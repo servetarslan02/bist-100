@@ -21,6 +21,7 @@ from .providers.yfinance_provider import yfinance_provider
 from .providers.kap_provider import kap_provider
 from .providers.tcmb_provider import tcmb_provider
 from .providers.news_provider import news_provider
+from .providers.social_provider import social_provider
 
 logger = structlog.get_logger()
 
@@ -52,6 +53,7 @@ class IngestionService:
             self._kap_loop(),
             self._macro_loop(),
             self._news_loop(),
+            self._social_loop(),
         )
 
     async def stop(self):
@@ -332,6 +334,53 @@ class IngestionService:
 
             except Exception as e:
                 logger.error("News loop error", error=str(e))
+                await asyncio.sleep(60)
+
+    # =====================================================
+    # Social Media Loop
+    # =====================================================
+
+    async def _social_loop(self):
+        """Periodically fetch social media data."""
+        while self._running:
+            try:
+                logger.info("Starting social media fetch cycle")
+
+                # Fetch from X (Twitter)
+                if hasattr(settings, 'x_api_key') and settings.x_api_key:
+                    social_provider.x_api_key = settings.x_api_key
+                    mentions = social_provider.fetch_x_mentions()
+                    for mention in mentions:
+                        event = CanonicalEvent(
+                            event_type=EventType.SOCIAL_EVENT,
+                            source="x",
+                            data=mention,
+                        )
+                        publish_event(event, key="social")
+
+                # Fetch StockTwits for top stocks
+                top_tickers = ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"]
+                for ticker in top_tickers:
+                    try:
+                        messages = social_provider.fetch_stocktwits(ticker)
+                        for msg in messages:
+                            event = CanonicalEvent(
+                                event_type=EventType.SOCIAL_EVENT,
+                                source="stocktwits",
+                                data={**msg, "ticker": ticker},
+                            )
+                            publish_event(event, key=f"social_{ticker}")
+                    except Exception:
+                        pass
+
+                flush_producer()
+                logger.info("Social media fetch cycle completed")
+
+                # Wait 15 minutes
+                await asyncio.sleep(900)
+
+            except Exception as e:
+                logger.error("Social loop error", error=str(e))
                 await asyncio.sleep(60)
 
 

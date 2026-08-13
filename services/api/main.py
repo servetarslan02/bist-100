@@ -324,6 +324,52 @@ async def get_portfolio():
 # Models
 # =====================================================
 
+@app.get("/api/world/state")
+async def get_world_state():
+    """Get current world state."""
+    try:
+        from ..core.database import redis_get
+        import json
+        state = await redis_get("world_state")
+        if state:
+            return json.loads(state)
+        return {"message": "No world state available"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/features/{ticker}")
+async def get_features(ticker: str):
+    """Get features for a ticker."""
+    try:
+        from ..core.database import redis_hgetall
+        features = await redis_hgetall(f"features:{ticker}")
+        if features:
+            return features
+        return {"message": f"No features for {ticker}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/events")
+async def get_events(
+    event_type: Optional[str] = None,
+    limit: int = 50,
+):
+    """Get recent events."""
+    try:
+        query = "SELECT * FROM system_events"
+        params = []
+        if event_type:
+            query += " WHERE event_type = $1"
+            params.append(event_type)
+        query += f" ORDER BY created_at DESC LIMIT {limit}"
+        rows = await pg_fetch(query, *params)
+        return [dict(row) for row in rows]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/models")
 async def get_models():
     """Get ML model registry."""
