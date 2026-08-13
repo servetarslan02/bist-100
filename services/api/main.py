@@ -240,7 +240,11 @@ async def get_instruments(
 
 
 @app.get("/api/market/instrument/{ticker}/ohlcv")
-async def get_instrument_ohlcv(ticker: str, period: str = "60d"):
+async def get_instrument_ohlcv(
+    ticker: str,
+    period: str = "60d",
+    interval: str = "1d"
+):
     """Get OHLCV data for chart — ClickHouse'dan oku, yfinance'den değil."""
     try:
         # Önce ClickHouse'dan dene
@@ -282,6 +286,84 @@ async def get_instrument_ohlcv(ticker: str, period: str = "60d"):
             volumes.append({"time": ts, "volume": int(row["Volume"]), "open": float(row["Open"]), "close": float(row["Close"])})
 
         return {"candles": candles, "volumes": volumes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/market/instrument/{ticker}/full")
+async def get_instrument_full(ticker: str):
+    """Get full instrument data: price + chart + features + signals."""
+    try:
+        import yfinance as yf
+        from ..features.calculator import FeatureCalculator
+        from ..intelligence.spec_engine import spec_engine
+        import polars as pl
+
+        # 1. OHLCV data
+        t = yf.Ticker(f"{ticker}.IS")
+        hist = t.history(period="60d")
+        if hist.empty:
+            raise HTTPException(status_code=404, detail=f"{ticker} not found")
+
+        hist = hist.reset_index()
+        candles = []
+        for _, row in hist.iterrows():
+            candles.append({
+                "time": int(row["Date"].timestamp()),
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+                "volume": int(row["Volume"]),
+            })
+
+        # 2. Features
+        df = pl.from_pandas(hist[["Date", "Open", "High", "Low", "Close", "Volume"]])
+        df = df.rename({"Date": "timestamp", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
+        df = df.drop_nulls(subset=["close"])
+
+        fc = FeatureCalculator()
+        features = fc.compute_all_features(df)
+
+        # 3. SPEC score
+        asset_state = {
+            "volume_zscore": features.get("volume_zscore", 0),
+            "price_change_1d_zscore": features.get("return_1d", 0) / 2,
+            "volatility_zscore": features.get("volatility_ratio", 1) - 1,
+            "bb_position": features.get("bb_position", 0.5),
+            "near_20d_high": features.get("near_20d_high", 0),
+            "relative_strength_vs_sector": 1.0,
+            "kap_sentiment": 0.0,
+            "roc_5d": features.get("roc_5d", 0),
+            "price_acceleration": features.get("price_acceleration", 0),
+            "volatility_regime": "NORMAL",
+            "amihud_illiquidity": 0.001,
+            "correlation_to_index": 0.75,
+            "momentum_20d": features.get("momentum_20d", 0),
+            "realized_vol_20d": features.get("realized_vol_20d", 20),
+        }
+        spec = spec_engine.compute_spec(ticker, asset_state, {"regime": "RANGE"})
+
+        # 4. Current price
+        close_list = [x for x in df["close"].to_list() if x is not None]
+        current_price = close_list[-1] if close_list else 0
+
+        return {
+            "ticker": ticker,
+            "price": current_price,
+            "candles": candles,
+            "features": {k: v for k, v in features.items() if isinstance(v, (int, float))},
+            "spec": {
+                "score": spec.spec_score,
+                "category": spec.category,
+                "anomaly": spec.anomaly_score,
+                "evidence": spec.evidence_consensus,
+                "regime": spec.regime_compatibility,
+            },
+        }
+
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
