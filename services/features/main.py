@@ -11,8 +11,8 @@ from ..core.database import (
     init_databases, close_databases, get_pg_pool,
     ch_insert, ch_execute, redis_hset, redis_hgetall,
 )
-from ..core.event_bus import (
 from ..core.event_schema import CanonicalEvent
+from ..core.event_bus import (
     ensure_topics, EventType,
     EventConsumer, publish_event, flush_producer,
 )

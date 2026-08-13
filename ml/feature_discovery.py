@@ -204,22 +204,23 @@ class FeatureDiscoveryPipeline:
     def _correlation_filter(
         self, data: pl.DataFrame, feature_names: List[str], threshold: float = 0.95
     ) -> List[str]:
-        """Remove highly correlated features."""
+        """Remove highly correlated features — Polars only."""
         # Polars correlation matrix
         corr_matrix = data.select(feature_names).corr()
-        corr_pandas = corr_matrix.to_pandas()
+        corr_np = corr_matrix.to_numpy()
+        col_names = feature_names
 
         # Find pairs to drop
         to_drop = set()
-        for i in range(len(corr_pandas.columns)):
-            for j in range(i + 1, len(corr_pandas.columns)):
-                if corr_pandas.iloc[i, j] > threshold:
-                    mean_i = corr_pandas.iloc[i].mean()
-                    mean_j = corr_pandas.iloc[j].mean()
+        for i in range(len(col_names)):
+            for j in range(i + 1, len(col_names)):
+                if abs(corr_np[i, j]) > threshold:
+                    mean_i = np.mean(np.abs(corr_np[i, :]))
+                    mean_j = np.mean(np.abs(corr_np[j, :]))
                     if mean_i > mean_j:
-                        to_drop.add(corr_pandas.columns[j])
+                        to_drop.add(col_names[j])
                     else:
-                        to_drop.add(corr_pandas.columns[i])
+                        to_drop.add(col_names[i])
 
         return [f for f in feature_names if f not in to_drop]
 

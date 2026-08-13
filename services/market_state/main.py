@@ -13,8 +13,8 @@ from ..core.database import (
     ch_insert, ch_execute, redis_get, redis_set,
     redis_hgetall, redis_hset,
 )
-from ..core.event_bus import (
 from ..core.event_schema import CanonicalEvent
+from ..core.event_bus import (
     ensure_topics, EventType,
     EventConsumer, publish_event, flush_producer,
 )

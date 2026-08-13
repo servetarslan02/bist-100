@@ -13,8 +13,8 @@ from ..core.database import (
     init_databases, close_databases, pg_fetch, pg_fetchrow, pg_execute,
     ch_execute, redis_get, redis_set,
 )
-from ..core.event_bus import (
 from ..core.event_schema import CanonicalEvent
+from ..core.event_bus import (
     ensure_topics, EventType,
     EventConsumer, publish_event,
 )
