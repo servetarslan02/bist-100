@@ -17,8 +17,17 @@ logger = structlog.get_logger()
 
 @dataclass
 class SPECConfig:
-    """SPEC skor hesaplama ağırlıkları ve eşikleri."""
-    # Ağırlıklar (toplam = 1.0)
+    """SPEC skor hesaplama ağırlıkları ve eşikleri.
+    
+    v0: Rule-based (elle belirlenmiş) — ilk baseline
+    v1: Learned (ML ile optimize edilmiş) — walk-forward validation ile
+    
+    Ağırlıkların learned olması için:
+    1. Geçmiş veride SPEC score ile gerçek outcome arasındaki korelasyonu最大化
+    2. Optuna ile hyperparameter optimization
+    3. Walk-forward validation ile out-of-sample test
+    """
+    # Ağırlıklar (toplam = 1.0) — v0 baseline, v1'de ML ile öğrenilecek
     w_anomaly: float = 0.20
     w_evidence: float = 0.25
     w_regime: float = 0.15

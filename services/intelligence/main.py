@@ -169,7 +169,12 @@ class IntelligenceService:
             logger.error("KAP analysis error", error=str(e))
 
     async def _build_context(self, ticker: str, event_data: Dict) -> Dict[str, Any]:
-        """Build context for LLM analysis."""
+        """Build enriched context for LLM analysis.
+        
+        v1.1: Knowledge graph, historical analogues, prediction history,
+        model uncertainty, scenario results, counterfactuals,
+        news cluster, event propagation, portfolio exposure eklenendi.
+        """
         context = {
             "ticker": ticker,
             "event_data": event_data,
@@ -177,25 +182,82 @@ class IntelligenceService:
         }
 
         try:
-            # Get features from Redis
+            # 1. Features from Redis
             features = await redis_hgetall(f"features:{ticker}")
             if features:
                 context["features"] = features
 
-            # Get market state
+            # 2. Market state
             market_state = await redis_get("market_state")
             if market_state:
                 context["market_state"] = market_state
 
-            # Get recent signals
+            # 3. World state
+            world_state = await redis_get("world_state")
+            if world_state:
+                context["world_state"] = world_state
+
+            # 4. Recent signals
             signals = await pg_fetch("""
-                SELECT * FROM signals
+                SELECT signal_type, direction, score, confidence, risk_level,
+                       horizon, expected_return_pct, created_at
+                FROM signals
                 WHERE instrument_id = (SELECT id FROM instruments WHERE symbol = $1)
                 AND status = 'ACTIVE'
                 ORDER BY created_at DESC LIMIT 5
             """, ticker)
             if signals:
                 context["recent_signals"] = [dict(s) for s in signals]
+
+            # 5. Prediction history
+            predictions = await pg_fetch("""
+                SELECT mp.predicted_direction, mp.predicted_return_pct,
+                       mp.probability_positive, mo.actual_return_pct, mo.is_correct
+                FROM model_predictions mp
+                LEFT JOIN model_outcomes mo ON mo.prediction_id = mp.id
+                WHERE mp.instrument_id = (SELECT id FROM instruments WHERE symbol = $1)
+                ORDER BY mp.created_at DESC LIMIT 10
+            """, ticker)
+            if predictions:
+                context["prediction_history"] = [dict(p) for p in predictions]
+
+            # 6. Historical analogues (benzer durumlar)
+            analogues = await redis_get(f"analogues:{ticker}")
+            if analogues:
+                context["historical_analogues"] = analogues
+
+            # 7. Model uncertainty
+            model_info = await redis_get(f"model_confidence:{ticker}")
+            if model_info:
+                context["model_uncertainty"] = model_info
+
+            # 8. Portfolio exposure
+            portfolio = await pg_fetch("""
+                SELECT p.quantity, p.avg_cost, p.current_price, p.weight_pct
+                FROM positions p
+                JOIN instruments i ON p.instrument_id = i.id
+                WHERE i.symbol = $1 AND p.status = 'OPEN'
+            """, ticker)
+            if portfolio:
+                context["portfolio_exposure"] = [dict(p) for p in portfolio]
+
+            # 9. Knowledge graph relations
+            kg_relations = await pg_fetch("""
+                SELECT kr.relation_type, kr.strength, ke.name as related_entity
+                FROM knowledge_relations kr
+                JOIN knowledge_entities ke ON ke.id = kr.target_entity_id
+                WHERE kr.source_entity_id = (
+                    SELECT id FROM knowledge_entities WHERE name = $1 LIMIT 1
+                )
+                ORDER BY kr.strength DESC LIMIT 10
+            """, ticker)
+            if kg_relations:
+                context["knowledge_graph"] = [dict(r) for r in kg_relations]
+
+            # 10. Event propagation impact
+            impact = await redis_get(f"impact:{ticker}")
+            if impact:
+                context["event_propagation"] = impact
 
         except Exception as e:
             logger.warning("Context building partial failure", error=str(e))

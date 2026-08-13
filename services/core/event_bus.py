@@ -9,8 +9,15 @@ import asyncio
 from typing import Optional, Callable, Dict, Any, List
 import structlog
 
-from confluent_kafka import Producer, Consumer, KafkaError
-from confluent_kafka.admin import AdminClient, NewTopic
+try:
+    from confluent_kafka import Producer, Consumer, KafkaError
+    from confluent_kafka.admin import AdminClient, NewTopic
+except ImportError:
+    Producer = None
+    Consumer = None
+    KafkaError = None
+    AdminClient = None
+    NewTopic = None
 
 from .config import settings
 from .event_schema import CanonicalEvent, EventType

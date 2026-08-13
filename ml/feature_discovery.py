@@ -205,20 +205,21 @@ class FeatureDiscoveryPipeline:
         self, data: pl.DataFrame, feature_names: List[str], threshold: float = 0.95
     ) -> List[str]:
         """Remove highly correlated features."""
-        corr_matrix = data.to_pandas().corr().abs()
+        # Polars correlation matrix
+        corr_matrix = data.select(feature_names).corr()
+        corr_pandas = corr_matrix.to_pandas()
 
         # Find pairs to drop
         to_drop = set()
-        for i in range(len(corr_matrix.columns)):
-            for j in range(i + 1, len(corr_matrix.columns)):
-                if corr_matrix.iloc[i, j] > threshold:
-                    # Drop the one with lower mean correlation to all others
-                    mean_i = corr_matrix.iloc[i].mean()
-                    mean_j = corr_matrix.iloc[j].mean()
+        for i in range(len(corr_pandas.columns)):
+            for j in range(i + 1, len(corr_pandas.columns)):
+                if corr_pandas.iloc[i, j] > threshold:
+                    mean_i = corr_pandas.iloc[i].mean()
+                    mean_j = corr_pandas.iloc[j].mean()
                     if mean_i > mean_j:
-                        to_drop.add(corr_matrix.columns[j])
+                        to_drop.add(corr_pandas.columns[j])
                     else:
-                        to_drop.add(corr_matrix.columns[i])
+                        to_drop.add(corr_pandas.columns[i])
 
         return [f for f in feature_names if f not in to_drop]
 
@@ -340,23 +341,42 @@ class FeatureDiscoveryPipeline:
     def _detect_leakage(
         self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
     ) -> Dict[str, bool]:
-        """Detect if any feature leaks future information."""
-        # Simple heuristic: if a feature has suspiciously high correlation with future target
-        # it might be leaking
-
+        """Detect if any feature leaks future information.
+        
+        Temporal validation: feature'in gelecekteki target ile korelasyonu
+        geçmişteki target ile korelasyonundan yüksekse leakage olabilir.
+        """
         leakage = {}
-        X = data.to_pandas()
+        X = data.to_numpy()
         y = target.to_numpy()
 
-        for f in feature_names:
-            try:
-                # Correlation with current target
-                corr_current = np.corrcoef(X[f].fillna(0), y)[0, 1]
+        mask = ~(np.isnan(X).any(axis=1) | np.isnan(y))
+        X_clean, y_clean = X[mask], y[mask]
 
-                # If correlation is extremely high (>0.9), flag as potential leakage
-                if abs(corr_current) > 0.9:
+        if len(X_clean) < 100:
+            return {f: False for f in feature_names}
+
+        n = len(X_clean)
+        half = n // 2
+
+        for idx, f in enumerate(feature_names):
+            try:
+                # First half: feature vs target
+                corr_first = np.corrcoef(X_clean[:half, idx], y_clean[:half])[0, 1]
+                # Second half: feature vs target
+                corr_second = np.corrcoef(X_clean[half:, idx], y_clean[half:])[0, 1]
+
+                # Temporal stability: korelasyonlar benzer olmalı
+                if abs(corr_first) > 0 and abs(corr_second) > 0:
+                    stability = min(abs(corr_first), abs(corr_second)) / max(abs(corr_first), abs(corr_second))
+                else:
+                    stability = 1.0
+
+                # Leakage: korelasyon异常 derecede yüksek ve temporal olarak kararsız
+                max_corr = max(abs(corr_first), abs(corr_second))
+                if max_corr > 0.95 and stability < 0.5:
                     leakage[f] = True
-                    logger.warning("Potential leakage detected", feature=f, correlation=corr_current)
+                    logger.warning("Potential leakage", feature=f, corr1=corr_first, corr2=corr_second)
                 else:
                     leakage[f] = False
             except:

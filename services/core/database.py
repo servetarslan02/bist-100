@@ -5,9 +5,20 @@ from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Optional, Any, List, Dict
 import structlog
 
-import asyncpg
-import clickhouse_connect
-import redis.asyncio as aioredis
+try:
+    import asyncpg
+except ImportError:
+    asyncpg = None
+
+try:
+    import clickhouse_connect
+except ImportError:
+    clickhouse_connect = None
+
+try:
+    import redis.asyncio as aioredis
+except ImportError:
+    aioredis = None
 
 from .config import settings
 
@@ -20,9 +31,11 @@ logger = structlog.get_logger()
 _pg_pool: Optional[asyncpg.Pool] = None
 
 
-async def get_pg_pool() -> asyncpg.Pool:
+async def get_pg_pool():
     """Get or create PostgreSQL connection pool."""
     global _pg_pool
+    if asyncpg is None:
+        raise RuntimeError("asyncpg not installed. Run: pip install asyncpg")
     if _pg_pool is None:
         _pg_pool = await asyncpg.create_pool(
             host=settings.postgres_host,
@@ -86,9 +99,11 @@ async def pg_fetchval(query: str, *args) -> Any:
 _ch_client: Optional[clickhouse_connect.driver.Client] = None
 
 
-def get_ch_client() -> clickhouse_connect.driver.Client:
+def get_ch_client():
     """Get or create ClickHouse client."""
     global _ch_client
+    if clickhouse_connect is None:
+        raise RuntimeError("clickhouse-connect not installed. Run: pip install clickhouse-connect")
     if _ch_client is None:
         _ch_client = clickhouse_connect.get_client(
             host=settings.clickhouse_host,
@@ -137,9 +152,11 @@ def ch_query_df(query: str, parameters: Optional[Dict] = None):
 _redis: Optional[aioredis.Redis] = None
 
 
-async def get_redis() -> aioredis.Redis:
+async def get_redis():
     """Get or create Redis connection."""
     global _redis
+    if aioredis is None:
+        raise RuntimeError("redis not installed. Run: pip install redis")
     if _redis is None:
         _redis = aioredis.from_url(
             settings.redis_url,
