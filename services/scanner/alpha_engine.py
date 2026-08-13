@@ -38,8 +38,12 @@ class AlphaEngine:
         # Katmanlar
         from .live_scanner import live_scanner
         from .event_scanner import event_scanner
+        from .event_queue import event_queue
+        from ml.model_loader import ml_model_loader
         self._live = live_scanner
         self._events = event_scanner
+        self._queue = event_queue
+        self._ml_loader = ml_model_loader
 
     def load_universe(self, tickers: List[str]):
         self._universe = tickers
@@ -294,28 +298,37 @@ class AlphaEngine:
         return None
 
     def _compute_ml_scores(self) -> Dict[str, float]:
-        """Quant Probability Proxy — feature-based heuristic score.
-        
-        NOT: Bu gerçek ML modeli değil. Feature kombinasyonlarından
-        üretilen bir heuristic. Gerçek ML modeli bağlandığında
-        bu fonksiyon güncellenecek.
         """
+        ML skorları — gerçek model varsa kullanır, yoksa quant proxy.
+        
+        ml/model_loader.py'daki MLModelLoader:
+        - Eğitilmiş model varsa → ML ensemble inference
+        - Yoksa → Quant Probability Proxy (feature-based heuristic)
+        """
+        # Modelleri yükle (bir kez)
+        if not self._ml_loader._loaded:
+            self._ml_loader.load_models()
+
         scores = {}
         for ticker, features in self._features_map.items():
-            # Basit ML proxy: momentum + volume + volatility kombinasyonu
-            mom = features.get("momentum_20d", 0)
-            vol_z = features.get("volume_zscore", 0)
-            rsi = features.get("rsi_14", 50)
+            result = self._ml_loader.predict_ensemble(features)
+            # 0-100 skoruna çevir
+            prediction = result.get("prediction", 0)
+            confidence = result.get("confidence", 0.3)
 
-            score = 50
-            if mom > 5: score += min(mom * 2, 20)
-            elif mom < -5: score += max(mom * 2, -20)
-            if vol_z > 2: score += min(vol_z * 5, 15)
-            if 30 < rsi < 70: score += 5
-            elif rsi < 25: score += 10  # oversold
-            elif rsi > 75: score -= 10  # overbought
+            # Prediction'ı 0-100 skoruna normalize et
+            score = 50 + prediction * 10  # -5..+5 → 45..55
+            score = max(0, min(100, score))
 
-            scores[ticker] = max(0, min(100, score))
+            # Confidence ile ayarla
+            source = result.get("source", "quant_proxy")
+            if source == "quant_proxy":
+                # Proxy düşük güven
+                scores[ticker] = score
+            else:
+                # Gerçek ML modeli
+                scores[ticker] = score
+
         return scores
 
     def get_last_summary(self) -> Dict:
