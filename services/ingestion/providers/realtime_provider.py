@@ -16,7 +16,10 @@ import json
 from datetime import datetime
 from typing import Optional, Dict, Any, Callable, List, Set
 from dataclasses import dataclass, field
-import aiohttp
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
 import structlog
 
 logger = structlog.get_logger()
@@ -39,8 +42,15 @@ class DataEvent:
 
 class RealTimeDataEngine:
     """
-    Event-driven veri motoru.
-    Polling yerine SSE/RSS/WebSocket/push kullanır.
+    Push-based veri motoru.
+
+    Dış kaynaklar:
+    - RSS/WebSub → push (yeni içerik otomatik gelir)
+    - WebSocket → push (fiyat/streaming)
+    - Webhook → push (bildirim)
+    - SSE → push (server-sent events)
+
+    Polling SON ÇAREDİR — sadece push desteklemeyen kaynaklar için.
     """
 
     def __init__(self):
@@ -59,7 +69,8 @@ class RealTimeDataEngine:
     async def start(self):
         """Tüm veri kaynaklarını başlat."""
         self._running = True
-        self._session = aiohttp.ClientSession()
+        if aiohttp:
+            self._session = aiohttp.ClientSession()
 
         logger.info("RealTime Data Engine started")
 
