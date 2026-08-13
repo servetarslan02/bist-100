@@ -195,7 +195,15 @@ def get_producer():
 
 
 def publish_event(event: CanonicalEvent, key: Optional[str] = None):
-    """Publish to Kafka (if available) + Redis Pub/Sub (always)."""
+    """Publish to Kafka (if available) + Redis Pub/Sub (always).
+    v1.1: Schema validation — yanlış payload publish edilemez.
+    """
+    # Schema validation
+    missing = event.validate_payload()
+    if missing:
+        logger.warning("Event payload validation failed", event_type=event.event_type, missing=missing)
+        return
+
     # Kafka
     producer = get_producer()
     if producer:

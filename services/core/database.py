@@ -43,8 +43,8 @@ async def get_pg_pool():
             database=settings.postgres_db,
             user=settings.postgres_user,
             password=settings.postgres_password,
-            min_size=5,
-            max_size=20,
+            min_size=2,
+            max_size=10,
             command_timeout=30,
         )
         logger.info("PostgreSQL pool created", host=settings.postgres_host)

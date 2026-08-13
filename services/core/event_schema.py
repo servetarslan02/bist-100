@@ -64,7 +64,12 @@ class EventMetadata(BaseModel):
 
 
 class CanonicalEvent(BaseModel):
-    """Base event structure — tüm olaylar bu formata uymalıdır."""
+    """Base event structure — tüm olaylar bu formata uymalıdır.
+    
+    v1.1: Schema validation eklendi.
+    Her event_type için beklenen data alanları tanımlı.
+    Yanlış payload event bus'a girememeli.
+    """
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
     schema_version: str = "v1"
@@ -77,6 +82,24 @@ class CanonicalEvent(BaseModel):
     confidence: float = 1.0
     data: Dict[str, Any] = Field(default_factory=dict)
     metadata: EventMetadata = Field(default_factory=EventMetadata)
+
+    # Schema validation rules
+    _REQUIRED_FIELDS: Dict[str, List[str]] = {
+        "market.tick": ["ticker", "price"],
+        "market.trade": ["ticker", "price", "quantity"],
+        "kap.event": ["ticker", "title"],
+        "news.event": ["title"],
+        "macro.event": [],
+        "signal.generated": ["ticker", "score", "direction"],
+        "anomaly.detected": ["ticker", "score"],
+        "risk.alert": [],
+    }
+
+    def validate_payload(self) -> List[str]:
+        """Payload'ı doğrula — eksik alanları döndür."""
+        required = self._REQUIRED_FIELDS.get(self.event_type, [])
+        missing = [f for f in required if f not in self.data]
+        return missing
 
     def to_json(self) -> str:
         return self.model_dump_json()

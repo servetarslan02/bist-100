@@ -241,8 +241,32 @@ async def get_instruments(
 
 @app.get("/api/market/instrument/{ticker}/ohlcv")
 async def get_instrument_ohlcv(ticker: str, period: str = "60d"):
-    """Get OHLCV data for chart."""
+    """Get OHLCV data for chart — ClickHouse'dan oku, yfinance'den değil."""
     try:
+        # Önce ClickHouse'dan dene
+        try:
+            from ..core.database import ch_execute
+            result = ch_execute("""
+                SELECT timestamp, open, high, low, close, volume
+                FROM ohlcv
+                WHERE instrument_id = (SELECT id FROM instruments WHERE symbol = %(ticker)s)
+                AND timeframe = '1d'
+                ORDER BY timestamp DESC LIMIT 60
+            """, parameters={"ticker": ticker})
+
+            if result.result_rows and len(result.result_rows) > 0:
+                candles = []
+                volumes = []
+                for row in reversed(result.result_rows):
+                    ts = int(row[0].timestamp()) if hasattr(row[0], 'timestamp') else 0
+                    candles.append({"time": ts, "open": float(row[1]), "high": float(row[2]),
+                                   "low": float(row[3]), "close": float(row[4])})
+                    volumes.append({"time": ts, "volume": int(row[5]), "open": float(row[1]), "close": float(row[4])})
+                return {"candles": candles, "volumes": volumes}
+        except Exception:
+            pass
+
+        # Fallback: yfinance
         import yfinance as yf
         t = yf.Ticker(f"{ticker}.IS")
         hist = t.history(period=period)
@@ -253,19 +277,9 @@ async def get_instrument_ohlcv(ticker: str, period: str = "60d"):
         volumes = []
         for idx, row in hist.iterrows():
             ts = int(idx.timestamp())
-            candles.append({
-                "time": ts,
-                "open": float(row["Open"]),
-                "high": float(row["High"]),
-                "low": float(row["Low"]),
-                "close": float(row["Close"]),
-            })
-            volumes.append({
-                "time": ts,
-                "volume": int(row["Volume"]),
-                "open": float(row["Open"]),
-                "close": float(row["Close"]),
-            })
+            candles.append({"time": ts, "open": float(row["Open"]), "high": float(row["High"]),
+                           "low": float(row["Low"]), "close": float(row["Close"])})
+            volumes.append({"time": ts, "volume": int(row["Volume"]), "open": float(row["Open"]), "close": float(row["Close"])})
 
         return {"candles": candles, "volumes": volumes}
     except Exception as e:
