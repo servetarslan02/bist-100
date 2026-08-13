@@ -277,13 +277,16 @@ async def get_instrument_ohlcv(
         if hist.empty:
             return {"candles": [], "volumes": []}
 
+        # NaN temizle
+        hist = hist.dropna(subset=["Open", "High", "Low", "Close"])
+
         candles = []
         volumes = []
         for idx, row in hist.iterrows():
             ts = int(idx.timestamp())
-            candles.append({"time": ts, "open": float(row["Open"]), "high": float(row["High"]),
-                           "low": float(row["Low"]), "close": float(row["Close"])})
-            volumes.append({"time": ts, "volume": int(row["Volume"]), "open": float(row["Open"]), "close": float(row["Close"])})
+            candles.append({"time": ts, "open": round(float(row["Open"]), 2), "high": round(float(row["High"]), 2),
+                           "low": round(float(row["Low"]), 2), "close": round(float(row["Close"]), 2)})
+            volumes.append({"time": ts, "volume": int(row["Volume"]), "open": round(float(row["Open"]), 2), "close": round(float(row["Close"]), 2)})
 
         return {"candles": candles, "volumes": volumes}
     except Exception as e:
@@ -305,15 +308,18 @@ async def get_instrument_full(ticker: str):
         if hist.empty:
             raise HTTPException(status_code=404, detail=f"{ticker} not found")
 
+        # NaN satırları temizle
+        hist = hist.dropna(subset=["Open", "High", "Low", "Close"])
         hist = hist.reset_index()
+
         candles = []
         for _, row in hist.iterrows():
             candles.append({
                 "time": int(row["Date"].timestamp()),
-                "open": float(row["Open"]),
-                "high": float(row["High"]),
-                "low": float(row["Low"]),
-                "close": float(row["Close"]),
+                "open": round(float(row["Open"]), 2),
+                "high": round(float(row["High"]), 2),
+                "low": round(float(row["Low"]), 2),
+                "close": round(float(row["Close"]), 2),
                 "volume": int(row["Volume"]),
             })
 
@@ -321,6 +327,9 @@ async def get_instrument_full(ticker: str):
         df = pl.from_pandas(hist[["Date", "Open", "High", "Low", "Close", "Volume"]])
         df = df.rename({"Date": "timestamp", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
         df = df.drop_nulls(subset=["close"])
+
+        if len(df) < 20:
+            raise HTTPException(status_code=404, detail=f"Insufficient data for {ticker}")
 
         fc = FeatureCalculator()
         features = fc.compute_all_features(df)
