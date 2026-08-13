@@ -11,6 +11,7 @@ services:
   postgres:
     <<: *common
     image: postgres:16-alpine
+    mem_limit: 1g
     ports:
       - "5432:5432"
     volumes:
@@ -29,6 +30,7 @@ services:
   clickhouse:
     <<: *common
     image: clickhouse/clickhouse-server:24.8-alpine
+    mem_limit: 2g
     ports:
       - "8123:8123"
       - "9000:9000"
@@ -52,6 +54,7 @@ services:
   redis:
     <<: *common
     image: redis:7-alpine
+    mem_limit: 512m
     ports:
       - "6379:6379"
     volumes:
@@ -67,6 +70,7 @@ services:
   redpanda:
     <<: *common
     image: redpandadata/redpanda:v24.2.8
+    mem_limit: 1g
     ports:
       - "9092:9092"
       - "9644:9644"
@@ -98,6 +102,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 512m
     ports:
       - "${APP_PORT:-8000}:8000"
     volumes:
@@ -120,6 +125,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 256m
     command: python -m services.ingestion.main
     volumes:
       - ./services:/app/services
@@ -138,6 +144,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 512m
     command: python -m services.features.main
     volumes:
       - ./services:/app/services
@@ -157,6 +164,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 256m
     command: python -m services.market_state.main
     volumes:
       - ./services:/app/services
@@ -175,6 +183,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 512m
     command: python -m services.intelligence.main
     volumes:
       - ./services:/app/services
@@ -195,6 +204,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 512m
     command: python -m services.simulation.main
     volumes:
       - ./services:/app/services
@@ -212,6 +222,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 256m
     command: python -m services.risk.main
     volumes:
       - ./services:/app/services
@@ -228,6 +239,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 256m
     command: python -m services.portfolio.main
     volumes:
       - ./services:/app/services
@@ -242,6 +254,7 @@ services:
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    mem_limit: 1g
     command: python -m services.learning.main
     volumes:
       - ./services:/app/services

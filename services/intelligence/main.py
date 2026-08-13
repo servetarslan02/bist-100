@@ -17,6 +17,9 @@ from ..core.event_bus import (
     EventConsumer, publish_event,
 )
 from ..core.logging import setup_logging
+from .spec_engine import spec_engine, SPECConfig
+from .impact_engine import impact_engine
+from .world_state import world_state_manager
 
 logger = structlog.get_logger()
 
