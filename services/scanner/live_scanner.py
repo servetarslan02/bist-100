@@ -62,9 +62,9 @@ class LiveScanner:
         state["volumes"].append(volume)
         state["volumes"] = state["volumes"][-100:]
 
-        # Değişim hesapla
+        # Değişim hesapla (tick bazlı, günlük değil)
         if state["prev_price"] > 0:
-            state["change_pct"] = (price / state["prev_price"] - 1) * 100
+            state["tick_change_pct"] = (price / state["prev_price"] - 1) * 100
 
         # Hacim z-score
         if len(state["volumes"]) >= 20:
@@ -74,9 +74,9 @@ class LiveScanner:
             std_v = np.std(vols)
             state["vol_z"] = (volume - mean_v) / std_v if std_v > 0 else 0
 
-        # Momentum (son 5 tick)
+        # Tick momentum (son 5 tick — günlük momentum değil)
         if len(state["prices"]) >= 5:
-            state["momentum"] = (state["prices"][-1] / state["prices"][-5] - 1) * 100
+            state["tick_momentum"] = (state["prices"][-1] / state["prices"][-5] - 1) * 100
 
         # Aday kontrolü
         candidate = self._check_candidate(ticker, state)
@@ -103,19 +103,21 @@ class LiveScanner:
                 "timestamp": state["last_update"],
             }
 
-        # Kriter 2: Ani fiyat hareketi
-        if change > 2.0:
+        # Kriter 2: Ani fiyat hareketi (tick bazlı)
+        tick_change = abs(state.get("tick_change_pct", 0))
+        if tick_change > 2.0:
             return {
                 "ticker": ticker,
                 "reason": "PRICE_SHOCK",
-                "score": min(change * 15, 100),
-                "change_pct": change,
+                "score": min(tick_change * 15, 100),
+                "tick_change_pct": tick_change,
                 "price": state["price"],
                 "timestamp": state["last_update"],
             }
 
-        # Kriter 3: Güçlü momentum
-        if momentum > 3.0 and vol_z > 1.5:
+        # Kriter 3: Güçlü tick momentum
+        tick_momentum = abs(state.get("tick_momentum", 0))
+        if tick_momentum > 3.0 and vol_z > 1.5:
             return {
                 "ticker": ticker,
                 "reason": "MOMENTUM_BUILD",

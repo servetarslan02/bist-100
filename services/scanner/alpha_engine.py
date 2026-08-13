@@ -136,20 +136,60 @@ class AlphaEngine:
     # Layer 3: Event Scanner (haber/KAP geldiğinde)
     # =====================================================
 
-    def on_event(self, event_type: str, event_data: Dict) -> List[str]:
+    def on_event(self, event_type: str, event_data: Dict) -> List[Dict]:
         """
-        Event geldiğinde çalışır. Immediate rescan.
+        Event geldiğinde çalışır.
+        1. Etkilenen hisseleri bul
+        2. Event score güncelle
+        3. Etkilenen hisseleri derin analiz yap
+        4. Opportunity Score yeniden hesapla
+        5. Sinyal üret
         """
+        from .alpha_scanner import alpha_scanner
+
         affected = self._events.on_event(event_type, event_data)
 
-        if affected:
-            logger.info("EVENT TRIGGERED", type=event_type, affected=affected)
+        if not affected:
+            return []
 
-            # Her etkilenen hisse için event score güncelle
-            for ticker in affected:
-                self._event_scores[ticker] = self._events.get_event_score(ticker)
+        logger.info("EVENT TRIGGERED", type=event_type, affected=affected)
 
-        return affected
+        results = []
+        for ticker in affected:
+            # 1. Event score güncelle
+            self._event_scores[ticker] = self._events.get_event_score(ticker)
+
+            # 2. Feature varsa derin analiz yap
+            features = self._features_map.get(ticker)
+            if features:
+                ml_score = self._ml_scores.get(ticker, 50.0)
+                event_score = self._event_scores.get(ticker, 50.0)
+
+                # 3. Scanner ile yeniden tara
+                result = alpha_scanner._scan_single(ticker, features, ml_score, event_score)
+
+                # 4. Sinyal üret
+                if result.opportunity_score > 50:
+                    alpha_scanner._generate_signal(result)
+                    results.append({
+                        "ticker": ticker,
+                        "opportunity_score": result.opportunity_score,
+                        "signal_type": result.signal_type,
+                        "signal_score": result.signal_score,
+                        "signal_direction": result.signal_direction,
+                        "event_type": event_type,
+                        "event_importance": event_data.get("importance", 0),
+                    })
+
+                    logger.info("EVENT RESCAN", ticker=ticker,
+                               score=result.opportunity_score,
+                               signal=result.signal_type)
+
+        # 6. Event scanner'dan temizle
+        for ticker in affected:
+            self._events.clear_rescan(ticker)
+
+        return results
 
     # =====================================================
     # Yardımcı Fonksiyonlar
@@ -221,7 +261,12 @@ class AlphaEngine:
         else: return "RANGE", 0.5
 
     def _compute_ml_scores(self) -> Dict[str, float]:
-        """ML skorları — şimdilik feature-based, sonra gerçek model."""
+        """Quant Probability Proxy — feature-based heuristic score.
+        
+        NOT: Bu gerçek ML modeli değil. Feature kombinasyonlarından
+        üretilen bir heuristic. Gerçek ML modeli bağlandığında
+        bu fonksiyon güncellenecek.
+        """
         scores = {}
         for ticker, features in self._features_map.items():
             # Basit ML proxy: momentum + volume + volatility kombinasyonu

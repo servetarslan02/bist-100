@@ -63,22 +63,24 @@ class EventScanner:
                 logger.info("News event → rescan", tickers=affected, importance=importance)
 
         elif event_type == "macro.event":
-            # Makro olay → tüm piyasayı etkiler ama bazı sektörleri daha fazla
+            # Makro olay → sektör exposure graph'a göre etkilenen hisseleri bul
             indicator = event_data.get("indicator", "")
             surprise = event_data.get("surprise_zscore", 0)
 
             if abs(surprise) > 1.5:
-                # Sürpriz makro veri → bankacılık ve enerji hisselerini etkile
-                affected = ["AKBNK", "GARAN", "YKBNK", "HALKB", "VAKBN",
-                           "TUPRS", "PETKM", "THYAO"]
+                affected = self._get_macro_affected_stocks(indicator, surprise)
+                importance = min(abs(surprise) / 3, 1.0)
+
                 for ticker in affected:
                     self._pending_rescans[ticker] = {
                         "event_type": "MACRO",
-                        "importance": min(abs(surprise) / 3, 1.0),
+                        "importance": importance,
                         "indicator": indicator,
+                        "surprise": surprise,
                         "timestamp": datetime.utcnow().isoformat(),
                     }
-                logger.info("Macro event → rescan", indicator=indicator, surprise=surprise)
+                logger.info("Macro event → rescan", indicator=indicator,
+                           surprise=surprise, affected_count=len(affected))
 
         elif event_type == "market_state.changed":
             # Rejim değişimi → tüm hisseleri yeniden değerlendir
@@ -113,6 +115,59 @@ class EventScanner:
             return True
 
         return False
+
+    def _get_macro_affected_stocks(self, indicator: str, surprise: float) -> List[str]:
+        """
+        Makro olaydan etkilenen hisseleri sektör exposure graph'a göre belirle.
+        Hard-coded liste yok — sektör_relationships kullanır.
+        """
+        # Sektör exposure graph
+        SECTOR_MACRO_EXPOSURE = {
+            "CPI": ["BANK", "RETAIL", "FOOD"],
+            "RATE": ["BANK", "REAL", "HOLDING"],
+            "USD": ["ENERGY", "AVIATION", "METAL", "CHEM"],
+            "OIL": ["ENERGY", "AVIATION", "TRANSPORT"],
+            "GDP": ["INDUST", "RETAIL", "TECH"],
+            "VIX": ["BANK", "HOLDING", "TECH"],
+            "GOLD": ["MINING", "HOLDING"],
+        }
+
+        # Sektör → hisse eşleme
+        SECTOR_STOCKS = {
+            "BANK": ["AKBNK", "GARAN", "YKBNK", "HALKB", "VAKBN", "SKBNK"],
+            "ENERGY": ["TUPRS", "PETKM", "AKSEN", "ODAS", "AYEN"],
+            "AVIATION": ["THYAO", "PGSUS"],
+            "METAL": ["EREGL", "KRDMD", "ISDMR"],
+            "RETAIL": ["BIMAS", "MGROS", "SOKM"],
+            "INDUST": ["ARCLK", "ASELS", "TOASO"],
+            "TECH": ["ASELS", "NETAS", "LOGO"],
+            "HOLDING": ["KCHOL", "SAHOL", "DOHOL"],
+            "REAL": ["EKGYO", "HLGYO"],
+            "FOOD": ["ULKER", "CCOLA", "AEFES"],
+            "CHEM": ["SISE", "BAGFS", "SASA"],
+            "TRANSPORT": ["THYAO", "PGSUS"],
+            "MINING": [],
+        }
+
+        # Indicator'a göre sektörleri belirle
+        indicator_upper = indicator.upper()
+        exposed_sectors = []
+
+        for key, sectors in SECTOR_MACRO_EXPOSURE.items():
+            if key in indicator_upper:
+                exposed_sectors.extend(sectors)
+
+        # Eğer eşleşme yoksa genel etki
+        if not exposed_sectors:
+            exposed_sectors = ["BANK", "ENERGY", "HOLDING"]
+
+        # Sektörlerden hisseleri topla
+        affected = set()
+        for sector in exposed_sectors:
+            stocks = SECTOR_STOCKS.get(sector, [])
+            affected.update(stocks)
+
+        return list(affected)
 
     def get_event_score(self, ticker: str) -> float:
         """
