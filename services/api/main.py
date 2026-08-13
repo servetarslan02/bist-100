@@ -466,6 +466,34 @@ async def live_websocket(websocket: WebSocket):
         manager.disconnect(websocket, "live")
 
 
+@app.get("/api/stream/events")
+async def stream_events():
+    """SSE endpoint for real-time event streaming."""
+    from fastapi.responses import StreamingResponse
+    import asyncio
+
+    async def event_generator():
+        while True:
+            # Check for new events from Redis pub/sub
+            try:
+                from ..core.database import get_redis
+                r = await get_redis()
+                pubsub = r.pubsub()
+                await pubsub.subscribe("alpha:events")
+
+                async for message in pubsub.listen():
+                    if message["type"] == "message":
+                        yield f"data: {message['data']}\n\n"
+            except Exception:
+                await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
+
+
 # =====================================================
 # Run
 # =====================================================
