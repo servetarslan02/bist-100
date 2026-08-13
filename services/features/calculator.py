@@ -14,7 +14,13 @@ class FeatureCalculator:
 
     def compute_all_features(self, df: pl.DataFrame) -> Dict[str, float]:
         """Compute all features for a single instrument's OHLCV data."""
-        if df.is_empty() or len(df) < 20:
+        if df.is_empty():
+            return {}
+
+        # NaN satırları temizle
+        df = df.drop_nulls(subset=["close", "high", "low", "volume"])
+
+        if len(df) < 20:
             return {}
 
         features = {}
