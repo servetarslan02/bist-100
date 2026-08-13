@@ -147,7 +147,10 @@ async def get_market_state():
     try:
         state = await redis_get("market_state")
         if state:
-            return json.loads(state.replace("'", '"'))
+            try:
+                return json.loads(state)
+            except json.JSONDecodeError:
+                return {"regime": "UNKNOWN", "message": "Invalid market state data"}
         return {"regime": "UNKNOWN", "message": "No market state available"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -174,7 +177,11 @@ async def get_instruments(
             query += " AND s.code = $1"
             params.append(sector)
 
-        query += f" ORDER BY i.symbol LIMIT {limit} OFFSET {offset}"
+        query += " ORDER BY i.symbol"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
+        params.append(offset)
+        query += f" OFFSET ${len(params)}"
 
         rows = await pg_fetch(query, *params)
         return [dict(row) for row in rows]
@@ -277,7 +284,9 @@ async def get_signals(
             query += f" AND s.horizon = ${len(params) + 1}"
             params.append(horizon)
 
-        query += f" ORDER BY s.score DESC LIMIT {limit}"
+        query += " ORDER BY s.score DESC"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
 
         rows = await pg_fetch(query, *params)
         return [dict(row) for row in rows]
@@ -363,7 +372,9 @@ async def get_events(
         if event_type:
             query += " WHERE event_type = $1"
             params.append(event_type)
-        query += f" ORDER BY created_at DESC LIMIT {limit}"
+        query += " ORDER BY created_at DESC"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
         rows = await pg_fetch(query, *params)
         return [dict(row) for row in rows]
     except Exception as e:
@@ -415,7 +426,9 @@ async def get_alerts(
             query += f" AND severity = ${len(params) + 1}"
             params.append(severity)
 
-        query += f" ORDER BY created_at DESC LIMIT {limit}"
+        query += " ORDER BY created_at DESC"
+        params.append(limit)
+        query += f" LIMIT ${len(params)}"
 
         rows = await pg_fetch(query, *params)
         return [dict(row) for row in rows]

@@ -61,11 +61,11 @@
     "near_20d_low"
   ],
   "metrics": {
-    "avg_direction_accuracy": 90.9,
-    "avg_sharpe": 6.289,
-    "avg_metric": 0.9316,
+    "avg_direction_accuracy": 88.6,
+    "avg_sharpe": 6.229,
+    "avg_metric": 0.923,
     "splits": 2
   },
-  "confidence": 0.9054,
-  "training_date": "2026-08-13T21:49:25.577628"
+  "confidence": 0.9009,
+  "training_date": "2026-08-13T21:55:32.982329"
 }

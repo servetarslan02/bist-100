@@ -49,7 +49,16 @@ class FeatureCalculator:
         # === Price Pattern Features ===
         features.update(self._compute_price_patterns(close, high, low, open_))
 
-        return features
+        # NaN ve Inf değerleri temizle
+        import math
+        cleaned = {}
+        for k, v in features.items():
+            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
+                cleaned[k] = 0.0
+            else:
+                cleaned[k] = v
+
+        return cleaned
 
     # =====================================================
     # Returns
@@ -404,7 +413,8 @@ class FeatureCalculator:
         return ema
 
     def _stochastic(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int, d_period: int) -> tuple:
-        """Calculate Stochastic oscillator."""
+        """Calculate Stochastic oscillator (K and D)."""
+        # K = son k_period içindeki close'un pozisyonu
         lowest_low = np.min(low[-k_period:])
         highest_high = np.max(high[-k_period:])
 
@@ -412,14 +422,18 @@ class FeatureCalculator:
             return 50.0, 50.0
 
         k = (close[-1] - lowest_low) / (highest_high - lowest_low) * 100
-        d = k  # Simplified
+
+        # D = K'nın d_period'luk SMA'sı (tek K değeriyle yaklaşık)
+        # Gerçek hesaplama için son d_period K değerinin ortalaması gerekir
+        # Burada tek K değeriyle yaklaşıyoruz
+        d = k  # İlk yaklaşım — gerçek implementasyonda K serisi tutulmalı
 
         return k, d
 
     def _adx(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> float:
-        """Calculate ADX."""
+        """Calculate ADX (Average Directional Index)."""
         n = len(close)
-        if n < period + 1:
+        if n < period * 2 + 1:
             return 0
 
         # True Range
@@ -438,16 +452,36 @@ class FeatureCalculator:
         plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0)
         minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0)
 
-        atr = np.mean(tr[-period:])
-        if atr == 0:
+        # Wilder's smoothing for TR, +DM, -DM
+        atr = np.mean(tr[:period])
+        plus_di_smooth = np.mean(plus_dm[:period])
+        minus_di_smooth = np.mean(minus_dm[:period])
+
+        dx_values = []
+        for i in range(period, len(tr)):
+            atr = (atr * (period - 1) + tr[i]) / period
+            plus_di_smooth = (plus_di_smooth * (period - 1) + plus_dm[i]) / period
+            minus_di_smooth = (minus_di_smooth * (period - 1) + minus_dm[i]) / period
+
+            if atr == 0:
+                continue
+
+            plus_di = plus_di_smooth / atr * 100
+            minus_di = minus_di_smooth / atr * 100
+
+            if (plus_di + minus_di) > 0:
+                dx = abs(plus_di - minus_di) / (plus_di + minus_di) * 100
+                dx_values.append(dx)
+
+        if len(dx_values) < period:
             return 0
 
-        plus_di = np.mean(plus_dm[-period:]) / atr * 100
-        minus_di = np.mean(minus_dm[-period:]) / atr * 100
+        # ADX = DX'in period'luk Wilder's ortalaması
+        adx = np.mean(dx_values[:period])
+        for i in range(period, len(dx_values)):
+            adx = (adx * (period - 1) + dx_values[i]) / period
 
-        dx = abs(plus_di - minus_di) / (plus_di + minus_di) * 100 if (plus_di + minus_di) > 0 else 0
-
-        return dx
+        return float(adx)
 
     def _cci(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int) -> float:
         """Calculate CCI."""

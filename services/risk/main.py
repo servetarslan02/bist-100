@@ -99,6 +99,9 @@ class RiskEngine:
             amount = event.data.get("amount", 0)
             portfolio_id = event.data.get("portfolio_id")
 
+            if not ticker or not portfolio_id:
+                return
+
             logger.info("Evaluating decision", ticker=ticker, action=action, amount=amount)
 
             # Risk checks

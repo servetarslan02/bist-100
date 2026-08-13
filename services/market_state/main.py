@@ -273,9 +273,13 @@ class MarketStateService:
         return max(0, min(1, risk_appetite))
 
     def _detect_regime(self, breadth: float, momentum: float, volatility: float, rsi: float) -> str:
-        """Detect current market regime."""
+        """Detect current market regime.
+        
+        volatility = annualized realized volatility (örn: 20.0 = %20)
+        Eşikler bu formata göre ayarlanmalı.
+        """
         # Panic
-        if breadth < 20 and volatility > 0.03:
+        if breadth < 20 and volatility > 40:
             return "PANIC"
 
         # Risk-off
@@ -283,7 +287,7 @@ class MarketStateService:
             return "RISK-OFF"
 
         # High volatility
-        if volatility > 0.025:
+        if volatility > 35:
             return "HIGH-VOLATILITY"
 
         # Trending up
@@ -303,7 +307,7 @@ class MarketStateService:
             return "RECOVERY"
 
         # Low volatility
-        if volatility < 0.01:
+        if volatility < 12:
             return "LOW-VOLATILITY"
 
         # Default
