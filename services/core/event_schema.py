@@ -81,6 +81,9 @@ class CanonicalEvent(BaseModel):
     def to_json(self) -> str:
         return self.model_dump_json()
 
+    def to_dict(self) -> Dict[str, Any]:
+        return self.model_dump(mode='json')
+
     @classmethod
     def from_json(cls, json_str: str) -> "CanonicalEvent":
         return cls.model_validate_json(json_str)
