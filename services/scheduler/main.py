@@ -1,8 +1,10 @@
 """
-ALPHA BIST — Scheduler Service v2.0
+ALPHA BIST — Scheduler v2.0
 
-Alpha Engine ile entegre.
-BIST saatlerinde otomatik çalışır.
+3 katmanlı tarama zamanlaması:
+- Layer 1: Live Scanner → sürekli (tick bazlı)
+- Layer 2: Batch Scanner → günde 5 kez (09:50, 12:00, 15:00, 17:50)
+- Layer 3: Event Scanner → event geldiğinde immediate
 """
 
 import asyncio
@@ -10,26 +12,27 @@ from datetime import datetime
 import structlog
 
 from ..scanner.alpha_engine import alpha_engine
-from ..ingestion.bist_universe import BIST_STOCKS
+from ..ingestion.bist_universe import bist_universe
 
 logger = structlog.get_logger()
 
 
 class AlphaScheduler:
-    """Otonom scheduler — Alpha Engine ile entegre."""
+    """Otonom scheduler — 3 katmanlı tarama."""
 
     def __init__(self):
         self._running = False
-        self._last_scan = None
-        self._scan_count = 0
+        self._last_batch_scan = None
+        self._batch_scan_times = [9, 12, 15, 17]  # Saat başları
 
     async def start(self):
         """Scheduler'ı başlat."""
         self._running = True
 
-        # 800 hisseyi yükle
-        alpha_engine.load_universe(BIST_STOCKS)
-        logger.info("ALPHA Scheduler started", universe=len(BIST_STOCKS))
+        # Universe yükle
+        tickers = bist_universe.get_tickers()
+        alpha_engine.load_universe(tickers)
+        logger.info("ALPHA Scheduler started", universe=len(tickers))
 
         while self._running:
             try:
@@ -45,13 +48,25 @@ class AlphaScheduler:
 
                 # BIST saatleri: 10:00-18:00
                 if 10 <= hour < 18:
-                    await self._market_hours()
+                    # Layer 2: Batch scan zamanı mı?
+                    if hour in self._batch_scan_times and minute < 5:
+                        await self._batch_scan()
+                    else:
+                        # Normal saatler — bekle
+                        await asyncio.sleep(60)
+
                 elif hour == 9 and minute >= 50:
+                    # Piyasa öncesi
                     await self._pre_market()
+
                 elif hour == 18 and minute <= 30:
+                    # Piyasa sonrası
                     await self._post_market()
+
                 elif hour == 23 and minute <= 10:
+                    # Günlük özet
                     await self._daily_summary()
+
                 else:
                     await asyncio.sleep(60)
 
@@ -63,43 +78,41 @@ class AlphaScheduler:
         self._running = False
 
     async def _pre_market(self):
-        """Piyasa öncesi hazırlık."""
+        """Piyasa öncesi hazırlık — ilk batch scan."""
         logger.info("=== PRE-MARKET ===")
-        # İlk tarama
-        summary = await alpha_engine.run_full_cycle()
-        logger.info("Pre-market scan completed", **{k: v for k, v in summary.items() if not isinstance(v, list)})
+        summary = await alpha_engine.run_batch_scan()
+        self._last_batch_scan = datetime.now()
+        logger.info("Pre-market scan completed",
+                    signals=summary.get("signals_generated", 0))
         await asyncio.sleep(60)
 
-    async def _market_hours(self):
-        """Piyasa açıkken sürekli tarama."""
-        logger.info("=== MARKET SCAN ===")
+    async def _batch_scan(self):
+        """Batch tarama — günde 5 kez."""
+        logger.info("=== BATCH SCAN ===")
+        summary = await alpha_engine.run_batch_scan()
+        self._last_batch_scan = datetime.now()
 
-        # Alpha Engine tam döngü
-        summary = await alpha_engine.run_full_cycle()
-
-        # Sonuçları logla
         signals = summary.get("top_signals", [])
         anomalies = summary.get("anomalies", 0)
 
         if signals:
-            logger.info("SIGNALS GENERATED", count=len(signals))
+            logger.info("SIGNALS", count=len(signals))
             for s in signals[:5]:
-                logger.info(f"  {s['type']}: {s['ticker']} score={s['score']:.0f} {s['direction']}")
+                logger.info(f"  {s['type']}: {s['ticker']} score={s['score']:.0f}")
 
         if anomalies > 0:
-            logger.warning("ANOMALIES DETECTED", count=anomalies)
+            logger.warning("ANOMALIES", count=anomalies)
 
-        self._last_scan = datetime.now()
-        self._scan_count += 1
-
-        # 5 dakika bekle
+        # Sonraki batch'e kadar bekle
         await asyncio.sleep(300)
 
     async def _post_market(self):
         """Piyasa sonrası rapor."""
         logger.info("=== POST-MARKET ===")
         summary = alpha_engine.get_last_summary()
-        logger.info("Daily summary", **{k: v for k, v in summary.items() if not isinstance(v, list)})
+        logger.info("Daily summary",
+                    scanned=summary.get("total_scanned", 0),
+                    signals=summary.get("signals_generated", 0))
         await asyncio.sleep(60)
 
     async def _daily_summary(self):
