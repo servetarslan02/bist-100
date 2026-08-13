@@ -5,8 +5,8 @@ import { usePolling, type AssetData } from "@/lib/api";
 import { StatCard } from "@/components/ui/StatCard";
 import dynamic from "next/dynamic";
 
-const TradingViewChart = dynamic(
-  () => import("@/components/charts/TradingViewChart").then(m => m.TradingViewChart),
+const LiveChart = dynamic(
+  () => import("@/components/charts/LiveChart").then(m => m.LiveChart),
   { ssr: false }
 );
 
@@ -83,9 +83,7 @@ export default function AssetIntelligence() {
                 <div className="text-lg font-mono text-zinc-200">₺{parseFloat(f.price || "0").toFixed(2)}</div>
               </div>
             </div>
-            <div className="h-[250px] bg-zinc-950/50 rounded flex items-center justify-center text-zinc-600 text-sm">
-              TradingView Chart — Live data connection required
-            </div>
+            <LiveChart ticker={ticker} height={250} />
           </div>
 
           {/* Metric Grid */}

@@ -183,6 +183,39 @@ async def get_instruments(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/market/instrument/{ticker}/ohlcv")
+async def get_instrument_ohlcv(ticker: str, period: str = "60d"):
+    """Get OHLCV data for chart."""
+    try:
+        import yfinance as yf
+        t = yf.Ticker(f"{ticker}.IS")
+        hist = t.history(period=period)
+        if hist.empty:
+            return {"candles": [], "volumes": []}
+
+        candles = []
+        volumes = []
+        for idx, row in hist.iterrows():
+            ts = int(idx.timestamp())
+            candles.append({
+                "time": ts,
+                "open": float(row["Open"]),
+                "high": float(row["High"]),
+                "low": float(row["Low"]),
+                "close": float(row["Close"]),
+            })
+            volumes.append({
+                "time": ts,
+                "volume": int(row["Volume"]),
+                "open": float(row["Open"]),
+                "close": float(row["Close"]),
+            })
+
+        return {"candles": candles, "volumes": volumes}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/market/instrument/{ticker}")
 async def get_instrument_detail(ticker: str):
     """Get detailed instrument data."""
@@ -355,12 +388,36 @@ async def websocket_endpoint(websocket: WebSocket, channel: str):
     await manager.connect(websocket, channel)
     try:
         while True:
-            # Keep connection alive
             data = await websocket.receive_text()
-            # Echo back for heartbeat
-            await websocket.send_json({"type": "pong", "data": data})
+            try:
+                msg = json.loads(data)
+                # Handle subscription
+                if msg.get("action") == "subscribe":
+                    await websocket.send_json({"type": "subscribed", "channel": msg.get("channel", channel)})
+                else:
+                    await websocket.send_json({"type": "pong", "data": data})
+            except json.JSONDecodeError:
+                await websocket.send_json({"type": "pong", "data": data})
     except WebSocketDisconnect:
         manager.disconnect(websocket, channel)
+
+
+@app.websocket("/ws/live")
+async def live_websocket(websocket: WebSocket):
+    """Live market data WebSocket."""
+    await manager.connect(websocket, "live")
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                if msg.get("action") == "subscribe":
+                    channel = msg.get("channel", "market.tick")
+                    await websocket.send_json({"type": "subscribed", "channel": channel})
+            except json.JSONDecodeError:
+                pass
+    except WebSocketDisconnect:
+        manager.disconnect(websocket, "live")
 
 
 # =====================================================
