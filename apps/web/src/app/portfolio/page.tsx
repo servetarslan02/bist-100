@@ -1,120 +1,71 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-interface Position {
-  ticker: string;
-  name: string;
-  quantity: number;
-  avg_cost: number;
-  current_price: number;
-  market_value: number;
-  unrealized_pnl: number;
-  unrealized_pnl_pct: number;
-  weight_pct: number;
-}
-
-interface PortfolioData {
-  portfolio: {
-    id: number;
-    name: string;
-    initial_capital: number;
-    current_capital: number;
-    cash_balance: number;
-    invested_value: number;
-    total_pnl: number;
-    total_return_pct: number;
-  };
-  positions: Position[];
-}
+import { usePolling, type PortfolioData } from "@/lib/api";
+import { StatCard } from "@/components/ui/StatCard";
 
 export default function PortfolioPage() {
-  const [data, setData] = useState<PortfolioData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchPortfolio();
-    const interval = setInterval(fetchPortfolio, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  async function fetchPortfolio() {
-    try {
-      const res = await fetch("/api/portfolio");
-      if (res.ok) {
-        setData(await res.json());
-      }
-    } catch (e) {
-      console.error("Failed to fetch portfolio:", e);
-    } finally {
-      setLoading(false);
-    }
-  }
-
+  const { data, loading } = usePolling<PortfolioData>("/portfolio", 15000);
   const p = data?.portfolio;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Portfolio</h1>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-5 gap-4 mb-6">
-        <Card label="CAPITAL" value={formatCurrency(p?.current_capital)} />
-        <Card label="INVESTED" value={formatCurrency(p?.invested_value)} />
-        <Card label="CASH" value={formatCurrency(p?.cash_balance)} />
-        <Card
-          label="P&L"
-          value={formatCurrency(p?.total_pnl)}
-          color={p && p.total_pnl >= 0 ? "text-alpha-accent" : "text-alpha-danger"}
-        />
-        <Card
-          label="RETURN"
-          value={`${p?.total_return_pct?.toFixed(2) || "0.00"}%`}
-          color={p && p.total_return_pct >= 0 ? "text-alpha-accent" : "text-alpha-danger"}
-        />
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-lg font-semibold text-zinc-100">Portfolio</h1>
+          <p className="text-[11px] text-zinc-600">Paper trading • {data?.positions?.length || 0} positions</p>
+        </div>
       </div>
 
-      {/* Positions Table */}
-      <div className="bg-alpha-surface border border-alpha-border rounded-lg overflow-hidden">
-        <div className="p-4 border-b border-alpha-border">
-          <h2 className="text-sm font-semibold">Positions</h2>
+      {/* Summary */}
+      <div className="grid grid-cols-5 gap-3">
+        <StatCard label="CAPITAL" value={p?.current_capital || 0} decimals={0} prefix="₺" size="sm" />
+        <StatCard label="INVESTED" value={p?.invested_value || 0} decimals={0} prefix="₺" size="sm" />
+        <StatCard label="CASH" value={p?.cash_balance || 0} decimals={0} prefix="₺" size="sm" />
+        <StatCard label="P&L" value={p?.total_pnl || 0} decimals={0} prefix="₺" color="auto" size="sm" />
+        <StatCard label="RETURN" value={p?.total_return_pct || 0} decimals={2} suffix="%" color="auto" size="sm" />
+      </div>
+
+      {/* Positions */}
+      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg overflow-hidden">
+        <div className="px-4 py-2.5 border-b border-zinc-800/60">
+          <h2 className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Positions</h2>
         </div>
 
-        <table className="w-full text-sm">
+        <table className="w-full text-[11px]">
           <thead>
-            <tr className="text-alpha-muted border-b border-alpha-border bg-alpha-bg/50">
-              <th className="text-left py-2 px-3">TICKER</th>
-              <th className="text-left py-2 px-3">NAME</th>
-              <th className="text-right py-2 px-3">QTY</th>
-              <th className="text-right py-2 px-3">AVG COST</th>
-              <th className="text-right py-2 px-3">CURRENT</th>
-              <th className="text-right py-2 px-3">VALUE</th>
-              <th className="text-right py-2 px-3">P&L</th>
-              <th className="text-right py-2 px-3">P&L %</th>
-              <th className="text-right py-2 px-3">WEIGHT</th>
+            <tr className="text-zinc-500 border-b border-zinc-800/40 bg-zinc-950/50">
+              <th className="text-left py-1.5 px-3 font-medium">TICKER</th>
+              <th className="text-left py-1.5 px-3 font-medium">NAME</th>
+              <th className="text-right py-1.5 px-3 font-medium">QTY</th>
+              <th className="text-right py-1.5 px-3 font-medium">AVG COST</th>
+              <th className="text-right py-1.5 px-3 font-medium">CURRENT</th>
+              <th className="text-right py-1.5 px-3 font-medium">VALUE</th>
+              <th className="text-right py-1.5 px-3 font-medium">P&L</th>
+              <th className="text-right py-1.5 px-3 font-medium">P&L%</th>
+              <th className="text-right py-1.5 px-3 font-medium">WEIGHT</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="text-center py-8 text-alpha-muted">Loading...</td></tr>
+              <tr><td colSpan={9} className="text-center py-12 text-zinc-600">Loading...</td></tr>
             ) : !data || data.positions.length === 0 ? (
-              <tr><td colSpan={9} className="text-center py-8 text-alpha-muted">No positions</td></tr>
+              <tr><td colSpan={9} className="text-center py-12 text-zinc-600">No positions</td></tr>
             ) : (
               data.positions.map((pos, i) => (
-                <tr key={i} className="border-b border-alpha-border/30 hover:bg-alpha-border/20">
-                  <td className="py-2 px-3 font-semibold text-alpha-accent">{pos.ticker}</td>
-                  <td className="py-2 px-3 text-alpha-muted truncate max-w-[150px]">{pos.name}</td>
-                  <td className="py-2 px-3 text-right font-mono">{pos.quantity}</td>
-                  <td className="py-2 px-3 text-right font-mono">{pos.avg_cost?.toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-mono">{pos.current_price?.toFixed(2)}</td>
-                  <td className="py-2 px-3 text-right font-mono">{formatCurrency(pos.market_value)}</td>
-                  <td className={`py-2 px-3 text-right font-mono ${pos.unrealized_pnl >= 0 ? "text-alpha-accent" : "text-alpha-danger"}`}>
-                    {formatCurrency(pos.unrealized_pnl)}
+                <tr key={i} className="border-b border-zinc-800/20 row-hover cursor-pointer">
+                  <td className="py-1.5 px-3 font-semibold text-zinc-200">{pos.ticker}</td>
+                  <td className="py-1.5 px-3 text-zinc-500 truncate max-w-[120px]">{pos.name}</td>
+                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">{pos.quantity}</td>
+                  <td className="py-1.5 px-3 text-right font-mono text-zinc-400">₺{pos.avg_cost?.toFixed(2)}</td>
+                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">₺{pos.current_price?.toFixed(2)}</td>
+                  <td className="py-1.5 px-3 text-right font-mono text-zinc-300">₺{pos.market_value?.toLocaleString()}</td>
+                  <td className={`py-1.5 px-3 text-right font-mono ${pos.unrealized_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                    ₺{pos.unrealized_pnl?.toLocaleString()}
                   </td>
-                  <td className={`py-2 px-3 text-right font-mono ${pos.unrealized_pnl_pct >= 0 ? "text-alpha-accent" : "text-alpha-danger"}`}>
+                  <td className={`py-1.5 px-3 text-right font-mono ${pos.unrealized_pnl_pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                     {pos.unrealized_pnl_pct?.toFixed(2)}%
                   </td>
-                  <td className="py-2 px-3 text-right font-mono">{pos.weight_pct?.toFixed(1)}%</td>
+                  <td className="py-1.5 px-3 text-right font-mono text-zinc-400">{pos.weight_pct?.toFixed(1)}%</td>
                 </tr>
               ))
             )}
@@ -123,23 +74,4 @@ export default function PortfolioPage() {
       </div>
     </div>
   );
-}
-
-function Card({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <div className="bg-alpha-surface border border-alpha-border rounded-lg p-3">
-      <p className="text-xs text-alpha-muted uppercase">{label}</p>
-      <p className={`text-lg font-bold mt-1 ${color || "text-alpha-text"}`}>{value}</p>
-    </div>
-  );
-}
-
-function formatCurrency(val?: number): string {
-  if (val === undefined || val === null) return "—";
-  return new Intl.NumberFormat("tr-TR", {
-    style: "currency",
-    currency: "TRY",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(val);
 }

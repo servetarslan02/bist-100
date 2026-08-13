@@ -1,4 +1,14 @@
 "use client";
+
 export default function ResearchPage() {
-  return (<div className="p-6"><h1 className="text-2xl font-bold mb-6">Research</h1><div className="bg-alpha-surface border border-alpha-border rounded-lg p-8 text-center"><p className="text-alpha-muted">Coming soon</p></div></div>);
+  return (
+    <div className="p-4">
+      <h1 className="text-lg font-semibold text-zinc-100 mb-1">Research</h1>
+      <p className="text-[11px] text-zinc-600 mb-4">Coming in next release</p>
+      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-8 text-center">
+        <p className="text-zinc-600 text-sm">This module is under development</p>
+        <p className="text-zinc-700 text-[11px] mt-1">Part of ALPHA BIST v1.2 roadmap</p>
+      </div>
+    </div>
+  );
 }

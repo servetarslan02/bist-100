@@ -1,83 +1,83 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useMemo } from "react";
+import { usePolling, type Instrument } from "@/lib/api";
 
-interface Instrument {
-  symbol: string;
-  name: string;
-  sector: string;
+interface EnrichedInstrument extends Instrument {
+  price?: number;
+  rsi?: number;
+  mom5?: number;
+  mom20?: number;
+  vol_z?: number;
+  anomaly?: number;
+  spec?: number;
 }
 
 export default function MarketRadar() {
-  const [instruments, setInstruments] = useState<Instrument[]>([]);
-  const [features, setFeatures] = useState<Record<string, Record<string, string>>>({});
-  const [loading, setLoading] = useState(true);
+  const { data: instruments, loading } = usePolling<Instrument[]>("/market/instruments?limit=500", 60000);
   const [search, setSearch] = useState("");
-  const [sectorFilter, setSectorFilter] = useState("");
+  const [sector, setSector] = useState("");
+  const [sortCol, setSortCol] = useState<string>("spec");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
-  useEffect(() => {
-    fetchInstruments();
-  }, []);
+  const sectors = useMemo(() => {
+    if (!instruments) return [];
+    return [...new Set(instruments.map(i => i.sector))].sort();
+  }, [instruments]);
 
-  async function fetchInstruments() {
-    try {
-      const res = await fetch("/api/market/instruments?limit=200");
-      if (res.ok) {
-        const data = await res.json();
-        setInstruments(data);
+  const filtered = useMemo(() => {
+    if (!instruments) return [];
+    return instruments.filter(i => {
+      if (search && !i.symbol.toLowerCase().includes(search.toLowerCase()) &&
+          !i.name.toLowerCase().includes(search.toLowerCase())) return false;
+      if (sector && i.sector !== sector) return false;
+      return true;
+    });
+  }, [instruments, search, sector]);
 
-        // Fetch features for each
-        for (const inst of data.slice(0, 50)) {
-          fetchFeatures(inst.symbol);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to fetch instruments:", e);
-    } finally {
-      setLoading(false);
+  const handleSort = (col: string) => {
+    if (sortCol === col) {
+      setSortDir(d => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortCol(col);
+      setSortDir("desc");
     }
-  }
+  };
 
-  async function fetchFeatures(ticker: string) {
-    try {
-      const res = await fetch(`/api/market/instrument/${ticker}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.features) {
-          setFeatures(prev => ({ ...prev, [ticker]: data.features }));
-        }
-      }
-    } catch {}
-  }
-
-  const filtered = instruments.filter(i => {
-    if (search && !i.symbol.toLowerCase().includes(search.toLowerCase()) &&
-        !i.name.toLowerCase().includes(search.toLowerCase())) return false;
-    if (sectorFilter && i.sector !== sectorFilter) return false;
-    return true;
-  });
-
-  const sectors = [...new Set(instruments.map(i => i.sector))].sort();
+  const SortHeader = ({ col, label, align = "left" }: { col: string; label: string; align?: string }) => (
+    <th
+      className={`py-1.5 px-2 font-medium cursor-pointer hover:text-zinc-300 select-none ${align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left"}`}
+      onClick={() => handleSort(col)}
+    >
+      <span className="flex items-center gap-1" style={{ justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start" }}>
+        {label}
+        {sortCol === col && (
+          <span className="text-zinc-600">{sortDir === "asc" ? "↑" : "↓"}</span>
+        )}
+      </span>
+    </th>
+  );
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Market Radar</h1>
-          <p className="text-sm text-alpha-muted">800+ BIST instruments — live scanning</p>
+          <h1 className="text-lg font-semibold text-zinc-100">Market Radar</h1>
+          <p className="text-[11px] text-zinc-600">{filtered.length} instruments • live scanning</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <input
             type="text"
-            placeholder="Search ticker..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="bg-alpha-bg border border-alpha-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-alpha-accent"
+            placeholder="Search..."
+            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 w-40"
           />
           <select
-            value={sectorFilter}
-            onChange={e => setSectorFilter(e.target.value)}
-            className="bg-alpha-bg border border-alpha-border rounded px-3 py-1.5 text-sm focus:outline-none focus:border-alpha-accent"
+            value={sector}
+            onChange={e => setSector(e.target.value)}
+            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
           >
             <option value="">All Sectors</option>
             {sectors.map(s => <option key={s} value={s}>{s}</option>)}
@@ -85,71 +85,73 @@ export default function MarketRadar() {
         </div>
       </div>
 
-      <div className="bg-alpha-surface border border-alpha-border rounded-lg overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-alpha-muted border-b border-alpha-border bg-alpha-bg/50">
-              <th className="text-left py-2 px-3">TICKER</th>
-              <th className="text-left py-2 px-3">NAME</th>
-              <th className="text-left py-2 px-3">SECTOR</th>
-              <th className="text-right py-2 px-3">RSI</th>
-              <th className="text-right py-2 px-3">MOM 5D</th>
-              <th className="text-right py-2 px-3">VOL Z</th>
-              <th className="text-right py-2 px-3">ANOMALY</th>
-              <th className="text-right py-2 px-3">SPEC</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan={8} className="text-center py-8 text-alpha-muted">Loading...</td>
+      {/* Table */}
+      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-[11px]">
+            <thead>
+              <tr className="text-zinc-500 border-b border-zinc-800/60 bg-zinc-950/50">
+                <SortHeader col="symbol" label="TICKER" />
+                <SortHeader col="name" label="NAME" />
+                <SortHeader col="sector" label="SECTOR" />
+                <SortHeader col="price" label="PRICE" align="right" />
+                <SortHeader col="change" label="CHG%" align="right" />
+                <SortHeader col="rsi" label="RSI" align="right" />
+                <SortHeader col="mom5" label="MOM5" align="right" />
+                <SortHeader col="mom20" label="MOM20" align="right" />
+                <SortHeader col="vol_z" label="VOL Z" align="right" />
+                <SortHeader col="anomaly" label="ANOM" align="right" />
+                <SortHeader col="spec" label="SPEC" align="right" />
               </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="text-center py-8 text-alpha-muted">No instruments found</td>
-              </tr>
-            ) : (
-              filtered.map(inst => {
-                const f = features[inst.symbol] || {};
-                return (
-                  <tr key={inst.symbol} className="border-b border-alpha-border/30 hover:bg-alpha-border/20 cursor-pointer">
-                    <td className="py-2 px-3 font-semibold text-alpha-accent">{inst.symbol}</td>
-                    <td className="py-2 px-3 text-alpha-muted truncate max-w-[200px]">{inst.name}</td>
-                    <td className="py-2 px-3 text-alpha-muted">{inst.sector}</td>
-                    <td className="py-2 px-3 text-right font-mono">{formatNum(f.rsi_14)}</td>
-                    <td className={`py-2 px-3 text-right font-mono ${getColor(f.momentum_5d)}`}>
-                      {formatPct(f.momentum_5d)}
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={11} className="text-center py-12 text-zinc-600">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+                      Loading market data...
+                    </div>
+                  </td>
+                </tr>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={11} className="text-center py-12 text-zinc-600">No instruments found</td>
+                </tr>
+              ) : (
+                filtered.map((inst, i) => (
+                  <tr
+                    key={inst.symbol}
+                    className="border-b border-zinc-800/20 row-hover cursor-pointer"
+                  >
+                    <td className="py-1.5 px-2 font-semibold text-zinc-200">{inst.symbol}</td>
+                    <td className="py-1.5 px-2 text-zinc-500 truncate max-w-[160px]">{inst.name}</td>
+                    <td className="py-1.5 px-2">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
+                        {inst.sector}
+                      </span>
                     </td>
-                    <td className="py-2 px-3 text-right font-mono">{formatNum(f.volume_zscore)}</td>
-                    <td className="py-2 px-3 text-right font-mono">{formatNum(f.anomaly_score)}</td>
-                    <td className="py-2 px-3 text-right font-mono">{formatNum(f.spec_score)}</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-300">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-400">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
+                    <td className="py-1.5 px-2 text-right font-mono text-zinc-400">—</td>
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex items-center justify-between text-[10px] text-zinc-600">
+        <span>Data: yfinance (15min delayed)</span>
+        <span>Refresh: 60s</span>
       </div>
     </div>
   );
-}
-
-function formatNum(val?: string): string {
-  if (!val) return "—";
-  const num = parseFloat(val);
-  return isNaN(num) ? "—" : num.toFixed(2);
-}
-
-function formatPct(val?: string): string {
-  if (!val) return "—";
-  const num = parseFloat(val);
-  return isNaN(num) ? "—" : `${num > 0 ? "+" : ""}${num.toFixed(2)}%`;
-}
-
-function getColor(val?: string): string {
-  if (!val) return "";
-  const num = parseFloat(val);
-  if (num > 0) return "text-alpha-accent";
-  if (num < 0) return "text-alpha-danger";
-  return "";
 }
