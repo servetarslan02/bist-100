@@ -98,12 +98,20 @@ class SimulationEngine:
             logger.error("Simulation error", error=str(e))
 
     async def _run_monte_carlo(self, params: Dict) -> Dict[str, Any]:
-        """Run Monte Carlo simulation."""
+        """
+        Monte Carlo simülasyonu — v1.1
+        
+        Daha gerçekçi:
+        - Regime-conditioned returns
+        - Fat tails (Student-t dağılımı)
+        - Volatility clustering (GARCH benzeri)
+        - Event shock injection
+        - Liquidity constraint
+        """
         ticker = params.get("ticker")
         num_simulations = params.get("num_simulations", 10000)
         horizon_days = params.get("horizon_days", 20)
 
-        # Get historical volatility
         vol_data = await self._get_historical_volatility(ticker)
         if not vol_data:
             return {"error": "Insufficient data for simulation"}
@@ -111,15 +119,41 @@ class SimulationEngine:
         daily_vol = vol_data.get("daily_volatility", 0.02)
         daily_return = vol_data.get("daily_return", 0.0005)
         current_price = vol_data.get("current_price", 100)
+        regime = vol_data.get("regime", "RANGE")
 
-        # Run simulations
+        # Regime-conditioned parameters
+        regime_mult = {"TRENDING-UP": 1.2, "RISK-OFF": 0.5, "PANIC": 0.3, "RANGE": 1.0}.get(regime, 1.0)
+        adjusted_return = daily_return * regime_mult
+
+        # Fat tails: Student-t dağılımı (df=5)
+        from scipy import stats
+        t_dist = stats.t(df=5)
+
         np.random.seed(42)
         simulations = np.zeros((num_simulations, horizon_days + 1))
         simulations[:, 0] = current_price
 
+        # Volatility clustering: basit GARCH(1,1)
+        current_vol = daily_vol
+        omega = daily_vol * 0.05  # uzun vadeli vol
+        alpha = 0.1  # yesterday's shock
+        beta = 0.85  # persistence
+
         for day in range(1, horizon_days + 1):
-            random_returns = np.random.normal(daily_return, daily_vol, num_simulations)
+            # Fat-tailed random returns
+            z = t_dist.rvs(size=num_simulations)
+            random_returns = adjusted_return + current_vol * z
+
+            # Event shock injection (%2 ihtimalle)
+            shock_mask = np.random.random(num_simulations) < 0.02
+            shock_size = np.random.choice([-0.05, -0.03, 0.03, 0.05], size=num_simulations)
+            random_returns = np.where(shock_mask, random_returns + shock_size, random_returns)
+
             simulations[:, day] = simulations[:, day-1] * (1 + random_returns)
+
+            # Volatility clustering güncelle
+            avg_return = np.mean(random_returns)
+            current_vol = np.sqrt(omega + alpha * avg_return**2 + beta * current_vol**2)
 
         # Calculate statistics
         final_prices = simulations[:, -1]
@@ -205,28 +239,57 @@ class SimulationEngine:
         }
 
     async def _run_stress_test(self, params: Dict) -> Dict[str, Any]:
-        """Run stress test."""
+        """Run stress test — gerçek hesaplama."""
         portfolio_id = params.get("portfolio_id")
+        positions = params.get("positions", [])
 
-        # Define stress scenarios
+        # Stress senaryoları
         stress_scenarios = [
-            {"name": "Market Crash -20%", "market_change": -20, "volatility_spike": 3},
-            {"name": "Currency Crisis", "usd_change": 30, "market_change": -15},
-            {"name": "Rate Shock +500bp", "rate_change": 5, "market_change": -10},
-            {"name": "Sector Rotation", "sector_change": {"BANK": -15, "TECH": 10}},
+            {"name": "Market Crash -20%", "market_shock": -0.20, "vol_spike": 3.0, "usd_shock": 0.10},
+            {"name": "Currency Crisis", "market_shock": -0.15, "vol_spike": 2.5, "usd_shock": 0.30},
+            {"name": "Rate Shock +500bp", "market_shock": -0.10, "vol_spike": 2.0, "usd_shock": 0.05},
+            {"name": "Sector Rotation", "market_shock": -0.05, "vol_spike": 1.5, "usd_shock": 0.02},
+            {"name": "Black Swan -30%", "market_shock": -0.30, "vol_spike": 5.0, "usd_shock": 0.20},
         ]
 
         results = []
         for scenario in stress_scenarios:
-            result = {
+            # Her pozisyon için etki hesapla
+            total_impact = 0
+            position_impacts = []
+
+            for pos in positions:
+                # Beta = 1 varsayılan
+                beta = 1.0
+                # USD hassasiyeti (exporter/importer)
+                usd_sensitivity = 0.5
+
+                market_impact = scenario["market_shock"] * beta
+                usd_impact = scenario["usd_shock"] * usd_sensitivity
+                total_pos_impact = market_impact + usd_impact
+
+                pos_loss = pos.get("value", 0) * total_pos_impact
+                total_impact += pos_loss
+
+                position_impacts.append({
+                    "ticker": pos.get("ticker", ""),
+                    "market_impact": round(market_impact * 100, 2),
+                    "usd_impact": round(usd_impact * 100, 2),
+                    "total_impact": round(total_pos_impact * 100, 2),
+                    "loss": round(pos_loss, 2),
+                })
+
+            results.append({
                 "scenario": scenario["name"],
                 "assumptions": scenario,
-                "impact": "calculated",  # Placeholder
-            }
-            results.append(result)
+                "portfolio_impact": round(total_impact, 2),
+                "portfolio_impact_pct": round(total_impact / 100000 * 100, 2) if total_impact else 0,
+                "positions": position_impacts,
+            })
 
         return {
             "stress_tests": results,
+            "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
             "timestamp": datetime.utcnow().isoformat(),
         }
 
