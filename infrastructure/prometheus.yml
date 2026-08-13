@@ -1,0 +1,34 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'alpha-api'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/metrics'
+
+  - job_name: 'alpha-services'
+    static_configs:
+      - targets:
+          - 'ingestion:8000'
+          - 'feature-engine:8000'
+          - 'market-state:8000'
+          - 'intelligence:8000'
+          - 'simulation:8000'
+          - 'risk:8000'
+          - 'portfolio:8000'
+          - 'learning:8000'
+    metrics_path: '/metrics'
+
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  - job_name: 'clickhouse'
+    static_configs:
+      - targets: ['clickhouse:8123']
