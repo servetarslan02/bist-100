@@ -68,13 +68,27 @@ class MarketStateService:
         logger.info("Market State Service stopped")
 
     async def _load_instruments(self):
-        """Load instrument mapping."""
-        from ..core.database import pg_fetch
+        """Load instrument mapping — BIST universe'un tamamını yükle."""
+        from ..ingestion.bist_universe import BIST_STOCKS
 
-        rows = await pg_fetch("""
-            SELECT i.symbol, i.id FROM instruments i WHERE i.active = TRUE
-        """)
-        self._ticker_map = {row["symbol"]: row["id"] for row in rows}
+        # BIST universe'un tamamını kaydet
+        for i, ticker in enumerate(BIST_STOCKS):
+            self._ticker_map[ticker] = i + 1
+            # Başlangıç state'i oluştur
+            self._instrument_states[i + 1] = {
+                "ticker": ticker,
+                "price": 0,
+                "previous_price": 0,
+                "volume": 0,
+                "change_pct": 0,
+                "rsi": 50,
+                "momentum": 0,
+                "volatility": 0,
+                "volume_zscore": 0,
+                "anomaly_score": 0,
+            }
+
+        logger.info("Instruments loaded", count=len(self._ticker_map))
 
     async def _on_tick(self, event: CanonicalEvent):
         """Handle tick events for real-time state updates."""

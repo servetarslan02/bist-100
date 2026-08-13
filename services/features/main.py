@@ -60,12 +60,14 @@ class FeatureEngineService:
         logger.info("Feature Engine Service stopped")
 
     async def _on_tick(self, event: CanonicalEvent):
-        """Handle incoming tick events."""
+        """Handle incoming tick events — her tick'te feature güncelle."""
         try:
             ticker = event.data.get("ticker")
             instrument_id = event.data.get("instrument_id")
+            price = event.data.get("price", 0)
+            volume = event.data.get("volume", 0)
 
-            if not ticker or not instrument_id:
+            if not ticker or not price:
                 return
 
             # Update price cache
@@ -73,28 +75,28 @@ class FeatureEngineService:
                 self._price_cache[ticker] = []
 
             self._price_cache[ticker].append({
-                "price": event.data.get("price", 0),
-                "volume": event.data.get("volume", 0),
+                "price": price,
+                "volume": volume,
                 "timestamp": event.timestamp.isoformat(),
             })
 
-            # Keep last 100 ticks
-            self._price_cache[ticker] = self._price_cache[ticker][-100:]
+            # Keep last 200 ticks
+            self._price_cache[ticker] = self._price_cache[ticker][-200:]
 
-            # Compute features if we have enough data
+            # Her tick'te feature güncelle (20+ tick varsa)
             if len(self._price_cache[ticker]) >= 20:
                 features = self._compute_features(ticker, self._price_cache[ticker])
 
                 if features:
-                    # Store in Redis (hot state)
+                    # Store in Redis (hot state) — anlık erişim için
                     await redis_hset(f"features:{ticker}", {
-                        k: str(v) for k, v in features.items()
+                        k: str(v) for k, v in features.items() if isinstance(v, (int, float))
                     })
 
                     # Store in ClickHouse (historical)
-                    self._store_features_ch(instrument_id, ticker, features)
+                    self._store_features_ch(instrument_id or 0, ticker, features)
 
-                    # Publish feature update event
+                    # Publish feature update event — market state ve scanner'a gider
                     feat_event = CanonicalEvent(
                         event_type=EventType.FEATURE_UPDATED,
                         source="feature-engine",
