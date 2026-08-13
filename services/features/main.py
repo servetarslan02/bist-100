@@ -58,7 +58,7 @@ class FeatureEngineService:
         await close_databases()
         logger.info("Feature Engine Service stopped")
 
-    async def _on_tick(self, event: AlphaEvent):
+    async def _on_tick(self, event: CanonicalEvent):
         """Handle incoming tick events."""
         try:
             ticker = event.data.get("ticker")
@@ -94,7 +94,7 @@ class FeatureEngineService:
                     self._store_features_ch(instrument_id, ticker, features)
 
                     # Publish feature update event
-                    feat_event = AlphaEvent(
+                    feat_event = CanonicalEvent(
                         event_type=EventType.FEATURE_UPDATED,
                         source="feature-engine",
                         data={

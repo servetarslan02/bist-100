@@ -72,7 +72,7 @@ class PortfolioService:
             """)
             logger.info("Default paper portfolio created")
 
-    async def _on_order_filled(self, event: AlphaEvent):
+    async def _on_order_filled(self, event: CanonicalEvent):
         """Handle order filled events."""
         try:
             order_id = event.data.get("order_id")

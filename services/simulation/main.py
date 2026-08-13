@@ -57,7 +57,7 @@ class SimulationEngine:
         await close_databases()
         logger.info("Simulation Engine stopped")
 
-    async def _on_simulation_request(self, event: AlphaEvent):
+    async def _on_simulation_request(self, event: CanonicalEvent):
         """Handle simulation requests."""
         try:
             sim_type = event.data.get("simulation_type", "monte_carlo")
@@ -82,7 +82,7 @@ class SimulationEngine:
             """, f"sim_{ticker}_{sim_type}", sim_type, json.dumps(event.data), json.dumps(result))
 
             # Publish result
-            result_event = AlphaEvent(
+            result_event = CanonicalEvent(
                 event_type=EventType.SIMULATION_COMPLETED,
                 source="simulation",
                 data={

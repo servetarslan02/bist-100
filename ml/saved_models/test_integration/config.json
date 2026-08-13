@@ -63,9 +63,9 @@
   "metrics": {
     "avg_direction_accuracy": 90.9,
     "avg_sharpe": 6.289,
-    "avg_metric": 0.9344,
+    "avg_metric": 0.9316,
     "splits": 2
   },
   "confidence": 0.9054,
-  "training_date": "2026-08-13T20:57:28.981295"
+  "training_date": "2026-08-13T21:12:13.444008"
 }

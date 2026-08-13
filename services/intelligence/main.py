@@ -66,7 +66,7 @@ class IntelligenceService:
         await close_databases()
         logger.info("Intelligence Service stopped")
 
-    async def _on_anomaly(self, event: AlphaEvent):
+    async def _on_anomaly(self, event: CanonicalEvent):
         """Handle anomaly events with AI analysis."""
         try:
             ticker = event.data.get("ticker")
@@ -92,7 +92,7 @@ class IntelligenceService:
                 await redis_set(f"ai_analysis:{ticker}", json.dumps(analysis), ex=3600)
 
                 # Publish AI analysis event
-                ai_event = AlphaEvent(
+                ai_event = CanonicalEvent(
                     event_type=EventType.SIGNAL_GENERATED,
                     source="intelligence",
                     data={
@@ -107,7 +107,7 @@ class IntelligenceService:
         except Exception as e:
             logger.error("Anomaly analysis error", error=str(e))
 
-    async def _on_signal(self, event: AlphaEvent):
+    async def _on_signal(self, event: CanonicalEvent):
         """Handle signal events with AI reasoning."""
         try:
             ticker = event.data.get("ticker")
@@ -134,7 +134,7 @@ class IntelligenceService:
         except Exception as e:
             logger.error("Signal analysis error", error=str(e))
 
-    async def _on_kap_event(self, event: AlphaEvent):
+    async def _on_kap_event(self, event: CanonicalEvent):
         """Handle KAP events with AI interpretation."""
         try:
             ticker = event.data.get("ticker")
@@ -269,14 +269,17 @@ class IntelligenceService:
         try:
             # Build the full prompt
             system_prompt = """You are ALPHA, an advanced financial market intelligence AI.
-Analyze the provided market data and provide:
-1. Assessment (what's happening)
-2. Reasoning (why it matters)
-3. Confidence (0-100)
-4. Risk factors
-5. Actionable insight
+Analyze the provided market data and return a JSON object with these fields:
+- assessment: what is happening (string)
+- reasoning: why it matters (string)
+- direction: LONG | SHORT | NEUTRAL
+- confidence: 0-100 (integer)
+- risk_factors: list of risk factor strings
+- invalidation: what would invalidate this thesis (string)
+- horizon: SHORT (1-5d) | MEDIUM (1-4w) | LONG (1-6m)
+- evidence_strength: WEAK | MODERATE | STRONG
 
-Be concise, data-driven, and objective. Do not give financial advice."""
+Return ONLY valid JSON, no other text. Do not give financial advice."""
 
             user_prompt = f"{prompt}\n\nContext:\n{json.dumps(context, indent=2, default=str)}"
 
@@ -297,8 +300,22 @@ Be concise, data-driven, and objective. Do not give financial advice."""
 
             if response.status_code == 200:
                 result = response.json()
+                raw_response = result.get("response", "")
+                
+                # Try to parse structured JSON from LLM
+                parsed = None
+                try:
+                    # Find JSON in response
+                    import re
+                    json_match = re.search(r'\{[^{}]*\}', raw_response, re.DOTALL)
+                    if json_match:
+                        parsed = json.loads(json_match.group())
+                except (json.JSONDecodeError, Exception):
+                    pass
+                
                 return {
-                    "analysis": result.get("response", ""),
+                    "analysis": raw_response,
+                    "structured": parsed,
                     "model": settings.ollama_model,
                     "timestamp": datetime.utcnow().isoformat(),
                     "eval_count": result.get("eval_count", 0),

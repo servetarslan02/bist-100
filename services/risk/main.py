@@ -90,7 +90,7 @@ class RiskEngine:
                 "max_correlation": 0.8,
             }
 
-    async def _on_decision(self, event: AlphaEvent):
+    async def _on_decision(self, event: CanonicalEvent):
         """Evaluate a trading decision against risk limits."""
         try:
             ticker = event.data.get("ticker")
@@ -133,7 +133,7 @@ class RiskEngine:
 
             if not result["approved"]:
                 # Publish risk alert
-                alert_event = AlphaEvent(
+                alert_event = CanonicalEvent(
                     event_type=EventType.RISK_ALERT,
                     source="risk-engine",
                     data={
@@ -152,7 +152,7 @@ class RiskEngine:
         except Exception as e:
             logger.error("Risk evaluation error", error=str(e))
 
-    async def _on_signal(self, event: AlphaEvent):
+    async def _on_signal(self, event: CanonicalEvent):
         """Evaluate signal risk."""
         try:
             ticker = event.data.get("ticker")
@@ -161,7 +161,7 @@ class RiskEngine:
 
             # Check if risk level is acceptable
             if risk_level == "CRITICAL":
-                alert_event = AlphaEvent(
+                alert_event = CanonicalEvent(
                     event_type=EventType.RISK_ALERT,
                     source="risk-engine",
                     data={

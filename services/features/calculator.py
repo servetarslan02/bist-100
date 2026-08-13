@@ -197,13 +197,16 @@ class FeatureCalculator:
             features["bb_position"] = float((close[-1] - features["bb_lower"]) / (features["bb_upper"] - features["bb_lower"])) if (features["bb_upper"] - features["bb_lower"]) > 0 else 0.5
 
         # Volatility regime
+        # realized_vol_20d yıllıklaştırılmış yüzde olarak hesaplanır (örn: 20.0 = %20)
+        # vol_ratio = vol_5d / vol_20d (oran, küçük değer)
         if n >= 20:
             vol_5 = np.std(log_returns[-5:]) if len(log_returns) >= 5 else 0
             vol_20 = np.std(log_returns[-20:])
             features["volatility_ratio"] = float(vol_5 / vol_20) if vol_20 > 0 else 1.0
 
+            # Regime: ratio bazlı (oran bazlı, kesin değer bazlı değil)
             if features["volatility_ratio"] > 1.5:
-                features["volatility_regime"] = 3  # HIGH
+                features["volatility_regime"] = 3  # HIGH (vol_5 vol_20'nin 1.5 katından fazla)
             elif features["volatility_ratio"] < 0.5:
                 features["volatility_regime"] = 1  # LOW
             else:
@@ -341,13 +344,22 @@ class FeatureCalculator:
     # =====================================================
 
     def _rsi(self, close: np.ndarray, period: int = 14) -> float:
-        """Calculate RSI."""
+        """Calculate RSI — Wilder's Smoothing (canonical)."""
         deltas = np.diff(close)
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
 
-        avg_gain = np.mean(gains[-period:])
-        avg_loss = np.mean(losses[-period:])
+        if len(gains) < period:
+            return 50.0
+
+        # İlk ortalama: simple average
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+
+        # Wilder's smoothing
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
 
         if avg_loss == 0:
             return 100.0
@@ -364,17 +376,32 @@ class FeatureCalculator:
         return ema
 
     def _macd(self, close: np.ndarray) -> tuple:
-        """Calculate MACD."""
-        ema12 = self._ema(close, 12)
-        ema26 = self._ema(close, 26)
-        macd_line = ema12 - ema26
+        """Calculate MACD with proper 9-period EMA signal line."""
+        # EMA 12 ve EMA 26 serileri
+        ema12_series = self._ema_series(close, 12)
+        ema26_series = self._ema_series(close, 26)
 
-        # Signal line (9-period EMA of MACD)
-        # Simplified: use last value
-        signal = macd_line * 0.9  # Approximate
+        # MACD line serisi
+        macd_series = ema12_series - ema26_series
+
+        # Signal line = 9-period EMA of MACD
+        signal_series = self._ema_series(macd_series, 9)
+
+        # Son değerler
+        macd_line = macd_series[-1]
+        signal = signal_series[-1]
         histogram = macd_line - signal
 
         return macd_line, signal, histogram
+
+    def _ema_series(self, data: np.ndarray, period: int) -> np.ndarray:
+        """Calculate EMA series (not just last value)."""
+        alpha = 2.0 / (period + 1)
+        ema = np.zeros(len(data))
+        ema[0] = data[0]
+        for i in range(1, len(data)):
+            ema[i] = alpha * data[i] + (1 - alpha) * ema[i - 1]
+        return ema
 
     def _stochastic(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int, d_period: int) -> tuple:
         """Calculate Stochastic oscillator."""

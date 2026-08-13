@@ -1,6 +1,7 @@
 """ALPHA BIST - Market State Engine (Main Entry Point)"""
 
 import asyncio
+import json
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -74,7 +75,7 @@ class MarketStateService:
         """)
         self._ticker_map = {row["symbol"]: row["id"] for row in rows}
 
-    async def _on_tick(self, event: AlphaEvent):
+    async def _on_tick(self, event: CanonicalEvent):
         """Handle tick events for real-time state updates."""
         try:
             ticker = event.data.get("ticker")
@@ -110,7 +111,7 @@ class MarketStateService:
         except Exception as e:
             logger.error("Tick processing error", error=str(e))
 
-    async def _on_feature_update(self, event: AlphaEvent):
+    async def _on_feature_update(self, event: CanonicalEvent):
         """Handle feature updates to recompute market state."""
         try:
             ticker = event.data.get("ticker")
@@ -187,11 +188,13 @@ class MarketStateService:
                 "avg_volatility": round(avg_volatility, 4),
                 "avg_rsi": round(avg_rsi, 2),
                 "anomaly_count": anomaly_count,
-                "risk_appetite": round(breadth_pct / 100, 4),
+                "risk_appetite": round(self._compute_risk_appetite(
+                    breadth_pct, avg_momentum, avg_volatility, avg_rsi
+                ), 4),
             }
 
             # Store in Redis
-            await redis_set("market_state", str(market_state), ex=60)
+            await redis_set("market_state", json.dumps(market_state, default=str), ex=60)
 
             # Store in ClickHouse
             ch_insert("market_states", [[
@@ -215,7 +218,7 @@ class MarketStateService:
                 old_regime = self._current_regime
                 self._current_regime = regime
 
-                event = AlphaEvent(
+                event = CanonicalEvent(
                     event_type=EventType.MARKET_STATE_CHANGED,
                     source="market-state",
                     data={
@@ -229,6 +232,44 @@ class MarketStateService:
 
         except Exception as e:
             logger.error("Market state computation error", error=str(e))
+
+    def _compute_risk_appetite(self, breadth: float, momentum: float,
+                                 volatility: float, rsi: float) -> float:
+        """Compute risk appetite from multiple factors.
+        
+        Risk appetite = weighted combination of:
+        - breadth (piyasa genişliği)
+        - momentum (güç)
+        - volatility (düşük vol = yüksek risk appetite)
+        - RSI (aşırı alım/satım)
+        """
+        # Breadth: 0-100 → 0-1
+        breadth_score = breadth / 100
+
+        # Momentum: normalize ([-50, 50] → [0, 1])
+        momentum_score = max(0, min(1, (momentum + 50) / 100))
+
+        # Volatility: düşük vol = yüksek risk appetite
+        # annualized vol 0-100 arası, 20 normal
+        vol_score = max(0, min(1, 1 - (volatility - 10) / 40)) if volatility > 0 else 0.5
+
+        # RSI: 30-70 arası normal, extremes risk-off
+        if rsi > 70:
+            rsi_score = max(0, 1 - (rsi - 70) / 30)  # Aşırı alım → risk-off
+        elif rsi < 30:
+            rsi_score = max(0, (rsi - 10) / 20)  # Aşırı satım → risk-on
+        else:
+            rsi_score = 0.5  # Normal
+
+        # Weighted average
+        risk_appetite = (
+            breadth_score * 0.35 +
+            momentum_score * 0.25 +
+            vol_score * 0.25 +
+            rsi_score * 0.15
+        )
+
+        return max(0, min(1, risk_appetite))
 
     def _detect_regime(self, breadth: float, momentum: float, volatility: float, rsi: float) -> str:
         """Detect current market regime."""

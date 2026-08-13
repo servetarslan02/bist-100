@@ -1,12 +1,17 @@
-"""ALPHA BIST - Incremental Feature State v1.1
+"""ALPHA BIST - Incremental Feature State v1.2
 
-Gerçek incremental state: tick geldiğinde tüm geçmişi yeniden hesaplamaz.
-Rolling window'lar bellekte tutulur, yeni veri geldikçe güncellenir.
-Ayrıca tick'lerden gerçek OHLC bar'ları üretir.
+v1.2 Düzeltmeler:
+- ATR: completed bar'dan güncellenir, tick'ten değil
+- 5m aggregation: zaman bazlı bucket (timestamp bucket)
+- Daily bars: doğru aggregation
+- return_1d: günlük return (tick-to-tick değil)
+- momentum_5d/20d: timeframe bazlı
+- MACD signal: gerçek 9-period EMA
+- RSI: tek canonical Wilder implementation
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from collections import deque
@@ -30,35 +35,78 @@ class OHLCBar:
 
 
 @dataclass
-class RollingWindow:
-    """Rolling window — sabit boyutlu deque."""
-    size: int
-    values: deque = field(default_factory=deque)
+class TimeframeState:
+    """Belirli bir timeframe için state (1m, 5m, 15m, 1h, 1d)."""
+    timeframe: str
+    bar_duration: timedelta
+    current_bar: Optional[OHLCBar] = None
+    completed_bars: deque = field(default_factory=lambda: deque(maxlen=252))
 
-    def append(self, value: float):
-        self.values.append(value)
-        if len(self.values) > self.size:
-            self.values.popleft()
+    def process_tick(self, price: float, volume: int, timestamp: datetime) -> Optional[OHLCBar]:
+        """Tick işle, gerekirse bar tamamla ve döndür."""
+        # Bar bucket timestamp
+        if self.bar_duration.total_seconds() >= 86400:
+            # Daily: günün başı
+            bar_ts = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
+        elif self.bar_duration.total_seconds() >= 3600:
+            # Hourly: saatin başı
+            bar_ts = timestamp.replace(minute=0, second=0, microsecond=0)
+        else:
+            # Minute-based: dakika bucket
+            total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
+            bucket_seconds = int(self.bar_duration.total_seconds())
+            bucketed = (total_seconds // bucket_seconds) * bucket_seconds
+            bar_ts = timestamp.replace(
+                hour=bucketed // 3600,
+                minute=(bucketed % 3600) // 60,
+                second=bucketed % 60,
+                microsecond=0,
+            )
 
-    def mean(self) -> float:
-        return np.mean(self.values) if self.values else 0.0
+        completed_bar = None
 
-    def std(self) -> float:
-        return np.std(self.values) if len(self.values) > 1 else 0.0
+        if self.current_bar is None:
+            # İlk bar
+            self.current_bar = OHLCBar(
+                timestamp=bar_ts, open=price, high=price, low=price,
+                close=price, volume=volume, trade_count=1, vwap=price,
+            )
+        elif bar_ts > self.current_bar.timestamp:
+            # Yeni bar zamanı → eski bar'ı tamamla
+            self.current_bar.is_complete = True
+            completed_bar = self.current_bar
+            self.completed_bars.append(self.current_bar)
 
-    def last(self) -> float:
-        return self.values[-1] if self.values else 0.0
+            # Yeni bar başlat
+            self.current_bar = OHLCBar(
+                timestamp=bar_ts, open=price, high=price, low=price,
+                close=price, volume=volume, trade_count=1, vwap=price,
+            )
+        else:
+            # Aynı bar içinde → güncelle
+            self.current_bar.high = max(self.current_bar.high, price)
+            self.current_bar.low = min(self.current_bar.low, price)
+            self.current_bar.close = price
+            self.current_bar.volume += volume
+            self.current_bar.trade_count += 1
+            total_val = self.current_bar.vwap * (self.current_bar.volume - volume) + price * volume
+            self.current_bar.vwap = total_val / self.current_bar.volume if self.current_bar.volume > 0 else price
 
-    def __len__(self):
-        return len(self.values)
+        return completed_bar
+
+    def get_all_bars(self) -> List[OHLCBar]:
+        """Tüm tamamlanmış bar'ları döndür."""
+        return list(self.completed_bars)
+
+    def get_last_n_bars(self, n: int) -> List[OHLCBar]:
+        """Son n tamamlanmış bar'ı döndür."""
+        bars = list(self.completed_bars)
+        return bars[-n:] if len(bars) >= n else bars
 
 
 @dataclass
 class IncrementalAssetState:
-    """
-    Her hissenin incremental state'i.
-    Tick geldiğinde sadece değişen değerler güncellenir.
-    """
+    """Her hissenin incremental state'i — v1.2 düzeltmeler."""
 
     instrument_id: int
     ticker: str
@@ -67,39 +115,35 @@ class IncrementalAssetState:
     # Current price
     price: float = 0.0
     previous_price: float = 0.0
+    previous_close_daily: float = 0.0  # Önceki günün kapanış fiyatı
 
-    # OHLC bars (tick'ten üretilen gerçek bar'lar)
-    current_bar: Optional[OHLCBar] = None
-    bars_1m: deque = field(default_factory=lambda: deque(maxlen=100))
-    bars_5m: deque = field(default_factory=lambda: deque(maxlen=100))
-    bars_1d: deque = field(default_factory=lambda: deque(maxlen=252))
+    # Timeframe states (zaman bazlı bar aggregation)
+    tf_1m: TimeframeState = field(default_factory=lambda: TimeframeState("1m", timedelta(minutes=1)))
+    tf_5m: TimeframeState = field(default_factory=lambda: TimeframeState("5m", timedelta(minutes=5)))
+    tf_15m: TimeframeState = field(default_factory=lambda: TimeframeState("15m", timedelta(minutes=15)))
+    tf_1h: TimeframeState = field(default_factory=lambda: TimeframeState("1h", timedelta(hours=1)))
+    tf_1d: TimeframeState = field(default_factory=lambda: TimeframeState("1d", timedelta(days=1)))
 
-    # Rolling windows (incremental)
-    returns_1d: RollingWindow = field(default_factory=lambda: RollingWindow(60))
-    volume_history: RollingWindow = field(default_factory=lambda: RollingWindow(20))
+    # Incremental RSI (Wilder's smoothing — tek canonical implementation)
+    rsi_14: float = 50.0
+    _avg_gain: float = 0.0
+    _avg_loss: float = 0.0
+    _rsi_initialized: bool = False
+    _rsi_period: int = 14
 
-    # Incremental EMA values
+    # Incremental EMA
     ema_12: float = 0.0
     ema_26: float = 0.0
-    ema_initialized: bool = False
+    ema_9_signal: float = 0.0  # MACD signal line
+    _ema_initialized: bool = False
 
-    # Incremental ATR
+    # Incremental ATR (tamamlanmış bar'lardan güncellenir)
     atr_14: float = 0.0
-    true_range_history: RollingWindow = field(default_factory=lambda: RollingWindow(14))
-    previous_high: float = 0.0
-    previous_low: float = 0.0
-    previous_close: float = 0.0
+    _atr_initialized: bool = False
+    _atr_multiplier: float = 13.0 / 14.0  # Wilder's smoothing
 
-    # Incremental RSI
-    rsi_14: float = 50.0
-    avg_gain: float = 0.0
-    avg_loss: float = 0.0
-    rsi_initialized: bool = False
-
-    # Volume stats
-    volume_avg_20d: float = 0.0
-    volume_std_20d: float = 0.0
-    volume_zscore: float = 0.0
+    # Volume stats (rolling window)
+    _volume_history: deque = field(default_factory=lambda: deque(maxlen=20))
 
     # Computed features cache
     features_cache: Dict[str, float] = field(default_factory=dict)
@@ -107,172 +151,116 @@ class IncrementalAssetState:
 
     def process_tick(self, price: float, volume: int, timestamp: datetime):
         """
-        Yeni tick geldiğinde state'i incremental güncelle.
-        Tüm geçmişi yeniden okumaz.
+        Yeni tick → tüm timeframe'leri güncelle.
+        Tamamlanan bar'lar → indicator güncelleme.
         """
         self.previous_price = self.price
         self.price = price
         self.last_update = timestamp
 
-        # Update current OHLC bar
-        self._update_current_bar(price, volume, timestamp)
+        # Her timeframe için tick'i işle
+        for tf in [self.tf_1m, self.tf_5m, self.tf_15m, self.tf_1h, self.tf_1d]:
+            completed_bar = tf.process_tick(price, volume, timestamp)
 
-        # Update rolling windows
-        if self.previous_price > 0:
-            ret = (price / self.previous_price - 1) * 100
-            self.returns_1d.append(ret)
+            # 1m bar tamamlandı → RSI, EMA güncelle
+            if tf == self.tf_1m and completed_bar:
+                self._update_rsi(completed_bar.close)
+                self._update_ema(completed_bar.close)
 
-        self.volume_history.append(volume)
+            # 1m bar tamamlandı → ATR güncelle (completed bar'dan)
+            if tf == self.tf_1m and completed_bar:
+                self._update_atr_from_bar(completed_bar)
 
-        # Update incremental indicators
-        self._update_ema(price)
-        self._update_rsi(price)
-        self._update_atr(price, 0, 0)  # High/Low bilgisi yoksa close kullan
+            # 1d bar tamamlandı → günlük referans fiyat güncelle
+            if tf == self.tf_1d and completed_bar:
+                self.previous_close_daily = completed_bar.close
 
-        # Update volume stats
-        if len(self.volume_history) >= 5:
-            self.volume_avg_20d = self.volume_history.mean()
-            self.volume_std_20d = self.volume_history.std()
-            if self.volume_std_20d > 0:
-                self.volume_zscore = (volume - self.volume_avg_20d) / self.volume_std_20d
+        # Volume history
+        self._volume_history.append(volume)
 
         self.features_dirty = True
 
-    def _update_current_bar(self, price: float, volume: int, timestamp: datetime):
-        """Mevcut OHLC bar'ını güncelle veya yeni bar başlat."""
-        # 1 dakikalık bar
-        bar_minute = timestamp.replace(second=0, microsecond=0)
+    # =====================================================
+    # RSI — Wilder's Smoothing (tek canonical implementation)
+    # =====================================================
 
-        if self.current_bar is None or self.current_bar.timestamp < bar_minute:
-            # Önceki bar'ı kapat
-            if self.current_bar is not None:
-                self.current_bar.is_complete = True
-                self.bars_1m.append(self.current_bar)
-                self._aggregate_bars()
-
-            # Yeni bar başlat
-            self.current_bar = OHLCBar(
-                timestamp=bar_minute,
-                open=price,
-                high=price,
-                low=price,
-                close=price,
-                volume=volume,
-                trade_count=1,
-                vwap=price,
-            )
-        else:
-            # Mevcut bar'ı güncelle
-            self.current_bar.high = max(self.current_bar.high, price)
-            self.current_bar.low = min(self.current_bar.low, price)
-            self.current_bar.close = price
-            self.current_bar.volume += volume
-            self.current_bar.trade_count += 1
-            total_value = self.current_bar.vwap * (self.current_bar.volume - volume) + price * volume
-            self.current_bar.vwap = total_value / self.current_bar.volume if self.current_bar.volume > 0 else price
-
-    def _aggregate_bars(self):
-        """1dk bar'lardan 5dk ve günlük bar'ları聚合le."""
-        # 5 dakikalık bar
-        if len(self.bars_1m) >= 5 and len(self.bars_1m) % 5 == 0:
-            last_5 = list(self.bars_1m)[-5:]
-            bar_5m = OHLCBar(
-                timestamp=last_5[0].timestamp,
-                open=last_5[0].open,
-                high=max(b.high for b in last_5),
-                low=min(b.low for b in last_5),
-                close=last_5[-1].close,
-                volume=sum(b.volume for b in last_5),
-                trade_count=sum(b.trade_count for b in last_5),
-                is_complete=True,
-            )
-            self.bars_5m.append(bar_5m)
-
-    def _update_ema(self, price: float):
-        """Incremental EMA güncelleme."""
-        if not self.ema_initialized:
-            self.ema_12 = price
-            self.ema_26 = price
-            self.ema_initialized = True
-        else:
-            alpha_12 = 2.0 / 13
-            alpha_26 = 2.0 / 27
-            self.ema_12 = alpha_12 * price + (1 - alpha_12) * self.ema_12
-            self.ema_26 = alpha_26 * price + (1 - alpha_26) * self.ema_26
-
-    def _update_rsi(self, price: float):
-        """Incremental RSI güncelleme (Wilder's smoothing)."""
+    def _update_rsi(self, close: float):
+        """Wilder's RSI — incremental."""
         if self.previous_price == 0:
             return
 
-        change = price - self.previous_price
+        change = close - self.previous_price
         gain = max(change, 0)
         loss = max(-change, 0)
 
-        if not self.rsi_initialized:
-            self.avg_gain = gain
-            self.avg_loss = loss
-            self.rsi_initialized = True
+        if not self._rsi_initialized:
+            self._avg_gain = gain
+            self._avg_loss = loss
+            self._rsi_initialized = True
         else:
-            # Wilder's smoothing
-            self.avg_gain = (self.avg_gain * 13 + gain) / 14
-            self.avg_loss = (self.avg_loss * 13 + loss) / 14
+            # Wilder's smoothing: (prev * (period-1) + current) / period
+            self._avg_gain = (self._avg_gain * (self._rsi_period - 1) + gain) / self._rsi_period
+            self._avg_loss = (self._avg_loss * (self._rsi_period - 1) + loss) / self._rsi_period
 
-        if self.avg_loss == 0:
+        if self._avg_loss == 0:
             self.rsi_14 = 100.0
         else:
-            rs = self.avg_gain / self.avg_loss
+            rs = self._avg_gain / self._avg_loss
             self.rsi_14 = 100 - (100 / (1 + rs))
 
-    def _update_atr(self, high: float, low: float, close: float):
-        """Incremental ATR güncelleme."""
-        # Tick'ten geldiğinde high/low yok, sadece close
-        if high == 0:
-            high = self.price
-            low = self.price
+    # =====================================================
+    # EMA — Incremental (MACD signal dahil)
+    # =====================================================
 
-        if self.previous_close > 0:
-            tr = max(
-                high - low,
-                abs(high - self.previous_close),
-                abs(low - self.previous_close)
-            )
-            self.true_range_history.append(tr)
+    def _update_ema(self, close: float):
+        """Incremental EMA + MACD signal line."""
+        if not self._ema_initialized:
+            self.ema_12 = close
+            self.ema_26 = close
+            self.ema_9_signal = close - close  # MACD = 0
+            self._ema_initialized = True
+        else:
+            alpha_12 = 2.0 / 13
+            alpha_26 = 2.0 / 27
+            alpha_9 = 2.0 / 10
 
-            if len(self.true_range_history) >= 14:
-                # Wilder's ATR
-                if self.atr_14 == 0:
-                    self.atr_14 = self.true_range_history.mean()
-                else:
-                    self.atr_14 = (self.atr_14 * 13 + self.true_range_history.last()) / 14
+            self.ema_12 = alpha_12 * close + (1 - alpha_12) * self.ema_12
+            self.ema_26 = alpha_26 * close + (1 - alpha_26) * self.ema_26
 
-        self.previous_high = high
-        self.previous_low = low
-        self.previous_close = self.price
+            macd_line = self.ema_12 - self.ema_26
+            self.ema_9_signal = alpha_9 * macd_line + (1 - alpha_9) * self.ema_9_signal
 
-    def get_daily_bars_numpy(self) -> Dict[str, np.ndarray]:
-        """Günlük bar'ları numpy array olarak döndür (feature calculation için)."""
-        bars = list(self.bars_1d)
-        if not bars:
-            # Fallback: son 60 1dk bar'ından günlük bar üret
-            bars = list(self.bars_1m)[-60:]
+    # =====================================================
+    # ATR — Tamamlanmış Bar'lardan (Wilder's)
+    # =====================================================
 
-        if not bars:
-            return {}
+    def _update_atr_from_bar(self, bar: OHLCBar):
+        """ATR güncelle — completed bar'dan, tick'ten değil."""
+        if self.previous_price == 0:
+            # İlk bar, TR hesaplanamaz
+            return
 
-        return {
-            "open": np.array([b.open for b in bars]),
-            "high": np.array([b.high for b in bars]),
-            "low": np.array([b.low for b in bars]),
-            "close": np.array([b.close for b in bars]),
-            "volume": np.array([b.volume for b in bars]),
-        }
+        # True Range = max(high-low, |high-prev_close|, |low-prev_close|)
+        prev_close = self.previous_price
+        tr = max(
+            bar.high - bar.low,
+            abs(bar.high - prev_close),
+            abs(bar.low - prev_close),
+        )
+
+        if not self._atr_initialized:
+            self.atr_14 = tr
+            self._atr_initialized = True
+        else:
+            # Wilder's ATR smoothing
+            self.atr_14 = (self.atr_14 * self._atr_multiplier + tr * (1 - self._atr_multiplier))
+
+    # =====================================================
+    # Feature Output
+    # =====================================================
 
     def get_incremental_features(self) -> Dict[str, float]:
-        """
-        Incremental olarak hesaplanmış feature'ları döndür.
-        Tüm geçmişi yeniden hesaplamaz.
-        """
+        """Incremental feature'ları döndür."""
         if not self.features_dirty:
             return self.features_cache
 
@@ -280,31 +268,43 @@ class IncrementalAssetState:
 
         # Price
         features["price"] = self.price
-        if self.previous_price > 0:
-            features["return_1d"] = (self.price / self.previous_price - 1) * 100
 
-        # RSI (incremental)
+        # Return 1d (önceki güne göre)
+        if self.previous_close_daily > 0:
+            features["return_1d"] = (self.price / self.previous_close_daily - 1) * 100
+
+        # RSI
         features["rsi_14"] = self.rsi_14
 
-        # EMA (incremental)
+        # EMA
         features["ema_12"] = self.ema_12
         features["ema_26"] = self.ema_26
-        features["macd"] = self.ema_12 - self.ema_26
 
-        # ATR (incremental)
+        # MACD (gerçek signal line ile)
+        macd_line = self.ema_12 - self.ema_26
+        features["macd"] = macd_line
+        features["macd_signal"] = self.ema_9_signal
+        features["macd_histogram"] = macd_line - self.ema_9_signal
+
+        # ATR
         features["atr_14"] = self.atr_14
         if self.price > 0:
             features["atr_14_pct"] = self.atr_14 / self.price * 100
 
-        # Volume (incremental)
-        features["volume_zscore"] = self.volume_zscore
-        features["volume_avg_20d"] = self.volume_avg_20d
+        # Volume stats
+        if len(self._volume_history) >= 5:
+            vol_arr = np.array(list(self._volume_history))
+            features["volume_avg"] = float(np.mean(vol_arr))
+            vol_std = float(np.std(vol_arr))
+            if vol_std > 0:
+                features["volume_zscore"] = (vol_arr[-1] - features["volume_avg"]) / vol_std
 
-        # Rolling returns
-        if len(self.returns_1d) >= 5:
-            features["momentum_5d"] = sum(list(self.returns_1d.values)[-5:])
-        if len(self.returns_1d) >= 20:
-            features["momentum_20d"] = sum(list(self.returns_1d.values)[-20:])
+        # Momentum from completed bars
+        bars_1d = self.tf_1d.get_all_bars()
+        if len(bars_1d) >= 5:
+            features["momentum_5d"] = (bars_1d[-1].close / bars_1d[-5].close - 1) * 100
+        if len(bars_1d) >= 20:
+            features["momentum_20d"] = (bars_1d[-1].close / bars_1d[-20].close - 1) * 100
 
         self.features_cache = features
         self.features_dirty = False
@@ -321,14 +321,12 @@ class IncrementalStateManager:
     def get_or_create(self, instrument_id: int, ticker: str) -> IncrementalAssetState:
         if instrument_id not in self._states:
             self._states[instrument_id] = IncrementalAssetState(
-                instrument_id=instrument_id,
-                ticker=ticker,
+                instrument_id=instrument_id, ticker=ticker,
             )
         return self._states[instrument_id]
 
     def process_tick(self, instrument_id: int, ticker: str,
                      price: float, volume: int, timestamp: datetime):
-        """Tick işle — incremental state güncelle."""
         state = self.get_or_create(instrument_id, ticker)
         state.process_tick(price, volume, timestamp)
         return state

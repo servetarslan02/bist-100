@@ -148,7 +148,7 @@ class IngestionService:
                             instrument_id = self._instrument_map.get(ticker)
                             if instrument_id:
                                 # Publish tick event
-                                event = AlphaEvent(
+                                event = CanonicalEvent(
                                     event_type=EventType.MARKET_TICK,
                                     source="yfinance",
                                     data={
@@ -172,7 +172,7 @@ class IngestionService:
                     try:
                         idx_data = yfinance_provider.fetch_index(index_symbol)
                         if idx_data:
-                            event = AlphaEvent(
+                            event = CanonicalEvent(
                                 event_type=EventType.MARKET_TICK,
                                 source="yfinance",
                                 data={
@@ -220,7 +220,7 @@ class IngestionService:
                     ticker = disc.get("ticker", "")
                     instrument_id = self._instrument_map.get(ticker)
 
-                    event = AlphaEvent(
+                    event = CanonicalEvent(
                         event_type=EventType.KAP_EVENT,
                         source="kap",
                         data={
@@ -251,7 +251,8 @@ class IngestionService:
     # =====================================================
     # Macro Loop
     # =====================================================
-async def _macro_loop(self):
+
+    async def _macro_loop(self):
         """Periodically fetch macro data."""
         while self._running:
             try:
@@ -262,7 +263,7 @@ async def _macro_loop(self):
                     tcmb_provider.api_key = settings.tcmb_evds_api_key
                     macro_data = tcmb_provider.fetch_all_macro()
 
-                    event = AlphaEvent(
+                    event = CanonicalEvent(
                         event_type=EventType.MACRO_EVENT,
                         source="tcmb",
                         data=macro_data,
@@ -272,7 +273,7 @@ async def _macro_loop(self):
                 # Fetch yfinance macro
                 macro_yf = yfinance_provider.fetch_macro()
 
-                event = AlphaEvent(
+                event = CanonicalEvent(
                     event_type=EventType.MACRO_EVENT,
                     source="yfinance",
                     data=macro_yf,
@@ -305,7 +306,7 @@ async def _macro_loop(self):
                     articles = news_provider.fetch_newsapi()
 
                     for article in articles:
-                        event = AlphaEvent(
+                        event = CanonicalEvent(
                             event_type=EventType.NEWS_RAW,
                             source="newsapi",
                             data=article,
@@ -315,7 +316,7 @@ async def _macro_loop(self):
                 # Fetch from RSS
                 rss_articles = news_provider.fetch_financial_news_rss()
                 for article in rss_articles:
-                    event = AlphaEvent(
+                    event = CanonicalEvent(
                         event_type=EventType.NEWS_RAW,
                         source="rss",
                         data=article,
