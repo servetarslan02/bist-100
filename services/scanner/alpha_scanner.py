@@ -104,6 +104,8 @@ class AlphaScanner:
         features_map: Dict[str, Dict[str, float]],
         market_regime: str = "RANGE",
         regime_confidence: float = 0.5,
+        ml_scores: Optional[Dict[str, float]] = None,
+        event_scores: Optional[Dict[str, float]] = None,
     ) -> List[ScannerResult]:
         """
         Tüm BIST'i tara → sonuçları döndür.
@@ -126,7 +128,9 @@ class AlphaScanner:
             if not features:
                 continue
 
-            result = self._scan_single(ticker, features)
+            ml = (ml_scores or {}).get(ticker, 50.0)
+            evt = (event_scores or {}).get(ticker, 50.0)
+            result = self._scan_single(ticker, features, ml, evt)
             results.append(result)
 
         # Tier 2: Opportunity ranking
@@ -150,7 +154,7 @@ class AlphaScanner:
 
         return results
 
-    def _scan_single(self, ticker: str, f: Dict[str, float]) -> ScannerResult:
+    def _scan_single(self, ticker: str, f: Dict[str, float], ml_score: float = 50.0, event_score: float = 50.0) -> ScannerResult:
         """Tek hisse için quant scan."""
         r = ScannerResult(ticker=ticker, timestamp=datetime.utcnow())
 
@@ -178,8 +182,8 @@ class AlphaScanner:
         r.volume_acceleration = self._calc_volume_acceleration(f)
         r.market_regime_fit = self._calc_regime_fit(f)
 
-        # Opportunity score
-        r.opportunity_score = self._calc_opportunity_score(r)
+        # Opportunity score (ML ve event skorları dahil)
+        r.opportunity_score = self._calc_opportunity_score(r, ml_score, event_score)
 
         return r
 
@@ -235,7 +239,7 @@ class AlphaScanner:
                 return 50
         return 50
 
-    def _calc_opportunity_score(self, r: ScannerResult) -> float:
+    def _calc_opportunity_score(self, r: ScannerResult, ml_score: float = 50.0, event_score: float = 50.0) -> float:
         """
         Opportunity Score = ağırlıklı toplam.
 
@@ -245,8 +249,8 @@ class AlphaScanner:
         10% breakout
         10% volatility_structure
         10% market_regime_fit
-        10% event_impact (şimdilik 0)
-        10% ML_probability (şimdilik 0)
+        10% event_impact (ML + haber + KAP etkisi)
+        10% ML_probability (model tahmin skoru)
         """
         # Momentum skoru (0-100)
         mom_score = 50
@@ -277,14 +281,14 @@ class AlphaScanner:
         vol_struct = 50
         if r.volatility > 0:
             if r.atr_pct < 2:
-                vol_struct = 70  # düşük volatilite = sıkışma
+                vol_struct = 70
             elif r.atr_pct > 5:
-                vol_struct = 40  # yüksek volatilite = risk
+                vol_struct = 40
 
         # Regime fit
         regime_score = r.market_regime_fit
 
-        # Ağırlıklı toplam
+        # Ağırlıklı toplam (ML ve event artık gerçek skor)
         score = (
             mom_score * 0.20
             + rs_score * 0.15
@@ -292,8 +296,8 @@ class AlphaScanner:
             + brk_score * 0.10
             + vol_struct * 0.10
             + regime_score * 0.10
-            + 50 * 0.10  # event placeholder
-            + 50 * 0.10  # ML placeholder
+            + event_score * 0.10
+            + ml_score * 0.10
         )
 
         return round(max(0, min(100, score)), 1)
@@ -325,11 +329,31 @@ class AlphaScanner:
             r.signal_type = SignalType.REGIME
             r.signal_score = score
         else:
-            r.signal_type = SignalType.SPEC
-            r.signal_score = score
+            # SPEC = residual anomaly (diğer modellerin açıklayamadığı)
+            # Kriterler: volume anomaly + fiyat sapması + cross-sectional deviation
+            if (r.volume_zscore > 2.0
+                and abs(r.roc_5d) > 2.0
+                and r.breakout_score < 50  # Breakout değil
+                and r.market_regime_fit < 60):  # Regime uyumu düşük
+                r.signal_type = SignalType.SPEC
+                r.signal_score = score
+            else:
+                # SPEC kriterleri karşılanmadı — sinyal üretme
+                return
 
-        # Yön
-        r.signal_direction = "LONG" if r.roc_20d > 0 else "SHORT"
+        # Yön — sinyal türüne göre akıllı belirleme
+        if r.signal_type == SignalType.REVERSAL:
+            # Reversal: düşüş sonrası LONG (dip dönüş)
+            r.signal_direction = "LONG" if r.rsi < 35 else "SHORT"
+        elif r.signal_type == SignalType.ACCUMULATION:
+            # Accumulation: genellikle LONG
+            r.signal_direction = "LONG"
+        elif r.signal_type == SignalType.EVENT:
+            # Event: sentiment'e göre
+            r.signal_direction = "LONG"  # Varsayılan, event analizi belirler
+        else:
+            # Diğer: momentum'a göre
+            r.signal_direction = "LONG" if r.roc_20d > 0 else "SHORT"
 
         # Confidence
         r.signal_confidence = min(score / 100, 0.95)
