@@ -89,8 +89,8 @@ class LiveScanner:
     def _check_candidate(self, ticker: str, state: Dict) -> Optional[Dict]:
         """Bu hisse aday mı?"""
         vol_z = state.get("vol_z", 0)
-        change = abs(state.get("change_pct", 0))
-        momentum = abs(state.get("momentum", 0))
+        tick_change = abs(state.get("tick_change_pct", 0))
+        tick_momentum = abs(state.get("tick_momentum", 0))
 
         # Kriter 1: Hacim anomalisi
         if vol_z > 3.0:

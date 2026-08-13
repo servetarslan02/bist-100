@@ -159,8 +159,12 @@ class AlphaEngine:
             # 1. Event score güncelle
             self._event_scores[ticker] = self._events.get_event_score(ticker)
 
-            # 2. Feature varsa derin analiz yap
+            # 2. Feature varsa derin analiz yap, yoksa hızlı feature hesapla
             features = self._features_map.get(ticker)
+            if not features:
+                # Fallback: hızlı feature hesaplama
+                features = self._compute_single_feature(ticker)
+
             if features:
                 ml_score = self._ml_scores.get(ticker, 50.0)
                 event_score = self._event_scores.get(ticker, 50.0)
@@ -259,6 +263,35 @@ class AlphaEngine:
         elif 45 < breadth < 55 and avg_mom > 0: return "RECOVERY", 0.6
         elif avg_vol < 12: return "LOW-VOLATILITY", 0.6
         else: return "RANGE", 0.5
+
+    def _compute_single_feature(self, ticker: str) -> Optional[Dict[str, float]]:
+        """Tek hisse için hızlı feature hesaplama (event fallback)."""
+        import yfinance as yf
+        import polars as pl
+        from ..features.calculator import FeatureCalculator
+
+        try:
+            t = yf.Ticker(f"{ticker}.IS")
+            hist = t.history(period="60d").reset_index()
+            if len(hist) < 20:
+                return None
+
+            df = pl.from_pandas(hist[["Date", "Open", "High", "Low", "Close", "Volume"]])
+            df = df.rename({"Date": "timestamp", "Open": "open", "High": "high",
+                           "Low": "low", "Close": "close", "Volume": "volume"})
+            df = df.drop_nulls(subset=["close"])
+
+            fc = FeatureCalculator()
+            features = fc.compute_all_features(df)
+            if features:
+                close_list = [x for x in df["close"].to_list() if x is not None]
+                features["price"] = close_list[-1] if close_list else 0
+                self._features_map[ticker] = features
+                return features
+        except Exception as e:
+            logger.warning("Single feature computation failed", ticker=ticker, error=str(e))
+
+        return None
 
     def _compute_ml_scores(self) -> Dict[str, float]:
         """Quant Probability Proxy — feature-based heuristic score.

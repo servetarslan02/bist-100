@@ -172,7 +172,7 @@ class EventScanner:
     def get_event_score(self, ticker: str) -> float:
         """
         Event etki skoru (0-100).
-        Bu skor Opportunity Score'a dahil edilir.
+        Event yönü (pozitif/negatif) ile birlikte hesaplanır.
         """
         pending = self._pending_rescans.get(ticker)
         if not pending:
@@ -180,17 +180,23 @@ class EventScanner:
 
         importance = pending.get("importance", 0)
         event_type = pending.get("event_type", "")
+        direction = pending.get("direction", 0)  # -1, 0, +1
 
-        # Event tipine göre skor
+        # Event tipine göre base skor
         base_score = 50
         if event_type == "KAP":
-            base_score += importance * 40
+            base_score += importance * 40 * direction
         elif event_type == "NEWS":
-            base_score += importance * 30
+            base_score += importance * 30 * direction
         elif event_type == "MACRO":
-            base_score += importance * 25
+            base_score += importance * 25 * direction
 
-        return min(100, base_score)
+        return max(0, min(100, base_score))
+
+    def set_event_direction(self, ticker: str, direction: int):
+        """Event yönünü belirle: +1 pozitif, -1 negatif, 0 nötr."""
+        if ticker in self._pending_rescans:
+            self._pending_rescans[ticker]["direction"] = direction
 
 
 # Singleton
