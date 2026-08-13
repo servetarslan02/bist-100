@@ -159,7 +159,7 @@ class AlphaScanner:
         r = ScannerResult(ticker=ticker, timestamp=datetime.utcnow())
 
         # State
-        r.price = f.get("price", 0) or f.get("close", 0)
+        r.price = f.get("price", 0) or f.get("close", 0) or f.get("current_price", 0)
         r.change_1d_pct = f.get("return_1d", 0)
         r.volume = int(f.get("volume", 0))
         r.volume_ratio = f.get("volume_ratio_20d", 1.0)

@@ -339,6 +339,8 @@ class DecisionEngine:
     def _calculate_targets(self, inp: DecisionInput) -> Dict[str, float]:
         """Hedef fiyatları hesapla."""
         price = inp.price
+        if price <= 0:
+            return {"1w": 0, "1m": 0, "3m": 0}
         atr = price * 0.02  # Yaklaşık ATR
 
         return {
@@ -349,6 +351,8 @@ class DecisionEngine:
 
     def _calculate_stop(self, inp: DecisionInput) -> tuple:
         """Stop loss hesapla."""
+        if inp.price <= 0:
+            return 0, "ATR"
         atr = inp.price * 0.02
         stop = inp.price - atr * 2
         max_stop = inp.price * 0.93  # Max %7
