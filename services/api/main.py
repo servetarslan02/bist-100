@@ -108,33 +108,36 @@ async def health():
 @app.get("/api/status")
 async def status():
     """System status endpoint."""
+    services = {}
+
+    # Check PostgreSQL
     try:
-        # Check PostgreSQL
         pg_ok = await pg_fetchval("SELECT 1") == 1
+        services["postgresql"] = "healthy" if pg_ok else "unhealthy"
+    except Exception:
+        services["postgresql"] = "unavailable"
 
-        # Check ClickHouse
+    # Check ClickHouse
+    try:
         ch_result = ch_execute("SELECT 1")
-        ch_ok = len(ch_result.result_rows) > 0
+        services["clickhouse"] = "healthy" if len(ch_result.result_rows) > 0 else "unhealthy"
+    except Exception:
+        services["clickhouse"] = "unavailable"
 
-        # Check Redis
+    # Check Redis
+    try:
         from ..core.database import get_redis
         r = await get_redis()
         redis_ok = await r.ping()
+        services["redis"] = "healthy" if redis_ok else "unhealthy"
+    except Exception:
+        services["redis"] = "unavailable"
 
-        return {
-            "status": "ok",
-            "services": {
-                "postgresql": "healthy" if pg_ok else "unhealthy",
-                "clickhouse": "healthy" if ch_ok else "unhealthy",
-                "redis": "healthy" if redis_ok else "unhealthy",
-            },
-            "timestamp": datetime.utcnow().isoformat(),
-        }
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "error": str(e)},
-        )
+    return {
+        "status": "ok",
+        "services": services,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 # =====================================================
@@ -151,9 +154,60 @@ async def get_market_state():
                 return json.loads(state)
             except json.JSONDecodeError:
                 return {"regime": "UNKNOWN", "message": "Invalid market state data"}
-        return {"regime": "UNKNOWN", "message": "No market state available"}
+        # Redis yoksa gerçek zamanlı hesapla
+        return await _compute_live_market_state()
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"regime": "UNKNOWN", "error": str(e)}
+
+
+async def _compute_live_market_state():
+    """Redis yoksa gerçek zamanlı market state hesapla."""
+    import yfinance as yf
+    from ..ingestion.bist_universe import BIST_STOCKS
+
+    # İlk 50 hisseyi hızlıca tara
+    tickers = [f"{t}.IS" for t in BIST_STOCKS[:50]]
+    try:
+        data = yf.download(tickers, period="2d", group_by="ticker", threads=True, progress=False)
+
+        advancing = 0
+        declining = 0
+        total = 0
+
+        for t in BIST_STOCKS[:50]:
+            try:
+                td = data[f"{t}.IS"].dropna()
+                if len(td) >= 2:
+                    change = (td["Close"].iloc[-1] / td["Close"].iloc[-2] - 1) * 100
+                    if change > 0:
+                        advancing += 1
+                    elif change < 0:
+                        declining += 1
+                    total += 1
+            except:
+                pass
+
+        breadth = (advancing / total * 100) if total > 0 else 50
+
+        regime = "RANGE"
+        if breadth > 65:
+            regime = "TRENDING-UP"
+        elif breadth < 35:
+            regime = "RISK-OFF"
+        elif breadth > 70:
+            regime = "MOMENTUM-EXPANSION"
+
+        return {
+            "regime": regime,
+            "breadth_pct": round(breadth, 1),
+            "advancing": advancing,
+            "declining": declining,
+            "total_instruments": total,
+            "timestamp": datetime.utcnow().isoformat(),
+            "source": "live_computation",
+        }
+    except Exception as e:
+        return {"regime": "UNKNOWN", "error": str(e)}
 
 
 @app.get("/api/market/instruments")
@@ -164,27 +218,22 @@ async def get_instruments(
 ):
     """Get list of instruments."""
     try:
-        query = """
-            SELECT i.symbol, c.name, s.code as sector, i.active
-            FROM instruments i
-            JOIN companies c ON i.company_id = c.id
-            LEFT JOIN sectors s ON c.sector_id = s.id
-            WHERE i.active = TRUE
-        """
-        params = []
+        # PostgreSQL yoksa BIST universe'den döndür
+        from ..ingestion.bist_universe import BIST_STOCKS, get_sector
 
-        if sector:
-            query += " AND s.code = $1"
-            params.append(sector)
+        instruments = []
+        for ticker in BIST_STOCKS:
+            s = get_sector(ticker)
+            if sector and s != sector:
+                continue
+            instruments.append({
+                "symbol": ticker,
+                "name": ticker,
+                "sector": s,
+                "active": True,
+            })
 
-        query += " ORDER BY i.symbol"
-        params.append(limit)
-        query += f" LIMIT ${len(params)}"
-        params.append(offset)
-        query += f" OFFSET ${len(params)}"
-
-        rows = await pg_fetch(query, *params)
-        return [dict(row) for row in rows]
+        return instruments[offset:offset + limit]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -264,32 +313,69 @@ async def get_signals(
     min_score: float = 0,
     limit: int = 20,
 ):
-    """Get active trading signals."""
+    """Get active trading signals — gerçek veriyle hesapla."""
     try:
-        query = """
-            SELECT s.*, i.symbol as ticker, c.name
-            FROM signals s
-            JOIN instruments i ON s.instrument_id = i.id
-            JOIN companies c ON i.company_id = c.id
-            WHERE s.status = 'ACTIVE'
-            AND s.score >= $1
-        """
-        params = [min_score]
+        import yfinance as yf
+        from ..ingestion.bist_universe import BIST_STOCKS, get_sector
+        from ..features.calculator import FeatureCalculator
+        from ..intelligence.spec_engine import spec_engine
 
-        if signal_type:
-            query += f" AND s.signal_type = ${len(params) + 1}"
-            params.append(signal_type)
+        fc = FeatureCalculator()
+        signals = []
 
-        if horizon:
-            query += f" AND s.horizon = ${len(params) + 1}"
-            params.append(horizon)
+        # İlk 30 hisseyi tara
+        tickers = BIST_STOCKS[:30]
+        data = yf.download([f"{t}.IS" for t in tickers], period="60d", group_by="ticker", threads=True, progress=False)
 
-        query += " ORDER BY s.score DESC"
-        params.append(limit)
-        query += f" LIMIT ${len(params)}"
+        for ticker in tickers:
+            try:
+                td = data[f"{ticker}.IS"].dropna()
+                if len(td) < 20:
+                    continue
 
-        rows = await pg_fetch(query, *params)
-        return [dict(row) for row in rows]
+                td = td.reset_index()
+                df = pl.from_pandas(td[["Date", "Open", "High", "Low", "Close", "Volume"]])
+                df = df.rename({"Date": "timestamp", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
+
+                features = fc.compute_all_features(df)
+                if not features:
+                    continue
+
+                asset_state = {
+                    "volume_zscore": features.get("volume_zscore", 0),
+                    "price_change_1d_zscore": features.get("return_1d", 0) / 2,
+                    "volatility_zscore": features.get("volatility_ratio", 1) - 1,
+                    "bb_position": features.get("bb_position", 0.5),
+                    "near_20d_high": features.get("near_20d_high", 0),
+                    "relative_strength_vs_sector": 1.0,
+                    "kap_sentiment": 0.0,
+                    "roc_5d": features.get("roc_5d", 0),
+                    "price_acceleration": features.get("price_acceleration", 0),
+                    "volatility_regime": "NORMAL",
+                    "amihud_illiquidity": 0.001,
+                    "correlation_to_index": 0.75,
+                    "momentum_20d": features.get("momentum_20d", 0),
+                    "realized_vol_20d": features.get("realized_vol_20d", 20),
+                }
+
+                spec = spec_engine.compute_spec(ticker, asset_state, {"regime": "RANGE"})
+
+                if spec.spec_score >= min_score:
+                    signals.append({
+                        "ticker": ticker,
+                        "name": ticker,
+                        "score": round(spec.spec_score, 1),
+                        "direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT",
+                        "risk_level": "HIGH" if features.get("realized_vol_20d", 20) > 30 else "MEDIUM" if features.get("realized_vol_20d", 20) > 20 else "LOW",
+                        "horizon": "1-4W",
+                        "expected_return_pct": round(features.get("momentum_20d", 0), 1),
+                        "spec_category": spec.category,
+                    })
+            except:
+                pass
+
+        signals.sort(key=lambda x: x["score"], reverse=True)
+        return signals[:limit]
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

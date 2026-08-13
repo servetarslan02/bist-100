@@ -28,7 +28,7 @@ logger = structlog.get_logger()
 # PostgreSQL (Async)
 # =====================================================
 
-_pg_pool: Optional[asyncpg.Pool] = None
+_pg_pool = None  # asyncpg.Pool when available
 
 
 async def get_pg_pool():
@@ -61,7 +61,7 @@ async def close_pg_pool():
 
 
 @asynccontextmanager
-async def get_pg_connection() -> AsyncGenerator[asyncpg.Connection, None]:
+async def get_pg_connection():
     """Get a PostgreSQL connection from the pool."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
@@ -74,13 +74,13 @@ async def pg_execute(query: str, *args) -> str:
         return await conn.execute(query, *args)
 
 
-async def pg_fetch(query: str, *args) -> List[asyncpg.Record]:
+async def pg_fetch(query: str, *args):
     """Fetch rows from PostgreSQL."""
     async with get_pg_connection() as conn:
         return await conn.fetch(query, *args)
 
 
-async def pg_fetchrow(query: str, *args) -> Optional[asyncpg.Record]:
+async def pg_fetchrow(query: str, *args):
     """Fetch a single row from PostgreSQL."""
     async with get_pg_connection() as conn:
         return await conn.fetchrow(query, *args)
@@ -96,7 +96,7 @@ async def pg_fetchval(query: str, *args) -> Any:
 # ClickHouse
 # =====================================================
 
-_ch_client: Optional[clickhouse_connect.driver.Client] = None
+_ch_client = None
 
 
 def get_ch_client():
@@ -149,7 +149,7 @@ def ch_query_df(query: str, parameters: Optional[Dict] = None):
 # Redis
 # =====================================================
 
-_redis: Optional[aioredis.Redis] = None
+_redis = None
 
 
 async def get_redis():
@@ -218,10 +218,19 @@ async def redis_publish(channel: str, message: str):
 
 async def init_databases():
     """Initialize all database connections."""
-    await get_pg_pool()
-    get_ch_client()
-    await get_redis()
-    logger.info("All database connections initialized")
+    try:
+        await get_pg_pool()
+    except Exception as e:
+        logger.warning(f"PostgreSQL not available: {e}")
+    try:
+        get_ch_client()
+    except Exception as e:
+        logger.warning(f"ClickHouse not available: {e}")
+    try:
+        await get_redis()
+    except Exception as e:
+        logger.warning(f"Redis not available: {e}")
+    logger.info("Database initialization completed")
 
 
 async def close_databases():
