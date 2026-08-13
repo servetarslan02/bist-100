@@ -14,7 +14,8 @@ from ..core.database import (
     redis_hgetall, redis_hset,
 )
 from ..core.event_bus import (
-    ensure_topics, AlphaEvent, EventType,
+from ..core.event_schema import CanonicalEvent
+    ensure_topics, EventType,
     EventConsumer, publish_event, flush_producer,
 )
 from ..core.logging import setup_logging

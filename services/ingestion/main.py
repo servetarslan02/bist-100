@@ -11,7 +11,8 @@ from ..core.database import (
     ch_insert, get_ch_client,
 )
 from ..core.event_bus import (
-    ensure_topics, publish_event, AlphaEvent, EventType,
+from ..core.event_schema import CanonicalEvent
+    ensure_topics, publish_event, EventType,
     flush_producer, EventConsumer,
 )
 from ..core.logging import setup_logging
