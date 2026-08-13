@@ -1,110 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
-interface Model {
-  id: number;
-  name: string;
-  description: string;
-  model_type: string;
-  framework: string;
-  target_variable: string;
-  status: string;
-  latest_version: string;
-  latest_status: string;
-  metrics: Record<string, number>;
-  backtest_metrics: Record<string, number>;
-}
+import { usePolling, type ModelInfo } from "@/lib/api";
 
 export default function ModelCenter() {
-  const [models, setModels] = useState<Model[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetchModels();
-  }, []);
-
-  async function fetchModels() {
-    try {
-      const res = await fetch("/api/models");
-      if (res.ok) {
-        setModels(await res.json());
-      }
-    } catch (e) {
-      console.error("Failed to fetch models:", e);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const { data: models, loading } = usePolling<ModelInfo[]>("/models", 30000);
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Model Center</h1>
+    <div className="p-4 space-y-4">
+      <div>
+        <h1 className="text-lg font-semibold text-zinc-100">Model Center</h1>
+        <p className="text-[11px] text-zinc-600">ML/AI model registry • champion/challenger</p>
+      </div>
 
-      <div className="grid grid-cols-1 gap-4">
-        {loading ? (
-          <div className="text-alpha-muted text-center py-8">Loading...</div>
-        ) : models.length === 0 ? (
-          <div className="bg-alpha-surface border border-alpha-border rounded-lg p-8 text-center">
-            <p className="text-alpha-muted">No models registered yet</p>
-            <p className="text-xs text-alpha-muted mt-2">Models will appear after first training cycle</p>
-          </div>
-        ) : (
-          models.map(model => (
-            <div key={model.id} className="bg-alpha-surface border border-alpha-border rounded-lg p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold">{model.name}</h3>
-                  <p className="text-sm text-alpha-muted">{model.description}</p>
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+        </div>
+      ) : !models || models.length === 0 ? (
+        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-8 text-center">
+          <p className="text-zinc-600 text-sm">No models registered yet</p>
+          <p className="text-zinc-700 text-[10px] mt-1">Models will appear after first training cycle</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {models.map(model => (
+            <div key={model.id} className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3 hover:border-zinc-700/60 transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-zinc-200">{model.name}</span>
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">{model.model_type}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs px-2 py-0.5 rounded bg-alpha-bg">{model.model_type}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded ${
-                    model.latest_status === "CHAMPION" ? "bg-green-900/30 text-green-400" :
-                    model.latest_status === "CANDIDATE" ? "bg-yellow-900/30 text-yellow-400" :
-                    "bg-alpha-bg text-alpha-muted"
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    model.latest_status === "CHAMPION" ? "bg-emerald-950 text-emerald-400" :
+                    model.latest_status === "CANDIDATE" ? "bg-amber-950 text-amber-400" :
+                    "bg-zinc-800 text-zinc-500"
                   }`}>
                     {model.latest_status || "DRAFT"}
+                  </span>
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${
+                    model.status === "ACTIVE" ? "bg-emerald-950 text-emerald-400" : "bg-zinc-800 text-zinc-500"
+                  }`}>
+                    {model.status}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                <div>
-                  <p className="text-alpha-muted text-xs">Framework</p>
-                  <p>{model.framework}</p>
-                </div>
-                <div>
-                  <p className="text-alpha-muted text-xs">Target</p>
-                  <p>{model.target_variable}</p>
-                </div>
-                <div>
-                  <p className="text-alpha-muted text-xs">Version</p>
-                  <p>{model.latest_version || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-alpha-muted text-xs">Status</p>
-                  <p>{model.status}</p>
-                </div>
+              <p className="text-[11px] text-zinc-600 mb-2">{model.description}</p>
+
+              <div className="flex items-center gap-4 text-[10px]">
+                <span className="text-zinc-600">Framework: <span className="text-zinc-400">{model.model_type}</span></span>
+                <span className="text-zinc-600">Version: <span className="text-zinc-400">{model.latest_version || "—"}</span></span>
               </div>
 
               {model.metrics && Object.keys(model.metrics).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-alpha-border">
-                  <p className="text-xs text-alpha-muted mb-2">Metrics</p>
-                  <div className="flex gap-4">
-                    {Object.entries(model.metrics).map(([key, value]) => (
-                      <div key={key}>
-                        <p className="text-xs text-alpha-muted">{key}</p>
-                        <p className="font-mono text-sm">{typeof value === "number" ? value.toFixed(4) : String(value)}</p>
-                      </div>
-                    ))}
-                  </div>
+                <div className="mt-2 pt-2 border-t border-zinc-800/60 flex gap-4">
+                  {Object.entries(model.metrics).map(([key, value]) => (
+                    <div key={key}>
+                      <p className="text-[9px] text-zinc-600 uppercase">{key.replace(/_/g, " ")}</p>
+                      <p className="text-[11px] font-mono text-zinc-300">
+                        {typeof value === "number" ? value.toFixed(4) : String(value)}
+                      </p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
