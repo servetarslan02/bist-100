@@ -505,3 +505,216 @@ tests/
 - [ ] 104 test dosyası yazıl (her modül için 1 test)
 - [ ] `pytest` ile tüm testler geçiyor
 - [ ] `run_system.py` sorunsuz çalışıyor
+
+---
+
+## GELİŞTİRME STANDARTLARI
+
+### 1. Modüller Arası İletişim
+
+**Sorun:** Şu an her modül doğrudan diğerini import ediyor. Bu tight coupling sorun yaratır — bir modül değişince diğeri bozulur.
+
+**Çözüm:** İki katmanlı iletişim:
+
+**a) Senkron çağrılar (doğrudan):**
+Sadece aynı katmandaki modüller birbirini doğrudan çağırabilir.
+```python
+# Core modülleri birbirini çağırabilir
+core.data_quality.check(...)
+core.reconciliation.reconcile(...)
+```
+
+**b) Asenkron event'ler (çapraz katman):**
+Farklı katmanlar arası iletişim event_bus üzerinden.
+```python
+# Intelligence, Core'a doğrudan çağrı yapmaz
+event_bus.publish("data.quality.checked", {"ticker": "THYAO", "quality": 95})
+
+# Core, event'i dinler
+event_bus.subscribe("data.quality.checked", handler)
+```
+
+**Kural:**
+- Core → Core: Doğrudan ✅
+- Features → Core: Doğrudan ✅
+- Intelligence → Features: Event ✅
+- Risk → Intelligence: Event ✅
+- Karar → Risk: Event ✅
+
+**Hangi modül hangi event'i publish/subscribe eder:**
+
+| Publisher | Event | Subscriber |
+|-----------|-------|------------|
+| data_quality | data.quality.checked | features, intelligence |
+| regime_engine | regime.detected | intelligence, risk |
+| factor_engine | factor.scored | intelligence |
+| signal_fusion | signal.generated | decision_engine |
+| decision_engine | decision.made | risk, portfolio |
+| risk_engine | risk.checked | portfolio, backtest |
+| portfolio | portfolio.updated | simulation, learning |
+
+### 2. Hata Yönetimi Stratejisi
+
+**Sorun:** Her modül kendi hatasını farklı şekilde handle ediyor. Standart yok.
+
+**Çözüm:** Üç seviyeli hata sınıflandırması:
+
+**Seviye 1 — Kritik (sistem durmalı):**
+```python
+class CriticalError(Exception):
+    """Risk motoru çalışmıyor, veri tabanı çöktü → TÜM İŞLEMLER DURUR"""
+    pass
+```
+
+**Seviye 2 — Uyarı (fallback kullan):**
+```python
+class WarningError(Exception):
+    """Bir provider başarısız → diğer kaynaktan devam et"""
+    pass
+```
+
+**Seviye 3 — Bilgi (logla, devam et):**
+```python
+class InfoError(Exception):
+    """Bir feature hesaplanamadı → None döndür, devam et"""
+    pass
+```
+
+**Retry politikası:**
+```python
+# services/core/retry.py (YENİ)
+def retry_with_backoff(func, max_retries=3, base_delay=1.0):
+    for attempt in range(max_retries):
+        try:
+            return func()
+        except WarningError:
+            if attempt == max_retries - 1:
+                raise
+            time.sleep(base_delay * (2 ** attempt))
+```
+
+**Kural:** Her modül hangi hata seviyesini kullanacağını belirtmeli.
+
+### 3. Konfigürasyon Yönetimi
+
+**Sorun:** config.py var ama tüm modüller nasıl config'e erişecek belli değil.
+
+**Çözüm:** Merkezi config servisi + environment-based override.
+
+```python
+# services/core/config.py — mevcut yapıyı koru, sadece erişim yöntemini standartlaştır
+from services.core.config import get_config
+
+# Her modül bu şekilde erişir
+config = get_config()
+commission_rate = config.bist_commission_rate  # 0.0003
+risk_limit = config.max_position_pct  # 10
+```
+
+**Config hiyerarşisi (öncelik sırası):**
+```
+1. Environment variable (en yüksek öncelik)
+2. .env dosyası
+3. config.py default değerleri (en düşük öncelik)
+```
+
+**Kural:** Hiçbir modül hardcoded değer kullanmamalı. Tüm sabitler config'den gelmeli.
+
+### 4. Veritabanı Şeması Senkronizasyonu
+
+**Sorun:** database.py ve database_dev.py var ama şema tanımları nerede, migration stratejisi yok.
+
+**Çözüm:** SQL migration dosyaları + version tracking.
+
+```
+database/
+├── migrations/
+│   ├── 001_initial_schema.sql
+│   ├── 002_add_features_table.sql
+│   └── ...
+└── schema_version.txt  # "3" gibi
+```
+
+**Migration kuralı:**
+```python
+# services/core/database.py'ye ekle
+def run_migrations(db):
+    current_version = get_schema_version(db)
+    for migration in get_pending_migrations(current_version):
+        db.execute(migration.sql)
+        update_schema_version(db, migration.version)
+```
+
+**Kural:** Şema değişikliği her zaman migration dosyası ile yapılmalı. Doğrudan ALTER TABLE yasak.
+
+### 5. Test Stratejisi
+
+**Sorun:** 104 test dosyası planladık ama unit test mi, integration test mi, mock mu, gerçek veri mi belli değil.
+
+**Çözüm:** Üç katmanlı test:
+
+**a) Unit test (her modül, mock veri):**
+```python
+# tests/test_core/test_data_quality.py
+def test_check_tick_valid():
+    result = data_quality_gate.check_tick("THYAO", 305.25, 100000, datetime.now())
+    assert result.passed == True
+
+def test_check_tick_zero_volume():
+    result = data_quality_gate.check_tick("THYAO", 305.25, 0, datetime.now())
+    assert result.passed == False
+```
+
+**b) Integration test (modül arası, mock veri):**
+```python
+# tests/test_integration/test_data_to_feature.py
+def test_data_to_feature_pipeline():
+    # Veri çek (mock)
+    data = mock_yfinance_data("THYAO")
+    # Kalite kontrol
+    quality = data_quality_gate.check_tick(...)
+    # Feature hesapla
+    features = seven_motor_engine.compute_all(...)
+    assert len(features) > 40
+```
+
+**c) E2E test (gerçek veri, manuel çalıştırma):**
+```python
+# tests/test_e2e/test_full_pipeline.py
+@pytest.mark.slow
+def test_full_pipeline_real_data():
+    # Gerçek API çağrısı
+    data = yfinance_provider.get_ohlcv("THYAO")
+    # Tüm zincir
+    ...
+```
+
+**Coverage hedefi:** %80 (unit + integration)
+
+### 6. Dokümantasyon-Kod Eşleşme Garantisi
+
+**Sorun:** Bölüm dokümantasyonundaki kod örnekleri ile gerçek kod farklı olabilir.
+
+**Çözüm:** Her bölümdeki kod bloğu için otomatik çalıştırma testi.
+
+```python
+# tests/test_docs/test_chapter_examples.py
+import subprocess
+import re
+
+def test_chapter_code_examples():
+    """Her bölümdeki python kod bloklarını çalıştır."""
+    for chapter_num in range(1, 33):
+        chapter_file = f"sistem ve calisma mantiklari/bolumler/bolum-{chapter_num:02d}-*.md"
+        # Markdown'dan kod bloklarını çıkar
+        code_blocks = extract_python_blocks(chapter_file)
+        
+        for i, code in enumerate(code_blocks):
+            # Çalıştır (hata vermemeli)
+            try:
+                exec(code)
+            except Exception as e:
+                print(f"✗ Bölüm {chapter_num}, blok {i+1}: {e}")
+```
+
+**Kural:** Dokümantasyondaki her `python` kod bloğu import edilebilir ve çalıştırılabilir olmalı. Hata veren blok varsa dokümantasyon güncellenmeli.
