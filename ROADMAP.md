@@ -1703,7 +1703,7 @@ GET  /api/system/health
 - [ ] Prometheus metrics
 - [ ] Distributed tracing (correlation_id)
 - [x] Alert system (critical events)
-- [ ] Cost monitoring (LLM token usage)
+- [x] Cost monitoring (LLM token usage)
 
 #### 14.5 Testing Pyramid
 
@@ -1723,7 +1723,7 @@ Security       → unauthorized access, injection
 - [x] Docker deterministic build
 - [x] Healthcheck'ler
 - [x] Graceful shutdown
-- [ ] Migration sistemi
+- [x] Migration sistemi
 - [x] CI/CD pipeline
 - [ ] Secret management
 - [x] Rate limiting
@@ -1737,8 +1737,8 @@ Security       → unauthorized access, injection
 - [ ] Risk dashboard çalışıyor
 - [ ] WebSocket real-time güncelleme
 - [ ] API endpoint'leri çalışıyor
-- [ ] Health check endpoint'leri
-- [ ] Docker compose production-ready
+- [x] Health check endpoint'leri
+- [x] Docker compose production-ready
 - [ ] E2E test: veri → karar → portföy → P&L
 - [ ] Failure test: DB/LLM/provider down senaryoları
 
