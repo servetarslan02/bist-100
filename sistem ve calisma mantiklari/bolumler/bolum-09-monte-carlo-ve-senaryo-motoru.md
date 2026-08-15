@@ -8,6 +8,16 @@ Tek bir tahmin yerine, binlerce farklı olası piyasa geleceğini simüle ederek
 
 ---
 
+## Kullanılacak sistemler
+
+- Monte Carlo Engine
+- Scenario Engine
+- Volatility Model
+- Correlation Model
+- Return Distribution
+- Tail Risk
+- Stress Testing
+
 ## Çalışma mantığı
 
 ```
@@ -52,6 +62,19 @@ result = scenario_engine.run_scenario(
 ```
 
 ---
+
+
+## Çıktı
+
+```
+Expected Return:     +28%
+Median Return:       +24%
+Downside Probability: %18
+5% Worst Case:       -22%
+95% Best Case:       +67%
+Tail Risk:           Orta
+Stress Result:       -31%
+```
 
 ## Temel prensip
 

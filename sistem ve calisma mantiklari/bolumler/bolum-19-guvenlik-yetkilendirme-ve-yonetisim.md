@@ -86,6 +86,18 @@ STARTING → INITIALIZING → READY → DEGRADED → RECOVERY → READY
 
 ---
 
+
+## Çıktı
+
+```
+User: analyst (ANALYST)
+Can run_backtest:     True
+Can live_execution:   False
+Risk Gate:            ALLOW
+Audit entries:        5
+System State:         READY
+```
+
 ## Temel prensip
 
 **AI hiçbir zaman sınırsız yetkiye sahip olmayacak.**

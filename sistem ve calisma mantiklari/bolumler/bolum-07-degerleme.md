@@ -64,7 +64,27 @@ dcf = valuation_engine.compute_dcf(
 
 ---
 
-## 3. Bear/Base/Bull Senaryoları
+## 3. Peer Comparison
+
+Aynı sektördeki şirketlerle karşılaştırır.
+
+### Örnek: Peer karşılaştırma
+
+```python
+# services/intelligence/valuation/engine.py
+company = {"pe": 8.5, "pb": 1.4, "ev_ebitda": 5.1}
+sector = {
+    "pe": {"median": 11.0, "avg": 12.5},
+    "pb": {"median": 1.8, "avg": 2.0},
+    "ev_ebitda": {"median": 7.0, "avg": 7.5},
+}
+multiples = valuation_engine.compute_multiples_valuation("THYAO", 305.25, company, sector)
+# P/E upside: +29.4%, P/B upside: +28.6%, EV/EBITDA upside: +37.3%
+```
+
+---
+
+## 4. Bear/Base/Bull Senaryoları
 
 **Araştırma bulgusu:** Oaktree Capital — "Investment assets have intrinsic value. The key is estimating it under different assumptions."
 

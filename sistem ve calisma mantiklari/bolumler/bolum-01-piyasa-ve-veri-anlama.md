@@ -10,6 +10,34 @@ Buradaki bölümün görevi hisse seçmek değil; sonraki bütün motorlara güv
 
 ---
 
+## Kullanılacak sistemler
+
+- yfinance (OHLCV, endeksler, makro)
+- KAP Provider (şirket bildirimleri)
+- News Provider (RSS haberler)
+- Social Provider (sosyal medya)
+- TCMB Provider (makro veriler)
+- Fundamental Provider (bilanço, gelir tablosu)
+- Market Calendar (piyasa saatleri, tatiller)
+- Corporate Actions (temettü, bölünme)
+- Cross-Source Reconciliation (çoklu kaynak doğrulama)
+- Data Quality Gate (kalite kontrol)
+- Tradability Mask (işlem yapılabilirlik)
+- PIT Store (point-in-time veri)
+- Streaming Anomaly Detector (anomali tespiti)
+
+---
+
+## Çalışma mantığı
+
+```
+Veri Kaynakları → Provider'lar → Data Quality Gate → Tradability Mask →
+Cross-Source Reconciliation → PIT Store → Anomaly Detection →
+MARKET STATE (güvenilir, temiz, anlamlandırılmış veri)
+```
+
+---
+
 ## 1. Kullanılacak veri kaynakları
 
 Sistem mümkün olduğunca şu kaynakları birlikte kullanacak:
@@ -178,7 +206,52 @@ result = streaming_anomaly_detector.check_price("THYAO", 350.0, 305.0, volatilit
 
 ---
 
-## 6. Çıktı
+## 6. FX Dönüşümü
+
+Farklı para birimindeki verileri ortak para birimine çevirmek ve kur etkisini takip etmek için kullanılır.
+
+### Örnek: Para birimi dönüşümü
+
+```python
+# services/portfolio/enhancements.py
+from services.portfolio.enhancements import multi_currency
+
+try_amount = multi_currency.convert(1000, "USD", "TRY")
+# try_amount = 47880 (USD/TRY = 47.88)
+
+fx_impact = multi_currency.get_fx_impact([
+    {"value": 10000, "currency": "TRY"},
+    {"value": 5000, "currency": "USD"},
+])
+# fx_impact = {"total_try": 249400, "total_usd": 5220}
+```
+
+FX etkisi portföy değerlemesinde ve risk hesaplamalarında sürekli takip edilir.
+
+---
+
+## 7. Trading Calendar
+
+Piyasanın açık/kapalı olduğunu kontrol eder. Sistem kapalı piyasada veri çekmez veya işlem yapmaz.
+
+### Örnek: Piyasa durumu kontrolü
+
+```python
+# services/core/market_calendar.py
+from services.core.market_calendar import market_calendar
+
+info = market_calendar.get_info()
+# is_trading_day: True
+# is_market_open: True
+# session: MORNING
+
+market_calendar.is_trading_day(date(2026, 1, 1))  # False (Yılbaşı)
+market_calendar.is_market_open(datetime(2026, 8, 16, 11, 15))  # True
+```
+
+---
+
+## 8. Çıktı
 
 ```
 MARKET STATE

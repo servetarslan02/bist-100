@@ -77,6 +77,18 @@ job_queue.complete(job_id, {"result": "success"})
 
 ---
 
+
+## Çıktı
+
+```
+Cache entries:        15
+Queue jobs:           3
+Worker status:        Active
+Database:             Healthy
+Event Bus:            Connected
+Monitoring:           Active
+```
+
 ## Temel prensip
 
 Bu bölüm yatırım kararı vermez; diğer bölümlerin **hızlı, ölçeklenebilir, event-driven ve hata durumunda toparlanabilir** şekilde çalışmasını sağlar.

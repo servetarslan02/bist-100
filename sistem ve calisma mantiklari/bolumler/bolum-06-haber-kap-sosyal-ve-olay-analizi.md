@@ -90,6 +90,44 @@ features = engine.compute_social_features("SUSPECT")
 
 ---
 
+## 4. Catalyst Detection
+
+Yaklaşan olayları takip eder ve potansiyel etkisini ölçer.
+
+### Örnek: Catalyst tespiti
+
+```python
+# services/features/seven_motors.py → Motor 6
+from services.features.seven_motors import CatalystMotor
+
+motor = CatalystMotor()
+catalysts = [
+    {"type": "earnings", "importance": 0.9, "days_until": 5},
+    {"type": "dividend", "importance": 0.7, "days_until": 15},
+]
+features = motor.compute("THYAO", catalysts)
+# catalyst_count: 2
+# catalyst_importance: 0.9
+# catalyst_days_nearest: 5
+```
+
+---
+
+## 5. Kaynak Doğrulama
+
+Her bilginin kaynağını ve güvenilirliğini doğrular.
+
+### Örnek: Kaynak güvenilirliği
+
+```python
+# services/ingestion/providers/news_provider.py
+np = NewsProvider()
+credibility = np.compute_credibility("Bloomberg")  # 0.95
+credibility = np.compute_credibility("twitter")    # 0.40
+```
+
+---
+
 ## Çıktı
 
 ```

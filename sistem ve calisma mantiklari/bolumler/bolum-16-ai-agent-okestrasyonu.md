@@ -97,6 +97,18 @@ result = await agent_orchestrator.run_research_pipeline("THYAO", context)
 
 ---
 
+
+## Çıktı
+
+```
+Agents Used:         8
+Evidence:            42
+Agreements:          31
+Conflicts:           7
+Unverified Claims:   2
+Final Confidence:    %84
+```
+
 ## Temel prensip
 
 > "Agentic AI systems built upon LLMs and deployed in multi-agent configurations are redefining intelligence, autonomy, collaboration." — ScienceDirect TRiSM (2026)

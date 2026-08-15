@@ -8,6 +8,19 @@ Bir hissenin sadece ne kadar kazandırabileceğini değil, ne kadar ve hangi ko�
 
 ---
 
+## Kullanılacak sistemler
+
+- Risk Engine
+- VaR / CVaR
+- Maximum Drawdown
+- Volatility
+- Liquidity Risk
+- Concentration Risk
+- Factor Exposure
+- Stress Test sonuçları
+- Monte Carlo sonuçları
+- Position Sizing
+
 ## Çalışma mantığı
 
 ```

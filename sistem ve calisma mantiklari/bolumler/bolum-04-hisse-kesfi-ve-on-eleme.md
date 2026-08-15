@@ -33,7 +33,24 @@ Skorlama → ADAY HİSSE HAVUZU
 
 ---
 
-## 1. Factor Engine
+## 1. Likidite Filtresi
+
+Düşük likiditeli hisseler elenir.
+
+### Örnek: Likidite skoru
+
+```python
+# services/ingestion/universe_enhancements.py
+from services.ingestion.universe_enhancements import universe_enhancements
+
+score = universe_enhancements.compute_liquidity_score(
+    avg_volume=1000000, avg_spread_pct=0.05, market_cap=50_000_000_000)
+# score = 90/100 (yüksek likidite)
+```
+
+---
+
+## 2. Factor Engine
 
 **Araştırma bulguları:**
 
@@ -104,6 +121,26 @@ all_scores = [72, 68, 65, 60, 55, 50, 48, 45, 42, 40]
 median_score = np.median(all_scores)  # 52.5
 std_score = np.std(all_scores)        # 10.2
 adaptive_threshold = max(40, median_score + 0.5 * std_score)  # 57.6
+```
+
+---
+
+## 5. Anomali Tespiti
+
+Olağandışı fiyat/hacim hareketlerini tespit eder ve şüpheli hisseleri işaretler.
+
+### Örnek: Anomali kontrolü
+
+```python
+# services/core/streaming_anomaly.py
+from services.core.streaming_anomaly import streaming_anomaly_detector
+
+result = streaming_anomaly_detector.check_all(
+    ticker="THYAO", price=350.0, previous_price=305.0,
+    volume=5000000, bid=349.5, ask=350.5, volatility=0.25)
+# price anomaly: CRITICAL (ani sıçrama)
+# volume anomaly: HIGH (anormal hacim)
+# spread anomaly: LOW (normal spread)
 ```
 
 ---

@@ -99,6 +99,17 @@ Failure → Detect → Retry/Restart → Resume from State → Event Replay → 
 
 ---
 
+
+## Çıktı
+
+```
+Circuit Breaker:      CLOSED
+Retry count:          0
+Last failure:         None
+Fallback:             Available
+Health status:        OK
+```
+
 ## Temel prensip
 
 > "Retry, timeout, and circuit breaker are the baseline layers of any resilient automation system." — LinkedIn (2026)

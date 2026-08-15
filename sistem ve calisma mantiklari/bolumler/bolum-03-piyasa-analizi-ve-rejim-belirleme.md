@@ -121,6 +121,48 @@ features = motor.compute("THYAO", close, high, low, volume)
 
 ---
 
+## 5. Korelasyon Analizi
+
+Piyasa bileşenleri arasındaki ilişkileri ölçer.
+
+### Örnek: Korelasyon
+
+```python
+# services/features/seven_motors.py → Motor 1
+from services.features.seven_motors import RelativeStrengthMotor
+
+motor = RelativeStrengthMotor()
+features = motor.compute(
+    "THYAO", stock_close, benchmark_close,
+    sector_close=sector_close,
+    peer_closes={"ASELS": asels_close, "PGSUS": pgsus_close},
+)
+# features["rs_vs_bist_20d"] = +5.2% (BIST'ten iyi)
+# features["rs_vs_sector_20d"] = +2.1% (Sektörden iyi)
+# features["rs_trend"] = +0.8 (güçleniyor)
+```
+
+---
+
+## 6. Anomali Kontrolü
+
+Olağandışı fiyat/hacim hareketlerini tespit eder.
+
+### Örnek: Anomali tespiti
+
+```python
+# services/core/streaming_anomaly.py
+from services.core.streaming_anomaly import streaming_anomaly_detector
+
+result = streaming_anomaly_detector.check_price("THYAO", 350.0, 305.0, volatility=0.25)
+# is_anomaly: True, severity: CRITICAL
+
+result = streaming_anomaly_detector.check_volume("THYAO", 5000000)
+# is_anomaly: True, zscore: 4.5
+```
+
+---
+
 ## Çıktı
 
 ```

@@ -89,7 +89,38 @@ features = fundamental_feature_engine.compute_quality_features(fund)
 
 ---
 
-## 4. Sektör Karşılaştırması
+## 4. Bilanço Analizi
+
+### Örnek: Bilanço feature'ları
+
+```python
+features = fundamental_feature_engine.compute_balance_sheet_features(fund)
+# debt_to_equity: 0.45
+# current_ratio: 1.8
+# net_debt_ebitda: 2.1
+# cash_debt_ratio: 0.40
+```
+
+---
+
+## 5. Earnings Quality
+
+Kârın kalitesini ölçer (sadece miktarı değil).
+
+### Örnek: Nakit dönüşümü
+
+```python
+features = fundamental_feature_engine.compute_cash_flow_features(fund)
+# fcf_margin: 6.8%
+# fcf_yield_pct: 6.8%
+# cash_conversion: 1.2 (faaliyet kârı nakit ile destekleniyor)
+```
+
+Yüksek kâr + düşük nakit dönüşümü = şüpheli kalite.
+
+---
+
+## 6. Sektör Karşılaştırması
 
 ### Örnek: Sektörel normalize
 

@@ -99,6 +99,19 @@ result = evidence_engine.verify_claim(claim)
 
 ---
 
+
+## Çıktı
+
+```
+Claim:            Yeni fabrika yatırımı
+Source:           KAP
+Source Reliability: High
+Timestamp:        Verified
+Cross-check:      Passed
+Claim Type:       FACT
+Evidence Score:   98/100
+```
+
 ## Temel prensip
 
 > "AI'nın söylediği şey doğru olduğu için değil, kanıtlanabildiği ölçüde doğru kabul edilir."

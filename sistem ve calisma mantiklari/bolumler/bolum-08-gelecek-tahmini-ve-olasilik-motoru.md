@@ -57,7 +57,32 @@ prob = probability_engine.compute_probability_from_features(
 
 ---
 
-## 3. Confidence Calibration
+## 3. Ensemble Forecasting
+
+Tek model yerine birden fazla modelin sonuçlarını birleştirir.
+
+### Örnek: Ensemble
+
+```python
+from services.intelligence.forecasting import ensemble_forecasting
+
+# Farklı modellerden gelen tahminler
+forecasts = [
+    Forecast(ticker="THYAO", horizon_days=5, predicted_return=1.2, probability_positive=0.6, confidence=0.8, model_source="technical"),
+    Forecast(ticker="THYAO", horizon_days=5, predicted_return=0.8, probability_positive=0.55, confidence=0.7, model_source="ml"),
+    Forecast(ticker="THYAO", horizon_days=5, predicted_return=1.5, probability_positive=0.65, confidence=0.6, model_source="fundamental"),
+]
+
+combined = ensemble_forecasting.combine_forecasts(forecasts)
+# combined.predicted_return = 1.17 (ağırlıklı ortalama)
+# combined.confidence = 0.71
+```
+
+Her modelin kendi güçlü ve zayıf yönleri var; ensemble bunları dengeler.
+
+---
+
+## 4. Confidence Calibration
 
 **Araştırma bulgusu:** ScienceDirect (2026) — "Quantifying uncertainty in financial forecasting: deterministic models often fail under market volatility."
 

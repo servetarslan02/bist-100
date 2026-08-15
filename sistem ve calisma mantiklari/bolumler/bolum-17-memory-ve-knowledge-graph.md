@@ -99,6 +99,18 @@ forward = data_lineage.trace_forward("raw_data", "price_THYAO")
 
 ---
 
+
+## Çıktı
+
+```
+Relevant Past Events:        14
+Similar Historical Cases:     6
+Previous Predictions:         9
+Prediction Accuracy History: %72
+Related Entities:             23
+Memory Confidence:            %91
+```
+
 ## Temel prensip
 
 **Memory** geçmişi saklar, **Knowledge Graph** ilişkileri saklar; **karar güncel analiz motorları tarafından verilir**.

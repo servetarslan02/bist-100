@@ -220,7 +220,37 @@ Gelecekteki veri bugünkü karara sızamaz.
 
 ---
 
-## 8. Güvenilirlik skoru
+## 8. Data Lineage
+
+Her verinin kaynağını ve dönüşüm geçmişini takip eder.
+
+### Örnek: Veri izleme
+
+```python
+# services/intelligence/research_memory.py
+from services.intelligence.research_memory import data_lineage, LineageNode
+
+# Ham veri → Feature → Model → Prediction zinciri
+data_lineage.add_node(LineageNode("raw_data", "price_THYAO", "2026-08-15T10:00:00"))
+data_lineage.add_node(LineageNode("feature", "rsi_THYAO", "2026-08-15T10:00:01",
+    parent_ids=["raw_data:price_THYAO"]))
+data_lineage.add_node(LineageNode("prediction", "pred_THYAO", "2026-08-15T10:00:02",
+    parent_ids=["feature:rsi_THYAO"]))
+
+# İleriye doğru izle (raw → feature → prediction)
+forward = data_lineage.trace_forward("raw_data", "price_THYAO")
+# forward: [raw_data, feature, prediction]
+
+# Geriye doğru izle (prediction → feature → raw)
+backward = data_lineage.trace_backward("prediction", "pred_THYAO")
+# backward: [prediction, feature, raw_data]
+```
+
+Bu sayede herhangi bir kararın hangi veriye dayandığı izlenebilir.
+
+---
+
+## 9. Güvenilirlik skoru
 
 Her veri için bir güvenilirlik skoru hesaplanacak.
 
@@ -258,3 +288,9 @@ Sadece sonraki motorlara temiz ve ölçülebilir bir veri zemini sağlar.
 ### Garbage in, garbage out
 
 Finansal piyasalarda bu kural en acımasız şekilde işler.
+
+---
+
+## Temel prensip
+
+Bu bölüm analiz yapmaz ve hisse seçmez. Sadece sonraki motorlara temiz ve ölçülebilir bir veri zemini sağlar.

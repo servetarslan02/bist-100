@@ -105,6 +105,17 @@ Ana risk: ...
 
 ---
 
+
+## Çıktı
+
+```
+Opportunity Score: 86/100
+Confidence:        %79
+Risk:              Orta
+Expected Return:   +31%
+Downside:          -14%
+```
+
 ## Temel prensip
 
 > "RMATS integrates four specialist agents and outputs structured ensemble decisions." — arXiv (2026)

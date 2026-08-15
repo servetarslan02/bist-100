@@ -99,6 +99,19 @@ Karar → Model → Agent → Veriler → Kaynaklar → Hesaplamalar → Risk ko
 
 ---
 
+
+## Çıktı
+
+```
+Data Health:          96%
+Model Health:         91%
+Agent Health:         98%
+Infrastructure:       99%
+Overall Health:       95%
+Audit entries:        142
+Alert count:          3
+```
+
 ## Temel prensip
 
 > "An observable system produces enough telemetry data that an engineer can diagnose any issue." — TotalShiftLeft (2026)
