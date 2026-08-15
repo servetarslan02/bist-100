@@ -95,7 +95,7 @@ async def main():
                         data_map[ticker] = df
                         total_fetched += 1
                 except Exception:
-                    pass
+                    pass  # Intentional: silent error handling
         except Exception as e:
             logger.warning("Batch download failed", batch=i, error=str(e))
             continue
@@ -128,7 +128,7 @@ async def main():
                 features["close"] = features["price"]
                 features_map[ticker] = features
         except Exception:
-            pass
+            pass  # Intentional: silent error handling
 
     feature_time = time.time() - start
     print(f"   ✓ {len(features_map)} hisse için {sum(len(f) for f in features_map.values())} feature hesaplandı ({feature_time:.1f}s)")
@@ -252,7 +252,7 @@ async def main():
             if result.spec_score > 55:
                 spec_results.append(result)
         except Exception:
-            pass
+            pass  # Intentional: silent error handling
 
     spec_results.sort(key=lambda r: r.spec_score, reverse=True)
 

@@ -332,23 +332,29 @@ class DevDatabase:
     # =====================================================
 
     async def redis_get(self, key: str) -> Optional[str]:
+        """Redis'ten deger oku."""
         return self._redis_store.get(key)
 
     async def redis_set(self, key: str, value: str, ex: Optional[int] = None):
+        """Redis'e deger yaz."""
         self._redis_store[key] = value
 
     async def redis_delete(self, key: str):
+        """Redis'ten deger sil."""
         self._redis_store.pop(key, None)
 
     async def redis_hgetall(self, key: str) -> Dict[str, str]:
+        """Redis hash tum alanlari getir."""
         return self._redis_hashes.get(key, {})
 
     async def redis_hset(self, key: str, mapping: Dict[str, str]):
+        """Redis hash alanlarini guncelle."""
         if key not in self._redis_hashes:
             self._redis_hashes[key] = {}
         self._redis_hashes[key].update(mapping)
 
     async def redis_publish(self, channel: str, message: str):
+        """Redis pub/sub yayin yap."""
         handlers = self._pubsub_handlers.get(channel, [])
         for h in handlers:
             try:
@@ -360,11 +366,13 @@ class DevDatabase:
                 logger.error("PubSub handler error", channel=channel, error=str(e))
 
     def redis_subscribe(self, channel: str, handler):
+        """Redis pub/sub dinle."""
         if channel not in self._pubsub_handlers:
             self._pubsub_handlers[channel] = []
         self._pubsub_handlers[channel].append(handler)
 
     async def close(self):
+        """Baglantilari kapat."""
         if self._db:
             self._db.close()
             self._db = None

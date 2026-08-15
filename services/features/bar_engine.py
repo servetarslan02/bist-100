@@ -30,6 +30,7 @@ class Bar:
     is_complete: bool = False
 
     def to_dict(self) -> Dict:
+        """World state'i dictionary'e cevir."""
         return {
             "timestamp": self.timestamp.isoformat(),
             "open": self.open, "high": self.high,
@@ -192,16 +193,19 @@ class BarEngineManager:
         self._engines: Dict[str, BarEngine] = {}
 
     def get_engine(self, ticker: str) -> BarEngine:
+        """Bar engine instance dondur."""
         if ticker not in self._engines:
             self._engines[ticker] = BarEngine(ticker)
         return self._engines[ticker]
 
     def process_tick(self, ticker: str, price: float, volume: int,
                      timestamp: datetime) -> List[Tuple[str, Bar]]:
+        """Tick verisini isle ve state guncelle."""
         engine = self.get_engine(ticker)
         return engine.process_tick(price, volume, timestamp)
 
     def get_all_tickers(self) -> List[str]:
+        """Tum takip edilen ticker'lari dondur."""
         return list(self._engines.keys())
 
 

@@ -72,6 +72,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, List[WebSocket]] = {}
 
     async def connect(self, websocket: WebSocket, channel: str):
+        """WebSocket baglantisi kur."""
         await websocket.accept()
         if channel not in self.active_connections:
             self.active_connections[channel] = []
@@ -79,17 +80,19 @@ class ConnectionManager:
         logger.info("WebSocket connected", channel=channel)
 
     def disconnect(self, websocket: WebSocket, channel: str):
+        """WebSocket baglantisi kes."""
         if channel in self.active_connections:
             self.active_connections[channel].remove(websocket)
         logger.info("WebSocket disconnected", channel=channel)
 
     async def broadcast(self, channel: str, message: dict):
+        """Tum connected client'lara mesaj gonder."""
         if channel in self.active_connections:
             for connection in self.active_connections[channel]:
                 try:
                     await connection.send_json(message)
                 except Exception:
-                    pass
+                    pass  # Intentional: silent error handling
 
 
 manager = ConnectionManager()
@@ -185,7 +188,7 @@ async def _compute_live_market_state():
                         declining += 1
                     total += 1
             except Exception:
-                pass
+                pass  # Intentional: silent error handling
 
         breadth = (advancing / total * 100) if total > 0 else 50
 
@@ -268,7 +271,7 @@ async def get_instrument_ohlcv(
                     volumes.append({"time": ts, "volume": int(row[5]), "open": float(row[1]), "close": float(row[4])})
                 return {"candles": candles, "volumes": volumes}
         except Exception:
-            pass
+            pass  # Intentional: silent error handling
 
         # Fallback: yfinance
         import yfinance as yf
@@ -477,7 +480,7 @@ async def get_signals(
                         "spec_category": spec.category,
                     })
             except Exception:
-                pass
+                pass  # Intentional: silent error handling
 
         signals.sort(key=lambda x: x["score"], reverse=True)
         return signals[:limit]
@@ -665,7 +668,7 @@ async def live_websocket(websocket: WebSocket):
                     channel = msg.get("channel", "market.tick")
                     await websocket.send_json({"type": "subscribed", "channel": channel})
             except json.JSONDecodeError:
-                pass
+                pass  # Intentional: silent error handling
     except WebSocketDisconnect:
         manager.disconnect(websocket, "live")
 
@@ -677,6 +680,7 @@ async def stream_events():
     import asyncio
 
     async def event_generator():
+        """Server-sent events generator."""
         while True:
             # Check for new events from Redis pub/sub
             try:

@@ -281,7 +281,7 @@ class RealTimeDataEngine:
                             )
                             await self._dispatch(event)
                         except Exception:
-                            pass
+                            pass  # Intentional: silent error handling
 
                 logger.debug("Market stream tick", stocks=len(watchlist))
 

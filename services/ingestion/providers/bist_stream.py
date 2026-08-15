@@ -120,7 +120,7 @@ class BISTStreamProvider:
                             self._tick_count += 1
 
                         except Exception:
-                            pass
+                            pass  # Intentional: silent error handling
 
                 # 60 saniye bekle (ücretsiz API limiti)
                 await asyncio.sleep(60)
@@ -171,7 +171,7 @@ class BISTStreamProvider:
                                         else:
                                             handler(tick)
                                     except Exception:
-                                        pass
+                                        pass  # Intentional: silent error handling
 
                                 self._tick_count += 1
 
@@ -236,7 +236,7 @@ class BISTStreamProvider:
                                     else:
                                         handler(tick)
                                 except Exception:
-                                    pass
+                                    pass  # Intentional: silent error handling
 
                             self._tick_count += 1
 

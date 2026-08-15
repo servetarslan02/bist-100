@@ -380,7 +380,7 @@ class FeatureDiscoveryPipeline:
                     logger.warning("Potential leakage", feature=f, corr1=corr_first, corr2=corr_second)
                 else:
                     leakage[f] = False
-            except:
+            except Exception:
                 leakage[f] = False
 
         return leakage

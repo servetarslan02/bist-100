@@ -103,12 +103,13 @@ class InternalEventBus:
                 await asyncio.sleep(0.1)
 
     async def stop(self):
+        """Dinlemeyi durdur."""
         self._running = False
         if self._redis:
             try:
                 await self._redis.close()
             except Exception:
-                pass
+                pass  # Intentional: silent error handling
 
 
 class InMemoryRedis:
@@ -118,6 +119,7 @@ class InMemoryRedis:
         self._pubsub_handlers = {}
 
     async def publish(self, channel: str, message: str):
+        """Event yayinla."""
         handlers = self._pubsub_handlers.get(channel, [])
         for h in handlers:
             try:
@@ -126,21 +128,25 @@ class InMemoryRedis:
                 else:
                     h({"type": "message", "channel": channel, "data": message})
             except Exception:
-                pass
+                pass  # Intentional: silent error handling
 
     def pubsub(self):
+        """Pubsub instance dondur."""
         return self
 
     async def subscribe(self, *channels):
+        """Kanala abone ol."""
         for ch in channels:
             if ch not in self._pubsub_handlers:
                 self._pubsub_handlers[ch] = []
 
     async def get_message(self, timeout=1.0):
+        """Mesaj al (blocking)."""
         await asyncio.sleep(timeout)
         return None
 
     async def close(self):
+        """Baglantilari kapat."""
         pass
 
     def publish_local(self, channel, event):
@@ -175,6 +181,7 @@ _producer: Optional[Producer] = None
 
 
 def get_producer():
+    """Kafka producer getir veya olustur."""
     global _producer
     if Producer is None:
         return None
@@ -220,13 +227,13 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
             )
             producer.poll(0)
         except Exception:
-            pass
+            pass  # Intentional: silent error handling
 
     # Redis Pub/Sub (push-based) + Stream (durable ledger)
     try:
         asyncio.create_task(_publish_with_idempotency(event))
     except Exception:
-        pass
+        pass  # Intentional: silent error handling
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
@@ -281,12 +288,14 @@ async def _publish_to_stream(event: CanonicalEvent):
 
 
 def flush_producer():
+    """Kafka producer buffer'ini bosalt."""
     global _producer
     if _producer:
         _producer.flush(timeout=10)
 
 
 def ensure_topics():
+    """Kafka topic'lerinin var oldugundan emin ol."""
     if AdminClient is None:
         return
     try:
@@ -296,7 +305,7 @@ def ensure_topics():
         if new_topics:
             admin.create_topics(new_topics)
     except Exception:
-        pass
+        pass  # Intentional: silent error handling
 
 
 # =====================================================
@@ -314,6 +323,7 @@ class EventConsumer:
         self._processed_ids: set = set()
 
     def on(self, event_type: str, handler: Callable):
+        """Event handler kaydet."""
         self._handlers[event_type] = handler
         return self
 
@@ -348,4 +358,5 @@ class EventConsumer:
         await event_bus.start_listening()
 
     def stop(self):
+        """Dinlemeyi durdur."""
         self._running = False

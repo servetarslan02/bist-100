@@ -75,6 +75,7 @@ class AlphaScheduler:
                 await asyncio.sleep(30)
 
     async def stop(self):
+        """Dinlemeyi durdur."""
         self._running = False
 
     async def _pre_market(self):
@@ -122,6 +123,7 @@ class AlphaScheduler:
 
 
 async def main():
+    """Scheduler baslangic noktasi."""
     scheduler = AlphaScheduler()
     try:
         await scheduler.start()

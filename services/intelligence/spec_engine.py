@@ -82,6 +82,7 @@ class SPECEngine:
         historical_analogues: Optional[List[Dict]] = None,
         ml_predictions: Optional[Dict[str, float]] = None,
     ) -> SPECResult:
+        """SPEC skoru hesapla."""
         anomaly = self._compute_anomaly(asset_state)
         evidence_consensus, evidence_list = self._compute_evidence(asset_state)
         regime_compat, regime_fit = self._compute_regime_compatibility(asset_state, market_state)

@@ -239,7 +239,7 @@ class AlphaEngine:
                     features["price"] = close_list[-1] if close_list else 0
                     features_map[ticker] = features
             except Exception:
-                pass
+                pass  # Intentional: silent error handling
         return features_map
 
     def _detect_regime(self) -> tuple:
@@ -337,18 +337,23 @@ class AlphaEngine:
         return scores
 
     def get_last_summary(self) -> Dict:
+        """Son tarama ozetini dondur."""
         return self._last_scan_summary
 
     def get_last_results(self) -> List:
+        """Son tarama sonuclarini dondur."""
         return self._last_scan_results
 
     def get_regime(self) -> str:
+        """Mevcut piyasa rejimini dondur."""
         return self._market_regime
 
     def get_live_candidates(self) -> Dict:
+        """Canlı adaylari dondur."""
         return self._live.get_candidates()
 
     def get_event_candidates(self) -> Dict:
+        """Event adaylarini dondur."""
         return self._events.get_pending_rescans()
 
 

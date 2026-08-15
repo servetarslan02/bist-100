@@ -188,7 +188,7 @@ class IngestionService:
                             )
                             publish_event(event, key=index_symbol)
                     except Exception:
-                        pass
+                        pass  # Intentional: silent error handling
 
                 flush_producer()
                 logger.info("Market data fetch cycle completed")
@@ -371,7 +371,7 @@ class IngestionService:
                             )
                             publish_event(event, key=f"social_{ticker}")
                     except Exception:
-                        pass
+                        pass  # Intentional: silent error handling
 
                 flush_producer()
                 logger.info("Social media fetch cycle completed")

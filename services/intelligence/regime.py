@@ -307,6 +307,7 @@ class RegimeEngine:
 
     @property
     def current_regime(self) -> Optional[RegimeState]:
+        """Mevcut rejim durumunu dondur."""
         return self._current_regime
 
     def get_regime_weights(self, regime: Regime) -> Dict[str, float]:

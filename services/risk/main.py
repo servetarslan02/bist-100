@@ -88,7 +88,7 @@ class RiskEngine:
                     try:
                         value = json.loads(value)
                     except Exception:
-                        pass
+                        pass  # Intentional: silent error handling
                 self._risk_limits[key] = float(value) if value else 0
 
             self._risk_limits_loaded = True

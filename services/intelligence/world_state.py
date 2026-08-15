@@ -64,6 +64,7 @@ class WorldState:
         self.inflation_pressure = float(np.clip(vec[9], 0, 1))
 
     def to_dict(self) -> Dict[str, float]:
+        """World state'i dictionary'e cevir."""
         return {
             "global_risk_appetite": self.global_risk_appetite,
             "usd_strength": self.usd_strength,

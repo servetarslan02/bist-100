@@ -102,13 +102,16 @@ class CanonicalEvent(BaseModel):
         return missing
 
     def to_json(self) -> str:
+        """Event'i JSON string'e cevir."""
         return self.model_dump_json()
 
     def to_dict(self) -> Dict[str, Any]:
+        """World state'i dictionary'e cevir."""
         return self.model_dump(mode='json')
 
     @classmethod
     def from_json(cls, json_str: str) -> "CanonicalEvent":
+        """JSON string'den event olustur."""
         return cls.model_validate_json(json_str)
 
 

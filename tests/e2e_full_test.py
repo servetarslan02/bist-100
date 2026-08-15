@@ -83,7 +83,7 @@ def test_real_data(t: E2ETest):
         try:
             td = batch[f"{tk}.IS"].dropna()
             t.check(f"{tk} veri var", len(td) >= 20, f"{len(td)} gün")
-        except:
+        except Exception:
             t.check(f"{tk} veri var", False)
 
     # BIST100 endeks

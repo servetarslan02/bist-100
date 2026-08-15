@@ -35,6 +35,7 @@ class FeatureValue:
         self.confidence = confidence
 
     def to_dict(self) -> Dict[str, Any]:
+        """World state'i dictionary'e cevir."""
         return {
             "name": self.name,
             "value": self.value,

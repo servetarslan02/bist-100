@@ -57,6 +57,7 @@ class PortfolioService:
         await self._consumer.consume_loop()
 
     async def stop(self):
+        """Dinlemeyi durdur."""
         self._running = False
         if self._consumer:
             self._consumer.stop()
@@ -341,6 +342,7 @@ class PortfolioService:
 
 
 async def main():
+    """Scheduler baslangic noktasi."""
     service = PortfolioService()
     try:
         await service.start()

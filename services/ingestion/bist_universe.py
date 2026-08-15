@@ -133,7 +133,7 @@ class BISTUniverse:
                     if len(td) > 0:
                         valid.append(t)
                 except Exception:
-                    pass
+                    pass  # Intentional: silent error handling
 
             # Eğer ilk 50'de >%80 geçerliyse, tüm listeyi kabul et
             if len(valid) > len(test_tickers) * 0.8:
@@ -305,10 +305,12 @@ bist_universe = BISTUniverse()
 
 # Kolaylık fonksiyonları
 def get_yfinance_ticker(ticker: str) -> str:
+    """BIST ticker'ini yfinance format'ina cevir."""
     return f"{ticker}.IS"
 
 
 def get_sector(ticker: str) -> str:
+    """Ticker icin sektor kodu dondur."""
     return SECTOR_MAP.get(ticker, "OTHER")
 
 
@@ -317,5 +319,6 @@ BIST_STOCKS = []  # Boş — artık dinamik
 
 
 def get_all_yfinance_tickers() -> list:
+    """Tum ticker'lari yfinance format'inda dondur."""
     tickers = bist_universe.get_tickers()
     return [f"{t}.IS" for t in tickers]

@@ -319,6 +319,7 @@ class IncrementalStateManager:
         self._states: Dict[int, IncrementalAssetState] = {}
 
     def get_or_create(self, instrument_id: int, ticker: str) -> IncrementalAssetState:
+        """State getir veya olustur."""
         if instrument_id not in self._states:
             self._states[instrument_id] = IncrementalAssetState(
                 instrument_id=instrument_id, ticker=ticker,
@@ -327,17 +328,21 @@ class IncrementalStateManager:
 
     def process_tick(self, instrument_id: int, ticker: str,
                      price: float, volume: int, timestamp: datetime):
+        """Tick verisini isle ve state guncelle."""
         state = self.get_or_create(instrument_id, ticker)
         state.process_tick(price, volume, timestamp)
         return state
 
     def get_state(self, instrument_id: int) -> Optional[IncrementalAssetState]:
+        """Ticker icin state dondur."""
         return self._states.get(instrument_id)
 
     def get_all_states(self) -> Dict[int, IncrementalAssetState]:
+        """Tum state'leri dondur."""
         return self._states
 
     def get_features(self, instrument_id: int) -> Dict[str, float]:
+        """Ticker icin feature'lari dondur."""
         state = self._states.get(instrument_id)
         if state:
             return state.get_incremental_features()

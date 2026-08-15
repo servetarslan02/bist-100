@@ -6,7 +6,7 @@ Purged walk-forward validation, gerçek label dataset, proper confidence.
 import numpy as np
 import polars as pl
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 import pickle
 import json
@@ -352,7 +352,7 @@ class MLTrainer:
                 "features": feat_names,
                 "metrics": avg_metrics,
                 "confidence": confidence,
-                "training_date": datetime.utcnow().isoformat(),
+                "training_date": datetime.now(timezone.utc).isoformat(),
             }, f, indent=2)
 
         self.models[config.model_name] = final_model

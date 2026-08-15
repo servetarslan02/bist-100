@@ -165,8 +165,8 @@ class AlphaIntegrationTest:
                             "ticker": t, "timestamp": str(row.Date),
                             "price": row.Close, "volume": row.Volume,
                         })
-            except:
-                pass
+            except Exception:
+                pass  # Intentional: silent error handling
 
         self.assert_test("Real data fetched", success == 5, f"{success}/5 stocks")
         self.assert_test("Data stored in DB", db.count("market_ticks") > 0, f"{db.count('market_ticks')} rows")

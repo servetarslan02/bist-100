@@ -75,18 +75,22 @@ class Settings(BaseSettings):
 
     @property
     def is_production(self) -> bool:
+        """Production ortaminda mi?"""
         return self.app_env.lower() in ("production", "prod", "staging")
 
     @property
     def postgres_url(self) -> str:
+        """Async PostgreSQL connection URL."""
         return f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     @property
     def postgres_url_sync(self) -> str:
+        """Sync PostgreSQL connection URL."""
         return f"postgresql://{self.postgres_user}:{self.postgres_password}@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
 
     @property
     def redis_url(self) -> str:
+        """Redis connection URL."""
         if self.redis_password:
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/0"
         return f"redis://{self.redis_host}:{self.redis_port}/0"
