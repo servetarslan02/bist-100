@@ -5397,3 +5397,235 @@ Ortaya çıkan sistem:
 «Veriyi toplayan, doğrulayan, anlamlandıran; teknik, fundamental, makro, haber, KAP, sosyal medya, event, değerleme ve istatistiksel analizleri birleştiren; farklı AI ajanlarıyla araştırma yapan; olasılıksal tahmin ve Monte Carlo simülasyonları gerçekleştiren; risk ve portföy etkisini hesaplayan; senaryo ve stres testleri uygulayan; sanal emirleri gerçekçi şekilde simüle eden; sonuçları geçmiş performansla karşılaştırarak modellerini değerlendiren; araştırma hafızası oluşturan; bütün kararların veri kaynağına kadar izlenebilmesini sağlayan; hata, veri kaybı, model arızası ve servis kesintilerinde güvenli moda geçebilen; recovery ve event replay destekli, production-grade AI yatırım araştırma ve portföy simülasyon platformudur.»
 
 Bu tanımın dışındaki hiçbir AI ajanı, servis veya modül kendi başına yeni bir yatırım mantığı icat ederek sisteme eklenmemelidir. Yeni bir yetenek eklenirse önce bu mimaride hangi katmana ait olduğu belirlenmeli, contract'ı tanımlanmalı, testleri yazılmalı ve audit/recovery mekanizmasına dahil edilmelidir.
+
+Tabii. Bunları kısa ama Mimo Claw'ın ne yapacağını anlayacağı netlikte özetleyelim:
+
+Son Sistemler — Kısa Teknik Tanımlar
+
+1. Multi-Market / Multi-Asset
+
+Sistem sadece tek borsa veya hisseye bağlı olmamalı. BIST, ABD, Avrupa ve farklı varlık sınıfları aynı temel mimariyle desteklenmeli.
+
+2. FX / Para Birimi
+
+USD, EUR, TRY gibi farklı para birimlerini tanımalı. Portföy değerlerini seçilen ana para birimine çevirmeli ve kur riskini ayrıca hesaplamalı.
+
+3. Trading Calendar
+
+Her piyasanın işlem günlerini, tatillerini, açılış/kapanış saatlerini ve seanslarını bilmeli. Kapalı piyasada veri veya işlem üretmemeli.
+
+4. Corporate Actions
+
+Temettü, bölünme, bedelsiz, sermaye artırımı, birleşme gibi şirket olaylarını fiyat ve portföy geçmişine doğru şekilde yansıtmalı.
+
+5. Survivorship Bias Protection
+
+Geçmiş analizlerde bugün hâlâ var olan şirketleri kullanıp iflas eden/silinmiş şirketleri yok saymamalı.
+
+6. Look-Ahead Bias Protection
+
+Model geçmişte karar verirken gelecekte henüz bilinmeyen hiçbir veriyi kullanamamalı.
+
+7. Point-in-Time Data
+
+Her verinin o tarihte gerçekten bilinen versiyonu saklanmalı. Sonradan düzeltilmiş bilanço/veri geçmiş analize yanlışlıkla girmemeli.
+
+8. Transaction Cost Model
+
+Komisyon, spread, slippage, vergi ve diğer işlem maliyetlerini hesaba katmalı. Kârlılığı brüt değil gerçekçi net sonuçla ölçmeli.
+
+9. Benchmark Engine
+
+Performansı BIST100, sektör endeksi veya uygun benchmark ile karşılaştırmalı.
+
+10. Performance Attribution
+
+Portföy getirisi neden oluştuğunu açıklamalı:
+
+Hisse seçimi
+Sektör seçimi
+Momentum
+Value
+Market exposure
+FX
+
+gibi katkıları ayırmalı.
+
+11. Factor Engine
+
+Value, Momentum, Quality, Size, Low Volatility gibi faktörleri hesaplamalı.
+
+12. Factor Exposure
+
+Portföyün hangi faktörlere ne kadar maruz kaldığını göstermeli. Örneğin portföy aşırı momentum ağırlıklıysa bunu belirtmeli.
+
+13. Liquidity Analysis
+
+Bir pozisyonun piyasayı ne kadar etkileyebileceğini hesaplamalı. Büyük pozisyonlarda kapasite ve çıkış riskini göstermeli.
+
+14. Privacy / Data Retention
+
+Kullanıcı verileri, portföy bilgileri ve hassas bilgiler güvenli tutulmalı. Hangi verinin ne kadar süre saklanacağı belirlenmeli.
+
+15. Multi-Tenant Isolation
+
+Birden fazla kullanıcı desteklenirse her kullanıcının:
+
+portfolio
+data
+memory
+settings
+API keys
+
+birbirinden tamamen izole olmalı.
+
+16. Provider Rate Limit
+
+Veri sağlayıcıların API limitlerini takip etmeli. Limit dolduğunda sistemi bozmak yerine queue/cache/fallback kullanmalı.
+
+17. Idempotency
+
+Aynı event iki kez gelirse işlem iki kez uygulanmamalı.
+
+Örneğin aynı BUY event'i iki kere gelirse iki ayrı işlem oluşmamalı.
+
+18. Distributed Locking
+
+Aynı pozisyon veya veri üzerinde iki worker aynı anda çakışan işlem yapmamalı.
+
+19. Circuit Breaker
+
+Bir servis sürekli hata veriyorsa sistem sürekli tekrar denemek yerine servisi geçici olarak devre dışı bırakıp fallback kullanmalı.
+
+20. Retry / Fallback
+
+Geçici ağ veya provider hatalarında kontrollü retry yapılmalı. Alternatif kaynak varsa fallback kullanılmalı.
+
+21. Database Versioning
+
+Database şeması değişiklikleri migration sistemiyle yapılmalı. Eski veriler kaybolmamalı.
+
+22. Disaster Recovery Testing
+
+Backup'ın gerçekten geri yüklenebildiği düzenli olarak test edilmeli. Sadece backup almak yeterli değil.
+
+23. Reproducibility
+
+Geçmişteki bir analiz aynı:
+
+data version
+feature version
+model version
+config
+prompt
+
+ile tekrar çalıştırıldığında aynı sonucu mümkün olduğunca üretmeli.
+
+24. Probability Calibration
+
+Model %70 olasılık verdiğinde uzun vadede bu tahminlerin yaklaşık %70 oranında gerçekleşip gerçekleşmediği ölçülmeli.
+
+25. Uncertainty Decomposition
+
+Belirsizliğin nereden geldiği ayrılmalı:
+
+Data uncertainty
+Model uncertainty
+Market uncertainty
+Event uncertainty
+
+26. Confidence Calibration
+
+Sistem gereğinden fazla özgüvenli olmamalı. Çok belirsiz durumda confidence otomatik düşmeli.
+
+27. Manipulation Detection
+
+Fiyat, hacim, haber veya sosyal medyada manipülasyon ihtimali aranmalı. Şüpheli durumda sinyal güvenilirliği azaltılmalı.
+
+28. AI Hallucination Protection
+
+AI'nın uydurma:
+
+haber
+şirket bilgisi
+istatistik
+kaynak
+finansal veri
+
+üretmesi engellenmeli. AI yalnızca doğrulanmış verilere dayanmalı.
+
+29. Citation Verification
+
+AI bir haber/veri/kaynak kullandığında kaynağın gerçekten mevcut ve iddiayı destekliyor olduğu doğrulanmalı.
+
+30. Decision Replay
+
+Geçmişte verilen bir karar bugünkü bilgilerle değil, kararın verildiği andaki verilerle tekrar oluşturulabilmeli.
+
+Örneğin:
+
+«“10 Ağustos'ta neden BUY denmişti?”»
+
+sorusuna sistem o günkü verilerle cevap verebilmeli.
+
+31. Compliance / Audit Retention
+
+Önemli işlemler ve kararlar uzun süre saklanmalı. Kim, ne zaman, hangi veri/model ile ne yaptı sorusu cevaplanabilmeli.
+
+---
+
+SON DURUM
+
+Bütün sistemleri birlikte düşündüğümüzde platformun ana yapısı:
+
+DATA
+ ↓
+DATA QUALITY
+ ↓
+FEATURES
+ ↓
+MARKET / FUNDAMENTAL / TECHNICAL / MACRO
+ ↓
+NEWS / KAP / SOCIAL / EVENTS
+ ↓
+VALUATION
+ ↓
+FORECAST
+ ↓
+MONTE CARLO
+ ↓
+RISK
+ ↓
+SCENARIO / STRESS TEST
+ ↓
+PORTFOLIO
+ ↓
+SIMULATION
+ ↓
+AI AGENTS
+ ↓
+DECISION SUPPORT
+ ↓
+EXECUTION SIMULATION
+ ↓
+OUTCOME
+ ↓
+LEARNING
+ ↓
+MEMORY
+ ↓
+AUDIT
+
+Bunun çevresinde de:
+
+SECURITY
+OBSERVABILITY
+COST CONTROL
+RECOVERY
+VERSIONING
+DATA LINEAGE
+GOVERNANCE
+
+bulunacak.
+
+Bu seviyede sistem tanımı mimari açıdan tamamlanmış kabul edilebilir. Bundan sonraki aşama yeni sistem tanımlamak değil, bunları modüllere, servislerə, API'lere, database tablolarına ve implementasyon görevlerine bölmek olur.
