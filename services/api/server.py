@@ -63,6 +63,14 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_config())
         elif path == "/api/knowledge-graph":
             self._json_response(self._get_knowledge_graph())
+        elif path == "/api/ranking":
+            self._json_response(self._get_ranking())
+        elif path == "/api/motors":
+            self._json_response(self._get_motors())
+        elif path == "/api/backtest":
+            self._json_response(self._get_backtest())
+        elif path == "/api/risk-enhanced":
+            self._json_response(self._get_risk_enhanced())
         elif path == "/api/alerts":
             self._json_response(self._get_alerts())
         elif path == "/api/models":
@@ -328,6 +336,60 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             }]
         except Exception as e:
             return []
+
+    def _get_ranking(self) -> dict:
+        """Ranking model durumu."""
+        try:
+            from services.ml.ranking_model import ranking_model
+            return {
+                "status": ranking_model.get_model_status(),
+                "feature_importance": ranking_model.get_feature_importance(),
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_motors(self) -> dict:
+        """7 motor durumu."""
+        return {
+            "motors": [
+                {"name": "Relative Strength", "status": "active", "features": 11},
+                {"name": "Momentum + Trend", "status": "active", "features": 6},
+                {"name": "Volume + Microstructure", "status": "active", "features": 8},
+                {"name": "Fundamental", "status": "active", "features": 4},
+                {"name": "KAP + News", "status": "active", "features": 5},
+                {"name": "Catalyst", "status": "active", "features": 5},
+                {"name": "Why Falling", "status": "active", "features": 8},
+            ],
+            "total_features": 47,
+        }
+
+    def _get_backtest(self) -> dict:
+        """Backtest durumu."""
+        try:
+            from services.backtest.enhanced_walk_forward import walk_forward_engine
+            return {
+                "engine": "walk_forward",
+                "train_days": walk_forward_engine.train_days,
+                "test_days": walk_forward_engine.test_days,
+                "purge_days": walk_forward_engine.purge_days,
+                "embargo_days": walk_forward_engine.embargo_days,
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_risk_enhanced(self) -> dict:
+        """Gelişmiş risk durumu."""
+        try:
+            from services.risk.enhanced_risk import concentration_risk
+            return {
+                "ledoit_wolf": True,
+                "volatility_targeting": True,
+                "kelly_criterion": True,
+                "rebalance_engine": True,
+                "concentration_risk": True,
+            }
+        except Exception as e:
+            return {"error": str(e)}
 
     def _get_learning(self) -> dict:
         """Öğrenme durumu."""
