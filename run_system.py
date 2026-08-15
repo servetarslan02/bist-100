@@ -177,6 +177,7 @@ class AlphaSystem:
             outlier_detector, survivorship_bias,
         )
         from services.learning.integrated_learning import integrated_learning
+        from services.learning.outcome_tracker import outcome_tracker
 
         self._opportunity_engine = opportunity_engine
         self._signal_fusion = signal_fusion_engine
@@ -224,6 +225,7 @@ class AlphaSystem:
         self._cross_source_reconciliation = cross_source_reconciliation
         self._universe_enhancements = universe_enhancements
         self._learning = integrated_learning
+        self._outcome_tracker = outcome_tracker
 
         # System state
         self._system_state.transition("INITIALIZING", "components loaded")
@@ -474,6 +476,16 @@ class AlphaSystem:
                 regime=regime,
             )
 
+            # Outcome tracker'a ekle (sonuç takibi başlat)
+            self._outcome_tracker.add_prediction({
+                "prediction_id": f"{ticker}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+                "ticker": ticker,
+                "predicted_direction": decision.direction,
+                "feature_snapshot": {**features, "price": price},
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "horizon": "1-5D",
+            })
+
             # Learning feedback: Geçmiş öğrenmeye göre ayarlama
             adjustment = self._learning.get_decision_adjustment(ticker, regime, opp["score"])
             if adjustment["should_adjust"]:
@@ -557,19 +569,51 @@ class AlphaSystem:
         self._health_checker.update_status("risk_engine", "HEALTHY")
 
     async def _main_loop(self):
-        """Ana döngü — periyodik tarama."""
+        """Ana döngü — periyodik tarama + outcome kontrolü."""
         now = datetime.now(timezone.utc)
-        hour = now.hour + 8  # UTC+8 (Shanghai time)
 
-        # BIST saatleri: 10:00-18:00 (UTC+3) = 15:00-01:00 (UTC+8)
-        # Hafta sonu kontrolü
+        # 1. Bekleyen outcome'ları kontrol et
+        await self._check_outcomes()
+
+        # 2. Hafta sonu kontrolü
         weekday = now.weekday()
-        if weekday >= 5:  # Cumartesi/Pazar
+        if weekday >= 5:
             logger.info("Hafta sonu — bekleniyor")
             return
 
-        # Tarama yap
+        # 3. Tarama yap
         await self._run_scan()
+
+    async def _check_outcomes(self):
+        """Bekleyen tahminlerin sonuçlarını kontrol et."""
+        async def price_fetcher(ticker: str) -> float:
+            """Anlık fiyat çek."""
+            try:
+                import yfinance as yf
+                t = yf.Ticker(f"{ticker}.IS")
+                info = t.info
+                return info.get("regularMarketPrice", 0)
+            except:
+                return 0
+
+        results = await self._outcome_tracker.check_pending_outcomes(
+            self._learning, price_fetcher
+        )
+
+        if results:
+            for r in results:
+                self._notification_system.notify(
+                    "LEARNING", "Outcome Recorded",
+                    f"{r['ticker']}: {r['actual_return']:+.2f}% (predicted: {r['predicted_direction']})",
+                    severity="INFO",
+                )
+
+            # Öğrenme özeti
+            insights = self._learning.get_insights()
+            logger.info("Learning update",
+                       accuracy=insights.get("overall_accuracy", 0),
+                       recent_accuracy=insights.get("recent_accuracy", 0),
+                       pending=self._outcome_tracker.get_pending_count())
 
     async def _shutdown(self):
         """Sistemi kapat."""
@@ -608,10 +652,12 @@ class AlphaSystem:
 
         # Learning insights
         insights = self._learning.get_insights()
+        outcome_stats = self._outcome_tracker.get_stats()
+        print(f"  ---")
+        print(f"  Öğrenme")
+        print(f"  Tahmin sayısı   : {insights.get('total_predictions', 0)}")
+        print(f"  Outcome bekleyen: {outcome_stats.get('pending', 0)}")
         if insights.get('total_resolved', 0) > 0:
-            print(f"  ---")
-            print(f"  Öğrenme")
-            print(f"  Tahmin sayısı   : {insights['total_predictions']}")
             print(f"  Çözümlenen      : {insights['total_resolved']}")
             print(f"  Genel doğruluk  : %{insights['overall_accuracy']*100:.1f}")
             print(f"  Son doğruluk    : %{insights['recent_accuracy']*100:.1f}")
