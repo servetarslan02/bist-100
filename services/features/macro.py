@@ -50,7 +50,7 @@ class MacroFeatureEngine:
             if len(history) >= 20:
                 mean = np.mean(history[-60:])
                 std = np.std(history[-60:])
-                if std > 0:
+                if std and std > 0:
                     features["usdtry_zscore"] = round((usdtry - mean) / std, 4)
 
                 # Momentum (son 20 gün)
@@ -154,7 +154,7 @@ class MacroFeatureEngine:
             if len(history) >= 20:
                 mean = np.mean(history[-60:])
                 std = np.std(history[-60:])
-                if std > 0:
+                if std and std > 0:
                     features["vix_zscore"] = round((float(vix) - mean) / std, 4)
 
                 # Percentile

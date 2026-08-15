@@ -141,7 +141,7 @@ class KAPProvider:
         negative_count = sum(1 for w in negative_words if w in text)
 
         total = positive_count + negative_count
-        if total == 0:
+        if not total or total == 0:
             return 0.0
 
         return (positive_count - negative_count) / total

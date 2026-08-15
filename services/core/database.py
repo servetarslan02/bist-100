@@ -70,26 +70,42 @@ async def get_pg_connection():
 
 async def pg_execute(query: str, *args) -> str:
     """Execute a PostgreSQL query."""
-    async with get_pg_connection() as conn:
-        return await conn.execute(query, *args)
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.execute(query, *args)
+    except Exception as e:
+        logger.error("pg_execute failed", query=query[:100], error=str(e))
+        raise
 
 
 async def pg_fetch(query: str, *args):
     """Fetch rows from PostgreSQL."""
-    async with get_pg_connection() as conn:
-        return await conn.fetch(query, *args)
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetch(query, *args)
+    except Exception as e:
+        logger.error("pg_fetch failed", query=query[:100], error=str(e))
+        raise
 
 
 async def pg_fetchrow(query: str, *args):
     """Fetch a single row from PostgreSQL."""
-    async with get_pg_connection() as conn:
-        return await conn.fetchrow(query, *args)
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetchrow(query, *args)
+    except Exception as e:
+        logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
+        raise
 
 
 async def pg_fetchval(query: str, *args) -> Any:
     """Fetch a single value from PostgreSQL."""
-    async with get_pg_connection() as conn:
-        return await conn.fetchval(query, *args)
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetchval(query, *args)
+    except Exception as e:
+        logger.error("pg_fetchval failed", query=query[:100], error=str(e))
+        raise
 
 
 # =====================================================

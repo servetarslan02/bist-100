@@ -248,7 +248,7 @@ class FundamentalFeatureEngine:
 
         # Debt manageable
         if total_equity and total_equity > 0:
-            de_ratio = total_debt / total_equity
+            de_ratio = total_debt / total_equity if total_debt else 0
             if de_ratio < 0.5:
                 score += 25
             elif de_ratio < 1.0:
@@ -259,7 +259,8 @@ class FundamentalFeatureEngine:
         features["growth_quality_score"] = float(score)
 
         # High growth + low margin + high debt = warning
-        if rev_growth > 20 and profit_margin < 5 and total_debt and total_equity and total_debt / total_equity > 1.5:
+        de_check = total_debt / total_equity if total_equity and total_equity > 0 and total_debt else 0
+        if rev_growth > 20 and profit_margin < 5 and de_check > 1.5:
             features["growth_quality_warning"] = 1.0
         else:
             features["growth_quality_warning"] = 0.0

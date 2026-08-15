@@ -107,7 +107,7 @@ class NewsProvider:
         neg = sum(1 for w in negative if w in text)
         total = pos + neg
 
-        if total == 0:
+        if not total or total == 0:
             return 0.0
         return (pos - neg) / total
 
