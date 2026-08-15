@@ -211,10 +211,36 @@
       "risks": [],
       "outcome": null,
       "resolved": false
+    },
+    {
+      "prediction_id": "ARCLK-20260815154005",
+      "ticker": "ARCLK",
+      "timestamp": "2026-08-15T15:40:05.121028+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08256880733944956,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 95.3499984741211,
+        "momentum_20d": -3.0999984741210938,
+        "rsi_14": 37.5787961927586,
+        "volume_zscore": -0.5490211742392983,
+        "realized_vol_20d": 14.82278015899717,
+        "bb_position": 0.01144478415091083,
+        "trend_slope_20d": -0.15743344048705538
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
     }
   ],
   "regime_accuracy": {},
   "feature_importance_feedback": {},
   "accuracy_window": [],
-  "saved_at": "2026-08-15T15:35:43.285181+00:00"
+  "saved_at": "2026-08-15T15:40:05.122832+00:00"
 }

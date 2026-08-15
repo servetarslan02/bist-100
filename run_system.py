@@ -119,7 +119,7 @@ class AlphaSystem:
 
         # 4. Start continuous loop
         print("\n🔄 Sürekli tarama başlatılıyor... (Ctrl+C ile durdur)")
-        print("   Piyasa açıkken her 5 dakikada bir tarama yapılacak.\n")
+        print("   Piyasa açıkken her 1 dakikada bir tarama yapılacak.\n")
 
         # Signal handlers (graceful shutdown)
         import signal as sig
@@ -130,7 +130,7 @@ class AlphaSystem:
         try:
             while self._running:
                 await self._main_loop()
-                await asyncio.sleep(300)  # 5 dakika
+                await asyncio.sleep(60)  # 1 dakika (anlık takip)
         except (KeyboardInterrupt, asyncio.CancelledError):
             print("\n⏹ Durduruluyor...")
         finally:
@@ -317,11 +317,30 @@ class AlphaSystem:
         from services.ingestion.providers.fundamental_provider import fundamental_provider
         from services.features.fundamental import fundamental_feature_engine
 
-        # Market data — BIST evreninin tamamı
+        # Market data — BIST evreninin tamamı, anlık fiyatlar
         test_tickers = self._tickers
         data_map = {}
-        batch_size = 20  # Daha büyük batch = daha hızlı
+        batch_size = 20
 
+        # 1. Anlık fiyatlar çek (sadece close — hızlı)
+        print("   Anlık fiyatlar çekiliyor...")
+        live_prices = {}
+        try:
+            tickers_yf = [f"{t}.IS" for t in test_tickers]
+            live_data = yf.download(tickers_yf, period="1d", group_by="ticker", threads=True, progress=False)
+            for ticker in test_tickers:
+                try:
+                    td = live_data[f"{ticker}.IS"].dropna()
+                    if len(td) > 0:
+                        live_prices[ticker] = float(td["Close"].iloc[-1])
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        print(f"   ✓ {len(live_prices)} anlık fiyat")
+
+        # 2. Tarihsel veri çek (feature hesaplama için)
+        print("   Tarihsel veri çekiliyor...")
         for i in range(0, len(test_tickers), batch_size):
             batch = test_tickers[i:i + batch_size]
             tickers_yf = [f"{t}.IS" for t in batch]
@@ -344,7 +363,7 @@ class AlphaSystem:
                 pass
 
         fetch_time = time.time() - start
-        print(f"   ✓ {len(data_map)} hisse için veri çekildi ({fetch_time:.1f}s)")
+        print(f"   ✓ {len(data_map)} hisse için tarihsel veri ({fetch_time:.1f}s)")
 
         # Features
         print("\n🧮 [4/8] Feature'lar hesaplanıyor...")
@@ -428,12 +447,25 @@ class AlphaSystem:
             fundamental_scores=fundamental_scores,
         )
 
-        top_opps = self._opportunity_engine.get_top_opportunities(results, limit=20, min_score=45)
+        # Adaptif eşik: piyasa koşullarına göre belirle (sabit kriter yok)
+        all_scores = [r.risk_adjusted_score for r in results if r.risk_adjusted_score > 0]
+        if all_scores:
+            import numpy as np
+            median_score = float(np.median(all_scores))
+            std_score = float(np.std(all_scores))
+            # Piyasa zorsa eşik düşer, iyiyse yükselir
+            adaptive_threshold = max(40, median_score + 0.5 * std_score)
+        else:
+            median_score = 50
+            adaptive_threshold = 45
+
+        top_opps = self._opportunity_engine.get_top_opportunities(results, limit=100, min_score=adaptive_threshold)
         signals = [r for r in results if r.signal_type]
 
         print(f"   ✓ {len(results)} hisse tarandı")
         print(f"   ✓ {len(signals)} sinyal üretildi")
-        print(f"   ✓ {len(top_opps)} fırsat bulundu")
+        print(f"   ✓ Adaptif eşik: {adaptive_threshold:.1f} (medyan={median_score:.1f})")
+        print(f"   ✓ {len(top_opps)} fırsat bulundu (kriteri geçen hepsi)")
 
         # Decision + Execution for ALL opportunities (yapay sİnIr yok)
         print("\n💼 [8/8] Kararlar ve İşlemler...")
