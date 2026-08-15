@@ -63,6 +63,10 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_config())
         elif path == "/api/knowledge-graph":
             self._json_response(self._get_knowledge_graph())
+        elif path == "/api/alerts":
+            self._json_response(self._get_alerts())
+        elif path == "/api/models":
+            self._json_response(self._get_models())
         elif path == "/api/learning":
             self._json_response(self._get_learning())
         elif path == "/api/regime":
@@ -281,6 +285,49 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             return {}
         except Exception as e:
             return {"error": str(e)}
+
+    def _get_alerts(self) -> dict:
+        """Uyarılar."""
+        try:
+            if self.system and hasattr(self.system, '_notification_system'):
+                notifications = self.system._notification_system.get_unread(limit=50)
+                return [{
+                    "id": n.get("id", ""),
+                    "alert_type": n.get("category", ""),
+                    "severity": n.get("severity", "INFO"),
+                    "title": n.get("title", ""),
+                    "message": n.get("message", ""),
+                    "created_at": n.get("timestamp", ""),
+                } for n in notifications]
+            return []
+        except Exception as e:
+            return []
+
+    def _get_models(self) -> dict:
+        """Model registry."""
+        try:
+            # Statik model listesi (MLflow entegrasyonu sonrası dinamik olacak)
+            return [{
+                "id": 1,
+                "name": "LightGBM Momentum",
+                "description": "5 günlük momentum tahmini",
+                "model_type": "lightgbm",
+                "status": "active",
+                "latest_version": "v1",
+                "latest_status": "candidate",
+                "metrics": {"accuracy": 0.52, "sharpe": 1.1},
+            }, {
+                "id": 2,
+                "name": "Heuristic Rule-Based",
+                "description": "Kural tabanlı fallback model",
+                "model_type": "rule_based",
+                "status": "active",
+                "latest_version": "v1",
+                "latest_status": "active",
+                "metrics": {"accuracy": 0.50},
+            }]
+        except Exception as e:
+            return []
 
     def _get_learning(self) -> dict:
         """Öğrenme durumu."""
