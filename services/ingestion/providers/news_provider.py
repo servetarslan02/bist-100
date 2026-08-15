@@ -46,6 +46,20 @@ COMPANY_NAME_MAP = {
     "tocl": "TOCL", "uşak seramik": "USAK",
     "xu100": "BIST100", "bist 100": "BIST100", "bist100": "BIST100",
     "borsa istanbul": "BIST100", "borsa": "BIST100",
+    "akbank": "AKBNK", "garanti bank": "GARAN", "yapi kredi": "YKBNK",
+    "halkbank": "HALKB", "vakifbank": "VAKBN", "ziraat": "ZIRAAT",
+    "turkcell": "TCELL", "turk telekom": "TTKOM",
+    "aselsan": "ASELS", "havelsan": "HVLSN", "tai": "TAI",
+    "ford otosan": "FROTO", "tofas": "TOASO", "arcelik": "ARCLK",
+    "bim": "BIMAS", "migros": "MGROS", "sok market": "SOKM",
+    "pegasus": "PGSUS", "sunexpress": "SXS",
+    "emlak konut": "EKGYO", "torunlar": "TRGYO",
+    "alarko": "ALARK", "enka": "ENKAI",
+    "sisecam": "SISE", "borusan": "BRSA",
+    "kardemir": "KRDMA", "tupras": "TUPRS", "petkim": "PETKM",
+    "aygaz": "AYGAZ", "opet": "OPET",
+    "sabanci": "SAHOL", "koc holding": "KCHOL",
+    "turkiye is bankasi": "ISCTR", "is bankasi": "ISCTR",
 }
 
 
@@ -104,8 +118,9 @@ class NewsProvider:
 
         rss_feeds = [
             ("https://www.dunya.com/rss/ekonomi.xml", "Dünya"),
-            ("https://www.paraanaliz.com/feed/", "ParaAnaliz"),
             ("https://www.borsagundem.com/rss", "Borsa Gündem"),
+            ("https://www.bloomberght.com/rss", "Bloomberg HT"),
+            ("https://www.aa.com.tr/tr/ekonomi/rss", "Anadolu Ajansı"),
         ]
 
         articles = []
