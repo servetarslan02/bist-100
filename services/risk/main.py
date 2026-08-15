@@ -22,6 +22,24 @@ from ..core.logging import setup_logging
 logger = structlog.get_logger()
 
 
+
+async def _db_fetchrow(query, *args):
+    """Fetch single row - try dev_db first, then pg."""
+    try:
+        from ..core.database_dev import dev_db
+        return await dev_db.pg_fetchrow(query, *args)
+    except Exception:
+        return await pg_fetchrow(query, *args)
+
+async def _db_fetchval(query, *args):
+    """Fetch single value - try dev_db first, then pg."""
+    try:
+        from ..core.database_dev import dev_db
+        return await dev_db.pg_fetchval(query, *args)
+    except Exception:
+        return await pg_fetchval(query, *args)
+
+
 class RiskEngine:
     """Independent risk management engine. Operates ABOVE the AI layer."""
 
@@ -70,10 +88,19 @@ class RiskEngine:
         Sistem risk limitlerini okuyamıyorsa işlem yapmamalı.
         """
         try:
-            rows = await pg_fetch("""
-                SELECT config_key, config_value FROM system_config
-                WHERE config_key LIKE 'risk.%'
-            """)
+            # Dev modda SQLite kullan
+            try:
+                from ..core.database_dev import dev_db
+                rows = await dev_db.pg_fetch("""
+                    SELECT config_key, config_value FROM system_config
+                    WHERE config_key LIKE 'risk.%'
+                """)
+            except Exception:
+                # Production modda PostgreSQL kullan
+                rows = await pg_fetch("""
+                    SELECT config_key, config_value FROM system_config
+                    WHERE config_key LIKE 'risk.%'
+                """)
             if not rows:
                 # Risk limitleri yoksa → FAIL CLOSED
                 logger.critical("NO RISK LIMITS FOUND IN DATABASE — FAIL CLOSED")
@@ -232,7 +259,7 @@ class RiskEngine:
 
         limit = self._risk_limits.get("max_position_pct", 10.0)
 
-        portfolio = await pg_fetchrow("""
+        portfolio = await _db_fetchrow("""
             SELECT current_capital FROM portfolios WHERE id = $1
         """, portfolio_id)
 
@@ -264,7 +291,7 @@ class RiskEngine:
 
         limit = self._risk_limits.get("max_sector_pct", 30.0)
 
-        sector = await pg_fetchval("""
+        sector = await _db_fetchval("""
             SELECT s.code FROM instruments i
             JOIN companies c ON i.company_id = c.id
             JOIN sectors s ON c.sector_id = s.id
@@ -277,7 +304,7 @@ class RiskEngine:
                     "details": f"Unknown sector for {ticker} — BLOCKED"}
 
         # Get sector exposure
-        sector_exposure = await pg_fetchval("""
+        sector_exposure = await _db_fetchval("""
             SELECT COALESCE(SUM(p.market_value), 0)
             FROM positions p
             JOIN instruments i ON p.instrument_id = i.id
@@ -286,7 +313,7 @@ class RiskEngine:
             WHERE p.portfolio_id = $1 AND s.code = $2 AND p.status = 'OPEN'
         """, portfolio_id, sector)
 
-        portfolio_value = await pg_fetchval("""
+        portfolio_value = await _db_fetchval("""
             SELECT current_capital FROM portfolios WHERE id = $1
         """, portfolio_id)
 
@@ -312,7 +339,7 @@ class RiskEngine:
         limit = self._risk_limits.get("daily_loss_limit_pct", 5.0)
 
         # Get today's P&L
-        daily_pnl = await pg_fetchval("""
+        daily_pnl = await _db_fetchval("""
             SELECT COALESCE(SUM(filled_quantity * avg_fill_price * CASE WHEN side = 'SELL' THEN 1 ELSE -1 END), 0)
             FROM orders
             WHERE portfolio_id = $1
@@ -320,7 +347,7 @@ class RiskEngine:
             AND DATE(filled_at) = CURRENT_DATE
         """, portfolio_id)
 
-        portfolio_value = await pg_fetchval("""
+        portfolio_value = await _db_fetchval("""
             SELECT current_capital FROM portfolios WHERE id = $1
         """, portfolio_id)
 
@@ -349,7 +376,7 @@ class RiskEngine:
 
         limit = self._risk_limits.get("max_drawdown_pct", 15.0)
 
-        portfolio = await pg_fetchrow("""
+        portfolio = await _db_fetchrow("""
             SELECT initial_capital, current_capital FROM portfolios WHERE id = $1
         """, portfolio_id)
 
