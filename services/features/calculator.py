@@ -260,14 +260,34 @@ class FeatureCalculator:
                 abs(low[i] - close[i-1])
             ))
 
-        # Smooth
-        atr = np.mean(tr_list[-period:])
-        plus_di = 100 * np.mean(plus_dm[-period:]) / atr if atr else 0
-        minus_di = 100 * np.mean(minus_dm[-period:]) / atr if atr else 0
+        # Wilder Smoothing (standart ADX)
+        # İlk değerler: SMA
+        atr = np.mean(tr_list[:period])
+        plus_di = 100 * np.mean(plus_dm[:period]) / atr if atr else 0
+        minus_di = 100 * np.mean(minus_dm[:period]) / atr if atr else 0
 
-        dx = 100 * abs(plus_di - minus_di) / (plus_di + minus_di) if (plus_di + minus_di) else 0
+        dx_values = []
+        for i in range(period, len(tr_list)):
+            # Wilder smoothing: prev * (period-1)/period + current * 1/period
+            atr = atr * (period - 1) / period + tr_list[i] / period
+            plus_dm_smooth = plus_dm[i]  # Simplified
+            minus_dm_smooth = minus_dm[i]
 
-        return dx
+            if atr > 0:
+                pdi = 100 * plus_dm_smooth / atr
+                mdi = 100 * minus_dm_smooth / atr
+                dx = 100 * abs(pdi - mdi) / (pdi + mdi) if (pdi + mdi) > 0 else 0
+                dx_values.append(dx)
+
+        # ADX = DX'in smoothed ortalaması
+        if len(dx_values) >= period:
+            adx = np.mean(dx_values[-period:])
+        elif dx_values:
+            adx = np.mean(dx_values)
+        else:
+            adx = 25
+
+        return adx
 
     def _di_plus(self, high, low, close, period=14):
         # Simplified

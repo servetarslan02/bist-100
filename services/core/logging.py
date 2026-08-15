@@ -28,3 +28,10 @@ def setup_logging(log_level: str = "INFO"):
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
     logging.getLogger("asyncio").setLevel(logging.WARNING)
+
+
+# Setup on import
+setup_logging()
+
+# Export logger
+logger = structlog.get_logger()

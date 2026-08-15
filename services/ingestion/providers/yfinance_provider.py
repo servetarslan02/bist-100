@@ -6,7 +6,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 import structlog
 
-from ..bist_universe import BIST_STOCKS, get_yfinance_ticker
+from ..bist_universe import bist_universe
 
 logger = structlog.get_logger()
 
@@ -94,7 +94,7 @@ class YFinanceProvider:
     ) -> Dict[str, pl.DataFrame]:
         """Fetch OHLCV data for multiple tickers."""
         if tickers is None:
-            tickers = BIST_STOCKS
+            tickers = bist_universe.get_tickers()
 
         results = {}
         yf_tickers = [get_yfinance_ticker(t) for t in tickers]

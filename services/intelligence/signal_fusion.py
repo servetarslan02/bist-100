@@ -262,3 +262,7 @@ class SignalFusionEngine:
 
 # Singleton
 signal_fusion_engine = SignalFusionEngine()
+
+
+# Singleton
+signal_fusion = signal_fusion_engine  # SignalFusionEngine instance
