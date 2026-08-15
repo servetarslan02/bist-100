@@ -2581,3 +2581,2819 @@ Test geçmeden sonraki faza geçme.
 Final hedef:
 
 «BIST evrenini sürekli tarayan, veri kalitesini denetleyen, piyasa rejimini çıkaran, teknik/fundamental/makro/haber/AI evidence'larını birleştiren, fırsatları risk-adjusted şekilde sıralayan, hard risk gate üzerinden karar veren, gerçekçi sanal emir ve portföy simülasyonu yapan, sonuçlarını öğrenme sistemiyle değerlendiren, tamamen audit edilebilir ve restart sonrası deterministik şekilde recovery yapabilen production-grade AI yatırım araştırma ve simülasyon platformu.»
+
+Evet. O zaman hisse bulma motorunu ayrı tutup, sistemin geri kalan bütün zeka ve analiz katmanlarını ayrı bir master bölüm olarak tanımlayalım.
+
+Aşağıdaki bölüm, önceki spesifikasyona eklenmek üzere hazırlanmıştır.
+
+AI YATIRIM SİSTEMİ
+
+Hisse Keşfi Dışındaki Tüm Analiz, Tahmin, Risk ve Zeka Sistemleri
+
+«NOT: Hisse keşif/ranking motoru bu dokümanın dışında tutulur. Bu doküman, aday bir varlık sisteme girdikten SONRA onun hakkında çalışan bütün analiz ve karar destek sistemini tanımlar.»
+
+---
+
+1. MASTER ANALYSIS PIPELINE
+
+Bir varlık aday olarak sisteme girdikten sonra:
+
+ASSET
+ ↓
+DATA VALIDATION
+ ↓
+MARKET CONTEXT
+ ↓
+FUNDAMENTAL ANALYSIS
+ ↓
+TECHNICAL ANALYSIS
+ ↓
+PRICE ACTION
+ ↓
+VOLUME ANALYSIS
+ ↓
+VOLATILITY ANALYSIS
+ ↓
+MACRO ANALYSIS
+ ↓
+SECTOR ANALYSIS
+ ↓
+NEWS ANALYSIS
+ ↓
+KAP ANALYSIS
+ ↓
+SOCIAL SENTIMENT
+ ↓
+EVENT ANALYSIS
+ ↓
+CATALYST ANALYSIS
+ ↓
+CORRELATION ANALYSIS
+ ↓
+ANOMALY DETECTION
+ ↓
+REGIME ANALYSIS
+ ↓
+FORECASTING
+ ↓
+PROBABILITY ENGINE
+ ↓
+MONTE CARLO
+ ↓
+VALUATION
+ ↓
+RISK ENGINE
+ ↓
+SCENARIO ENGINE
+ ↓
+STRESS TEST
+ ↓
+PORTFOLIO IMPACT
+ ↓
+AI SYNTHESIS
+ ↓
+CONFIDENCE
+ ↓
+DECISION SUPPORT
+
+Hiçbir tek modül tek başına yatırım kararı vermez.
+
+---
+
+2. DATA VALIDATION ENGINE
+
+Analiz başlamadan önce tüm veriler kontrol edilir.
+
+Kontroller:
+
+missing
+stale
+duplicate
+outlier
+timestamp
+source reliability
+cross-source consistency
+
+Örneğin fiyat kaynağı A:
+
+100.20
+
+kaynak B:
+
+100.25
+
+ise normal fark kabul edilebilir.
+
+Ama:
+
+100.20
+vs
+145.80
+
+ise veri anomalisi olarak işaretlenir.
+
+Veri kalitesi düşükse model confidence düşürülür.
+
+---
+
+3. FUNDAMENTAL ANALYSIS ENGINE
+
+Şirketin ekonomik ve finansal yapısını analiz eder.
+
+Gelir
+
+Revenue
+Revenue Growth
+Revenue CAGR
+Organic Growth
+
+Kârlılık
+
+Gross Margin
+EBIT Margin
+EBITDA Margin
+Net Margin
+ROE
+ROA
+ROIC
+
+Bilanço
+
+Cash
+Debt
+Net Debt
+Working Capital
+Current Ratio
+Debt/Equity
+Net Debt/EBITDA
+
+Nakit
+
+Operating Cash Flow
+Free Cash Flow
+FCF Margin
+FCF Yield
+Cash Conversion
+
+Büyüme kalitesi
+
+Sadece büyüme miktarı değil:
+
+growth
++
+margin
++
+cash flow
++
+debt
+
+birlikte değerlendirilir.
+
+---
+
+4. FUNDAMENTAL TREND ENGINE
+
+Tek bir bilanço yerine zaman serisini analiz eder.
+
+Örneğin:
+
+Revenue:
++12%
++18%
++24%
+
+→ accelerating growth.
+
+Ama:
+
+Revenue:
++25%
++15%
++5%
+
+→ growth deceleration.
+
+Aynı işlem:
+
+- margin
+- EPS
+- FCF
+- debt
+- ROIC
+
+için yapılır.
+
+---
+
+5. EARNINGS QUALITY ENGINE
+
+Kârın kalitesini ölçer.
+
+Örneğin:
+
+Net Income ↑
+Cash Flow ↓
+
+varsa uyarı.
+
+Ayrıca:
+
+receivables growth
+inventory growth
+cash flow conversion
+one-off gains
+
+incelenir.
+
+Amaç:
+
+«Muhasebe kârı ile ekonomik kâr arasındaki farkı yakalamak.»
+
+---
+
+6. VALUATION ENGINE
+
+Bir şirketin yalnızca ucuz/pahalı olduğunu değil, farklı yöntemlerle değerini tahmin eder.
+
+Multiples
+
+P/E
+P/B
+EV/EBITDA
+EV/EBIT
+EV/Sales
+FCF Yield
+Dividend Yield
+
+Peer comparison
+
+Şirket:
+
+vs sector median
+vs sector average
+vs historical own valuation
+
+karşılaştırılır.
+
+---
+
+7. DCF ENGINE
+
+Uygun şirketlerde:
+
+Revenue
+Margins
+Taxes
+Capex
+Working Capital
+FCF
+WACC
+Terminal Growth
+
+kullanılarak DCF yapılır.
+
+Sonuç:
+
+Intrinsic Value
+Current Price
+Upside
+Downside
+
+olur.
+
+Tek bir DCF sonucu kullanılmaz.
+
+Varsayımlar senaryo halinde tutulur.
+
+---
+
+8. VALUATION SCENARIOS
+
+En az:
+
+Bear
+Base
+Bull
+
+senaryosu.
+
+Örneğin:
+
+Bear → intrinsic value 85
+Base → 110
+Bull → 145
+
+Mevcut fiyat:
+
+100
+
+ise sistem sadece:
+
+«“%10 upside”»
+
+demez.
+
+Olasılık ağırlıklı sonuç üretir.
+
+---
+
+9. TECHNICAL ANALYSIS ENGINE
+
+Teknik göstergeler ayrı ayrı hesaplanır.
+
+Trend
+
+SMA20
+SMA50
+SMA100
+SMA200
+EMA20
+EMA50
+EMA200
+
+Momentum
+
+RSI
+MACD
+ROC
+Momentum
+Stochastic
+
+Volatility
+
+ATR
+Bollinger Band Width
+Historical Volatility
+Realized Volatility
+
+Trend strength
+
+ADX
+Directional Movement
+
+---
+
+10. PRICE ACTION ENGINE
+
+İndikatörlerden bağımsız olarak:
+
+higher high
+higher low
+lower high
+lower low
+breakout
+breakdown
+retest
+reversal
+consolidation
+gap
+
+tespit edilir.
+
+Candlestick pattern'leri yardımcı sinyal olarak kullanılabilir.
+
+---
+
+11. SUPPORT / RESISTANCE ENGINE
+
+Destek ve direnç:
+
+historical price
+volume profile
+swing points
+moving averages
+previous highs/lows
+
+kullanılarak çıkarılır.
+
+Her seviye için:
+
+strength
+touch_count
+recency
+volume
+
+hesaplanabilir.
+
+---
+
+12. VOLUME ENGINE
+
+Fiyat hareketinin hacim tarafından desteklenip desteklenmediğini ölçer.
+
+Örneğin:
+
+Price ↑
+Volume ↑
+
+→ confirmation.
+
+Ama:
+
+Price ↑
+Volume ↓
+
+→ weaker confirmation.
+
+Ayrıca:
+
+volume spike
+relative volume
+volume acceleration
+OBV
+
+hesaplanır.
+
+---
+
+13. VOLATILITY ENGINE
+
+Volatiliteyi tek sayı olarak görmez.
+
+Hesaplar:
+
+realized volatility
+historical volatility
+ATR
+downside volatility
+upside volatility
+volatility regime
+volatility expansion
+volatility contraction
+
+Volatility expansion tespit edilirse risk motoruna event gönderilir.
+
+---
+
+14. MARKET MICROSTRUCTURE ENGINE
+
+Veri destekliyorsa:
+
+bid
+ask
+spread
+depth
+order imbalance
+liquidity
+
+analiz edilir.
+
+Amaç:
+
+«İşlem yapılabilir fiyat ile teorik fiyat arasındaki farkı anlamak.»
+
+---
+
+15. MACRO ENGINE
+
+Şirketi piyasadan bağımsız değerlendirme.
+
+Takip:
+
+TCMB policy rate
+inflation
+USDTRY
+EURTRY
+US rates
+VIX
+gold
+oil
+global indices
+credit conditions
+
+---
+
+16. MACRO SENSITIVITY ENGINE
+
+Her şirket için:
+
+USDTRY sensitivity
+interest sensitivity
+commodity sensitivity
+global market sensitivity
+
+tahmin edilir.
+
+Örneğin:
+
+USDTRY +10%
+
+senaryosunda şirketin:
+
+revenue
+cost
+margin
+debt
+valuation
+
+üzerindeki etkisi hesaplanır.
+
+---
+
+17. SECTOR ENGINE
+
+Şirketin bulunduğu sektör analiz edilir.
+
+Ölç:
+
+sector momentum
+sector valuation
+sector earnings growth
+sector relative strength
+sector volatility
+sector fund flow
+
+Şirketin sektöre göre performansı:
+
+stock return - sector return
+
+gibi relative metrics ile izlenir.
+
+---
+
+18. RELATIVE STRENGTH ENGINE
+
+Varlığı:
+
+BIST100
+sector
+peer group
+global benchmark
+
+ile karşılaştır.
+
+Örneğin:
+
+Stock +15%
+BIST +5%
+Sector +7%
+
+→ strong relative performance.
+
+---
+
+19. NEWS ENGINE
+
+Haberler:
+
+source
+timestamp
+company
+sector
+topic
+sentiment
+importance
+novelty
+credibility
+
+ile işlenir.
+
+Haber sadece:
+
+positive / negative
+
+olarak sınıflandırılmaz.
+
+---
+
+20. NEWS IMPACT ENGINE
+
+Her haber için:
+
+impact direction
+impact magnitude
+confidence
+time horizon
+
+çıkarılır.
+
+Örneğin:
+
+New contract
+
+→ positive.
+
+Ama sözleşmenin şirket gelirine etkisi küçükse:
+
+impact = LOW
+
+olabilir.
+
+---
+
+21. KAP ANALYSIS ENGINE
+
+KAP açıklamaları özel önceliğe sahip olur.
+
+Kategoriler:
+
+financial results
+capital increase
+buyback
+dividend
+merger
+acquisition
+contract
+investment
+management change
+legal
+regulatory
+guidance
+
+Analiz edilir.
+
+---
+
+22. NEWS DUPLICATION ENGINE
+
+Aynı haber:
+
+Reuters
+Bloomberg
+local media
+social media
+
+tarafından tekrar tekrar paylaşılmış olabilir.
+
+Bunları tek event altında birleştir.
+
+Ama kaynakların güvenilirlik bilgilerini kaybetme.
+
+---
+
+23. SOCIAL SENTIMENT ENGINE
+
+Desteklenen sosyal kaynaklardan:
+
+post volume
+sentiment
+engagement
+author reliability
+topic
+trend
+
+çıkarılır.
+
+---
+
+24. SOCIAL MANIPULATION ENGINE
+
+Sosyal medya sinyali doğrudan güvenilir kabul edilmez.
+
+Tespit:
+
+bot-like activity
+spam
+duplicate posts
+coordinated posting
+sudden artificial volume
+low-quality accounts
+
+yüksekse sentiment confidence düşürülür.
+
+---
+
+25. SENTIMENT MOMENTUM
+
+Sentiment'in yalnızca seviyesi değil değişimi izlenir.
+
+Örneğin:
+
+Positive sentiment:
+20 → 30 → 45 → 70
+
+→ accelerating sentiment.
+
+Ama:
+
+80 → 70 → 55
+
+→ sentiment deterioration.
+
+---
+
+26. EVENT ENGINE
+
+Olayları tek tek değil zaman çizelgesi olarak takip eder.
+
+Örneğin:
+
+KAP
+↓
+News
+↓
+Social
+↓
+Price
+↓
+Volume
+
+arasındaki ilişki incelenir.
+
+---
+
+27. CATALYST ENGINE
+
+Yaklaşan olayları izler:
+
+earnings
+dividend
+general assembly
+contract
+product launch
+regulatory decision
+central bank
+macro data
+
+Her catalyst:
+
+date
+importance
+expected impact
+uncertainty
+
+taşır.
+
+---
+
+28. EVENT DECAY ENGINE
+
+Bir haberin etkisi zamanla azalabilir.
+
+Örneğin:
+
+Day 0 → 100%
+Day 1 → 70%
+Day 2 → 45%
+Day 5 → 15%
+
+Bu değerler sabit olmak zorunda değildir; event türüne göre öğrenilebilir.
+
+---
+
+29. CORRELATION ENGINE
+
+Hisse ile:
+
+other stocks
+sector
+BIST
+USDTRY
+gold
+oil
+VIX
+rates
+
+arasındaki korelasyon hesaplanır.
+
+Rolling correlation kullanılmalı.
+
+---
+
+30. ANOMALY ENGINE
+
+Olağandışı durumları yakalar:
+
+price anomaly
+volume anomaly
+volatility anomaly
+news anomaly
+sentiment anomaly
+fundamental anomaly
+
+Örneğin:
+
+Normal volume: 1M
+Current volume: 12M
+
+→ volume anomaly.
+
+---
+
+31. REGIME ENGINE
+
+Piyasanın mevcut rejimini belirler:
+
+BULL
+BEAR
+SIDEWAYS
+HIGH_VOL
+LOW_VOL
+RISK_ON
+RISK_OFF
+CRISIS
+RECOVERY
+
+Aynı teknik sinyal farklı rejimlerde farklı anlam taşıyabilir.
+
+---
+
+32. SIGNAL FUSION ENGINE
+
+Bütün modüllerin sonuçları burada birleştirilir.
+
+Örneğin:
+
+Technical       +18
+Fundamental     +22
+Macro           +12
+News            +8
+Social          +4
+Relative        +9
+Valuation       +15
+Risk            -10
+
+Ancak basit toplama zorunlu değildir.
+
+Ağırlıklar:
+
+market regime
+asset type
+time horizon
+data confidence
+
+ile değişebilir.
+
+---
+
+33. PROBABILITY ENGINE
+
+Sistem:
+
+«“Fiyat kesin yükselecek.”»
+
+demez.
+
+Örneğin:
+
+P(+10% within 20d) = 61%
+P(+5% within 20d)  = 73%
+P(-5% within 20d)  = 24%
+P(-10% within 20d) = 9%
+
+gibi olasılık dağılımları üretir.
+
+---
+
+34. FORECASTING ENGINE
+
+Farklı zaman horizonları:
+
+intraday
+1 day
+5 day
+20 day
+60 day
+120 day
+
+olarak ayrılabilir.
+
+Her horizon ayrı prediction olarak tutulur.
+
+---
+
+35. ENSEMBLE FORECASTING
+
+Tek model yerine:
+
+technical model
+statistical model
+time-series model
+ML model
+LLM analysis
+Monte Carlo
+
+sonuçları karşılaştırılabilir.
+
+Modellerin geçmiş performanslarına göre ensemble weighting yapılabilir.
+
+---
+
+36. MONTE CARLO ENGINE
+
+Monte Carlo, tek bir fiyat tahmini üretmek için kullanılmaz.
+
+Binlerce olası gelecek yol simüle edilir.
+
+Örneğin:
+
+Current Price = P
+Expected Return = μ
+Volatility = σ
+Horizon = T
+
+ile çok sayıda fiyat path'i oluşturulur.
+
+Sonuç:
+
+P10
+P25
+P50
+P75
+P90
+
+gibi dağılımlar olur.
+
+---
+
+37. MONTE CARLO OUTPUT
+
+Örneğin:
+
+20 gün sonra:
+
+P10 = 82
+P25 = 91
+P50 = 104
+P75 = 119
+P90 = 134
+
+Sistem böylece:
+
+downside probability
+upside probability
+expected value
+tail risk
+
+hesaplayabilir.
+
+---
+
+38. MONTE CARLO PORTFOLIO
+
+Tek hisse değil bütün portföy simüle edilebilir.
+
+Correlation matrix kullanılarak:
+
+10,000 portfolio paths
+
+oluşturulur.
+
+Sonuç:
+
+expected return
+VaR
+CVaR
+max drawdown distribution
+probability of loss
+
+olur.
+
+---
+
+39. RISK ENGINE
+
+Risk kategorileri:
+
+market risk
+volatility risk
+liquidity risk
+concentration risk
+correlation risk
+event risk
+macro risk
+tail risk
+model risk
+data risk
+
+ayrı hesaplanır.
+
+---
+
+40. VaR / CVaR
+
+Portfolio için:
+
+VaR 95%
+VaR 99%
+CVaR 95%
+CVaR 99%
+
+hesaplanabilir.
+
+CVaR özellikle tail loss'u anlamak için kullanılır.
+
+---
+
+41. DRAWDOWN ENGINE
+
+Takip:
+
+peak equity
+current equity
+drawdown
+max drawdown
+drawdown duration
+recovery time
+
+yapılır.
+
+---
+
+42. POSITION RISK ENGINE
+
+Her pozisyon için:
+
+position value
+portfolio weight
+volatility contribution
+VaR contribution
+sector contribution
+correlation contribution
+
+hesaplanır.
+
+---
+
+43. PORTFOLIO OPTIMIZATION
+
+Amaç yalnızca maksimum getiri değildir.
+
+Optimize edilebilecek hedefler:
+
+risk-adjusted return
+minimum volatility
+maximum Sharpe
+maximum diversification
+drawdown constraint
+sector constraint
+position constraint
+
+---
+
+44. SCENARIO ENGINE
+
+Kullanıcı:
+
+USDTRY +10%
+BIST -15%
+VIX +50%
+TCMB +500bp
+
+girdiğinde bütün analiz zinciri yeniden çalıştırılır.
+
+Sonuç:
+
+portfolio impact
+asset impact
+sector impact
+risk change
+drawdown estimate
+
+---
+
+45. STRESS TEST ENGINE
+
+Extreme senaryolar:
+
+2008-style crisis
+2020-style shock
+BIST crash
+currency shock
+rate shock
+liquidity shock
+
+gibi tarihsel veya sentetik senaryolarla test edilir.
+
+---
+
+46. MODEL RISK ENGINE
+
+Modelin kendisinin yanılma ihtimali ölçülür.
+
+Örneğin:
+
+prediction confidence = 90%
+model reliability = 62%
+
+ise nihai confidence doğrudan %90 olamaz.
+
+Model reliability confidence'ı sınırlar.
+
+---
+
+47. DATA CONFIDENCE ENGINE
+
+Sonuç:
+
+Confidence = 88%
+
+ise bu:
+
+data quality
++
+model reliability
++
+source reliability
++
+agreement
+
+ile hesaplanmalı.
+
+Veri kalitesi düşerse confidence düşmeli.
+
+---
+
+48. AI SYNTHESIS ENGINE
+
+Son aşamada AI bütün sonuçları okur:
+
+technical
+fundamental
+macro
+news
+social
+valuation
+forecast
+Monte Carlo
+risk
+scenario
+
+ve insan tarafından okunabilir araştırma raporu üretir.
+
+Ama AI:
+
+- ham veriyi değiştiremez,
+- metrikleri uyduramaz,
+- risk veto'sunu geçemez,
+- olmayan haberi kaynak gösteremez.
+
+---
+
+49. EXPLAINABILITY ENGINE
+
+Her sonuç için:
+
+WHY?
+WHY NOT?
+WHAT CHANGED?
+WHAT COULD INVALIDATE THIS?
+WHAT IS THE MAIN RISK?
+WHAT IS THE MAIN CATALYST?
+
+sorularına cevap üretilir.
+
+---
+
+50. DECISION SUPPORT
+
+Nihai çıktı örneği:
+
+ASSET: XYZ
+
+Overall View:
+POSITIVE
+
+Confidence:
+78%
+
+Expected Return:
++11.4%
+
+Risk:
+MEDIUM
+
+Monte Carlo:
+P(+10%) = 57%
+
+Valuation:
++18% upside
+
+Technical:
+Positive
+
+Fundamental:
+Strong
+
+Macro:
+Neutral
+
+News:
+Positive
+
+Social:
+Moderately Positive
+
+Main Catalyst:
+Earnings
+
+Main Risk:
+Currency sensitivity
+
+Invalidation:
+Price < X
+Fundamental deterioration
+Regime change
+
+Bu çıktı yatırım tavsiyesi olarak değil, sistemin bütün analizlerinin birleşmiş araştırma sonucu olarak saklanır.
+
+---
+
+51. PREDICTION OUTCOME ENGINE
+
+Her tahmin daha sonra gerçekle karşılaştırılır.
+
+Örneğin:
+
+Prediction:
++10% / 20 days
+
+Actual:
++7.2%
+
+kaydedilir.
+
+Sonra:
+
+prediction error
+model error
+regime
+features
+
+analiz edilir.
+
+---
+
+52. LEARNING ENGINE
+
+Sistem şunu öğrenmeye çalışır:
+
+hangi sinyal?
+hangi regime?
+hangi sektör?
+hangi horizon?
+hangi model?
+
+hangi koşullarda başarılı.
+
+Örneğin:
+
+RSI breakout
++ high volume
++ bull regime
+
+başarılı olabilirken:
+
+RSI breakout
++ bear regime
+
+başarısız olabilir.
+
+---
+
+53. DRIFT ENGINE
+
+Zaman içinde:
+
+feature distribution
+prediction distribution
+sentiment distribution
+market regime
+model performance
+
+değişirse drift tespit edilir.
+
+---
+
+54. MODEL COMPARISON
+
+Her model:
+
+accuracy
+calibration
+Sharpe contribution
+false positives
+false negatives
+regime performance
+
+ile karşılaştırılır.
+
+---
+
+55. RESEARCH MEMORY
+
+Sistem geçmiş araştırmaları saklar.
+
+Örneğin:
+
+2026-08-01:
+Bullish
+
+2026-08-05:
+Neutral
+
+2026-08-10:
+Bearish
+
+ve neden değiştiğini gösterir.
+
+---
+
+56. DECISION TIMELINE
+
+Bir varlık için:
+
+News
+ ↓
+Sentiment
+ ↓
+Technical
+ ↓
+Fundamental
+ ↓
+Prediction
+ ↓
+Monte Carlo
+ ↓
+Risk
+ ↓
+Decision
+ ↓
+Outcome
+
+zaman çizelgesi gösterilir.
+
+---
+
+57. SELF-CHECK ENGINE
+
+Nihai analizden önce sistem kendi sonucunu sorgular:
+
+Is data stale?
+Are sources conflicting?
+Is confidence too high?
+Is there look-ahead?
+Is there an anomaly?
+Is market regime changing?
+Is model degraded?
+Is risk underestimated?
+
+Herhangi biri kritikse confidence düşürülür veya:
+
+NO_TRADE
+
+üretilir.
+
+---
+
+58. CONFLICT ENGINE
+
+Örneğin:
+
+Technical: BUY
+Fundamental: SELL
+News: BUY
+Macro: SELL
+
+ise sistem bunu gizlememeli.
+
+Şunu göstermeli:
+
+SIGNAL CONFLICT
+
+ve hangi tarafın neden daha ağır bastığını açıklamalı.
+
+---
+
+59. FINAL RESEARCH OBJECT
+
+Her varlık için bütün sistemlerin çıktısı tek bir canonical research object'te birleşmeli:
+
+AssetResearch
+ ├── data_quality
+ ├── technical
+ ├── price_action
+ ├── volume
+ ├── volatility
+ ├── fundamental
+ ├── valuation
+ ├── macro
+ ├── sector
+ ├── relative_strength
+ ├── news
+ ├── kap
+ ├── social
+ ├── events
+ ├── catalysts
+ ├── correlations
+ ├── anomalies
+ ├── regime
+ ├── forecasts
+ ├── probabilities
+ ├── monte_carlo
+ ├── risk
+ ├── scenarios
+ ├── stress_tests
+ ├── model_confidence
+ ├── ai_synthesis
+ └── audit
+
+Bu object sistemin bütün diğer katmanları tarafından kullanılabilir.
+
+---
+
+60. EN ÖNEMLİ KURAL
+
+Hiçbir sistem:
+
+RSI → BUY
+AI → BUY
+News → BUY
+Monte Carlo → BUY
+
+şeklinde tek başına karar veremez.
+
+Doğru mimari:
+
+MULTIPLE INDEPENDENT EVIDENCE
+          ↓
+DATA QUALITY
+          ↓
+CONTEXT
+          ↓
+SIGNAL FUSION
+          ↓
+PROBABILITY
+          ↓
+MONTE CARLO
+          ↓
+RISK
+          ↓
+SCENARIO
+          ↓
+AI SYNTHESIS
+          ↓
+DECISION SUPPORT
+
+şeklindedir.
+
+Böylece sistem bir indikatör botu değil, çok katmanlı bir quant + fundamental + macro + event + sentiment + AI research platformu olur.
+
+Hisse keşif motoru bunun üzerine ayrıca bağlanır ve yalnızca hangi varlıkların bu araştırma pipeline'ına gireceğini belirler.
+
+Evet. Bunların tamamını da sistemin ana spesifikasyonuna ekleyecek şekilde tanımlıyorum. Böylece analitik motor + veri altyapısı + AI ajanları + hafıza + güvenlik + operasyon + recovery + governance birlikte tamamlanmış olacak.
+
+AI YATIRIM PLATFORMU
+
+Sistem Omurgası, AI Ajanları, Veri Altyapısı, Hafıza, Güvenlik ve Operasyon Master Spec
+
+Bu doküman önceki:
+
+- Hisse keşfi
+- Teknik analiz
+- Fundamental analiz
+- Haber/KAP
+- Sosyal medya
+- Makro
+- Değerleme
+- Tahmin
+- Monte Carlo
+- Risk
+- Portföy
+- Backtest
+- Scenario
+- Learning
+
+tanımlarının üzerine eklenir.
+
+Amaç, sistemi sadece analiz yapan bir uygulama olmaktan çıkarıp uçtan uca çalışan, denetlenebilir, hatalara dayanıklı ve sürekli öğrenen AI yatırım araştırma/simülasyon platformu haline getirmektir.
+
+---
+
+1. DATA INGESTION SYSTEM
+
+Sistemin dış dünyayla bağlantı katmanıdır.
+
+Kaynaklar:
+
+Market Data
+Fundamentals
+KAP
+News
+Social
+Macro
+Company Data
+Economic Data
+
+Her provider için adapter oluştur.
+
+ProviderAdapter
+ ├── authenticate()
+ ├── fetch()
+ ├── normalize()
+ ├── validate()
+ └── health_check()
+
+Provider değişince domain kodu değişmemeli.
+
+---
+
+2. ETL / ELT PIPELINE
+
+Veri:
+
+FETCH
+ ↓
+RAW
+ ↓
+NORMALIZE
+ ↓
+VALIDATE
+ ↓
+ENRICH
+ ↓
+FEATURE
+ ↓
+STORE
+ ↓
+EVENT
+
+şeklinde ilerler.
+
+Raw data mümkün olduğunca korunmalı.
+
+---
+
+3. DATA QUALITY SYSTEM
+
+Her veri kaydına:
+
+quality_score
+source
+timestamp
+freshness
+validation_status
+
+eklenir.
+
+Durumlar:
+
+VALID
+STALE
+INVALID
+MISSING
+DUPLICATE
+SUSPICIOUS
+CONFLICTED
+
+---
+
+4. DATA SOURCE RELIABILITY
+
+Provider'ların güvenilirliği ayrıca ölçülür.
+
+Örneğin:
+
+Provider A: 98%
+Provider B: 91%
+Provider C: 76%
+
+Bu değerler:
+
+- hata oranı
+- gecikme
+- veri tutarlılığı
+- missing data
+- geçmiş doğruluk
+
+üzerinden hesaplanabilir.
+
+---
+
+5. DATA RECONCILIATION
+
+Aynı veri birden fazla kaynaktan geldiğinde:
+
+Source A
+Source B
+Source C
+ ↓
+Reconciliation
+
+yapılır.
+
+Çelişki varsa:
+
+CONFLICT
+
+oluşturulur.
+
+Sistem sessizce birini seçmemeli.
+
+---
+
+6. FEATURE STORE
+
+Bütün hesaplanmış feature'ların canonical kaynağıdır.
+
+Örneğin:
+
+RSI
+ATR
+EMA
+ROE
+FCF Yield
+Momentum
+Volatility
+
+burada tutulur.
+
+Her feature:
+
+feature_name
+value
+timestamp
+asset
+calculation_version
+source_version
+
+taşır.
+
+---
+
+7. FEATURE VERSIONING
+
+Formül değişirse eski backtest bozulmamalı.
+
+Örneğin:
+
+RSI_v1
+RSI_v2
+
+ayrı tutulabilir.
+
+---
+
+8. REAL-TIME EVENT SYSTEM
+
+Yeni veri geldiğinde ilgili sistemler otomatik tetiklenir.
+
+Örneğin:
+
+NEW_PRICE
+ ↓
+Technical Update
+ ↓
+Signal Update
+ ↓
+Risk Update
+
+Yeni KAP:
+
+NEW_KAP
+ ↓
+News Analysis
+ ↓
+Event Analysis
+ ↓
+Sentiment
+ ↓
+Forecast
+ ↓
+Risk
+
+---
+
+9. EVENT PRIORITY
+
+Event'ler önem derecesine sahip olur:
+
+CRITICAL
+HIGH
+NORMAL
+LOW
+
+Örneğin şirket iflas haberi:
+
+CRITICAL
+
+normal sosyal medya postu:
+
+LOW
+
+---
+
+10. EVENT ORCHESTRATOR
+
+Bütün pipeline'ı yönetir.
+
+Görevi:
+
+hangi job?
+hangi sırada?
+hangi paralel?
+hangi dependency?
+hangi retry?
+
+belirlemek.
+
+---
+
+11. JOB QUEUE
+
+Ağır işler queue'ya gönderilir:
+
+AI analysis
+Monte Carlo
+Backtest
+Scenario
+Large universe scan
+Feature recalculation
+
+Web request'i bloklamamalı.
+
+---
+
+12. CACHE SYSTEM
+
+Pahalı hesaplar cache'lenir.
+
+Örneğin:
+
+DCF
+Monte Carlo
+fundamental analysis
+AI summary
+
+aynı input hash ile tekrar gelirse gereksiz hesap yapılmaz.
+
+Cache invalidation event-based olabilir.
+
+---
+
+13. KNOWLEDGE GRAPH
+
+Sistem yalnızca tablo verisi kullanmamalı.
+
+İlişkiler:
+
+Company
+ ↕
+Sector
+ ↕
+Supplier
+ ↕
+Customer
+ ↕
+Product
+ ↕
+Person
+ ↕
+Event
+ ↕
+News
+ ↕
+Macro Event
+
+şeklinde tutulabilir.
+
+Örneğin:
+
+«Petrol yükseldi.»
+
+Sistem:
+
+Oil
+ ↓
+Energy sector
+ ↓
+Company A
+ ↓
+Cost impact
+ ↓
+Margin impact
+
+ilişkisini kurabilmeli.
+
+---
+
+14. RESEARCH MEMORY
+
+Sistem geçmiş araştırmaları unutmamalı.
+
+Her araştırma:
+
+asset
+date
+thesis
+evidence
+risk
+prediction
+outcome
+model
+prompt
+
+ile saklanır.
+
+---
+
+15. LONG-TERM MEMORY
+
+Sistem zaman içinde:
+
+company behavior
+sector behavior
+event behavior
+model behavior
+
+hakkında tarihsel hafıza oluşturur.
+
+---
+
+16. RESEARCH CONTEXT ENGINE
+
+AI'ya bütün database'i göndermek yerine ilgili context oluşturulur.
+
+Örneğin THYAO analizinde:
+
+company data
+recent news
+recent KAP
+sector
+macro
+technical
+historical decisions
+
+toplanır.
+
+Sonra AI'ya verilir.
+
+---
+
+17. AI AGENT SYSTEM
+
+Ajanlar görev bazlıdır.
+
+Örneğin:
+
+Research Agent
+News Agent
+Macro Agent
+Fundamental Agent
+Technical Agent
+Risk Agent
+Portfolio Agent
+Scenario Agent
+Backtest Agent
+Audit Agent
+
+Her agent kendi domain'inde çalışır.
+
+---
+
+18. AGENT ORCHESTRATOR
+
+Ajanları yöneten üst katmandır.
+
+Örneğin:
+
+Research Request
+ ↓
+Technical Agent
+Fundamental Agent
+News Agent
+Macro Agent
+ ↓
+Risk Agent
+ ↓
+Synthesis Agent
+
+---
+
+19. AGENT TOOL SYSTEM
+
+Agent'ların erişebileceği araçlar açıkça sınırlandırılır.
+
+Örneğin Research Agent:
+
+read_market_data
+read_news
+read_fundamentals
+run_analysis
+
+Risk Agent:
+
+read_portfolio
+calculate_risk
+approve/reject
+
+Agent'ın ihtiyaç olmayan tool'a erişimi olmamalı.
+
+---
+
+20. AGENT MEMORY
+
+Her agent:
+
+current_context
+task_history
+tool_results
+
+tutabilir.
+
+Ama kritik state merkezi sistemde tutulmalı.
+
+Agent memory canonical database yerine geçmemeli.
+
+---
+
+21. AGENT COMMUNICATION
+
+Agent'lar birbirine doğrudan rastgele mesaj göndermemeli.
+
+Canonical event/message formatı:
+
+sender
+receiver
+task_id
+correlation_id
+payload
+timestamp
+
+olmalı.
+
+---
+
+22. AGENT LOOP CONTROL
+
+Ajan:
+
+analyze
+→ analyze
+→ analyze
+→ analyze
+
+şeklinde sonsuz döngüye girmemeli.
+
+Her task:
+
+max_steps
+timeout
+max_retries
+
+sınırına sahip olmalı.
+
+---
+
+23. AGENT CONFIDENCE
+
+Agent sonucu:
+
+result
+confidence
+evidence
+uncertainty
+
+ile dönmeli.
+
+Confidence uydurulmamalı.
+
+Evidence ile desteklenmeli.
+
+---
+
+24. HUMAN-IN-THE-LOOP
+
+Kritik işlemlerde insan onayı bulunabilir.
+
+Örneğin:
+
+LIVE EXECUTION
+MODEL PROMOTION
+RISK LIMIT CHANGE
+SYSTEM CONFIG CHANGE
+
+için approval gerekebilir.
+
+---
+
+25. NOTIFICATION SYSTEM
+
+Bildirim kategorileri:
+
+Opportunity
+Risk
+News
+KAP
+Regime
+Portfolio
+Model
+System
+Security
+
+---
+
+26. ALERT ENGINE
+
+Örnek:
+
+Portfolio drawdown > threshold
+
+→ alert.
+
+New critical KAP
+
+→ alert.
+
+Model degradation
+
+→ alert.
+
+---
+
+27. PORTFOLIO ACCOUNTING
+
+Portfolio yalnızca:
+
+price × quantity
+
+değildir.
+
+Hesapla:
+
+cash
+fees
+slippage
+realized P&L
+unrealized P&L
+average cost
+tax model if configured
+
+---
+
+28. ACCOUNTING LEDGER
+
+Her financial state değişimi ledger event'i üretmeli.
+
+Örneğin:
+
+BUY
+SELL
+FEE
+DIVIDEND
+DEPOSIT
+WITHDRAWAL
+SPLIT
+
+---
+
+29. EXECUTION SIMULATOR
+
+Emir:
+
+CREATE
+→ VALIDATE
+→ RISK
+→ EXECUTE
+→ FILL
+
+akışından geçer.
+
+---
+
+30. SLIPPAGE MODEL
+
+Slippage:
+
+volatility
+spread
+liquidity
+order size
+market condition
+
+ile ilişkilendirilir.
+
+---
+
+31. PARTIAL FILL
+
+Büyük emir tamamen dolmayabilir.
+
+Örneğin:
+
+Order = 10,000
+Fill = 6,000
+Remaining = 4,000
+
+desteklenmeli.
+
+---
+
+32. RECONCILIATION ENGINE
+
+Şunlar eşit/tutarlı olmalı:
+
+Cash
++
+Position Market Value
+=
+Equity
+
+Ledger ile positions uyuşmalı.
+
+Uyuşmazlık varsa işlem durdurulabilir.
+
+---
+
+33. EXPERIMENT SYSTEM
+
+Her strateji deney olarak kaydedilir:
+
+experiment_id
+strategy
+parameters
+dataset
+feature_version
+model_version
+result
+
+---
+
+34. A/B TEST SYSTEM
+
+Örneğin:
+
+Strategy A
+vs
+Strategy B
+
+aynı historical period üzerinde karşılaştırılır.
+
+---
+
+35. RESEARCH LAB
+
+Araştırmacı:
+
+strategy
+feature
+model
+threshold
+
+değiştirip deney çalıştırabilir.
+
+Production sistemi değiştirmez.
+
+---
+
+36. MODEL REGISTRY
+
+Her model:
+
+model_id
+version
+task
+metrics
+training_data
+feature_version
+status
+
+ile kayıtlıdır.
+
+Status:
+
+EXPERIMENTAL
+VALIDATED
+SHADOW
+PRODUCTION
+RETIRED
+
+---
+
+37. MODEL LIFECYCLE
+
+Model:
+
+TRAIN
+ ↓
+VALIDATE
+ ↓
+BACKTEST
+ ↓
+WALK-FORWARD
+ ↓
+SHADOW
+ ↓
+PROMOTE
+ ↓
+MONITOR
+ ↓
+ROLLBACK / RETIRE
+
+---
+
+38. MODEL ROLLBACK
+
+Yeni model kötüleşirse:
+
+Model V5
+↓ failure
+Model V4
+
+otomatik veya approval sonrası geri alınabilir.
+
+---
+
+39. RESEARCH LINEAGE
+
+Bir prediction'ın kaynağı takip edilebilmeli:
+
+Prediction
+ ↓
+Model
+ ↓
+Prompt
+ ↓
+Features
+ ↓
+Normalized Data
+ ↓
+Raw Data
+ ↓
+Provider
+
+---
+
+40. DATA LINEAGE
+
+Her feature için:
+
+raw source
+→ transformation
+→ feature
+→ model
+→ prediction
+
+zinciri tutulmalı.
+
+---
+
+41. AUDIT SYSTEM
+
+Audit kayıtları:
+
+WHO
+WHAT
+WHEN
+WHY
+INPUT
+OUTPUT
+VERSION
+
+bilgilerini içermeli.
+
+---
+
+42. SECURITY SYSTEM
+
+Secret'lar:
+
+API keys
+DB passwords
+JWT secrets
+provider credentials
+
+kod içine yazılmamalı.
+
+Environment/secret manager kullanılmalı.
+
+---
+
+43. AUTHENTICATION
+
+Kullanıcı login sistemi.
+
+Session/token güvenliği.
+
+Password hashing.
+
+Token expiration.
+
+---
+
+44. AUTHORIZATION
+
+Permission matrix:
+
+READ_MARKET
+READ_PORTFOLIO
+RUN_BACKTEST
+RUN_SCENARIO
+CHANGE_CONFIG
+PROMOTE_MODEL
+LIVE_EXECUTION
+
+ayrı izinler olabilir.
+
+---
+
+45. NETWORK SECURITY
+
+Public internetten:
+
+database
+redis
+event bus
+internal services
+
+doğrudan erişilememeli.
+
+---
+
+46. SECRET REDACTION
+
+Loglarda:
+
+API key
+password
+token
+secret
+
+asla görünmemeli.
+
+---
+
+47. OBSERVABILITY
+
+Üç temel katman:
+
+Logs
+Metrics
+Traces
+
+---
+
+48. DISTRIBUTED TRACING
+
+Bir kullanıcı isteği:
+
+API
+→ Orchestrator
+→ Agent
+→ Feature
+→ Risk
+→ Portfolio
+
+şeklinde ilerliyorsa aynı "correlation_id" korunmalı.
+
+---
+
+49. PERFORMANCE MONITORING
+
+Ölç:
+
+API latency
+AI latency
+database latency
+event latency
+queue latency
+Monte Carlo duration
+backtest duration
+
+---
+
+50. COST MONITORING
+
+AI/API maliyetleri:
+
+tokens
+requests
+provider
+model
+cost
+
+bazında takip edilir.
+
+Böylece:
+
+«“Bu sistem bugün neden 20$ harcadı?”»
+
+cevaplanabilir.
+
+---
+
+51. RESOURCE MANAGEMENT
+
+CPU/GPU/RAM kullanımı izlenir.
+
+Ağır işler:
+
+Monte Carlo
+Backtest
+LLM inference
+large scans
+
+resource-aware queue'ya alınabilir.
+
+---
+
+52. CONFIGURATION SYSTEM
+
+Threshold'lar kod içine gömülmemeli.
+
+Örneğin:
+
+RSI threshold
+risk limit
+position limit
+model weight
+alert threshold
+
+config üzerinden yönetilmeli.
+
+---
+
+53. CONFIG VERSIONING
+
+Her configuration değişikliği:
+
+old
+new
+who
+when
+reason
+
+şeklinde kaydedilmeli.
+
+---
+
+54. SNAPSHOT SYSTEM
+
+Periyodik sistem snapshot:
+
+portfolio
+positions
+cash
+decisions
+model versions
+config version
+world state
+
+saklanır.
+
+---
+
+55. DISASTER RECOVERY
+
+Felaket durumunda:
+
+backup
++
+snapshot
++
+event log
+
+kullanılarak sistem geri getirilebilir.
+
+---
+
+56. EVENT REPLAY
+
+Belirli timestamp'ten itibaren eventler yeniden oynatılabilir.
+
+Amaç:
+
+- bug reproduction
+- recovery
+- backtest
+- debugging
+
+---
+
+57. DETERMINISTIC RECOVERY
+
+Recovery sonrası:
+
+positions
+cash
+ledger
+equity
+
+aynı sonucu üretmeli.
+
+---
+
+58. FAILURE INJECTION
+
+Test ortamında bilerek:
+
+DB down
+Redis down
+LLM down
+Provider down
+Network timeout
+Duplicate event
+Corrupted data
+Partial fill
+
+oluştur.
+
+Sistemin nasıl davrandığını doğrula.
+
+---
+
+59. CHAOS TESTING
+
+Bir servisin kapanması diğer sistemi tamamen çökertmemeli.
+
+Örneğin:
+
+News provider DOWN
+
+iken:
+
+Market monitoring
+Technical analysis
+Portfolio
+
+çalışmaya devam edebilir.
+
+Ancak confidence düşebilir.
+
+---
+
+60. SAFETY GOVERNANCE
+
+Kesin sınırlar:
+
+AI cannot bypass risk
+Agent cannot change its own permissions
+Agent cannot modify audit history
+Model cannot self-promote
+Data provider cannot directly create trades
+News cannot directly create orders
+Social sentiment cannot directly create orders
+
+---
+
+61. NO-TRADE GATE
+
+Aşağıdaki durumlardan biri kritikse:
+
+bad data
+risk engine unavailable
+portfolio inconsistent
+model invalid
+critical event uncertainty
+system degraded
+
+sistem:
+
+NO_TRADE
+
+durumuna geçebilir.
+
+---
+
+62. SYSTEM STATE MACHINE
+
+Global state:
+
+STARTING
+ ↓
+INITIALIZING
+ ↓
+READY
+ ↓
+DEGRADED
+ ↓
+RECOVERY
+ ↓
+READY
+
+Critical failure:
+
+FAILED
+
+---
+
+63. TESTING PYRAMID
+
+Unit
+
+Her hesaplama.
+
+Integration
+
+Servisler arası iletişim.
+
+E2E
+
+Gerçek pipeline.
+
+Replay
+
+Historical event replay.
+
+Failure
+
+Provider/DB/LLM failure.
+
+Concurrency
+
+Aynı anda event/order işlemleri.
+
+Regression
+
+Eski davranışların bozulmaması.
+
+Security
+
+Unauthorized access.
+
+---
+
+64. GOLDEN DATASETS
+
+Sistem için değişmeyen test datasetleri oluştur.
+
+Örneğin:
+
+known market period
+known news
+known fundamentals
+known outcomes
+
+Yeni kod bunlarla test edilir.
+
+---
+
+65. GOLDEN DECISIONS
+
+Bazı senaryolarda beklenen sonuçlar önceden belirlenebilir.
+
+Örneğin:
+
+critical data missing
+→ NO_TRADE
+
+Yeni sürüm farklı davranırsa regression failure.
+
+---
+
+66. CONTRACT TESTING
+
+Servislerin API/event schema'ları değiştiğinde consumer'lar kırılmamalı.
+
+Schema compatibility kontrolü yapılmalı.
+
+---
+
+67. VERSION COMPATIBILITY
+
+Event:
+
+schema_version = 2
+
+ise consumer gerektiğinde V1/V2 uyumluluğunu yönetmeli.
+
+---
+
+68. GRACEFUL SHUTDOWN
+
+Servis kapanırken:
+
+stop accepting new jobs
+finish safe jobs
+flush events
+persist state
+close connections
+
+yapmalı.
+
+---
+
+69. STARTUP RECOVERY
+
+Startup:
+
+load config
+load snapshot
+verify DB
+verify event position
+verify portfolio
+resume consumers
+
+şeklinde ilerlemeli.
+
+---
+
+70. FINAL SYSTEM MODEL
+
+Bütün sistem artık:
+
+                ┌───────────────┐
+                │ DATA SOURCES  │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ DATA INGESTION│
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ DATA QUALITY  │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ FEATURE STORE │
+                └───────┬───────┘
+                        ↓
+        ┌───────────────┴────────────────┐
+        ↓                                ↓
+ ANALYTICS ENGINE                  EVENT ENGINE
+        ↓                                ↓
+        └───────────────┬────────────────┘
+                        ↓
+                ┌───────────────┐
+                │ WORLD STATE   │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ AI AGENTS     │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ SIGNAL FUSION │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ FORECAST      │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ MONTE CARLO   │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ RISK ENGINE   │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ SCENARIO      │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ DECISION      │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ SIMULATOR     │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ PORTFOLIO     │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ OUTCOME       │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ LEARNING      │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ MEMORY        │
+                └───────┬───────┘
+                        ↓
+                ┌───────────────┐
+                │ AUDIT         │
+                └───────────────┘
+
+       SECURITY / OBSERVABILITY / RECOVERY
+             ↓        ↓        ↓
+          ALL SYSTEM COMPONENTS
+
+71. SYSTEM'S FUNDAMENTAL RULE
+
+Sistemin hiçbir katmanı tek başına otorite değildir.
+
+Doğru yaklaşım:
+
+DATA
++
+EVIDENCE
++
+CONTEXT
++
+MODELS
++
+PROBABILITY
++
+RISK
++
+SCENARIO
++
+AUDIT
+
+birlikte değerlendirilir.
+
+AI ise bunların üzerine çalışan zekâ katmanıdır; finansal güvenlik sınırlarının üzerinde değildir.
+
+72. FINAL DEFINITION
+
+Ortaya çıkan sistem:
+
+«Veriyi toplayan, doğrulayan, anlamlandıran; teknik, fundamental, makro, haber, KAP, sosyal medya, event, değerleme ve istatistiksel analizleri birleştiren; farklı AI ajanlarıyla araştırma yapan; olasılıksal tahmin ve Monte Carlo simülasyonları gerçekleştiren; risk ve portföy etkisini hesaplayan; senaryo ve stres testleri uygulayan; sanal emirleri gerçekçi şekilde simüle eden; sonuçları geçmiş performansla karşılaştırarak modellerini değerlendiren; araştırma hafızası oluşturan; bütün kararların veri kaynağına kadar izlenebilmesini sağlayan; hata, veri kaybı, model arızası ve servis kesintilerinde güvenli moda geçebilen; recovery ve event replay destekli, production-grade AI yatırım araştırma ve portföy simülasyon platformudur.»
+
+Bu tanımın dışındaki hiçbir AI ajanı, servis veya modül kendi başına yeni bir yatırım mantığı icat ederek sisteme eklenmemelidir. Yeni bir yetenek eklenirse önce bu mimaride hangi katmana ait olduğu belirlenmeli, contract'ı tanımlanmalı, testleri yazılmalı ve audit/recovery mekanizmasına dahil edilmelidir.
