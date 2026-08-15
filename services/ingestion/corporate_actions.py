@@ -65,6 +65,11 @@ class CorporateActionsHandler:
 
     def add_action(self, action: CorporateAction):
         """Şirket olayı ekle."""
+        if not action.ticker or not action.ticker.strip():
+            logger.warning("Corporate action rejected: empty ticker", action_id=action.action_id)
+            return
+        if not action.action_id:
+            action.action_id = f"{action.ticker}-{action.action_type.value}-{action.ex_date.isoformat()}"
         if action.ticker not in self._actions:
             self._actions[action.ticker] = []
         self._actions[action.ticker].append(action)

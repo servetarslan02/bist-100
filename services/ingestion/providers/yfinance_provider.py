@@ -116,29 +116,35 @@ class YFinanceProvider:
             for ticker in tickers:
                 yf_ticker = get_yfinance_ticker(ticker)
                 try:
-                    if len(tickers) == 1:
-                        ticker_data = data.copy()
-                    else:
-                        ticker_data = data[yf_ticker].copy()
-
+                    # yfinance always returns MultiIndex with group_by='ticker'
+                    # Even for single ticker: (ticker, OHLCV)
+                    ticker_data = data[yf_ticker].copy()
                     ticker_data = ticker_data.dropna()
                     if ticker_data.empty:
                         continue
-
                     ticker_data = ticker_data.reset_index()
                     ticker_data["ticker"] = ticker
 
-                    pl_df = pl.from_pandas(ticker_data)
-                    pl_df = pl_df.rename({
-                        "Date": "timestamp",
-                        "Open": "open",
-                        "High": "high",
-                        "Low": "low",
-                        "Close": "close",
-                        "Volume": "volume",
-                    })
+                    # Normalize column names (case-insensitive)
+                    col_map = {}
+                    for col in ticker_data.columns:
+                        if not isinstance(col, str):
+                            col = str(col)
+                        cl = col.lower()
+                        if cl == "date":
+                            col_map[col] = "timestamp"
+                        elif cl in ("open", "high", "low", "close", "volume"):
+                            col_map[col] = cl
+                    ticker_data = ticker_data.rename(columns=col_map)
 
-                    results[ticker] = pl_df.select(["ticker", "timestamp", "open", "high", "low", "close", "volume"])
+                    required = ["ticker", "timestamp", "open", "high", "low", "close", "volume"]
+                    missing = [c for c in required if c not in ticker_data.columns]
+                    if missing:
+                        logger.warning("Missing columns", ticker=ticker, missing=missing)
+                        continue
+
+                    pl_df = pl.from_pandas(ticker_data[required])
+                    results[ticker] = pl_df
 
                 except Exception as e:
                     logger.warning("Failed to process ticker data", ticker=ticker, error=str(e))
