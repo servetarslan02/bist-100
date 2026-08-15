@@ -2,159 +2,30 @@
 
 ## Amaç
 
-Sistemin geçmiş analizleri, şirket ilişkilerini, olayları ve tahmin sonuçlarını kaybedip her seferinde sıfırdan başlamasını önlemek.
+Sistemin geçmiş analizleri, şirket ilişkilerini ve olayları kaybedip her seferinde sıfırdan başlamasını önlemek.
 
----
-
-## Kullanılacak sistemler
-
-- Research Memory
-- Long-Term Memory
-- Vector Database
-- Embeddings
-- Knowledge Graph
-- Entity / Relationship Store
-- Historical Event Store
-- Prediction & Outcome Memory
-
----
+**Kaynak:** Vector DB semantic search, Knowledge Graph entity relationships.
 
 ## Çalışma mantığı
 
 ```
-Yeni Veri / Analiz
-    ↓
-Entity + Event çıkarımı
-    ↓
-Embedding
-    ↓
-Memory + Knowledge Graph
-    ↓
-Geçmiş bilgilerle ilişkilendirme
-    ↓
-Güncel analiz
+Yeni Veri/Analiz → Entity+Event çıkarımı → Embedding →
+Memory + Knowledge Graph → Geçmiş bilgilerle ilişkilendirme → Güncel analiz
 ```
-
----
-
-## Memory ne tutacak?
-
-Örneğin Hisse X için:
-
-```
-Şirket
-├─ Finansal geçmiş
-├─ KAP açıklamaları
-├─ Haberler
-├─ Önemli olaylar
-├─ Sektör ilişkileri
-├─ Önceki tahminler
-├─ Gerçekleşen sonuçlar
-└─ Önceki analizlerin nedenleri
-```
-
----
-
-## Knowledge Graph ne yapacak?
-
-Sadece metin saklamayacak; **ilişki kuracak**.
-
-Örneğin:
-
-```
-Şirket X
-    ↓ ait
-Sektör Y
-    ↓ etkileniyor
-Faiz
-    ↓ etkiliyor
-Banka kârlılığı
-```
-
-ve:
-
-```
-KAP Olayı
-    ↓ bildirildi
-Şirket X
-    ↓ etkiliyor
-Gelir beklentisi
-    ↓ etkiliyor
-Forecast
-    ↓ gerçekleşti
-Gerçekleşen sonuç
-```
-
-gibi ilişkiler tutulacak.
-
----
-
-## Embedding neden kullanılacak?
-
-Haber, KAP ve analiz gibi metinsel bilgilerin **anlamsal olarak aranabilmesi** için.
-
-Örneğin sistem:
-
-> "Bu şirket daha önce benzer bir sözleşme açıklamış mı?"
-
-diye sorduğunda sadece aynı kelimeleri değil, **anlam olarak benzer olayları** da bulabilecek.
-
----
-
-## En önemli prensip
-
-**Memory karar motoru değildir.**
-
-Geçmiş bilgiyi sağlar.
-
-Güncel veri ile geçmiş bilgi çelişirse:
-
-**güncel ve doğrulanmış veri önceliklidir.**
-
----
-
-## Çıktı
-
-```
-Relevant Past Events:        14
-Similar Historical Cases:     6
-Previous Predictions:         9
-Prediction Accuracy History: %72
-Related Entities:             23
-Memory Confidence:            %91
-```
-
-Böylece sistem:
-
-> "Bu olay yeni ama tamamen benzersiz değil; geçmişte benzer 6 olay yaşandı ve sonuçları şunlardı."
-
-diyebilir.
-
----
-
-
----
-
-**Kaynak:** Memory — vector DB for semantic search. Knowledge Graph for entity relationships.
-
 
 ### Örnek: Knowledge graph
 
 ```python
-# services/intelligence/knowledge_graph.py
 from services.intelligence.knowledge_graph import knowledge_graph
 
 knowledge_graph.load_bist_defaults()
-
-# Enerji → Havacılık zinciri
 path = knowledge_graph.find_path("macro_OIL", "sector_ENERGY")
 # path = ["macro_OIL", "sector_ENERGY"]
 
-# Etki yayılımı
 impacts = knowledge_graph.propagate_impact("macro_OIL", 0.5)
-# impacts = {"sector_ENERGY": 0.5, "sector_AVIATION": -0.3, ...}
+# sector_ENERGY: 0.5, sector_AVIATION: -0.3
 ```
 
 ## Temel prensip
 
-**Memory** geçmişi saklar, **Knowledge Graph** ilişkileri saklar, **Embedding** sistemi anlam üzerinden geçmişi bulur; **karar ise güncel analiz motorları tarafından verilir.**
+Memory geçmişi saklar, Knowledge Graph ilişkileri saklar; karar güncel analiz motorları tarafından verilir.
