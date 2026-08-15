@@ -145,20 +145,20 @@ class DataSourceManager:
         return self.get_stock_data(benchmark, **kwargs)
 
     def _load_from_cache(self, ticker: str, interval: str) -> Optional[pd.DataFrame]:
-        """Cache'den veri yükle."""
-        cache_file = self.cache_dir / f"{ticker}_{interval}.parquet"
+        """Cache'den veri yukle (CSV formati)."""
+        cache_file = self.cache_dir / f"{ticker}_{interval}.csv"
 
         if not cache_file.exists():
             return None
 
-        # TTL kontrolü
+        # TTL kontrolu
         file_age = datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
         if file_age > timedelta(hours=self.cache_ttl_hours):
             logger.info("Cache expired", ticker=ticker)
             return None
 
         try:
-            df = pd.read_parquet(cache_file)
+            df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
         except Exception as e:
@@ -166,24 +166,27 @@ class DataSourceManager:
             return None
 
     def _save_to_cache(self, ticker: str, df: pd.DataFrame, interval: str):
-        """Veriyi cache'e kaydet."""
-        cache_file = self.cache_dir / f"{ticker}_{interval}.parquet"
+        """Veriyi cache'e kaydet (CSV formati)."""
+        cache_file = self.cache_dir / f"{ticker}_{interval}.csv"
 
         try:
-            df.to_parquet(cache_file, compression="zstd")
+            df.to_csv(cache_file)
             logger.info("Cache saved", ticker=ticker, rows=len(df))
         except Exception as e:
             logger.warning("Cache save failed", ticker=ticker, error=str(e))
 
     def clear_cache(self):
-        """Tüm cache'i temizle."""
+        """Tum cache'i temizle."""
+        for f in self.cache_dir.glob("*.csv"):
+            f.unlink()
+        # Eski parquet cache'leri de temizle
         for f in self.cache_dir.glob("*.parquet"):
             f.unlink()
         logger.info("Cache cleared")
 
     def get_cache_stats(self) -> Dict[str, Any]:
         """Cache istatistikleri."""
-        files = list(self.cache_dir.glob("*.parquet"))
+        files = list(self.cache_dir.glob("*.csv"))
         total_size = sum(f.stat().st_size for f in files)
 
         return {

@@ -109,7 +109,8 @@ class RankingModel:
         # Ensemble ağırlıkları
         self._ensemble_weights = {"lgbm": 0.7, "rule_based": 0.3}
 
-        # Feature importance history
+        # Feature importance
+        self._feature_importance = {}
         self._feature_importance_history = []
 
         logger.info("RankingModel v3.0 initialized", features=len(self._feature_names))

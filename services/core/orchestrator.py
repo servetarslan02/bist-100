@@ -97,7 +97,7 @@ class SystemOrchestrator:
             from services.core.tradability_mask import tradability_mask
             masks = {}
             for ticker, df in market_data.items():
-                masks[ticker] = tradability_mask.compute_mask(
+                mask_result = tradability_mask.compute_mask(
                     ticker=ticker,
                     open_=df["Open"].values,
                     high=df["High"].values,
@@ -105,6 +105,8 @@ class SystemOrchestrator:
                     close=df["Close"].values,
                     volume=df["Volume"].values
                 )
+                # MaskResult dataclass -> numpy array
+                masks[ticker] = mask_result.mask if hasattr(mask_result, 'mask') else mask_result
         except Exception as e:
             logger.error("Tradability mask failed", error=str(e))
             errors.append(f"Mask: {str(e)}")
@@ -114,7 +116,7 @@ class SystemOrchestrator:
         try:
             from services.features.calculator import feature_calculator
             from services.features.cross_sectional import cross_sectional_engine
-            from services.features.seven_motors import seven_motors
+            from services.features.seven_motors import seven_motor_engine
 
             all_features = {}
             for ticker, df in market_data.items():
@@ -125,10 +127,10 @@ class SystemOrchestrator:
                     df, mask=mask, ticker=ticker
                 )
 
-                # 7 motor feature'ları
-                motor_features = seven_motors.compute_all(ticker, df, mask)
+                # 7 motor feature'lari
+                motor_features = seven_motor_engine.compute_all(ticker, df, mask)
 
-                # Birleştir
+                # Birlestir
                 all_features[ticker] = {**tech_features, **motor_features}
 
             # Cross-sectional features
@@ -178,9 +180,12 @@ class SystemOrchestrator:
         try:
             from services.ml.ranking_model import ranking_model
 
+            # RegimeState -> string
+            regime_str = self._current_regime.regime if hasattr(self._current_regime, 'regime') else str(self._current_regime)
+
             ranking_result = ranking_model.rank(
                 features_map=all_features,
-                regime=self._current_regime,
+                regime=regime_str,
             )
 
             top_opportunities = [
