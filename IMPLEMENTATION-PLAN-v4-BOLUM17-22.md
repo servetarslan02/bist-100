@@ -26,7 +26,7 @@
 | 17.3 | find_path() | `intelligence/knowledge_graph.py` | Entity'den entity'ye yol buluyor mu? | ❓ |
 | 17.4 | propagate_impact() | `intelligence/knowledge_graph.py` | Etki yayılımı çalışıyor mu? | ❓ |
 | 17.5 | add_entity() | `intelligence/knowledge_graph.py` | Yeni entity ekleniyor mu? | ❓ |
-| 17.6 | add_relationship() | `intelligence/knowledge_graph.py` | İlişki ekleniyor mu? | ❓ |
+| 17.6 | add_relation() | `intelligence/knowledge_graph.py` | İlişki ekleniyor mu? | ❓ |
 | 17.7 | ResearchRecord sınıfı | `intelligence/research_memory.py` | `class ResearchRecord` | ✅ |
 | 17.8 | add_record() | `intelligence/research_memory.py` | Araştırma kaydı ekleniyor mu? | ❓ |
 | 17.9 | get_ticker_history() | `intelligence/research_memory.py` | Geçmiş getiriliyor mu? | ❓ |
@@ -76,7 +76,7 @@ assert len(forward) == 2
 | 18.6 | _classify_claim() | `intelligence/evidence_engine.py` | Claim tipi sınıflandırılıyor mu? | ❓ |
 | 18.7 | verify_claim() | `intelligence/evidence_engine.py` | Claim doğrulanıyor mu? | ❓ |
 | 18.8 | detect_hallucination() | `intelligence/evidence_engine.py` | Hallucination tespit ediliyor mu? | ❓ |
-| 18.9 | compute_evidence_score() | `intelligence/evidence_engine.py` | Evidence score hesaplanıyor mu? | ❓ |
+| 18.9 | _compute_evidence_score() | `intelligence/evidence_engine.py` | Evidence score hesaplanıyor mu? | ❓ |
 
 **Test senaryosu:**
 ```python
@@ -112,8 +112,8 @@ assert halluc["hallucination_detected"] == True
 | 19.4 | check_permission() | `core/security.py` | Yetki kontrolü çalışıyor mu? | ❓ |
 | 19.5 | authz_service | `core/security.py` | Authorization servisi çalışıyor mu? | ❓ |
 | 19.6 | AuditLog | `core/audit_log.py` | `class AuditLog` | ✅ |
-| 19.7 | log_action() | `core/audit_log.py` | Aksiyon loglanıyor mu? | ❓ |
-| 19.8 | get_entries() | `core/audit_log.py` | Log getiriliyor mu? | ❓ |
+| 19.7 | log() / log_decision() | `core/audit_log.py` | Aksiyon loglanıyor mu? | ❓ |
+| 19.8 | get_recent() / get_entity_history() | `core/audit_log.py` | Log getiriliyor mu? | ❓ |
 
 **Test senaryosu:**
 ```python
@@ -123,10 +123,16 @@ assert authz_service.check_permission(user, Permission.RUN_BACKTEST) == True
 assert authz_service.check_permission(user, Permission.LIVE_EXECUTION) == False
 
 # Audit
-audit_log.log_action(user="analyst", action="BUY", ticker="THYAO", details={"lot": 100})
-entries = audit_log.get_entries(user="analyst")
+audit_log.log_decision(ticker="THYAO", decision="BUY", confidence=0.8, reasoning="Strong momentum")
+entries = audit_log.get_recent(limit=10)
 assert len(entries) > 0
-assert entries[-1]["action"] == "BUY"
+
+# AuditEntry
+entry = AuditEntry(entry_id="A001", timestamp=datetime.now(), user="analyst",
+    action="BUY", ticker="THYAO", details={"lot": 100})
+audit_log.log(entry)
+history = audit_log.get_entity_history("THYAO")
+assert len(history) > 0
 ```
 
 ---
@@ -141,7 +147,7 @@ assert entries[-1]["action"] == "BUY"
 | 20.4 | set() / get() | `core/infrastructure.py` | Cache okuma/yazma çalışıyor mu? | ❓ |
 | 20.5 | JobQueue | `core/infrastructure.py` | `class JobQueue` | ✅ |
 | 20.6 | enqueue() / dequeue() | `core/infrastructure.py` | Kuyruk çalışıyor mu? | ❓ |
-| 20.7 | EventBus | `core/event_bus.py` | `class EventBus` | ✅ |
+| 20.7 | InternalEventBus | `core/event_bus.py` | `class InternalEventBus` | ✅ |
 | 20.8 | publish() / subscribe() | `core/event_bus.py` | Pub/sub çalışıyor mu? | ❓ |
 | 20.9 | DevDatabase | `core/database_dev.py` | `class DevDatabase` | ✅ |
 | 20.10 | ch_execute() / ch_query_df() | `core/database.py` | ClickHouse çalışıyor mu? | ❓ |
@@ -313,4 +319,7 @@ GÜN 6: Aşama 4 (Vector DB, No-Trade Gate, DLQ eklemeleri)
 - [ ] Circuit Breaker: CLOSED→OPEN→HALF_OPEN state machine çalışıyor
 - [ ] Observability: health_check, metrics, structured logging çalışıyor
 - [ ] 11+ test dosyası yazıl
+- [ ] add_relation() (add_relationship değil) çalışıyor
+- [ ] log() / log_decision() (log_action değil) çalışıyor
+- [ ] get_recent() (get_entries değil) çalışıyor
 - [ ] 5 entegrasyon zinciri çalışıyor
