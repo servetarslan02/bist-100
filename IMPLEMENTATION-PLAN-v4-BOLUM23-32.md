@@ -4,7 +4,7 @@
 
 | Kategori | Eski Plan | Gerçek İhtiyaç |
 |----------|----------|----------------|
-| Toplam yeni modül | 20 | **49** (10'u mevcut kodda kısmen var) |
+| Toplam yeni modül | 20 | **58** (10'u mevcut kodda kısmen var) |
 | Bölüm 23 | 4 | **7** |
 | Bölüm 24 | 2 | **3** (1'i mevcut güncellenecek) |
 | Bölüm 25 | 1 | **6** |
