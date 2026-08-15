@@ -294,3 +294,32 @@ Finansal piyasalarda bu kural en acımasız şekilde işler.
 ## Temel prensip
 
 Bu bölüm analiz yapmaz ve hisse seçmez. Sadece sonraki motorlara temiz ve ölçülebilir bir veri zemini sağlar.
+
+## 11. BIST'e Özel Anomali Tespiti
+
+BIST'te devre kesici sonrası fiyat sıçramaları normal olabilir, sistem bunu bilmeli:
+
+### Devre kesici sonrası anomali kontrolü:
+```python
+# services/core/bist_anomaly.py
+def is_normal_after_halt(price_change, halt_duration_minutes):
+    # Devre kesici 5-30 dakika sürdüyse, ilk dakikalardaki sıçrama normal
+    if halt_duration_minutes <= 30 and abs(price_change) < 0.05:
+        return True, "Normal post-halt volatility"
+    
+    # 30 dakikadan uzun durdurma sonrası daha büyük hareket normal
+    if halt_duration_minutes > 30 and abs(price_change) < 0.10:
+        return True, "Extended halt normal volatility"
+    
+    return False, "Anomalous post-halt movement"
+```
+
+### Brüt takas sonrası anomali kontrolü:
+```python
+def is_normal_gross_settlement(spread_pct, avg_spread_pct):
+    # Brüt takasta spread genişlemesi normal
+    if spread_pct < avg_spread_pct * 3:
+        return True, "Normal gross settlement spread"
+    
+    return False, "Excessive spread in gross settlement"
+```

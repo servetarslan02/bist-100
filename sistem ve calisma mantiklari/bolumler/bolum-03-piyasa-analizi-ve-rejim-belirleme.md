@@ -181,3 +181,35 @@ Risk seviyesi:     Düşük
 ## Temel prensip
 
 > "Feature-based approaches outperform threshold-based methods in regime detection." — Springer (2026)
+
+## 7. BIST'e Özel Makro Göstergeler
+
+Türkiye'ye özgü makro göstergeler rejim tespitinde kullanılmalı:
+
+### TCMB faiz etkisi:
+```python
+def compute_tcmb_regime(tcmb_data):
+    rate = tcmb_data["policy_rate"]
+    inflation = tcmb_data["inflation"]
+    real_rate = rate - inflation
+    
+    if real_rate > 5:
+        return "TIGHT"  # Sıkı para politikası
+    elif real_rate > 0:
+        return "NEUTRAL"
+    else:
+        return "LOOSE"  # Gevşek para politikası
+```
+
+### USDTRY volatilitesi:
+```python
+def compute_fx_regime(usdtry_data):
+    vol_20d = usdtry_data.pct_change().rolling(20).std() * (252 ** 0.5)
+    
+    if vol_20d > 0.30:
+        return "HIGH_VOLATILITY"
+    elif vol_20d > 0.15:
+        return "NORMAL"
+    else:
+        return "LOW_VOLATILITY"
+```

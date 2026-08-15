@@ -125,3 +125,40 @@ Margin of Safety: Orta/Yüksek
 ## Temel prensip
 
 Sistem sadece "hisse ucuz" demeyecek; "hangi varsayımlarla, hangi yöntemlerle, ne kadar ucuz ve bu hesabın güveni ne?" sorularını cevaplayacak.
+
+## 5. Enflasyon Muhasebesi ile DCF (TMS 29)
+
+Yüksek enflasyonda DCF hesaplaması farklılaşır:
+
+### Nominal vs Reel DCF:
+```python
+def inflation_adjusted_dcf(nominal_fcf, inflation_rate, discount_rate, years):
+    # Reel faiz oranı
+    real_rate = (1 + discount_rate) / (1 + inflation_rate) - 1
+    
+    # Reel FCF'ler
+    real_fcfs = []
+    for i in range(years):
+        real_fcf = nominal_fcf / ((1 + inflation_rate) ** (i + 1))
+        real_fcfs.append(real_fcf)
+    
+    # Reel DCF
+    dcf = sum(fcf / ((1 + real_rate) ** (i + 1)) for i, fcf in enumerate(real_fcfs))
+    
+    return dcf
+```
+
+### TMS 29 düzeltmesi:
+```python
+def tms29_adjustment(financials, cpi_index_current, cpi_index_base):
+    adjustment_factor = cpi_index_current / cpi_index_base
+    
+    adjusted = {
+        "revenue": financials["revenue"] * adjustment_factor,
+        "cost": financials["cost"] * adjustment_factor,
+        "depreciation": financials["ppe"] / financials["useful_life"] * adjustment_factor,
+        "monetary_gain_loss": calculate_monetary_items(financials, adjustment_factor),
+    }
+    
+    return adjusted
+```

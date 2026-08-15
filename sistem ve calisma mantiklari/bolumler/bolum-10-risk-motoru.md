@@ -94,3 +94,47 @@ Risk/Reward:    2.8
 ## Temel prensip
 
 "Bu hisse iyi mi?" sorusundan önce "bu fırsatı hangi riskle ve portföyün ne kadarını kullanarak değerlendirmeliyiz?" sorusunu cevaplar.
+
+## 5. Türkiye'ye Özgü Riskler
+
+### Ülke riski (CDS):
+```python
+def compute_country_risk(cds_5y):
+    if cds_5y > 400:
+        return {"level": "HIGH", "impact": "Yabancı çıkış, kur baskısı"}
+    elif cds_5y > 250:
+        return {"level": "MEDIUM", "impact": "Sınırlı yabancı ilgisi"}
+    else:
+        return {"level": "LOW", "impact": "Yabancı giriş destekli"}
+```
+
+### Kur riski:
+```python
+def compute_fx_risk(portfolio, usdtry_change):
+    fx_exposure = sum(
+        pos["value"] * pos.get("fx_beta", 0) for pos in portfolio
+    )
+    fx_impact = fx_exposure * usdtry_change
+    
+    return {
+        "fx_exposure": fx_exposure,
+        "fx_impact": fx_impact,
+        "hedge_needed": abs(fx_impact) > portfolio.total_value * 0.02
+    }
+```
+
+### Siyasi risk:
+```python
+def compute_political_risk(events):
+    risk_score = 0
+    
+    for event in events:
+        if event["type"] == "ELECTION":
+            risk_score += 20
+        elif event["type"] == "POLICY_CHANGE":
+            risk_score += 15
+        elif event["type"] == "GEOPOLITICAL":
+            risk_score += 25
+    
+    return min(risk_score, 100)
+```

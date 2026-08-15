@@ -118,3 +118,40 @@ Robustness:        GOOD
 > "Rigorous IS-WFA-OOS framework with purged validation and parameter stability." — arXiv AlgoXpert (2026)
 
 Backtest'in amacı güzel bir geçmiş grafik üretmek değil, **stratejinin farklı dönemlerde dayanıklı olup olmadığını kanıtlamaktır**.
+
+## 5. BIST'e Gerçekçi Backtest
+
+### BIST komisyon yapısı:
+```python
+def bist_transaction_cost(amount, broker_rate=0.0003):
+    broker_fee = amount * broker_rate
+    bist_fee = amount * 0.00004
+    mkk_fee = amount * 0.00001
+    bsmv = (broker_fee + bist_fee + mkk_fee) * 0.05
+    
+    return max(broker_fee + bist_fee + mkk_fee + bsmv, 1.0)
+```
+
+### BIST slippage modeli:
+```python
+def bist_slippage(order_size, avg_daily_volume, volatility, spread_pct):
+    base_slippage = spread_pct / 2
+    volume_impact = (order_size / avg_daily_volume) * volatility * 10
+    
+    return base_slippage + volume_impact
+```
+
+### BIST devre kesici etkisi:
+```python
+def account_for_circuit_breaker(trades, halts):
+    adjusted_trades = []
+    
+    for trade in trades:
+        if any(halt["start"] <= trade["time"] <= halt["end"] for halt in halts):
+            trade["executed"] = False
+            trade["reason"] = "Circuit breaker active"
+        
+        adjusted_trades.append(trade)
+    
+    return adjusted_trades
+```
