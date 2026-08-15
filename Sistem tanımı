@@ -1,0 +1,2583 @@
+Evet. Mimo Claw'a vereceğimiz şey basit bir “bug fix promptu” değil; sistemin teknik şartnamesi + mimarisi + çalışma akışı + geliştirme fazları olacak.
+
+Aşağıdaki tasarım, şimdiye kadar belirlediğimiz hedefleri birleştiriyor: 800+ BIST evrenini tarayan fırsat keşif motoru, AI destekli araştırma/karar sistemi, risk kontrollü sanal portföy, senaryo analizi, öğrenme katmanı ve kurumsal terminal tarzı web dashboard. Gerçek para işlemleri bu sistemden ayrı ve kontrollü kalacak.
+
+Mimo Claw'a anlatılacak sistem
+
+1. Sistemin amacı
+
+Sistem yalnızca birkaç hisseyi analiz eden bir uygulama olmayacak.
+
+Ana amaç:
+
+> BIST'teki tüm erişilebilir varlıkları sürekli izleyen, piyasa rejimini anlayan, haber/makro/teknik/fundamental/AI verilerini birleştiren, fırsatları sıralayan, risklerini hesaplayan ve bunları sanal portföy üzerinde test eden otonom bir yatırım araştırma ve simülasyon platformu oluşturmak.
+
+
+
+Sistem kendi kendine:
+
+1. BIST evrenini tarayacak.
+
+
+2. Verileri toplayacak.
+
+
+3. Verilerin kalitesini kontrol edecek.
+
+
+4. Piyasa rejimini çıkaracak.
+
+
+5. Hisseleri/fonları/varlıkları analiz edecek.
+
+
+6. Fırsatları keşfedecek.
+
+
+7. Riskleri hesaplayacak.
+
+
+8. Fırsatları puanlayacak.
+
+
+9. Sanal portföyde işlemleri simüle edecek.
+
+
+10. Sonuçları izleyecek.
+
+
+11. Hatalı kararları analiz edecek.
+
+
+12. Modellerin performansını ölçecek.
+
+
+13. Dashboard'da tüm süreci görünür hale getirecek.
+
+
+
+
+---
+
+2. En önemli prensip
+
+Sistem:
+
+“AI → BUY”
+
+şeklinde çalışmayacak.
+
+Doğru mimari:
+
+DATA
+ ↓
+DATA QUALITY
+ ↓
+FEATURES
+ ↓
+MARKET STATE
+ ↓
+ASSET ANALYSIS
+ ↓
+OPPORTUNITY ENGINE
+ ↓
+DECISION ENGINE
+ ↓
+RISK ENGINE
+ ↓
+PORTFOLIO SIMULATOR
+ ↓
+OUTCOME
+ ↓
+LEARNING
+
+AI bu sistemin bir bileşeni olacak.
+
+Sistemin sahibi AI değil, kurallar + veri + risk motoru + state machine olacak.
+
+
+---
+
+3. BIST Universe Engine
+
+İlk büyük motor bu.
+
+Sistem:
+
+BIST
+ ├── BIST 100
+ ├── BIST 30
+ ├── BIST 50
+ ├── sektörler
+ ├── diğer hisseler
+ ├── ETF/Fon
+ └── desteklenen diğer varlıklar
+
+evrenini tanıyacak.
+
+Kullanıcı yalnızca 3–5 hisse girmeyecek.
+
+Sistem mümkün olan 800+ BIST varlığını tarayabilecek.
+
+Her varlığın:
+
+symbol
+name
+sector
+industry
+market
+currency
+listing_status
+liquidity
+market_cap
+
+bilgisi olacak.
+
+Universe değiştiğinde otomatik güncellenecek.
+
+
+---
+
+4. Data Ingestion Layer
+
+Birden fazla veri kaynağı olacak.
+
+Örneğin:
+
+Market Data
+ ├── OHLCV
+ ├── bid/ask
+ ├── volume
+ └── market depth (destekleniyorsa)
+
+Fundamental
+ ├── revenue
+ ├── EBITDA
+ ├── net income
+ ├── debt
+ ├── cash
+ ├── FCF
+ ├── EPS
+ └── ratios
+
+News
+ ├── KAP
+ ├── financial news
+ └── company news
+
+Macro
+ ├── USDTRY
+ ├── EURTRY
+ ├── rates
+ ├── inflation
+ ├── VIX
+ ├── commodities
+ └── global indices
+
+Social/Sentiment
+ ├── supported social sources
+ └── sentiment signals
+
+Her veri kaynağının reliability score'u olacak.
+
+
+---
+
+5. Data Quality Engine
+
+Veri geldikten sonra doğrudan sisteme sokulmayacak.
+
+Her veri:
+
+VALID
+INVALID
+STALE
+DUPLICATE
+OUT_OF_ORDER
+MISSING
+SUSPICIOUS
+
+durumlarından geçirilecek.
+
+Örneğin:
+
+price = -10
+
+→ reject.
+
+volume = None
+
+→ missing.
+
+timestamp = 3 hours old
+
+→ stale.
+
+same tick twice
+
+→ duplicate.
+
+Veri hatalıysa:
+
+> Hatalı veriyle karar üretme.
+
+
+
+
+---
+
+6. Feature Engine
+
+Ham verilerden özellikler üretilecek.
+
+Teknik
+
+SMA
+
+EMA
+
+RSI
+
+MACD
+
+ATR
+
+Bollinger Bands
+
+volatility
+
+momentum
+
+relative strength
+
+volume acceleration
+
+breakout
+
+trend strength
+
+
+Fundamental
+
+P/E
+
+P/B
+
+EV/EBITDA
+
+ROE
+
+ROIC
+
+debt/equity
+
+FCF yield
+
+earnings growth
+
+revenue growth
+
+margin trends
+
+
+Market-relative
+
+Örneğin:
+
+hisse getirisi
+vs BIST100
+vs sektör
+vs benchmark
+
+Macro
+
+USDTRY değişimi
+
+faiz
+
+enflasyon
+
+VIX
+
+petrol
+
+altın
+
+global risk appetite
+
+
+
+---
+
+7. World State Engine
+
+Sistem piyasayı tek tek hisselerden ibaret görmeyecek.
+
+Örneğin:
+
+Market Regime:
+RISK_ON
+
+Volatility:
+MEDIUM
+
+Liquidity:
+GOOD
+
+USDTRY:
+STRESSING
+
+Rates:
+RESTRICTIVE
+
+Global:
+RISK_OFF
+
+gibi bir World State oluşturacak.
+
+Bu state sürekli güncellenecek.
+
+
+---
+
+8. Regime Engine
+
+Piyasa rejimleri örneğin:
+
+BULL
+BEAR
+SIDEWAYS
+HIGH_VOLATILITY
+LOW_VOLATILITY
+RISK_ON
+RISK_OFF
+CRISIS
+RECOVERY
+
+olabilir.
+
+Ancak bunlar rastgele thresholdlarla değil, ölçülebilir feature'larla çıkarılmalı.
+
+Regime değiştiğinde karar motorunun ağırlıkları da gerektiğinde değişebilmeli.
+
+
+---
+
+9. Intelligence Engine
+
+Burada AI devreye girecek.
+
+AI:
+
+haberleri okuyacak,
+
+KAP açıklamalarını analiz edecek,
+
+şirket açıklamalarını yorumlayacak,
+
+sentiment çıkaracak,
+
+olayın etkisini değerlendirecek,
+
+şirketler arasındaki ilişkileri bulacak,
+
+makro olayları yorumlayacak.
+
+
+Ama AI'nın verdiği:
+
+BUY
+
+tek başına emir olmayacak.
+
+AI sonucu:
+
+evidence
+confidence
+reasoning
+source
+timestamp
+model_version
+
+şeklinde sisteme girecek.
+
+
+---
+
+10. Event Impact Engine
+
+Örneğin:
+
+> TCMB faiz artırdı.
+
+
+
+Sistem bunu sadece “negative” diye işaretlemeyecek.
+
+Şunu hesaplayacak:
+
+event
+ ↓
+magnitude
+ ↓
+surprise
+ ↓
+market regime
+ ↓
+sector sensitivity
+ ↓
+asset sensitivity
+ ↓
+expected impact
+ ↓
+decay
+
+Örneğin bankalar ile ihracatçı şirketler aynı etkilenmeyebilir.
+
+
+---
+
+11. Opportunity Discovery Engine
+
+Sistemin en önemli parçalarından biri.
+
+Her tarama sonunda:
+
+BIST 800+
+ ↓
+candidate filtering
+ ↓
+liquidity filter
+ ↓
+data quality filter
+ ↓
+technical filter
+ ↓
+fundamental filter
+ ↓
+macro compatibility
+ ↓
+sentiment
+ ↓
+AI evidence
+ ↓
+risk
+ ↓
+opportunity score
+
+oluşacak.
+
+Sonuç:
+
+#1 ABC
+Opportunity Score: 91
+Risk: Medium
+Confidence: 87%
+Expected Return: ...
+Expected Holding Period: ...
+
+gibi olacak.
+
+Ama sadece yüksek skor değil:
+
+risk-adjusted opportunity esas alınacak.
+
+
+---
+
+12. Decision Engine
+
+Decision Engine:
+
+LONG
+SHORT
+HOLD
+NO_TRADE
+
+üretebilir.
+
+Önemli:
+
+score < threshold → SHORT
+
+gibi hatalı mantık olmayacak.
+
+HOLD gerçekten HOLD olacak.
+
+
+---
+
+13. Risk Engine
+
+Decision'dan önce veya decision ile birlikte risk gate çalışacak.
+
+Kontroller:
+
+position limit
+portfolio exposure
+sector exposure
+correlation
+liquidity
+volatility
+drawdown
+daily loss
+max risk
+concentration
+
+olacak.
+
+Örneğin AI:
+
+BUY
+
+dedi.
+
+Ama:
+
+sector exposure > limit
+
+ise:
+
+RISK REJECT
+
+olacak.
+
+AI bunu bypass edemeyecek.
+
+
+---
+
+14. Position Sizing
+
+“BUY” demek yeterli değil.
+
+Sistem:
+
+capital
+risk budget
+stop distance
+volatility
+confidence
+portfolio exposure
+correlation
+
+kullanarak:
+
+position size
+
+hesaplayacak.
+
+Örneğin:
+
+Portfolio:
+100,000 TL
+
+Risk budget:
+0.75%
+
+Maximum loss:
+750 TL
+
+Sonra stop mesafesine göre pozisyon büyüklüğü hesaplanacak.
+
+
+---
+
+15. Order Engine
+
+Gerçek para ile işlem yapmak yerine ilk aşamada:
+
+SIMULATED ORDER
+
+üretilecek.
+
+Order state:
+
+CREATED
+VALIDATED
+RISK_APPROVED
+SUBMITTED
+FILLED
+PARTIALLY_FILLED
+CANCELLED
+REJECTED
+
+olacak.
+
+
+---
+
+16. Execution Simulator
+
+Gerçek broker yerine simülasyon.
+
+Spread:
+
+bid/ask
+
+slippage:
+
+market volatility
+liquidity
+order size
+
+ile simüle edilecek.
+
+Commission/fees de gerçekçi modele göre uygulanacak.
+
+
+---
+
+17. Virtual Portfolio
+
+Kullanıcı sermayesini girecek:
+
+100.000 TL
+
+ve sistem sanal portföy oluşturacak.
+
+Portfolio:
+
+cash
+positions
+average cost
+market value
+realized P&L
+unrealized P&L
+fees
+drawdown
+exposure
+risk
+
+tutacak.
+
+
+---
+
+18. Portfolio Ledger
+
+Her fill immutable ledger'a yazılacak.
+
+Örneğin:
+
+BUY
+THYAO
+100 shares
+320 TL
+commission ...
+timestamp ...
+decision_id ...
+risk_id ...
+order_id ...
+fill_id ...
+
+Böylece sonradan:
+
+> “Bu THYAO alımını neden yaptın?”
+
+
+
+sorusunun cevabı bulunabilecek.
+
+
+---
+
+19. Learning Engine
+
+Sistem “öğreniyor” demek:
+
+> Her şeyi kendi kendine değiştiriyor
+
+
+
+anlamına gelmeyecek.
+
+Önce outcome kaydedilecek.
+
+Örneğin:
+
+Prediction:
++8%
+
+Actual:
+-3%
+
+Sistem:
+
+prediction error
+
+hesaplayacak.
+
+Sonra:
+
+hangi feature?
+hangi regime?
+hangi model?
+hangi source?
+hangi strategy?
+
+daha çok hata yapıyor analiz edilecek.
+
+
+---
+
+20. Model Evaluation
+
+Her AI/model için:
+
+accuracy
+precision
+recall
+calibration
+profit factor
+Sharpe
+Sortino
+max drawdown
+hit rate
+false positive
+false negative
+
+ölçülebilecek.
+
+Model iyi görünmüyorsa sistem bunu gösterecek.
+
+
+---
+
+21. Scenario Engine
+
+Kullanıcı:
+
+> USDTRY %10 artarsa?
+
+
+
+diyebilecek.
+
+Sistem:
+
+USDTRY shock
+ ↓
+macro state
+ ↓
+sector impacts
+ ↓
+asset impacts
+ ↓
+portfolio impacts
+
+simüle edecek.
+
+Diğer senaryolar:
+
+TCMB faiz +500bp
+BIST -10%
+VIX +50%
+petrol +20%
+USDTRY +10%
+global risk-off
+
+olabilir.
+
+
+---
+
+22. Backtest Engine
+
+Geçmiş veriler üzerinde:
+
+strategy
+ ↓
+historical market
+ ↓
+decision
+ ↓
+risk
+ ↓
+simulated execution
+ ↓
+portfolio
+
+çalıştırılacak.
+
+Backtest ile live simulator aynı domain logic'i mümkün olduğunca kullanacak.
+
+
+---
+
+23. Recovery
+
+Sistem kapanırsa:
+
+snapshot
++
+event log
+
+ile aynı state'e geri dönebilecek.
+
+Örneğin kapanmadan önce:
+
+Cash: 54,321
+Positions: 7
+Equity: 108,542
+
+ise restart sonrası aynı state yeniden üretilecek.
+
+
+---
+
+24. Event Replay
+
+Belirli bir günü yeniden çalıştırabilmelisin:
+
+2026-08-01
+
+eventleri:
+
+replay
+
+edilip aynı kararlar tekrar üretilebilmeli.
+
+Bu özellikle debugging ve backtest için çok önemli.
+
+
+---
+
+25. Dashboard
+
+Kullanıcı tarafında basit admin paneli değil, kurumsal yatırım terminali olacak.
+
+Ana workspace'ler:
+
+Overview
+Market Radar
+Market Map
+Events
+Opportunities
+Asset Research
+World State
+AI Research
+Portfolio
+Risk
+Scenarios
+Backtest
+Models
+System Health
+Audit
+
+Dashboard tarayıcıda çalışacak.
+
+EXE yalnızca opsiyonel launcher olabilir.
+
+
+---
+
+26. Overview
+
+Ana ekran:
+
+BIST
+Market Regime
+Risk Regime
+Top Opportunities
+Top Risks
+Portfolio
+P&L
+AI Confidence
+Recent Events
+System Health
+
+gösterecek.
+
+
+---
+
+27. Market Radar
+
+800+ varlığı tarayacak.
+
+Filtreler:
+
+sector
+score
+risk
+momentum
+valuation
+volume
+volatility
+AI confidence
+market cap
+
+olacak.
+
+
+---
+
+28. Opportunity Terminal
+
+Sıralama:
+
+Opportunity
+Risk-adjusted return
+Confidence
+Risk
+Liquidity
+Holding period
+
+üzerinden olacak.
+
+Kullanıcı bir hisseye tıklayınca:
+
+Why?
+Evidence
+Risks
+Catalysts
+Technical
+Fundamental
+Macro
+AI analysis
+Decision
+
+görecek.
+
+
+---
+
+29. Asset Research
+
+Bir varlığın tam araştırma ekranı:
+
+Price
+Chart
+Technical
+Fundamental
+News
+KAP
+Sentiment
+AI
+Macro sensitivity
+Risk
+Historical behavior
+Current signal
+Decision history
+
+
+---
+
+30. Portfolio Terminal
+
+Şunları gösterecek:
+
+Total Equity
+Cash
+Invested
+Daily P&L
+Total P&L
+Drawdown
+Positions
+Sector Exposure
+Risk
+Open Orders
+Trade History
+
+
+---
+
+31. Risk Dashboard
+
+Örneğin:
+
+Portfolio Risk       LOW
+Concentration        MEDIUM
+Liquidity             GOOD
+Correlation           LOW
+Drawdown               2.1%
+Daily Risk Budget      0.8%
+
+gibi.
+
+Risk neden yükseldiği de açıklanacak.
+
+
+---
+
+32. AI Research
+
+AI'nın ne yaptığını gizleme.
+
+Her karar için:
+
+Model
+Version
+Input
+Evidence
+Confidence
+Reasoning
+Decision
+Risk Decision
+Outcome
+
+görülebilmeli.
+
+
+---
+
+33. Audit
+
+Kullanıcı:
+
+> “Bugün neden 15 numaralı işlemi yaptın?”
+
+
+
+dediğinde sistem:
+
+Order
+↓
+Risk approval
+↓
+Decision
+↓
+Signal
+↓
+Features
+↓
+Events
+↓
+Raw data
+
+zincirini göstermeli.
+
+
+---
+
+34. System Health
+
+Canlı olarak:
+
+API
+Database
+Redis/Event Bus
+Data Providers
+LLM
+Decision Engine
+Risk Engine
+Portfolio
+Execution Simulator
+
+durumları:
+
+HEALTHY
+DEGRADED
+FAILED
+
+olarak gösterilmeli.
+
+
+---
+
+35. Gerçek para güvenliği
+
+İlk ve ana sistem:
+
+Sanal portföy.
+
+Gerçek para execution'ı:
+
+SIMULATION
+
+katmanından tamamen ayrılmalı.
+
+Gerçek broker bağlantısı daha sonra ayrı:
+
+LIVE EXECUTION
+
+olarak ele alınmalı.
+
+Risk motoru olmadan canlı emir gönderilmemeli.
+
+
+---
+
+36. Teknoloji mimarisi
+
+Mevcut proje yapısı korunarak ihtiyaç halinde şu ayrım hedeflenmeli:
+
+apps/
+  web/
+
+services/
+  ingestion/
+  intelligence/
+  risk/
+  portfolio/
+  decision/
+  order/
+  execution/
+  core/
+
+infra/
+  postgres/
+  redis/
+  event-bus/
+
+tests/
+  unit/
+  integration/
+  e2e/
+  replay/
+  failure/
+
+Backend domain logic ile UI birbirinden ayrılmalı.
+
+
+---
+
+37. Geliştirme sırası
+
+Mimo Claw'a hepsini aynı anda yaptırma.
+
+Sıra:
+
+PHASE 0
+Repository audit
+        ↓
+PHASE 1
+Core + Config + Database
+        ↓
+PHASE 2
+Data ingestion + Quality
+        ↓
+PHASE 3
+Event infrastructure
+        ↓
+PHASE 4
+World State + Intelligence
+        ↓
+PHASE 5
+Opportunity Engine
+        ↓
+PHASE 6
+Decision Engine
+        ↓
+PHASE 7
+Risk Engine
+        ↓
+PHASE 8
+Order + Execution Simulator
+        ↓
+PHASE 9
+Portfolio Ledger
+        ↓
+PHASE 10
+Learning + Backtest + Scenario
+        ↓
+PHASE 11
+Dashboard
+        ↓
+PHASE 12
+Recovery + Replay
+        ↓
+PHASE 13
+Full E2E + Failure Testing
+        ↓
+PHASE 14
+Production Hardening
+
+
+---
+
+38. Her fazın çalışma yöntemi
+
+Mimo Claw her fazda:
+
+1. Repository'yi oku
+2. Mevcut mimariyi çıkar
+3. Gereksinimleri eşleştir
+4. Kodla
+5. Unit test
+6. Integration test
+7. Failure test
+8. Regression test
+9. Security check
+10. State invariant check
+11. Git diff incele
+12. Sonraki faza geç
+
+yapmalı.
+
+Test geçmeden sonraki faza geçmemeli.
+
+
+---
+
+39. Son kabul testi
+
+Sistem ancak aşağıdaki uçtan uca akış başarıyla çalışırsa tamamlanmış kabul edilecek:
+
+BIST Universe
+      ↓
+Market Data
+      ↓
+Data Quality
+      ↓
+Features
+      ↓
+World State
+      ↓
+AI Intelligence
+      ↓
+Opportunity Discovery
+      ↓
+Decision
+      ↓
+Risk Gate
+      ↓
+Simulated Order
+      ↓
+Execution
+      ↓
+Fill
+      ↓
+Portfolio Ledger
+      ↓
+P&L
+      ↓
+Learning
+      ↓
+Audit
+      ↓
+Snapshot
+      ↓
+Restart
+      ↓
+Recovery
+      ↓
+SAME STATE
+
+Ve aynı sistem:
+
+duplicate event
+invalid data
+DB failure
+Redis failure
+LLM failure
+execution failure
+partial fill
+restart
+concurrent orders
+
+durumlarında da güvenli davranmalı.
+
+En önemli hedef
+
+Ortaya çıkacak sistem bir “hisse tahmin botu” değil.
+
+BIST'in tamamını izleyen, fırsat keşfeden, piyasa rejimini anlayan, AI destekli araştırma yapan, risk kontrollü karar üreten, gerçekçi sanal işlemler gerçekleştiren, sonuçlarını ölçen ve geçmiş kararlarını denetlenebilir şekilde saklayan bir AI yatırım araştırma/simülasyon terminali olacak.
+
+Mimo Claw'ın görevi de bunu faz faz, test ederek ve mevcut sistemi bozmadan gerçekleştirmek.
+
+Evet. Kalan kısmı da tamamlayalım. Önceki metnin devamı olarak aşağıdakileri Mimo Claw'a ver. Bu bölüm sistemi uygulanabilir teknik spesifikasyon seviyesine tamamlar.
+
+MASTER SPEC — EK TEKNİK ŞARTNAME
+
+FAZ 21 — SERVICE CONTRACTLARI
+
+Her servis bağımsız çalışabilmeli ve açık contract'a sahip olmalı.
+
+Ingestion
+
+POST /internal/market-data
+GET  /internal/market-data/{symbol}
+
+Output:
+
+symbol
+timestamp
+open
+high
+low
+close
+volume
+bid
+ask
+source
+quality
+
+Universe
+
+GET /api/universe
+GET /api/universe/{symbol}
+GET /api/sectors
+
+Intelligence
+
+GET /api/assets/{symbol}/analysis
+GET /api/assets/{symbol}/signals
+GET /api/assets/{symbol}/events
+
+Opportunity
+
+GET /api/opportunities
+GET /api/opportunities/{symbol}
+
+Decision
+
+GET /api/decisions
+GET /api/decisions/{decision_id}
+
+Risk
+
+GET /api/risk
+GET /api/risk/portfolio
+GET /api/risk/{decision_id}
+
+Portfolio
+
+GET /api/portfolio
+GET /api/portfolio/positions
+GET /api/portfolio/trades
+GET /api/portfolio/pnl
+
+Scenario
+
+POST /api/scenarios
+GET  /api/scenarios/{scenario_id}
+
+Backtest
+
+POST /api/backtests
+GET  /api/backtests/{backtest_id}
+
+---
+
+FAZ 22 — DATABASE SCHEMA
+
+PostgreSQL canonical persistence katmanı olacak.
+
+Minimum tablolar:
+
+assets
+asset_prices
+market_snapshots
+fundamentals
+fundamental_snapshots
+
+events
+event_consumers
+event_dead_letters
+
+features
+world_states
+regime_states
+
+signals
+decisions
+risk_decisions
+
+portfolios
+positions
+portfolio_ledger
+orders
+fills
+
+scenarios
+scenario_results
+
+backtests
+backtest_trades
+backtest_metrics
+
+model_versions
+model_predictions
+prediction_outcomes
+
+audit_log
+state_snapshots
+system_health
+
+Her ana entity
+
+En az:
+
+id
+created_at
+updated_at
+version
+
+taşımalı.
+
+Financial transaction tablolarında mümkünse immutable kayıt yaklaşımı kullanılmalı.
+
+---
+
+FAZ 23 — DATABASE CONSTRAINTS
+
+Database yalnızca uygulamaya güvenmemeli.
+
+Örneğin:
+
+quantity >= 0
+price > 0
+confidence >= 0
+confidence <= 1
+quality >= 0
+quality <= 1
+
+constraint'leri mümkün olduğunda DB seviyesinde de korunmalı.
+
+Unique:
+
+event_id
+fill_id
+broker_execution_id
+order_external_id
+
+için unique constraint kullanılmalı.
+
+Foreign key'ler gerçek ilişkileri korumalı.
+
+---
+
+FAZ 24 — EVENT SCHEMAS
+
+Event türleri açıkça tanımlanmalı.
+
+Örneğin:
+
+MARKET_TICK
+MARKET_BAR
+FUNDAMENTAL_UPDATE
+NEWS_EVENT
+MACRO_EVENT
+
+FEATURE_UPDATE
+WORLD_STATE_UPDATED
+REGIME_CHANGED
+
+SIGNAL_CREATED
+DECISION_CREATED
+RISK_APPROVED
+RISK_REJECTED
+
+ORDER_CREATED
+ORDER_SUBMITTED
+ORDER_ACCEPTED
+ORDER_REJECTED
+
+FILL_CREATED
+ORDER_CANCELLED
+
+POSITION_UPDATED
+PORTFOLIO_UPDATED
+
+PREDICTION_CREATED
+PREDICTION_RESOLVED
+
+RECOVERY_STARTED
+RECOVERY_COMPLETED
+
+Her event:
+
+event_id
+event_type
+schema_version
+timestamp
+source
+correlation_id
+causation_id
+entity_id
+payload
+
+içermeli.
+
+---
+
+FAZ 25 — EVENT STREAM
+
+Event stream'ler domain'e göre ayrılmalı.
+
+Örneğin:
+
+market.events
+fundamental.events
+news.events
+macro.events
+
+feature.events
+worldstate.events
+signal.events
+decision.events
+
+risk.events
+order.events
+execution.events
+portfolio.events
+
+learning.events
+system.events
+
+Consumer group kullanılmalı.
+
+Aynı event iki consumer tarafından yanlışlıkla iki kez uygulanmamalı.
+
+---
+
+FAZ 26 — AI MODEL MİMARİSİ
+
+AI görevleri tek modele yüklenmemeli.
+
+Önerilen routing:
+
+Qwen3-Coder
+→ code / technical agent tasks
+
+DeepSeek-R1
+→ deep reasoning / complex analysis
+
+Gemma 3
+→ lightweight classification / summarization
+
+Ancak modellerin rolü config üzerinden değiştirilebilir olmalı.
+
+Model registry:
+
+model_id
+provider
+version
+task
+context_limit
+temperature
+status
+created_at
+
+tutmalı.
+
+---
+
+FAZ 27 — AI FALLBACK
+
+LLM çalışmazsa bütün sistem durmamalı.
+
+Örneğin:
+
+Primary LLM
+↓ failure
+Secondary LLM
+↓ failure
+Rule-based fallback
+↓ failure
+NO_TRADE / DEGRADED
+
+olmalı.
+
+AI unavailable durumunda risk motoru bypass edilmemeli.
+
+---
+
+FAZ 28 — AI OUTPUT VALIDATION
+
+LLM'den gelen JSON/schema doğrudan güvenilmemeli.
+
+Pipeline:
+
+LLM
+↓
+parse
+↓
+schema validation
+↓
+range validation
+↓
+source validation
+↓
+confidence validation
+↓
+domain validation
+↓
+accept/reject
+
+LLM:
+
+price = -500
+confidence = 4.8
+
+döndürürse reject edilmeli.
+
+---
+
+FAZ 29 — PROMPT VERSIONING
+
+Her AI prediction:
+
+model_version
+prompt_version
+input_hash
+feature_version
+timestamp
+
+saklamalı.
+
+Böylece:
+
+«“Bu karar hangi prompt/model ile üretildi?”»
+
+cevaplanabilmeli.
+
+---
+
+FAZ 30 — FEATURE VERSIONING
+
+Feature hesaplamaları versioned olmalı.
+
+Örneğin:
+
+technical_features_v1
+technical_features_v2
+fundamental_features_v1
+macro_features_v1
+
+Backtest eski feature version'ı ile yeniden üretilebilmeli.
+
+Live ile backtest arasındaki feature leakage engellenmeli.
+
+---
+
+FAZ 31 — NO LOOK-AHEAD BIAS
+
+Backtest'te gelecekteki veri kesinlikle kullanılmamalı.
+
+Örneğin:
+
+2025-05-01 decision
+
+hesaplanırken:
+
+2025-05-02
+
+verisi hiçbir şekilde erişilebilir olmamalı.
+
+Fundamental data için:
+
+publication timestamp kullanılmalı.
+
+Sadece fiscal period kullanmak yeterli değil.
+
+---
+
+FAZ 32 — MARKET CALENDAR
+
+Sistem:
+
+- BIST trading hours,
+- hafta sonları,
+- resmi tatiller,
+- half-day,
+- suspension,
+- trading halt
+
+durumlarını bilmeli.
+
+Market kapalıyken normal tick beklenmemeli.
+
+---
+
+FAZ 33 — DATA PROVIDER FAILOVER
+
+Her veri tipi için provider priority:
+
+Primary
+↓
+Secondary
+↓
+Cached
+↓
+Unavailable
+
+şeklinde olmalı.
+
+Provider failure:
+
+system crash
+
+olmamalı.
+
+Ancak kritik veri yoksa:
+
+NO_TRADE
+
+olabilir.
+
+---
+
+FAZ 34 — RATE LIMIT
+
+Her external provider için:
+
+timeout
+retry
+backoff
+rate_limit
+circuit_breaker
+
+uygula.
+
+Retry exponential backoff kullanmalı.
+
+Örneğin:
+
+1s
+2s
+4s
+8s
+
+gibi.
+
+Sonsuz retry yok.
+
+---
+
+FAZ 35 — CIRCUIT BREAKER
+
+Provider sürekli hata veriyorsa:
+
+CLOSED
+→ OPEN
+→ HALF_OPEN
+→ CLOSED
+
+state machine kullanılmalı.
+
+Bu mekanizma:
+
+- market provider,
+- news provider,
+- LLM provider,
+- broker simulator
+
+için kullanılabilir.
+
+---
+
+FAZ 36 — API SECURITY
+
+API:
+
+- authentication,
+- authorization,
+- rate limiting,
+- input validation,
+- request size limits,
+- timeout
+
+kullanmalı.
+
+Admin endpointleri kullanıcı endpointlerinden ayrılmalı.
+
+Internal servisler public internetten erişilebilir olmamalı.
+
+---
+
+FAZ 37 — AUTHORIZATION
+
+Roller:
+
+VIEWER
+ANALYST
+OPERATOR
+ADMIN
+SYSTEM
+
+olabilir.
+
+Örneğin:
+
+VIEWER
+→ dashboard okuyabilir
+
+ANALYST
+→ scenario/backtest çalıştırabilir
+
+OPERATOR
+→ simulator kontrol edebilir
+
+ADMIN
+→ config/model yönetebilir
+
+SYSTEM
+→ internal event operations
+
+---
+
+FAZ 38 — WEBSOCKET / REAL-TIME
+
+Dashboard gerçek zamanlı güncellenebilmeli.
+
+Örneğin:
+
+/ws/market
+/ws/opportunities
+/ws/portfolio
+/ws/risk
+/ws/system
+
+olabilir.
+
+Backend event → WebSocket update.
+
+Frontend polling'e bağımlı olmamalı.
+
+---
+
+FAZ 39 — FRONTEND STATE
+
+Frontend'de server state ile UI state ayrılmalı.
+
+Server state:
+
+- market,
+- portfolio,
+- risk,
+- opportunities.
+
+UI state:
+
+- selected symbol,
+- filters,
+- tabs,
+- chart range.
+
+Server state cache/revalidation mekanizması kullanılmalı.
+
+---
+
+FAZ 40 — DASHBOARD UX
+
+Ana navigation:
+
+Overview
+Markets
+Opportunities
+Research
+Portfolio
+Risk
+Scenarios
+Backtests
+AI
+Models
+Events
+System
+Audit
+
+olmalı.
+
+Her ekran bağımsız route olmalı.
+
+URL üzerinden doğrudan erişilebilir olmalı.
+
+---
+
+FAZ 41 — MARKET MAP
+
+Heatmap:
+
+sector
+market cap
+daily return
+volume
+
+gösterebilmeli.
+
+Örneğin:
+
+Banking
+Industrial
+Energy
+Technology
+Retail
+
+ayrılmalı.
+
+---
+
+FAZ 42 — OPPORTUNITY RANKING
+
+Opportunity ranking tek score'dan oluşmamalı.
+
+Ayrı metrikler:
+
+Opportunity Score
+Risk Score
+Confidence
+Expected Return
+Expected Loss
+Liquidity Score
+Regime Compatibility
+Fundamental Score
+Technical Score
+Macro Score
+Sentiment Score
+
+gösterilmeli.
+
+---
+
+FAZ 43 — SCORE EXPLAINABILITY
+
+Örneğin:
+
+Opportunity Score: 87
+
+yanında:
+
+Technical       +18
+Fundamental     +21
+Macro           +14
+Momentum        +16
+Sentiment       +9
+Risk            -7
+Liquidity       +4
+
+gibi decomposition göster.
+
+Kullanıcı score'un nereden geldiğini görebilmeli.
+
+---
+
+FAZ 44 — RISK EXPLAINABILITY
+
+Risk:
+
+Risk Score: 72
+
+ise:
+
+Volatility       +18
+Concentration    +15
+Correlation      +12
+Liquidity         +8
+Drawdown          +7
+Event Risk       +12
+
+gibi açıklanmalı.
+
+---
+
+FAZ 45 — SCENARIO ENGINE
+
+Scenario input generic olmalı.
+
+Örneğin:
+
+{
+  "usdtry_change": 0.10,
+  "interest_rate_change": 0.05,
+  "bist_change": -0.10,
+  "vix_change": 0.50
+}
+
+Scenario engine:
+
+scenario
+↓
+macro shock
+↓
+sector response
+↓
+asset response
+↓
+portfolio response
+
+üretmeli.
+
+Sonuç:
+
+expected_equity
+expected_drawdown
+sector_impacts
+asset_impacts
+risk_change
+
+---
+
+FAZ 46 — BACKTEST METRICS
+
+Backtest sonucu:
+
+Total Return
+CAGR
+Sharpe
+Sortino
+Calmar
+Max Drawdown
+Win Rate
+Profit Factor
+Average Win
+Average Loss
+Expectancy
+Turnover
+Fees
+Slippage
+Exposure
+
+hesaplanmalı.
+
+Ayrıca benchmark:
+
+BIST100
+
+ile karşılaştırılmalı.
+
+---
+
+FAZ 47 — WALK-FORWARD TEST
+
+Model/strategy yalnızca tek historical backtest ile değerlendirilmemeli.
+
+Örneğin:
+
+Train
+→ Validate
+→ Test
+→ Move window
+→ Repeat
+
+walk-forward yapılmalı.
+
+---
+
+FAZ 48 — MODEL CALIBRATION
+
+Prediction:
+
+confidence = 90%
+
+diyorsa gerçekleşme oranları gerçekten yaklaşık %90 civarında mı kontrol edilmeli.
+
+Calibration curve / Brier score gibi metrikler kullanılabilir.
+
+Overconfident model tespit edilmeli.
+
+---
+
+FAZ 49 — DRIFT DETECTION
+
+Model zamanla bozulabilir.
+
+İzlenecek:
+
+feature drift
+prediction drift
+outcome drift
+data distribution drift
+regime drift
+
+Drift aşırı yükselirse:
+
+MODEL_DEGRADED
+
+durumuna geç.
+
+---
+
+FAZ 50 — MODEL PROMOTION
+
+Yeni model doğrudan production'a geçmemeli.
+
+Pipeline:
+
+TRAIN
+↓
+VALIDATE
+↓
+BACKTEST
+↓
+WALK-FORWARD
+↓
+PAPER TEST
+↓
+SHADOW
+↓
+PROMOTE
+
+olmalı.
+
+Rollback desteklenmeli.
+
+---
+
+FAZ 51 — SHADOW MODE
+
+Yeni model eski modelle aynı veriyi görür ama gerçek karar sistemini değiştirmez.
+
+Karşılaştır:
+
+old_model
+vs
+new_model
+
+Sonuçları ölç.
+
+Yeni model ancak üstünlüğü kanıtlanırsa promote edilir.
+
+---
+
+FAZ 52 — AUDIT IMMUTABILITY
+
+Audit kayıtları mümkün olduğunca immutable olmalı.
+
+Bir karar sonradan sessizce değiştirilmemeli.
+
+Correction gerekiyorsa:
+
+old_record
++
+correction_event
+
+oluştur.
+
+---
+
+FAZ 53 — SYSTEM DEGRADATION MODES
+
+Sistem sadece:
+
+UP
+DOWN
+
+olmamalı.
+
+Örneğin:
+
+FULL
+DEGRADED_DATA
+DEGRADED_AI
+DEGRADED_EVENT
+DEGRADED_DATABASE
+READ_ONLY
+NO_TRADE
+RECOVERY
+
+durumları olabilir.
+
+Örneğin LLM yoksa:
+
+DEGRADED_AI
+
+ama market monitoring devam edebilir.
+
+Risk sistemi yoksa:
+
+NO_TRADE
+
+olmalı.
+
+---
+
+FAZ 54 — HEALTH CHECK
+
+Her servis:
+
+/live
+/ready
+/health
+
+endpointlerine sahip olabilir.
+
+Health:
+
+database
+redis
+event bus
+providers
+model
+worker
+
+durumlarını kontrol etmeli.
+
+---
+
+FAZ 55 — METRICS
+
+Prometheus/OpenTelemetry uyumlu metric sistemi kurulabilir.
+
+Minimum:
+
+events_total
+events_failed_total
+events_duplicate_total
+data_quality_failures_total
+
+llm_requests_total
+llm_failures_total
+llm_latency
+
+decisions_total
+risk_rejections_total
+
+orders_total
+fills_total
+
+portfolio_equity
+portfolio_drawdown
+
+provider_errors
+recovery_failures
+
+---
+
+FAZ 56 — ALERTING
+
+Critical:
+
+database failure
+event loss
+portfolio inconsistency
+recovery failure
+risk engine failure
+unexpected negative cash
+duplicate fills
+
+alert üretmeli.
+
+---
+
+FAZ 57 — LOGGING
+
+JSON structured logs:
+
+{
+  "timestamp": "...",
+  "level": "ERROR",
+  "service": "risk",
+  "event_id": "...",
+  "correlation_id": "...",
+  "message": "Risk check failed"
+}
+
+kullan.
+
+Secret loglama.
+
+---
+
+FAZ 58 — DOCKER
+
+Her servis:
+
+- deterministic build,
+- healthcheck,
+- non-root user,
+- environment-based configuration,
+- graceful shutdown
+
+desteklemeli.
+
+Development ve production compose ayrılmalı.
+
+---
+
+FAZ 59 — MIGRATIONS
+
+DB schema değişiklikleri migration üzerinden yapılmalı.
+
+Elle production DB değiştirme.
+
+Migration:
+
+up
+down
+version
+
+kontrolüne sahip olmalı.
+
+Destructive migration dikkatle uygulanmalı.
+
+---
+
+FAZ 60 — CI/CD
+
+Her commit:
+
+lint
+typecheck
+unit tests
+integration tests
+security scan
+build
+
+çalıştırmalı.
+
+PR merge öncesi başarısız test varsa merge engellenmeli.
+
+---
+
+FAZ 61 — TYPESCRIPT
+
+Frontend:
+
+- strict TypeScript
+- "any" yok
+- API contract types
+- runtime validation
+- error boundaries
+
+kullanmalı.
+
+Backend Python ise:
+
+- strict typing
+- mypy/pyright
+- Ruff
+- Pydantic
+
+kullanılabilir.
+
+---
+
+FAZ 62 — ERROR HANDLING
+
+Generic:
+
+except Exception:
+    pass
+
+kullanma.
+
+Her hata:
+
+expected
+recoverable
+retryable
+fatal
+
+olarak sınıflandırılmalı.
+
+---
+
+FAZ 63 — TRANSACTION BOUNDARIES
+
+Financial state değiştiren işlemler transaction içinde olmalı.
+
+Özellikle:
+
+fill
+cash
+position
+ledger
+P&L
+
+tek atomic operation olmalı.
+
+---
+
+FAZ 64 — IDEMPOTENCY KEY
+
+Her mutating request:
+
+idempotency_key
+
+alabilmeli.
+
+Aynı request tekrar gelirse:
+
+same result
+
+döndürülmeli.
+
+---
+
+FAZ 65 — TIME STANDARD
+
+Tüm backend timestamp'leri:
+
+UTC + timezone-aware
+
+olmalı.
+
+Frontend kullanıcı timezone'una çevirebilir.
+
+Naive datetime kullanma.
+
+---
+
+FAZ 66 — MONEY STANDARD
+
+Para hesaplarında floating point kritik financial calculation için kullanılmamalı.
+
+Uygun:
+
+Decimal
+
+veya DB numeric.
+
+Currency explicit:
+
+TRY
+USD
+EUR
+
+olmalı.
+
+---
+
+FAZ 67 — NUMERIC PRECISION
+
+Quantity ve price precision asset bazlı tanımlanmalı.
+
+Örneğin:
+
+price_precision
+quantity_precision
+tick_size
+lot_size
+
+tutulmalı.
+
+---
+
+FAZ 68 — MARKET MICROSTRUCTURE
+
+Simülasyonda:
+
+spread
+slippage
+liquidity
+order size
+volume participation
+
+dikkate alınmalı.
+
+100 TL'lik emir ile 10 milyon TL'lik emir aynı şekilde execute edilmemeli.
+
+---
+
+FAZ 69 — PORTFOLIO RECONCILIATION
+
+Periyodik:
+
+ledger
+vs
+positions
+vs
+cash
+vs
+equity
+
+karşılaştır.
+
+Fark varsa:
+
+RECONCILIATION_FAILURE
+
+üret.
+
+Sessizce düzeltme.
+
+---
+
+FAZ 70 — FINAL ACCEPTANCE
+
+Sistem tamamlandı kabul edilmesi için:
+
+Data
+
+800+ asset scan
+✓
+
+Quality
+
+invalid/stale/duplicate detection
+✓
+
+Intelligence
+
+AI + deterministic features
+✓
+
+Decision
+
+LONG / SHORT / HOLD / NO_TRADE
+✓
+
+Risk
+
+hard veto
+✓
+
+Simulation
+
+order → execution → fill
+✓
+
+Portfolio
+
+ledger → position → P&L
+✓
+
+Learning
+
+prediction → outcome → evaluation
+✓
+
+Recovery
+
+restart → replay → same state
+✓
+
+Audit
+
+decision → evidence → order → fill
+✓
+
+Testing
+
+unit
+integration
+e2e
+failure
+replay
+concurrency
+regression
+✓
+
+---
+
+MIMO CLAW İÇİN SON TALİMAT
+
+Bu sistemi tek seferde baştan yazma.
+
+Mevcut repository'yi önce analiz et.
+
+Her fazı mevcut kodla eşleştir.
+
+Mevcut çalışan parçaları mümkün olduğunca koru.
+
+Bir servis zaten doğru implement edilmişse yeniden yazma.
+
+Eksik olanı tamamla.
+
+Hatalı olanı düzelt.
+
+Çakışan iki implementation varsa tek canonical implementation bırak.
+
+Duplicate business logic bırakma.
+
+Her domain için tek source of truth oluştur.
+
+Her faz sonunda:
+
+FILES CHANGED
+BUGS FIXED
+ARCHITECTURAL CHANGES
+TESTS ADDED
+TEST RESULTS
+REMAINING RISKS
+
+raporu ver.
+
+Test geçmeden sonraki faza geçme.
+
+Final hedef:
+
+«BIST evrenini sürekli tarayan, veri kalitesini denetleyen, piyasa rejimini çıkaran, teknik/fundamental/makro/haber/AI evidence'larını birleştiren, fırsatları risk-adjusted şekilde sıralayan, hard risk gate üzerinden karar veren, gerçekçi sanal emir ve portföy simülasyonu yapan, sonuçlarını öğrenme sistemiyle değerlendiren, tamamen audit edilebilir ve restart sonrası deterministik şekilde recovery yapabilen production-grade AI yatırım araştırma ve simülasyon platformu.»
