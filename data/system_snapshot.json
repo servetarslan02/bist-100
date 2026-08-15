@@ -1,12 +1,18 @@
 {
-  "timestamp": "2026-08-15T17:21:07.369563+00:00",
-  "scan_count": 3,
+  "timestamp": "2026-08-15T17:36:56.477039+00:00",
+  "scan_count": 4,
   "state": {
     "state": "READY",
     "substates": {},
     "history_count": 2
   },
-  "learning": {},
+  "learning": {
+    "total_predictions": 101,
+    "total_resolved": 0,
+    "total_pending": 101,
+    "overall_accuracy": 0,
+    "recent_accuracy": 0
+  },
   "outcome_tracker": {
     "total_tracked": 100,
     "checked": 0,
@@ -18,29 +24,29 @@
       "database": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T17:19:11.887374+00:00"
+        "last_check": "2026-08-15T17:35:44.945933+00:00"
       },
       "feature_store": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T17:19:11.887378+00:00"
+        "last_check": "2026-08-15T17:35:44.945936+00:00"
       },
       "opportunity_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T17:21:07.360825+00:00"
+        "last_check": "2026-08-15T17:36:56.470032+00:00"
       },
       "decision_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T17:21:07.360827+00:00"
+        "last_check": "2026-08-15T17:36:56.470035+00:00"
       },
       "risk_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T17:21:07.360831+00:00"
+        "last_check": "2026-08-15T17:36:56.470038+00:00"
       }
     },
-    "timestamp": "2026-08-15T17:21:07.369611+00:00"
+    "timestamp": "2026-08-15T17:36:56.477077+00:00"
   }
 }

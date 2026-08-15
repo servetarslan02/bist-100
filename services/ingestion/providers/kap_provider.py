@@ -20,9 +20,10 @@ class KAPProvider:
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json",
+            "Accept": "application/json, text/html, */*",
             "Accept-Language": "tr-TR,tr;q=0.9",
         })
+        self.TIMEOUT = 10  # Kısa timeout
 
     def fetch_disclosures(
         self,
@@ -47,8 +48,9 @@ class KAPProvider:
         if ticker:
             params["ticker"] = ticker
 
+        # Yöntem 1: KAP API
         try:
-            resp = self.session.get(url, params=params, timeout=30)
+            resp = self.session.get(url, params=params, timeout=self.TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 
@@ -78,15 +80,90 @@ class KAPProvider:
             return disclosures
 
         except Exception as e:
-            logger.error("Failed to fetch KAP disclosures", error=str(e))
-            return []
+            logger.warning("KAP API failed, trying RSS", error=str(e))
+
+        # Yöntem 2: RSS feed
+        try:
+            resp = self.session.get("https://www.kap.org.tr/tr/RSSFeed", timeout=self.TIMEOUT)
+            if resp.status_code == 200:
+                return self._parse_rss(resp.text)
+        except Exception as e:
+            logger.debug("KAP RSS failed", error=str(e))
+
+        # Yöntem 3: Scrape
+        try:
+            resp = self.session.get("https://www.kap.org.tr/tr/bildirimler", timeout=self.TIMEOUT)
+            if resp.status_code == 200:
+                return self._parse_html(resp.text)
+        except Exception as e:
+            logger.debug("KAP scrape failed", error=str(e))
+
+        logger.error("All KAP fetch methods failed")
+        return []
+
+    def _parse_rss(self, xml_text: str) -> List[Dict[str, Any]]:
+        """RSS feed parse."""
+        results = []
+        try:
+            import feedparser
+            feed = feedparser.parse(xml_text)
+            for entry in feed.entries[:50]:
+                title = entry.get("title", "")
+                results.append({
+                    "kap_id": entry.get("id", ""),
+                    "ticker": "",
+                    "company_name": "",
+                    "title": title,
+                    "summary": entry.get("summary", ""),
+                    "category": "RSS",
+                    "subject": "",
+                    "publish_date": entry.get("published", ""),
+                    "is_price_sensitive": False,
+                    "attachment_count": 0,
+                    "raw_html": "",
+                    "sentiment": self._analyze_sentiment({"title": title, "summary": ""}),
+                    "importance": self._assess_importance({"title": title, "is_price_sensitive": False, "subject": "", "attachment_count": 0}),
+                })
+            logger.info("KAP RSS parsed", count=len(results))
+        except Exception as e:
+            logger.warning("RSS parse failed", error=str(e))
+        return results
+
+    def _parse_html(self, html: str) -> List[Dict[str, Any]]:
+        """HTML scrape parse."""
+        results = []
+        try:
+            import re
+            titles = re.findall(r'class="[^"]*title[^"]*"[^>]*>([^<]+)<', html)
+            for title in titles[:20]:
+                title = title.strip()
+                if len(title) > 10:
+                    results.append({
+                        "kap_id": "",
+                        "ticker": "",
+                        "company_name": "",
+                        "title": title,
+                        "summary": "",
+                        "category": "HTML_SCRAPE",
+                        "subject": "",
+                        "publish_date": "",
+                        "is_price_sensitive": False,
+                        "attachment_count": 0,
+                        "raw_html": "",
+                        "sentiment": self._analyze_sentiment({"title": title, "summary": ""}),
+                        "importance": self._assess_importance({"title": title, "is_price_sensitive": False, "subject": "", "attachment_count": 0}),
+                    })
+            logger.info("KAP HTML scraped", count=len(results))
+        except Exception as e:
+            logger.warning("HTML parse failed", error=str(e))
+        return results
 
     def fetch_company_financials(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Fetch latest financial data for a company from KAP."""
         url = f"{KAP_API_URL}/financials/{ticker}"
 
         try:
-            resp = self.session.get(url, timeout=30)
+            resp = self.session.get(url, timeout=self.TIMEOUT)
             resp.raise_for_status()
             data = resp.json()
 

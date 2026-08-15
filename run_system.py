@@ -386,6 +386,45 @@ class AlphaSystem:
 
         print(f"   ✓ {len(features_map)} hisse için feature hesaplandı")
 
+        # Haber verilerini çek ve ticker'a ata
+        print("\n📰 [4.5/8] Haberler çekiliyor...")
+        from services.ingestion.providers.news_provider import news_provider
+        from services.features.sentiment import SentimentFeatureEngine
+
+        news_articles = news_provider.fetch_financial_news_rss()
+        ticker_news: Dict[str, List] = {}
+        general_news = []
+
+        for article in news_articles:
+            tickers = article.get("tickers", [])
+            if tickers:
+                for t in tickers:
+                    if t not in ticker_news:
+                        ticker_news[t] = []
+                    ticker_news[t].append(article)
+            else:
+                general_news.append(article)
+
+        print(f"   ✓ {len(news_articles)} haber çekildi")
+        print(f"   ✓ {len(ticker_news)} hisse ile ilişkilendirildi")
+
+        # Haber sentiment'larını feature'lara ekle
+        now = datetime.now(timezone.utc)
+        for ticker, articles in ticker_news.items():
+            if ticker not in features_map:
+                continue
+            news_events = [{
+                "sentiment": a.get("sentiment", 0),
+                "importance": a.get("importance", 0.5),
+                "credibility": a.get("credibility", 0.5),
+                "timestamp": a.get("published_at", now.isoformat()),
+            } for a in articles]
+            sf_engine = SentimentFeatureEngine()
+            for ne in news_events:
+                sf_engine.add_news_event(ticker, ne)
+            sf = sf_engine.compute_all_sentiment_features(ticker)
+            features_map[ticker].update(sf)
+
         # Fundamental
         print("\n📈 [5/8] Fundamental veriler çekiliyor...")
         fundamental_scores = {}

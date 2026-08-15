@@ -2654,10 +2654,88 @@
       "risks": [],
       "outcome": null,
       "resolved": false
+    },
+    {
+      "prediction_id": "ESEN-20260815173656",
+      "ticker": "ESEN",
+      "timestamp": "2026-08-15T17:36:56.384712+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11314162859446393,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3.4700000286102295,
+        "momentum_20d": -0.04999995231628418,
+        "rsi_14": 50.25437851280539,
+        "volume_zscore": -0.22496840451034333,
+        "realized_vol_20d": 29.50489559567866,
+        "bb_position": 0.6086559983949344,
+        "trend_slope_20d": -0.29555164667196493
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "EUREN-20260815173656",
+      "ticker": "EUREN",
+      "timestamp": "2026-08-15T17:36:56.426717+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08523908523908538,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3.890000104904175,
+        "momentum_20d": -0.20000004768371582,
+        "rsi_14": 41.15204145691884,
+        "volume_zscore": 0.6780827699314071,
+        "realized_vol_20d": 27.275907507591374,
+        "bb_position": 0.3799110076198242,
+        "trend_slope_20d": -0.4335389924589453
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "YKSLN-20260815173656",
+      "ticker": "YKSLN",
+      "timestamp": "2026-08-15T17:36:56.449492+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06661009758167166,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.859999895095825,
+        "momentum_20d": -0.3300001621246338,
+        "rsi_14": 39.95581236734432,
+        "volume_zscore": 0.34800070944269007,
+        "realized_vol_20d": 26.087809395196594,
+        "bb_position": 0.37464984229458953,
+        "trend_slope_20d": -0.8622959053007804
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
     }
   ],
   "regime_accuracy": {},
   "feature_importance_feedback": {},
   "accuracy_window": [],
-  "saved_at": "2026-08-15T17:21:07.339814+00:00"
+  "saved_at": "2026-08-15T17:36:56.449559+00:00"
 }
