@@ -281,6 +281,132 @@
       "risks": [],
       "outcome": null,
       "resolved": false
+    },
+    {
+      "prediction_id": "AGESA-20260815152316",
+      "ticker": "AGESA",
+      "timestamp": "2026-08-15T15:23:16.174993+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.05205479452054793,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "momentum_20d": -5.899993896484375,
+        "rsi_14": 46.706747330647346,
+        "volume_zscore": 1.0396952693021273,
+        "realized_vol_20d": 20.900316293256644,
+        "bb_position": 0.3128044835836207,
+        "trend_slope_20d": -0.05926392905835848
+      },
+      "reasons": [
+        "SPEC g\u00fc\u00e7l\u00fc: 62",
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKGRT-20260815152316",
+      "ticker": "AKGRT",
+      "timestamp": "2026-08-15T15:23:16.201028+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11317254174397035,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "momentum_20d": -0.6599998474121094,
+        "rsi_14": 34.451072162665696,
+        "volume_zscore": -0.48889529141104693,
+        "realized_vol_20d": 22.5727967273681,
+        "bb_position": 0.25019214497937997,
+        "trend_slope_20d": -0.7348448712872423
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AHGAZ-20260815152316",
+      "ticker": "AHGAZ",
+      "timestamp": "2026-08-15T15:23:16.218805+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.011621333723453604,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "momentum_20d": -1.2000007629394531,
+        "rsi_14": 50.30350823468888,
+        "volume_zscore": 2.546777156857472,
+        "realized_vol_20d": 31.82573960554933,
+        "bb_position": 0.5368862684791547,
+        "trend_slope_20d": -0.5569150504176726
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ARCLK-20260815152316",
+      "ticker": "ARCLK",
+      "timestamp": "2026-08-15T15:23:16.235204+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08256880733944956,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "momentum_20d": -3.0999984741210938,
+        "rsi_14": 37.5787961927586,
+        "volume_zscore": -0.5490211742392983,
+        "realized_vol_20d": 14.82278015899717,
+        "bb_position": 0.01144478415091083,
+        "trend_slope_20d": -0.15743344048705538
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AFYON-20260815152316",
+      "ticker": "AFYON",
+      "timestamp": "2026-08-15T15:23:16.252760+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.7,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.03772646163532429,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "momentum_20d": -0.36999988555908203,
+        "rsi_14": 47.41717289698998,
+        "volume_zscore": -0.5548819381942159,
+        "realized_vol_20d": 25.375099542976976,
+        "bb_position": 0.4294969507065864,
+        "trend_slope_20d": -0.14294687902955677
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
     }
   ],
   "regime_accuracy": {
@@ -300,5 +426,5 @@
   "accuracy_window": [
     true
   ],
-  "saved_at": "2026-08-15T15:19:33.437159+00:00"
+  "saved_at": "2026-08-15T15:23:16.252829+00:00"
 }

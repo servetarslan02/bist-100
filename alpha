@@ -1,0 +1,168 @@
+#!/bin/bash
+# ALPHA BIST — Sistem Yönetim Scripti
+#
+# Kullanım:
+#   ./alpha start      # Sistemi başlat (arka plan)
+#   ./alpha stop       # Sistemi durdur
+#   ./alpha status     # Durum kontrolü
+#   ./alpha logs       # Son logları göster
+#   ./alpha scan       # Tek tarama yap ve çık
+#   ./alpha dashboard  # Dashboard URL'sini göster
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PID_FILE="$SCRIPT_DIR/data/alpha.pid"
+LOG_FILE="$SCRIPT_DIR/data/alpha.log"
+SNAPSHOT_FILE="$SCRIPT_DIR/data/system_snapshot.json"
+
+start() {
+    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "⚡ ALPHA BIST zaten çalışıyor (PID: $(cat "$PID_FILE"))"
+        return 1
+    fi
+
+    echo "⚡ ALPHA BIST başlatılıyor..."
+    mkdir -p "$SCRIPT_DIR/data"
+
+    cd "$SCRIPT_DIR"
+    nohup python3 start.py >> "$LOG_FILE" 2>&1 &
+    echo $! > "$PID_FILE"
+
+    sleep 2
+    if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "✅ ALPHA BIST başlatıldı (PID: $(cat "$PID_FILE"))"
+        echo "📊 Dashboard: http://localhost:8000/"
+        echo "📋 Loglar: ./alpha logs"
+    else
+        echo "❌ Başlatılamadı. Logları kontrol edin: ./alpha logs"
+        rm -f "$PID_FILE"
+        return 1
+    fi
+}
+
+stop() {
+    if [ ! -f "$PID_FILE" ]; then
+        echo "⚠️  ALPHA BIST çalışmıyor"
+        return 1
+    fi
+
+    PID=$(cat "$PID_FILE")
+    if kill -0 "$PID" 2>/dev/null; then
+        echo "⏹  ALPHA BIST durduruluyor (PID: $PID)..."
+        kill -TERM "$PID"
+        # Graceful shutdown için bekle
+        for i in $(seq 1 10); do
+            if ! kill -0 "$PID" 2>/dev/null; then
+                break
+            fi
+            sleep 1
+        done
+        # Hala çalışıyorsa zorla kapat
+        if kill -0 "$PID" 2>/dev/null; then
+            kill -9 "$PID"
+            echo "⚠️  Zorla kapatıldı"
+        else
+            echo "✅ Graceful shutdown tamamlandı"
+        fi
+        rm -f "$PID_FILE"
+    else
+        echo "⚠️  Process bulunamadı"
+        rm -f "$PID_FILE"
+    fi
+}
+
+status() {
+    echo "=== ALPHA BIST Durum ==="
+    echo ""
+
+    # Process durumu
+    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        echo "🟢 Sistem: ÇALIŞIYOR (PID: $(cat "$PID_FILE"))"
+    else
+        echo "🔴 Sistem: DURDURULMUŞ"
+        [ -f "$PID_FILE" ] && rm -f "$PID_FILE"
+    fi
+
+    echo ""
+
+    # Snapshot durumu
+    if [ -f "$SNAPSHOT_FILE" ]; then
+        SCAN_COUNT=$(python3 -c "import json; d=json.load(open('$SNAPSHOT_FILE')); print(d.get('scan_count', 0))" 2>/dev/null || echo "0")
+        TIMESTAMP=$(python3 -c "import json; d=json.load(open('$SNAPSHOT_FILE')); print(d.get('timestamp', '?'))" 2>/dev/null || echo "?")
+        STATE=$(python3 -c "import json; d=json.load(open('$SNAPSHOT_FILE')); print(d.get('state', {}).get('state', '?'))" 2>/dev/null || echo "?")
+        echo "📊 Son tarama: #$SCAN_COUNT"
+        echo "🕐 Zaman: $TIMESTAMP"
+        echo "⚙️  Durum: $STATE"
+    else
+        echo "📊 Henüz tarama yapılmadı"
+    fi
+
+    echo ""
+
+    # Learning durumu
+    if [ -f "$SCRIPT_DIR/data/learning_state.json" ]; then
+        PREDICTIONS=$(python3 -c "import json; d=json.load(open('$SCRIPT_DIR/data/learning_state.json')); print(len(d.get('predictions', [])))" 2>/dev/null || echo "0")
+        RESOLVED=$(python3 -c "import json; d=json.load(open('$SCRIPT_DIR/data/learning_state.json')); print(len([p for p in d.get('predictions', []) if p.get('resolved')]))" 2>/dev/null || echo "0")
+        echo "🧠 Tahmin: $PREDICTIONS"
+        echo "✅ Çözümlenen: $RESOLVED"
+    else
+        echo "🧠 Henüz tahmin yok"
+    fi
+
+    echo ""
+
+    # Piyasa durumu
+    python3 -c "
+import sys; sys.path.insert(0, '$SCRIPT_DIR')
+from services.core.market_calendar import market_calendar
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)
+info = market_calendar.get_info(now)
+print(f'📅 Piyasa: {\"AÇIK\" if info[\"is_market_open\"] else \"KAPALI\"}')
+print(f'   Seans: {info[\"session\"]}')
+print(f'   Sonraki açılış: {info[\"next_open\"]}')
+" 2>/dev/null || echo "📅 Piyasa durumu alınamadı"
+}
+
+logs() {
+    if [ -f "$LOG_FILE" ]; then
+        tail -50 "$LOG_FILE"
+    else
+        echo "📋 Log dosyası bulunamadı"
+    fi
+}
+
+scan() {
+    echo "🔍 Tek tarama yapılıyor..."
+    cd "$SCRIPT_DIR"
+    python3 start.py --scan-once
+}
+
+dashboard() {
+    echo "📊 Dashboard: http://localhost:8000/"
+    echo "📈 API: http://localhost:8000/api/system/health"
+    echo "🧠 Learning: http://localhost:8000/api/learning"
+}
+
+case "$1" in
+    start)    start ;;
+    stop)     stop ;;
+    restart)  stop; sleep 2; start ;;
+    status)   status ;;
+    logs)     logs ;;
+    scan)     scan ;;
+    dashboard) dashboard ;;
+    *)
+        echo "ALPHA BIST — Sistem Yönetim Scripti"
+        echo ""
+        echo "Kullanım: ./alpha <komut>"
+        echo ""
+        echo "Komutlar:"
+        echo "  start      Sistemi başlat (arka plan)"
+        echo "  stop       Sistemi durdur"
+        echo "  restart    Yeniden başlat"
+        echo "  status     Durum kontrolü"
+        echo "  logs       Son logları göster"
+        echo "  scan       Tek tarama yap"
+        echo "  dashboard  Dashboard URL'si"
+        ;;
+esac
