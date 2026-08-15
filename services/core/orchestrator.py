@@ -15,6 +15,7 @@ KURAL: Bu sistem insan müdahalesi olmadan 7/24 çalışmalı.
 
 import json
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone, timedelta
@@ -96,7 +97,14 @@ class SystemOrchestrator:
             from services.core.tradability_mask import tradability_mask
             masks = {}
             for ticker, df in market_data.items():
-                masks[ticker] = tradability_mask.compute(df)
+                masks[ticker] = tradability_mask.compute_mask(
+                    ticker=ticker,
+                    open_=df["Open"].values,
+                    high=df["High"].values,
+                    low=df["Low"].values,
+                    close=df["Close"].values,
+                    volume=df["Volume"].values
+                )
         except Exception as e:
             logger.error("Tradability mask failed", error=str(e))
             errors.append(f"Mask: {str(e)}")

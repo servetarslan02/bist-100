@@ -10,7 +10,7 @@ KURAL: Sample covariance = gürültü. Shrinkage = gerçek.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import structlog
 
 logger = structlog.get_logger()

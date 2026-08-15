@@ -16,7 +16,8 @@ from ..core.event_bus import (
     flush_producer, EventConsumer,
 )
 from ..core.logging import setup_logging
-from .bist_universe import BIST_STOCKS, get_sector, BIST_INDICES
+from .bist_universe import BISTUniverse, get_sector, BIST_INDICES
+BIST_STOCKS = BISTUniverse.BIST_100_TICKERS
 from .providers.yfinance_provider import yfinance_provider
 from .providers.kap_provider import kap_provider
 from .providers.tcmb_provider import tcmb_provider

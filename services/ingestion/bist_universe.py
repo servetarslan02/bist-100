@@ -169,5 +169,14 @@ class BISTUniverse:
             # Async olmayan basit kontrol
             self._validated = True
 
+# Module-level helper functions for backward compatibility
+def get_sector(ticker: str) -> str:
+    """Hissenin sektörünü bul."""
+    universe = BISTUniverse()
+    return universe.get_ticker_sector(ticker)
+
+BIST_STOCKS = BISTUniverse.BIST_100_TICKERS
+BIST_INDICES = ["XU100", "XU030", "XU050"]
+
 # Singleton
 bist_universe = BISTUniverse()
