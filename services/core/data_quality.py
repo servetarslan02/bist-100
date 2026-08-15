@@ -1,265 +1,171 @@
 """
-ALPHA BIST — Data Quality Gate v2.0
+ALPHA BIST — Data Quality & Tradability Mask v1.0
 
-P0-2 düzeltmeleri:
-- Stale detection: .seconds → total_seconds()
-- Duplicate protection: distributed-safe (time-windowed)
-- Missing != 0: explicit VALID/MISSING/STALE/INVALID states
-- Out-of-order detection
-- Future timestamp detection
-- Tick validation BEFORE state update
+ROADMAP v3.0: Mask-First Design
+- Devre kesici, tavan/taban, halt edilmiş fiyatlar maskelenir
+- Hiçbir feature hesaplaması mask=0 olan fiyatı görmez
+- Bu tek başına +0.44 Sharpe katkısı (Du 2026)
+
+KURAL: Execute edilemeyen fiyat kullanma!
 """
 
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
+import numpy as np
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
 
-
-class DataValidity(str, Enum):
-    """Veri geçerlilik durumu — missing != 0 != invalid."""
-    VALID = "VALID"
-    MISSING = "MISSING"      # Veri yok
-    STALE = "STALE"          # Veri çok eski
-    INVALID = "INVALID"      # Veri mantıksız (negatif fiyat vb.)
-    DUPLICATE = "DUPLICATE"  # Aynı veri tekrar gelmiş
-    OUT_OF_ORDER = "OUT_OF_ORDER"  # Zaman sırası bozuk
-    FUTURE = "FUTURE"        # Gelecekten timestamp
-
-
 @dataclass
-class QualityCheck:
-    """Veri kalite kontrol sonucu."""
-    passed: bool
-    validity: DataValidity
-    score: float  # 0-1
-    issues: list = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+class TradabilityMask:
+    """Hisse başına tradability durumu."""
+    ticker: str
+    timestamp: datetime
+    is_tradable: bool
+    reasons: List[str]
 
+    # Mask değerleri (0 = kullanma, 1 = kullan)
+    price_mask: float = 1.0
+    volume_mask: float = 1.0
 
-class DataQualityGate:
-    """Veri kalite kapısı — her veri buradan geçer.
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "ticker": self.ticker,
+            "timestamp": self.timestamp.isoformat(),
+            "is_tradable": self.is_tradable,
+            "reasons": self.reasons,
+            "price_mask": self.price_mask,
+            "volume_mask": self.volume_mask,
+        }
 
-    Kritik: Validate → Accept → State Update sırası.
-    Geçersiz tick mevcut state'i DEĞİŞTİRMEMELİ.
-    """
-
-    # Stale threshold
-    STALE_THRESHOLD_SECONDS = 300  # 5 dakika
-    MAX_PRICE_CHANGE_PCT = 20.0     # Tek tick'te max %20 değişim
-    LARGE_PRICE_CHANGE_PCT = 10.0
-    DUPLICATE_WINDOW_SECONDS = 60   # 1 dakika içinde aynı hash = duplicate
-    MAX_FUTURE_DRIFT_SECONDS = 5    # 5 saniye gelecek toleransı
+class DataQualityEngine:
+    """Veri kalitesi ve tradability kontrol motoru."""
 
     def __init__(self):
-        self._last_tick_time: Dict[str, datetime] = {}
-        self._last_price: Dict[str, float] = {}
-        # Duplicate protection: ticker+hash → timestamp (time-windowed)
-        self._recent_hashes: Dict[str, datetime] = {}
-        self._tick_counts: Dict[str, int] = {}
-        self._rejected_counts: Dict[str, int] = {}
+        self._masks: Dict[str, TradabilityMask] = {}
+        logger.info("DataQualityEngine initialized")
 
-    def check_tick(
+    def check_tradability(
         self,
         ticker: str,
-        price: float,
-        volume: int,
-        timestamp: datetime,
-        bid: float = 0,
-        ask: float = 0,
-    ) -> QualityCheck:
-        """Tick verisini doğrula.
-
-        Kritik: Bu fonksiyon state güncellemeden ÖNCE çağrılmalıdır.
-        Geçersiz tick → state güncellenmez.
-        """
-        issues = []
-        score = 1.0
-        validity = DataValidity.VALID
-        now = datetime.now(timezone.utc)
-
-        # Timestamp timezone-aware yap
-        if timestamp.tzinfo is None:
-            timestamp = timestamp.replace(tzinfo=timezone.utc)
-
-        # 0. Future timestamp kontrolü
-        future_drift = (timestamp - now).total_seconds()
-        if future_drift > self.MAX_FUTURE_DRIFT_SECONDS:
-            issues.append(f"future_timestamp_{future_drift:.0f}s")
-            validity = DataValidity.FUTURE
-            score -= 0.8
-
-        # 1. Fiyat kontrolü
-        if price <= 0:
-            issues.append("invalid_price")
-            validity = DataValidity.INVALID
-            score -= 0.5
-
-        if price < 0:
-            issues.append("negative_price")
-            validity = DataValidity.INVALID
-            score -= 0.5
-
-        # 2. Volume kontrolü
-        if volume < 0:
-            issues.append("negative_volume")
-            validity = DataValidity.INVALID
-            score -= 0.5
-
-        # 3. Duplicate kontrolü (time-windowed)
-        tick_hash = f"{ticker}:{price}:{volume}:{timestamp.isoformat()[:19]}"
-        last_seen = self._recent_hashes.get(tick_hash)
-        if last_seen:
-            time_since = abs((timestamp - last_seen).total_seconds())
-            if time_since < self.DUPLICATE_WINDOW_SECONDS:
-                issues.append("duplicate_tick")
-                validity = DataValidity.DUPLICATE
-                score -= 0.5
-        self._recent_hashes[tick_hash] = timestamp
-
-        # Duplicate hash cache temizliği
-        if len(self._recent_hashes) > 50000:
-            cutoff = now - timedelta(seconds=self.DUPLICATE_WINDOW_SECONDS * 2)
-            self._recent_hashes = {
-                k: v for k, v in self._recent_hashes.items()
-                if v > cutoff
-            }
-
-        # 4. Out-of-order kontrolü
-        last_time = self._last_tick_time.get(ticker)
-        if last_time and timestamp < last_time:
-            drift = (last_time - timestamp).total_seconds()
-            if drift > 10:  # 10 saniyeden fazla geriye gitme
-                issues.append(f"out_of_order_{drift:.0f}s")
-                validity = DataValidity.OUT_OF_ORDER
-                score -= 0.3
-
-        # 5. Stale price kontrolü (total_seconds kullan!)
-        last_price = self._last_price.get(ticker)
-        if last_price and price == last_price and last_time:
-            stale_seconds = abs((timestamp - last_time).total_seconds())
-            if stale_seconds > self.STALE_THRESHOLD_SECONDS:
-                issues.append(f"stale_price_{stale_seconds:.0f}s")
-                validity = DataValidity.STALE
-                score -= 0.3
-
-        # 6. Ani fiyat değişimi kontrolü
-        if last_price and last_price > 0 and price > 0:
-            change_pct = abs(price / last_price - 1) * 100
-            if change_pct > self.MAX_PRICE_CHANGE_PCT:
-                issues.append(f"extreme_price_change_{change_pct:.1f}%")
-                score -= 0.4
-            elif change_pct > self.LARGE_PRICE_CHANGE_PCT:
-                issues.append(f"large_price_change_{change_pct:.1f}%")
-                score -= 0.2
-
-        # 7. Bid/Ask spread kontrolü
-        if bid > 0 and ask > 0:
-            if ask < bid:
-                issues.append("inverted_bid_ask")
-                score -= 0.5
-            if price > 0:
-                spread_pct = (ask - bid) / price * 100
-                if spread_pct > 5:
-                    issues.append(f"wide_spread_{spread_pct:.1f}%")
-                    score -= 0.2
-
-        # 8. Clock drift kontrolü (total_seconds!)
-        drift = abs((now - timestamp).total_seconds())
-        if drift > 60 and validity == DataValidity.VALID:
-            issues.append(f"clock_drift_{drift:.0f}s")
-            score -= 0.2
-
-        # Sadece VALID tick'ler state'i güncellemeli
-        passed = score >= 0.5 and validity == DataValidity.VALID
-
-        # İstatistik
-        self._tick_counts[ticker] = self._tick_counts.get(ticker, 0) + 1
-        if not passed:
-            self._rejected_counts[ticker] = self._rejected_counts.get(ticker, 0) + 1
-
-        # State güncelleme SADECE passed=True ise yapılmalı
-        if passed:
-            self._last_tick_time[ticker] = timestamp
-            self._last_price[ticker] = price
-
-        return QualityCheck(
-            passed=passed,
-            validity=validity,
-            score=max(0, score),
-            issues=issues,
-            metadata={
-                "ticker": ticker,
-                "price": price,
-                "volume": volume,
-                "timestamp": timestamp.isoformat(),
-            },
-        )
-
-    def check_bar(
-        self,
-        ticker: str,
-        open_: float,
+        open_price: float,
         high: float,
         low: float,
         close: float,
-        volume: int,
-    ) -> QualityCheck:
-        """OHLC bar doğrula."""
-        issues = []
-        score = 1.0
-        validity = DataValidity.VALID
+        volume: float,
+        prev_close: float,
+        timestamp: Optional[datetime] = None,
+    ) -> TradabilityMask:
+        """Hisse tradability kontrolü."""
 
-        # Negatif değerler
-        if any(v < 0 for v in [open_, high, low, close]):
-            issues.append("negative_price")
-            validity = DataValidity.INVALID
-            score -= 0.5
+        reasons = []
+        is_tradable = True
+        price_mask = 1.0
+        volume_mask = 1.0
 
-        # OHLC mantığı
-        if high < low:
-            issues.append("high_less_than_low")
-            validity = DataValidity.INVALID
-            score -= 0.5
+        # 1. Devre kesici kontrolü (BIST: ±5% gün içi, ±10% açılış)
+        if prev_close > 0:
+            daily_change = abs(close / prev_close - 1) * 100
+            if daily_change >= 9.5:  # Tavan/taban yakını
+                reasons.append(f"Tavan/taban: %{daily_change:.1f}")
+                price_mask = 0.0
+                is_tradable = False
 
-        if high < open_ or high < close:
-            issues.append("high_inconsistent")
-            score -= 0.3
+        # 2. Halt edilmiş hisse (fiyat değişmemiş ve hacim 0)
+        if volume == 0 and close == open_price and close == high and close == low:
+            reasons.append("Halt edilmiş (işlem yok)")
+            price_mask = 0.0
+            volume_mask = 0.0
+            is_tradable = False
 
-        if low > open_ or low > close:
-            issues.append("low_inconsistent")
-            score -= 0.3
+        # 3. Anormal fiyat (high < low, open > high, vb.)
+        if high < low or open_price > high or open_price < low or close > high or close < low:
+            reasons.append("Anormal fiyat yapısı")
+            price_mask = 0.0
+            is_tradable = False
 
-        if volume < 0:
-            issues.append("negative_volume")
-            validity = DataValidity.INVALID
-            score -= 0.5
+        # 4. Aşırı düşük hacim (likidite yok)
+        if volume < 1000:  # 1000 lot altı
+            reasons.append("Düşük likidite")
+            volume_mask = 0.5  # Kısmen kullan
 
-        if volume == 0:
-            issues.append("zero_volume")
-            score -= 0.1
+        # 5. Fiyat = 0 veya negatif
+        if close <= 0 or open_price <= 0 or high <= 0 or low <= 0:
+            reasons.append("Geçersiz fiyat (≤0)")
+            price_mask = 0.0
+            is_tradable = False
 
-        passed = score >= 0.5 and validity in (DataValidity.VALID,)
-        return QualityCheck(
-            passed=passed,
-            validity=validity,
-            score=max(0, score),
-            issues=issues,
+        # 6. Aşırı volatilite (tek günde %15+ hareket)
+        if prev_close > 0:
+            intraday_range = (high - low) / prev_close * 100
+            if intraday_range > 15:
+                reasons.append(f"Aşırı volatilite: %{intraday_range:.1f}")
+                price_mask = 0.3  # Kısmen kullan
+
+        mask = TradabilityMask(
+            ticker=ticker,
+            timestamp=timestamp or datetime.now(),
+            is_tradable=is_tradable,
+            reasons=reasons if reasons else ["OK"],
+            price_mask=price_mask,
+            volume_mask=volume_mask,
         )
 
-    def get_stats(self) -> Dict[str, Any]:
-        """Kalite istatistikleri."""
+        self._masks[ticker] = mask
+
+        if not is_tradable:
+            logger.warning("Tradability check failed",
+                ticker=ticker, reasons=reasons)
+
+        return mask
+
+    def apply_mask(self, features: Dict[str, Any], mask: TradabilityMask) -> Dict[str, Any]:
+        """Feature'lara mask uygula."""
+        if mask.price_mask == 0.0:
+            # Fiyat bazlı feature'ları NaN/None yap
+            price_features = ["roc_5d", "roc_20d", "momentum_20d", "rsi_14", 
+                            "macd", "macd_signal", "macd_hist", "bb_position",
+                            "stoch_k", "stoch_d", "adx", "price_vs_sma20", "price_vs_sma50"]
+            for feat in price_features:
+                if feat in features:
+                    features[feat] = None  # Mask = kullanma
+
+        if mask.volume_mask == 0.0:
+            volume_features = ["volume_zscore", "volume_trend", "obv"]
+            for feat in volume_features:
+                if feat in features:
+                    features[feat] = None
+
+        return features
+
+    def get_mask(self, ticker: str) -> Optional[TradabilityMask]:
+        """Hisse mask'ını getir."""
+        return self._masks.get(ticker)
+
+    def get_untradable_count(self) -> int:
+        """Tradable olmayan hisse sayısı."""
+        return sum(1 for m in self._masks.values() if not m.is_tradable)
+
+    def get_mask_stats(self) -> Dict[str, Any]:
+        """Mask istatistikleri."""
+        total = len(self._masks)
+        untradable = self.get_untradable_count()
         return {
-            "tracked_tickers": len(self._last_price),
-            "total_ticks_processed": sum(self._tick_counts.values()),
-            "total_rejected": sum(self._rejected_counts.values()),
-            "recent_duplicate_hashes": len(self._recent_hashes),
-            "rejected_by_ticker": dict(self._rejected_counts),
+            "total_checked": total,
+            "untradable": untradable,
+            "tradable_pct": round((total - untradable) / total * 100, 1) if total else 0,
+            "reasons_breakdown": self._get_reasons_breakdown(),
         }
 
+    def _get_reasons_breakdown(self) -> Dict[str, int]:
+        """Nedenlerin dağılımı."""
+        reasons = {}
+        for mask in self._masks.values():
+            for reason in mask.reasons:
+                if reason != "OK":
+                    reasons[reason] = reasons.get(reason, 0) + 1
+        return reasons
 
 # Singleton
-data_quality_gate = DataQualityGate()
+data_quality = DataQualityEngine()
