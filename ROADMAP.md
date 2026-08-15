@@ -302,12 +302,12 @@ Her provider için:
 
 **Dosya:** `services/ingestion/bist_universe.py`
 
-- [ ] KAP'tan canlı şirket listesi çekme (şu an var, güçlendir)
-- [ ] Sektör/alt-sektör mapping
-- [ ] Market cap bilgisi
+- [x] KAP'tan canlı şirket listesi çekme (şu an var, güçlendir)
+- [x] Sektör/alt-sektör mapping
+- [x] Market cap bilgisi
 - [ ] Likidite skoru
-- [ ] Listing status (active/suspended/delisted)
-- [ ] Otomatik günlük güncelleme
+- [x] Listing status (active/suspended/delisted)
+- [x] Otomatik günlük güncelleme
 - [ ] Survivorship bias koruması (delisted şirketler de tarihte tutulacak)
 
 #### 1.7 Data Quality Engine
@@ -318,42 +318,42 @@ Her provider için:
 - [x] Stale detection (total_seconds)
 - [x] Duplicate protection (time-windowed)
 - [x] Missing ≠ 0 ayrımı
-- [ ] Cross-source reconciliation (A kaynağı 100.20, B kaynağı 100.25 → normal; A=100.20, B=145.80 → anomali)
-- [ ] Outlier detection (Z-score > 4)
-- [ ] Data source reliability tracking
+- [x] Cross-source reconciliation (A kaynağı 100.20, B kaynağı 100.25 → normal; A=100.20, B=145.80 → anomali)
+- [x] Outlier detection (Z-score > 4)
+- [x] Data source reliability tracking
 
 #### 1.8 Trading Calendar
 
 **Dosya:** `services/core/market_calendar.py` [YENİ]
 
-- [ ] BIST işlem saatleri (10:00-18:00)
-- [ ] Hafta sonları
-- [ ] Resmi tatiller (ulusal bayramlar, dini bayramlar)
-- [ ] Yarım günler
-- [ ] Devre kesici durumları
-- [ ] Trading halt bilgisi
-- [ ] Market açık/kapalı kontrolü
+- [x] BIST işlem saatleri (10:00-18:00)
+- [x] Hafta sonları
+- [x] Resmi tatiller (ulusal bayramlar, dini bayramlar)
+- [x] Yarım günler
+- [x] Devre kesici durumları
+- [x] Trading halt bilgisi
+- [x] Market açık/kapalı kontrolü
 
 #### 1.9 Corporate Actions
 
 **Dosya:** `services/ingestion/corporate_actions.py` [YENİ]
 
-- [ ] Temettü (dividend) düzeltmesi
-- [ ] Bedelsiz sermaye artırımı (split)
-- [ ] Bedelli sermaye artırımı
-- [ ] Birleşme/devralma
-- [ ] Fiyat geçmişi düzeltmesi (geçmiş fiyatlar bölünme oranına göre düzeltilmeli)
-- [ ] Portföy pozisyon düzeltmesi
+- [x] Temettü (dividend) düzeltmesi
+- [x] Bedelsiz sermaye artırımı (split)
+- [x] Bedelli sermaye artırımı
+- [x] Birleşme/devralma
+- [x] Fiyat geçmişi düzeltmesi (geçmiş fiyatlar bölünme oranına göre düzeltilmeli)
+- [x] Portföy pozisyon düzeltmesi
 
 #### Çıkış Kriterleri
 
-- [ ] 500+ hisse için veri çekme çalışıyor
-- [ ] Provider failover test edilmiş
-- [ ] Circuit breaker çalışıyor
-- [ ] Data quality gate tüm verilerden geçiriliyor
-- [ ] Trading calendar BIST saatlerini doğru gösteriyor
-- [ ] Unit test: provider, quality gate, calendar
-- [ ] Integration test: veri çek → quality → store
+- [x] 500+ hisse için veri çekme çalışıyor
+- [x] Provider failover test edilmiş
+- [x] Circuit breaker çalışıyor
+- [x] Data quality gate tüm verilerden geçiriliyor
+- [x] Trading calendar BIST saatlerini doğru gösteriyor
+- [x] Unit test: provider, quality gate, calendar
+- [x] Integration test: veri çek → quality → store
 
 ---
 
@@ -367,18 +367,18 @@ Her provider için:
 
 Mevcut 58 feature. Eklenecekler:
 
-- [ ] Ichimoku Cloud
-- [ ] Fibonacci retracement levels
-- [ ] Volume Profile (POC, VAH, VAL)
-- [ ] VWAP (Volume Weighted Average Price)
-- [ ] Pivot Points
-- [ ] Heikin-Ashi
-- [ ] Elder Ray (Bull/Bear Power)
-- [ ] Keltner Channels
-- [ ] Donchian Channels
-- [ ] Rate of Change (ROC) çoklu periyot
-- [ ] Williams %R çoklu periyot
-- [ ] ATR çoklu periyot (5, 14, 20)
+- [x] Ichimoku Cloud
+- [x] Fibonacci retracement levels
+- [x] Volume Profile (POC, VAH, VAL)
+- [x] VWAP (Volume Weighted Average Price)
+- [x] Pivot Points
+- [x] Heikin-Ashi
+- [x] Elder Ray (Bull/Bear Power)
+- [x] Keltner Channels
+- [x] Donchian Channels
+- [x] Rate of Change (ROC) çoklu periyot
+- [x] Williams %R çoklu periyot
+- [x] ATR çoklu periyot (5, 14, 20)
 
 #### 2.2 Fundamental Feature'lar [YENİ]
 
@@ -506,14 +506,14 @@ ML Training
 
 #### Çıkış Kriterleri
 
-- [ ] 100+ feature hesaplanıyor
-- [ ] Feature store Redis/DB'de tutuluyor
-- [ ] Feature versioning çalışıyor
-- [ ] Fundamental feature'lar (P/E, ROE, vb.) hesaplanıyor
-- [ ] Macro feature'lar (USDTRY, VIX, vb.) hesaplanıyor
-- [ ] Sentiment feature'lar (news, KAP) hesaplanıyor
-- [ ] Unit test: her feature grubu için
-- [ ] Integration test: veri → feature → store
+- [x] 100+ feature hesaplanıyor
+- [x] Feature store Redis/DB'de tutuluyor
+- [x] Feature versioning çalışıyor
+- [x] Fundamental feature'lar (P/E, ROE, vb.) hesaplanıyor
+- [x] Macro feature'lar (USDTRY, VIX, vb.) hesaplanıyor
+- [x] Sentiment feature'lar (news, KAP) hesaplanıyor
+- [x] Unit test: her feature grubu için
+- [x] Integration test: veri → feature → store
 
 ---
 
@@ -527,13 +527,13 @@ ML Training
 
 Mevcut: 10 latent factor. Eklenecekler:
 
-- [ ] Global equity momentum (S&P500, DAX, Nikkei)
-- [ ] Credit conditions (CDS, spread)
-- [ ] Liquidity conditions
-- [ ] Market breadth (advance/decline ratio)
-- [ ] Sector rotation state
-- [ ] Yield curve shape (normal/inverted/flat)
-- [ ] Crypto market sentiment (risk appetite proxy)
+- [x] Global equity momentum (S&P500, DAX, Nikkei)
+- [x] Credit conditions (CDS, spread)
+- [x] Liquidity conditions
+- [x] Market breadth (advance/decline ratio)
+- [x] Sector rotation state
+- [x] Yield curve shape (normal/inverted/flat)
+- [x] Crypto market sentiment (risk appetite proxy)
 
 #### 3.2 Regime Engine (Mevcut — Genişletilecek)
 
@@ -543,11 +543,11 @@ Mevcut regime detection: basit threshold-based.
 
 Yapılacak:
 
-- [ ] Regime tespiti için feature-based (threshold değil)
-- [ ] Regime transition probability matrix
-- [ ] Regime duration tracking
-- [ ] Regime-conditioned model weights
-- [ ] Regime history (geçmiş rejim değişimleri)
+- [x] Regime tespiti için feature-based (threshold değil)
+- [x] Regime transition probability matrix
+- [x] Regime duration tracking
+- [x] Regime-conditioned model weights
+- [x] Regime history (geçmiş rejim değişimleri)
 
 Regime'ler:
 
@@ -565,10 +565,10 @@ MOMENTUM_EXPANSION / MOMENTUM_CONTRACTION
 
 Her şirket için:
 
-- [ ] USDTRY sensitivity (ithalat/ihracat bağımlılığı)
-- [ ] Faiz sensitivity (borç yapısı)
-- [ ] Emtia sensitivity (girdi maliyetleri)
-- [ ] Global market sensitivity (korelasyon)
+- [x] USDTRY sensitivity (ithalat/ihracat bağımlılığı)
+- [x] Faiz sensitivity (borç yapısı)
+- [x] Emtia sensitivity (girdi maliyetleri)
+- [x] Global market sensitivity (korelasyon)
 
 Örnek:
 ```
@@ -579,12 +579,12 @@ AKBNK: Interest rate sensitivity = HIGH (bankacılık)
 
 #### Çıkış Kriterleri
 
-- [ ] World state 15+ factor içeriyor
-- [ ] Regime detection feature-based
-- [ ] Regime değiştiğinde ağırlıklar değişiyor
-- [ ] Macro sensitivity her şirket için hesaplanmış
-- [ ] Unit test: world state, regime, sensitivity
-- [ ] Integration test: market data → world state → regime
+- [x] World state 15+ factor içeriyor
+- [x] Regime detection feature-based
+- [x] Regime değiştiğinde ağırlıklar değişiyor
+- [x] Macro sensitivity her şirket için hesaplanmış
+- [x] Unit test: world state, regime, sensitivity
+- [x] Integration test: market data → world state → regime
 
 ---
 
@@ -596,46 +596,46 @@ AKBNK: Interest rate sensitivity = HIGH (bankacılık)
 
 **Dosya:** `services/ingestion/providers/fundamental_provider.py`
 
-- [ ] KAP'tan bilanço verisi çekme
-- [ ] Gelir tablosu verisi
-- [ ] Nakit akış tablosu
-- [ ] Çeyreklik + yıllık veri
-- [ ] Point-in-time data (o tarihte bilinen versiyon)
+- [x] KAP'tan bilanço verisi çekme
+- [x] Gelir tablosu verisi
+- [x] Nakit akış tablosu
+- [x] Çeyreklik + yıllık veri
+- [x] Point-in-time data (o tarihte bilinen versiyon)
 
 #### 4.2 Gelir Analizi
 
-- [ ] Revenue (ciro)
-- [ ] Revenue Growth (yıllık, çeyreklik)
-- [ ] Revenue CAGR (3 yıllık, 5 yıllık)
-- [ ] Organic growth vs inorganic growth
+- [x] Revenue (ciro)
+- [x] Revenue Growth (yıllık, çeyreklik)
+- [x] Revenue CAGR (3 yıllık, 5 yıllık)
+- [x] Organic growth vs inorganic growth
 
 #### 4.3 Kârlılık Analizi
 
-- [ ] Gross Margin
-- [ ] EBIT Margin
-- [ ] EBITDA Margin
-- [ ] Net Margin
-- [ ] ROE (Return on Equity)
-- [ ] ROA (Return on Assets)
-- [ ] ROIC (Return on Invested Capital)
+- [x] Gross Margin
+- [x] EBIT Margin
+- [x] EBITDA Margin
+- [x] Net Margin
+- [x] ROE (Return on Equity)
+- [x] ROA (Return on Assets)
+- [x] ROIC (Return on Invested Capital)
 
 #### 4.4 Bilanço Analizi
 
-- [ ] Cash & Equivalents
-- [ ] Total Debt
-- [ ] Net Debt
-- [ ] Working Capital
-- [ ] Current Ratio
-- [ ] Debt/Equity Ratio
-- [ ] Net Debt/EBITDA
+- [x] Cash & Equivalents
+- [x] Total Debt
+- [x] Net Debt
+- [x] Working Capital
+- [x] Current Ratio
+- [x] Debt/Equity Ratio
+- [x] Net Debt/EBITDA
 
 #### 4.5 Nakit Akış Analizi
 
-- [ ] Operating Cash Flow
-- [ ] Free Cash Flow (FCF)
-- [ ] FCF Margin
-- [ ] FCF Yield
-- [ ] Cash Conversion Ratio
+- [x] Operating Cash Flow
+- [x] Free Cash Flow (FCF)
+- [x] FCF Margin
+- [x] FCF Yield
+- [x] Cash Conversion Ratio
 
 #### 4.6 Büyüme Kalitesi
 
@@ -665,21 +665,21 @@ class FundamentalTrendEngine:
 
 #### 4.8 Earnings Quality Engine
 
-- [ ] Net Income vs Cash Flow karşılaştırması
-- [ ] Receivables growth vs Revenue growth
-- [ ] Inventory changes
-- [ ] One-off gains/losses ayrımı
-- [ ] Accruals ratio
+- [x] Net Income vs Cash Flow karşılaştırması
+- [x] Receivables growth vs Revenue growth
+- [x] Inventory changes
+- [x] One-off gains/losses ayrımı
+- [x] Accruals ratio
 
 #### Çıkış Kriterleri
 
-- [ ] En az 100 şirket için finansal veri çekiliyor
-- [ ] 20+ fundamental feature hesaplanıyor
-- [ ] Trend analizi çalışıyor (accelerating/decelerating)
-- [ ] Earnings quality skoru hesaplanıyor
-- [ ] Point-in-time data korunuyor (look-ahead bias yok)
-- [ ] Unit test: her hesaplama için
-- [ ] Integration test: KAP → bilanço → feature → scoring
+- [x] En az 100 şirket için finansal veri çekiliyor
+- [x] 20+ fundamental feature hesaplanıyor
+- [x] Trend analizi çalışıyor (accelerating/decelerating)
+- [x] Earnings quality skoru hesaplanıyor
+- [x] Point-in-time data korunuyor (look-ahead bias yok)
+- [x] Unit test: her hesaplama için
+- [x] Integration test: KAP → bilanço → feature → scoring
 
 ---
 
@@ -689,13 +689,13 @@ class FundamentalTrendEngine:
 
 #### 5.1 Multiples Valuation
 
-- [ ] P/E (Price/Earnings)
-- [ ] P/B (Price/Book)
-- [ ] EV/EBITDA
-- [ ] EV/EBIT
-- [ ] EV/Sales
-- [ ] FCF Yield
-- [ ] Dividend Yield
+- [x] P/E (Price/Earnings)
+- [x] P/B (Price/Book)
+- [x] EV/EBITDA
+- [x] EV/EBIT
+- [x] EV/Sales
+- [x] FCF Yield
+- [x] Dividend Yield
 
 #### 5.2 Peer Comparison
 
@@ -772,12 +772,12 @@ Her şirket için:
 
 #### Çıkış Kriterleri
 
-- [ ] Multiples valuation hesaplanıyor
-- [ ] Peer comparison çalışıyor
-- [ ] DCF engine çalışıyor
-- [ ] Bear/Base/Bull senaryoları üretiliyor
-- [ ] Unit test: DCF, multiples, peer comparison
-- [ ] Integration test: bilanço → valuation → summary
+- [x] Multiples valuation hesaplanıyor
+- [x] Peer comparison çalışıyor
+- [x] DCF engine çalışıyor
+- [x] Bear/Base/Bull senaryoları üretiliyor
+- [x] Unit test: DCF, multiples, peer comparison
+- [x] Integration test: bilanço → valuation → summary
 
 ---
 
@@ -863,14 +863,14 @@ def compute_scenario_count(volatility, uncertainty, portfolio_size, budget):
 
 #### Çıkış Kriterleri
 
-- [ ] Monte Carlo fiyat simülasyonu çalışıyor
-- [ ] P10, P25, P50, P75, P90 hesaplanıyor
-- [ ] Olasılık dağılımları üretiliyor (P(+10%), P(-5%), vb.)
-- [ ] Portfolio-level Monte Carlo çalışıyor
-- [ ] VaR / CVaR hesaplanıyor
-- [ ] Dinamik senaryo sayısı (volatiliteye göre)
-- [ ] Unit test: Monte Carlo, probability, VaR
-- [ ] Integration test: features → Monte Carlo → probabilities
+- [x] Monte Carlo fiyat simülasyonu çalışıyor
+- [x] P10, P25, P50, P75, P90 hesaplanıyor
+- [x] Olasılık dağılımları üretiliyor (P(+10%), P(-5%), vb.)
+- [x] Portfolio-level Monte Carlo çalışıyor
+- [x] VaR / CVaR hesaplanıyor
+- [x] Dinamik senaryo sayısı (volatiliteye göre)
+- [x] Unit test: Monte Carlo, probability, VaR
+- [x] Integration test: features → Monte Carlo → probabilities
 
 ---
 
@@ -959,13 +959,13 @@ class StressTestEngine:
 
 #### Çıkış Kriterleri
 
-- [ ] Scenario engine çalışıyor (input → macro shock → portfolio impact)
-- [ ] Önceden tanımlı senaryolar (TCMB, USDTRY, BIST crash, vb.)
-- [ ] Stress test engine çalışıyor
-- [ ] Portfolio impact analizi (pozisyon bazlı etki)
-- [ ] Breaking point analizi
-- [ ] Unit test: scenario, stress test
-- [ ] Integration test: portfolio → scenario → impact
+- [x] Scenario engine çalışıyor (input → macro shock → portfolio impact)
+- [x] Önceden tanımlı senaryolar (TCMB, USDTRY, BIST crash, vb.)
+- [x] Stress test engine çalışıyor
+- [x] Portfolio impact analizi (pozisyon bazlı etki)
+- [x] Breaking point analizi
+- [x] Unit test: scenario, stress test
+- [x] Integration test: portfolio → scenario → impact
 
 ---
 
@@ -1099,15 +1099,15 @@ AGENT_TIMEOUT_SECONDS = 120
 
 #### Çıkış Kriterleri
 
-- [ ] Agent orchestrator çalışıyor
-- [ ] En az 3 agent implemente edilmiş (Research, News, Macro)
-- [ ] Agent tool system çalışıyor (erişim kontrolü)
-- [ ] AI output validation çalışıyor (hallucination detection)
-- [ ] AI fallback çalışıyor (LLM down → rule-based)
-- [ ] Prompt versioning saklanıyor
-- [ ] Agent loop control (sonsuz döngü koruması)
-- [ ] Unit test: agent, validation, orchestrator
-- [ ] Integration test: agent → LLM → validation → result
+- [x] Agent orchestrator çalışıyor
+- [x] En az 3 agent implemente edilmiş (Research, News, Macro)
+- [x] Agent tool system çalışıyor (erişim kontrolü)
+- [x] AI output validation çalışıyor (hallucination detection)
+- [x] AI fallback çalışıyor (LLM down → rule-based)
+- [x] Prompt versioning saklanıyor
+- [x] Agent loop control (sonsuz döngü koruması)
+- [x] Unit test: agent, validation, orchestrator
+- [x] Integration test: agent → LLM → validation → result
 
 ---
 
@@ -1166,13 +1166,13 @@ Risk-Adjusted Return = Expected Return / Expected Volatility
 
 #### Çıkış Kriterleri
 
-- [ ] 800+ hisse taranıyor
-- [ ] Filtreleme pipeline'ı çalışıyor
-- [ ] Opportunity score hesaplanıyor
-- [ ] Risk-adjusted ranking çalışıyor
-- [ ] Score decomposition gösteriliyor
-- [ ] Unit test: scoring, ranking
-- [ ] Integration test: features → opportunity → ranking
+- [x] 800+ hisse taranıyor
+- [x] Filtreleme pipeline'ı çalışıyor
+- [x] Opportunity score hesaplanıyor
+- [x] Risk-adjusted ranking çalışıyor
+- [x] Score decomposition gösteriliyor
+- [x] Unit test: scoring, ranking
+- [x] Integration test: features → opportunity → ranking
 
 ---
 
@@ -1186,11 +1186,11 @@ Risk-Adjusted Return = Expected Return / Expected Volatility
 
 - [x] HOLD ayrı action
 - [x] Risk veto
-- [ ] 4 karar: LONG / SHORT / HOLD / NO_TRADE
-- [ ] Rejim-conditioned weights
-- [ ] Multi-timeframe decision (kısa/orta/uzun vade ayrı)
-- [ ] Signal conflict detection (teknik BUY ama fundamental SELL)
-- [ ] Conflict resolution (hangi taraf neden ağır basıyor)
+- [x] 4 karar: LONG / SHORT / HOLD / NO_TRADE
+- [x] Rejim-conditioned weights
+- [x] Multi-timeframe decision (kısa/orta/uzun vade ayrı)
+- [x] Signal conflict detection (teknik BUY ama fundamental SELL)
+- [x] Conflict resolution (hangi taraf neden ağır basıyor)
 
 #### 10.2 Risk Engine (Mevcut — Genişletilecek)
 
@@ -1201,12 +1201,12 @@ Risk-Adjusted Return = Expected Return / Expected Volatility
 - [x] Sector concentration
 - [x] Daily loss limit
 - [x] Drawdown limit
-- [ ] Correlation risk
-- [ ] Liquidity risk
-- [ ] Volatility risk
-- [ ] Event risk (yaklaşan kritik olay var mı?)
-- [ ] Tail risk
-- [ ] Model risk (model güvenilirliği düşük mü?)
+- [x] Correlation risk
+- [x] Liquidity risk
+- [x] Volatility risk
+- [x] Event risk (yaklaşan kritik olay var mı?)
+- [x] Tail risk
+- [x] Model risk (model güvenilirliği düşük mü?)
 
 #### 10.3 Position Sizing
 
@@ -1249,13 +1249,13 @@ Event Risk       +12
 
 #### Çıkış Kriterleri
 
-- [ ] 4 karar destekleniyor (LONG/SHORT/HOLD/NO_TRADE)
-- [ ] Risk engine 8+ kontrol yapıyor
-- [ ] Position sizing çalışıyor
-- [ ] Risk explainability gösteriliyor
-- [ ] Signal conflict detection çalışıyor
-- [ ] Unit test: decision, risk, position sizing
-- [ ] Integration test: signal → decision → risk → size
+- [x] 4 karar destekleniyor (LONG/SHORT/HOLD/NO_TRADE)
+- [x] Risk engine 8+ kontrol yapıyor
+- [x] Position sizing çalışıyor
+- [x] Risk explainability gösteriliyor
+- [x] Signal conflict detection çalışıyor
+- [x] Unit test: decision, risk, position sizing
+- [x] Integration test: signal → decision → risk → size
 
 ---
 
@@ -1342,13 +1342,13 @@ Remaining: 0
 
 #### Çıkış Kriterleri
 
-- [ ] Order lifecycle (CREATED → FILLED) çalışıyor
-- [ ] Execution simulator spread/slippage uyguluyor
-- [ ] Transaction cost model gerçekçi
-- [ ] Partial fill destekleniyor
-- [ ] Commission model (broker + BIST + BSMV)
-- [ ] Unit test: order, execution, slippage, commission
-- [ ] Integration test: decision → order → execution → fill
+- [x] Order lifecycle (CREATED → FILLED) çalışıyor
+- [x] Execution simulator spread/slippage uyguluyor
+- [x] Transaction cost model gerçekçi
+- [x] Partial fill destekleniyor
+- [x] Commission model (broker + BIST + BSMV)
+- [x] Unit test: order, execution, slippage, commission
+- [x] Integration test: decision → order → execution → fill
 
 ---
 
@@ -1364,11 +1364,11 @@ Remaining: 0
 - [x] Oversell protection
 - [x] Atomik transaction
 - [x] Commission model
-- [ ] Multi-currency support (TRY, USD, EUR)
-- [ ] FX conversion
-- [ ] Tax model (stopaj, BSMV)
-- [ ] Dividend handling
-- [ ] Corporate action adjustment
+- [x] Multi-currency support (TRY, USD, EUR)
+- [x] FX conversion
+- [x] Tax model (stopaj, BSMV)
+- [x] Dividend handling
+- [x] Corporate action adjustment
 
 #### 12.2 Portfolio Ledger
 
@@ -1408,18 +1408,18 @@ class ReconciliationEngine:
 
 #### 12.4 Performance Metrics
 
-- [ ] Total Return
-- [ ] CAGR
-- [ ] Sharpe Ratio
-- [ ] Sortino Ratio
-- [ ] Calmar Ratio
-- [ ] Max Drawdown
-- [ ] Win Rate
-- [ ] Profit Factor
-- [ ] Average Win / Average Loss
-- [ ] Expectancy
-- [ ] Turnover
-- [ ] Exposure
+- [x] Total Return
+- [x] CAGR
+- [x] Sharpe Ratio
+- [x] Sortino Ratio
+- [x] Calmar Ratio
+- [x] Max Drawdown
+- [x] Win Rate
+- [x] Profit Factor
+- [x] Average Win / Average Loss
+- [x] Expectancy
+- [x] Turnover
+- [x] Exposure
 
 #### 12.5 Benchmark Comparison
 
@@ -1453,13 +1453,13 @@ class AttributionEngine:
 
 #### Çıkış Kriterleri
 
-- [ ] Portfolio ledger immutable
-- [ ] Reconciliation engine çalışıyor
-- [ ] Performance metrics hesaplanıyor (Sharpe, Sortino, vb.)
-- [ ] Benchmark comparison çalışıyor
-- [ ] Performance attribution çalışıyor
-- [ ] Unit test: ledger, reconciliation, metrics
-- [ ] Integration test: fill → ledger → reconciliation → metrics
+- [x] Portfolio ledger immutable
+- [x] Reconciliation engine çalışıyor
+- [x] Performance metrics hesaplanıyor (Sharpe, Sortino, vb.)
+- [x] Benchmark comparison çalışıyor
+- [x] Performance attribution çalışıyor
+- [x] Unit test: ledger, reconciliation, metrics
+- [x] Integration test: fill → ledger → reconciliation → metrics
 
 ---
 
@@ -1633,17 +1633,17 @@ ROLLBACK / RETIRE
 
 #### Çıkış Kriterleri
 
-- [ ] Backtest engine çalışıyor
-- [ ] Walk-forward validation çalışıyor
-- [ ] Backtest metrics hesaplanıyor (Sharpe, Sortino, vb.)
-- [ ] No look-ahead bias doğrulanmış
+- [x] Backtest engine çalışıyor
+- [x] Walk-forward validation çalışıyor
+- [x] Backtest metrics hesaplanıyor (Sharpe, Sortino, vb.)
+- [x] No look-ahead bias doğrulanmış
 - [ ] Point-in-time data korunuyor
-- [ ] Golden datasets oluşturulmuş
-- [ ] Learning engine prediction/outcome kaydediyor
-- [ ] Model evaluation çalışıyor
-- [ ] Drift detection çalışıyor
-- [ ] Unit test: backtest, walk-forward, learning, drift
-- [ ] Integration test: strategy → backtest → metrics → learning
+- [x] Golden datasets oluşturulmuş
+- [x] Learning engine prediction/outcome kaydediyor
+- [x] Model evaluation çalışıyor
+- [x] Drift detection çalışıyor
+- [x] Unit test: backtest, walk-forward, learning, drift
+- [x] Integration test: strategy → backtest → metrics → learning
 
 ---
 
@@ -1699,10 +1699,10 @@ GET  /api/system/health
 
 #### 14.4 Observability
 
-- [ ] Structured logging (JSON)
+- [x] Structured logging (JSON)
 - [ ] Prometheus metrics
 - [ ] Distributed tracing (correlation_id)
-- [ ] Alert system (critical events)
+- [x] Alert system (critical events)
 - [ ] Cost monitoring (LLM token usage)
 
 #### 14.5 Testing Pyramid
@@ -1720,14 +1720,14 @@ Security       → unauthorized access, injection
 
 #### 14.6 Production Hardening
 
-- [ ] Docker deterministic build
-- [ ] Healthcheck'ler
-- [ ] Graceful shutdown
+- [x] Docker deterministic build
+- [x] Healthcheck'ler
+- [x] Graceful shutdown
 - [ ] Migration sistemi
-- [ ] CI/CD pipeline
+- [x] CI/CD pipeline
 - [ ] Secret management
-- [ ] Rate limiting
-- [ ] Input validation
+- [x] Rate limiting
+- [x] Input validation
 
 #### Çıkış Kriterleri
 
@@ -2071,10 +2071,10 @@ Company ↔ Event (KAP, haber)
 Company ↔ Macro Event
 ```
 
-- [ ] PostgreSQL `knowledge_entities` + `knowledge_relations` tabloları (schema'da mevcut)
-- [ ] pgvector ile entity embedding'leri
-- [ ] Entity extraction (NER) — şirket, kişi, kurum, ülke, emtia tanıma
-- [ ] İlişki gücü scoring (strength)
+- [x] PostgreSQL `knowledge_entities` + `knowledge_relations` tabloları (schema'da mevcut)
+- [x] pgvector ile entity embedding'leri
+- [x] Entity extraction (NER) — şirket, kişi, kurum, ülke, emtia tanıma
+- [x] İlişki gücü scoring (strength)
 - [ ] "Petrol yükseldi → Energy sector → TUPRS cost impact" gibi zincirleme
 
 ---

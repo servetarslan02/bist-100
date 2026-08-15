@@ -55,6 +55,9 @@ class FeatureCalculator:
         # === Price Pattern Features ===
         features.update(self._compute_price_patterns(close, high, low, open_))
 
+        # === Volume Profile ===
+        features.update(self._compute_volume_profile(close, volume, high, low))
+
         # NaN ve Inf değerleri temizle
         import math
         cleaned = {}
@@ -357,6 +360,73 @@ class FeatureCalculator:
     # =====================================================
     # Helper Functions
     # =====================================================
+
+
+    def _compute_volume_profile(self, close: np.ndarray, volume: np.ndarray, high: np.ndarray, low: np.ndarray) -> Dict[str, float]:
+        """Volume Profile (POC, VAH, VAL)."""
+        features = {}
+        n = len(close)
+        if n < 20:
+            return features
+
+        # Price range
+        price_min = np.min(low[-20:])
+        price_max = np.max(high[-20:])
+        price_range = price_max - price_min
+
+        if price_range <= 0:
+            return features
+
+        # Create price bins
+        n_bins = 20
+        bin_size = price_range / n_bins
+        volume_at_price = np.zeros(n_bins)
+
+        for i in range(-20, 0):
+            bin_idx = int((close[i] - price_min) / bin_size)
+            bin_idx = max(0, min(n_bins - 1, bin_idx))
+            volume_at_price[bin_idx] += volume[i]
+
+        # POC (Point of Control): price level with highest volume
+        poc_idx = np.argmax(volume_at_price)
+        poc = price_min + (poc_idx + 0.5) * bin_size
+        features["volume_profile_poc"] = round(float(poc), 2)
+
+        # VAH (Value Area High) and VAL (Value Area Low)
+        # Value area = 70% of total volume
+        total_volume = np.sum(volume_at_price)
+        target_volume = total_volume * 0.70
+
+        # Start from POC and expand outward
+        cumulative = volume_at_price[poc_idx]
+        low_idx = poc_idx
+        high_idx = poc_idx
+
+        while cumulative < target_volume and (low_idx > 0 or high_idx < n_bins - 1):
+            expand_low = volume_at_price[low_idx - 1] if low_idx > 0 else 0
+            expand_high = volume_at_price[high_idx + 1] if high_idx < n_bins - 1 else 0
+
+            if expand_low >= expand_high and low_idx > 0:
+                low_idx -= 1
+                cumulative += volume_at_price[low_idx]
+            elif high_idx < n_bins - 1:
+                high_idx += 1
+                cumulative += volume_at_price[high_idx]
+            else:
+                break
+
+        features["volume_profile_val"] = round(float(price_min + (low_idx + 0.5) * bin_size), 2)
+        features["volume_profile_vah"] = round(float(price_min + (high_idx + 0.5) * bin_size), 2)
+
+        # Price relative to value area
+        if close[-1] > features.get("volume_profile_vah", 0):
+            features["above_value_area"] = 1.0
+        elif close[-1] < features.get("volume_profile_val", 0):
+            features["below_value_area"] = 1.0
+        else:
+            features["in_value_area"] = 1.0
+
+        return features
 
     def _rsi(self, close: np.ndarray, period: int = 14) -> float:
         """Calculate RSI — Wilder's Smoothing (canonical)."""
