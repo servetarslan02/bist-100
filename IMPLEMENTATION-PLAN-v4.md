@@ -4,7 +4,7 @@
 
 | Kategori | Durum |
 |----------|-------|
-| Toplam modül | **104** (düzeltildi: 87 değildi) |
+| Toplam modül | **104** (doğrulandı) |
 | Bölüm 1-8 ile ilişkili | ~60 modül |
 | Planlanan | ~40 modül |
 | **EKSİK** | **43 modül** |
@@ -15,7 +15,7 @@
 
 ## AŞAMA 1: Tüm 104 Modülü Doğrula
 
-### Katman 1: Core (17 modül)
+### Katman 1: Core (21 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
@@ -51,7 +51,7 @@
 
 ---
 
-### Katman 2: Data Providers (15 modül)
+### Katman 2: Data Providers (19 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
@@ -117,7 +117,7 @@
 
 ---
 
-### Katman 4: Intelligence (17 modül)
+### Katman 4: Intelligence (20 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
@@ -153,7 +153,7 @@
 
 ---
 
-### Katman 5: Risk & Portfolio (5 modül)
+### Katman 5: Risk & Portfolio (6 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
@@ -171,7 +171,7 @@
 
 ---
 
-### Katman 6: Learning (5 modül)
+### Katman 6: Learning (6 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
@@ -190,6 +190,24 @@
 |---|-------|-------|-------|-------|
 | 7.1 | Ranking Model | `ml/ranking_model.py` | 4 | ✅ |
 | 7.2 | **ML Main** | - | - | ❌ Yok |
+
+---
+
+### Katman 7b: Backtest (3 modül)
+
+| # | Modül | Dosya | Bölüm | Durum |
+|---|-------|-------|-------|-------|
+| 7b.1 | Backtest Engine | `backtest/engine.py` | 13 | ✅ |
+| 7b.2 | Walk-Forward | `backtest/walk_forward.py` | 13 | ✅ |
+| 7b.3 | Enhanced Walk-Forward | `backtest/enhanced_walk_forward.py` | 13 | ✅ |
+
+---
+
+### Katman 7c: Agents (1 modül)
+
+| # | Modül | Dosya | Bölüm | Durum |
+|---|-------|-------|-------|-------|
+| 7c.1 | Agent System | `agents/agent_system.py` | 16 | ✅ |
 
 ---
 
