@@ -4,10 +4,10 @@
 
 | Kategori | Durum |
 |----------|-------|
-| Toplam modül | **104** (doğrulandı) |
-| Bölüm 1-8 ile ilişkili | ~60 modül |
-| Planlanan | ~40 modül |
-| **EKSİK** | **43 modül** |
+| Toplam mevcut modül | **104** (doğrulandı, HEPSİ MEVCUT) |
+| Bölüm 1-8 ile ilişkili | 61 modül (✅ ile işaretli) |
+| Bölüm 1-8 ile ilişkisiz | 43 modül (mevcut ama bölümde yok) |
+| Yeni yazılacak (B23-32) | **49 modül** |
 | Test dosyaları | ❌ Hiç yok |
 | Entegrasyon testleri | ❌ Yapılmamış |
 
@@ -34,12 +34,12 @@
 | 1.13 | Observability | `core/observability.py` | 22 | ✅ |
 | 1.14 | Recovery | `core/recovery.py` | 21 | ✅ |
 | 1.15 | State Recovery | `core/state_recovery.py` | 21 | ✅ |
-| 1.16 | **Config** | `core/config.py` | - | ❌ Planlanmamış |
-| 1.17 | **Models** | `core/models.py` | - | ❌ Planlanmamış |
-| 1.18 | **Event Schema** | `core/event_schema.py` | - | ❌ Planlanmamış |
-| 1.19 | **Logging** | `core/logging.py` | - | ❌ Planlanmamış |
-| 1.20 | **Database** | `core/database.py` | - | ❌ Planlanmamış |
-| 1.21 | **Database Dev** | `core/database_dev.py` | - | ❌ Planlanmamış |
+| 1.16 | **Config** | `core/config.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
+| 1.17 | **Models** | `core/models.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
+| 1.18 | **Event Schema** | `core/event_schema.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
+| 1.19 | **Logging** | `core/logging.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
+| 1.20 | **Database** | `core/database.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
+| 1.21 | **Database Dev** | `core/database_dev.py` | - | ⚠️ Mevcut, bölümde kapsanmamış |
 
 **Eksik açıklamaları:**
 - `config.py`: Sistem konfigürasyonu (env, settings)
@@ -63,17 +63,17 @@
 | 2.6 | Fundamental Provider | `ingestion/providers/fundamental_provider.py` | 1,5 | ✅ |
 | 2.7 | Corporate Actions | `ingestion/corporate_actions.py` | 1 | ✅ |
 | 2.8 | Data Validator | `ingestion/providers/data_validator.py` | 2 | ✅ |
-| 2.9 | **BIST Provider** | `ingestion/providers/bist_provider.py` | - | ❌ |
-| 2.10 | **BIST Stream** | `ingestion/providers/bist_stream.py` | - | ❌ |
-| 2.11 | **Macro Provider** | `ingestion/providers/macro_provider.py` | - | ❌ |
-| 2.12 | **Matriks Provider** | `ingestion/providers/matriks_provider.py` | - | ❌ |
-| 2.13 | **News Credibility** | `ingestion/providers/news_credibility.py` | - | ❌ |
-| 2.14 | **Provider Manager** | `ingestion/providers/provider_manager.py` | - | ❌ |
-| 2.15 | **Realtime Provider** | `ingestion/providers/realtime_provider.py` | - | ❌ |
-| 2.16 | **Realtime** | `ingestion/realtime.py` | - | ❌ |
-| 2.17 | **BIST Universe** | `ingestion/bist_universe.py` | - | ❌ |
+| 2.9 | **BIST Provider** | `ingestion/providers/bist_provider.py` | - | ⚠️ Mevcut |
+| 2.10 | **BIST Stream** | `ingestion/providers/bist_stream.py` | - | ⚠️ Mevcut |
+| 2.11 | **Macro Provider** | `ingestion/providers/macro_provider.py` | - | ⚠️ Mevcut |
+| 2.12 | **Matriks Provider** | `ingestion/providers/matriks_provider.py` | - | ⚠️ Mevcut |
+| 2.13 | **News Credibility** | `ingestion/providers/news_credibility.py` | - | ⚠️ Mevcut |
+| 2.14 | **Provider Manager** | `ingestion/providers/provider_manager.py` | - | ⚠️ Mevcut |
+| 2.15 | **Realtime Provider** | `ingestion/providers/realtime_provider.py` | - | ⚠️ Mevcut |
+| 2.16 | **Realtime** | `ingestion/realtime.py` | - | ⚠️ Mevcut |
+| 2.17 | **BIST Universe** | `ingestion/bist_universe.py` | - | ⚠️ Mevcut |
 | 2.18 | **Universe Enhancements** | `ingestion/universe_enhancements.py` | 4 | ✅ |
-| 2.19 | **Ingestion Main** | `ingestion/main.py` | - | ❌ |
+| 2.19 | **Ingestion Main** | `ingestion/main.py` | - | ⚠️ Mevcut |
 
 **Eksik açıklamaları:**
 - `bist_provider.py`: BIST'ten doğrudan veri çekme
@@ -98,13 +98,13 @@
 | 3.3 | Sentiment Features | `features/sentiment.py` | 6 | ✅ |
 | 3.4 | Cross-Sectional | `features/cross_sectional.py` | 3 | ✅ |
 | 3.5 | Macro Features | `features/macro.py` | 3 | ✅ |
-| 3.6 | **Bar Engine** | `features/bar_engine.py` | - | ❌ |
-| 3.7 | **Calculator** | `features/calculator.py` | - | ❌ |
-| 3.8 | **Discovery** | `features/discovery.py` | - | ❌ |
-| 3.9 | **Extended Indicators** | `features/extended_indicators.py` | - | ❌ |
-| 3.10 | **Incremental State** | `features/incremental_state.py` | - | ❌ |
-| 3.11 | **Store** | `features/store.py` | - | ❌ |
-| 3.12 | **Features Main** | `features/main.py` | - | ❌ |
+| 3.6 | **Bar Engine** | `features/bar_engine.py` | - | ⚠️ Mevcut |
+| 3.7 | **Calculator** | `features/calculator.py` | - | ⚠️ Mevcut |
+| 3.8 | **Discovery** | `features/discovery.py` | - | ⚠️ Mevcut |
+| 3.9 | **Extended Indicators** | `features/extended_indicators.py` | - | ⚠️ Mevcut |
+| 3.10 | **Incremental State** | `features/incremental_state.py` | - | ⚠️ Mevcut |
+| 3.11 | **Store** | `features/store.py` | - | ⚠️ Mevcut |
+| 3.12 | **Features Main** | `features/main.py` | - | ⚠️ Mevcut |
 
 **Eksik açıklamaları:**
 - `bar_engine.py`: OHLCV bar oluşturma (time-based, tick-based, volume-based)
@@ -134,13 +134,13 @@
 | 4.11 | Knowledge Graph | `intelligence/knowledge_graph.py` | 17 | ✅ |
 | 4.12 | Research Memory | `intelligence/research_memory.py` | 17 | ✅ |
 | 4.13 | Evidence Engine | `intelligence/evidence_engine.py` | 18 | ✅ |
-| 4.14 | **Analysis Engines** | `intelligence/analysis_engines.py` | - | ❌ |
-| 4.15 | **Impact Engine** | `intelligence/impact_engine.py` | - | ❌ |
-| 4.16 | **Macro Sensitivity** | `intelligence/macro_sensitivity.py` | - | ❌ |
-| 4.17 | **News Pipeline** | `intelligence/news_pipeline.py` | - | ❌ |
-| 4.18 | **Spec Engine** | `intelligence/spec_engine.py` | - | ❌ |
-| 4.19 | **Trade Planner** | `intelligence/trade_planner.py` | - | ❌ |
-| 4.20 | **Intelligence Main** | `intelligence/main.py` | - | ❌ |
+| 4.14 | **Analysis Engines** | `intelligence/analysis_engines.py` | - | ⚠️ Mevcut |
+| 4.15 | **Impact Engine** | `intelligence/impact_engine.py` | - | ⚠️ Mevcut |
+| 4.16 | **Macro Sensitivity** | `intelligence/macro_sensitivity.py` | - | ⚠️ Mevcut |
+| 4.17 | **News Pipeline** | `intelligence/news_pipeline.py` | - | ⚠️ Mevcut |
+| 4.18 | **Spec Engine** | `intelligence/spec_engine.py` | - | ⚠️ Mevcut |
+| 4.19 | **Trade Planner** | `intelligence/trade_planner.py` | - | ⚠️ Mevcut |
+| 4.20 | **Intelligence Main** | `intelligence/main.py` | - | ⚠️ Mevcut |
 
 **Eksik açıklamaları:**
 - `analysis_engines.py`: Çoklu analiz motoru orkestratörü
@@ -160,9 +160,9 @@
 | 5.1 | Enhanced Risk | `risk/enhanced_risk.py` | 10-11 | ✅ |
 | 5.2 | Position Sizing | `risk/position_sizing.py` | 10 | ✅ |
 | 5.3 | Portfolio Main | `portfolio/main.py` | 11 | ✅ |
-| 5.4 | **Portfolio Enhancements** | `portfolio/enhancements.py` | 1 | ❌ |
-| 5.5 | **Risk Main** | `risk/main.py` | - | ❌ |
-| 5.6 | **Risk Reconciliation** | `risk/reconciliation.py` | - | ❌ |
+| 5.4 | **Portfolio Enhancements** | `portfolio/enhancements.py` | 1 | ⚠️ Mevcut, bölümde kapsanmamış |
+| 5.5 | **Risk Main** | `risk/main.py` | - | ⚠️ Mevcut |
+| 5.6 | **Risk Reconciliation** | `risk/reconciliation.py` | - | ⚠️ Mevcut |
 
 **Eksik açıklamaları:**
 - `portfolio/enhancements.py`: Multi-currency, FX impact (Bölüm 1'de var ama planda eksik)
@@ -177,19 +177,19 @@
 |---|-------|-------|-------|-------|
 | 6.1 | Integrated Learning | `learning/integrated_learning.py` | 15 | ✅ |
 | 6.2 | Outcome Tracker | `learning/outcome_tracker.py` | 15 | ✅ |
-| 6.3 | **Attribution** | `learning/attribution.py` | - | ❌ |
-| 6.4 | **Learning Loop** | `learning/learning_loop.py` | - | ❌ |
-| 6.5 | **Learning Main** | `learning/main.py` | - | ❌ |
-| 6.6 | **Label Generator** | `labels/generator.py` | - | ❌ |
+| 6.3 | **Attribution** | `learning/attribution.py` | - | ⚠️ Mevcut |
+| 6.4 | **Learning Loop** | `learning/learning_loop.py` | - | ⚠️ Mevcut |
+| 6.5 | **Learning Main** | `learning/main.py` | - | ⚠️ Mevcut |
+| 6.6 | **Label Generator** | `labels/generator.py` | - | ⚠️ Mevcut |
 
 ---
 
-### Katman 7: ML (2 modül)
+### Katman 7: ML (1 modül)
 
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
 | 7.1 | Ranking Model | `ml/ranking_model.py` | 4 | ✅ |
-| 7.2 | **ML Main** | - | - | ❌ Yok |
+| 7.2 | **ML Main** | - | - | ⚠️ Mevcut Yok |
 
 ---
 
@@ -211,7 +211,7 @@
 
 ---
 
-### Katman 8: Scanner (7 modül) — HİÇ PLANLANMAMIŞ
+### Katman 8: Scanner (7 modül) — Mevcut, bölümde kapsanmamış
 
 | # | Modül | Dosya | Açıklama |
 |---|-------|-------|----------|
@@ -225,7 +225,7 @@
 
 ---
 
-### Katman 9: Scheduler (2 modül) — HİÇ PLANLANMAMIŞ
+### Katman 9: Scheduler (2 modül) — Mevcut, bölümde kapsanmamış
 
 | # | Modül | Dosya | Açıklama |
 |---|-------|-------|----------|
@@ -239,11 +239,11 @@
 | # | Modül | Dosya | Bölüm | Durum |
 |---|-------|-------|-------|-------|
 | 10.1 | Execution Simulator | `simulation/execution_simulator.py` | 14 | ✅ |
-| 10.2 | **Simulation Main** | `simulation/main.py` | - | ❌ |
+| 10.2 | **Simulation Main** | `simulation/main.py` | - | ⚠️ Mevcut |
 
 ---
 
-### Katman 11: API (3 modül) — HİÇ PLANLANMAMIŞ
+### Katman 11: API (3 modül) — Mevcut, bölümde kapsanmamış
 
 | # | Modül | Dosya | Açıklama |
 |---|-------|-------|----------|
@@ -253,7 +253,7 @@
 
 ---
 
-### Katman 12: Market State (1 modül) — HİÇ PLANLANMAMIŞ
+### Katman 12: Market State (1 modül) — Mevcut, bölümde kapsanmamış
 
 | # | Modül | Dosya | Açıklama |
 |---|-------|-------|----------|
@@ -341,11 +341,11 @@ for mod in modules:
 
 ## AŞAMA 4: Test Yazma (Tüm modüller)
 
-### Test dosyaları (43 yeni + mevcut):
+### Test dosyaları (104 modül + 5 entegrasyon = 109 test):
 
 ```
 tests/
-├── test_core/                    # 17 modül
+├── test_core/                    # 21 modül
 │   ├── test_market_calendar.py
 │   ├── test_data_quality.py
 │   ├── test_tradability_mask.py
@@ -362,15 +362,33 @@ tests/
 │   ├── test_config.py
 │   ├── test_models.py
 │   ├── test_database.py
-│   └── test_logging.py
-├── test_ingestion/               # 15 modül
+│   ├── test_database_dev.py
+│   ├── test_event_schema.py
+│   ├── test_logging.py
+│   ├── test_recovery.py
+│   └── test_state_recovery.py
+├── test_ingestion/               # 19 modül
 │   ├── test_providers.py
 │   ├── test_bist_provider.py
+│   ├── test_bist_stream.py
 │   ├── test_kap_provider.py
 │   ├── test_news_provider.py
+│   ├── test_news_credibility.py
 │   ├── test_provider_manager.py
 │   ├── test_universe.py
-│   └── test_realtime.py
+│   ├── test_universe_enhancements.py
+│   ├── test_bist_universe.py
+│   ├── test_corporate_actions.py
+│   ├── test_data_validator.py
+│   ├── test_fundamental_provider.py
+│   ├── test_macro_provider.py
+│   ├── test_matriks_provider.py
+│   ├── test_realtime.py
+│   ├── test_realtime_provider.py
+│   ├── test_social_provider.py
+│   ├── test_tcmb_provider.py
+│   ├── test_yfinance_provider.py
+│   └── test_ingestion_main.py
 ├── test_features/                # 12 modül
 │   ├── test_seven_motors.py
 │   ├── test_fundamental.py
@@ -380,11 +398,15 @@ tests/
 │   ├── test_calculator.py
 │   ├── test_discovery.py
 │   ├── test_extended_indicators.py
-│   └── test_store.py
-├── test_intelligence/            # 17 modül
+│   ├── test_incremental_state.py
+│   ├── test_macro.py
+│   ├── test_store.py
+│   └── test_features_main.py
+├── test_intelligence/            # 20 modül
 │   ├── test_regime.py
 │   ├── test_factor_engine.py
 │   ├── test_valuation.py
+│   ├── test_valuation_engine.py
 │   ├── test_forecasting.py
 │   ├── test_probability.py
 │   ├── test_signal_fusion.py
@@ -396,35 +418,58 @@ tests/
 │   ├── test_evidence_engine.py
 │   ├── test_analysis_engines.py
 │   ├── test_impact_engine.py
+│   ├── test_kap_extractor.py
+│   ├── test_macro_sensitivity.py
 │   ├── test_news_pipeline.py
-│   └── test_trade_planner.py
-├── test_risk/                    # 3 modül
+│   ├── test_spec_engine.py
+│   ├── test_trade_planner.py
+│   └── test_intelligence_main.py
+├── test_risk/                    # 4 modül
 │   ├── test_enhanced_risk.py
 │   ├── test_position_sizing.py
-│   └── test_risk_main.py
+│   ├── test_risk_main.py
+│   └── test_risk_reconciliation.py
 ├── test_portfolio/               # 2 modül
 │   ├── test_portfolio_main.py
 │   └── test_enhancements.py
-├── test_learning/                # 5 modül
+├── test_learning/                # 6 modül
 │   ├── test_integrated_learning.py
 │   ├── test_outcome_tracker.py
 │   ├── test_attribution.py
-│   └── test_learning_loop.py
+│   ├── test_learning_loop.py
+│   ├── test_learning_main.py
+│   └── test_learning_service.py
+├── test_labels/                  # 1 modül
+│   └── test_generator.py
 ├── test_ml/                      # 1 modül
 │   └── test_ranking_model.py
+├── test_backtest/                # 3 modül
+│   ├── test_backtest_engine.py
+│   ├── test_walk_forward.py
+│   └── test_enhanced_walk_forward.py
+├── test_agents/                  # 1 modül
+│   └── test_agent_system.py
 ├── test_scanner/                 # 7 modül
 │   ├── test_alpha_engine.py
 │   ├── test_alpha_scanner.py
+│   ├── test_event_queue.py
 │   ├── test_event_scanner.py
 │   ├── test_live_scanner.py
-│   └── test_opportunity_engine.py
+│   ├── test_opportunity_engine.py
+│   └── test_tiered_scanner.py
+├── test_scheduler/               # 2 modül
+│   ├── test_daily_report.py
+│   └── test_scheduler_main.py
 ├── test_simulation/              # 2 modül
 │   ├── test_execution_simulator.py
 │   └── test_simulation_main.py
 ├── test_api/                     # 3 modül
 │   ├── test_api_main.py
+│   ├── test_api_server.py
 │   └── test_websocket.py
-└── test_integration/             # Entegrasyon
+├── test_market_state/            # 1 modül
+│   └── test_market_state_main.py
+└── test_integration/             # 5 entegrasyon
     ├── test_data_to_feature.py
     ├── test_feature_to_intelligence.py
     ├── test_intelligence_to_risk.py
@@ -457,6 +502,6 @@ tests/
 - [ ] 12 kod örneği beklenen çıktıyı üretiyor
 - [ ] 10 entegrasyon zinciri çalışıyor
 - [ ] 43 eksik modül açıklanmış (Grup A: mevcut, Grup B: yeni)
-- [ ] 50+ test dosyası yazıl
+- [ ] 104 test dosyası yazıl (her modül için 1 test)
 - [ ] `pytest` ile tüm testler geçiyor
 - [ ] `run_system.py` sorunsuz çalışıyor
