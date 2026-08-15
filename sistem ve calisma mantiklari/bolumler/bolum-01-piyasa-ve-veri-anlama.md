@@ -1,201 +1,143 @@
 # Bölüm 1 — Piyasa ve Veri Anlama
 
-## Amaç
+## Ana amaç
 
-Sistemin analiz yapmadan önce piyasadaki gerçek durumu eksiksiz ve güncel şekilde toplaması.
+Sistem herhangi bir hisseyi analiz etmeye başlamadan önce piyasanın o anki gerçek fotoğrafını çıkaracak.
 
-## Çalışma Mantığı
+Buradaki bölümün görevi hisse seçmek değil; sonraki bütün motorlara güvenilir ve anlamlandırılmış bir piyasa ortamı sağlamaktır.
+
+---
+
+## 1. Kullanılacak veri kaynakları
+
+Sistem mümkün olduğunca şu kaynakları birlikte kullanacak:
+
+- **Fiyat/OHLCV:** Açılış, yüksek, düşük, kapanış, hacim
+- **Endeksler:** BIST100, BIST30, sektör endeksleri vb.
+- **Şirket finansalları:** Bilanço, gelir tablosu, nakit akışı
+- **KAP:** Özel durum açıklamaları ve şirket bildirimleri
+- **Haberler:** Şirket, sektör ve ekonomi haberleri
+- **Sosyal medya:** Yatırımcı ilgisi ve sentiment
+- **Makro veriler:** Faiz, enflasyon, döviz, CDS, emtia vb.
+- **Sektör verileri:** Sektör performansı ve gelişmeleri
+- **Corporate actions:** Temettü, bölünme, bedelsiz, sermaye artırımı
+- **Trading calendar:** Seans, tatil ve piyasa açık/kapalı bilgisi
+- **FX:** TRY/USD/EUR gibi kur verileri
+
+---
+
+## 2. Sistem bunları ayrı ayrı toplamakla kalmayacak
+
+Veriler zaman damgasıyla sisteme girecek.
+
+Örneğin:
+
+- BIST100 → -%1.8
+- Bankacılık → -%2.7
+- USD/TRY → +%0.8
+- Faiz → yüksek
+- Sektör sentiment → negatif
+- Hisse X → -%3.2
+- Hisse X hacim → yüksek
+
+Sistem bunları birlikte değerlendirerek:
+
+> "Bugünkü piyasa ortamı risk-off, bankacılık sektörü piyasadan daha zayıf ve döviz hareketi yüksek."
+
+gibi yapısal piyasa durumu oluşturacak.
+
+---
+
+## 3. Veriler birbirini nasıl etkileyecek?
+
+Önemli nokta bu.
+
+Örneğin:
 
 ```
-Veri kaynakları → Veri toplama → Normalleştirme → Zaman/piyasa kontrolü → Veri birleştirme → Son güncel piyasa görünümü
+Makro ↓ Sektör ↓ Şirket ↓ Hisse
 ```
 
-## Temel Prensip
+ve:
 
-Bu bölüm **yorum yapmaz** ve **hisse önermez**.
+```
+Haber + KAP ↓ Şirket olayı ↓ Hisse üzerindeki potansiyel etki
+```
 
-Sadece şu sorunun cevabını oluşturur:
+ve:
 
-> "Şu anda piyasada ne oluyor ve elimizde hangi güvenilir bilgiler var?"
+```
+BIST100 + Sektör Endeksi + Hisse ↓ Relative Strength
+```
 
-Bu çıktıyı sonraki Piyasa Analizi, Hisse Keşfi, Fundamental Analiz, Haber Analizi, Tahmin ve Risk bölümleri kullanır.
+şeklinde ilişkiler kurulacak.
 
----
-
-## 1. Market Data
-
-**Amaç:** Hisse/fon fiyatı, OHLCV, hacim, endeks ve volatilite gibi piyasa verilerini toplar.
-
-**Kaynak:** yfinance (15dk gecikmeli), gelecekte Matriks/İş Yatırım
-
-**Veri:**
-- OHLCV (Açılış, Yüksek, Düşük, Kapanış, Hacim)
-- Endeks verileri (BIST100, BIST30, sektör endeksleri)
-- Volatilite (VIX, ATR, realized vol)
-
-**Durum:** ✅ Çalışıyor (472 hisse, batch download)
-
-**Dosya:** `services/ingestion/providers/yfinance_provider.py`
+Yani sistem her veriyi bağımsız kolon olarak saklayıp bırakmayacak.
 
 ---
 
-## 2. Fundamental Data
+## 4. Zaman boyutu
 
-**Amaç:** Şirketlerin bilanço, gelir tablosu, nakit akışı, borç, kârlılık ve büyüme verilerini toplar.
+Her veri:
 
-**Kaynak:** yfinance (company info), gelecekte KAP finansal raporlar
+- Ne zaman oluştu?
+- Ne zaman sisteme geldi?
+- Hangi dönem için geçerli?
 
-**Veri:**
-- Bilanço (toplam varlık, borç, özkaynak)
-- Gelir tablosu (ciro, FAVÖK, net kâr)
-- Nakit akışı (faaliyat, yatırım, finansman)
-- Oranlar (F/K, PD/DD, ROE, ROIC, borç/özkaynak)
+bilgileriyle tutulacak.
 
-**Durum:** ✅ Çalışıyor (20 şirket, yfinance)
+Bu özellikle daha sonra:
 
-**Dosya:** `services/ingestion/providers/fundamental_provider.py`
+- backtest
+- tahmin
+- Monte Carlo
+- haber analizi
 
----
-
-## 3. KAP
-
-**Amaç:** Şirket açıklamalarını, finansal sonuçları, özel durumları ve yatırımcı açısından önemli duyuruları toplar.
-
-**Kaynak:** kap.org.tr API (şu an 500 hatası — sunucu sorunu)
-
-**Veri:**
-- Bildirim başlığı ve özeti
-- Bildirim türü (finansal sonuç, temettü, yatırım, sözleşme, dava)
-- Önem skoru
-- Duyarlılık analizi
-
-**Durum:** ⚠️ KAP API 500 hatası, RSS fallback var
-
-**Dosya:** `services/ingestion/providers/kap_provider.py`
+sırasında geleceğin geçmişe sızmasını engelleyecek.
 
 ---
 
-## 4. News
+## 5. Çıktı ne olacak?
 
-**Amaç:** Şirket, sektör, ekonomi ve piyasayla ilgili haberleri toplar.
+Bölüm 1 sonunda sistemin elinde şu bulunacak:
 
-**Kaynak:** RSS feed'ler (Dünya, Borsa Gündem, Bloomberg HT, AA)
+```
+MARKET STATE
+Piyasa rejimi: ?
+Endeks durumu: ?
+Sektör durumu: ?
+Makro durum: ?
+Volatilite: ?
+Likidite: ?
+Haber ortamı: ?
+KAP aktivitesi: ?
+Sosyal sentiment: ?
+Kur ortamı: ?
+Önemli olaylar: ?
+Veri güncelliği: ?
+```
 
-**Veri:**
-- Haber başlığı ve özeti
-- Kaynak ve güvenilirlik
-- Duyarlılık analizi
-- Ticker eşleştirme (haber başlığından şirket adı çıkarma)
+Bu çıktı Bölüm 2'nin veri kalitesi kontrolünden geçecek ve ardından:
 
-**Durum:** ✅ Çalışıyor (80 haber, 4 kaynak, 9 ticker eşleştiriliyor)
+- Piyasa Analizi
+- Hisse Bulma
+- Fundamental
+- Haber
+- Tahmin
+- Risk
 
-**Dosya:** `services/ingestion/providers/news_provider.py`
-
----
-
-## 5. Social Media
-
-**Amaç:** Sosyal medyadaki yatırımcı ilgisini ve genel sentiment'i toplar. **Tek başına gerçek kabul edilmez.**
-
-**Kaynak:** StockTwits (403 engelli), Reddit (403 engelli), X/Twitter (ücretli API)
-
-**Veri:**
-- Mesaj hacmi
-- Duyarlılık analizi
-- Manipülasyon tespiti (bot, spam, koordinasyon)
-
-**Durum:** ❌ Tüm kaynaklar engelli
-
-**Dosya:** `services/ingestion/providers/social_provider.py`
+motorlarının girdisi olacak.
 
 ---
 
-## 6. Macro Data
+## Kısacası
 
-**Amaç:** Faiz, enflasyon, döviz, emtia, küresel endeksler gibi makroekonomik verileri toplar.
+**Bölüm 1 = Sistemin dünyayı algılama katmanı.**
 
-**Kaynak:** yfinance (USDTRY, VIX, Gold, Oil, S&P500, Nasdaq), TCMB EVDS
+Hisse seçmez, BUY vermez, tahmin yapmaz.
 
-**Veri:**
-- USD/TRY, EUR/TRY kurları
-- TCMB politika faizi
-- TÜFE, ÜFE
-- VIX, S&P500, Nasdaq
-- Altın, petrol fiyatları
+Önce:
 
-**Durum:** ✅ Çalışıyor (yfinance ile)
+> "Piyasa şu anda hangi ortamda, hangi olaylar yaşanıyor ve elimizde hangi bilgiler var?"
 
-**Dosya:** `services/ingestion/providers/yfinance_provider.py` (fetch_macro)
-
----
-
-## 7. Sector Data
-
-**Amaç:** Şirketin bulunduğu sektörün performansını ve sektör bazlı gelişmeleri toplar.
-
-**Kaynak:** yfinance (sektör endeksleri), KAP (sektör bildirimleri)
-
-**Veri:**
-- Sektör endeks performansı
-- Sektör relatif gücü
-- Sektör rotasyonu
-- Sektör bazlı gelişmeler
-
-**Durum:** ⚠️ Kısmen (sektör mapping var, endeks verisi eksik)
-
-**Dosya:** `services/features/cross_sectional.py`
-
----
-
-## 8. Corporate Actions
-
-**Amaç:** Temettü, bölünme, bedelsiz, sermaye artırımı gibi şirket olaylarını takip eder.
-
-**Kaynak:** KAP bildirimleri
-
-**Veri:**
-- Temettü miktarı ve tarihi
-- Bölünme/bedelsiz oranı
-- Bedelli sermaye artırımı
-- Fiyat düzeltme katsayıları
-
-**Durum:** ✅ Çalışıyor (fiyat ve pozisyon düzeltmesi)
-
-**Dosya:** `services/ingestion/corporate_actions.py`
-
----
-
-## 9. Trading Calendar
-
-**Amaç:** Piyasanın açık/kapalı olduğunu, seans saatlerini ve tatilleri kontrol eder.
-
-**Kaynak:** BIST resmi takvimi
-
-**Veri:**
-- İşlem günü mü?
-- Piyasa açık mı?
-- Seans (açılış, öğle arası, kapanış)
-- Resmi tatiller
-- Devre kesici durumları
-
-**Durum:** ✅ Çalışıyor
-
-**Dosya:** `services/core/market_calendar.py`
-
----
-
-## 10. FX
-
-**Amaç:** Farklı para birimlerindeki verileri ortak para birimine çevirmek ve kur etkisini takip etmek için kullanılır.
-
-**Kaynak:** yfinance (USDTRY, EURTRY)
-
-**Veri:**
-- Döviz kurları
-- Kur değişim hızı
-- Kur volatilitesi
-- Parasal pozisyon düzeltmesi
-
-**Durum:** ✅ Çalışıyor
-
-**Dosya:** `services/ingestion/providers/yfinance_provider.py`, `services/portfolio/enhancements.py`
+sorusunu mümkün olduğunca doğru cevaplar.
