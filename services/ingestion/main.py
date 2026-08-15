@@ -16,8 +16,11 @@ from ..core.event_bus import (
     flush_producer, EventConsumer,
 )
 from ..core.logging import setup_logging
-from .bist_universe import BISTUniverse, get_sector, BIST_INDICES
-BIST_STOCKS = BISTUniverse.BIST_100_TICKERS
+from .bist_universe import bist_universe, get_sector, BIST_INDICES
+
+# Dinamik hisse listesi — otomatik keşif aktif
+BIST_STOCKS = bist_universe.BIST_100_TICKERS
+BIST_ALL = bist_universe.BIST_ALL_TICKERS
 from .providers.yfinance_provider import yfinance_provider
 from .providers.kap_provider import kap_provider
 from .providers.tcmb_provider import tcmb_provider
@@ -39,6 +42,9 @@ class IngestionService:
         setup_logging()
         logger.info("Starting ALPHA BIST Ingestion Service")
 
+        # Otomatik hisse evrenini yenile (başlangıçta)
+        await self._refresh_universe()
+
         await init_databases()
         ensure_topics()
 
@@ -46,7 +52,23 @@ class IngestionService:
         await self._load_instrument_map()
 
         self._running = True
-        logger.info("Ingestion Service started", instruments=len(self._instrument_map))
+        logger.info("Ingestion Service started",
+                    instruments=len(self._instrument_map),
+                    universe_size=len(BIST_ALL))
+
+    async def _refresh_universe(self):
+        """Hisse evrenini otomatik yenile."""
+        global BIST_STOCKS, BIST_ALL
+        try:
+            logger.info("Refreshing BIST universe...")
+            bist_universe.refresh()
+            BIST_STOCKS = bist_universe.BIST_100_TICKERS
+            BIST_ALL = bist_universe.BIST_ALL_TICKERS
+            logger.info("BIST universe refreshed",
+                        bist_100=len(BIST_STOCKS),
+                        bist_all=len(BIST_ALL))
+        except Exception as e:
+            logger.warning("Universe refresh failed, using cached/static", error=str(e))
 
         # Run ingestion loops
         await asyncio.gather(
