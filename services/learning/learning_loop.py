@@ -8,7 +8,7 @@ Regime drift → Model decay → Retrain → OOS → Champion/Reject
 
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -58,7 +58,7 @@ class LearningLoop:
             "confidence": confidence,
             "features": features.copy(),
             "regime": regime,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         self._state.total_predictions += 1
 

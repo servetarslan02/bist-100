@@ -13,7 +13,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, timezone, date, time, timedelta
 
 
 def test_market_calendar():
@@ -310,7 +310,7 @@ def test_circuit_breaker():
         failed += 1
 
     # Test 4: Recovery timeout sonrası HALF_OPEN
-    cb.last_failure_time = datetime.utcnow() - timedelta(seconds=61)
+    cb.last_failure_time = datetime.now(timezone.utc) - timedelta(seconds=61)
     if cb.can_execute() and cb.state == CircuitState.HALF_OPEN:
         print(f"  ✓ Timeout sonrası HALF_OPEN")
         passed += 1
@@ -331,7 +331,7 @@ def test_circuit_breaker():
     cb = CircuitBreaker(name="test2", failure_threshold=2)
     cb.record_failure()
     cb.record_failure()
-    cb.last_failure_time = datetime.utcnow() - timedelta(seconds=61)
+    cb.last_failure_time = datetime.now(timezone.utc) - timedelta(seconds=61)
     cb.can_execute()  # → HALF_OPEN
     cb.record_failure()
     if cb.state == CircuitState.OPEN:

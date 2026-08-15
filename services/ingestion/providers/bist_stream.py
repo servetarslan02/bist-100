@@ -12,7 +12,7 @@ ALPHA BIST — BIST Market Data Stream v1.0
 import asyncio
 import json
 from typing import Dict, List, Optional, Callable, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog
 
@@ -27,7 +27,7 @@ class StreamTick:
     volume: int
     bid: float = 0.0
     ask: float = 0.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     source: str = ""
 
 
@@ -103,7 +103,7 @@ class BISTStreamProvider:
                                 ticker=ticker,
                                 price=float(last_row["Close"]),
                                 volume=int(last_row["Volume"]),
-                                timestamp=datetime.utcnow(),
+                                timestamp=datetime.now(timezone.utc),
                                 source="yfinance",
                             )
 
@@ -160,7 +160,7 @@ class BISTStreamProvider:
                                     ticker=ticker_data.get("symbol", ""),
                                     price=float(ticker_data.get("last", 0)),
                                     volume=int(ticker_data.get("volume", 0)),
-                                    timestamp=datetime.utcnow(),
+                                    timestamp=datetime.now(timezone.utc),
                                     source="investing",
                                 )
 
@@ -170,7 +170,7 @@ class BISTStreamProvider:
                                             await handler(tick)
                                         else:
                                             handler(tick)
-                                    except:
+                                    except Exception:
                                         pass
 
                                 self._tick_count += 1
@@ -225,7 +225,7 @@ class BISTStreamProvider:
                                 volume=int(data.get("volume", 0)),
                                 bid=float(data.get("bid", 0)),
                                 ask=float(data.get("ask", 0)),
-                                timestamp=datetime.utcnow(),
+                                timestamp=datetime.now(timezone.utc),
                                 source="bistech",
                             )
 
@@ -235,7 +235,7 @@ class BISTStreamProvider:
                                         await handler(tick)
                                     else:
                                         handler(tick)
-                                except:
+                                except Exception:
                                     pass
 
                             self._tick_count += 1

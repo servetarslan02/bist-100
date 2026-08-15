@@ -11,7 +11,7 @@ FAZ 1.3-1.5: Provider Failover + Circuit Breaker + Rate Limit
 
 import time
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional, Any, Callable
 from enum import Enum
 from dataclasses import dataclass, field
@@ -54,12 +54,12 @@ class CircuitBreaker:
         elif self.state == CircuitState.CLOSED:
             self.failure_count = max(0, self.failure_count - 1)
 
-        self.last_success_time = datetime.utcnow()
+        self.last_success_time = datetime.now(timezone.utc)
 
     def record_failure(self):
         """Başarısız çağrı kaydet."""
         self.failure_count += 1
-        self.last_failure_time = datetime.utcnow()
+        self.last_failure_time = datetime.now(timezone.utc)
 
         if self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
@@ -77,7 +77,7 @@ class CircuitBreaker:
         if self.state == CircuitState.OPEN:
             # Recovery timeout doldu mu?
             if self.last_failure_time:
-                elapsed = (datetime.utcnow() - self.last_failure_time).total_seconds()
+                elapsed = (datetime.now(timezone.utc) - self.last_failure_time).total_seconds()
                 if elapsed >= self.recovery_timeout_seconds:
                     self.state = CircuitState.HALF_OPEN
                     self.half_open_calls = 0
@@ -215,7 +215,7 @@ class ProviderReliability:
         self._results.append({
             "success": success,
             "latency_ms": latency_ms,
-            "timestamp": datetime.utcnow(),
+            "timestamp": datetime.now(timezone.utc),
         })
 
         # Pencere boyutunu aş
@@ -248,7 +248,7 @@ class ProviderReliability:
                 break
 
         if last_success:
-            minutes_since = (datetime.utcnow() - last_success).total_seconds() / 60
+            minutes_since = (datetime.now(timezone.utc) - last_success).total_seconds() / 60
             freshness_factor = max(0, 1 - (minutes_since / 60))  # 1 saat içinde
         else:
             freshness_factor = 0

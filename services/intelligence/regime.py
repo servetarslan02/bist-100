@@ -12,7 +12,7 @@ FAZ 3.2: Regime Engine
 
 import numpy as np
 from typing import Dict, List, Optional, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
 import structlog
@@ -40,7 +40,7 @@ class RegimeState:
     regime: Regime
     confidence: float
     features_used: Dict[str, float]
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     duration_hours: float = 0.0
 
 
@@ -117,7 +117,7 @@ class RegimeEngine:
         # Regime değiştiyse duration sıfırla
         duration = 0.0
         if self._current_regime and self._current_regime.regime == best_regime:
-            elapsed = (datetime.utcnow() - self._current_regime.timestamp).total_seconds() / 3600
+            elapsed = (datetime.now(timezone.utc) - self._current_regime.timestamp).total_seconds() / 3600
             duration = self._current_regime.duration_hours + elapsed
 
         new_state = RegimeState(

@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 import numpy as np
 import polars as pl
@@ -61,7 +61,7 @@ class LearningService:
 
                 # Check if training is needed
                 last_training = await self._get_last_training_time()
-                hours_since = (datetime.utcnow() - last_training).total_seconds() / 3600 if last_training else 999
+                hours_since = (datetime.now(timezone.utc) - last_training).total_seconds() / 3600 if last_training else 999
 
                 if hours_since >= 168:  # Weekly
                     await self._train_all_models()

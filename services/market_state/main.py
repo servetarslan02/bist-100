@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
 import structlog
@@ -69,10 +69,15 @@ class MarketStateService:
 
     async def _load_instruments(self):
         """Load instrument mapping — BIST universe'un tamamını yükle."""
-        from ..ingestion.bist_universe import BIST_STOCKS
+        try:
+            from ..ingestion.bist_universe import bist_universe
+            tickers = bist_universe.get_tickers()
+        except Exception as e:
+            logger.error("Failed to load BIST universe", error=str(e))
+            tickers = []
 
         # BIST universe'un tamamını kaydet
-        for i, ticker in enumerate(BIST_STOCKS):
+        for i, ticker in enumerate(tickers):
             self._ticker_map[ticker] = i + 1
             # Başlangıç state'i oluştur
             self._instrument_states[i + 1] = {
@@ -150,7 +155,7 @@ class MarketStateService:
                 })
 
             # Recompute market state periodically
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if self._last_update is None or (now - self._last_update).seconds > 30:
                 await self._compute_market_state()
                 self._last_update = now
@@ -193,7 +198,7 @@ class MarketStateService:
 
             # Market state
             market_state = {
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "regime": regime,
                 "breadth_pct": round(breadth_pct, 2),
                 "advancing": advancing,
@@ -213,7 +218,7 @@ class MarketStateService:
 
             # Store in ClickHouse
             ch_insert("market_states", [[
-                datetime.utcnow(),
+                datetime.now(timezone.utc),
                 regime,
                 0.8,  # confidence
                 float(avg_momentum),

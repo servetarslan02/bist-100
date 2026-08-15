@@ -8,7 +8,7 @@ Bu zincir eksiksiz olmalı.
 
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -111,7 +111,7 @@ class NewsPipeline:
 
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             source=raw_news.get("source", "unknown"),
             title=title,
             body=body,

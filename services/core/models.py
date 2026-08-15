@@ -355,7 +355,7 @@ class Prediction(BaseModel):
     probability_positive: float
     predicted_volatility_pct: float
     confidence: float
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Outcome(BaseModel):
@@ -405,4 +405,4 @@ class Alert(BaseModel):
     instrument_id: Optional[int] = None
     data: Dict[str, Any] = Field(default_factory=dict)
     acknowledged: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

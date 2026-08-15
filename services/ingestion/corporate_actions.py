@@ -7,7 +7,7 @@ fiyat ve portföy geçmişine doğru şekilde yansıtır.
 FAZ 1.5: Corporate Actions
 """
 
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from dataclasses import dataclass, field
@@ -53,7 +53,7 @@ class CorporateAction:
     description: str = ""
     source: str = "KAP"
     is_confirmed: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CorporateActionsHandler:
@@ -232,30 +232,37 @@ class CorporateActionsHandler:
 
     def load_from_kap(self, kap_events: List[Dict[str, Any]]):
         """KAP'tan gelen şirket olaylarını yükle."""
+        if not kap_events:
+            return
+
         for event in kap_events:
-            action_type = self._classify_kap_event(event)
-            if action_type is None:
+            try:
+                action_type = self._classify_kap_event(event)
+                if action_type is None:
+                    continue
+
+                action = CorporateAction(
+                    action_id=event.get("kap_id", ""),
+                    ticker=event.get("ticker", ""),
+                    action_type=action_type,
+                    ex_date=self._parse_date(event.get("publish_date", "")),
+                    description=event.get("title", ""),
+                    source="KAP",
+                )
+
+                # Temettü miktarını çıkar
+                if action_type == ActionType.DIVIDEND:
+                    action.dividend_per_share = self._extract_dividend_amount(event)
+
+                # Bölünme oranını çıkar
+                if action_type in (ActionType.STOCK_SPLIT, ActionType.BONUS_SHARE):
+                    action.split_ratio = self._extract_split_ratio(event)
+
+                if action.ticker:
+                    self.add_action(action)
+            except Exception as e:
+                logger.warning("Failed to process KAP event", error=str(e))
                 continue
-
-            action = CorporateAction(
-                action_id=event.get("kap_id", ""),
-                ticker=event.get("ticker", ""),
-                action_type=action_type,
-                ex_date=self._parse_date(event.get("publish_date", "")),
-                description=event.get("title", ""),
-                source="KAP",
-            )
-
-            # Temettü miktarını çıkar
-            if action_type == ActionType.DIVIDEND:
-                action.dividend_per_share = self._extract_dividend_amount(event)
-
-            # Bölünme oranını çıkar
-            if action_type in (ActionType.STOCK_SPLIT, ActionType.BONUS_SHARE):
-                action.split_ratio = self._extract_split_ratio(event)
-
-            if action.ticker:
-                self.add_action(action)
 
     def _classify_kap_event(self, event: Dict) -> Optional[ActionType]:
         """KAP olayını sınıflandır."""

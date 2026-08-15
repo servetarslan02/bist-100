@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 from contextlib import asynccontextmanager
 
@@ -102,7 +102,7 @@ manager = ConnectionManager()
 @app.get("/api/health")
 async def health():
     """Health check endpoint."""
-    return {"status": "ok", "timestamp": datetime.utcnow().isoformat()}
+    return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/api/status")
@@ -136,7 +136,7 @@ async def status():
     return {
         "status": "ok",
         "services": services,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
 
@@ -184,7 +184,7 @@ async def _compute_live_market_state():
                     elif change < 0:
                         declining += 1
                     total += 1
-            except:
+            except Exception:
                 pass
 
         breadth = (advancing / total * 100) if total > 0 else 50
@@ -203,7 +203,7 @@ async def _compute_live_market_state():
             "advancing": advancing,
             "declining": declining,
             "total_instruments": total,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "source": "live_computation",
         }
     except Exception as e:
@@ -476,7 +476,7 @@ async def get_signals(
                         "expected_return_pct": round(features.get("momentum_20d", 0), 1),
                         "spec_category": spec.category,
                     })
-            except:
+            except Exception:
                 pass
 
         signals.sort(key=lambda x: x["score"], reverse=True)

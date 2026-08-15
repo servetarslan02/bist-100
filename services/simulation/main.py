@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
 import structlog
@@ -181,7 +181,7 @@ class SimulationEngine:
                 "75": float(np.percentile(returns, 75)),
                 "95": float(np.percentile(returns, 95)),
             },
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         logger.info("Monte Carlo simulation completed", ticker=ticker, simulations=num_simulations)
@@ -235,7 +235,7 @@ class SimulationEngine:
         return {
             "ticker": ticker,
             "scenarios": results,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     async def _run_stress_test(self, params: Dict) -> Dict[str, Any]:
@@ -290,7 +290,7 @@ class SimulationEngine:
         return {
             "stress_tests": results,
             "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     async def _get_historical_volatility(self, ticker: str) -> Optional[Dict[str, Any]]:

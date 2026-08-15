@@ -18,7 +18,7 @@ import math
 import time
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import numpy as np
 import structlog
 
@@ -46,7 +46,7 @@ class AssetTierState:
     instrument_id: int = 0
     current_tier: int = Tier.CONTINUOUS_WATCH
     tier_score: float = 0.0
-    last_tier_update: datetime = field(default_factory=datetime.utcnow)
+    last_tier_update: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Tier 0 — State tracking
     price: float = 0.0
@@ -218,7 +218,7 @@ class TieredScanner:
         if prev_price > 0:
             asset.price_change_pct = (price / prev_price - 1) * 100
 
-        asset.last_tier_update = timestamp or datetime.utcnow()
+        asset.last_tier_update = timestamp or datetime.now(timezone.utc)
 
     # =====================================================
     # Tier 1: Quant Scan (Matematiksel Filtreler)

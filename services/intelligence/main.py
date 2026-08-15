@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import httpx
 import structlog
@@ -179,7 +179,7 @@ class IntelligenceService:
         context = {
             "ticker": ticker,
             "event_data": event_data,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
         try:
@@ -314,7 +314,7 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
                     "analysis": raw_response,
                     "structured": parsed,
                     "model": settings.ollama_model,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "eval_count": result.get("eval_count", 0),
                     "eval_duration_ms": result.get("eval_duration", 0) / 1000000,
                 }

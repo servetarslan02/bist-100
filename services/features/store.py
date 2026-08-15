@@ -13,7 +13,7 @@ FAZ 2.5: Feature Store + Versioning
 
 import json
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import structlog
 
@@ -30,7 +30,7 @@ class FeatureValue:
         self.value = value
         self.ticker = ticker
         self.version = version
-        self.timestamp = timestamp or datetime.utcnow()
+        self.timestamp = timestamp or datetime.now(timezone.utc)
         self.source = source
         self.confidence = confidence
 
@@ -101,7 +101,7 @@ class FeatureStore:
 
         # Metadata güncelle
         self._metadata[ticker] = {
-            "last_update": datetime.utcnow().isoformat(),
+            "last_update": datetime.now(timezone.utc).isoformat(),
             "version": version,
             "feature_count": len(self._store[ticker][version]),
             "source": source,
@@ -111,7 +111,7 @@ class FeatureStore:
         if ticker not in self._history:
             self._history[ticker] = []
         self._history[ticker].append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": version,
             "feature_count": len(features),
         })

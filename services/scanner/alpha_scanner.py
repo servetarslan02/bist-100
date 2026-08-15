@@ -12,7 +12,7 @@ import time
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -143,7 +143,7 @@ class AlphaScanner:
             self._generate_signal(r)
 
         elapsed = time.time() - start
-        self._last_scan = datetime.utcnow()
+        self._last_scan = datetime.now(timezone.utc)
         self._scan_count += 1
 
         logger.info("Alpha scan completed",
@@ -156,7 +156,7 @@ class AlphaScanner:
 
     def _scan_single(self, ticker: str, f: Dict[str, float], ml_score: float = 50.0, event_score: float = 50.0) -> ScannerResult:
         """Tek hisse için quant scan."""
-        r = ScannerResult(ticker=ticker, timestamp=datetime.utcnow())
+        r = ScannerResult(ticker=ticker, timestamp=datetime.now(timezone.utc))
 
         # State
         r.price = f.get("price", 0) or f.get("close", 0) or f.get("current_price", 0)
@@ -382,7 +382,7 @@ class AlphaScanner:
         overbought = [r for r in results if r.rsi > 70]
 
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "regime": self._regime,
             "total_scanned": len(results),
             "signals_generated": len(signals),

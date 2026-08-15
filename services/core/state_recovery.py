@@ -10,7 +10,7 @@ P0-7 düzeltmesi:
 
 import json
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import structlog
 
 logger = structlog.get_logger()
@@ -148,7 +148,7 @@ class StateRecovery:
                 "ticker": ticker,
                 "price": close_list[-1] if close_list else 0,
                 "features": features,
-                "recovered_at": datetime.utcnow().isoformat(),
+                "recovered_at": datetime.now(timezone.utc).isoformat(),
                 "data_points": len(df),
                 "recovery_method": "clickhouse_fallback",
             }
@@ -166,7 +166,7 @@ class StateRecovery:
         Bu, bir sonraki restart için kullanılır.
         """
         try:
-            state["snapshot_time"] = datetime.utcnow().isoformat()
+            state["snapshot_time"] = datetime.now(timezone.utc).isoformat()
 
             if redis_client:
                 await redis_client.set(

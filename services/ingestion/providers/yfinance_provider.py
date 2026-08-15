@@ -2,7 +2,7 @@
 
 import yfinance as yf
 import polars as pl
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 import structlog
 
@@ -42,7 +42,7 @@ class YFinanceProvider:
                 "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
                 "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
                 "avg_volume_20d": info.get("averageVolume"),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
             logger.warning("Failed to fetch price", ticker=ticker, error=str(e))
@@ -169,7 +169,7 @@ class YFinanceProvider:
                 "previous_close": info.get("regularMarketPreviousClose", 0),
                 "change_pct": info.get("regularMarketChangePercent", 0),
                 "volume": info.get("regularMarketVolume", 0),
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
             logger.warning("Failed to fetch index", symbol=index_symbol, error=str(e))

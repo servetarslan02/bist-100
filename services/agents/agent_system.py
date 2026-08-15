@@ -16,7 +16,7 @@ import hashlib
 import re
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 import structlog
 
@@ -46,7 +46,7 @@ class AgentTask:
     context: Dict[str, Any]
     max_steps: int = 10
     timeout_seconds: int = 120
-    created_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -373,7 +373,7 @@ class AgentOrchestrator:
                 agent = BaseAgent(role)
 
             task = AgentTask(
-                task_id=f"{ticker}-{role.value}-{datetime.utcnow().strftime('%H%M%S')}",
+                task_id=f"{ticker}-{role.value}-{datetime.now(timezone.utc).strftime('%H%M%S')}",
                 agent_role=role,
                 ticker=ticker,
                 prompt=f"Analyze {ticker} from {role.value} perspective",
@@ -387,7 +387,7 @@ class AgentOrchestrator:
         # Synthesis
         synthesis_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(AgentRole.SYNTHESIS)
         synthesis_task = AgentTask(
-            task_id=f"{ticker}-SYNTHESIS-{datetime.utcnow().strftime('%H%M%S')}",
+            task_id=f"{ticker}-SYNTHESIS-{datetime.now(timezone.utc).strftime('%H%M%S')}",
             agent_role=AgentRole.SYNTHESIS,
             ticker=ticker,
             prompt=f"Synthesize all analysis for {ticker}",
@@ -398,7 +398,7 @@ class AgentOrchestrator:
 
         return {
             "ticker": ticker,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "results": {k: {
                 "direction": v.output.get("direction", "NEUTRAL"),
                 "confidence": v.confidence,

@@ -13,7 +13,7 @@ v1.2 Düzeltmeler:
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from collections import deque
 import structlog
 
@@ -110,7 +110,7 @@ class IncrementalAssetState:
 
     instrument_id: int
     ticker: str
-    last_update: datetime = field(default_factory=datetime.utcnow)
+    last_update: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     # Current price
     price: float = 0.0

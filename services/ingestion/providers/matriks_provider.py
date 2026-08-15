@@ -9,7 +9,7 @@ Kullanım: İkinci doğrulama kaynağı, cross-validation
 
 import requests
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -39,7 +39,7 @@ class MatriksProvider:
                     "price": data.get("last", 0),
                     "change_pct": data.get("changePercent", 0),
                     "volume": data.get("volume", 0),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "source": "matriks",
                     "delay_minutes": 15,
                 }

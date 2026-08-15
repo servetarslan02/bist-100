@@ -1,7 +1,7 @@
 """ALPHA BIST - Feature Engine Service (Main Entry Point)"""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any
 import polars as pl
 import structlog
@@ -136,7 +136,7 @@ class FeatureEngineService:
 
             # Add metadata
             features["ticker"] = ticker
-            features["computed_at"] = datetime.utcnow().isoformat()
+            features["computed_at"] = datetime.now(timezone.utc).isoformat()
             features["data_points"] = len(df)
 
             return features
@@ -148,7 +148,7 @@ class FeatureEngineService:
     def _store_features_ch(self, instrument_id: int, ticker: str, features: Dict[str, float]):
         """Store features in ClickHouse."""
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             rows = []
 
             for feature_name, feature_value in features.items():

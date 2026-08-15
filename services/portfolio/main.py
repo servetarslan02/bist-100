@@ -5,7 +5,7 @@ v1.1: market.tick handler ile canlı mark-to-market.
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import structlog
 
@@ -123,7 +123,7 @@ class PortfolioService:
                 "current_price": str(price),
                 "unrealized_pnl": str(round(unrealized_pnl, 2)),
                 "unrealized_pnl_pct": str(round(unrealized_pnl_pct, 2)),
-                "last_update": datetime.utcnow().isoformat(),
+                "last_update": datetime.now(timezone.utc).isoformat(),
             })
 
         except Exception as e:

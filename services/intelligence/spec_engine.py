@@ -10,7 +10,7 @@ import math
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -115,7 +115,7 @@ class SPECEngine:
         }
 
         return SPECResult(
-            ticker=ticker, timestamp=datetime.utcnow(),
+            ticker=ticker, timestamp=datetime.now(timezone.utc),
             spec_score=round(spec_score_100, 2), category=category,
             anomaly_score=round(anomaly, 4), evidence_consensus=round(evidence_consensus, 4),
             regime_compatibility=round(regime_compat, 4), expected_value=round(expected_value, 4),

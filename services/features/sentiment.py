@@ -13,7 +13,7 @@ FAZ 2.4: Sentiment Features
 import math
 import numpy as np
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -36,7 +36,7 @@ class SentimentFeatureEngine:
             "importance": event.get("importance", 0.5),
             "credibility": event.get("credibility", 0.5),
             "novelty": event.get("novelty", 0.5),
-            "timestamp": event.get("timestamp", datetime.utcnow().isoformat()),
+            "timestamp": event.get("timestamp", datetime.now(timezone.utc).isoformat()),
         })
         # Son 100 haber tut
         self._news_history[ticker] = self._news_history[ticker][-100:]
@@ -50,7 +50,7 @@ class SentimentFeatureEngine:
             "importance": event.get("importance", 0.5),
             "is_price_sensitive": event.get("is_price_sensitive", False),
             "category": event.get("category", ""),
-            "timestamp": event.get("timestamp", datetime.utcnow().isoformat()),
+            "timestamp": event.get("timestamp", datetime.now(timezone.utc).isoformat()),
         })
         self._kap_history[ticker] = self._kap_history[ticker][-50:]
 
@@ -62,7 +62,7 @@ class SentimentFeatureEngine:
             "sentiment": event.get("sentiment", 0),
             "engagement_score": event.get("engagement_score", 0),
             "platform": event.get("platform", ""),
-            "timestamp": event.get("timestamp", datetime.utcnow().isoformat()),
+            "timestamp": event.get("timestamp", datetime.now(timezone.utc).isoformat()),
         })
         self._social_history[ticker] = self._social_history[ticker][-200:]
 
@@ -79,7 +79,7 @@ class SentimentFeatureEngine:
             return features
 
         # Son 24 saat
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         recent = [e for e in events if self._is_recent(e.get("timestamp"), hours=24)]
 
         if recent:
@@ -264,7 +264,7 @@ class SentimentFeatureEngine:
                 from datetime import timezone
                 ts = ts.replace(tzinfo=timezone.utc)
             return (datetime.now(ts.tzinfo) - ts) < timedelta(hours=hours)
-        except:
+        except Exception:
             return False
 
 

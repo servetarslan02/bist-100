@@ -6,7 +6,7 @@ Olayların varlıklara nasıl yayıldığını modelleyen motor.
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 import structlog
 
 logger = structlog.get_logger()
@@ -161,7 +161,7 @@ class ImpactEngine:
             return PropagationResult(
                 source_event_type=event_type,
                 source_event_id=event_id,
-                timestamp=datetime.utcnow(),
+                timestamp=datetime.now(timezone.utc),
                 affected_instruments=[],
                 world_state_delta={},
                 propagation_chain=[],
@@ -264,7 +264,7 @@ class ImpactEngine:
         return PropagationResult(
             source_event_type=event_type,
             source_event_id=event_id,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             affected_instruments=list(aggregated.values()),
             world_state_delta=world_delta,
             propagation_chain=chain,

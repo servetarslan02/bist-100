@@ -12,7 +12,7 @@ FAZ 9: Decision & Risk Engine Integration
 
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -98,7 +98,7 @@ class SignalFusionEngine:
         """
         result = FusedSignal(
             ticker=ticker,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
         # Bileşen yönleri ve skorları

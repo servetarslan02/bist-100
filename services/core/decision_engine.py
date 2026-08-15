@@ -25,7 +25,7 @@ Girdiler:
 
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -181,7 +181,7 @@ class DecisionEngine:
 
         return DecisionOutput(
             ticker=inp.ticker,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             action=action,
             conviction=conviction,
             direction="LONG" if composite > 50 else "SHORT",

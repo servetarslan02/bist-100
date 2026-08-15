@@ -2,7 +2,7 @@
 
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
 import structlog
@@ -87,7 +87,7 @@ class RiskEngine:
                 if isinstance(value, str):
                     try:
                         value = json.loads(value)
-                    except:
+                    except Exception:
                         pass
                 self._risk_limits[key] = float(value) if value else 0
 
@@ -164,7 +164,7 @@ class RiskEngine:
                 "action": action,
                 "approved": all_passed and len(blocking_checks) == 0,
                 "checks": checks,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
             if not result["approved"]:

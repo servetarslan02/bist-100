@@ -107,7 +107,7 @@ class InternalEventBus:
         if self._redis:
             try:
                 await self._redis.close()
-            except:
+            except Exception:
                 pass
 
 
@@ -125,7 +125,7 @@ class InMemoryRedis:
                     await h({"type": "message", "channel": channel, "data": message})
                 else:
                     h({"type": "message", "channel": channel, "data": message})
-            except:
+            except Exception:
                 pass
 
     def pubsub(self):

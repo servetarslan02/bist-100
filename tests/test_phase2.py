@@ -190,7 +190,7 @@ def test_macro_features():
 def test_sentiment_features():
     """Sentiment Feature Engine testleri."""
     from services.features.sentiment import SentimentFeatureEngine
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
 
     engine = SentimentFeatureEngine()
     passed = 0
@@ -205,7 +205,7 @@ def test_sentiment_features():
     print("  ✓ Empty state")
 
     # 2. News events
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     engine.add_news_event("THYAO", {"sentiment": 0.8, "importance": 0.7, "credibility": 0.9, "timestamp": now})
     engine.add_news_event("THYAO", {"sentiment": 0.6, "importance": 0.5, "credibility": 0.8, "timestamp": now})
     features = engine.compute_news_features("THYAO")

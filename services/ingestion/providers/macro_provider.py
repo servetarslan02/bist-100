@@ -7,7 +7,7 @@ Kullanım: Dünya piyasaları, makro veriler
 
 import requests
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -56,7 +56,7 @@ class MacroProvider:
                     "price": info.get("regularMarketPrice", 0),
                     "change_pct": info.get("regularMarketChangePercent", 0),
                     "source": "yahoo",
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
             except Exception as e:
                 logger.debug("Yahoo macro fetch failed", symbol=name, error=str(e))

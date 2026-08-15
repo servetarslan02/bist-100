@@ -46,8 +46,13 @@ class AlphaEngine:
         self._ml_loader = ml_model_loader
 
     def load_universe(self, tickers: List[str]):
-        self._universe = tickers
-        logger.info("Universe loaded", count=len(tickers))
+        """BIST evrenini yükle."""
+        try:
+            self._universe = tickers
+            logger.info("Universe loaded", count=len(tickers))
+        except Exception as e:
+            logger.error("Failed to load universe", error=str(e))
+            self._universe = []
 
     # =====================================================
     # Layer 1: Live Scanner (her tick'te)
@@ -233,7 +238,7 @@ class AlphaEngine:
                     close_list = [x for x in df["close"].to_list() if x is not None]
                     features["price"] = close_list[-1] if close_list else 0
                     features_map[ticker] = features
-            except:
+            except Exception:
                 pass
         return features_map
 

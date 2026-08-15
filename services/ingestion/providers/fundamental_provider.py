@@ -11,7 +11,7 @@ FAZ 1.4: Fundamental Provider
 """
 
 import requests
-from datetime import datetime, date
+from datetime import datetime, timezone, date
 from typing import Optional, List, Dict, Any
 import structlog
 
@@ -34,14 +34,14 @@ class FundamentalProvider:
         cached = self._cache.get(ticker)
         if cached:
             cached_time = cached.get("_cached_at", 0)
-            if (datetime.utcnow().timestamp() - cached_time) < self._cache_ttl_seconds:
+            if (datetime.now(timezone.utc).timestamp() - cached_time) < self._cache_ttl_seconds:
                 return cached
 
         # yfinance'dan çek
         result = self._fetch_from_yfinance(ticker)
 
         if result:
-            result["_cached_at"] = datetime.utcnow().timestamp()
+            result["_cached_at"] = datetime.now(timezone.utc).timestamp()
             result["_source"] = "yfinance"
             self._cache[ticker] = result
             return result
@@ -49,7 +49,7 @@ class FundamentalProvider:
         # KAP'tan çek
         result = self._fetch_from_kap(ticker)
         if result:
-            result["_cached_at"] = datetime.utcnow().timestamp()
+            result["_cached_at"] = datetime.now(timezone.utc).timestamp()
             result["_source"] = "kap"
             self._cache[ticker] = result
             return result
@@ -70,7 +70,7 @@ class FundamentalProvider:
 
             result = {
                 "ticker": ticker,
-                "fetch_date": datetime.utcnow().isoformat(),
+                "fetch_date": datetime.now(timezone.utc).isoformat(),
 
                 # Değerleme
                 "pe_ratio": info.get("trailingPE"),

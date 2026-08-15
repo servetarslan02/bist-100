@@ -15,7 +15,7 @@ Bulunan hisseler için:
 import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -131,7 +131,7 @@ class TradePlanner:
 
         return TradePlan(
             ticker=ticker,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             action=action,
             conviction=conviction,
             direction=direction,

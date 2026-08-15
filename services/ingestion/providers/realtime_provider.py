@@ -13,7 +13,7 @@ Gerçek zamanlı kaynaklar:
 import asyncio
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable, List, Set
 from dataclasses import dataclass, field
 try:
@@ -31,7 +31,7 @@ class DataEvent:
     source: str
     event_type: str
     data: Dict[str, Any]
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     content_hash: str = ""
 
     def __post_init__(self):
@@ -124,7 +124,7 @@ class RealTimeDataEngine:
         KAP WebSocket/SSE yok ama RSS/API çok sık poll edilebilir.
         Her 30 saniyede bir yeni bildirim kontrolü.
         """
-        last_check = datetime.utcnow()
+        last_check = datetime.now(timezone.utc)
 
         while self._running:
             try:
@@ -132,7 +132,7 @@ class RealTimeDataEngine:
                 url = "https://www.kap.org.tr/tr/api/disclosures"
                 params = {
                     "fromDate": last_check.strftime("%Y-%m-%d"),
-                    "toDate": datetime.utcnow().strftime("%Y-%m-%d"),
+                    "toDate": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                 }
 
                 async with self._session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
@@ -155,7 +155,7 @@ class RealTimeDataEngine:
                             )
                             await self._dispatch(event)
 
-                        last_check = datetime.utcnow()
+                        last_check = datetime.now(timezone.utc)
                         logger.debug("KAP check completed", new=len(data.get("data", [])))
 
             except Exception as e:

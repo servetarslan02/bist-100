@@ -4,7 +4,7 @@ Tüm olaylar bu standart formatta üretilir ve tüketilir.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 from enum import Enum
@@ -73,10 +73,10 @@ class CanonicalEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str
     schema_version: str = "v1"
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     source: str = ""
     source_timestamp: Optional[datetime] = None
-    ingest_timestamp: datetime = Field(default_factory=datetime.utcnow)
+    ingest_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     quality: float = 1.0
     latency_ms: int = 0
     confidence: float = 1.0

@@ -8,7 +8,7 @@ Bir provider bozulursa ALPHA'nın gözü kapanmaz.
 """
 
 from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog
 
@@ -81,15 +81,15 @@ class ProviderManager:
             if not func:
                 continue
 
-            start = datetime.utcnow()
+            start = datetime.now(timezone.utc)
             try:
                 result = func(**kwargs)
-                latency = (datetime.utcnow() - start).total_seconds() * 1000
+                latency = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
                 # Sağlık güncelle
                 if health:
                     health.is_healthy = True
-                    health.last_success = datetime.utcnow()
+                    health.last_success = datetime.now(timezone.utc)
                     health.consecutive_failures = 0
                     health.avg_latency_ms = (health.avg_latency_ms * 0.9) + (latency * 0.1)
                     health.success_rate = min(1.0, health.success_rate + 0.01)
@@ -97,7 +97,7 @@ class ProviderManager:
                 return ProviderResult(
                     provider=provider_name,
                     data=result,
-                    timestamp=datetime.utcnow(),
+                    timestamp=datetime.now(timezone.utc),
                     latency_ms=latency,
                     quality=1.0,
                 )
@@ -106,7 +106,7 @@ class ProviderManager:
                 logger.warning("Provider failed", provider=provider_name, error=str(e))
                 if health:
                     health.is_healthy = health.consecutive_failures < 10
-                    health.last_failure = datetime.utcnow()
+                    health.last_failure = datetime.now(timezone.utc)
                     health.consecutive_failures += 1
                     health.success_rate = max(0, health.success_rate - 0.05)
 

@@ -8,7 +8,7 @@ ALPHA BIST — Event Priority Queue v1.0
 import asyncio
 from typing import Dict, List, Any, Callable, Optional
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -22,7 +22,7 @@ class EventTask:
     ticker: str
     importance: float
     priority: int  # 1=en yüksek, 5=en düşük
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class EventPriorityQueue:

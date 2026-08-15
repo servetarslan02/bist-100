@@ -10,7 +10,7 @@ Pipeline:
 """
 
 from typing import Dict, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -34,7 +34,7 @@ class LiveScanner:
 
         Returns: None (normal) veya candidate dict (ilginç hareket)
         """
-        ts = timestamp or datetime.utcnow()
+        ts = timestamp or datetime.now(timezone.utc)
 
         # State yoksa oluştur
         if ticker not in self._states:

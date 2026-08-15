@@ -132,7 +132,7 @@ class BISTUniverse:
                     td = data[f"{t}.IS"].dropna()
                     if len(td) > 0:
                         valid.append(t)
-                except:
+                except Exception:
                     pass
 
             # Eğer ilk 50'de >%80 geçerliyse, tüm listeyi kabul et

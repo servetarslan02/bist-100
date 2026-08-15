@@ -6,7 +6,7 @@ Event → World State t0 → Event → World State t1 → Impact Propagation →
 
 import numpy as np
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog
 
@@ -160,8 +160,8 @@ class WorldStateManager:
     }
 
     def __init__(self):
-        self._current_state = WorldState(timestamp=datetime.utcnow())
-        self._last_update = datetime.utcnow()
+        self._current_state = WorldState(timestamp=datetime.now(timezone.utc))
+        self._last_update = datetime.now(timezone.utc)
 
     @property
     def current_state(self) -> WorldState:
@@ -174,7 +174,7 @@ class WorldStateManager:
         Returns: world state delta (değişen faktörler)
         """
         # Decay uygula (zaman geçtikçe etki azalır)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         hours_elapsed = (now - self._last_update).total_seconds() / 3600
         self._current_state.apply_decay(hours_elapsed)
         self._last_update = now
@@ -266,7 +266,7 @@ class WorldStateManager:
                         self._current_state.oil_pressure + delta, 0, 1
                     ))
 
-        self._current_state.timestamp = datetime.utcnow()
+        self._current_state.timestamp = datetime.now(timezone.utc)
 
     def get_state_vector(self) -> np.ndarray:
         """World state vektörü (ML feature olarak kullanılabilir)."""

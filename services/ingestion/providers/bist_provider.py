@@ -10,7 +10,7 @@ Kullanım: Endeks verileri, piyasa geneli, hacim, yükselen/düşenler
 
 import requests
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -78,7 +78,7 @@ class BISTProvider:
                     "low": data.get("low", 0),
                     "open": data.get("open", 0),
                     "close": data.get("close", 0),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "source": "bist_official",
                     "delay_minutes": 15,
                 }

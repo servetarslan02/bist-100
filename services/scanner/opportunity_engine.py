@@ -18,7 +18,7 @@ FAZ 8: Opportunity Discovery Engine
 import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -108,7 +108,7 @@ class OpportunityDiscoveryEngine:
         """Tek hisse için fırsat skoru hesapla."""
         score = OpportunityScore(
             ticker=ticker,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             price=features.get("price", 0) or features.get("close", 0),
             change_1d_pct=features.get("return_1d", 0),
         )
