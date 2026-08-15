@@ -46,8 +46,18 @@ class IntegratedLearningSystem:
             features: Mevcut feature'lar
             regime: Mevcut piyasa rejimi
         """
+        # Aynı ticker için son 24 saatte zaten tahmin var mı?
+        now = datetime.now(timezone.utc)
+        cutoff = (now - timedelta(hours=24)).isoformat()
+        for existing in reversed(self._predictions):
+            if (existing["ticker"] == ticker
+                and not existing["resolved"]
+                and existing.get("timestamp", "") > cutoff):
+                logger.debug("Duplicate prediction skipped", ticker=ticker)
+                return
+
         prediction = {
-            "prediction_id": f"{ticker}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}",
+            "prediction_id": f"{ticker}-{now.strftime('%Y%m%d%H%M%S')}",
             "ticker": ticker,
             "timestamp": datetime.now(timezone.utc).isoformat(),
 
@@ -61,6 +71,7 @@ class IntegratedLearningSystem:
             # Bağlam
             "regime": regime,
             "feature_snapshot": {
+                "price": features.get("price", 0),
                 "momentum_20d": features.get("momentum_20d", 0),
                 "rsi_14": features.get("rsi_14", 50),
                 "volume_zscore": features.get("volume_zscore", 0),
