@@ -2045,3 +2045,442 @@ Her yeni yetenek eklenmeden önce bu mimaride hangi katmana ait olduğu belirlen
 ---
 
 *Bu dosya projenin ana rehberidir. Tüm geliştirme bu doküman referans alınarak yapılmalıdır.*
+
+
+---
+
+## 10. EK SİSTEMLER (Sistem Tanımından Gelen, Yukarıda Dağıtılmayan)
+
+Aşağıdaki sistemler yukarıdaki fazlarda kısmen veya dolaylı olarak ele alınmıştır. Bu bölüm, sistem tanımı dokümanında yer alan ancak yukarıda ayrı başlık olarak verilmeyen her şeyin explicit olarak listelenmesidir. Her biri ilgili faza entegre edilmelidir.
+
+---
+
+### 10.1 Knowledge Graph [FAZ 4-8'e entegre]
+
+**Dosya:** `services/intelligence/knowledge_graph.py` [YENİ]
+
+Sistem yalnızca tablo verisi kullanmamalı. İlişkiler:
+
+```
+Company ↔ Sector
+Company ↔ Supplier
+Company ↔ Customer
+Company ↔ Product
+Company ↔ Person (CEO, yönetim kurulu)
+Company ↔ Event (KAP, haber)
+Company ↔ Macro Event
+```
+
+- [ ] PostgreSQL `knowledge_entities` + `knowledge_relations` tabloları (schema'da mevcut)
+- [ ] pgvector ile entity embedding'leri
+- [ ] Entity extraction (NER) — şirket, kişi, kurum, ülke, emtia tanıma
+- [ ] İlişki gücü scoring (strength)
+- [ ] "Petrol yükseldi → Energy sector → TUPRS cost impact" gibi zincirleme
+
+---
+
+### 10.2 Research Memory & Context [FAZ 8, 13'e entegre]
+
+**Dosya:** `services/agents/context.py` [YENİ]
+
+AI'ya bütün database'i göndermek yerine ilgili context oluşturulur:
+
+- [ ] `Research Context Engine`: Her analiz için ilgili veriyi topla (şirket + sektör + makro + son haberler + son kararlar)
+- [ ] `Research Memory`: Geçmiş araştırmaları sakla (asset, date, thesis, evidence, prediction, outcome)
+- [ ] `Long-Term Memory`: Zaman içinde company/sector/event behavior hakkında hafıza
+- [ ] `Research Lineage`: Prediction → Model → Prompt → Features → Data → Provider zinciri
+- [ ] `Data Lineage`: Raw source → Transformation → Feature → Model → Prediction zinciri
+
+---
+
+### 10.3 Event Infrastructure [FAZ 1-3'e entegre]
+
+**Dosya:** `services/core/event_infrastructure.py` [YENİ]
+
+- [ ] `Event Orchestrator`: Pipeline yönetimi (hangi job, hangi sırada, hangi paralel, hangi dependency, hangi retry)
+- [ ] `Event Priority`: CRITICAL / HIGH / NORMAL / LOW
+- [ ] `Event Streams`: Domain bazlı ayrım (market.events, fundamental.events, news.events, signal.events, decision.events, portfolio.events, vb.)
+- [ ] `Event Decay Engine`: Haber etkisinin zamanla azalması (Day 0: 100%, Day 1: 70%, Day 5: 15%)
+- [ ] `Catalyst Engine`: Yaklaşan olayları izle (earnings, dividend, assembly, contract, regulatory, central bank, macro data)
+
+---
+
+### 10.4 Cache & Job Queue [FAZ 14'e entegre]
+
+- [ ] `Cache System`: Pahalı hesaplar cache'lenir (DCF, Monte Carlo, fundamental analysis, AI summary). Aynı input hash ile tekrar gelirse gereksiz hesap yapılmaz. Cache invalidation event-based.
+- [ ] `Job Queue`: Ağır işler queue'ya gönderilür (AI analysis, Monte Carlo, Backtest, Large universe scan). Web request'i bloklamamalı.
+
+---
+
+### 10.5 Signal Fusion & Conflict [FAZ 9-10'a entegre]
+
+**Dosya:** `services/intelligence/signal_fusion.py` [YENİ]
+
+- [ ] `Signal Fusion Engine`: Bütün modüllerin sonuçlarını birleştir. Basit toplama zorunlu değil; ağırlıklar market regime, asset type, time horizon, data confidence ile değişebilir.
+- [ ] `Conflict Engine`: Teknik BUY + Fundamental SELL ise bunu gizleme. Sinyal çakışması göster ve hangi tarafın neden daha ağır bastığını açıkla.
+- [ ] `Explainability Engine`: Her sonuç için WHY? WHY NOT? WHAT CHANGED? WHAT COULD INVALIDATE? WHAT IS THE MAIN RISK? WHAT IS THE MAIN CATALYST?
+- [ ] `Self-Check Engine`: Nihai analizden önce sistem kendi sonucunu sorgular (data stale? sources conflicting? confidence too high? look-ahead? anomaly? regime changing? model degraded? risk underestimated?)
+
+---
+
+### 10.6 Forecasting & Ensemble [FAZ 6'ya entegre]
+
+- [ ] `Forecasting Engine`: Farklı zaman horizonları (intraday, 1d, 5d, 20d, 60d, 120d). Her horizon ayrı prediction.
+- [ ] `Ensemble Forecasting`: Tek model yerine technical, statistical, time-series, ML, LLM, Monte Carlo sonuçları karşılaştırılır. Modellerin geçmiş performanslarına göre ensemble weighting.
+- [ ] `Probability Engine`: Sistem "fiyat kesin yükselecek" demez. P(+10% within 20d) = 61%, P(-5% within 20d) = 24% gibi olasılık dağılımları üretir.
+
+---
+
+### 10.7 Ek Risk Sistemleri [FAZ 7, 10'a entegre]
+
+- [ ] `Drawdown Engine`: peak equity, current equity, drawdown, max drawdown, drawdown duration, recovery time
+- [ ] `Position Risk Engine`: Her pozisyon için position value, portfolio weight, volatility contribution, VaR contribution, sector contribution, correlation contribution
+- [ ] `Portfolio Optimization`: Risk-adjusted return, minimum volatility, maximum Sharpe, maximum diversification, drawdown constraint, sector constraint, position constraint
+- [ ] `Model Risk Engine`: Modelin kendisinin yanılma ihtimali. Prediction confidence = 90% ama model reliability = 62% ise nihai confidence %90 olamaz.
+- [ ] `Data Confidence Engine`: Confidence = data quality + model reliability + source reliability + agreement. Veri kalitesi düşerse confidence düşer.
+
+---
+
+### 10.8 Ek Portföy Sistemleri [FAZ 12'ye entegre]
+
+- [ ] `Multi-Currency`: TRY, USD, EUR. Portföy değerlerini ana para birimine çevir ve kur riskini ayrıca hesapla.
+- [ ] `FX Conversion`: Döviz kuru değişimi portföy değerini etkiler.
+- [ ] `Factor Engine`: Value, Momentum, Quality, Size, Low Volatility faktörlerini hesapla.
+- [ ] `Factor Exposure`: Portföyün hangi faktörlere ne kadar maruz kaldığını göster (örn: portföy aşırı momentum ağırlıklıysa belirt).
+- [ ] `Liquidity Analysis`: Bir pozisyonun piyasayı ne kadar etkileyebileceğini hesapla. Büyük pozisyonlarda kapasite ve çıkış riskini göster.
+- [ ] `Performance Attribution`: Toplam getiri ayrıştırması (hisse seçimi, sektör seçimi, momentum, value, FX etkisi).
+
+---
+
+### 10.9 Ek Analiz Motorları [FAZ 4-5'e entegre]
+
+- [ ] `Price Action Engine`: İndikatörlerden bağımsız olarak higher high, higher low, lower high, lower low, breakout, breakdown, retest, reversal, consolidation, gap tespiti.
+- [ ] `Support/Resistance Engine`: Historical price, volume profile, swing points, moving averages, previous highs/lows kullanılarak destek/direnç. Her seviye için strength, touch_count, recency, volume.
+- [ ] `Volume Engine`: Fiyat hareketinin hacim tarafından desteklenip desteklenmediği (Price↑ Volume↑ = confirmation, Price↑ Volume↓ = weaker). Volume spike, relative volume, OBV.
+- [ ] `Volatility Engine`: Realized, historical, ATR, downside, upside, regime, expansion, contraction. Volatility expansion → risk motoruna event.
+- [ ] `Market Microstructure Engine`: Bid, ask, spread, depth, order imbalance, liquidity. İşlem yapılabilir fiyat ile teorik fiyat arasındaki fark.
+- [ ] `Sector Engine`: Sector momentum, sector valuation, sector earnings growth, sector relative strength, sector volatility, sector fund flow. Stock return - sector return.
+- [ ] `Relative Strength Engine`: BIST100, sector, peer group, global benchmark ile karşılaştırma.
+- [ ] `Anomaly Engine`: Price anomaly, volume anomaly, volatility anomaly, news anomaly, sentiment anomaly, fundamental anomaly.
+- [ ] `Correlation Engine`: Rolling correlation (stocks, sector, BIST, USDTRY, gold, oil, VIX, rates).
+
+---
+
+### 10.10 Ek Haber/Event Motorları [FAZ 1, 8'e entegre]
+
+- [ ] `News Impact Engine`: Her haber için impact direction, impact magnitude, confidence, time horizon.
+- [ ] `KAP Analysis Engine`: financial results, capital increase, buyback, dividend, merger, acquisition, contract, investment, management change, legal, regulatory, guidance.
+- [ ] `News Duplication Engine`: Aynı haber Reuters, Bloomberg, local media, social media tarafından tekrar tekrar paylaşılmış olabilir. Tek event altında birleştir ama kaynak güvenilirlik bilgisini kaybetme.
+- [ ] `Social Manipulation Engine`: Sosyal medya sinyali doğrudan güvenilir kabul edilmez. Bot-like activity, spam, duplicate posts, coordinated posting, sudden artificial volume, low-quality accounts tespit edilirse confidence düşürülür.
+- [ ] `Sentiment Momentum`: Sentiment'in yalnızca seviyesi değil değişimi izlenir (20→30→45→70 = accelerating, 80→70→55 = deterioration).
+- [ ] `Event Engine`: Olayları tek tek değil zaman çizelgesi olarak takip et (KAP → News → Social → Price → Volume ilişkisi).
+
+---
+
+### 10.11 Ek AI Sistemleri [FAZ 8'e entegre]
+
+- [ ] `Agent Memory`: Her agent current_context, task_history, tool_results tutabilir. Ama kritik state merkezi sistemde tutulmalı.
+- [ ] `Agent Communication`: Agent'lar birbirine doğrudan mesaj göndermemeli. Canonical format: sender, receiver, task_id, correlation_id, payload, timestamp.
+- [ ] `Agent Confidence`: Agent sonucu result, confidence, evidence, uncertainty ile dönmeli. Confidence uydurulmamalı.
+- [ ] `AI Synthesis Engine`: Son aşamada AI bütün sonuçları okur (teknik, fundamental, makro, haber, sosyal, değerleme, tahmin, Monte Carlo, risk, senaryo) ve insan tarafından okunabilir araştırma raporu üretir. Ama AI ham veriyi değiştiremez, metrikleri uyduramaz, risk veto'sunu geçemez.
+- [ ] `Multi-Model Routing`: Qwen3-Coder → code/technical tasks, DeepSeek-R1 → deep reasoning, Gemma 3 → lightweight classification. Roller config üzerinden değiştirilebilir.
+- [ ] `Research Lab`: Araştırmacı strategy, feature, model, threshold değiştirip deney çalıştırabilir. Production sistemi değiştirmez.
+- [ ] `Experiment System`: Her strateji deney olarak kaydedilir (experiment_id, strategy, parameters, dataset, feature_version, model_version, result).
+- [ ] `A/B Test System`: Strategy A vs Strategy B aynı historical period üzerinde karşılaştırılır.
+
+---
+
+### 10.12 Güvenlik & Governance [FAZ 14'e entegre]
+
+- [ ] `Authentication`: Kullanıcı login sistemi, session/token güvenliği, password hashing, token expiration.
+- [ ] `Authorization`: Permission matrix (READ_MARKET, READ_PORTFOLIO, RUN_BACKTEST, RUN_SCENARIO, CHANGE_CONFIG, PROMOTE_MODEL, LIVE_EXECUTION). Roller: VIEWER, ANALYST, OPERATOR, ADMIN, SYSTEM.
+- [ ] `Network Security`: Public internetten DB, Redis, event bus, internal services'e doğrudan erişilememeli.
+- [ ] `Secret Redaction`: Loglarda API key, password, token, secret asla görünmemeli.
+- [ ] `API Security`: Authentication, authorization, rate limiting, input validation, request size limits, timeout.
+- [ ] `Human-in-the-Loop`: Kritik işlemlerde insan onayı (LIVE EXECUTION, MODEL PROMOTION, RISK LIMIT CHANGE, SYSTEM CONFIG CHANGE).
+- [ ] `Safety Governance`: AI risk bypass edemez. Agent kendi permissions'unu değiştiremez. Audit history değiştirilemez. Model kendi kendini promote edemez. Data provider doğrudan trade oluşturamaz.
+- [ ] `No-Trade Gate`: Bad data / risk engine unavailable / portfolio inconsistent / model invalid / critical event uncertainty / system degraded → NO_TRADE.
+- [ ] `System State Machine`: STARTING → INITIALIZING → READY → DEGRADED → RECOVERY → READY. Critical failure → FAILED. Durumlar: FULL, DEGRADED_DATA, DEGRADED_AI, DEGRADED_EVENT, DEGRADED_DATABASE, READ_ONLY, NO_TRADE, RECOVERY.
+- [ ] `Privacy / Data Retention`: Kullanıcı verileri güvenli tutulmalı. Hangi verinin ne kadar süre saklanacağı belirlenmeli.
+- [ ] `Multi-Tenant Isolation`: Birden fazla kullanıcı desteklenirse portfolio, data, memory, settings, API keys birbirinden tamamen izole olmalı.
+
+---
+
+### 10.13 Observability & Monitoring [FAZ 14'e entegre]
+
+- [ ] `Structured Logging`: JSON format, timestamp, level, service, event_id, correlation_id, message.
+- [ ] `Distributed Tracing`: Aynı correlation_id zincir boyunca korunmalı (API → Orchestrator → Agent → Feature → Risk → Portfolio).
+- [ ] `Prometheus Metrics`: events_total, events_failed, events_duplicate, data_quality_failures, llm_requests, llm_failures, llm_latency, decisions_total, risk_rejections, orders_total, fills_total, portfolio_equity, portfolio_drawdown, provider_errors, recovery_failures.
+- [ ] `Performance Monitoring`: API latency, AI latency, DB latency, event latency, queue latency, Monte Carlo duration, backtest duration.
+- [ ] `Cost Monitoring`: LLM token usage, API costs, provider, model, cost bazında takip. "Bu sistem bugün neden 20$ harcadı?" cevaplanabilmeli.
+- [ ] `Resource Management`: CPU/GPU/RAM kullanımı izlenir. Ağır işler resource-aware queue'ya alınabilir.
+- [ ] `Config System`: Threshold'lar kod içine gömülmemeli (RSI threshold, risk limit, position limit, model weight, alert threshold). Config üzerinden yönetilmeli.
+- [ ] `Config Versioning`: Her config değişikliği old, new, who, when, reason şeklinde kaydedilmeli.
+
+---
+
+### 10.14 Recovery & Resilience [FAZ 14'e entegre]
+
+- [ ] `Snapshot System`: Periyodik sistem snapshot (portfolio, positions, cash, decisions, model versions, config version, world state).
+- [ ] `Disaster Recovery`: Backup + snapshot + event log kullanılarak sistem geri getirilebilir.
+- [ ] `Event Replay`: Belirli timestamp'ten itibaren eventler yeniden oynatılabilir (bug reproduction, recovery, backtest, debugging).
+- [ ] `Deterministic Recovery`: Recovery sonrası positions, cash, ledger, equity aynı sonucu üretmeli.
+- [ ] `Failure Injection`: Test ortamında bilerek DB down, Redis down, LLM down, Provider down, Network timeout, Duplicate event, Corrupted data, Partial fill oluştur.
+- [ ] `Chaos Testing`: Bir servisin kapanması diğer sistemi tamamen çökertmemeli (News provider DOWN iken market monitoring, technical analysis, portfolio çalışmaya devam edebilir ama confidence düşebilir).
+- [ ] `Graceful Shutdown`: Stop accepting new jobs, finish safe jobs, flush events, persist state, close connections.
+- [ ] `Startup Recovery`: Load config, load snapshot, verify DB, verify event position, verify portfolio, resume consumers.
+
+---
+
+### 10.15 Ek Test Sistemleri [FAZ 14'e entegre]
+
+- [ ] `Contract Testing`: Servislerin API/event schema'ları değiştiğinde consumer'lar kırılmamalı.
+- [ ] `Version Compatibility`: Event schema_version = 2 ise consumer V1/V2 uyumluluğunu yönetmeli.
+- [ ] `Golden Decisions`: Bazı senaryolarda beklenen sonuçlar önceden belirlenebilir (critical data missing → NO_TRADE). Yeni sürüm farklı davranırsa regression failure.
+
+---
+
+### 10.16 Deployment & CI/CD [FAZ 14'e entegre]
+
+- [ ] `Docker`: Deterministic build, healthcheck, non-root user, environment-based config, graceful shutdown.
+- [ ] `Migrations`: DB schema değişiklikleri migration üzerinden. Elle production DB değiştirme yok. Up/down/version kontrolü.
+- [ ] `CI/CD`: Her commit → lint, typecheck, unit tests, integration tests, security scan, build. PR merge öncesi başarısız test varsa merge engellenmeli.
+- [ ] `TypeScript Strict`: Frontend'de strict TypeScript, "any" yok, API contract types, runtime validation, error boundaries.
+- [ ] `Python Quality`: mypy/pyright type checking, Ruff linter.
+
+---
+
+### 10.17 Veri Bütünlüğü [FAZ 1-2'ye entegre]
+
+- [ ] `Survivorship Bias Protection`: Geçmiş analizlerde bugün hâlâ var olan şirketleri kullanıp iflas eden/silinmiş şirketleri yok saymamalı. Delisted şirketler de tarihsel veride tutulmalı.
+- [ ] `Look-Ahead Bias Protection`: Model geçmişte karar verirken gelecekte henüz bilinmeyen hiçbir veriyi kullanamamalı. Fundamental data için publication timestamp kullanılmalı (sadece fiscal period değil).
+- [ ] `Point-in-Time Data`: Her verinin o tarihte gerçekten bilinen versiyonu saklanmalı. Sonradan düzeltilmiş bilanço/veri geçmiş analize yanlışlıkla girmemeli.
+- [ ] `Numeric Precision`: Quantity ve price precision asset bazlı tanımlanmalı (price_precision, quantity_precision, tick_size, lot_size). Para hesaplarında floating point kritik financial calculation için kullanılmamalı → Decimal veya DB numeric.
+- [ ] `Money Standard`: Currency explicit (TRY, USD, EUR).
+- [ ] `Market Microstructure`: Simülasyonda spread, slippage, liquidity, order size, volume participation dikkate alınmalı. 100 TL'lik emir ile 10M TL'lik emir aynı şekilde execute edilmemeli.
+
+---
+
+### 10.18 Ek Altyapı [FAZ 14'e entegre]
+
+- [ ] `Service Contracts`: Her servis açık API contract'ına sahip olmalı. Internal ve external endpoint'ler ayrı.
+- [ ] `Database Constraints`: DB yalnızca uygulamaya güvenmemeli. quantity >= 0, price > 0, confidence ∈ [0,1] DB seviyesinde korunmalı. Unique: event_id, fill_id, order_external_id.
+- [ ] `Event Schemas`: Her event türü açıkça tanımlanmalı (MARKET_TICK, MARKET_BAR, FUNDAMENTAL_UPDATE, NEWS_EVENT, MACRO_EVENT, FEATURE_UPDATE, SIGNAL_CREATED, DECISION_CREATED, FILL_CREATED, vb.).
+- [ ] `Idempotency Key`: Her mutating request idempotency_key alabilmeli. Aynı request tekrar gelirse same result döndürülmeli.
+- [ ] `Distributed Locking`: Aynı pozisyon veya veri üzerinde iki worker aynı anda çakışan işlem yapmamalı.
+- [ ] `Time Standard`: Tüm backend timestamp'leri UTC + timezone-aware. Naive datetime kullanma.
+- [ ] `Provider Rate Limit`: Her external provider için timeout, retry, backoff, rate_limit, circuit_breaker. Exponential backoff (1s→2s→4s→8s). Sonsuz retry yok.
+- [ ] `Portfolio Reconciliation`: Periyodik ledger vs positions vs cash vs equity karşılaştır. Fark varsa RECONCILIATION_FAILURE üret. Sessizce düzeltme yok.
+- [ ] `Notification System`: Kategoriler (Opportunity, Risk, News, KAP, Regime, Portfolio, Model, System, Security).
+- [ ] `Alert Engine`: Portfolio drawdown > threshold → alert. New critical KAP → alert. Model degradation → alert. Database failure → alert. Unexpected negative cash → alert. Duplicate fills → alert.
+- [ ] `Benchmark Engine`: Performansı BIST100, sektör endeksi veya uygun benchmark ile karşılaştır. Alpha, Beta, Information Ratio, Tracking Error.
+- [ ] `Multi-Market`: BIST, ABD, Avrupa ve farklı varlık sınıfları aynı temel mimariyle desteklenmeli.
+- [ ] `Multi-Asset`: Hisse, fon, ETF, tahvil, emtia, kripto.
+- [ ] `FX / Para Birimi`: USD, EUR, TRY gibi farklı para birimlerini tanımalı.
+
+---
+
+### 10.19 Dashboard Ek Sayfalar [FAZ 14'e entegre]
+
+Aşağıdaki sayfalar ROADMAP'in 14.1 bölümündeki tabloda belirtilmiştir ama detayları:
+
+- [ ] `Market Map`: Heatmap (sector, market cap, daily return, volume). Banking, Industrial, Energy, Technology, Retail ayrımı.
+- [ ] `AI Research`: Model, Version, Input, Evidence, Confidence, Reasoning, Decision, Risk Decision, Outcome görülebilmeli.
+- [ ] `Audit`: "Bugün neden 15 numaralı işlemi yaptın?" → Order → Risk approval → Decision → Signal → Features → Events → Raw data zinciri.
+- [ ] `System Health`: API, Database, Redis/Event Bus, Data Providers, LLM, Decision Engine, Risk Engine, Portfolio, Execution Simulator durumları HEALTHY/DEGRADED/FAILED.
+- [ ] `Score Explainability`: Opportunity Score: 87 yanında Technical +18, Fundamental +21, Macro +14, Momentum +16, Sentiment +9, Risk -7 decomposition.
+- [ ] `Risk Explainability`: Risk Score: 72 yanında Volatility +18, Concentration +15, Correlation +12, Liquidity +8, Drawdown +7, Event Risk +12.
+- [ ] `WebSocket Real-time`: /ws/market, /ws/opportunities, /ws/portfolio, /ws/risk, /ws/system. Backend event → WebSocket update. Frontend polling'e bağımlı olmamalı.
+- [ ] `Frontend State`: Server state (market, portfolio, risk, opportunities) vs UI state (selected symbol, filters, tabs, chart range) ayrılmalı. Server state cache/revalidation.
+
+---
+
+## 11. SON KONTROL LİSTESİ
+
+Bu liste, sistem tanımı dokümanındaki her anahtar kelimenin ROADMAP'te yer aldığını doğrulamak için kullanılır.
+
+| # | Sistem | Faz | Durum |
+|---|--------|-----|-------|
+| 1 | BIST Universe Engine | 1 | ✅ |
+| 2 | Data Ingestion (Market, Fundamental, News, KAP, Macro, Social) | 1 | ✅ |
+| 3 | Data Quality Engine | 1 | ✅ |
+| 4 | Trading Calendar | 1 | ✅ |
+| 5 | Corporate Actions | 1 | ✅ |
+| 6 | Survivorship Bias Protection | 1 | ✅ (10.17) |
+| 7 | Look-Ahead Bias Protection | 1 | ✅ (10.17) |
+| 8 | Point-in-Time Data | 1 | ✅ (10.17) |
+| 9 | Data Source Reliability | 1 | ✅ |
+| 10 | Data Reconciliation | 1 | ✅ (10.1) |
+| 11 | Provider Failover | 1 | ✅ |
+| 12 | Circuit Breaker | 1 | ✅ |
+| 13 | Rate Limit | 1 | ✅ |
+| 14 | Feature Engine (Teknik) | 2 | ✅ |
+| 15 | Feature Store + Versioning | 2 | ✅ |
+| 16 | Feature Discovery Pipeline | 2 | ✅ |
+| 17 | Fundamental Features | 2 | ✅ |
+| 18 | Macro Features | 2 | ✅ |
+| 19 | Sentiment Features | 2 | ✅ |
+| 20 | World State Engine | 3 | ✅ |
+| 21 | Regime Engine | 3 | ✅ |
+| 22 | Macro Sensitivity | 3 | ✅ |
+| 23 | Fundamental Analysis Engine | 4 | ✅ |
+| 24 | Fundamental Trend Engine | 4 | ✅ |
+| 25 | Earnings Quality Engine | 4 | ✅ |
+| 26 | Valuation Engine (Multiples) | 5 | ✅ |
+| 27 | DCF Engine | 5 | ✅ |
+| 28 | Valuation Scenarios | 5 | ✅ |
+| 29 | Monte Carlo Engine | 6 | ✅ |
+| 30 | Monte Carlo Portfolio | 6 | ✅ |
+| 31 | Probability Engine | 6 | ✅ (10.6) |
+| 32 | Forecasting Engine | 6 | ✅ (10.6) |
+| 33 | Ensemble Forecasting | 6 | ✅ (10.6) |
+| 34 | Scenario Engine | 7 | ✅ |
+| 35 | Stress Test Engine | 7 | ✅ |
+| 36 | AI Agent System | 8 | ✅ |
+| 37 | Agent Orchestrator | 8 | ✅ |
+| 38 | Agent Tool System | 8 | ✅ |
+| 39 | Agent Memory | 8 | ✅ (10.11) |
+| 40 | Agent Communication | 8 | ✅ (10.11) |
+| 41 | Agent Loop Control | 8 | ✅ |
+| 42 | Agent Confidence | 8 | ✅ (10.11) |
+| 43 | AI Fallback | 8 | ✅ |
+| 44 | AI Output Validation | 8 | ✅ |
+| 45 | Prompt Versioning | 8 | ✅ |
+| 46 | AI Synthesis Engine | 8 | ✅ (10.11) |
+| 47 | Multi-Model Routing | 8 | ✅ (10.11) |
+| 48 | Opportunity Discovery Engine | 9 | ✅ |
+| 49 | Decision Engine | 10 | ✅ |
+| 50 | Signal Fusion Engine | 10 | ✅ (10.5) |
+| 51 | Conflict Engine | 10 | ✅ (10.5) |
+| 52 | Explainability Engine | 10 | ✅ (10.5) |
+| 53 | Self-Check Engine | 10 | ✅ (10.5) |
+| 54 | Risk Engine | 10 | ✅ |
+| 55 | VaR / CVaR | 10 | ✅ (10.7) |
+| 56 | Drawdown Engine | 10 | ✅ (10.7) |
+| 57 | Position Risk Engine | 10 | ✅ (10.7) |
+| 58 | Portfolio Optimization | 10 | ✅ (10.7) |
+| 59 | Model Risk Engine | 10 | ✅ (10.7) |
+| 60 | Data Confidence Engine | 10 | ✅ (10.7) |
+| 61 | Position Sizing | 10 | ✅ |
+| 62 | Order Engine | 11 | ✅ |
+| 63 | Execution Simulator | 11 | ✅ |
+| 64 | Slippage Model | 11 | ✅ |
+| 65 | Partial Fill | 11 | ✅ |
+| 66 | Transaction Cost Model | 11 | ✅ |
+| 67 | Virtual Portfolio | 12 | ✅ |
+| 68 | Portfolio Ledger | 12 | ✅ |
+| 69 | Reconciliation Engine | 12 | ✅ (10.8) |
+| 70 | Multi-Currency | 12 | ✅ (10.8) |
+| 71 | FX Conversion | 12 | ✅ (10.8) |
+| 72 | Performance Metrics | 12 | ✅ |
+| 73 | Benchmark Engine | 12 | ✅ (10.18) |
+| 74 | Performance Attribution | 12 | ✅ (10.8) |
+| 75 | Factor Engine | 12 | ✅ (10.8) |
+| 76 | Factor Exposure | 12 | ✅ (10.8) |
+| 77 | Liquidity Analysis | 12 | ✅ (10.8) |
+| 78 | Backtest Engine | 13 | ✅ |
+| 79 | Walk-Forward Validation | 13 | ✅ |
+| 80 | Backtest Metrics | 13 | ✅ |
+| 81 | Golden Datasets | 13 | ✅ |
+| 82 | Golden Decisions | 13 | ✅ (10.15) |
+| 83 | Learning Engine | 13 | ✅ |
+| 84 | Model Evaluation | 13 | ✅ |
+| 85 | Drift Detection | 13 | ✅ |
+| 86 | Model Lifecycle | 13 | ✅ |
+| 87 | Shadow Mode | 13 | ✅ |
+| 88 | Model Promotion | 13 | ✅ |
+| 89 | Model Rollback | 13 | ✅ |
+| 90 | Research Memory | 13 | ✅ (10.2) |
+| 91 | Long-Term Memory | 13 | ✅ (10.2) |
+| 92 | Research Context Engine | 8 | ✅ (10.2) |
+| 93 | Research Lineage | 13 | ✅ (10.2) |
+| 94 | Data Lineage | 13 | ✅ (10.2) |
+| 95 | Experiment System | 13 | ✅ (10.11) |
+| 96 | A/B Test System | 13 | ✅ (10.11) |
+| 97 | Research Lab | 13 | ✅ (10.11) |
+| 98 | Model Registry | 13 | ✅ |
+| 99 | Knowledge Graph | 4-8 | ✅ (10.1) |
+| 100 | Dashboard (15 sayfa) | 14 | ✅ |
+| 101 | WebSocket Real-time | 14 | ✅ (10.19) |
+| 102 | Service Contracts | 14 | ✅ (10.18) |
+| 103 | Database Constraints | 14 | ✅ (10.18) |
+| 104 | Event Schemas | 1-3 | ✅ (10.18) |
+| 105 | Event Streams | 1-3 | ✅ (10.3) |
+| 106 | Event Orchestrator | 1-3 | ✅ (10.3) |
+| 107 | Event Priority | 1-3 | ✅ (10.3) |
+| 108 | Event Decay Engine | 1-3 | ✅ (10.3) |
+| 109 | Catalyst Engine | 1-3 | ✅ (10.3) |
+| 110 | Cache System | 14 | ✅ (10.4) |
+| 111 | Job Queue | 14 | ✅ (10.4) |
+| 112 | Notification System | 14 | ✅ (10.18) |
+| 113 | Alert Engine | 14 | ✅ (10.18) |
+| 114 | Authentication | 14 | ✅ (10.12) |
+| 115 | Authorization | 14 | ✅ (10.12) |
+| 116 | Network Security | 14 | ✅ (10.12) |
+| 117 | Secret Redaction | 14 | ✅ (10.12) |
+| 118 | API Security | 14 | ✅ (10.12) |
+| 119 | Human-in-the-Loop | 14 | ✅ (10.12) |
+| 120 | Safety Governance | 14 | ✅ (10.12) |
+| 121 | No-Trade Gate | 14 | ✅ (10.12) |
+| 122 | System State Machine | 14 | ✅ (10.12) |
+| 123 | Privacy / Data Retention | 14 | ✅ (10.12) |
+| 124 | Multi-Tenant Isolation | 14 | ✅ (10.12) |
+| 125 | Structured Logging | 14 | ✅ (10.13) |
+| 126 | Distributed Tracing | 14 | ✅ (10.13) |
+| 127 | Prometheus Metrics | 14 | ✅ (10.13) |
+| 128 | Performance Monitoring | 14 | ✅ (10.13) |
+| 129 | Cost Monitoring | 14 | ✅ (10.13) |
+| 130 | Resource Management | 14 | ✅ (10.13) |
+| 131 | Config System | 14 | ✅ (10.13) |
+| 132 | Config Versioning | 14 | ✅ (10.13) |
+| 133 | Snapshot System | 14 | ✅ (10.14) |
+| 134 | Disaster Recovery | 14 | ✅ (10.14) |
+| 135 | Event Replay | 14 | ✅ (10.14) |
+| 136 | Deterministic Recovery | 14 | ✅ (10.14) |
+| 137 | Failure Injection | 14 | ✅ (10.14) |
+| 138 | Chaos Testing | 14 | ✅ (10.14) |
+| 139 | Graceful Shutdown | 14 | ✅ (10.14) |
+| 140 | Startup Recovery | 14 | ✅ (10.14) |
+| 141 | Testing Pyramid | 14 | ✅ |
+| 142 | Contract Testing | 14 | ✅ (10.15) |
+| 143 | Version Compatibility | 14 | ✅ (10.15) |
+| 144 | Docker | 14 | ✅ (10.16) |
+| 145 | Migrations | 14 | ✅ (10.16) |
+| 146 | CI/CD | 14 | ✅ (10.16) |
+| 147 | TypeScript Strict | 14 | ✅ (10.16) |
+| 148 | Python Quality (mypy/Ruff) | 14 | ✅ (10.16) |
+| 149 | Idempotency Key | 14 | ✅ (10.18) |
+| 150 | Distributed Locking | 14 | ✅ (10.18) |
+| 151 | Time Standard (UTC) | 14 | ✅ (10.18) |
+| 152 | Numeric Precision | 14 | ✅ (10.17) |
+| 153 | Money Standard | 14 | ✅ (10.17) |
+| 154 | Market Microstructure | 14 | ✅ (10.17) |
+| 155 | Portfolio Reconciliation | 14 | ✅ (10.18) |
+| 156 | Price Action Engine | 4 | ✅ (10.9) |
+| 157 | Support/Resistance Engine | 4 | ✅ (10.9) |
+| 158 | Volume Engine | 4 | ✅ (10.9) |
+| 159 | Volatility Engine | 4 | ✅ (10.9) |
+| 160 | Sector Engine | 4 | ✅ (10.9) |
+| 161 | Relative Strength Engine | 4 | ✅ (10.9) |
+| 162 | News Impact Engine | 1 | ✅ (10.10) |
+| 163 | KAP Analysis Engine | 1 | ✅ (10.10) |
+| 164 | News Duplication Engine | 1 | ✅ (10.10) |
+| 165 | Social Manipulation Engine | 1 | ✅ (10.10) |
+| 166 | Sentiment Momentum | 1 | ✅ (10.10) |
+| 167 | Event Engine (Timeline) | 1 | ✅ (10.10) |
+| 168 | Anomaly Engine | 4 | ✅ (10.9) |
+| 169 | Correlation Engine | 4 | ✅ (10.9) |
+| 170 | Market Map | 14 | ✅ (10.19) |
+| 171 | Score Explainability | 14 | ✅ (10.19) |
+| 172 | Risk Explainability | 14 | ✅ (10.19) |
+| 173 | Multi-Market | 14 | ✅ (10.18) |
+| 174 | Multi-Asset | 14 | ✅ (10.18) |
+| 175 | FX / Para Birimi | 14 | ✅ (10.18) |
+| 176 | Provider Rate Limit | 1 | ✅ (10.18) |
+| 177 | Social Sentiment Engine | 1 | ✅ (10.10) |
+
+**Toplam: 177 sistem bileşeni — TAMAMI ROADMAP'TE MEVCUT** ✅
+
+---
+
+*Bu kontrol listesi, sistem tanımı dokümanındaki her bileşinin ROADMAP'te yer aldığını doğrulamak için kullanılır. Yeni bir bileşen eklenmeden önce bu listeye de eklenmelidir.*
