@@ -23,10 +23,198 @@
       "risks": [],
       "outcome": null,
       "resolved": false
+    },
+    {
+      "prediction_id": "AGESA-20260815153543",
+      "ticker": "AGESA",
+      "timestamp": "2026-08-15T15:35:43.175021+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.05205479452054793,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 237.5,
+        "momentum_20d": -5.899993896484375,
+        "rsi_14": 46.706747330647346,
+        "volume_zscore": 1.0396952693021273,
+        "realized_vol_20d": 20.900316293256644,
+        "bb_position": 0.3128044835836207,
+        "trend_slope_20d": -0.05926392905835848
+      },
+      "reasons": [
+        "SPEC g\u00fc\u00e7l\u00fc: 62",
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "EGEEN-20260815153543",
+      "ticker": "EGEEN",
+      "timestamp": "2026-08-15T15:35:43.196251+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.12756113681427633,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 5320.0,
+        "momentum_20d": -232.5,
+        "rsi_14": 45.960000772906874,
+        "volume_zscore": 0.5432518318356102,
+        "realized_vol_20d": 12.636780870679242,
+        "bb_position": 0.4685636485761651,
+        "trend_slope_20d": -0.3043204816552665
+      },
+      "reasons": [
+        "SPEC g\u00fc\u00e7l\u00fc: 60",
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KLSER-20260815153543",
+      "ticker": "KLSER",
+      "timestamp": "2026-08-15T15:35:43.212858+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1265219692959238,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 25.100000381469727,
+        "momentum_20d": -0.6999988555908203,
+        "rsi_14": 47.037833674729114,
+        "volume_zscore": 3.965345696494928,
+        "realized_vol_20d": 16.669569831136123,
+        "bb_position": 0.533318707051768,
+        "trend_slope_20d": -0.31680774632894587
+      },
+      "reasons": [
+        "SPEC g\u00fc\u00e7l\u00fc: 60",
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KATMR-20260815153543",
+      "ticker": "KATMR",
+      "timestamp": "2026-08-15T15:35:43.231115+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.6,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.16592948312902828,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.299999952316284,
+        "momentum_20d": -0.06999993324279785,
+        "rsi_14": 45.169549628226804,
+        "volume_zscore": 2.01965542231824,
+        "realized_vol_20d": 25.19499290343643,
+        "bb_position": 0.5640026822702634,
+        "trend_slope_20d": -0.46714599433081305
+      },
+      "reasons": [
+        "SPEC g\u00fc\u00e7l\u00fc: 60",
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKGRT-20260815153543",
+      "ticker": "AKGRT",
+      "timestamp": "2026-08-15T15:35:43.248535+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11317254174397035,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 6.400000095367432,
+        "momentum_20d": -0.6599998474121094,
+        "rsi_14": 34.451072162665696,
+        "volume_zscore": -0.48889529141104693,
+        "realized_vol_20d": 22.5727967273681,
+        "bb_position": 0.25019214497937997,
+        "trend_slope_20d": -0.7348448712872423
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AHGAZ-20260815153543",
+      "ticker": "AHGAZ",
+      "timestamp": "2026-08-15T15:35:43.265909+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.011621333723453604,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 33.86000061035156,
+        "momentum_20d": -1.2000007629394531,
+        "rsi_14": 50.30350823468888,
+        "volume_zscore": 2.546777156857472,
+        "realized_vol_20d": 31.82573960554933,
+        "bb_position": 0.5368862684791547,
+        "trend_slope_20d": -0.5569150504176726
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "RGYAS-20260815153543",
+      "ticker": "RGYAS",
+      "timestamp": "2026-08-15T15:35:43.285112+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.6,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 209.39999389648438,
+        "momentum_20d": 3.0999908447265625,
+        "rsi_14": 64.55247153713603,
+        "volume_zscore": 3.24611732559775,
+        "realized_vol_20d": 23.656469242935504,
+        "bb_position": 1.1014988928227523,
+        "trend_slope_20d": -0.07231551384001347
+      },
+      "reasons": [
+        "ML pozitif: 65",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
     }
   ],
   "regime_accuracy": {},
   "feature_importance_feedback": {},
   "accuracy_window": [],
-  "saved_at": "2026-08-15T15:29:46.583637+00:00"
+  "saved_at": "2026-08-15T15:35:43.285181+00:00"
 }

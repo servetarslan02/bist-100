@@ -1,12 +1,32 @@
 {
-  "timestamp": "2026-08-15T15:28:40.509704+00:00",
-  "scan_count": 3,
+  "timestamp": "2026-08-15T15:33:16.536899+00:00",
+  "scan_count": 2,
   "state": {
     "state": "READY",
     "substates": {},
     "history_count": 2
   },
-  "learning": {},
+  "learning": {
+    "total_predictions": 11,
+    "total_resolved": 1,
+    "overall_accuracy": 1.0,
+    "recent_accuracy": 1.0,
+    "best_regime": "N/A",
+    "best_regime_accuracy": 0,
+    "worst_regime": "N/A",
+    "worst_regime_accuracy": 0,
+    "regime_performance": {},
+    "error_patterns": {},
+    "feature_feedback": {
+      "momentum_20d": 0.01,
+      "rsi_14": 0.01,
+      "volume_zscore": 0.01,
+      "realized_vol_20d": 0.01,
+      "bb_position": 0.01,
+      "trend_slope_20d": 0.01
+    },
+    "last_update": "2026-08-15T15:22:55.836457+00:00"
+  },
   "outcome_tracker": {
     "total_tracked": 5,
     "checked": 0,
@@ -18,29 +38,29 @@
       "database": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T15:28:18.999052+00:00"
+        "last_check": "2026-08-15T15:22:55.839571+00:00"
       },
       "feature_store": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T15:28:18.999056+00:00"
+        "last_check": "2026-08-15T15:22:55.839575+00:00"
       },
       "opportunity_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T15:28:40.508650+00:00"
+        "last_check": "2026-08-15T15:23:16.270326+00:00"
       },
       "decision_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T15:28:40.508653+00:00"
+        "last_check": "2026-08-15T15:23:16.270329+00:00"
       },
       "risk_engine": {
         "status": "HEALTHY",
         "details": "",
-        "last_check": "2026-08-15T15:28:40.508655+00:00"
+        "last_check": "2026-08-15T15:23:16.270331+00:00"
       }
     },
-    "timestamp": "2026-08-15T15:28:40.509734+00:00"
+    "timestamp": "2026-08-15T15:33:16.536922+00:00"
   }
 }

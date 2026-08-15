@@ -317,10 +317,10 @@ class AlphaSystem:
         from services.ingestion.providers.fundamental_provider import fundamental_provider
         from services.features.fundamental import fundamental_feature_engine
 
-        # Market data
-        test_tickers = self._tickers[:50]
+        # Market data — BIST evreninin tamamı
+        test_tickers = self._tickers
         data_map = {}
-        batch_size = 10
+        batch_size = 20  # Daha büyük batch = daha hızlı
 
         for i in range(0, len(test_tickers), batch_size):
             batch = test_tickers[i:i + batch_size]
@@ -435,12 +435,12 @@ class AlphaSystem:
         print(f"   ✓ {len(signals)} sinyal üretildi")
         print(f"   ✓ {len(top_opps)} fırsat bulundu")
 
-        # Decision + Execution for top opportunities
-        print("\n💼 [8/8] Kararlar ve işlemler...")
+        # Decision + Execution for ALL opportunities (yapay sİnIr yok)
+        print("\n💼 [8/8] Kararlar ve İşlemler...")
         decisions_made = 0
         orders_filled = 0
 
-        for opp in top_opps[:5]:
+        for opp in top_opps:
             ticker = opp["ticker"]
             features = features_map.get(ticker, {})
             price = features.get("price", 0)
@@ -564,7 +564,7 @@ class AlphaSystem:
         print(f"\n{'=' * 70}")
         print(f"  📊 TARAMA SONUÇLARI (#{self._scan_count})")
         print(f"{'=' * 70}")
-        print(f"  Taranan hisse    : {len(features_map)}")
+        print(f"  Taranan hisse    : {len(features_map)} / {len(test_tickers)}")
         print(f"  Piyasa rejimi    : {regime}")
         print(f"  Breadth          : %{breadth:.1f}")
         print(f"  Üretilen sinyal  : {len(signals)}")
@@ -576,10 +576,10 @@ class AlphaSystem:
 
         # Top opportunities
         if top_opps:
-            print(f"\n  🏆 EN GÜÇLÜ FIRSATLAR:")
+            print(f"\n  🏆 FIRSATLAR ({len(top_opps)} adet):")
             print(f"  {'#':<4} {'Hisse':<10} {'Skor':>6} {'Sinyal':<15} {'Yön':<8} {'Fiyat':>10}")
             print(f"  {'-'*55}")
-            for i, opp in enumerate(top_opps[:10], 1):
+            for i, opp in enumerate(top_opps, 1):
                 print(f"  {i:<4} {opp['ticker']:<10} {opp['score']:>6.1f} {opp.get('signal',''):<15} {opp.get('direction',''):<8} {features_map.get(opp['ticker'], {}).get('price', 0):>10.2f}")
 
         # Snapshot
