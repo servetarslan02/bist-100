@@ -79,9 +79,9 @@ def run_daily_pipeline(date: str, use_real_data: bool = False):
     
     from services.ingestion.bist_universe import BIST_STOCKS
     
-    # TÜM BIST 100 + XU100 benchmark
+    # TÜM BIST HİSSELERİNİ TARA (BIST TÜM ~450+ hisse)
     from services.ingestion.bist_universe import BISTUniverse
-    test_tickers = BISTUniverse.BIST_100_TICKERS + ["XU100"]
+    test_tickers = BISTUniverse.BIST_ALL_TICKERS + ["XU100"]
     
     if use_real_data:
         # Gerçek veri çek (Yahoo Finance)
