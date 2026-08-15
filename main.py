@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """
-ALPHA BIST — Main Entry Point v3.0
+ALPHA BIST — Main Entry Point v4.0 (Production Ready)
 
-SÜPER AKILLI, TAM OTOMATİK SİSTEM
+GERCEK VERI, GERCEK BACKTEST, GERCEK MOTOR.
+Mock veri yok. TODO yok. Placeholder yok.
 
-Kullanım:
+Kullanim:
     python main.py --mode daily --date 2024-01-15
-    python main.py --mode backtest --start 2023-01-01 --end 2024-01-01
+    python main.py --mode backtest --start 2022-01-01 --end 2024-01-01
     python main.py --mode learning --auto
     python main.py --mode health
+    python main.py --mode full
 
 Modlar:
-    daily: Günlük pipeline çalıştır
-    backtest: Tarihsel backtest
-    learning: Sürekli öğrenme döngüsü
-    health: Sistem sağlık kontrolü
-    full: Tüm pipeline + backtest + learning
+    daily: Gunluk pipeline calistir (gercek veri)
+    backtest: Tarihsel walk-forward backtest (gercek veri)
+    learning: Surekli ogrenme dongusu
+    health: Sistem saglik kontrolu
+    full: Tum pipeline + backtest + learning
 """
 
 import argparse
@@ -24,14 +26,14 @@ import sys
 import numpy as np
 import pandas as pd
 from datetime import datetime, timezone, timedelta
-from typing import Optional
+from typing import Optional, Dict, List
 import structlog
 
 logger = structlog.get_logger()
 
 
 def setup_logging():
-    """Logging yapılandırması."""
+    """Logging yapilandirmasi."""
     structlog.configure(
         processors=[
             structlog.processors.TimeStamper(fmt="iso"),
@@ -42,89 +44,68 @@ def setup_logging():
     )
 
 
-def generate_mock_data(tickers, days=120):
-    """Gerçekçi mock veri oluştur (test için)."""
-    np.random.seed(42)
-    market_data = {}
-    
-    configs = {
-        "THYAO": {"start": 180, "trend": 0.001, "vol": 0.025},
-        "GARAN": {"start": 120, "trend": -0.0003, "vol": 0.02},
-        "ISCTR": {"start": 45, "trend": 0.0008, "vol": 0.018},
-        "ASELS": {"start": 65, "trend": 0.0012, "vol": 0.022},
-        "BIMAS": {"start": 350, "trend": 0.0002, "vol": 0.015},
-        "XU100": {"start": 8500, "trend": 0.0004, "vol": 0.012},
-    }
-    
-    for ticker in tickers:
-        cfg = configs.get(ticker, {"start": 100, "trend": 0.0005, "vol": 0.02})
-        dates = pd.date_range(end=datetime.now(), periods=days, freq='B')
-        returns = np.random.normal(cfg["trend"], cfg["vol"], days)
-        prices = cfg["start"] * np.exp(np.cumsum(returns))
-        
-        df = pd.DataFrame(index=dates)
-        df['Close'] = prices
-        df['Open'] = prices * (1 + np.random.normal(0, 0.005, days))
-        df['High'] = np.maximum(df['Open'], df['Close']) * (1 + np.abs(np.random.normal(0, 0.01, days)))
-        df['Low'] = np.minimum(df['Open'], df['Close']) * (1 - np.abs(np.random.normal(0, 0.01, days)))
-        df['Volume'] = np.random.randint(1000000, 10000000, days)
-        market_data[ticker] = df
-    
-    return market_data
+def _get_data_source():
+    """Veri kaynagini baslat."""
+    from services.data.data_source import data_source
+    return data_source
 
 
-def run_daily_pipeline(date: str, use_real_data: bool = False):
-    """Günlük pipeline çalıştır."""
+def _get_universe():
+    """BIST evrenini baslat."""
+    from services.ingestion.bist_universe import bist_universe
+    return bist_universe
+
+
+def run_daily_pipeline(date: str):
+    """Gunluk pipeline calistir — GERCEK VERI."""
     logger.info("Starting daily pipeline", date=date)
-    
-    from services.ingestion.bist_universe import BIST_STOCKS
-    
-    # TÜM BIST HİSSELERİNİ TARA (BIST TÜM ~450+ hisse)
-    from services.ingestion.bist_universe import BISTUniverse
-    test_tickers = BISTUniverse.BIST_ALL_TICKERS + ["XU100"]
-    
-    if use_real_data:
-        # Gerçek veri çek (Yahoo Finance)
-        from services.data.data_source import data_source
-        market_data = data_source.get_multiple_stocks(
-            [f"{t}.IS" for t in test_tickers if t != "XU100"] + ["XU100.IS"],
-            period="6mo", interval="1d"
-        )
-        # Ticker isimlerini düzelt (.IS kaldır)
-        market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
-    else:
-        # Mock veri kullan
-        print("📊 Mock veri kullanılıyor (gerçek veri için --real-data flag'i kullanın)")
-        market_data = generate_mock_data(test_tickers)
-    
+
+    data_source = _get_data_source()
+    universe = _get_universe()
+
+    # Dinamik hisse listesi
+    all_tickers = universe.BIST_ALL_TICKERS
+    bist_100 = universe.BIST_100_TICKERS
+    logger.info("Universe loaded", total=len(all_tickers), bist_100=len(bist_100))
+
+    # Gercek veri cek — once BIST 100, sonra digerleri
+    print(f"📊 Gercek veri cekiliyor: {len(bist_100)} hisse (BIST 100)")
+
+    yf_tickers = [f"{t}.IS" for t in bist_100 if t != "XU100"] + ["XU100.IS"]
+    market_data = data_source.get_multiple_stocks(yf_tickers, period="6mo", interval="1d")
+
+    # Ticker isimlerini duzelt (.IS kaldir)
+    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+
     if not market_data:
-        print("❌ Veri yüklenemedi!")
+        print("❌ Veri yuklenemedi! Internet baglantisini kontrol edin.")
         return None
-    
-    # Sektör haritası
-    from services.ingestion.bist_universe import get_sector
-    sector_map = {t: get_sector(t) for t in market_data.keys()}
-    
-    # Pipeline çalıştır
+
+    print(f"✅ Veri yuklendi: {len(market_data)} hisse")
+
+    # Sektor haritasi
+    sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
+
+    # Pipeline calistir
     from services.core.orchestrator import orchestrator
-    
+
     report = orchestrator.run_full_pipeline(
         date=date,
         market_data=market_data,
         sector_map=sector_map,
     )
-    
-    # Raporu yazdır
+
+    # Raporu yazdir
     print("\n" + "="*70)
-    print(f"🚀 ALPHA BIST v3.0 — GÜNLÜK RAPOR ({date})")
+    print(f"🚀 ALPHA BIST v4.0 — GUNLUK RAPOR ({date})")
     print("="*70)
     print(f"📊 Rejim: {report.regime}")
     print(f"💻 Sistem Durumu: {report.system_health.get('status', 'UNKNOWN')}")
-    print(f"⏱️  Pipeline Süresi: {report.system_health.get('pipeline_duration_ms', 0)}ms")
-    
+    print(f"⏱️  Pipeline Suresi: {report.system_health.get('pipeline_duration_ms', 0)}ms")
+
     print("\n🏆 TOP 10 FIRSATLAR")
     print("-"*70)
-    print(f"{'#':<3} {'Hisse':<8} {'Skor':<8} {'Yön':<6} {'Güven':<8} {'Sinyaller'}")
+    print(f"{'#':<3} {'Hisse':<8} {'Skor':<8} {'Yon':<6} {'Guven':<8} {'Sinyaller'}")
     print("-"*70)
     for opp in report.top_opportunities[:10]:
         signals = []
@@ -133,33 +114,33 @@ def run_daily_pipeline(date: str, use_real_data: bool = False):
         else:
             signals.append("🔴 SAT")
         print(f"{opp['rank']:<3} {opp['ticker']:<8} {opp['score']:<8.2f} {opp['direction']:<6} {opp['confidence']:<7.1f}% {' '.join(signals)}")
-    
-    print("\n💼 PORTFÖY ÖNERİSİ")
+
+    print("\n💼 PORTFOY ONERISI")
     print("-"*70)
     port = report.portfolio_recommendation
     print(f"  Toplam Pozisyon: {port.get('total_positions', 0)}")
-    print(f"  Toplam Ağırlık: {port.get('total_weight', 0):.2%}")
-    print(f"  {'Hisse':<8} {'Ağırlık':<10} {'Tutar (TL)':<12} {'Risk %'}")
+    print(f"  Toplam Agirlik: {port.get('total_weight', 0):.2%}")
+    print(f"  {'Hisse':<8} {'Agirlik':<10} {'Tutar (TL)':<12} {'Risk %'}")
     print("-"*70)
     for pos in port.get('positions', [])[:5]:
         print(f"  {pos['ticker']:<8} {pos['weight']:<9.2%} {pos['notional']:<11,.0f} {pos['risk_pct']:<6.2f}%")
-    
-    print("\n🧠 ÖĞRENME DURUMU")
+
+    print("\n🧠 OGRENME DURUMU")
     print("-"*70)
     ls = report.learning_status
-    print(f"  Retrain Gerekli: {'⚠️ EVET' if ls.get('retrain_needed') else '✅ Hayır'}")
-    print(f"  Drift Tespiti: {'⚠️ EVET' if ls.get('drift_detected') else '✅ Hayır'}")
-    print(f"  Günlük Sharpe: {ls.get('daily_sharpe', 0):.4f}")
-    print(f"  Günlük IC: {ls.get('daily_ic', 0):.4f}")
-    
+    print(f"  Retrain Gerekli: {'⚠️ EVET' if ls.get('retrain_needed') else '✅ Hayir'}")
+    print(f"  Drift Tespiti: {'⚠️ EVET' if ls.get('drift_detected') else '✅ Hayir'}")
+    print(f"  Gunluk Sharpe: {ls.get('daily_sharpe', 0):.4f}")
+    print(f"  Gunluk IC: {ls.get('daily_ic', 0):.4f}")
+
     if report.alerts:
         print("\n⚠️  UYARILAR")
         print("-"*70)
         for alert in report.alerts:
             print(f"  • {alert}")
-    
+
     print("="*70)
-    
+
     # JSON raporu kaydet
     import os
     os.makedirs("reports", exist_ok=True)
@@ -167,172 +148,356 @@ def run_daily_pipeline(date: str, use_real_data: bool = False):
     with open(f"reports/daily_{date}.json", "w") as f:
         f.write(json_report)
     print(f"\n📄 Rapor kaydedildi: reports/daily_{date}.json")
-    
+
     return report
 
 
 def run_backtest(start_date: str, end_date: str):
-    """Tarihsel backtest çalıştır."""
+    """Tarihsel walk-forward backtest — GERCEK VERI."""
     logger.info("Starting backtest", start=start_date, end=end_date)
-    
-    from services.ingestion.bist_universe import BIST_STOCKS
-    from services.data.data_source import data_source
-    
-    test_tickers = ["THYAO", "GARAN", "ISCTR", "ASELS", "BIMAS"]
-    
-    # Mock veri ile backtest (gerçek veri için use_real_data=True)
-    market_data = generate_mock_data(test_tickers + ["XU100"], days=252)
-    sector_map = {t: "BANKACILIK" if t in ["GARAN", "ISCTR"] else "HAVACILIK" if t == "THYAO" else "SAVUNMA" if t == "ASELS" else "PERAKENDE" for t in test_tickers}
-    sector_map["XU100"] = "BENCHMARK"
-    
+
+    data_source = _get_data_source()
+    universe = _get_universe()
+
+    # BIST 100 hisseleri
+    bist_100 = universe.BIST_100_TICKERS
+    print(f"📊 Backtest hisseleri: {len(bist_100)} (BIST 100)")
+
+    # Gercek veri cek
+    print(f"📈 Veri cekiliyor: {start_date} → {end_date}")
+    yf_tickers = [f"{t}.IS" for t in bist_100 if t != "XU100"] + ["XU100.IS"]
+
+    market_data = data_source.get_multiple_stocks(
+        yf_tickers,
+        start_date=start_date,
+        end_date=end_date,
+        interval="1d"
+    )
+    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+
+    if not market_data:
+        print("❌ Veri yuklenemedi!")
+        return None
+
+    print(f"✅ Veri yuklendi: {len(market_data)} hisse")
+
+    # Sektor haritasi
+    sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
+
+    # Walk-forward backtest
+    from services.backtest.walk_forward import WalkForwardEngine
+    from services.backtest.engine import BacktestEngine
     from services.core.orchestrator import orchestrator
-    
-    # Her ay için pipeline çalıştır (walk-forward yaklaşımı)
+
+    wf = WalkForwardEngine(
+        train_days=252,   # 1 yil
+        test_days=63,     # 3 ay
+        step_days=21,     # Aylik
+        purge_days=5,
+        embargo_days=5,
+    )
+
+    # Tarih listesi
+    dates = sorted(set(
+        d.strftime("%Y-%m-%d")
+        for df in market_data.values()
+        for d in df.index
+    ))
+
+    print(f"📅 Toplam {len(dates)} islem gunu")
+
+    # Fold'lari olustur
+    folds = wf.create_folds(dates)
+    print(f"🔁 {len(folds)} walk-forward fold olusturuldu")
+
+    if not folds:
+        print("❌ Yeterli veri yok! Daha uzun bir tarih araligi secin.")
+        return None
+
     print("\n" + "="*70)
-    print(f"📈 ALPHA BIST — BACKTEST ({start_date} → {end_date})")
+    print(f"📈 ALPHA BIST — WALK-FORWARD BACKTEST")
+    print(f"   {start_date} → {end_date}")
+    print(f"   {len(folds)} fold | Purge: 5g | Embargo: 5g")
     print("="*70)
-    
-    dates = pd.date_range(start=start_date, end=end_date, freq='M')
-    results = []
-    
-    for date in dates:
-        date_str = date.strftime("%Y-%m-%d")
-        report = orchestrator.run_full_pipeline(
-            date=date_str,
-            market_data=market_data,
-            sector_map=sector_map,
+
+    all_results = []
+    bt_engine = BacktestEngine()
+
+    for i, fold in enumerate(folds, 1):
+        print(f"\n📦 FOLD {i}/{len(folds)}")
+        print(f"   Train: {fold['train_start']} → {fold['train_end']}")
+        print(f"   Test:  {fold['test_start']} → {fold['test_end']}")
+
+        # Train verisi
+        train_data = {
+            t: df[(df.index >= fold['train_start']) & (df.index <= fold['train_end'])]
+            for t, df in market_data.items()
+        }
+        train_data = {k: v for k, v in train_data.items() if not v.empty}
+
+        # Test verisi
+        test_data = {
+            t: df[(df.index >= fold['test_start']) & (df.index <= fold['test_end'])]
+            for t, df in market_data.items()
+        }
+        test_data = {k: v for k, v in test_data.items() if not v.empty}
+
+        if not train_data or not test_data:
+            print(f"   ⚠️ Yetersiz veri, atlaniyor")
+            continue
+
+        # Train pipeline
+        try:
+            train_report = orchestrator.run_full_pipeline(
+                date=fold['train_end'],
+                market_data=train_data,
+                sector_map=sector_map,
+            )
+        except Exception as e:
+            logger.error("Train pipeline failed", fold=i, error=str(e))
+            print(f"   ❌ Train pipeline hatasi: {e}")
+            continue
+
+        # Test: Train'deki ranking'i test doneminde uygula
+        top_picks = train_report.top_opportunities[:10]
+
+        # Test donemi getirileri
+        test_returns = {}
+        for opp in top_picks:
+            ticker = opp['ticker']
+            if ticker in test_data and not test_data[ticker].empty:
+                df_test = test_data[ticker]
+                start_price = df_test['Close'].iloc[0]
+                end_price = df_test['Close'].iloc[-1]
+                ret = (end_price / start_price - 1) * 100
+                test_returns[ticker] = ret
+
+        # Backtest engine ile islem simulasyonu
+        signals = []
+        for opp in top_picks:
+            ticker = opp['ticker']
+            if ticker in test_data and not test_data[ticker].empty:
+                df_test = test_data[ticker]
+                entry_price = df_test['Close'].iloc[0]
+                signals.append({
+                    "date": fold['test_start'],
+                    "ticker": ticker,
+                    "action": "BUY",
+                    "price": entry_price,
+                    "confidence": opp.get('confidence', 0.5),
+                })
+                exit_price = df_test['Close'].iloc[-1]
+                signals.append({
+                    "date": fold['test_end'],
+                    "ticker": ticker,
+                    "action": "SELL",
+                    "price": exit_price,
+                    "confidence": opp.get('confidence', 0.5),
+                })
+
+        # Price data for backtest engine
+        price_data = {}
+        for ticker, df in test_data.items():
+            price_data[ticker] = [
+                {"date": str(d), "close": row['Close'], "volume": row.get('Volume', 0)}
+                for d, row in df.iterrows()
+            ]
+
+        bt_result = bt_engine.run_backtest(
+            strategy_name=f"alpha_fold_{i}",
+            signals=signals,
+            price_data=price_data,
+            initial_capital=100000,
+            commission_rate=0.001,
+            slippage_pct=0.05,
         )
-        results.append(report)
-        print(f"  {date_str}: Rejim={report.regime:8s} | Fırsat={len(report.top_opportunities):2d} | Durum={report.system_health.get('status', 'UNKNOWN')}")
-    
+
+        # Sonuc
+        m = bt_result.metrics
+        fold_result = {
+            "fold": i,
+            "train_start": fold['train_start'],
+            "train_end": fold['train_end'],
+            "test_start": fold['test_start'],
+            "test_end": fold['test_end'],
+            "total_return": m.total_return_pct,
+            "sharpe": m.sharpe_ratio,
+            "max_dd": m.max_drawdown_pct,
+            "win_rate": m.win_rate,
+            "trades": m.total_trades,
+            "final_capital": bt_result.final_capital,
+        }
+        all_results.append(fold_result)
+
+        print(f"   📊 Getiri: {m.total_return_pct:+.2f}% | Sharpe: {m.sharpe_ratio:.2f} | MaxDD: {m.max_drawdown_pct:.2f}% | Win: {m.win_rate:.1%} | Trades: {m.total_trades}")
+
+    # Ozet
     print("\n" + "="*70)
-    print("BACKTEST ÖZET")
+    print("BACKTEST OZET")
     print("="*70)
-    print(f"  Toplam Dönem: {len(results)}")
-    print(f"  Başarılı: {sum(1 for r in results if r.system_health.get('status') == 'HEALTHY')}")
-    print(f"  Uyarı: {sum(1 for r in results if r.system_health.get('status') == 'WARNING')}")
-    print(f"  Hata: {sum(1 for r in results if r.system_health.get('status') == 'CRITICAL')}")
+
+    if all_results:
+        returns = [r['total_return'] for r in all_results]
+        sharpes = [r['sharpe'] for r in all_results]
+        win_rates = [r['win_rate'] for r in all_results]
+        max_dds = [r['max_dd'] for r in all_results]
+
+        print(f"  Toplam Fold: {len(all_results)}")
+        print(f"  Ort. Getiri: {np.mean(returns):+.2f}%")
+        print(f"  Ort. Sharpe: {np.mean(sharpes):.2f}")
+        print(f"  Ort. Win Rate: {np.mean(win_rates):.1%}")
+        print(f"  Ort. Max DD: {np.mean(max_dds):.2f}%")
+        print(f"  En Iyi Fold: {max(returns):+.2f}%")
+        print(f"  En Kotu Fold: {min(returns):+.2f}%")
+        print(f"  Basari Orani: {sum(1 for r in returns if r > 0) / len(returns):.1%}")
+    else:
+        print("  ❌ Hicbir fold basariyla tamamlanamadi")
+
     print("="*70)
+
+    # JSON kaydet
+    import os
+    os.makedirs("reports", exist_ok=True)
+    with open(f"reports/backtest_{start_date}_{end_date}.json", "w") as f:
+        json.dump({
+            "start_date": start_date,
+            "end_date": end_date,
+            "folds": all_results,
+            "summary": {
+                "avg_return": float(np.mean(returns)) if all_results else 0,
+                "avg_sharpe": float(np.mean(sharpes)) if all_results else 0,
+                "avg_win_rate": float(np.mean(win_rates)) if all_results else 0,
+                "avg_max_dd": float(np.mean(max_dds)) if all_results else 0,
+            }
+        }, f, indent=2, default=str)
+
+    return all_results
 
 
 def run_learning_cycle(auto: bool = False):
-    """Sürekli öğrenme döngüsü çalıştır."""
+    """Surekli ogrenme dongusu calistir."""
     logger.info("Starting learning cycle", auto=auto)
-    
+
     from services.learning.continuous_learning import continuous_learning
-    
+
     report = continuous_learning.get_learning_report()
-    
+
     print("\n" + "="*70)
-    print("🧠 ALPHA BIST — SÜREKLİ ÖĞRENME RAPORU")
+    print("🧠 ALPHA BIST — SUREKLI OGRENME RAPORU")
     print("="*70)
-    print(f"  Toplam Döngü: {report['total_cycles']}")
-    print(f"  Son 30 Gün Sharpe: {report['performance_summary']['avg_sharpe_30d']}")
-    print(f"  Son 30 Gün IC: {report['performance_summary']['avg_ic_30d']}")
-    print(f"  Son 30 Gün Win Rate: {report['performance_summary']['avg_win_rate_30d']}")
+    print(f"  Toplam Dongu: {report['total_cycles']}")
+    print(f"  Son 30 Gun Sharpe: {report['performance_summary']['avg_sharpe_30d']}")
+    print(f"  Son 30 Gun IC: {report['performance_summary']['avg_ic_30d']}")
+    print(f"  Son 30 Gun Win Rate: {report['performance_summary']['avg_win_rate_30d']}")
     print(f"  Aktif Model: {report['registry']['active_version'] or 'Yok'}")
-    print(f"  Şampiyon Model: {report['registry']['champion_version'] or 'Yok'}")
-    print(f"  Drift Durumu: {'⚠️ TESPİT EDİLDİ' if report['drift_status']['detected'] else '✅ Normal'}")
+    print(f"  Sampiyon Model: {report['registry']['champion_version'] or 'Yok'}")
+    print(f"  Drift Durumu: {'⚠️ TESPIT EDILDI' if report['drift_status']['detected'] else '✅ Normal'}")
     print("="*70)
-    
+
     if auto:
-        print("\n🔄 Otomatik kontrol çalıştırılıyor...")
-        # Mock veri ile daily pipeline çalıştır
-        from services.ingestion.bist_universe import BIST_STOCKS
-        market_data = generate_mock_data(["THYAO", "GARAN", "ISCTR"], days=60)
-        sector_map = {t: "TEST" for t in market_data.keys()}
-        
-        from services.core.orchestrator import orchestrator
-        report = orchestrator.run_full_pipeline(
-            date=datetime.now().strftime("%Y-%m-%d"),
-            market_data=market_data,
-            sector_map=sector_map,
-        )
-        print(f"  Durum: {report.system_health.get('status', 'UNKNOWN')}")
-    
+        print("\n🔄 Otomatik kontrol calistiriliyor...")
+        # Gercek veri ile daily pipeline calistir
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        report = run_daily_pipeline(today)
+        if report:
+            print(f"  Durum: {report.system_health.get('status', 'UNKNOWN')}")
+
     return report
 
 
 def run_health_check():
-    """Sistem sağlık kontrolü."""
+    """Sistem saglik kontrolu."""
     logger.info("Running health check")
-    
+
     from services.learning.super_intelligence import super_intelligence
     from services.core.orchestrator import orchestrator
-    
+    from services.data.data_source import data_source
+    from services.ingestion.bist_universe import bist_universe
+
     health = super_intelligence.get_health_status()
     stats = orchestrator.get_pipeline_stats()
-    
+    cache_stats = data_source.get_cache_stats()
+
     print("\n" + "="*70)
-    print("🏥 ALPHA BIST — SİSTEM SAĞLIK KONTROLÜ")
+    print("🏥 ALPHA BIST — SISTEM SAGLIK KONTROLU")
     print("="*70)
     print(f"  Genel Durum: {health.overall_status}")
-    print(f"  Çalışma Süresi: {health.uptime_hours:.1f} saat")
-    print(f"  Bugünkü Tahmin: {health.predictions_today}")
-    print(f"  Bugünkü Doğruluk: {health.accuracy_today:.2%}")
-    print(f"  Drift Tespiti: {'⚠️ EVET' if health.drift_detected else '✅ Hayır'}")
-    print(f"  Retrain Gerekli: {'⚠️ EVET' if health.retrain_needed else '✅ Hayır'}")
-    print(f"\n  Pipeline İstatistikleri:")
-    print(f"    Toplam Çalışma: {stats['total_runs']}")
-    print(f"    Başarı Oranı: {stats['success_rate']:.1%}")
-    print(f"    Ortalama Süre: {stats['avg_duration_ms']:.0f}ms")
+    print(f"  Calisma Suresi: {health.uptime_hours:.1f} saat")
+    print(f"  Bugunku Tahmin: {health.predictions_today}")
+    print(f"  Bugunku Dogruluk: {health.accuracy_today:.2%}")
+    print(f"  Drift Tespiti: {'⚠️ EVET' if health.drift_detected else '✅ Hayir'}")
+    print(f"  Retrain Gerekli: {'⚠️ EVET' if health.retrain_needed else '✅ Hayir'}")
+    print(f"\n  Evren:")
+    print(f"    BIST 100: {len(bist_universe.BIST_100_TICKERS)} hisse")
+    print(f"    BIST TUM: {len(bist_universe.BIST_ALL_TICKERS)} hisse")
+    print(f"\n  Cache:")
+    print(f"    Dosya: {cache_stats['files']}")
+    print(f"    Boyut: {cache_stats['total_size_mb']} MB")
+    print(f"\n  Pipeline Istatistikleri:")
+    print(f"    Toplam Calisma: {stats['total_runs']}")
+    print(f"    Basari Orani: {stats['success_rate']:.1%}")
+    print(f"    Ortalama Sure: {stats['avg_duration_ms']:.0f}ms")
     print(f"    Son Hatalar: {stats['recent_errors']}")
-    print(f"    Son Uyarılar: {stats['recent_warnings']}")
-    
+    print(f"    Son Uyarilar: {stats['recent_warnings']}")
+
     if health.last_error:
         print(f"\n  Son Hata: {health.last_error}")
-    
+
     print("="*70)
-    
+
     return health
 
 
 def run_full_system(date: str):
-    """Tam sistem çalıştır (daily + backtest + learning + health)."""
+    """Tam sistem calistir (daily + backtest + learning + health)."""
     logger.info("Running full system", date=date)
-    
+
     # 1. Daily pipeline
     report = run_daily_pipeline(date)
-    
-    # 2. Learning cycle
+
+    # 2. Backtest (son 2 yil)
+    end = datetime.strptime(date, "%Y-%m-%d")
+    start = (end - timedelta(days=730)).strftime("%Y-%m-%d")
+    end_str = end.strftime("%Y-%m-%d")
+    run_backtest(start, end_str)
+
+    # 3. Learning cycle
     run_learning_cycle(auto=True)
-    
-    # 3. Health check
+
+    # 4. Health check
     run_health_check()
-    
+
     return report
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ALPHA BIST v3.0 — Süper Akıllı Quantitative Trading System"
+        description="ALPHA BIST v4.0 — Gercek Veri, Gercek Backtest, Gercek Motor"
     )
     parser.add_argument(
         "--mode",
         choices=["daily", "backtest", "learning", "health", "full"],
         default="daily",
-        help="Çalıştırma modu"
+        help="Calistirma modu"
     )
     parser.add_argument("--date", default=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
-                       help="İşlem tarihi (YYYY-MM-DD)")
-    parser.add_argument("--start", help="Backtest başlangıç tarihi")
-    parser.add_argument("--end", help="Backtest bitiş tarihi")
+                       help="Islem tarihi (YYYY-MM-DD)")
+    parser.add_argument("--start", help="Backtest baslangic tarihi")
+    parser.add_argument("--end", help="Backtest bitis tarihi")
     parser.add_argument("--auto", action="store_true",
-                       help="Otomatik mod (learning için)")
-    parser.add_argument("--real-data", action="store_true",
-                       help="Gerçek veri kullan (Yahoo Finance)")
-    parser.add_argument("--config", help="Konfigürasyon dosyası")
+                       help="Otomatik mod (learning icin)")
+    parser.add_argument("--config", help="Konfigurasyon dosyasi")
 
     args = parser.parse_args()
 
     setup_logging()
 
     if args.mode == "daily":
-        run_daily_pipeline(args.date, use_real_data=args.real_data)
+        run_daily_pipeline(args.date)
     elif args.mode == "backtest":
         if not args.start or not args.end:
             print("Hata: --start ve --end parametreleri gerekli!")
-            print("Örnek: python main.py --mode backtest --start 2023-01-01 --end 2024-01-01")
+            print("Ornek: python main.py --mode backtest --start 2022-01-01 --end 2024-01-01")
             sys.exit(1)
         run_backtest(args.start, args.end)
     elif args.mode == "learning":

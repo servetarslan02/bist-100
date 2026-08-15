@@ -14,6 +14,8 @@ KURAL: Veri = petrol. Kirli veri = kirli petrol.
 
 import os
 import json
+import re
+import requests
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
@@ -235,7 +237,19 @@ class YahooFinanceSource:
 
 
 class BISTSource:
-    """BIST resmi veri kaynağı."""
+    """Borsa Istanbul resmi veri kaynagi — web scraping + API."""
+
+    BASE_URL = "https://www.borsaistanbul.com"
+    API_URL = "https://www.borsaistanbul.com/api"
+
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "application/json, text/html, */*",
+            "Accept-Language": "tr-TR,tr;q=0.9",
+        })
+        self.timeout = 15
 
     def fetch(
         self,
@@ -245,13 +259,181 @@ class BISTSource:
         period: str = "2y",
         interval: str = "1d",
     ) -> Optional[pd.DataFrame]:
-        """BIST'ten veri çek.
+        """Borsa Istanbul'dan veri cek.
 
-        Not: BIST API entegrasyonu gerekiyor.
-        Şimdilik placeholder.
+        Strateji:
+        1. BIST API'den dene
+        2. BIST web sitesinden scrape et
+        3. Basarisiz olursa None don (fallback: YahooFinance)
         """
-        # TODO: BIST API entegrasyonu
-        logger.info("BIST source not yet implemented")
+        # Ticker formatini duzelt
+        ticker_clean = ticker.replace(".IS", "").upper()
+
+        # Yontem 1: BIST API
+        try:
+            df = self._fetch_from_api(ticker_clean, start_date, end_date)
+            if df is not None and not df.empty:
+                logger.info("BIST API data fetched", ticker=ticker_clean, rows=len(df))
+                return df
+        except Exception as e:
+            logger.debug("BIST API failed", ticker=ticker_clean, error=str(e))
+
+        # Yontem 2: Web scrape (son fiyat)
+        try:
+            df = self._fetch_from_web(ticker_clean)
+            if df is not None and not df.empty:
+                logger.info("BIST web data fetched", ticker=ticker_clean)
+                return df
+        except Exception as e:
+            logger.debug("BIST web scrape failed", ticker=ticker_clean, error=str(e))
+
+        logger.warning("BIST source failed for ticker", ticker=ticker_clean)
+        return None
+
+    def _fetch_from_api(self, ticker: str, start_date: Optional[str], end_date: Optional[str]) -> Optional[pd.DataFrame]:
+        """BIST API'den tarihsel veri cek."""
+        # Borsa Istanbul'un hisse detay API'si
+        url = f"{self.API_URL}/stock/{ticker}/history"
+
+        params = {}
+        if start_date:
+            params["from"] = start_date
+        if end_date:
+            params["to"] = end_date
+
+        resp = self.session.get(url, params=params, timeout=self.timeout)
+        if resp.status_code != 200:
+            return None
+
+        data = resp.json()
+        if not data or "data" not in data:
+            return None
+
+        rows = []
+        for item in data.get("data", []):
+            rows.append({
+                "Date": pd.to_datetime(item.get("date", "")),
+                "Open": float(item.get("open", 0)),
+                "High": float(item.get("high", 0)),
+                "Low": float(item.get("low", 0)),
+                "Close": float(item.get("close", 0)),
+                "Volume": int(item.get("volume", 0)),
+            })
+
+        if not rows:
+            return None
+
+        df = pd.DataFrame(rows)
+        df.set_index("Date", inplace=True)
+        df.sort_index(inplace=True)
+        return df
+
+    def _fetch_from_web(self, ticker: str) -> Optional[pd.DataFrame]:
+        """BIST web sitesinden son fiyat bilgisi cek."""
+        url = f"{self.BASE_URL}/tr/hisse/{ticker}"
+        resp = self.session.get(url, timeout=self.timeout)
+
+        if resp.status_code != 200:
+            # Alternatif URL dene
+            url = f"{self.BASE_URL}/tr/sirketler/{ticker}"
+            resp = self.session.get(url, timeout=self.timeout)
+            if resp.status_code != 200:
+                return None
+
+        html = resp.text
+
+        # Fiyat bilgilerini regex ile parse et
+        import re
+
+        price_patterns = [
+            r'class="[^"]*last-price[^"]*"[^>]*>([0-9.,]+)<',
+            r'class="[^"]*price[^"]*"[^>]*>([0-9.,]+)<',
+            r'data-last-price="([0-9.,]+)"',
+            r'<span[^>]*class="[^"]*value[^"]*"[^>]*>([0-9.,]+)</span>',
+        ]
+
+        close = None
+        for pattern in price_patterns:
+            match = re.search(pattern, html)
+            if match:
+                close_str = match.group(1).replace(".", "").replace(",", ".")
+                try:
+                    close = float(close_str)
+                    break
+                except ValueError:
+                    continue
+
+        if close is None:
+            return None
+
+        # Hacim
+        volume = 0
+        vol_patterns = [
+            r'class="[^"]*volume[^"]*"[^>]*>([0-9.,]+)<',
+            r'Hacim[\s:]*</[^>]*>\s*<[^>]*>([0-9.,]+)<',
+        ]
+        for pattern in vol_patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                vol_str = match.group(1).replace(".", "").replace(",", "")
+                try:
+                    volume = int(vol_str)
+                    break
+                except ValueError:
+                    continue
+
+        # Degisim
+        change = 0
+        change_patterns = [
+            r'class="[^"]*change[^"]*"[^>]*>([+-]?[0-9.,]+)<',
+            r'Degisim[\s:]*</[^>]*>\s*<[^>]*>([+-]?[0-9.,]+)<',
+        ]
+        for pattern in change_patterns:
+            match = re.search(pattern, html, re.IGNORECASE)
+            if match:
+                change_str = match.group(1).replace(",", ".")
+                try:
+                    change = float(change_str)
+                    break
+                except ValueError:
+                    continue
+
+        # Onceki kapanis tahmini
+        prev_close = close / (1 + change / 100) if change != 0 else close
+
+        # Tek gunluk DataFrame olustur
+        today = pd.Timestamp.now().normalize()
+        df = pd.DataFrame({
+            "Open": [prev_close],
+            "High": [max(close, prev_close)],
+            "Low": [min(close, prev_close)],
+            "Close": [close],
+            "Volume": [volume],
+        }, index=[today])
+
+        return df
+
+    def fetch_index_data(self, index_code: str = "XU100") -> Optional[pd.DataFrame]:
+        """Endeks verisi cek."""
+        try:
+            url = f"{self.API_URL}/index/{index_code}"
+            resp = self.session.get(url, timeout=self.timeout)
+
+            if resp.status_code == 200:
+                data = resp.json()
+                if data:
+                    today = pd.Timestamp.now().normalize()
+                    df = pd.DataFrame({
+                        "Open": [float(data.get("open", 0))],
+                        "High": [float(data.get("high", 0))],
+                        "Low": [float(data.get("low", 0))],
+                        "Close": [float(data.get("lastPrice", 0))],
+                        "Volume": [int(data.get("volume", 0))],
+                    }, index=[today])
+                    return df
+        except Exception as e:
+            logger.debug("BIST index fetch failed", error=str(e))
+
         return None
 
 

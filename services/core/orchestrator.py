@@ -250,22 +250,60 @@ class SystemOrchestrator:
 
         # === STAGE 6: BACKTEST VALIDATION ===
         backtest_summary = {}
-        if historical_returns:
-            try:
-                from services.backtest.walk_forward import walk_forward_engine
+        try:
+            from services.backtest.walk_forward import walk_forward_engine
+            from services.backtest.engine import backtest_engine
 
-                # Son 1 yılın backtest'i
-                # Gerçek implementasyonda predictions ve actual_returns verilir
+            # Market data'dan historical returns hesapla
+            hist_returns = {}
+            if market_data:
+                for t, df in market_data.items():
+                    if not df.empty and len(df) > 1 and 'Close' in df.columns:
+                        # Gunluk getiriler
+                        returns = df['Close'].pct_change().dropna()
+                        for date_idx, ret in returns.items():
+                            date_str = date_idx.strftime("%Y-%m-%d") if hasattr(date_idx, 'strftime') else str(date_idx)[:10]
+                            if date_str not in hist_returns:
+                                hist_returns[date_str] = {}
+                            hist_returns[date_str][t] = ret
+
+            # Tahminler: ranking sonuclarindan
+            predictions = [
+                {"date": date, "ticker": opp["ticker"], "score": opp["score"]}
+                for opp in top_opportunities
+            ]
+
+            if predictions and hist_returns:
+                # Walk-forward validation
+                dates = sorted(hist_returns.keys())
+                wf_result = walk_forward_engine.run_walk_forward(
+                    predictions=predictions,
+                    actual_returns=hist_returns,
+                    dates=dates,
+                )
+
                 backtest_summary = {
-                    "status": "SKIPPED",
-                    "reason": "Historical returns provided but full backtest requires prediction history",
+                    "status": "COMPLETED",
+                    "folds": wf_result.total_folds,
+                    "avg_test_return": wf_result.avg_test_return,
+                    "avg_test_sharpe": wf_result.avg_test_sharpe,
+                    "avg_test_drawdown": wf_result.avg_test_drawdown,
+                    "avg_win_rate": wf_result.avg_win_rate,
+                    "avg_precision_at_5": wf_result.avg_precision_at_5,
+                    "avg_precision_at_10": wf_result.avg_precision_at_10,
+                    "avg_ic": wf_result.avg_ic,
+                    "stability_score": wf_result.stability_score,
+                    "deflated_sharpe": wf_result.deflated_sharpe,
+                    "worst_fold": wf_result.worst_fold_return,
+                    "best_fold": wf_result.best_fold_return,
                 }
-            except Exception as e:
-                logger.warning("Backtest failed", error=str(e))
-                warnings.append(f"Backtest: {str(e)}")
-                backtest_summary = {"status": "FAILED", "error": str(e)}
-        else:
-            backtest_summary = {"status": "NO_DATA", "reason": "No historical returns provided"}
+            else:
+                backtest_summary = {"status": "NO_DATA", "reason": "Insufficient predictions or returns"}
+
+        except Exception as e:
+            logger.warning("Backtest failed", error=str(e))
+            warnings.append(f"Backtest: {str(e)}")
+            backtest_summary = {"status": "FAILED", "error": str(e)}
 
         # === STAGE 7: CONTINUOUS LEARNING ===
         learning_status = {}

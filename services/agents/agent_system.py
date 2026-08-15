@@ -331,11 +331,94 @@ class BaseAgent:
             )
 
     async def _call_llm(self, task: AgentTask, llm_client: Any) -> Dict[str, Any]:
-        """LLM çağrısı (alt sınıflarda override edilebilir)."""
-        # Basitleştirilmiş LLM çağrısı
-        return AIFallback.rule_based_analysis(
-            task.context.get("features", {}), task.ticker
-        )
+        """Ollama LLM cagrisi."""
+        import aiohttp
+        from services.core.config import settings
+
+        # Prompt olustur
+        system_prompt = f"""Sen bir finansal analistsin. {task.ticker} hissesini {task.agent_role.value} perspektifinden analiz et.
+
+Kurallar:
+- Sadece verilen verilere dayan
+- Spekulasyon yapma
+- JSON formatinda yanit ver
+- Confidence 0-1 arasi
+
+Context: {json.dumps(task.context, default=str, ensure_ascii=False)[:4000]}
+"""
+
+        user_prompt = task.prompt
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                payload = {
+                    "model": settings.ollama_model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "num_ctx": settings.llm_context_size,
+                    },
+                }
+
+                async with session.post(
+                    f"{settings.ollama_base_url}/api/chat",
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status != 200:
+                        raise Exception(f"Ollama HTTP {resp.status}")
+
+                    data = await resp.json()
+                    content = data.get("message", {}).get("content", "")
+
+                    # JSON parse
+                    try:
+                        # JSON blogu ara
+                        json_match = re.search(r'\{[^{}]*\}', content, re.DOTALL)
+                        if json_match:
+                            parsed = json.loads(json_match.group())
+                        else:
+                            parsed = json.loads(content)
+
+                        # Normalize
+                        result = {
+                            "direction": parsed.get("direction", "NEUTRAL"),
+                            "confidence": float(parsed.get("confidence", 0.5)),
+                            "score": float(parsed.get("score", 50)),
+                            "reasoning": parsed.get("reasoning", ""),
+                            "reasons": parsed.get("reasons", []),
+                            "risks": parsed.get("risks", []),
+                            "source": "ollama_llm",
+                        }
+                        return result
+
+                    except json.JSONDecodeError:
+                        # JSON degilse, metinden cikarim yap
+                        direction = "NEUTRAL"
+                        if "AL" in content.upper() or "LONG" in content.upper() or "YUKSEL" in content.upper():
+                            direction = "LONG"
+                        elif "SAT" in content.upper() or "SHORT" in content.upper() or "DUS" in content.upper():
+                            direction = "SHORT"
+
+                        return {
+                            "direction": direction,
+                            "confidence": 0.5,
+                            "score": 50,
+                            "reasoning": content[:500],
+                            "reasons": [],
+                            "risks": [],
+                            "source": "ollama_text",
+                        }
+
+        except Exception as e:
+            logger.warning("Ollama call failed, falling back to rule-based", error=str(e))
+            return AIFallback.rule_based_analysis(
+                task.context.get("features", {}), task.ticker
+            )
 
 
 class AgentOrchestrator:

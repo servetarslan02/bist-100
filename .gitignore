@@ -51,3 +51,4 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+data/universe_cache.json
