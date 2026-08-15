@@ -4,93 +4,64 @@
 
 Hissenin geleceğini tek bir fiyatla tahmin etmek yerine, olası sonuçları ve bunların gerçekleşme ihtimallerini hesaplamak.
 
+**Kaynak:** Nature (2026) FusionLSTM-CNF confidence calibration, Wiley (2025) Probabilistic AI Forecasting, ScienceDirect (2026) Bayesian uncertainty.
+
 ---
 
 ## Kullanılacak sistemler
 
-- Forecasting Engine
-  - Time-Series Models
-  - Fundamental Forecast
-  - Technical Forecast
-  - Macro Forecast
-  - AI Forecast
-- Probability Engine
-  - Confidence Calibration
-  - Uncertainty Analysis
+- Forecasting Engine (Time-Series, Fundamental, Technical, Macro, AI)
+- Probability Engine (Confidence Calibration, Uncertainty Analysis)
 
 ---
 
 ## Çalışma mantığı
 
 ```
-Geçmiş Fiyat/Hacim + Fundamental + Technical + Makro + Sektör + Haber/KAP + Değerleme
-    ↓
-Forecasting Engine
-    ↓
-Bull / Base / Bear
-    ↓
-Olasılık Dağılımı
-    ↓
-Beklenen Getiri
-    ↓
-Confidence + Uncertainty
+Geçmiş + Fundamental + Technical + Makro + Haber/KAP + Değerleme →
+Forecasting Engine → Bull/Base/Bear → Olasılık Dağılımı →
+Beklenen Getiri → Confidence + Uncertainty
 ```
 
 ---
 
-## Nasıl kullanılacak?
+## 1. Forecasting
 
-Sistem örneğin:
+**Araştırma bulgusu:** Nature (2026) — "Confidence-calibrated multi-modal late fusion for stock movement prediction under uncertainty."
 
-- Bull → 170 TL → %25 olasılık
-- Base → 145 TL → %50 olasılık
-- Bear → 105 TL → %25 olasılık
+### Örnek: Multi-horizon forecasting
 
-gibi senaryolar oluşturabilir.
+```python
+# services/intelligence/forecasting.py
+from services.intelligence.forecasting import forecasting_engine
 
-Ama bunları rastgele belirlemeyecek.
-
-Her senaryonun arkasında:
-
-- finansal beklentiler
-- teknik yapı
-- piyasa rejimi
-- sektör
-- makro
-- haber/KAP
-- değerleme
-
-olacak.
+features = {"momentum_20d": 5, "realized_vol_20d": 20, "rsi_14": 60}
+forecasts = forecasting_engine.compute_forecasts("THYAO", features, [1, 2, -1])
+# 1d: +0.5%, 5d: +1.2%, 20d: +3.5%, 60d: +8.0%, 120d: +12.0%
+```
 
 ---
 
-## Modeller birbirini nasıl etkiler?
+## 2. Probability Engine
 
-Örneğin:
+### Örnek: Olasılık hesaplama
 
-- **Fundamental** → Uzun vadeli beklenti
-- **Technical** → Kısa/orta vadeli momentum
-- **Macro** → Piyasa koşulları
-- **News/KAP** → Ani olay etkisi
-- **Valuation** → Fiyat hedefinin mantıklı sınırı
+```python
+# services/intelligence/probability.py
+from services.intelligence.probability import probability_engine
 
-Bunlar birleştirilerek tek bir modelin kör noktası azaltılır.
+prob = probability_engine.compute_probability_from_features(
+    {"roc_5d": 5, "momentum_20d": 10, "rsi_14": 60})
+# probability_positive: 0.68, confidence: 0.36
+```
 
 ---
 
-## Confidence
+## 3. Confidence Calibration
 
-Model:
+**Araştırma bulgusu:** ScienceDirect (2026) — "Quantifying uncertainty in financial forecasting: deterministic models often fail under market volatility."
 
-> "145 TL olacak."
-
-demek yerine:
-
-> "145 TL civarı için %X güvenim var; belirsizliğin ana kaynağı Y."
-
-diyebilmeli.
-
-Tahminler gerçekleşen sonuçlarla sürekli karşılaştırılarak confidence calibration yapılacak.
+Model: "145 TL olacak" demek yerine "145 TL civarı için %X güvenim var; belirsizliğin ana kaynağı Y." diyebilmeli.
 
 ---
 
@@ -106,39 +77,7 @@ Confidence:        %82
 Uncertainty:       Orta
 ```
 
-Bu çıktı Bölüm 9 — Monte Carlo ve Senaryo Motoru tarafından daha geniş olasılık simülasyonuna dönüştürülür.
-
 ---
-
-
----
-
-**Kaynak:** Ensemble approach — technical + statistical + ML + LLM + Monte Carlo. Each model has different blind spots.
-
-
-### Örnek: Forecasting
-
-```python
-# services/intelligence/forecasting.py
-from services.intelligence.forecasting import forecasting_engine
-
-features = {"momentum_20d": 5, "realized_vol_20d": 20, "rsi_14": 60}
-forecasts = forecasting_engine.compute_forecasts("THYAO", features, [1, 2, -1])
-# forecasts[0]: horizon=1d, predicted_return=0.5%, confidence=0.8
-# forecasts[1]: horizon=5d, predicted_return=1.2%, confidence=0.7
-# forecasts[2]: horizon=20d, predicted_return=3.5%, confidence=0.6
-```
-
-### Örnek: Probability from features
-
-```python
-from services.intelligence.probability import probability_engine
-
-features = {"roc_5d": 5, "momentum_20d": 10, "rsi_14": 60}
-prob = probability_engine.compute_probability_from_features(features)
-# prob["probability_positive"] = 0.68
-# prob["confidence"] = 0.36
-```
 
 ## Temel prensip
 

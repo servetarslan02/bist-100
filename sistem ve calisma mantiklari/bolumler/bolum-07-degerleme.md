@@ -4,13 +4,14 @@
 
 Şirket kaliteli ve geleceği olumlu görünse bile, mevcut fiyatının bu beklentilere göre ucuz mu pahalı mı olduğunu belirlemek.
 
+**Kaynak:** Oaktree Capital "The Calculus of Value" (2025), Margin of Safety concept, Bear/Base/Bull scenario analysis.
+
 ---
 
 ## Kullanılacak sistemler
 
 - DCF
-- Relative Valuation
-  - P/E, P/B, EV/EBITDA vb. çarpanlar
+- Relative Valuation (P/E, P/B, EV/EBITDA)
 - Fair Value Engine
 - Growth Assumptions
 - Margin of Safety
@@ -21,97 +22,15 @@
 ## Çalışma mantığı
 
 ```
-Şirket Analizi + Haber / KAP / Olaylar + Sektör + Makro
-    ↓
-Gelecek finansal varsayımlar
-    ↓
-DCF + Çarpan Analizi
-    ↓
-Fair Value
-    ↓
-Mevcut Fiyat
-    ↓
-Upside / Downside
-    ↓
-Margin of Safety
+Şirket Analizi + Haber/KAP + Sektör + Makro → Gelecek finansal varsayımlar →
+DCF + Çarpan Analizi → Fair Value → Mevcut Fiyat → Upside/Downside → Margin of Safety
 ```
 
 ---
 
-## Nasıl kullanılacak?
+## 1. Multiples Değerleme
 
-Örneğin sistem şirket için:
-
-- Büyüme: %25
-- Marj: iyileşiyor
-- FCF: güçlü
-- Risk: orta
-
-gibi Bölüm 5 ve 6'dan gelen bilgileri kullanarak geleceğe yönelik finansal varsayımlar oluşturur.
-
-Sonra tek bir yönteme güvenmez.
-
-Örneğin:
-
-- DCF Fair Value → 150 TL
-- P/E Fair Value → 142 TL
-- EV/EBITDA Value → 155 TL
-- Sector Comparison → 148 TL
-
-Bunları karşılaştırarak daha sağlam bir fair value aralığı oluşturur.
-
-Örneğin:
-
-```
-Current Price:    110 TL
-Fair Value Range: 142–155 TL
-Expected Upside:  +29–41%
-```
-
----
-
-## Çok önemli prensip
-
-**İyi şirket ≠ iyi yatırım.**
-
-Şirket mükemmel olabilir ama fiyatı aşırı pahalıysa sistem bunu fırsat olarak değerlendirmemeli.
-
-Aynı şekilde ucuz görünen bir hisse de sadece ucuz olduğu için önerilmemeli.
-
----
-
-## Diğer bölümlerle etkileşim
-
-- **Fundamental** → DCF varsayımlarını besler.
-- **Haber/KAP** → Gelecek gelir, büyüme veya risk varsayımlarını değiştirebilir.
-- **Makro** → İskonto oranı ve büyüme varsayımlarını etkiler.
-- **Sektör** → Çarpanların karşılaştırılacağı referansı sağlar.
-- **Risk** → Fair value'nun güven aralığını etkiler.
-
----
-
-## Çıktı
-
-```
-Fair Value:           142–155 TL
-Current Price:        110 TL
-Upside:               +29–41%
-Valuation:            Ucuz
-Margin of Safety:     Orta/Yüksek
-Valuation Confidence: %84
-```
-
-Bu da Bölüm 8 — Gelecek Tahmini için başlangıç girdilerinden biri olur.
-
----
-
-
----
-
-**Kaynak:** Multiples vs DCF comparison. Bear/Base/Bull scenarios with probability weighting. Margin of Safety concept.
-
-
-### Örnek: Multiples değerleme
+### Örnek: Multiples karşılaştırma
 
 ```python
 # services/intelligence/valuation/engine.py
@@ -122,10 +41,14 @@ multiples = valuation_engine.compute_multiples_valuation(
     company_multiples={"pe": 8.5, "pb": 1.4, "ev_ebitda": 5.1},
     sector_multiples={"pe": {"median": 11.0, "avg": 12.5}},
 )
-# multiples[0].upside_pct = +29.4% (P/E 8.5 vs sektör 11.0)
+# P/E upside: +29.4% (8.5 vs sektör 11.0)
 ```
 
-### Örnek: DCF
+---
+
+## 2. DCF
+
+### Örnek: DCF hesaplama
 
 ```python
 dcf = valuation_engine.compute_dcf(
@@ -135,10 +58,49 @@ dcf = valuation_engine.compute_dcf(
     shares_outstanding=1_373_278_203,
     total_debt=5e9, total_cash=10e9,
 )
-# dcf.implied_price = 340.50
-# dcf.upside_pct = +11.6%
-# dcf.sensitivity_table = {"17.0%": {"2.0%": 320, "3.0%": 340, "4.0%": 365}}
+# implied_price: 340.50, upside: +11.6%
+# sensitivity_table: WACC × terminal_growth → fiyat
 ```
+
+---
+
+## 3. Bear/Base/Bull Senaryoları
+
+**Araştırma bulgusu:** Oaktree Capital — "Investment assets have intrinsic value. The key is estimating it under different assumptions."
+
+### Örnek: Senaryo değerleme
+
+```python
+scenarios = valuation_engine.compute_valuation_scenarios(
+    ticker="THYAO", current_price=305.25,
+    base_assumptions={"revenue_growth": 0.10, "margin": 0.12, "wacc": 0.20},
+    bear_adjustments={"revenue_growth": -0.05, "margin": -0.03, "wacc": 0.03},
+    bull_adjustments={"revenue_growth": 0.05, "margin": 0.03, "wacc": -0.02},
+    shares_outstanding=1_373_278_203,
+)
+# Bear: 280 TL, Base: 340 TL, Bull: 420 TL
+# Expected Value = P(bear)×280 + P(base)×340 + P(bull)×420 = 347 TL
+```
+
+---
+
+## 4. Çok Önemli Prensip
+
+**İyi şirket ≠ iyi yatırım.** Şirket mükemmel olabilir ama fiyatı aşırı pahalıysa sistem bunu fırsat olarak değerlendirmemeli.
+
+---
+
+## Çıktı
+
+```
+Fair Value Range: 142–155 TL
+Current Price:    110 TL
+Upside:           +29–41%
+Valuation:        Ucuz
+Margin of Safety: Orta/Yüksek
+```
+
+---
 
 ## Temel prensip
 
