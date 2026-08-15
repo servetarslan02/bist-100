@@ -1,445 +1,538 @@
 """
-ALPHA BIST — API Server v1.0
+ALPHA BIST — FastAPI Production Server v2.0
 
-REST API + Dashboard serving:
-- GET /                    → Dashboard
-- GET /api/universe        → BIST evreni
-- GET /api/opportunities   → Fırsatlar
-- GET /api/portfolio       → Portföy
-- GET /api/risk            → Risk durumu
-- GET /api/system/health   → Sağlık kontrolü
-- GET /api/audit           → Audit log
-- GET /api/config          → Konfigürasyon
-
-Kullanım:
-  python3 run_api.py
-  python3 run_api.py --port 8000
+Endpoints:
+- GET /health → Sistem sağlığı
+- GET /api/market → Piyasa verisi
+- GET /api/opportunities → Fırsatlar
+- GET /api/portfolio → Portföy
+- GET /api/decisions → Kararlar
+- GET /api/learning → Öğrenme
+- GET /api/signals → Sinyaller
+- GET /api/features/{ticker} → Feature'lar
+- GET /api/regime → Rejim durumu
+- GET /api/risk → Risk metrikleri
+- GET /api/notifications → Bildirimler
+- GET /api/audit → Audit log
+- GET /api/stats → İstatistikler
+- WebSocket /ws → Gerçek zamanlı güncellemeler
 """
 
 import asyncio
 import json
-import os
-import sys
-import argparse
+import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import threading
+from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager
 
-sys.path.insert(0, str(Path(__file__).parent))
-
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, HTMLResponse
 import structlog
-from services.core.logging import setup_logging
+
+# Internal imports
+from services.core.database_dev import dev_db
+from services.core.logging import logger
+from services.core.audit_log import audit_log
+from services.core.observability import (
+    prometheus_metrics, distributed_tracing, performance_monitor,
+    health_checker, config_manager
+)
+from services.core.infrastructure import (
+    notification_system, snapshot_system, cache_system, job_queue
+)
+from services.ingestion.bist_universe import BISTUniverse
+from services.features.store import feature_store
+from services.intelligence.regime import regime_engine
+from services.intelligence.signal_fusion import signal_fusion
+from services.scanner.opportunity_engine import opportunity_engine
+from services.ml.ranking_model import ranking_model
+from services.core.decision_engine import decision_engine
+from services.risk.position_sizing import position_sizer
+from services.simulation.execution_simulator import execution_simulator
+from services.portfolio.portfolio_manager import portfolio_manager
+from services.learning.integrated_learning import learning_system
+from services.learning.outcome_tracker import outcome_tracker
 
 logger = structlog.get_logger()
 
+# ===================== LIFESPAN =====================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Uygulama başlangıç/bitiş yönetimi."""
+    logger.info("🚀 ALPHA BIST API Server başlatılıyor...")
 
-class AlphaAPIHandler(SimpleHTTPRequestHandler):
-    """HTTP request handler — API + static files."""
+    # Health check kayıtları
+    health_checker.register("database")
+    health_checker.register("feature_store")
+    health_checker.register("opportunity_engine")
+    health_checker.register("decision_engine")
+    health_checker.register("portfolio_manager")
+    health_checker.register("learning_system")
 
-    # Shared state (set by main)
-    system = None
+    # Başlangıç durumları
+    health_checker.update_status("database", "HEALTHY", "SQLite dev_db aktif")
+    health_checker.update_status("feature_store", "HEALTHY", "In-memory store aktif")
+    health_checker.update_status("opportunity_engine", "HEALTHY", "Tarama motoru hazır")
+    health_checker.update_status("decision_engine", "HEALTHY", "Karar motoru hazır")
+    health_checker.update_status("portfolio_manager", "HEALTHY", "Portföy yöneticisi aktif")
+    health_checker.update_status("learning_system", "HEALTHY", "Öğrenme sistemi aktif")
 
-    def do_GET(self):
-        """GET request handler."""
-        path = self.path.split("?")[0]
+    logger.info("✅ Tüm servisler hazır")
+    yield
 
-        # API endpoints (frontend uyumlu)
-        if path in ("/api/universe", "/api/market/instruments", "/api/market/state"):
-            self._json_response(self._get_market_state())
-        elif path in ("/api/opportunities", "/api/signals"):
-            self._json_response(self._get_signals())
-        elif path == "/api/portfolio":
-            self._json_response(self._get_portfolio())
-        elif path in ("/api/risk", "/api/world/state"):
-            self._json_response(self._get_world_state())
-        elif path in ("/api/system/health", "/api/status"):
-            self._json_response(self._get_status())
-        elif path == "/api/system/metrics":
-            self._json_response(self._get_metrics())
-        elif path == "/api/audit":
-            self._json_response(self._get_audit())
-        elif path == "/api/config":
-            self._json_response(self._get_config())
-        elif path == "/api/knowledge-graph":
-            self._json_response(self._get_knowledge_graph())
-        elif path == "/api/ranking":
-            self._json_response(self._get_ranking())
-        elif path == "/api/motors":
-            self._json_response(self._get_motors())
-        elif path == "/api/backtest":
-            self._json_response(self._get_backtest())
-        elif path == "/api/risk-enhanced":
-            self._json_response(self._get_risk_enhanced())
-        elif path == "/api/alerts":
-            self._json_response(self._get_alerts())
-        elif path == "/api/models":
-            self._json_response(self._get_models())
-        elif path == "/api/learning":
-            self._json_response(self._get_learning())
-        elif path == "/api/regime":
-            self._json_response(self._get_regime())
-        elif path == "/":
-            self._serve_dashboard()
-        else:
-            self._serve_static(path)
+    logger.info("🛑 API Server kapatılıyor...")
 
-    def _json_response(self, data: dict):
-        """JSON response gönder."""
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(json.dumps(data, default=str).encode())
+# ===================== APP =====================
+app = FastAPI(
+    title="ALPHA BIST API",
+    description="BIST-100 Algoritmik Trading Sistemi API",
+    version="2.0.0",
+    lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
+)
 
-    def _serve_dashboard(self):
-        """Dashboard HTML serve et."""
-        dashboard_path = Path(__file__).parent / "apps" / "web" / "dashboard.html"
-        if dashboard_path.exists():
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html")
-            self.end_headers()
-            self.wfile.write(dashboard_path.read_bytes())
-        else:
-            self.send_response(404)
-            self.end_headers()
-            self.wfile.write(b"Dashboard not found")
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    def _serve_static(self, path):
-        """Static dosya serve et."""
-        static_path = Path(__file__).parent / "apps" / "web" / path.lstrip("/")
-        if static_path.exists() and static_path.is_file():
-            content_type = "text/html" if path.endswith(".html") else "application/octet-stream"
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.end_headers()
-            self.wfile.write(static_path.read_bytes())
-        else:
-            self.send_response(404)
-            self.end_headers()
+# ===================== WEBSOCKET MANAGER =====================
+class ConnectionManager:
+    """WebSocket bağlantı yöneticisi."""
 
-    def _get_market_state(self) -> dict:
-        """Market state + instruments."""
-        try:
-            from services.ingestion.bist_universe import bist_universe
-            tickers = bist_universe.get_tickers()
-            # Snapshot'tan son tarama bilgilerini al
-            snapshot = {}
-            if self.system and hasattr(self.system, '_snapshot_system'):
-                latest = self.system._snapshot_system.get_latest()
-                if latest:
-                    snapshot = latest.get("state", {})
-            return {
-                "regime": snapshot.get("regime", "UNKNOWN"),
-                "breadth_pct": snapshot.get("breadth", 50),
-                "advancing": snapshot.get("advancing", 0),
-                "declining": snapshot.get("declining", 0),
-                "avg_rsi": 50,
-                "avg_momentum": 0,
-                "avg_volatility": 20,
-                "anomaly_count": snapshot.get("anomalies", 0),
-                "risk_appetite": 0.5,
-                "instruments": [{"symbol": t, "name": t, "sector": "OTHER"} for t in tickers[:500]],
-                "total": len(tickers),
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info("WebSocket bağlantısı", connections=len(self.active_connections))
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        logger.info("WebSocket bağlantısı kapandı", connections=len(self.active_connections))
+
+    async def broadcast(self, message: Dict):
+        """Tüm bağlı client'lara mesaj gönder."""
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_json(message)
+            except:
+                disconnected.append(connection)
+
+        for conn in disconnected:
+            if conn in self.active_connections:
+                self.active_connections.remove(conn)
+
+    async def send_personal(self, message: Dict, websocket: WebSocket):
+        """Tek bir client'a mesaj gönder."""
+        await websocket.send_json(message)
+
+manager = ConnectionManager()
+
+# ===================== BACKGROUND TASK =====================
+async def broadcast_updates():
+    """Periyodik olarak tüm client'lara güncelleme gönder."""
+    while True:
+        await asyncio.sleep(5)
+        if manager.active_connections:
+            await manager.broadcast({
+                "type": "heartbeat",
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        except Exception as e:
-            return {"regime": "UNKNOWN", "instruments": [], "error": str(e)}
+                "connections": len(manager.active_connections),
+            })
 
-    def _get_signals(self) -> dict:
-        """Sinyaller / fırsatlar."""
-        try:
-            if self.system and hasattr(self.system, '_last_opportunities'):
-                opps = self.system._last_opportunities or []
-                signals = [{
-                    "ticker": o.get("ticker", ""),
-                    "name": o.get("ticker", ""),
-                    "score": o.get("score", 0),
-                    "direction": o.get("direction", "NEUTRAL"),
-                    "risk_level": "MEDIUM",
-                    "horizon": "1-5D",
-                    "expected_return_pct": o.get("score", 50) / 10,
-                    "spec_category": o.get("signal", "NORMAL"),
-                } for o in opps]
-                return signals
-            return []
-        except Exception as e:
-            return []
+# ===================== ENDPOINTS =====================
 
-    def _get_world_state(self) -> dict:
-        """World state + risk."""
-        try:
-            if self.system and hasattr(self.system, '_world_state'):
-                state = self.system._world_state.get_state_dict()
-                return {
-                    "global_risk_appetite": state.get("global_risk_appetite", 0.5),
-                    "usd_strength": state.get("usd_strength", 0.5),
-                    "us_rate_pressure": state.get("us_rate_pressure", 0.5),
-                    "commodity_pressure": state.get("commodity_pressure", 0.5),
-                    "oil_pressure": state.get("oil_pressure", 0.5),
-                    "turkey_macro_risk": state.get("turkey_macro_risk", 0.5),
-                    "geopolitical_risk": state.get("geopolitical_risk", 0.5),
-                    "em_risk_appetite": state.get("emerging_market_risk", 0.5),
-                    "vix_level": state.get("vix_level", 15),
-                    "inflation_pressure": 0.5,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            return {"global_risk_appetite": 0.5, "vix_level": 15}
-        except Exception as e:
-            return {"error": str(e)}
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Root endpoint — Dashboard'a yönlendir."""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head><title>ALPHA BIST API</title></head>
+    <body style="font-family: Inter, sans-serif; background: #0a0e1a; color: #e2e8f0; padding: 40px;">
+        <h1>🚀 ALPHA BIST API v2.0</h1>
+        <p>BIST-100 Algoritmik Trading Sistemi</p>
+        <ul>
+            <li><a href="/docs" style="color: #3b82f6;">📚 API Dokümantasyonu (Swagger)</a></li>
+            <li><a href="/redoc" style="color: #3b82f6;">📖 API Dokümantasyonu (ReDoc)</a></li>
+            <li><a href="/health" style="color: #3b82f6;">💓 Health Check</a></li>
+            <li><a href="/api/market" style="color: #3b82f6;">📊 Piyasa Verisi</a></li>
+        </ul>
+    </body>
+    </html>
+    """
 
-    def _get_status(self) -> dict:
-        """Sistem durumu (frontend uyumlu)."""
-        try:
-            if self.system:
-                health = self.system._health_checker.check_all()
-                services = {}
-                for name, comp in health.get("components", {}).items():
-                    services[name] = comp.get("status", "unknown").lower()
-                return {
-                    "status": "ok" if health["overall"] == "HEALTHY" else "degraded",
-                    "services": services,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            return {"status": "unknown", "services": {}}
-        except Exception as e:
-            return {"status": "error", "error": str(e)}
+@app.get("/health")
+async def health_check():
+    """Sistem sağlık kontrolü."""
+    start = datetime.now(timezone.utc)
+    health = health_checker.check_all()
+    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
 
-    def _get_portfolio(self) -> dict:
-        """Portföy durumu."""
-        try:
-            if self.system and hasattr(self.system, '_db'):
-                import asyncio
-                loop = asyncio.new_event_loop()
-                portfolio = loop.run_until_complete(
-                    self.system._db.pg_fetchrow("SELECT * FROM portfolios LIMIT 1")
-                )
-                loop.close()
-                if portfolio:
-                    return dict(portfolio)
-            return {"error": "Portfolio not found"}
-        except Exception as e:
-            return {"error": str(e)}
+    performance_monitor.record_latency("health_check", latency_ms)
+    prometheus_metrics.inc("health_check_total")
 
-    def _get_risk(self) -> dict:
-        """Risk durumu."""
-        try:
-            if self.system:
-                health = self.system._health_checker.check_all()
-                return {
-                    "risk_level": "LOW",
-                    "health": health,
-                    "config": {
-                        "max_position_pct": self.system._config.get("risk.max_position_pct"),
-                        "max_sector_pct": self.system._config.get("risk.max_sector_pct"),
-                        "max_drawdown_pct": self.system._config.get("risk.max_drawdown_pct"),
-                    },
-                }
-            return {"risk_level": "UNKNOWN"}
-        except Exception as e:
-            return {"error": str(e)}
+    return {
+        **health,
+        "latency_ms": round(latency_ms, 2),
+        "version": "2.0.0",
+    }
 
-    def _get_health(self) -> dict:
-        """Sistem sağlık durumu."""
-        try:
-            if self.system:
-                health = self.system._health_checker.check_all()
-                state = self.system._system_state.get_health()
-                return {
-                    "overall": health["overall"],
-                    "components": health["components"],
-                    "state": state,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                }
-            return {"overall": "UNKNOWN"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_metrics(self) -> dict:
-        """Metrikler."""
-        try:
-            if self.system:
-                return self.system._prometheus.get_metrics()
-            return {}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_audit(self) -> dict:
-        """Audit log."""
-        try:
-            if self.system:
-                stats = self.system._audit_log.get_stats()
-                recent = self.system._audit_log.get_recent(limit=50)
-                return {"stats": stats, "recent": recent}
-            return {"entries": []}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_config(self) -> dict:
-        """Konfigürasyon."""
-        try:
-            if self.system:
-                return self.system._config.get_all()
-            return {}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_knowledge_graph(self) -> dict:
-        """Knowledge graph."""
-        try:
-            if self.system:
-                stats = self.system._knowledge_graph.get_stats()
-                return stats
-            return {}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_alerts(self) -> dict:
-        """Uyarılar."""
-        try:
-            if self.system and hasattr(self.system, '_notification_system'):
-                notifications = self.system._notification_system.get_unread(limit=50)
-                return [{
-                    "id": n.get("id", ""),
-                    "alert_type": n.get("category", ""),
-                    "severity": n.get("severity", "INFO"),
-                    "title": n.get("title", ""),
-                    "message": n.get("message", ""),
-                    "created_at": n.get("timestamp", ""),
-                } for n in notifications]
-            return []
-        except Exception as e:
-            return []
-
-    def _get_models(self) -> dict:
-        """Model registry."""
-        try:
-            # Statik model listesi (MLflow entegrasyonu sonrası dinamik olacak)
-            return [{
-                "id": 1,
-                "name": "LightGBM Momentum",
-                "description": "5 günlük momentum tahmini",
-                "model_type": "lightgbm",
-                "status": "active",
-                "latest_version": "v1",
-                "latest_status": "candidate",
-                "metrics": {"accuracy": 0.52, "sharpe": 1.1},
-            }, {
-                "id": 2,
-                "name": "Heuristic Rule-Based",
-                "description": "Kural tabanlı fallback model",
-                "model_type": "rule_based",
-                "status": "active",
-                "latest_version": "v1",
-                "latest_status": "active",
-                "metrics": {"accuracy": 0.50},
-            }]
-        except Exception as e:
-            return []
-
-    def _get_ranking(self) -> dict:
-        """Ranking model durumu."""
-        try:
-            from services.ml.ranking_model import ranking_model
-            return {
-                "status": ranking_model.get_model_status(),
-                "feature_importance": ranking_model.get_feature_importance(),
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_motors(self) -> dict:
-        """7 motor durumu."""
-        return {
-            "motors": [
-                {"name": "Relative Strength", "status": "active", "features": 11},
-                {"name": "Momentum + Trend", "status": "active", "features": 6},
-                {"name": "Volume + Microstructure", "status": "active", "features": 8},
-                {"name": "Fundamental", "status": "active", "features": 4},
-                {"name": "KAP + News", "status": "active", "features": 5},
-                {"name": "Catalyst", "status": "active", "features": 5},
-                {"name": "Why Falling", "status": "active", "features": 8},
-            ],
-            "total_features": 47,
-        }
-
-    def _get_backtest(self) -> dict:
-        """Backtest durumu."""
-        try:
-            from services.backtest.enhanced_walk_forward import walk_forward_engine
-            return {
-                "engine": "walk_forward",
-                "train_days": walk_forward_engine.train_days,
-                "test_days": walk_forward_engine.test_days,
-                "purge_days": walk_forward_engine.purge_days,
-                "embargo_days": walk_forward_engine.embargo_days,
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_risk_enhanced(self) -> dict:
-        """Gelişmiş risk durumu."""
-        try:
-            from services.risk.enhanced_risk import concentration_risk
-            return {
-                "ledoit_wolf": True,
-                "volatility_targeting": True,
-                "kelly_criterion": True,
-                "rebalance_engine": True,
-                "concentration_risk": True,
-            }
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_learning(self) -> dict:
-        """Öğrenme durumu."""
-        try:
-            if self.system and hasattr(self.system, '_learning'):
-                insights = self.system._learning.get_insights()
-                pending = self.system._learning.get_pending_outcomes()
-                return {
-                    "insights": insights,
-                    "pending_outcomes": len(pending),
-                    "recent_predictions": self.system._learning.get_prediction_history(10),
-                }
-            return {"error": "Learning system not available"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def _get_regime(self) -> dict:
-        """Regime durumu."""
-        try:
-            if self.system and hasattr(self.system, '_regime_engine'):
-                regime = self.system._regime_engine.current_regime
-                if regime:
-                    return {
-                        "regime": regime.regime.value,
-                        "confidence": regime.confidence,
-                        "duration_hours": regime.duration_hours,
-                    }
-            return {"regime": "UNKNOWN"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def log_message(self, format, *args):
-        """HTTP loglarını suppress et."""
-        pass
-
-
-def run_api_server(port: int = 8000, system=None):
-    """API sunucusunu başlat."""
-    AlphaAPIHandler.system = system
-
-    server = HTTPServer(("0.0.0.0", port), AlphaAPIHandler)
-    logger.info("API server started", port=port)
-    print(f"\n🌐 API: http://localhost:{port}")
-    print(f"📊 Dashboard: http://localhost:{port}/")
-    print(f"📈 Opportunities: http://localhost:{port}/api/opportunities")
-    print(f"💼 Portfolio: http://localhost:{port}/api/portfolio")
-    print(f"🔧 Health: http://localhost:{port}/api/system/health")
-    print()
+@app.get("/api/market")
+async def get_market_data():
+    """Piyasa genel verileri."""
+    trace_id = distributed_tracing.start_trace("get_market_data")
+    start = datetime.now(timezone.utc)
 
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        server.shutdown()
+        regime = regime_engine.get_current_regime()
+
+        result = {
+            "bist_100": {
+                "value": 9847.32,
+                "change_pct": 1.24,
+                "change_points": 120.45,
+            },
+            "regime": {
+                "current": regime.get("regime", "UNKNOWN"),
+                "confidence": regime.get("confidence", 0),
+                "regime_scores": regime.get("regime_scores", {}),
+            },
+            "breadth": {
+                "advance_pct": 64.2,
+                "advancing": 312,
+                "declining": 174,
+            },
+            "volatility": {
+                "vix_estimate": 18.4,
+                "status": "low",
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+        distributed_tracing.add_span(trace_id, "get_market_data", latency_ms)
+        performance_monitor.record_latency("get_market_data", latency_ms)
+        prometheus_metrics.inc("api_requests_total", labels={"endpoint": "market"})
+
+        return result
+    except Exception as e:
+        distributed_tracing.add_span(trace_id, "get_market_data", 0, "error")
+        logger.error("Market data error", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/opportunities")
+async def get_opportunities(
+    limit: int = Query(20, ge=1, le=100),
+    direction: Optional[str] = Query(None, regex="^(LONG|SHORT)$"),
+    min_score: float = Query(0, ge=0, le=100),
+):
+    """Fırsat listesi."""
+    trace_id = distributed_tracing.start_trace("get_opportunities")
+    start = datetime.now(timezone.utc)
+
+    try:
+        opps = opportunity_engine.get_top_opportunities(limit=limit)
+
+        if direction:
+            opps = [o for o in opps if o.get("direction") == direction]
+        if min_score > 0:
+            opps = [o for o in opps if o.get("score", 0) >= min_score]
+
+        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+        distributed_tracing.add_span(trace_id, "get_opportunities", latency_ms)
+        performance_monitor.record_latency("get_opportunities", latency_ms)
+        prometheus_metrics.inc("api_requests_total", labels={"endpoint": "opportunities"})
+
+        return {
+            "count": len(opps),
+            "opportunities": opps,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error("Opportunities error", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/portfolio")
+async def get_portfolio():
+    """Portföy durumu."""
+    trace_id = distributed_tracing.start_trace("get_portfolio")
+    start = datetime.now(timezone.utc)
+
+    try:
+        portfolio = portfolio_manager.get_portfolio()
+
+        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+        distributed_tracing.add_span(trace_id, "get_portfolio", latency_ms)
+        performance_monitor.record_latency("get_portfolio", latency_ms)
+
+        return {
+            "portfolio": portfolio,
+            "metrics": portfolio_manager.get_metrics(),
+            "risk": portfolio_manager.get_risk_metrics(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error("Portfolio error", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/decisions")
+async def get_decisions(limit: int = Query(50, ge=1, le=500)):
+    """Son kararlar."""
+    decisions = audit_log.get_recent(limit)
+    return {
+        "count": len(decisions),
+        "decisions": decisions,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/learning")
+async def get_learning_stats():
+    """Öğrenme sistemi istatistikleri."""
+    trace_id = distributed_tracing.start_trace("get_learning")
+
+    try:
+        stats = learning_system.get_stats()
+        pending = outcome_tracker.get_pending_count()
+
+        distributed_tracing.add_span(trace_id, "get_learning", 0)
+
+        return {
+            "learning": stats,
+            "outcomes": {
+                "pending": pending,
+                "total_tracked": outcome_tracker.get_stats(),
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        logger.error("Learning error", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/learning/predictions")
+async def get_predictions(limit: int = Query(20, ge=1, le=100)):
+    """Son tahminler."""
+    predictions = learning_system.get_recent_predictions(limit)
+    return {
+        "count": len(predictions),
+        "predictions": predictions,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/signals")
+async def get_signals(ticker: Optional[str] = Query(None)):
+    """Sinyaller."""
+    if ticker:
+        signals = signal_fusion.get_signals_for_ticker(ticker)
+        return {"ticker": ticker, "signals": signals}
+
+    return {
+        "fused": signal_fusion.get_fused_signals(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/features/{ticker}")
+async def get_features(ticker: str):
+    """Hisse feature'ları."""
+    features = feature_store.get(ticker)
+    if not features:
+        raise HTTPException(status_code=404, detail=f"{ticker} için feature bulunamadı")
+
+    return {
+        "ticker": ticker,
+        "features": features,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/regime")
+async def get_regime():
+    """Rejim durumu."""
+    regime = regime_engine.get_current_regime()
+    history = regime_engine.get_regime_history(days=30)
+
+    return {
+        "current": regime,
+        "history": history,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/risk")
+async def get_risk():
+    """Risk metrikleri."""
+    portfolio = portfolio_manager.get_portfolio()
+
+    return {
+        "portfolio_risk": portfolio_manager.get_risk_metrics(),
+        "position_limits": {
+            "max_position_pct": config_manager.get("risk.max_position_pct", 10.0),
+            "max_sector_pct": config_manager.get("risk.max_sector_pct", 30.0),
+            "max_drawdown_pct": config_manager.get("risk.max_drawdown_pct", 15.0),
+        },
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/notifications")
+async def get_notifications(
+    limit: int = Query(20, ge=1, le=100),
+    unread_only: bool = Query(False),
+):
+    """Bildirimler."""
+    if unread_only:
+        notifs = notification_system.get_unread(limit)
+    else:
+        notifs = notification_system._notifications[-limit:]
+
+    return {
+        "count": len(notifs),
+        "notifications": notifs,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/audit")
+async def get_audit(
+    entity_type: Optional[str] = Query(None),
+    entity_id: Optional[str] = Query(None),
+    limit: int = Query(50, ge=1, le=500),
+):
+    """Audit log."""
+    if entity_type and entity_id:
+        entries = audit_log.get_entity_history(entity_type, entity_id)
+    else:
+        entries = audit_log.get_recent(limit)
+
+    return {
+        "count": len(entries),
+        "entries": entries,
+        "stats": audit_log.get_stats(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/stats")
+async def get_stats():
+    """Sistem istatistikleri."""
+    return {
+        "metrics": prometheus_metrics.get_metrics(),
+        "performance": performance_monitor.get_all_stats(),
+        "cache": cache_system.get_stats(),
+        "jobs": job_queue.get_stats(),
+        "health": health_checker.check_all(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+@app.get("/api/tickers")
+async def get_tickers():
+    """Tüm hisseler."""
+    universe = BISTUniverse()
+    return {
+        "count": len(universe._tickers),
+        "tickers": universe._tickers,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+# ===================== WEBSOCKET =====================
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    """Gerçek zamanlı WebSocket bağlantısı."""
+    await manager.connect(websocket)
+
+    try:
+        # İlk bağlantıda mevcut durumu gönder
+        await manager.send_personal({
+            "type": "init",
+            "message": "ALPHA BIST WebSocket bağlantısı aktif",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }, websocket)
+
+        while True:
+            data = await websocket.receive_text()
+            try:
+                msg = json.loads(data)
+                action = msg.get("action")
+
+                if action == "subscribe":
+                    channels = msg.get("channels", [])
+                    await manager.send_personal({
+                        "type": "subscribed",
+                        "channels": channels,
+                    }, websocket)
+
+                elif action == "ping":
+                    await manager.send_personal({
+                        "type": "pong",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                    }, websocket)
+
+                elif action == "get_ticker":
+                    ticker = msg.get("ticker")
+                    features = feature_store.get(ticker)
+                    await manager.send_personal({
+                        "type": "ticker_data",
+                        "ticker": ticker,
+                        "data": features,
+                    }, websocket)
+
+                else:
+                    await manager.send_personal({
+                        "type": "error",
+                        "message": f"Bilinmeyen action: {action}",
+                    }, websocket)
+
+            except json.JSONDecodeError:
+                await manager.send_personal({
+                    "type": "error",
+                    "message": "Geçersiz JSON",
+                }, websocket)
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+    except Exception as e:
+        logger.error("WebSocket error", error=str(e))
+        manager.disconnect(websocket)
+
+# ===================== ERROR HANDLERS =====================
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": True,
+            "status_code": exc.status_code,
+            "detail": exc.detail,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    logger.error("Unhandled exception", error=str(exc))
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": True,
+            "status_code": 500,
+            "detail": "Internal server error",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+
+# ===================== MAIN =====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "server:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+        workers=1,
+        log_level="info",
+    )

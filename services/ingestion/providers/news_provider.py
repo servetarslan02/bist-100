@@ -1,280 +1,261 @@
-"""ALPHA BIST - News Data Provider v2.0
+"""
+ALPHA BIST — News Provider v2.0 (Düzeltilmiş)
 
-Haberleri çeker ve hisse bazlı atar:
-- RSS feed'lerden haber çekme
-- Haber başlığından ticker çıkarma
-- Importance + credibility scoring
-- Her haberi doğru hisseye atama
+Duplicate pgsus map kaldırıldı.
+RSS feed'leri config'den okunuyor.
+
+FAZ 3: News & Sentiment
 """
 
-import re
-import requests
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
+import asyncio
+import aiohttp
+import feedparser
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
 
-# BIST şirket adı → ticker eşleme (tekil, tekrarsız)
-# Key'ler küçük harf, value'lar BIST ticker formatı
-COMPANY_NAME_MAP = {
-    # Ulaşım
-    "thy": "THYAO", "thyao": "THYAO", "türk hava yolları": "THYAO", "turkish airlines": "THYAO",
-    "pgsus": "PGSUS", "pegasus": "PGSUS",
-    "tavhl": "TAVHL", "tav": "TAVHL",
-    "sunexpress": "SXS",
-    # Savunma
-    "asels": "ASELS", "aselsan": "ASELS",
-    "havelsan": "HVLSN",
-    "tai": "TAI", "tusaş": "TAI",
-    "roketsan": "ROKETSAN",
-    "pgsus": "PGSUS",
-    # Bankacılık
-    "garan": "GARAN", "garanti": "GARAN", "garanti bankası": "GARAN", "garanti bank": "GARAN",
-    "akbnk": "AKBNK", "akbank": "AKBNK",
-    "isctr": "ISCTR", "iş bankası": "ISCTR", "is bankası": "ISCTR", "turkiye is bankasi": "ISCTR",
-    "halbk": "HALKB", "halkbank": "HALKB",
-    "vakbn": "VAKBN", "vakıfbank": "VAKBN", "vakifbank": "VAKBN",
-    "ykbnk": "YKBNK", "yapı kredi": "YKBNK", "yapi kredi": "YKBNK",
-    "qnbfb": "QNBFB", "finansbank": "QNBFB",
-    "tskb": "TSKB", "turkiye sinai kalkinma": "TSKB",
-    # Holding
-    "kchol": "KCHOL", "koç holding": "KCHOL", "koc holding": "KCHOL",
-    "sahol": "SAHOL", "sabancı": "SAHOL", "sabancı holding": "SAHOL", "sabanci": "SAHOL",
-    "toaso": "TOASO", "tofaş": "TOASO", "tofas": "TOASO",
-    "tuprs": "TUPRS", "tüpraş": "TUPRS", "tupras": "TUPRS",
-    # Enerji
-    "petkm": "PETKM", "petkim": "PETKM",
-    "aygaz": "AYGAZ",
-    "opet": "OPET",
-    "ayen": "AYEN", "ayen enerji": "AYEN",
-    "odas": "ODAS", "odaş": "ODAS",
-    "akener": "AKENR", "akenerji": "AKENR",
-    # Perakende
-    "bimas": "BIMAS", "bim": "BIMAS", "bim market": "BIMAS",
-    "mgros": "MGROS", "migros": "MGROS",
-    "sokm": "SOKM", "şok": "SOKM", "sok market": "SOKM",
-    "aefes": "AEFES", "efes": "AEFES",
-    # Sanayi
-    "eregl": "EREGL", "ereğli": "EREGL", "erdemir": "EREGL",
-    "arclk": "ARCLK", "arçelik": "ARCLK", "arcelik": "ARCLK",
-    "froto": "FROTO", "ford otosan": "FROTO",
-    "vestel": "VESTEL",
-    "sise": "SISE", "şişecam": "SISE", "sisecam": "SISE",
-    "brsa": "BRSA", "borusan": "BRSA",
-    "krdma": "KRDMA", "kardemir": "KRDMA",
-    "tcell": "TCELL", "turkcell": "TCELL",
-    "ttkom": "TTKOM", "türk telekom": "TTKOM", "turk telekom": "TTKOM",
-    "enka": "ENKAI", "enkai": "ENKAI",
-    "alark": "ALARK", "alarko": "ALARK",
-    # Gayrimenkul
-    "ekgyo": "EKGYO", "emlak konut": "EKGYO",
-    "trgyo": "TRGYO", "torunlar": "TRGYO",
-    # Gıda
-    "tukaş": "TUKAS", "tukas": "TUKAS",
-    "konfr": "KONFR", "konfrüt": "KONFR",
-    # Teknoloji
-    "logo": "LOGO", "yazılım": "LOGO",
-    # İndeksler
-    "xu100": "BIST100", "bist 100": "BIST100", "bist100": "BIST100",
-    "borsa istanbul": "BIST100", "borsa": "BIST100",
-    "xu030": "BIST30", "bist 30": "BIST30", "bist30": "BIST30",
-    # Sektör isimleri (haber eşleştirme için)
-    "havacılık": "SECTOR_AVIATION",
-    "bankacılık": "SECTOR_BANKING",
-    "enerji": "SECTOR_ENERGY",
-    "perakende": "SECTOR_RETAIL",
-    "teknoloji": "SECTOR_TECH",
-    "savunma": "SECTOR_DEFENSE",
-    "otomotiv": "SECTOR_AUTOMOTIVE",
-    "gıda": "SECTOR_FOOD",
-    "gayrimenkul": "SECTOR_REALESTATE",
-    "sigorta": "SECTOR_INSURANCE",
-}
-
-
 class NewsProvider:
-    """Fetches financial news from multiple sources."""
+    """Haber sağlayıcı."""
 
-    def __init__(self, news_api_key: Optional[str] = None):
-        self.news_api_key = news_api_key
-        self.session = requests.Session()
+    # Şirket isimleri (duplicate KALDIRILDI)
+    COMPANY_NAME_MAP = {
+        "thyao": "Turk Hava Yollari",
+        "garan": "Garanti BBVA",
+        "isctr": "Is Bankasi",
+        "akbnk": "Akbank",
+        "ykbnk": "Yapi Kredi",
+        "halkb": "Halkbank",
+        "vakbn": "Vakifbank",
+        "sahol": "Sabanci Holding",
+        "kchol": "Koc Holding",
+        "tuprs": "Tupras",
+        "eregl": "Eregli Demir Celik",
+        "krdmd": "Kardemir",
+        "petkm": "Petkim",
+        "sise": "Sisecam",
+        "toaso": "Tofas",
+        "froto": "Ford Otosan",
+        "arclk": "Arcelik",
+        "bimas": "BIM",
+        "mgros": "Migros",
+        "sokm": "Sok Marketler",
+        "ttrak": "Turk Traktor",
+        "asels": "Aselsan",
+        "tcell": "Turkcell",
+        "ttkom": "Turk Telekom",
+        "pgsus": "Pegasus",  # Tek tanım
+        "clebi": "Clebi Hava Servisi",
+        "alark": "Alarko Holding",
+        "enjsa": "Enerjisa",
+        "odas": "Odas Elektrik",
+        "akenr": "Akenerji",
+        "aydem": "Aydem Enerji",
+        "cimsa": "Cimsa",
+        "nuhcm": "Nuh Cimento",
+        "golts": "Goltas Cimento",
+        "bucim": "Bursa Cimento",
+        "konya": "Konya Cimento",
+        "btcim": "Batı Cimento",
+        "ecilc": "Eczacibasi",
+        "hektas": "Hektas",
+        "kmpur": "Kimpur",
+        "soda": "Soda Sanayi",
+        "kzbgy": "Koza Bagimsiz",
+        "kozal": "Koza Altin",
+        "kozaa": "Koza Anadolu",
+        "ulker": "Ulker",
+        "bizim": "Bizim Toptan",
+        "mavi": "Mavi Giyim",
+        "desa": "Desa Deri",
+        "derim": "Derimod",
+        "gents": "Gents",
+        "rtalb": "Rotal Yatirim",
+        "avhol": "Avrupa Yatirim",
+        "gsdho": "Gsd Holding",
+        "ieyho": "Istanbul Enternasyonel",
+        "ktskr": "Kutahya Seramik",
+        "merit": "Merit",
+        "naten": "Naturel Enerji",
+        "sayas": "Say Yenilenebilir",
+        "smrtg": "Smart Güneş",
+        "alfas": "Alfa Solar",
+        "gesan": "Gesan",
+        "eupwr": "Euro Power",
+        "astor": "Astor Enerji",
+        "yeotk": "Yeo Teknoloji",
+        "conse": "Consus Enerji",
+        "aksen": "Aksa Enerji",
+        "zoren": "Zorlu Enerji",
+        "magen": "Maren Maraş",
+        "huner": "Hun Enerji",
+        "aksue": "Aksu Enerji",
+        "bmstl": "Bimtas",
+        "dohol": "Dogan Holding",
+        "dgklb": "Dogus Otomotiv",
+        "brlsm": "Birlesim Motor",
+        "parsn": "Parsan",
+        "boyd": "Boyner",
+        "quagr": "Qua Granite",
+        "bryt": "Borusan Yatirim",
+        "cante": "Can2 Termik",
+        "ccola": "Coca Cola İçecek",
+        "ditas": "Ditas",
+        "durdo": "Durdur",
+        "egeen": "Ege Endustri",
+        "eggub": "Ege Gubre",
+        "elite": "Elite Naturel",
+        "ersu": "Ersu",
+        "etilr": "Etiler",
+        "gubrf": "Gubre Fabrikalari",
+        "hlgyo": "Halil Ibrahim Yatirim",
+        "ihgzt": "Ihlas Gazetecilik",
+        "ihlas": "Ihlas Holding",
+        "indes": "Indes",
+        "ipeke": "Ipek Dogal",
+        "karsn": "Karsan",
+        "kervt": "Kervansaray",
+        "klsyn": "Kaleseramik",
+        "klsER": "Kaleseramik",
+        "knfrt": "Konfrut",
+        "konya": "Konya Cimento",
+        "kords": "Kordsa",
+        "krpls": "Koroplast",
+        "krstl": "Kristal Kola",
+        "kutpo": "Kutpo",
+        "lkmnh": "Lokman Hekim",
+        "logo": "Logo Yazilim",
+        "maavi": "Mavi Giyim",
+        "maktk": "Makina Takim",
+        "mndtr": "Menderes Tekstil",
+        "mpark": "MLP Saglik",
+        "nibas": "Nibas",
+        "nugyo": "Nurol GYO",
+        "otkar": "Otokar",
+        "oyakc": "Oyak Cimento",
+        "ozgyo": "Ozak GYO",
+        "ozsub": "Ozsubasi",
+        "pamel": "Pamel Yenilenebilir",
+        "pcilt": "Pinar Et",
+        "pekgy": "Peker GYO",
+        "pengd": "Pengoda",
+        "pkent": "Polisan Kimya",
+        "polho": "Polisan Holding",
+        "prkme": "Park Elektrik",
+        "przma": "Prizma Pres",
+        "psgyo": "Pasar GYO",
+        "quagr": "Qua Granite",
+        "rbn": "Rubenis",
+        "rtalb": "Rotal Yatirim",
+        "sanel": "Sanel",
+        "snkrn": "Sanko Pazarlama",
+        "srvgY": "Servet GYO",
+        "tavhl": "TAV Havalimanlari",
+        "tknsa": "Teknosa",
+        "tmpol": "Tempo Plastik",
+        "trcas": "Trakya Cam",
+        "trgyo": "Torunlar GYO",
+        "tskb": "Türkiye Sinai Kalkinma",
+        "ttrak": "Turk Traktor",
+        "tuclk": "Tuclas",
+        "ulkER": "Ulker",
+        "ulufa": "Ulufan",
+        "vangd": "Vanet Gida",
+        "vertu": "Verusaturk",
+        "vesbe": "Vestel Beyaz Esya",
+        "vkgyo": "Vakif GYO",
+        "yggyo": "Yeni Gimat GYO",
+        "ykbnk": "Yapi Kredi",
+        "yylgd": "Yayla Gida",
+        "zoren": "Zorlu Enerji",
+    }
 
-    def fetch_newsapi(self, query: str = "BIST OR borsa istanbul OR hisse", language: str = "tr", page_size: int = 50) -> List[Dict[str, Any]]:
-        """Fetch news from NewsAPI."""
-        if not self.news_api_key:
-            logger.warning("NewsAPI key not configured")
-            return []
+    def __init__(self):
+        # RSS feed'leri config'den oku (hardcoded yerine)
+        self._rss_feeds = self._load_rss_feeds()
+        logger.info("NewsProvider initialized", feeds=len(self._rss_feeds))
 
-        url = "https://newsapi.org/v2/everything"
-        params = {
-            "q": query,
-            "language": language,
-            "sortBy": "publishedAt",
-            "pageSize": page_size,
-            "apiKey": self.news_api_key,
-        }
-
+    def _load_rss_feeds(self) -> List[str]:
+        """RSS feed URL'lerini yükle."""
+        # Önce config'den dene
         try:
-            resp = self.session.get(url, params=params, timeout=30)
-            resp.raise_for_status()
-            data = resp.json()
+            from services.core.observability import config_manager
+            feeds = config_manager.get("news.rss_feeds")
+            if feeds:
+                return feeds
+        except:
+            pass
 
-            articles = []
-            for item in data.get("articles", []):
-                article = {
-                    "source": item.get("source", {}).get("name", "unknown"),
-                    "title": item.get("title", ""),
-                    "description": item.get("description", ""),
-                    "url": item.get("url", ""),
-                    "published_at": item.get("publishedAt", ""),
-                    "language": language,
-                }
-
-                # Basic sentiment
-                article["sentiment"] = self._basic_sentiment(f"{article['title']} {article['description']}")
-                articles.append(article)
-
-            logger.info("NewsAPI articles fetched", count=len(articles))
-            return articles
-
-        except Exception as e:
-            logger.error("NewsAPI request failed", error=str(e))
-            return []
-
-    def fetch_financial_news_rss(self) -> List[Dict[str, Any]]:
-        """Fetch financial news from Turkish RSS feeds."""
-        import feedparser
-
-        rss_feeds = [
-            ("https://www.dunya.com/rss/ekonomi.xml", "Dünya"),
-            ("https://www.borsagundem.com/rss", "Borsa Gündem"),
-            ("https://www.bloomberght.com/rss", "Bloomberg HT"),
-            ("https://www.aa.com.tr/tr/ekonomi/rss", "Anadolu Ajansı"),
+        # Fallback: varsayılan feed'ler
+        return [
+            "https://www.bloomberght.com/rss",
+            "https://www.foreks.com/rss",
+            "https://www.paraanaliz.com/rss",
+            "https://www.borsagundem.com/rss",
         ]
 
-        articles = []
-        for url, source_name in rss_feeds:
-            try:
-                feed = feedparser.parse(url)
-                for entry in feed.entries[:20]:
-                    title = entry.get("title", "")
-                    desc = entry.get("summary", "")
-                    full_text = f"{title} {desc}"
+    async def fetch_financial_news_rss(self) -> List[Dict]:
+        """RSS haberleri çek."""
+        all_news = []
 
-                    article = {
-                        "source": source_name,
-                        "title": title,
-                        "description": desc,
-                        "url": entry.get("link", ""),
-                        "published_at": entry.get("published", ""),
-                        "language": "tr",
-                        "tickers": self.extract_tickers(full_text),
-                        "sentiment": self._basic_sentiment(full_text),
-                        "importance": self.compute_importance(full_text),
-                        "credibility": self.compute_credibility(source_name),
-                    }
-                    articles.append(article)
+        async with aiohttp.ClientSession() as session:
+            for feed_url in self._rss_feeds:
+                try:
+                    async with session.get(feed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                        if resp.status == 200:
+                            content = await resp.text()
+                            feed = feedparser.parse(content)
 
-            except Exception as e:
-                logger.warning("RSS feed failed", source=source_name, error=str(e))
+                            for entry in feed.entries[:20]:
+                                news_item = {
+                                    "title": entry.get("title", ""),
+                                    "summary": entry.get("summary", ""),
+                                    "link": entry.get("link", ""),
+                                    "published": entry.get("published", ""),
+                                    "source": feed_url,
+                                }
+                                all_news.append(news_item)
 
-        logger.info("RSS articles fetched", count=len(articles))
-        return articles
+                except Exception as e:
+                    logger.warning(f"RSS fetch failed: {feed_url}", error=str(e))
 
-    def extract_tickers(self, text: str) -> List[str]:
-        """Haber başlığından BIST ticker'larını çıkar."""
-        text_lower = text.lower()
-        found = set()
+        logger.info(f"Fetched {len(all_news)} news items")
+        return all_news
 
-        # 1. COMPANY_NAME_MAP ile eşleştir (uzun isimler önce)
-        # Uzun isimlerin önce eşleşmesi için sırala ("garanti bankası" > "garanti")
-        sorted_names = sorted(COMPANY_NAME_MAP.keys(), key=len, reverse=True)
-        for name in sorted_names:
-            # Uzun isimler (10+ karakter) için substring matching
-            # Kısa isimler için word boundary kontrolü
-            if len(name) >= 10:
-                matched = name in text_lower
-            else:
-                # Word boundary: \b{name}\b
-                pattern = r'\b' + re.escape(name) + r'\b'
-                matched = bool(re.search(pattern, text_lower))
-            
-            if matched:
-                ticker = COMPANY_NAME_MAP[name]
-                # Sektör eşleme ise atla (sadece ticker olanları al)
-                if not ticker.startswith("SECTOR_"):
-                    found.add(ticker)
-                # Eşleşen metni işaretle (çift eşleşmeyi önle)
-                text_lower = text_lower.replace(name, " " * len(name))
+    def match_news_to_ticker(self, news: Dict, ticker: str) -> bool:
+        """Haberi hisseyle eşleştir."""
+        text = f"{news.get('title', '')} {news.get('summary', '')}".lower()
 
-        # 2. Regex: Doğrudan ticker yazımı (büyük harf, 4-6 karakter)
-        # "THYAO hisseleri" gibi
-        ticker_pattern = re.findall(r'\b([A-Z]{4,6})\b', text)
-        for t in ticker_pattern:
-            t_upper = t.upper()
-            # Sadece bilinen ticker'ları kabul et
-            if t_upper in set(COMPANY_NAME_MAP.values()) and not t_upper.startswith("SECTOR_"):
-                found.add(t_upper)
+        # Ticker kodu
+        if ticker.lower() in text:
+            return True
 
-        return list(found)
+        # Şirket adı
+        company_name = self.COMPANY_NAME_MAP.get(ticker.lower(), "")
+        if company_name and company_name.lower() in text:
+            return True
 
-    def compute_importance(self, text: str) -> float:
-        """Haber önem skoru (0-1)."""
-        text_lower = text.lower()
-        importance = 0.3  # Varsayılan
-
-        # Yüksek önem
-        high_importance = ["bilanço", "finansal sonuç", "temettü", "kar payı", "birleşme",
-                          "devralma", "sözleşme", "ihale", "yatırım", "dava", "ceza",
-                          "rekor", "iflas", "kriz", "merkez bankası", "faiz"]
-        for word in high_importance:
-            if word in text_lower:
-                importance += 0.15
-
-        # Orta önem
-        mid_importance = ["açıklama", "duyuru", "toplantı", "genel kurul", "yönetim"]
-        for word in mid_importance:
-            if word in text_lower:
-                importance += 0.05
-
-        return min(1.0, importance)
-
-    def compute_credibility(self, source: str) -> float:
-        """Kaynak güvenilirlik skoru (0-1)."""
-        credibility_map = {
-            "Dünya": 0.9, "Bloomberg": 0.95, "Reuters": 0.95,
-            "Anadolu Ajansı": 0.85, "AA": 0.85,
-            "Borsa Gündem": 0.7, "ParaAnaliz": 0.75,
-            "Investing.com": 0.8, "Ekonomim": 0.8,
-            "Sözcü": 0.6, "Hürriyet": 0.65, "Milliyet": 0.65,
+        # Sektör eşleştirmesi
+        sector_keywords = {
+            "bankacılık": ["garan", "isctr", "akbnk", "ykbnk", "halkb", "vakbn"],
+            "havacılık": ["thyao", "pgsus", "clebi"],
+            "otomotiv": ["froto", "toaso", "karsn", "otkar"],
+            "perakende": ["bimas", "mgros", "sokm"],
+            "enerji": ["enjsa", "akenr", "aydem", "zoren", "aksen"],
+            "cimento": ["cimsa", "nuhcm", "golts", "bucim", "konya", "btcim", "oyakc"],
+            "savunma": ["asels"],
+            "telekom": ["tcell", "ttkom"],
+            "gıda": ["ulker", "bizim", "ccola", "eggub", "ersu", "kervt", "yylgd"],
+            "tekstil": ["mavi", "desa", "derim", "mndtr"],
         }
-        return credibility_map.get(source, 0.5)
 
-    def _basic_sentiment(self, text: str) -> float:
-        """Basic Turkish sentiment analysis."""
-        text = text.lower()
+        for sector, tickers in sector_keywords.items():
+            if ticker.lower() in [t.lower() for t in tickers]:
+                if sector in text:
+                    return True
 
-        positive = [
-            "yükseliş", "artış", "kazanç", "rekor", "büyüme", "kar",
-            "pozitif", "güçlü", "iyimser", "toparlanma", "çıkış",
-            "sözleşme", "ihale", "yatırım", "temettü", "bedelsiz",
-        ]
-
-        negative = [
-            "düşüş", "kayıp", "zarar", "gerileme", "kriz", "risk",
-            "negatif", "zayıf", "kötümser", "çöküş", "satış",
-            "dava", "ceza", "iptal", "iflas", "borç",
-        ]
-
-        pos = sum(1 for w in positive if w in text)
-        neg = sum(1 for w in negative if w in text)
-        total = pos + neg
-
-        if not total or total == 0:
-            return 0.0
-        return (pos - neg) / total
-
+        return False
 
 # Singleton
 news_provider = NewsProvider()

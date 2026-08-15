@@ -1,268 +1,1005 @@
 <!DOCTYPE html>
 <html lang="tr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ALPHA BIST — Market Intelligence</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'SF Mono', 'Fira Code', monospace; background: #0a0a0a; color: #e0e0e0; }
-        .header { background: #111; border-bottom: 1px solid #333; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
-        .header h1 { font-size: 16px; color: #00d4aa; }
-        .header .status { font-size: 12px; color: #888; }
-        .header .status .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-        .header .status .dot.green { background: #00d4aa; }
-        .header .status .dot.red { background: #ff4444; }
-        .header .status .dot.yellow { background: #ffaa00; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1px; background: #222; height: calc(100vh - 45px); }
-        .panel { background: #0a0a0a; padding: 16px; overflow-y: auto; }
-        .panel-title { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; border-bottom: 1px solid #222; padding-bottom: 8px; }
-        .stat { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
-        .stat .label { color: #888; }
-        .stat .value { color: #e0e0e0; font-weight: 500; }
-        .stat .value.green { color: #00d4aa; }
-        .stat .value.red { color: #ff4444; }
-        .stat .value.yellow { color: #ffaa00; }
-        .opportunity { background: #111; border: 1px solid #222; border-radius: 4px; padding: 10px; margin-bottom: 8px; }
-        .opportunity .ticker { font-size: 14px; font-weight: bold; color: #00d4aa; }
-        .opportunity .score { font-size: 20px; font-weight: bold; }
-        .opportunity .details { font-size: 11px; color: #888; margin-top: 4px; }
-        .signal-tag { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 10px; font-weight: bold; }
-        .signal-tag.LONG { background: #00d4aa22; color: #00d4aa; border: 1px solid #00d4aa44; }
-        .signal-tag.SHORT { background: #ff444422; color: #ff4444; border: 1px solid #ff444444; }
-        .signal-tag.HOLD { background: #ffaa0022; color: #ffaa00; border: 1px solid #ffaa0044; }
-        .position { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #1a1a1a; }
-        .position .ticker { font-weight: bold; }
-        .position .pnl { font-size: 13px; }
-        .risk-meter { height: 4px; background: #222; border-radius: 2px; margin-top: 4px; }
-        .risk-meter .fill { height: 100%; border-radius: 2px; transition: width 0.3s; }
-        .event { padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 12px; }
-        .event .time { color: #666; font-size: 10px; }
-        .event .type { color: #00d4aa; font-weight: bold; }
-        .ws-status { font-size: 10px; color: #666; }
-        .ws-status.connected { color: #00d4aa; }
-        #connection-status { position: fixed; bottom: 8px; right: 8px; font-size: 10px; padding: 4px 8px; border-radius: 4px; background: #111; border: 1px solid #333; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALPHA BIST — Market Intelligence</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0e1a;
+      --bg-secondary: #111827;
+      --bg-card: rgba(30, 41, 59, 0.8);
+      --bg-card-hover: rgba(30, 41, 59, 0.95);
+      --border-subtle: rgba(255,255,255,0.05);
+      --border-blue: rgba(59, 130, 246, 0.15);
+      --border-purple: rgba(139, 92, 246, 0.15);
+      --border-green: rgba(34, 197, 94, 0.15);
+      --border-red: rgba(239, 68, 68, 0.15);
+      --border-orange: rgba(245, 158, 11, 0.15);
+      --text-primary: #f8fafc;
+      --text-secondary: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --color-green: #22c55e;
+      --color-green-dark: #16a34a;
+      --color-red: #ef4444;
+      --color-red-dark: #dc2626;
+      --color-blue: #3b82f6;
+      --color-blue-light: #60a5fa;
+      --color-purple: #8b5cf6;
+      --color-purple-light: #a78bfa;
+      --color-orange: #f59e0b;
+      --color-pink: #ec4899;
+      --shadow-card: 0 4px 24px rgba(0,0,0,0.3);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-xs: 6px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 50%, #0f172a 100%);
+      min-height: 100vh;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+    /* Animations */
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
+    .animate-fade { animation: fadeIn 0.5s ease-out forwards; }
+    .animate-slide { animation: slideIn 0.4s ease-out forwards; }
+
+    /* Navigation */
+    .nav {
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-blue);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 12px; }
+    .nav-logo {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--color-blue), var(--color-purple));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 800; font-size: 14px; color: white;
+    }
+    .nav-title { font-weight: 700; font-size: 16px; color: var(--text-primary); letter-spacing: -0.3px; }
+    .nav-subtitle { font-size: 11px; color: var(--text-dim); }
+    .nav-status { display: flex; align-items: center; gap: 20px; }
+    .status-indicator {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--color-green);
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      background: var(--color-green); border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .nav-info { font-size: 12px; color: var(--text-dim); }
+
+    /* Main Layout */
+    .main { padding: 24px; max-width: 1600px; margin: 0 auto; }
+
+    /* Cards Grid */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px; margin-bottom: 24px;
+    }
+    .card {
+      background: linear-gradient(145deg, var(--bg-card), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      padding: 20px;
+      position: relative; overflow: hidden;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    .card:hover {
+      border-color: var(--border-blue);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-card);
+    }
+    .card-glow {
+      position: absolute; top: 0; right: 0;
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      filter: blur(40px);
+      opacity: 0.3;
+    }
+    .card-glow.blue { background: var(--color-blue); }
+    .card-glow.purple { background: var(--color-purple); }
+    .card-glow.green { background: var(--color-green); }
+    .card-glow.orange { background: var(--color-orange); }
+    .card-glow.pink { background: var(--color-pink); }
+    .card-label {
+      font-size: 11px; color: var(--text-dim);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+    .card-value {
+      font-size: 28px; font-weight: 700;
+      color: var(--text-primary);
+    }
+    .card-value.small { font-size: 22px; }
+    .card-sub {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 6px;
+    }
+    .card-sub .up { color: var(--color-green); font-size: 13px; font-weight: 600; }
+    .card-sub .down { color: var(--color-red); font-size: 13px; font-weight: 600; }
+    .card-sub .muted { color: var(--text-dim); font-size: 11px; }
+    .card-progress {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 6px;
+    }
+    .card-progress-bar {
+      width: 60px; height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px; overflow: hidden;
+    }
+    .card-progress-fill {
+      height: 100%; border-radius: 2px;
+    }
+    .card-progress-text { font-size: 11px; color: var(--color-purple-light); }
+
+    /* Two Column Layout */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+    }
+    @media (max-width: 1200px) {
+      .two-col { grid-template-columns: 1fr; }
+    }
+
+    /* Panel */
+    .panel {
+      background: linear-gradient(145deg, var(--bg-card), rgba(15, 23, 42, 0.9));
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .panel:hover { border-color: var(--border-blue); }
+    .panel-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-title {
+      font-size: 15px; font-weight: 700;
+      color: var(--text-primary);
+    }
+    .panel-subtitle {
+      font-size: 11px; color: var(--text-dim);
+      margin-top: 2px;
+    }
+    .panel-actions {
+      display: flex; gap: 8px;
+    }
+    .btn {
+      padding: 6px 14px; border-radius: 8px;
+      font-size: 12px; cursor: pointer;
+      transition: all 0.2s ease; border: none;
+    }
+    .btn-primary {
+      background: rgba(59,130,246,0.15);
+      color: var(--color-blue);
+      border: 1px solid rgba(59,130,246,0.3);
+    }
+    .btn-primary:hover { background: rgba(59,130,246,0.25); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-ghost:hover {
+      color: var(--text-secondary);
+      border-color: rgba(255,255,255,0.2);
+    }
+    .btn-ghost.active {
+      background: rgba(59,130,246,0.15);
+      color: var(--color-blue);
+      border-color: rgba(59,130,246,0.3);
+    }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%; border-collapse: collapse;
+      font-size: 13px;
+    }
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      color: var(--text-dim);
+      font-weight: 500; font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    th.right { text-align: right; }
+    th.center { text-align: center; }
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.2s ease;
+    }
+    tr { cursor: pointer; transition: background 0.2s ease; }
+    tr:hover td { background: rgba(59,130,246,0.05); }
+    .ticker-name { font-weight: 600; color: var(--text-primary); }
+    .ticker-sector { font-size: 11px; color: var(--text-dim); }
+    .score-badge {
+      padding: 4px 10px; border-radius: 8px;
+      font-weight: 700; font-size: 12px; color: white;
+    }
+    .score-badge.green {
+      background: linear-gradient(135deg, var(--color-green), var(--color-green-dark));
+    }
+    .score-badge.red {
+      background: linear-gradient(135deg, var(--color-red), var(--color-red-dark));
+    }
+    .direction-up { color: var(--color-green); font-weight: 600; }
+    .direction-down { color: var(--color-red); font-weight: 600; }
+    .signal-tag {
+      padding: 3px 8px; border-radius: 6px;
+      font-size: 11px;
+    }
+    .signal-tag.momentum {
+      background: rgba(34,197,94,0.1); color: var(--color-green);
+    }
+    .signal-tag.breakout {
+      background: rgba(139,92,246,0.1); color: var(--color-purple-light);
+    }
+    .signal-tag.spec {
+      background: rgba(245,158,11,0.1); color: var(--color-orange);
+    }
+    .signal-tag.volume {
+      background: rgba(34,197,94,0.1); color: var(--color-green);
+    }
+    .signal-tag.regime {
+      background: rgba(236,72,153,0.1); color: var(--color-pink);
+    }
+    .mini-bar {
+      width: 40px; height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px; margin: 0 auto;
+      overflow: hidden;
+    }
+    .mini-bar-fill {
+      height: 100%; border-radius: 2px;
+    }
+    .risk-low { color: var(--color-green); font-size: 12px; }
+    .risk-med { color: var(--color-orange); font-size: 12px; }
+    .risk-high { color: var(--color-red); font-size: 12px; }
+
+    /* Portfolio Cards */
+    .portfolio-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px; margin-bottom: 16px;
+    }
+    .portfolio-stat {
+      background: rgba(255,255,255,0.03);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .portfolio-stat-label {
+      font-size: 11px; color: var(--text-dim);
+    }
+    .portfolio-stat-value {
+      font-size: 20px; font-weight: 700;
+      color: var(--text-primary);
+    }
+    .portfolio-stat-value.small { font-size: 18px; }
+
+    /* Position Item */
+    .position-item {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 12px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+    }
+    .position-item:hover { transform: translateX(4px); }
+    .position-item.long {
+      background: rgba(34,197,94,0.05);
+      border: 1px solid rgba(34,197,94,0.1);
+    }
+    .position-item.short {
+      background: rgba(239,68,68,0.05);
+      border: 1px solid rgba(239,68,68,0.1);
+    }
+    .position-info-name { font-weight: 600; color: var(--text-primary); }
+    .position-info-detail { font-size: 11px; color: var(--text-dim); }
+    .position-pnl { text-align: right; }
+    .position-pnl-value { font-weight: 600; }
+    .position-pnl-value.green { color: var(--color-green); }
+    .position-pnl-value.red { color: var(--color-red); }
+    .position-pnl-pct { font-size: 11px; }
+    .position-pnl-pct.green { color: var(--color-green); }
+    .position-pnl-pct.red { color: var(--color-red); }
+
+    /* Risk Bars */
+    .risk-item { margin-bottom: 14px; }
+    .risk-item-header {
+      display: flex; justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .risk-item-label { font-size: 12px; color: var(--text-muted); }
+    .risk-item-value { font-size: 12px; font-weight: 600; }
+    .risk-bar {
+      height: 6px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 3px; overflow: hidden;
+    }
+    .risk-bar-fill {
+      height: 100%; border-radius: 3px;
+      transition: width 0.5s ease;
+    }
+
+    /* Regime History */
+    .regime-item {
+      display: flex; align-items: center;
+      gap: 12px; margin-bottom: 10px;
+    }
+    .regime-date {
+      width: 60px; font-size: 11px; color: var(--text-dim);
+    }
+    .regime-bar {
+      flex: 1; height: 24px;
+      border-radius: 6px;
+      display: flex; align-items: center;
+      padding: 0 10px;
+    }
+    .regime-bar.bull { background: rgba(139,92,246,0.15); }
+    .regime-bar.sideways { background: rgba(245,158,11,0.15); }
+    .regime-bar.bear { background: rgba(239,68,68,0.15); }
+    .regime-name { font-size: 12px; font-weight: 600; }
+    .regime-name.bull { color: var(--color-purple-light); }
+    .regime-name.sideways { color: var(--color-orange); }
+    .regime-name.bear { color: var(--color-red); }
+    .regime-confidence {
+      width: 40px; text-align: right;
+      font-size: 11px;
+    }
+    .regime-confidence.bull { color: var(--color-purple-light); }
+    .regime-confidence.sideways { color: var(--color-orange); }
+    .regime-confidence.bear { color: var(--color-red); }
+
+    /* Feature Importance */
+    .feature-item {
+      display: flex; align-items: center;
+      gap: 12px; margin-bottom: 10px;
+    }
+    .feature-name {
+      width: 140px; font-size: 12px;
+      color: var(--text-muted);
+    }
+    .feature-bar {
+      flex: 1; height: 8px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px; overflow: hidden;
+    }
+    .feature-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--color-blue), var(--color-purple));
+      transition: width 0.5s ease;
+    }
+    .feature-value {
+      width: 40px; text-align: right;
+      font-size: 12px; color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    /* Health Status */
+    .health-item {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      transition: all 0.2s ease;
+    }
+    .health-item:hover { transform: translateX(4px); }
+    .health-item.ok { background: rgba(34,197,94,0.05); }
+    .health-item.warn { background: rgba(245,158,11,0.05); }
+    .health-item.error { background: rgba(239,68,68,0.05); }
+    .health-name { font-size: 12px; color: var(--text-muted); }
+    .health-status { font-size: 12px; font-weight: 600; }
+    .health-status.ok { color: var(--color-green); }
+    .health-status.warn { color: var(--color-orange); }
+    .health-status.error { color: var(--color-red); }
+
+    /* Notification */
+    .notif-item {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      border-left: 3px solid transparent;
+      transition: all 0.2s ease;
+    }
+    .notif-item:hover { transform: translateX(4px); }
+    .notif-item.opportunity {
+      background: rgba(34,197,94,0.05);
+      border-left-color: var(--color-green);
+    }
+    .notif-item.regime {
+      background: rgba(59,130,246,0.05);
+      border-left-color: var(--color-blue);
+    }
+    .notif-item.risk {
+      background: rgba(245,158,11,0.05);
+      border-left-color: var(--color-orange);
+    }
+    .notif-category {
+      font-size: 11px; font-weight: 600;
+    }
+    .notif-category.opportunity { color: var(--color-green); }
+    .notif-category.regime { color: var(--color-blue); }
+    .notif-category.risk { color: var(--color-orange); }
+    .notif-text {
+      font-size: 12px; color: var(--text-secondary);
+      margin-top: 2px;
+    }
+    .notif-time {
+      font-size: 10px; color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Chart Container */
+    .chart-container {
+      position: relative;
+      height: 80px;
+      width: 100%;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .cards-grid { grid-template-columns: 1fr 1fr; }
+      .portfolio-grid { grid-template-columns: 1fr; }
+      .nav { flex-wrap: wrap; gap: 8px; }
+      .nav-status { flex-wrap: wrap; }
+    }
+
+    /* Loading Skeleton */
+    .skeleton {
+      background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 4px;
+    }
+
+    /* Tooltip */
+    .tooltip {
+      position: relative;
+    }
+    .tooltip::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%; left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .tooltip:hover::after { opacity: 1; }
+  </style>
 </head>
 <body>
-    <div class="header">
-        <h1>⚡ ALPHA BIST</h1>
-        <div class="status">
-            <span class="dot green" id="system-dot"></span>
-            <span id="system-status">Sistem Hazır</span>
-            <span style="margin-left: 16px;" id="regime-tag"></span>
-            <span style="margin-left: 16px; color: #666;" id="clock"></span>
+  <!-- Navigation -->
+  <nav class="nav">
+    <div class="nav-brand">
+      <div class="nav-logo">α</div>
+      <div>
+        <div class="nav-title">ALPHA BIST</div>
+        <div class="nav-subtitle">Market Intelligence & Quant Engine</div>
+      </div>
+    </div>
+    <div class="nav-status">
+      <div class="status-indicator">
+        <span class="status-dot"></span>
+        Sistem Aktif
+      </div>
+      <div class="nav-info">Tarama #<span id="scan-count">1,247</span></div>
+      <div class="nav-info" id="current-time">15 Ağu 2026 23:39</div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <div class="main">
+    <!-- Market Overview Cards -->
+    <div class="cards-grid">
+      <div class="card animate-fade" style="animation-delay: 0s;">
+        <div class="card-glow blue"></div>
+        <div class="card-label">BIST 100</div>
+        <div class="card-value" id="bist-value">9,847.32</div>
+        <div class="card-sub">
+          <span class="up" id="bist-change">▲ %1.24</span>
+          <span class="muted" id="bist-points">+120.45</span>
         </div>
+      </div>
+
+      <div class="card animate-fade" style="animation-delay: 0.05s;">
+        <div class="card-glow purple"></div>
+        <div class="card-label">Piyasa Rejimi</div>
+        <div class="card-value small" id="regime-value" style="color: var(--color-purple);">BULL</div>
+        <div class="card-progress">
+          <div class="card-progress-bar">
+            <div class="card-progress-fill" id="regime-bar" style="width: 78%; background: linear-gradient(90deg, var(--color-purple), var(--color-purple-light));"></div>
+          </div>
+          <span class="card-progress-text" id="regime-confidence">%78 güven</span>
+        </div>
+      </div>
+
+      <div class="card animate-fade" style="animation-delay: 0.1s;">
+        <div class="card-glow green"></div>
+        <div class="card-label">Breadth</div>
+        <div class="card-value" id="breadth-value" style="color: var(--color-green);">%64.2</div>
+        <div class="card-sub">
+          <span class="up" id="breadth-up">▲ 312</span>
+          <span class="down" id="breadth-down">▼ 174</span>
+        </div>
+      </div>
+
+      <div class="card animate-fade" style="animation-delay: 0.15s;">
+        <div class="card-glow orange"></div>
+        <div class="card-label">Volatilite</div>
+        <div class="card-value" id="vol-value" style="color: var(--color-orange);">%18.4</div>
+        <div class="card-sub">
+          <span class="muted" id="vol-status">Düşük volatilite</span>
+        </div>
+      </div>
+
+      <div class="card animate-fade" style="animation-delay: 0.2s;">
+        <div class="card-glow pink"></div>
+        <div class="card-label">Fırsatlar</div>
+        <div class="card-value" id="opp-count" style="color: var(--color-pink);">24</div>
+        <div class="card-sub">
+          <span style="background: rgba(34,197,94,0.15); color: var(--color-green); font-size: 11px; padding: 2px 8px; border-radius: 10px;">12 LONG</span>
+          <span style="background: rgba(239,68,68,0.15); color: var(--color-red); font-size: 11px; padding: 2px 8px; border-radius: 10px;">12 SHORT</span>
+        </div>
+      </div>
     </div>
 
-    <div class="grid">
-        <!-- Sol Panel: Piyasa & Fırsatlar -->
-        <div class="panel">
-            <div class="panel-title">📊 Piyasa Durumu</div>
-            <div id="market-stats">
-                <div class="stat"><span class="label">BIST 100</span><span class="value" id="bist100">—</span></div>
-                <div class="stat"><span class="label">Rejim</span><span class="value yellow" id="regime">—</span></div>
-                <div class="stat"><span class="label">Breadth</span><span class="value" id="breadth">—</span></div>
-                <div class="stat"><span class="label">Volatilite</span><span class="value" id="volatility">—</span></div>
-                <div class="stat"><span class="label">Taranan</span><span class="value" id="scanned">—</span></div>
-                <div class="stat"><span class="label">Sinyal</span><span class="value green" id="signals">—</span></div>
-                <div class="stat"><span class="label">Fırsat</span><span class="value green" id="opportunities">—</span></div>
-            </div>
+    <!-- Two Column Layout -->
+    <div class="two-col">
+      <!-- Left Column -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
 
-            <div class="panel-title" style="margin-top: 16px;">🎯 Fırsatlar</div>
-            <div id="opportunity-list"></div>
+        <!-- Opportunities Table -->
+        <div class="panel animate-fade" style="animation-delay: 0.25s;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">🎯 Fırsatlar</div>
+              <div class="panel-subtitle">Risk-adjusted scoring ile sıralanmış</div>
+            </div>
+            <div class="panel-actions">
+              <button class="btn btn-primary active" onclick="filterOpps('all')">Tümü</button>
+              <button class="btn btn-ghost" onclick="filterOpps('long')">LONG</button>
+              <button class="btn btn-ghost" onclick="filterOpps('short')">SHORT</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table id="opportunities-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Hisse</th>
+                  <th class="right">Fiyat</th>
+                  <th class="right">Skor</th>
+                  <th class="center">Yön</th>
+                  <th class="center">Sinyal</th>
+                  <th class="right">Güven</th>
+                  <th class="center">Teknik</th>
+                  <th class="center">Momentum</th>
+                  <th class="center">Risk</th>
+                </tr>
+              </thead>
+              <tbody id="opportunities-body">
+                <!-- JS ile doldurulacak -->
+              </tbody>
+            </table>
+          </div>
         </div>
 
-        <!-- Orta Panel: Portföy -->
-        <div class="panel">
-            <div class="panel-title">💼 Portföy</div>
-            <div id="portfolio-stats">
-                <div class="stat"><span class="label">Toplam Değer</span><span class="value" id="equity">₺100,000</span></div>
-                <div class="stat"><span class="label">Nakit</span><span class="value" id="cash">₺100,000</span></div>
-                <div class="stat"><span class="label">Yatırım</span><span class="value" id="invested">₺0</span></div>
-                <div class="stat"><span class="label">Günlük P&L</span><span class="value" id="daily-pnl">₺0</span></div>
-                <div class="stat"><span class="label">Toplam P&L</span><span class="value" id="total-pnl">₺0</span></div>
-                <div class="stat"><span class="label">Getiri</span><span class="value" id="return-pct">%0.00</span></div>
-                <div class="stat"><span class="label">Drawdown</span><span class="value" id="drawdown">%0.00</span></div>
-            </div>
+        <!-- Portfolio & Regime Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
 
-            <div class="panel-title" style="margin-top: 16px;">📈 Pozisyonlar</div>
-            <div id="positions-list">
-                <div style="color: #666; font-size: 12px; padding: 20px 0; text-align: center;">Henüz pozisyon yok</div>
-            </div>
-
-            <div class="panel-title" style="margin-top: 16px;">⚠️ Risk</div>
-            <div id="risk-stats">
-                <div class="stat"><span class="label">Risk Seviyesi</span><span class="value green" id="risk-level">DÜŞÜK</span></div>
-                <div class="stat"><span class="label">Sektör Konsantrasyonu</span><span class="value" id="sector-conc">%0</span></div>
-                <div class="stat"><span class="label">Korelasyon</span><span class="value" id="correlation">0.00</span></div>
-                <div class="risk-meter"><div class="fill" id="risk-fill" style="width: 20%; background: #00d4aa;"></div></div>
-            </div>
-        </div>
-
-        <!-- Sağ Panel: Olaylar & Sistem -->
-        <div class="panel">
-            <div class="panel-title">🧠 AI Araştırması</div>
-            <div id="ai-research">
-                <div style="color: #666; font-size: 12px; padding: 10px 0;">Son analizler burada görünecek...</div>
-            </div>
-
-            <div class="panel-title" style="margin-top: 16px;">📋 Olaylar</div>
-            <div id="event-list">
-                <div class="event">
-                    <span class="time">—</span>
-                    <span class="type">SYSTEM</span>
-                    Sistem başlatıldı
+          <!-- Portfolio Performance -->
+          <div class="panel animate-fade" style="animation-delay: 0.3s;">
+            <div style="padding: 20px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                <div class="panel-title">💼 Portföy Performansı</div>
+                <span style="background: rgba(34,197,94,0.1); color: var(--color-green); padding: 3px 10px; border-radius: 8px; font-size: 11px;">+₺12,450</span>
+              </div>
+              <div class="portfolio-grid">
+                <div class="portfolio-stat">
+                  <div class="portfolio-stat-label">Toplam Değer</div>
+                  <div class="portfolio-stat-value" id="portfolio-total">₺112,450</div>
                 </div>
+                <div class="portfolio-stat">
+                  <div class="portfolio-stat-label">Getiri</div>
+                  <div class="portfolio-stat-value" id="portfolio-return" style="color: var(--color-green);">%12.45</div>
+                </div>
+                <div class="portfolio-stat">
+                  <div class="portfolio-stat-label">Nakit</div>
+                  <div class="portfolio-stat-value small" id="portfolio-cash">₺45,200</div>
+                </div>
+                <div class="portfolio-stat">
+                  <div class="portfolio-stat-label">Drawdown</div>
+                  <div class="portfolio-stat-value small" id="portfolio-dd" style="color: var(--color-green);">%3.2</div>
+                </div>
+              </div>
+              <div class="chart-container">
+                <canvas id="portfolioChart"></canvas>
+              </div>
             </div>
+          </div>
 
-            <div class="panel-title" style="margin-top: 16px;">🔧 Sistem</div>
-            <div id="system-stats">
-                <div class="stat"><span class="label">Servisler</span><span class="value green" id="services-status">HEALTHY</span></div>
-                <div class="stat"><span class="label">Database</span><span class="value green" id="db-status">OK</span></div>
-                <div class="stat"><span class="label">Feature Store</span><span class="value green" id="fs-status">OK</span></div>
-                <div class="stat"><span class="label">Knowledge Graph</span><span class="value" id="kg-count">0 entities</span></div>
-                <div class="stat"><span class="label">Audit Entries</span><span class="value" id="audit-count">0</span></div>
-                <div class="stat"><span class="label">Tarama #</span><span class="value" id="scan-count">0</span></div>
+          <!-- Regime History -->
+          <div class="panel animate-fade" style="animation-delay: 0.35s;">
+            <div style="padding: 20px;">
+              <div class="panel-title" style="margin-bottom: 16px;">📊 Rejim Geçmişi</div>
+              <div id="regime-history">
+                <!-- JS ile doldurulacak -->
+              </div>
             </div>
+          </div>
         </div>
+
+        <!-- Feature Importance -->
+        <div class="panel animate-fade" style="animation-delay: 0.4s;">
+          <div style="padding: 20px;">
+            <div class="panel-title" style="margin-bottom: 16px;">🧠 Feature Importance (LightGBM)</div>
+            <div id="feature-importance">
+              <!-- JS ile doldurulacak -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div style="display: flex; flex-direction: column; gap: 20px;">
+
+        <!-- Positions -->
+        <div class="panel animate-fade" style="animation-delay: 0.3s;">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">📈 Pozisyonlar</div>
+              <div class="panel-subtitle">5 aktif pozisyon</div>
+            </div>
+          </div>
+          <div style="padding: 16px;" id="positions-list">
+            <!-- JS ile doldurulacak -->
+          </div>
+        </div>
+
+        <!-- Risk Panel -->
+        <div class="panel animate-fade" style="animation-delay: 0.35s;">
+          <div style="padding: 20px;">
+            <div class="panel-title" style="margin-bottom: 16px;">⚠️ Risk Durumu</div>
+            <div id="risk-panel">
+              <!-- JS ile doldurulacak -->
+            </div>
+          </div>
+        </div>
+
+        <!-- System Health -->
+        <div class="panel animate-fade" style="animation-delay: 0.4s;">
+          <div style="padding: 20px;">
+            <div class="panel-title" style="margin-bottom: 16px;">🔧 Sistem Sağlığı</div>
+            <div id="health-panel">
+              <!-- JS ile doldurulacak -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div class="panel animate-fade" style="animation-delay: 0.45s;">
+          <div style="padding: 20px;">
+            <div class="panel-title" style="margin-bottom: 16px;">📋 Son Olaylar</div>
+            <div id="notifications-list">
+              <!-- JS ile doldurulacak -->
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div id="connection-status">
-        <span class="ws-status" id="ws-status">● Bağlanıyor...</span>
-    </div>
+  <script>
+    // ===================== DATA =====================
+    const opportunities = [
+      { rank: 1, ticker: "THYAO", sector: "Havacılık", price: 287.40, score: 87.4, direction: "LONG", signal: "MOMENTUM", confidence: 92, technical: 85, momentum: 90, risk: "low" },
+      { rank: 2, ticker: "GARAN", sector: "Bankacılık", price: 125.80, score: 84.2, direction: "LONG", signal: "BREAKOUT", confidence: 88, technical: 78, momentum: 82, risk: "low" },
+      { rank: 3, ticker: "ASELS", sector: "Savunma", price: 68.45, score: 81.7, direction: "SHORT", signal: "SPEC", confidence: 75, technical: 65, momentum: 45, risk: "med" },
+      { rank: 4, ticker: "BIMAS", sector: "Perakende", price: 412.30, score: 79.3, direction: "LONG", signal: "VOLUME", confidence: 85, technical: 72, momentum: 88, risk: "low" },
+      { rank: 5, ticker: "EREGL", sector: "Metal", price: 45.20, score: 76.8, direction: "SHORT", signal: "REGIME", confidence: 72, technical: 55, momentum: 40, risk: "high" },
+    ];
 
-    <script>
-        // WebSocket connection
-        let ws = null;
-        let reconnectInterval = null;
+    const positions = [
+      { ticker: "THYAO", lots: 350, entry: 275.20, pnl: 4270, pnlPct: 4.45, direction: "long" },
+      { ticker: "GARAN", lots: 800, entry: 118.50, pnl: 5840, pnlPct: 6.16, direction: "long" },
+      { ticker: "ASELS", lots: 500, entry: 72.30, pnl: -1925, pnlPct: -5.33, direction: "short" },
+    ];
 
-        function connect() {
-            const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = protocol + '//' + location.hostname + ':8765/system';
+    const regimeHistory = [
+      { date: "Bugün", regime: "BULL", confidence: 78 },
+      { date: "Dün", regime: "BULL", confidence: 72 },
+      { date: "2 gün", regime: "SIDEWAYS", confidence: 45 },
+      { date: "3 gün", regime: "SIDEWAYS", confidence: 51 },
+      { date: "4 gün", regime: "BEAR", confidence: 63 },
+    ];
 
-            try {
-                ws = new WebSocket(wsUrl);
+    const featureImportance = [
+      { name: "momentum_20d", value: 18.4 },
+      { name: "volume_zscore", value: 15.2 },
+      { name: "rsi_14", value: 12.8 },
+      { name: "bb_position", value: 10.5 },
+      { name: "roc_5d", value: 9.1 },
+    ];
 
-                ws.onopen = () => {
-                    document.getElementById('ws-status').textContent = '● Bağlı';
-                    document.getElementById('ws-status').className = 'ws-status connected';
-                    if (reconnectInterval) { clearInterval(reconnectInterval); reconnectInterval = null; }
-                };
+    const riskMetrics = [
+      { label: "Risk Seviyesi", value: "DÜŞÜK", pct: 25, color: "green" },
+      { label: "Sektör Konsantrasyonu", value: "%18", pct: 18, color: "green" },
+      { label: "Portföy Korelasyonu", value: "0.62", pct: 62, color: "orange" },
+      { label: "Max Drawdown", value: "%3.2", pct: 21, color: "green" },
+    ];
 
-                ws.onmessage = (event) => {
-                    try {
-                        const data = JSON.parse(event.data);
-                        handleMessage(data);
-                    } catch (e) {}
-                };
+    const healthStatus = [
+      { name: "Database", status: "HEALTHY", type: "ok" },
+      { name: "Feature Store", status: "HEALTHY", type: "ok" },
+      { name: "Opportunity Engine", status: "HEALTHY", type: "ok" },
+      { name: "Decision Engine", status: "HEALTHY", type: "ok" },
+      { name: "Knowledge Graph", status: "156 entities", type: "warn" },
+    ];
 
-                ws.onclose = () => {
-                    document.getElementById('ws-status').textContent = '● Bağlantı kesildi';
-                    document.getElementById('ws-status').className = 'ws-status';
-                    if (!reconnectInterval) reconnectInterval = setInterval(connect, 5000);
-                };
+    const notifications = [
+      { category: "OPPORTUNITY", text: "THYAO momentum sinyali üretildi", time: "2 dk önce", type: "opportunity" },
+      { category: "REGIME", text: "Piyasa rejimi BULL'a geçti", time: "15 dk önce", type: "regime" },
+      { category: "RISK", text: "ASELS pozisyonu stop-loss yakınında", time: "1 saat önce", type: "risk" },
+    ];
 
-                ws.onerror = () => {
-                    ws.close();
-                };
-            } catch (e) {
-                document.getElementById('ws-status').textContent = '● Bağlanamıyor';
-            }
+    // ===================== RENDER FUNCTIONS =====================
+    function renderOpportunities(filter = 'all') {
+      const tbody = document.getElementById('opportunities-body');
+      let filtered = opportunities;
+      if (filter === 'long') filtered = opportunities.filter(o => o.direction === 'LONG');
+      if (filter === 'short') filtered = opportunities.filter(o => o.direction === 'SHORT');
+
+      tbody.innerHTML = filtered.map(opp => `
+        <tr onclick="showStockDetail('${opp.ticker}')">
+          <td style="color: var(--text-dim);">${opp.rank}</td>
+          <td>
+            <div class="ticker-name">${opp.ticker}</div>
+            <div class="ticker-sector">${opp.sector}</div>
+          </td>
+          <td class="right" style="font-weight: 600;">₺${opp.price.toFixed(2)}</td>
+          <td class="right">
+            <span class="score-badge ${opp.direction === 'LONG' ? 'green' : 'red'}">${opp.score}</span>
+          </td>
+          <td class="center">
+            <span class="direction-${opp.direction === 'LONG' ? 'up' : 'down'}">${opp.direction === 'LONG' ? '▲' : '▼'} ${opp.direction}</span>
+          </td>
+          <td class="center">
+            <span class="signal-tag ${opp.signal.toLowerCase()}">${opp.signal}</span>
+          </td>
+          <td class="right" style="color: ${opp.confidence >= 80 ? 'var(--color-green)' : opp.confidence >= 60 ? 'var(--color-orange)' : 'var(--color-red)'};">%${opp.confidence}</td>
+          <td class="center">
+            <div class="mini-bar">
+              <div class="mini-bar-fill" style="width: ${opp.technical}%; background: ${opp.technical >= 70 ? 'var(--color-green)' : opp.technical >= 50 ? 'var(--color-orange)' : 'var(--color-red)'};"></div>
+            </div>
+          </td>
+          <td class="center">
+            <div class="mini-bar">
+              <div class="mini-bar-fill" style="width: ${opp.momentum}%; background: ${opp.momentum >= 70 ? 'var(--color-green)' : opp.momentum >= 50 ? 'var(--color-orange)' : 'var(--color-red)'};"></div>
+            </div>
+          </td>
+          <td class="center">
+            <span class="risk-${opp.risk}">${opp.risk === 'low' ? 'Düşük' : opp.risk === 'med' ? 'Orta' : 'Yüksek'}</span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function renderPositions() {
+      const container = document.getElementById('positions-list');
+      container.innerHTML = positions.map(pos => `
+        <div class="position-item ${pos.direction}">
+          <div>
+            <div class="position-info-name">${pos.ticker}</div>
+            <div class="position-info-detail">${pos.lots} lot @ ₺${pos.entry.toFixed(2)}</div>
+          </div>
+          <div class="position-pnl">
+            <div class="position-pnl-value ${pos.pnl >= 0 ? 'green' : 'red'}">${pos.pnl >= 0 ? '+' : ''}₺${Math.abs(pos.pnl).toLocaleString()}</div>
+            <div class="position-pnl-pct ${pos.pnlPct >= 0 ? 'green' : 'red'}">${pos.pnlPct >= 0 ? '+' : ''}%${pos.pnlPct.toFixed(2)}</div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderRegimeHistory() {
+      const container = document.getElementById('regime-history');
+      container.innerHTML = regimeHistory.map(r => `
+        <div class="regime-item">
+          <div class="regime-date">${r.date}</div>
+          <div class="regime-bar ${r.regime.toLowerCase()}">
+            <span class="regime-name ${r.regime.toLowerCase()}">${r.regime}</span>
+          </div>
+          <div class="regime-confidence ${r.regime.toLowerCase()}">%${r.confidence}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderFeatureImportance() {
+      const container = document.getElementById('feature-importance');
+      const maxVal = Math.max(...featureImportance.map(f => f.value));
+      container.innerHTML = featureImportance.map(f => `
+        <div class="feature-item">
+          <div class="feature-name">${f.name}</div>
+          <div class="feature-bar">
+            <div class="feature-bar-fill" style="width: ${(f.value / maxVal * 100).toFixed(1)}%;"></div>
+          </div>
+          <div class="feature-value">%${f.value}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderRiskPanel() {
+      const container = document.getElementById('risk-panel');
+      const colorMap = {
+        green: { bg: 'linear-gradient(90deg, var(--color-green), var(--color-green-dark))', text: 'var(--color-green)' },
+        orange: { bg: 'linear-gradient(90deg, var(--color-orange), #d97706)', text: 'var(--color-orange)' },
+        red: { bg: 'linear-gradient(90deg, var(--color-red), var(--color-red-dark))', text: 'var(--color-red)' },
+      };
+      container.innerHTML = riskMetrics.map(r => `
+        <div class="risk-item">
+          <div class="risk-item-header">
+            <span class="risk-item-label">${r.label}</span>
+            <span class="risk-item-value" style="color: ${colorMap[r.color].text};">${r.value}</span>
+          </div>
+          <div class="risk-bar">
+            <div class="risk-bar-fill" style="width: ${r.pct}%; background: ${colorMap[r.color].bg};"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function renderHealthPanel() {
+      const container = document.getElementById('health-panel');
+      container.innerHTML = healthStatus.map(h => `
+        <div class="health-item ${h.type}">
+          <span class="health-name">${h.name}</span>
+          <span class="health-status ${h.type}">${h.type === 'ok' ? '✓' : '⚠'} ${h.status}</span>
+        </div>
+      `).join('');
+    }
+
+    function renderNotifications() {
+      const container = document.getElementById('notifications-list');
+      container.innerHTML = notifications.map(n => `
+        <div class="notif-item ${n.type}">
+          <div class="notif-category ${n.type}">${n.category}</div>
+          <div class="notif-text">${n.text}</div>
+          <div class="notif-time">${n.time}</div>
+        </div>
+      `).join('');
+    }
+
+    // ===================== CHARTS =====================
+    function initPortfolioChart() {
+      const ctx = document.getElementById('portfolioChart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
+          datasets: [{
+            data: [100000, 102500, 101800, 105200, 108400, 110100, 112450],
+            borderColor: '#22c55e',
+            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: true } },
+          scales: {
+            x: { display: false },
+            y: { display: false }
+          },
+          interaction: { intersect: false, mode: 'index' },
+        }
+      });
+    }
+
+    // ===================== INTERACTIONS =====================
+    function filterOpps(type) {
+      document.querySelectorAll('.panel-actions .btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+      renderOpportunities(type);
+    }
+
+    function showStockDetail(ticker) {
+      alert(`${ticker} detay sayfası açılıyor...\n\nBu sayfada:\n- Teknik analiz grafikleri\n- Fundamental veriler\n- Sinyal geçmişi\n- AI analizi\n- Haberler\n\ngörüntülenecek.`);
+    }
+
+    function updateTime() {
+      const now = new Date();
+      const options = { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' };
+      document.getElementById('current-time').textContent = now.toLocaleDateString('tr-TR', options);
+    }
+
+    // ===================== WEBSOCKET SIMULATION =====================
+    function simulateRealtimeUpdates() {
+      setInterval(() => {
+        // Random BIST update
+        const bistEl = document.getElementById('bist-value');
+        if (bistEl) {
+          const current = parseFloat(bistEl.textContent.replace(',', ''));
+          const change = (Math.random() - 0.5) * 10;
+          bistEl.textContent = (current + change).toLocaleString('tr-TR', { minimumFractionDigits: 2 });
         }
 
-        function handleMessage(data) {
-            switch (data.type) {
-                case 'tick':
-                    updatePrice(data);
-                    break;
-                case 'opportunity':
-                    addOpportunity(data);
-                    break;
-                case 'portfolio_update':
-                    updatePortfolio(data);
-                    break;
-                case 'risk_alert':
-                    addRiskAlert(data);
-                    break;
-                case 'system_status':
-                    updateSystem(data);
-                    break;
-                case 'scan_result':
-                    updateScanResults(data);
-                    break;
-            }
+        // Random scan count
+        const scanEl = document.getElementById('scan-count');
+        if (scanEl) {
+          scanEl.textContent = (parseInt(scanEl.textContent.replace(',', '')) + 1).toLocaleString();
         }
+      }, 5000);
+    }
 
-        function updatePrice(data) {
-            // Update market stats
-        }
-
-        function addOpportunity(data) {
-            const list = document.getElementById('opportunity-list');
-            const color = data.direction === 'LONG' ? 'green' : 'red';
-            const html = '<div class="opportunity">' +
-                '<div style="display: flex; justify-content: space-between;">' +
-                '<span class="ticker">' + data.ticker + '</span>' +
-                '<span class="score" style="color: #' + (color === 'green' ? '00d4aa' : 'ff4444') + '">' + data.score.toFixed(1) + '</span>' +
-                '</div>' +
-                '<div class="details">' +
-                '<span class="signal-tag ' + data.direction + '">' + data.direction + '</span> ' +
-                '<span>' + data.signal + '</span>' +
-                '</div></div>';
-
-            list.insertAdjacentHTML('afterbegin', html);
-            // Keep only last 10
-            while (list.children.length > 10) list.removeChild(list.lastChild);
-        }
-
-        function updatePortfolio(data) {
-            document.getElementById('equity').textContent = '₺' + data.equity.toLocaleString();
-            const pnlEl = document.getElementById('total-pnl');
-            pnlEl.textContent = '₺' + data.pnl.toLocaleString();
-            pnlEl.className = 'value ' + (data.pnl >= 0 ? 'green' : 'red');
-        }
-
-        function addRiskAlert(data) {
-            addEvent('RISK', data.message);
-        }
-
-        function updateSystem(data) {
-            document.getElementById('services-status').textContent = data.status;
-            document.getElementById('services-status').className = 'value ' + (data.status === 'HEALTHY' ? 'green' : 'red');
-        }
-
-        function updateScanResults(data) {
-            document.getElementById('scanned').textContent = data.scanned || '—';
-            document.getElementById('signals').textContent = data.signals || '—';
-            document.getElementById('opportunities').textContent = data.opportunities || '—';
-            document.getElementById('regime').textContent = data.regime || '—';
-            document.getElementById('breadth').textContent = data.breadth ? '%' + data.breadth.toFixed(1) : '—';
-            document.getElementById('volatility').textContent = data.volatility ? '%' + data.volatility.toFixed(1) : '—';
-            document.getElementById('scan-count').textContent = data.scan_count || '—';
-
-            const regimeTag = document.getElementById('regime-tag');
-            regimeTag.textContent = data.regime || '';
-            regimeTag.style.color = '#ffaa00';
-        }
-
-        function addEvent(type, message) {
-            const list = document.getElementById('event-list');
-            const now = new Date().toLocaleTimeString('tr-TR');
-            const html = '<div class="event"><span class="time">' + now + '</span> <span class="type">' + type + '</span> ' + message + '</div>';
-            list.insertAdjacentHTML('afterbegin', html);
-            while (list.children.length > 20) list.removeChild(list.lastChild);
-        }
-
-        // Clock
-        function updateClock() {
-            document.getElementById('clock').textContent = new Date().toLocaleTimeString('tr-TR');
-        }
-        setInterval(updateClock, 1000);
-        updateClock();
-
-        // Connect
-        connect();
-    </script>
+    // ===================== INIT =====================
+    document.addEventListener('DOMContentLoaded', () => {
+      renderOpportunities();
+      renderPositions();
+      renderRegimeHistory();
+      renderFeatureImportance();
+      renderRiskPanel();
+      renderHealthPanel();
+      renderNotifications();
+      initPortfolioChart();
+      updateTime();
+      setInterval(updateTime, 60000);
+      simulateRealtimeUpdates();
+    });
+  </script>
 </body>
 </html>
