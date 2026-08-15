@@ -191,7 +191,16 @@ class NewsProvider:
         # Uzun isimlerin önce eşleşmesi için sırala ("garanti bankası" > "garanti")
         sorted_names = sorted(COMPANY_NAME_MAP.keys(), key=len, reverse=True)
         for name in sorted_names:
-            if name in text_lower:
+            # Uzun isimler (10+ karakter) için substring matching
+            # Kısa isimler için word boundary kontrolü
+            if len(name) >= 10:
+                matched = name in text_lower
+            else:
+                # Word boundary: \b{name}\b
+                pattern = r'\b' + re.escape(name) + r'\b'
+                matched = bool(re.search(pattern, text_lower))
+            
+            if matched:
                 ticker = COMPANY_NAME_MAP[name]
                 # Sektör eşleme ise atla (sadece ticker olanları al)
                 if not ticker.startswith("SECTOR_"):
