@@ -305,10 +305,10 @@ Her provider için:
 - [x] KAP'tan canlı şirket listesi çekme (şu an var, güçlendir)
 - [x] Sektör/alt-sektör mapping
 - [x] Market cap bilgisi
-- [ ] Likidite skoru
+- [x] Likidite skoru
 - [x] Listing status (active/suspended/delisted)
 - [x] Otomatik günlük güncelleme
-- [ ] Survivorship bias koruması (delisted şirketler de tarihte tutulacak)
+- [x] Survivorship bias koruması (delisted şirketler de tarihte tutulacak)
 
 #### 1.7 Data Quality Engine
 
