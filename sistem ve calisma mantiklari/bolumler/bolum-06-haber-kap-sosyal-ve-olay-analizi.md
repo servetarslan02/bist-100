@@ -4,6 +4,8 @@
 
 Sayısal verilerin tek başına gösteremediği güncel gelişmeleri ve piyasa algısını analiz etmek.
 
+**Kaynak:** Springer (2025) Stock Sentiment Rank Metric, NLP-based financial event extraction.
+
 ---
 
 ## Kullanılacak sistemler
@@ -22,71 +24,69 @@ Sayısal verilerin tek başına gösteremediği güncel gelişmeleri ve piyasa a
 ## Çalışma mantığı
 
 ```
-Haber + KAP + Sosyal Medya
-    ↓
-NLP / Embedding
-    ↓
-Konu / Olay Tespiti
-    ↓
-Sentiment Analizi
-    ↓
-Etki Analizi
-    ↓
-Catalyst / Risk Tespiti
-    ↓
+Haber + KAP + Sosyal Medya → NLP/Embedding → Konu/Olay Tespiti →
+Sentiment Analizi → Etki Analizi → Catalyst/Risk Tespiti →
 Şirket Analizine Etki
 ```
 
 ---
 
-## Nasıl çalışacak?
+## 1. KAP Analizi
 
-Örneğin bir şirket hakkında:
+**Yapılandırılmış extraction** — sadece pozitif/negatif değil.
 
-- KAP → Yeni büyük sözleşme
-- Haber → Pozitif
-- Sosyal medya → İlgi artıyor
+### Örnek: KAP sınıflandırma
 
-Sistem bunları üç ayrı sinyal olarak görür; aynı haberin tekrar tekrar sayılıp sentiment'in yapay şekilde yükselmesine izin vermez.
+```python
+# services/intelligence/kap_extractor.py
+from services.intelligence.kap_extractor import kap_extractor
 
-Sonra olayın şirket üzerindeki etkisini değerlendirir:
-
-- Gelire etkisi
-- Kârlılığa etkisi
-- Büyümeye etkisi
-- Risk etkisi
-- Beklentilere etkisi
-- Geçici mi kalıcı mı olduğu
-
----
-
-## KAP ve haber aynı ağırlıkta olmayacak
-
-Özellikle birincil kaynak olan KAP, haber veya sosyal medya yorumundan daha güçlü kanıt kabul edilir.
-
-Sosyal medya ise:
-
-> "Piyasa bunu nasıl algılıyor?"
-
-sorusuna yardımcı olur; tek başına gerçek kabul edilmez.
-
----
-
-## Manipülasyon kontrolü
-
-Aşırı sosyal medya hareketi, bot benzeri davranışlar, koordineli paylaşımlar veya olağandışı haber yoğunluğu varsa sentiment'in güveni düşürülür.
-
----
-
-## Önceki bölümlerle etkileşim
-
-```
-Fundamental + Technical + News/KAP/Social
-    ↓
-Güncel şirket görünümü
+result = kap_extractor.extract("THYAO", "K001",
+    "Şirketimiz yeni büyük sözleşme imzaladı. Tutar: 500M TL")
+# event_type: CONTRACT
+# financial_impact: +0.3
+# surprise_score: 0.6
+# time_horizon: MEDIUM
+# affected_sectors: ["AVIATION"]
 ```
 
-Örneğin finansallar güçlü ama ciddi negatif KAP geldiyse sistem bunu gizlemez; şirketin mevcut değerlendirmesini aşağı çeker.
+### Örnek: Sektör zincirleme etki
+
+```python
+from services.intelligence.kap_extractor import sector_chain
+impacts = sector_chain.compute_chain_impact("ENERGY", 0.5)
+# Enerji → Havacılık: -0.60 (yakıt maliyeti)
+```
+
+---
+
+## 2. Haber Analizi
+
+### Örnek: Haber feature'ları
+
+```python
+# services/features/sentiment.py
+from services.features.sentiment import SentimentFeatureEngine
+
+engine = SentimentFeatureEngine()
+engine.add_news_event("THYAO", {
+    "sentiment": 0.8, "importance": 0.7, "credibility": 0.9,
+    "timestamp": datetime.now(timezone.utc).isoformat(),
+})
+features = engine.compute_all_sentiment_features("THYAO")
+# news_sentiment: 0.8, composite_sentiment: 0.7
+```
+
+---
+
+## 3. Manipülasyon Kontrolü
+
+### Örnek: Manipülasyon tespiti
+
+```python
+features = engine.compute_social_features("SUSPECT")
+# social_manipulation_score: 0.6 (yüksek = şüpheli)
+```
 
 ---
 
@@ -97,48 +97,11 @@ News Sentiment:        +72
 KAP Impact:            +85
 Social Sentiment:      +61
 Catalyst:              Güçlü
-Event Risk:            Düşük
 Manipulation Risk:     Düşük
 Overall Event Impact:  Pozitif
-Confidence:            %88
 ```
-
-Bu sonuç Bölüm 7 — Değerleme ve daha sonra Tahmin/Risk motorlarına aktarılır.
 
 ---
-
-
----
-
-**Kaynak:** Du (2026) — Adjusted-MSE loss for wrong-direction penalties. KAP: structured extraction (event type, financial impact, surprise, uncertainty). News: multi-source deduplication.
-
-
-### Örnek: KAP sınıflandırma
-
-```python
-# services/intelligence/kap_extractor.py
-from services.intelligence.kap_extractor import kap_extractor
-
-result = kap_extractor.extract(
-    ticker="THYAO", kap_id="K001",
-    title="Şirketimiz yeni büyük sözleşme imzaladı. Tutar: 500M TL",
-)
-# result.event_type = "CONTRACT"
-# result.financial_impact = 0.3
-# result.surprise_score = 0.6
-# result.time_horizon = "MEDIUM"
-# result.affected_sectors = ["AVIATION"]
-```
-
-### Örnek: Sektör zincirleme etki
-
-```python
-from services.intelligence.kap_extractor import sector_chain
-
-impacts = sector_chain.compute_chain_impact("ENERGY", 0.5)
-# Enerji → Havacılık: -0.60 (yakıt maliyeti)
-# Enerji → Perakende: -0.30 (lojistik)
-```
 
 ## Temel prensip
 
