@@ -1,0 +1,10 @@
+{
+  "timestamp": "2026-08-15T15:18:42.265227+00:00",
+  "scan_count": 1,
+  "state": {
+    "state": "READY"
+  },
+  "learning": {
+    "total_predictions": 6
+  }
+}

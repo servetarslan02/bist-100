@@ -109,6 +109,9 @@ class AlphaSystem:
         # 3. Run initial scan
         await self._run_scan()
 
+        # Snapshot kaydet (scan_once modunda da)
+        self._save_snapshot()
+
         if self._scan_once:
             print("\n✓ Tek tarama tamamlandı. Çıkılıyor...")
             await self._print_summary()
@@ -118,11 +121,17 @@ class AlphaSystem:
         print("\n🔄 Sürekli tarama başlatılıyor... (Ctrl+C ile durdur)")
         print("   Piyasa açıkken her 5 dakikada bir tarama yapılacak.\n")
 
+        # Signal handlers (graceful shutdown)
+        import signal as sig
+        loop = asyncio.get_event_loop()
+        for s in (sig.SIGINT, sig.SIGTERM):
+            loop.add_signal_handler(s, lambda: asyncio.create_task(self._shutdown()))
+
         try:
             while self._running:
                 await self._main_loop()
                 await asyncio.sleep(300)  # 5 dakika
-        except KeyboardInterrupt:
+        except (KeyboardInterrupt, asyncio.CancelledError):
             print("\n⏹ Durduruluyor...")
         finally:
             await self._shutdown()
@@ -252,10 +261,31 @@ class AlphaSystem:
         # Graceful shutdown
         graceful_shutdown.register_handler(self._shutdown)
 
+        # Startup recovery — diskten son snapshot'ı yükle
+        self._load_snapshot()
+
         self._system_state.transition("READY", "all components initialized")
         print(f"   ✓ {len(self._knowledge_graph._entities)} knowledge entities")
         print(f"   ✓ {len(self._knowledge_graph._relations)} knowledge relations")
         print("   ✓ Tüm bileşenler hazır")
+
+    def _load_snapshot(self):
+        """Diskten son snapshot'ı yükle (restart sonrası)."""
+        try:
+            import json
+            snapshot_path = Path("data/system_snapshot.json")
+            if snapshot_path.exists():
+                with open(snapshot_path) as f:
+                    snapshot = json.load(f)
+                self._scan_count = snapshot.get("scan_count", 0)
+                logger.info("Snapshot loaded from disk",
+                          scan_count=self._scan_count,
+                          saved_at=snapshot.get("timestamp", "unknown"))
+                print(f"   ✓ Son snapshot yüklendi (tarama #{self._scan_count})")
+            else:
+                print("   ~ İlk çalıştırma — snapshot yok")
+        except Exception as e:
+            logger.warning("Snapshot load failed", error=str(e))
 
     async def _load_universe(self):
         """BIST evrenini yükle."""
@@ -569,20 +599,54 @@ class AlphaSystem:
         self._health_checker.update_status("risk_engine", "HEALTHY")
 
     async def _main_loop(self):
-        """Ana döngü — periyodik tarama + outcome kontrolü."""
+        """Ana döngü — periyodik tarama + outcome kontrolü + bakım."""
         now = datetime.now(timezone.utc)
 
-        # 1. Bekleyen outcome'ları kontrol et
+        # 1. Bekleyen outcome'ları kontrol et (her zaman)
         await self._check_outcomes()
 
-        # 2. Hafta sonu kontrolü
-        weekday = now.weekday()
-        if weekday >= 5:
-            logger.info("Hafta sonu — bekleniyor")
+        # 2. Snapshot kaydet (her döngüde)
+        self._save_snapshot()
+
+        # 3. Piyasa açık mı kontrol et
+        if not self._market_calendar.is_market_open(now):
+            # Piyasa kapalı — bakım görevleri yap
+            await self._maintenance_tasks()
             return
 
-        # 3. Tarama yap
+        # 4. Piyasa açık — tarama yap
         await self._run_scan()
+
+    async def _maintenance_tasks(self):
+        """Piyasa kapalıyken yapılacak bakım görevleri."""
+        # Learning insights güncelle
+        insights = self._learning.get_insights()
+        if insights.get('total_resolved', 0) > 0:
+            logger.info("Market closed — learning maintenance",
+                       accuracy=insights.get('overall_accuracy', 0),
+                       resolved=insights.get('total_resolved', 0))
+
+        # Eski snapshot'ları temizle
+        self._snapshot_system._snapshots = self._snapshot_system._snapshots[-20:]
+
+    def _save_snapshot(self):
+        """Snapshot'ı diske kaydet (restart sonrası kurtarma için)."""
+        try:
+            import json
+            snapshot_path = Path("data/system_snapshot.json")
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "scan_count": self._scan_count,
+                "state": self._system_state.get_health(),
+                "learning": self._learning.get_insights(),
+                "outcome_tracker": self._outcome_tracker.get_stats(),
+                "health": self._health_checker.check_all(),
+            }
+            with open(snapshot_path, "w") as f:
+                json.dump(snapshot, f, default=str, indent=2)
+        except Exception as e:
+            logger.warning("Snapshot save failed", error=str(e))
 
     async def _check_outcomes(self):
         """Bekleyen tahminlerin sonuçlarını kontrol et."""
@@ -616,23 +680,31 @@ class AlphaSystem:
                        pending=self._outcome_tracker.get_pending_count())
 
     async def _shutdown(self):
-        """Sistemi kapat."""
+        """Sistemi kapat — state'i diske kaydet."""
+        if not self._running:
+            return
         self._running = False
         self._system_state.transition("SHUTDOWN", "user initiated")
 
-        # Final snapshot
+        # Final snapshot diske kaydet
+        self._save_snapshot()
+
+        # Memory snapshot
         self._snapshot_system.take_snapshot({
             "shutdown": True,
             "total_scans": self._scan_count,
             "uptime_seconds": (datetime.now(timezone.utc) - self._start_time).total_seconds() if self._start_time else 0,
         })
 
+        # Learning state kaydet
+        self._learning._save_state()
+
         # Close database
         if self._db:
             await self._db.close()
 
         self._system_state.transition("FAILED", "shutdown complete")
-        print("\n✓ ALPHA BIST kapatıldı.")
+        print("\n✓ ALPHA BIST kapatıldı. State diske kaydedildi.")
 
     async def _print_summary(self):
         """Özet yazdır."""
