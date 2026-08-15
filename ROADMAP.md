@@ -1,0 +1,2047 @@
+# ALPHA BIST — Master Roadmap & TODO
+
+> **Proje:** BIST Market Intelligence & Quant Engine (Aladdin-seviye)
+> **Amaç:** 800+ BIST varlığını sürekli tarayan, fırsat keşfeden, risk-kontrollü AI yatırım araştırma/simülasyon platformu
+> **Güncelleme:** 15 Ağustos 2026
+> **Durum:** Aktif geliştirme
+
+---
+
+## İçindekiler
+
+1. [Sistem Özeti](#1-sistem-özeti)
+2. [Temel Prensipler](#2-temel-prensipler)
+3. [Mevcut Durum Analizi](#3-mevcut-durum-analizi)
+4. [Faz Planı (Toplam 14 Faz)](#4-faz-planı)
+5. [Faz Detayları](#5-faz-detayları)
+6. [Kabul Kriterleri](#6-kabul-kriterleri)
+7. [Teknoloji Stack](#7-teknoloji-stack)
+8. [Dosya Yapısı](#8-dosya-yapısı)
+9. [Sözleşmeler & Kurallar](#9-sözleşmeler--kurallar)
+
+---
+
+## 1. Sistem Özeti
+
+Bu sistem:
+
+- ❌ 3-5 hisse analiz eden basit bir bot **değil**
+- ❌ Teknik indikatör çizelgesi **değil**
+- ❌ AI'ya "hangi hisseyi alayım?" diye soran uygulama **değil**
+
+Bu sistem:
+
+> **BIST'in tamamını sürekli sayısal olarak izleyen, olayları anlayan, ilişkileri çıkaran, fırsatları keşfeden, senaryo/backtest yapan, risk hesaplayan, sonuçlarını ölçen ve kontrollü biçimde kendini geliştiren otonom finansal zekâ platformudur.**
+
+### Sistem Akışı (Üst Düzey)
+
+```
+KAYNAKLAR (Piyasa, KAP, Haber, Makro, Sosyal)
+    ↓
+VERİ KALİTESİ (Validate, Clean, Normalize)
+    ↓
+ÖZELLİKLER (Teknik, Fundamental, Makro, Haber)
+    ↓
+DÜNYA DURUMU (Rejim, Volatilite, Likidite, Risk)
+    ↓
+AI AJANLARI (Araştırma, Haber, Makro, Sentiment)
+    ↓
+FIRSAT KEŞFİ (Tarama, Sıralama, Puanlama)
+    ↓
+KARAR MOTORU (LONG / SHORT / HOLD / NO_TRADE)
+    ↓
+RİSK KAPISI (Limit, Konsantrasyon, Drawdown)
+    ↓
+SİMÜLASYON (Emir, Dolum, Komisyon, Slippage)
+    ↓
+PORTFÖY (Pozisyon, Nakit, P&L, Ledger)
+    ↓
+SONUÇ (Gerçek vs Tahmin, Hata Analizi)
+    ↓
+ÖĞRENME (Model Değerlendirme, Drift, Kalibrasyon)
+    ↓
+DENETİM (Audit, Lineage, Replay, Recovery)
+```
+
+---
+
+## 2. Temel Prensipler
+
+### 2.1 AI Karar Vermez, Destekler
+
+```
+❌  AI → BUY
+✅  DATA + EVIDENCE + RISK → DECISION (AI bir bileşen)
+```
+
+AI sonucu tek başına emir olamaz. AI yalnızca **evidence, confidence, reasoning** üretir.
+
+### 2.2 Tek Kaynak Güvenilir Değildir
+
+RSI, MACD, F/K gibi sabit metrikler tek başına kullanılmaz. Sistem **çok boyutlu piyasa durumu → olasılıksal değerlendirme** yapar.
+
+### 2.3 Missing ≠ Zero
+
+Eksik veri sıfır olarak değerlendirilmez. Her veri için **VALID / MISSING / STALE / INVALID / DUPLICATE** ayrımı yapılır.
+
+### 2.4 Risk Motoru Üsttedir
+
+AI "BUY" dese bile risk motoru veto edebilir. Risk fail-closed çalışır (yüklenemezse işlem yapılmaz).
+
+### 2.5 Her Şey İzlenebilir
+
+Her kararın veri kaynağına kadar izlenebilirliği sağlanır:
+```
+FILL → ORDER → DECISION → SIGNAL → FEATURES → EVENTS → RAW DATA
+```
+
+### 2.6 Geriye Dönük Test Zorunlu
+
+Her strateji/model canlıya alınmadan önce:
+```
+TRAIN → VALIDATE → BACKTEST → WALK-FORWARD → PAPER → SHADOW → PROMOTE
+```
+
+---
+
+## 3. Mevcut Durum Analizi
+
+### Çalışan Parçalar ✅
+
+| Bileşen | Dosya | Durum |
+|---------|-------|-------|
+| Config (Production Security) | `services/core/config.py` | ✅ P0 düzeltildi |
+| Data Quality Gate v2.0 | `services/core/data_quality.py` | ✅ P0 düzeltildi |
+| Event Bus (Durable + Idempotent) | `services/core/event_bus.py` | ✅ P0 düzeltildi |
+| Event Schema (Validation) | `services/core/event_schema.py` | ✅ Çalışıyor |
+| Models (Invariant Validation) | `services/core/models.py` | ✅ P0 düzeltildi |
+| Decision Engine (HOLD Fix) | `services/core/decision_engine.py` | ✅ P0 düzeltildi |
+| Risk Engine (Fail-Closed) | `services/risk/main.py` | ✅ P0 düzeltildi |
+| Portfolio Service (Avg Cost Fix) | `services/portfolio/main.py` | ✅ P0 düzeltildi |
+| State Recovery (Snapshot+Events) | `services/core/state_recovery.py` | ✅ P0 düzeltildi |
+| Feature Calculator (58 feature) | `services/features/calculator.py` | ✅ Çalışıyor |
+| Alpha Scanner | `services/scanner/alpha_scanner.py` | ✅ Çalışıyor |
+| SPEC Engine | `services/intelligence/spec_engine.py` | ✅ Çalışıyor |
+| World State | `services/intelligence/world_state.py` | ✅ Düzeltildi |
+| Impact Engine | `services/intelligence/impact_engine.py` | ✅ Çalışıyor |
+| Trade Planner | `services/intelligence/trade_planner.py` | ✅ Çalışıyor |
+| Ingestion Service | `services/ingestion/main.py` | ✅ Temel yapı var |
+| Market State Service | `services/market_state/main.py` | ✅ Çalışıyor |
+| BIST Universe | `services/ingestion/bist_universe.py` | ✅ 493 hisse yüklüyor |
+
+### Kısmen Çalışan / Eksik Parçalar ⚠️
+
+| Bileşen | Durum | Eksik |
+|---------|-------|-------|
+| Intelligence Service (LLM) | ⚠️ Temel | Fallback yok, prompt versioning yok |
+| Scheduler | ⚠️ Temel | Sadece batch scan, event-driven yok |
+| ML modelleri | ⚠️ Skeleton | Gerçek eğitim/inference yok |
+| Backtest | ⚠️ Temel | Walk-forward, metrics eksik |
+| Database Schema | ⚠️ Temel | Birçok tablo eksik |
+| Docker Compose | ⚠️ Var | Dev ortamı ayrılmamış |
+
+### Olmayan Parçalar ❌
+
+| Bileşen | Öncelik |
+|---------|---------|
+| Fundamental Analysis Engine | Kritik |
+| Valuation / DCF Engine | Kritik |
+| Monte Carlo Engine | Yüksek |
+| Probability Engine | Yüksek |
+| Scenario Engine | Yüksek |
+| Stress Test Engine | Yüksek |
+| Backtest Metrics (Sharpe, Sortino, vb.) | Yüksek |
+| Walk-forward Validation | Yüksek |
+| AI Agent System | Yüksek |
+| Agent Orchestrator | Yüksek |
+| Model Registry / Lifecycle | Yüksek |
+| Shadow Mode | Yüksek |
+| Execution Simulator (Gerçekçi) | Yüksek |
+| Corporate Actions | Orta |
+| Knowledge Graph | Orta |
+| Factor Engine | Orta |
+| Benchmark / Attribution | Orta |
+| Multi-Asset / Multi-Market | Orta |
+| Dashboard (16 sayfa) | Yüksek |
+| Audit / Lineage | Yüksek |
+| Event Replay | Orta |
+| Testing Pyramid | Kritik |
+| Observability (Metrics/Traces) | Orta |
+| Alert System | Orta |
+| WebSocket Real-time | Orta |
+
+---
+
+## 4. Faz Planı
+
+```
+FAZ 0  → Repository Audit & Temel Düzeltmeler          [TAMAMLANDI]
+FAZ 1  → Data Ingestion & Quality                       [DEVAM EDİYOR]
+FAZ 2  → Feature Engine & Store                         [DEVAM EDİYOR]
+FAZ 3  → World State & Regime Engine                    [DEVAM EDİYOR]
+FAZ 4  → Fundamental Analysis Engine                    [BAŞLANMADI]
+FAZ 5  → Valuation & DCF Engine                         [BAŞLANMADI]
+FAZ 6  → Monte Carlo & Probability Engine               [BAŞLANMADI]
+FAZ 7  → Scenario & Stress Test Engine                  [BAşLANMADI]
+FAZ 8  → AI Agent System                                [BAŞLANMADI]
+FAZ 9  → Opportunity Discovery Engine                   [BAŞLANMADI]
+FAZ 10 → Decision & Risk Engine                         [DEVAM EDİYOR]
+FAZ 11 → Order & Execution Simulator                    [BAŞLANMADI]
+FAZ 12 → Portfolio & Accounting                         [DEVAM EDİYOR]
+FAZ 13 → Backtest & Learning Engine                     [BAŞLANMADI]
+FAZ 14 → Dashboard & Production                         [BAŞLANMADI]
+```
+
+---
+
+## 5. Faz Detayları
+
+---
+
+### FAZ 0 — Repository Audit & Temel Düzeltmeler ✅ TAMAMLANDI
+
+**Amaç:** Mevcut kodu production-grade hale getirmek.
+
+#### Yapılanlar
+
+- [x] Config: Production validation, insecure default detection
+- [x] Data Quality: Stale detection (total_seconds), duplicate protection, missing≠0
+- [x] Event Bus: Durable (Redis Streams), idempotent publish
+- [x] Event Schema: Validation güçlendirildi
+- [x] Models: Invariant validation (price>0, confidence∈[0,1])
+- [x] Decision Engine: HOLD ayrı action, risk veto
+- [x] Risk Engine: Fail-closed, unknown→BLOCK
+- [x] Portfolio: Weighted avg cost, oversell protection, atomik transaction
+- [x] State Recovery: Snapshot+events, re-fetch 60d kaldırıldı
+- [x] World State: Hard-code kaldırıldı, z-score normalization
+- [x] SPEC Engine: Sigmoid calibration, evidence weighting
+
+#### Dosyalar
+
+```
+services/core/config.py              — Security hardened
+services/core/data_quality.py        — v2.0
+services/core/event_bus.py           — Durable + idempotent
+services/core/event_schema.py        — Validation
+services/core/models.py              — Invariants
+services/core/decision_engine.py     — HOLD fix
+services/core/state_recovery.py      — Snapshot approach
+services/risk/main.py                — Fail-closed
+services/portfolio/main.py           — Avg cost + transaction
+services/intelligence/spec_engine.py — Calibration
+services/intelligence/world_state.py — Z-score normalization
+```
+
+---
+
+### FAZ 1 — Data Ingestion & Quality
+
+**Amaç:** Tüm BIST verilerini güvenilir şekilde toplamak.
+
+#### 1.1 Market Data Provider'ları
+
+**Dosya:** `services/ingestion/providers/`
+
+| Provider | Veri | Durum | Yapılacak |
+|----------|------|-------|-----------|
+| yfinance | OHLCV, fiyat | ✅ Çalışıyor | Retry, circuit breaker ekle |
+| KAP | Şirket bildirimleri | ⚠️ Temel | Parser güçlendir, kategori ekle |
+| TCMB EVDS | Makro veri | ⚠️ Temel | Seri numarası mapping, fallback |
+| NewsAPI | Haberler | ⚠️ Temel | Türkçe NLP, sentiment |
+| RSS | Finansal haberler | ⚠️ Temel | Kaynak sayısı artır |
+| X (Twitter) | Sosyal medya | ❌ Yok | Implementasyon gerekli |
+| Matriks | Alternatif fiyat | ⚠️ Temel | Fallback olarak |
+
+#### 1.2 Provider Contract
+
+Her provider bu interface'i uygulamalı:
+
+```python
+class DataProvider:
+    def fetch(self, params) -> List[RawData]
+    def normalize(self, raw_data) -> List[NormalizedData]
+    def validate(self, normalized_data) -> List[ValidData]
+    def health_check() -> ProviderHealth
+    def get_reliability_score() -> float  # 0-1
+```
+
+#### 1.3 Provider Failover
+
+```
+Primary Provider
+    ↓ failure
+Secondary Provider
+    ↓ failure
+Cached Data
+    ↓ stale
+UNAVAILABLE (log + alert)
+```
+
+#### 1.4 Circuit Breaker
+
+```
+CLOSED (normal)
+    ↓ 5 consecutive failures
+OPEN (skip provider, use fallback)
+    ↓ 60 seconds
+HALF_OPEN (try 1 request)
+    ↓ success → CLOSED
+    ↓ failure → OPEN
+```
+
+#### 1.5 Rate Limit
+
+Her provider için:
+- `timeout`: max bekleme süresi
+- `retry`: max deneme sayısı
+- `backoff`: exponential (1s → 2s → 4s → 8s)
+- `rate_limit`: saniyede max istek
+- `circuit_breaker`: açık/kapalı durum
+
+#### 1.6 BIST Universe Engine
+
+**Dosya:** `services/ingestion/bist_universe.py`
+
+- [ ] KAP'tan canlı şirket listesi çekme (şu an var, güçlendir)
+- [ ] Sektör/alt-sektör mapping
+- [ ] Market cap bilgisi
+- [ ] Likidite skoru
+- [ ] Listing status (active/suspended/delisted)
+- [ ] Otomatik günlük güncelleme
+- [ ] Survivorship bias koruması (delisted şirketler de tarihte tutulacak)
+
+#### 1.7 Data Quality Engine
+
+**Dosya:** `services/core/data_quality.py`
+
+- [x] Tick validation (price>0, volume>=0, timestamp)
+- [x] Stale detection (total_seconds)
+- [x] Duplicate protection (time-windowed)
+- [x] Missing ≠ 0 ayrımı
+- [ ] Cross-source reconciliation (A kaynağı 100.20, B kaynağı 100.25 → normal; A=100.20, B=145.80 → anomali)
+- [ ] Outlier detection (Z-score > 4)
+- [ ] Data source reliability tracking
+
+#### 1.8 Trading Calendar
+
+**Dosya:** `services/core/market_calendar.py` [YENİ]
+
+- [ ] BIST işlem saatleri (10:00-18:00)
+- [ ] Hafta sonları
+- [ ] Resmi tatiller (ulusal bayramlar, dini bayramlar)
+- [ ] Yarım günler
+- [ ] Devre kesici durumları
+- [ ] Trading halt bilgisi
+- [ ] Market açık/kapalı kontrolü
+
+#### 1.9 Corporate Actions
+
+**Dosya:** `services/ingestion/corporate_actions.py` [YENİ]
+
+- [ ] Temettü (dividend) düzeltmesi
+- [ ] Bedelsiz sermaye artırımı (split)
+- [ ] Bedelli sermaye artırımı
+- [ ] Birleşme/devralma
+- [ ] Fiyat geçmişi düzeltmesi (geçmiş fiyatlar bölünme oranına göre düzeltilmeli)
+- [ ] Portföy pozisyon düzeltmesi
+
+#### Çıkış Kriterleri
+
+- [ ] 500+ hisse için veri çekme çalışıyor
+- [ ] Provider failover test edilmiş
+- [ ] Circuit breaker çalışıyor
+- [ ] Data quality gate tüm verilerden geçiriliyor
+- [ ] Trading calendar BIST saatlerini doğru gösteriyor
+- [ ] Unit test: provider, quality gate, calendar
+- [ ] Integration test: veri çek → quality → store
+
+---
+
+### FAZ 2 — Feature Engine & Store
+
+**Amaç:** Ham verilerden anlamlı özellikler üretmek ve versiyonlamak.
+
+#### 2.1 Teknik Feature'lar (Mevcut — Güçlendirilecek)
+
+**Dosya:** `services/features/calculator.py`
+
+Mevcut 58 feature. Eklenecekler:
+
+- [ ] Ichimoku Cloud
+- [ ] Fibonacci retracement levels
+- [ ] Volume Profile (POC, VAH, VAL)
+- [ ] VWAP (Volume Weighted Average Price)
+- [ ] Pivot Points
+- [ ] Heikin-Ashi
+- [ ] Elder Ray (Bull/Bear Power)
+- [ ] Keltner Channels
+- [ ] Donchian Channels
+- [ ] Rate of Change (ROC) çoklu periyot
+- [ ] Williams %R çoklu periyot
+- [ ] ATR çoklu periyot (5, 14, 20)
+
+#### 2.2 Fundamental Feature'lar [YENİ]
+
+**Dosya:** `services/features/fundamental.py`
+
+```python
+class FundamentalFeatureEngine:
+    def compute_valuation_features(self, financials) -> Dict:
+        """P/E, P/B, EV/EBITDA, FCF Yield, Dividend Yield"""
+
+    def compute_profitability_features(self, financials) -> Dict:
+        """ROE, ROA, ROIC, margins (gross, EBIT, net)"""
+
+    def compute_growth_features(self, financials_history) -> Dict:
+        """Revenue growth, EPS growth, FCF growth, CAGR"""
+
+    def compute_balance_sheet_features(self, financials) -> Dict:
+        """Debt/Equity, Current Ratio, Net Debt/EBITDA"""
+
+    def compute_quality_features(self, financials) -> Dict:
+        """Earnings quality, cash conversion, accruals"""
+
+    def compute_trend_features(self, financials_history) -> Dict:
+        """Margin trend, growth acceleration/deceleration"""
+```
+
+#### 2.3 Makro Feature'lar [YENİ]
+
+**Dosya:** `services/features/macro.py`
+
+```python
+class MacroFeatureEngine:
+    def compute_currency_features(self, usdtry, eurtry) -> Dict:
+        """FX momentum, volatility, regime"""
+
+    def compute_rate_features(self, tcmb_rate, us_rate) -> Dict:
+        """Rate differential, yield curve"""
+
+    def compute_commodity_features(self, oil, gold) -> Dict:
+        """Commodity momentum, Turkey sensitivity"""
+
+    def compute_global_features(self, vix, sp500, dax) -> Dict:
+        """Global risk appetite, correlation"""
+
+    def compute_inflation_features(self, cpi, ppi) -> Dict:
+        """Inflation trend, surprise"""
+```
+
+#### 2.4 Sentiment Feature'lar [YENİ]
+
+**Dosya:** `services/features/sentiment.py`
+
+```python
+class SentimentFeatureEngine:
+    def compute_news_sentiment(self, news_events) -> Dict:
+        """Aggregated news sentiment, novelty, credibility"""
+
+    def compute_kap_sentiment(self, kap_events) -> Dict:
+        """KAP announcement sentiment, category impact"""
+
+    def compute_social_sentiment(self, social_events) -> Dict:
+        """Social media sentiment, volume, manipulation score"""
+
+    def compute_sentiment_momentum(self, history) -> Dict:
+        """Sentiment trend, acceleration"""
+```
+
+#### 2.5 Feature Store
+
+**Dosya:** `services/features/store.py` [YENİ]
+
+```python
+class FeatureStore:
+    """Tüm feature'ların canonical kaynağı."""
+
+    def get(self, ticker: str, feature_name: str, version: str = "latest") -> FeatureValue
+    def set(self, ticker: str, feature_name: str, value: float, version: str)
+    def get_all(self, ticker: str, version: str = "latest") -> Dict[str, float]
+    def get_history(self, ticker: str, feature_name: str, lookback_days: int) -> List[FeatureValue]
+
+    def register_version(self, feature_group: str, version: str, formula: str)
+    def get_version_info(self, feature_group: str, version: str) -> VersionInfo
+```
+
+#### 2.6 Feature Versioning
+
+Her feature grubu versioned:
+
+```
+technical_features_v1    → RSI(14), SMA(20), MACD(12,26,9)
+technical_features_v2    → RSI(14) Wilder smoothing, SMA(20), MACD(12,26,9)
+fundamental_features_v1  → P/E, P/B, ROE
+macro_features_v1        → USDTRY z-score, VIX normalize
+```
+
+Backtest eski version ile yeniden çalıştırılabilmeli.
+
+#### 2.7 Feature Discovery Pipeline [YENİ]
+
+**Dosya:** `services/features/discovery.py`
+
+```
+Raw Features (80+)
+    ↓
+Feature Interaction Generation
+  - pairwise products
+  - ratios
+  - differences
+  - lag features (1d, 2d, 5d)
+    ↓
+Candidate Features (500+)
+    ↓
+Filtering:
+  1. Mutual Information (target ile)
+  2. Correlation filter (yüksek korelasyonlu olanları ele)
+  3. Permutation Importance
+  4. SHAP values
+  5. Feature Stability
+  6. Leakage Detection
+    ↓
+Selected Features (100-200)
+    ↓
+ML Training
+```
+
+#### Çıkış Kriterleri
+
+- [ ] 100+ feature hesaplanıyor
+- [ ] Feature store Redis/DB'de tutuluyor
+- [ ] Feature versioning çalışıyor
+- [ ] Fundamental feature'lar (P/E, ROE, vb.) hesaplanıyor
+- [ ] Macro feature'lar (USDTRY, VIX, vb.) hesaplanıyor
+- [ ] Sentiment feature'lar (news, KAP) hesaplanıyor
+- [ ] Unit test: her feature grubu için
+- [ ] Integration test: veri → feature → store
+
+---
+
+### FAZ 3 — World State & Regime Engine
+
+**Amaç:** Piyasanın genel durumunu anlamak.
+
+#### 3.1 World State Engine (Mevcut — Genişletilecek)
+
+**Dosya:** `services/intelligence/world_state.py`
+
+Mevcut: 10 latent factor. Eklenecekler:
+
+- [ ] Global equity momentum (S&P500, DAX, Nikkei)
+- [ ] Credit conditions (CDS, spread)
+- [ ] Liquidity conditions
+- [ ] Market breadth (advance/decline ratio)
+- [ ] Sector rotation state
+- [ ] Yield curve shape (normal/inverted/flat)
+- [ ] Crypto market sentiment (risk appetite proxy)
+
+#### 3.2 Regime Engine (Mevcut — Genişletilecek)
+
+**Dosya:** `services/intelligence/regime.py` [YENİ veya mevcut market_state]
+
+Mevcut regime detection: basit threshold-based.
+
+Yapılacak:
+
+- [ ] Regime tespiti için feature-based (threshold değil)
+- [ ] Regime transition probability matrix
+- [ ] Regime duration tracking
+- [ ] Regime-conditioned model weights
+- [ ] Regime history (geçmiş rejim değişimleri)
+
+Regime'ler:
+
+```
+BULL / BEAR / SIDEWAYS
+HIGH_VOLATILITY / LOW_VOLATILITY
+RISK_ON / RISK_OFF
+CRISIS / RECOVERY
+MOMENTUM_EXPANSION / MOMENTUM_CONTRACTION
+```
+
+#### 3.3 Macro Sensitivity Engine [YENİ]
+
+**Dosya:** `services/intelligence/macro_sensitivity.py`
+
+Her şirket için:
+
+- [ ] USDTRY sensitivity (ithalat/ihracat bağımlılığı)
+- [ ] Faiz sensitivity (borç yapısı)
+- [ ] Emtia sensitivity (girdi maliyetleri)
+- [ ] Global market sensitivity (korelasyon)
+
+Örnek:
+```
+THYAO: USDTRY sensitivity = HIGH (yakıt maliyeti)
+EREGL: Commodity sensitivity = HIGH (demir-çelik)
+AKBNK: Interest rate sensitivity = HIGH (bankacılık)
+```
+
+#### Çıkış Kriterleri
+
+- [ ] World state 15+ factor içeriyor
+- [ ] Regime detection feature-based
+- [ ] Regime değiştiğinde ağırlıklar değişiyor
+- [ ] Macro sensitivity her şirket için hesaplanmış
+- [ ] Unit test: world state, regime, sensitivity
+- [ ] Integration test: market data → world state → regime
+
+---
+
+### FAZ 4 — Fundamental Analysis Engine [YENİ]
+
+**Amaç:** Şirketlerin finansal sağlığını analiz etmek.
+
+#### 4.1 Finansal Veri Çekme
+
+**Dosya:** `services/ingestion/providers/fundamental_provider.py`
+
+- [ ] KAP'tan bilanço verisi çekme
+- [ ] Gelir tablosu verisi
+- [ ] Nakit akış tablosu
+- [ ] Çeyreklik + yıllık veri
+- [ ] Point-in-time data (o tarihte bilinen versiyon)
+
+#### 4.2 Gelir Analizi
+
+- [ ] Revenue (ciro)
+- [ ] Revenue Growth (yıllık, çeyreklik)
+- [ ] Revenue CAGR (3 yıllık, 5 yıllık)
+- [ ] Organic growth vs inorganic growth
+
+#### 4.3 Kârlılık Analizi
+
+- [ ] Gross Margin
+- [ ] EBIT Margin
+- [ ] EBITDA Margin
+- [ ] Net Margin
+- [ ] ROE (Return on Equity)
+- [ ] ROA (Return on Assets)
+- [ ] ROIC (Return on Invested Capital)
+
+#### 4.4 Bilanço Analizi
+
+- [ ] Cash & Equivalents
+- [ ] Total Debt
+- [ ] Net Debt
+- [ ] Working Capital
+- [ ] Current Ratio
+- [ ] Debt/Equity Ratio
+- [ ] Net Debt/EBITDA
+
+#### 4.5 Nakit Akış Analizi
+
+- [ ] Operating Cash Flow
+- [ ] Free Cash Flow (FCF)
+- [ ] FCF Margin
+- [ ] FCF Yield
+- [ ] Cash Conversion Ratio
+
+#### 4.6 Büyüme Kalitesi
+
+Sadece büyüme miktarı değil, birlikte değerlendirme:
+
+```
+Büyüme Kalitesi = f(growth, margin, cash_flow, debt)
+```
+
+Yüksek büyüme + düşen margin + artan borç = düşük kalite
+
+#### 4.7 Fundamental Trend Engine
+
+Tek bilanço değil zaman serisi analizi:
+
+```python
+class FundamentalTrendEngine:
+    def analyze_revenue_trend(self, quarterly_revenue) -> TrendResult:
+        """Accelerating / Decelerating / Stable / Declining"""
+
+    def analyze_margin_trend(self, quarterly_margins) -> TrendResult:
+        """Expanding / Contracting / Stable"""
+
+    def analyze_earnings_quality(self, net_income, cash_flow) -> QualityResult:
+        """High quality (cash-backed) / Low quality (accrual-heavy)"""
+```
+
+#### 4.8 Earnings Quality Engine
+
+- [ ] Net Income vs Cash Flow karşılaştırması
+- [ ] Receivables growth vs Revenue growth
+- [ ] Inventory changes
+- [ ] One-off gains/losses ayrımı
+- [ ] Accruals ratio
+
+#### Çıkış Kriterleri
+
+- [ ] En az 100 şirket için finansal veri çekiliyor
+- [ ] 20+ fundamental feature hesaplanıyor
+- [ ] Trend analizi çalışıyor (accelerating/decelerating)
+- [ ] Earnings quality skoru hesaplanıyor
+- [ ] Point-in-time data korunuyor (look-ahead bias yok)
+- [ ] Unit test: her hesaplama için
+- [ ] Integration test: KAP → bilanço → feature → scoring
+
+---
+
+### FAZ 5 — Valuation & DCF Engine [YENİ]
+
+**Amaç:** Şirketlerin değerlemesini yapmak.
+
+#### 5.1 Multiples Valuation
+
+- [ ] P/E (Price/Earnings)
+- [ ] P/B (Price/Book)
+- [ ] EV/EBITDA
+- [ ] EV/EBIT
+- [ ] EV/Sales
+- [ ] FCF Yield
+- [ ] Dividend Yield
+
+#### 5.2 Peer Comparison
+
+```python
+class PeerComparison:
+    def compare_to_sector(self, ticker, metric) -> ComparisonResult:
+        """vs sector median, vs sector average"""
+
+    def compare_to_historical(self, ticker, metric, years) -> ComparisonResult:
+        """vs own historical valuation"""
+
+    def compare_to_peers(self, ticker, peer_group, metric) -> ComparisonResult:
+        """vs specific peer group"""
+```
+
+#### 5.3 DCF Engine
+
+**Dosya:** `services/intelligence/valuation/dcf_engine.py`
+
+```python
+class DCFEngine:
+    def compute_dcf(
+        self,
+        revenue_forecast: List[float],
+        margin_forecast: List[float],
+        tax_rate: float,
+        capex_forecast: List[float],
+        working_capital_changes: List[float],
+        wacc: float,
+        terminal_growth: float,
+        shares_outstanding: int,
+    ) -> DCFResult:
+        """Intrinsic value, upside/downside, sensitivity table"""
+```
+
+#### 5.4 Valuation Scenarios
+
+En az 3 senaryo:
+
+```
+Bear  → conservative assumptions → intrinsic_value_bear
+Base  → realistic assumptions   → intrinsic_value_base
+Bull  → optimistic assumptions  → intrinsic_value_bull
+```
+
+Olasılık ağırlıklı sonuç:
+
+```
+Expected Value = P(bear) × V_bear + P(base) × V_base + P(bull) × V_bull
+```
+
+#### 5.5 Valuation Summary
+
+Her şirket için:
+
+```
+┌─────────────────────────────────────────┐
+│ THYAO — DEĞERLEME                       │
+├─────────────────────────────────────────┤
+│ P/E:        8.2x  (Sektör medyan: 11x) │
+│ P/B:        1.4x  (Sektör medyan: 1.8x)│
+│ EV/EBITDA:  5.1x  (Sektör medyan: 7x)  │
+│ FCF Yield:  %6.8  (Sektör medyan: %4.2)│
+├─────────────────────────────────────────┤
+│ DCF Bear:   ₺280  (%10.4 downside)     │
+│ DCF Base:   ₺340  (%8.7 upside)        │
+│ DCF Bull:   ₺420  (%34.2 upside)       │
+├─────────────────────────────────────────┤
+│ Olasılık Ağırlıklı: ₺347               │
+│ Mevcut Fiyat:       ₺312               │
+│ Upside:             %11.2              │
+└─────────────────────────────────────────┘
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Multiples valuation hesaplanıyor
+- [ ] Peer comparison çalışıyor
+- [ ] DCF engine çalışıyor
+- [ ] Bear/Base/Bull senaryoları üretiliyor
+- [ ] Unit test: DCF, multiples, peer comparison
+- [ ] Integration test: bilanço → valuation → summary
+
+---
+
+### FAZ 6 — Monte Carlo & Probability Engine [YENİ]
+
+**Amaç:** Olasılıksal tahminler yapmak.
+
+#### 6.1 Monte Carlo Engine
+
+**Dosya:** `services/intelligence/monte_carlo.py`
+
+```python
+class MonteCarloEngine:
+    def simulate_price_paths(
+        self,
+        current_price: float,
+        expected_return: float,
+        volatility: float,
+        horizon_days: int,
+        num_simulations: int = 10000,
+    ) -> MonteCarloResult:
+        """Binlerce olası fiyat yolu simüle et."""
+
+    def compute_percentiles(self, result) -> PercentileResult:
+        """P10, P25, P50, P75, P90"""
+
+    def compute_probabilities(self, result, targets) -> ProbabilityResult:
+        """P(+10%), P(+5%), P(-5%), P(-10%)"""
+```
+
+#### 6.2 Monte Carlo Portfolio
+
+```python
+class PortfolioMonteCarlo:
+    def simulate_portfolio(
+        self,
+        positions: List[Position],
+        correlation_matrix: np.ndarray,
+        num_simulations: int = 10000,
+        horizon_days: int = 20,
+    ) -> PortfolioMonteCarloResult:
+        """Portföy seviyesinde Monte Carlo."""
+
+    def compute_var(self, result, confidence=0.95) -> VaRResult:
+        """VaR 95%, VaR 99%"""
+
+    def compute_cvar(self, result, confidence=0.95) -> CVaRResult:
+        """CVaR (Expected Shortfall)"""
+```
+
+#### 6.3 Probability Engine
+
+**Dosya:** `services/intelligence/probability.py`
+
+```python
+class ProbabilityEngine:
+    def compute_return_distribution(
+        self,
+        features: Dict,
+        ml_predictions: Dict,
+        historical_analogues: List[Dict],
+    ) -> ReturnDistribution:
+        """Getiri olasılık dağılımı."""
+
+    def compute_hit_rate(self, predictions, outcomes) -> float:
+        """Tahmin doğruluğu."""
+
+    def compute_calibration(self, predictions, outcomes) -> CalibrationResult:
+        """Confidence vs actual frequency."""
+```
+
+#### 6.4 Monte Carlo Dinamik Senaryo Sayısı
+
+```python
+def compute_scenario_count(volatility, uncertainty, portfolio_size, budget):
+    base = 1000
+    vol_mult = max(1.0, volatility / 0.02)
+    uncertainty_mult = max(1.0, uncertainty / 0.3)
+    size_mult = max(1.0, portfolio_size / 100000)
+    count = int(base * vol_mult * uncertainty_mult * size_mult)
+    return min(count, 50000)
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Monte Carlo fiyat simülasyonu çalışıyor
+- [ ] P10, P25, P50, P75, P90 hesaplanıyor
+- [ ] Olasılık dağılımları üretiliyor (P(+10%), P(-5%), vb.)
+- [ ] Portfolio-level Monte Carlo çalışıyor
+- [ ] VaR / CVaR hesaplanıyor
+- [ ] Dinamik senaryo sayısı (volatiliteye göre)
+- [ ] Unit test: Monte Carlo, probability, VaR
+- [ ] Integration test: features → Monte Carlo → probabilities
+
+---
+
+### FAZ 7 — Scenario & Stress Test Engine [YENİ]
+
+**Amaç:** Senaryo analizi ve stres testleri yapmak.
+
+#### 7.1 Scenario Engine
+
+**Dosya:** `services/intelligence/scenario.py`
+
+```python
+class ScenarioEngine:
+    def run_scenario(
+        self,
+        scenario: ScenarioInput,
+        portfolio: Portfolio,
+        world_state: WorldState,
+        asset_states: Dict[str, AssetState],
+    ) -> ScenarioResult:
+        """Senaryo çalıştır."""
+
+class ScenarioInput:
+    usdtry_change: float      # ör: +0.10 (%10 artış)
+    interest_rate_change: float # ör: +0.05 (500bp)
+    bist_change: float         # ör: -0.15 (%15 düşüş)
+    vix_change: float          # ör: +0.50 (%50 artış)
+    oil_change: float          # ör: +0.20 (%20 artış)
+    gold_change: float         # ör: +0.10 (%10 artış)
+```
+
+#### 7.2 Senaryo Akışı
+
+```
+Scenario Input
+    ↓
+Macro Shock
+    ↓
+Sector Response (her sektör farklı etkilenir)
+    ↓
+Asset Response (her hisse farklı etkilenir)
+    ↓
+Portfolio Impact
+    ↓
+Risk Change
+    ↓
+Scenario Result
+```
+
+#### 7.3 Önceden Tanımlı Senaryolar
+
+```python
+PREDEFINED_SCENARIOS = {
+    "TCMB_RATE_HIKE_500BP": ScenarioInput(interest_rate_change=0.05),
+    "USDTRY_10_PCT": ScenarioInput(usdtry_change=0.10),
+    "BIST_CRASH_15_PCT": ScenarioInput(bist_change=-0.15),
+    "VIX_SPIKE_50_PCT": ScenarioInput(vix_change=0.50),
+    "OIL_SHOCK_20_PCT": ScenarioInput(oil_change=0.20),
+    "GLOBAL_RISK_OFF": ScenarioInput(bist_change=-0.10, vix_change=0.40, usdtry_change=0.05),
+    "2008_CRISIS": ScenarioInput(bist_change=-0.50, vix_change=2.0, usdtry_change=0.30),
+    "2020_COVID": ScenarioInput(bist_change=-0.30, vix_change=1.5, oil_change=-0.50),
+}
+```
+
+#### 7.4 Stress Test Engine
+
+**Dosya:** `services/intelligence/stress_test.py`
+
+```python
+class StressTestEngine:
+    def run_stress_test(
+        self,
+        portfolio: Portfolio,
+        scenarios: List[ScenarioInput],
+    ) -> StressTestResult:
+        """Birden fazla stres senaryosu çalıştır."""
+
+    def find_breaking_point(
+        self,
+        portfolio: Portfolio,
+        shock_variable: str,
+        max_shock: float,
+    ) -> BreakingPointResult:
+        """Portföyün ne kadar şoka dayanabileceğini bul."""
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Scenario engine çalışıyor (input → macro shock → portfolio impact)
+- [ ] Önceden tanımlı senaryolar (TCMB, USDTRY, BIST crash, vb.)
+- [ ] Stress test engine çalışıyor
+- [ ] Portfolio impact analizi (pozisyon bazlı etki)
+- [ ] Breaking point analizi
+- [ ] Unit test: scenario, stress test
+- [ ] Integration test: portfolio → scenario → impact
+
+---
+
+### FAZ 8 — AI Agent System [YENİ]
+
+**Amaç:** AI'yı sistematik ve kontrollü kullanmak.
+
+#### 8.1 Agent Architecture
+
+```
+Agent Orchestrator
+    ↓
+┌─────────────┬──────────────┬──────────────┐
+│ Research    │ News         │ Macro        │
+│ Agent       │ Agent        │ Agent        │
+├─────────────┼──────────────┼──────────────┤
+│ Fundamental │ Sentiment    │ Risk         │
+│ Agent       │ Agent        │ Agent        │
+└─────────────┴──────────────┴──────────────┘
+```
+
+#### 8.2 Agent Contract
+
+**Dosya:** `services/agents/base.py`
+
+```python
+class BaseAgent:
+    name: str
+    tools: List[str]    # erişebileceği araçlar
+    max_steps: int       # max adım sayısı
+    timeout: int         # max süre (saniye)
+
+    def execute(self, task: AgentTask) -> AgentResult:
+        """Görevi çalıştır."""
+
+    def validate_output(self, result: AgentResult) -> bool:
+        """Çıktıyı doğrula."""
+```
+
+#### 8.3 Agent Tool System
+
+Her agent yalnızca tanımlı araçlara erişebilir:
+
+```python
+RESEARCH_AGENT_TOOLS = [
+    "read_market_data",
+    "read_news",
+    "read_fundamentals",
+    "run_technical_analysis",
+    "run_valuation",
+]
+
+RISK_AGENT_TOOLS = [
+    "read_portfolio",
+    "calculate_risk",
+    "approve_decision",
+    "reject_decision",
+]
+
+# Agent kendi tools'unu değiştiremez
+```
+
+#### 8.4 AI Output Validation
+
+**Dosya:** `services/agents/validation.py`
+
+```python
+class AIOutputValidator:
+    def validate(self, llm_output: Dict) -> ValidationResult:
+        """
+        1. JSON parse
+        2. Schema validation
+        3. Range validation (confidence 0-1, price > 0)
+        4. Domain validation (makul değerler)
+        5. Source validation (var olmayan haberi kaynak gösterme)
+        6. Hallucination check
+        """
+```
+
+#### 8.5 AI Fallback
+
+```
+Primary LLM (Ollama Gemma)
+    ↓ failure
+Secondary LLM (DeepSeek, Qwen)
+    ↓ failure
+Rule-based fallback
+    ↓ failure
+NO_TRADE / DEGRADED
+```
+
+#### 8.6 Prompt Versioning
+
+Her AI prediction saklar:
+
+```python
+{
+    "model_version": "gemma4:12b-q4_0",
+    "prompt_version": "v1.2",
+    "input_hash": "sha256:abc123...",
+    "feature_version": "v1",
+    "timestamp": "2026-08-15T10:32:01Z",
+}
+```
+
+#### 8.7 Agent Orchestrator
+
+**Dosya:** `services/agents/orchestrator.py`
+
+```python
+class AgentOrchestrator:
+    def run_research_pipeline(self, ticker: str) -> ResearchResult:
+        """
+        1. Research Agent → teknik + fundamental analiz
+        2. News Agent → haber + KAP analizi
+        3. Macro Agent → makro etki analizi
+        4. Sentiment Agent → sosyal medya analizi
+        5. Risk Agent → risk değerlendirmesi
+        6. Synthesis Agent → bütün sonuçları birleştir
+        """
+```
+
+#### 8.8 Agent Loop Control
+
+```python
+# Sonsuz döngü koruması
+MAX_AGENT_STEPS = 10
+MAX_AGENT_RETRIES = 3
+AGENT_TIMEOUT_SECONDS = 120
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Agent orchestrator çalışıyor
+- [ ] En az 3 agent implemente edilmiş (Research, News, Macro)
+- [ ] Agent tool system çalışıyor (erişim kontrolü)
+- [ ] AI output validation çalışıyor (hallucination detection)
+- [ ] AI fallback çalışıyor (LLM down → rule-based)
+- [ ] Prompt versioning saklanıyor
+- [ ] Agent loop control (sonsuz döngü koruması)
+- [ ] Unit test: agent, validation, orchestrator
+- [ ] Integration test: agent → LLM → validation → result
+
+---
+
+### FAZ 9 — Opportunity Discovery Engine [YENİ]
+
+**Amaç:** BIST'in tamamından en güçlü fırsatları bulmak.
+
+#### 9.1 Pipeline
+
+```
+BIST 800+
+    ↓
+Candidate Filter (likidite, veri kalitesi)
+    ↓
+Technical Filter (momentum, trend, breakout)
+    ↓
+Fundamental Filter (değerleme, kalite, büyüme)
+    ↓
+Macro Compatibility (rejim uyumu)
+    ↓
+Sentiment (haber, KAP, sosyal)
+    ↓
+AI Evidence (agent sonuçları)
+    ↓
+Risk Filter (volatilite, korelasyon)
+    ↓
+Opportunity Score (risk-adjusted)
+    ↓
+Ranking
+```
+
+#### 9.2 Opportunity Score
+
+Tek skor değil, çok boyutlu:
+
+```
+Opportunity Score: 87
+├── Technical:       +18
+├── Fundamental:     +21
+├── Macro:           +14
+├── Momentum:        +16
+├── Sentiment:       +9
+├── Valuation:       +12
+├── Risk:            -7
+├── Liquidity:       +4
+└── Regime Fit:      +2
+```
+
+#### 9.3 Risk-Adjusted Ranking
+
+Sadece yüksek skor değil:
+
+```
+Risk-Adjusted Return = Expected Return / Expected Volatility
+```
+
+#### Çıkış Kriterleri
+
+- [ ] 800+ hisse taranıyor
+- [ ] Filtreleme pipeline'ı çalışıyor
+- [ ] Opportunity score hesaplanıyor
+- [ ] Risk-adjusted ranking çalışıyor
+- [ ] Score decomposition gösteriliyor
+- [ ] Unit test: scoring, ranking
+- [ ] Integration test: features → opportunity → ranking
+
+---
+
+### FAZ 10 — Decision & Risk Engine [DEVAM EDİYOR]
+
+**Amaç:** Güvenli karar üretmek.
+
+#### 10.1 Decision Engine (Mevcut — Genişletilecek)
+
+**Dosya:** `services/core/decision_engine.py`
+
+- [x] HOLD ayrı action
+- [x] Risk veto
+- [ ] 4 karar: LONG / SHORT / HOLD / NO_TRADE
+- [ ] Rejim-conditioned weights
+- [ ] Multi-timeframe decision (kısa/orta/uzun vade ayrı)
+- [ ] Signal conflict detection (teknik BUY ama fundamental SELL)
+- [ ] Conflict resolution (hangi taraf neden ağır basıyor)
+
+#### 10.2 Risk Engine (Mevcut — Genişletilecek)
+
+**Dosya:** `services/risk/main.py`
+
+- [x] Fail-closed
+- [x] Position limit
+- [x] Sector concentration
+- [x] Daily loss limit
+- [x] Drawdown limit
+- [ ] Correlation risk
+- [ ] Liquidity risk
+- [ ] Volatility risk
+- [ ] Event risk (yaklaşan kritik olay var mı?)
+- [ ] Tail risk
+- [ ] Model risk (model güvenilirliği düşük mü?)
+
+#### 10.3 Position Sizing
+
+**Dosya:** `services/risk/position_sizing.py` [YENİ]
+
+```python
+class PositionSizer:
+    def calculate_size(
+        self,
+        capital: float,
+        risk_budget_pct: float,     # ör: 0.75%
+        stop_distance: float,       # giriş - stop arası
+        volatility: float,
+        confidence: float,
+        portfolio_exposure: float,
+        correlation: float,
+    ) -> PositionSize:
+        """
+        Portfolio: 100,000 TL
+        Risk budget: 0.75%
+        Maximum loss: 750 TL
+        Stop distance: 5 TL
+        → Shares: 150
+        → Position value: 150 × price
+        """
+```
+
+#### 10.4 Risk Explainability
+
+```
+Risk Score: 72
+
+Volatility       +18
+Concentration    +15
+Correlation      +12
+Liquidity         +8
+Drawdown          +7
+Event Risk       +12
+```
+
+#### Çıkış Kriterleri
+
+- [ ] 4 karar destekleniyor (LONG/SHORT/HOLD/NO_TRADE)
+- [ ] Risk engine 8+ kontrol yapıyor
+- [ ] Position sizing çalışıyor
+- [ ] Risk explainability gösteriliyor
+- [ ] Signal conflict detection çalışıyor
+- [ ] Unit test: decision, risk, position sizing
+- [ ] Integration test: signal → decision → risk → size
+
+---
+
+### FAZ 11 — Order & Execution Simulator [YENİ]
+
+**Amaç:** Gerçekçi sanal işlem yapmak.
+
+#### 11.1 Order Lifecycle
+
+```
+CREATED
+    ↓
+VALIDATED (geçerli emir mi?)
+    ↓
+RISK_APPROVED (risk onayı)
+    ↓
+SUBMITTED (simülatöre gönderildi)
+    ↓
+ACCEPTED (simülatör kabul etti)
+    ↓
+PARTIALLY_FILLED (kısmi dolum)
+    ↓
+FILLED (tam dolum)
+
+veya:
+REJECTED / CANCELLED / EXPIRED / FAILED
+```
+
+#### 11.2 Execution Simulator
+
+**Dosya:** `services/simulation/execution_simulator.py` [YENİ]
+
+```python
+class ExecutionSimulator:
+    def execute_order(
+        self,
+        order: Order,
+        market_data: MarketData,
+    ) -> Fill:
+        """
+        Spread: bid/ask
+        Slippage: volatility × liquidity × order_size
+        Commission: broker + BIST + BSMV
+        """
+
+    def simulate_slippage(
+        self,
+        order_size: int,
+        avg_volume: int,
+        volatility: float,
+        spread: float,
+    ) -> float:
+        """
+        100 lot emir ile 10,000 lot emir aynı slippage'a sahip olmamalı.
+        """
+```
+
+#### 11.3 Slippage Model
+
+```
+Base Slippage = spread / 2
+Volume Impact = order_size / avg_daily_volume × volatility × k
+Total Slippage = Base + Volume Impact
+```
+
+#### 11.4 Transaction Cost Model
+
+```
+Commission = amount × broker_rate + amount × exchange_fee
+BSMV = commission × bsmv_rate
+Total Cost = commission + BSMV + slippage
+```
+
+#### 11.5 Partial Fill
+
+```python
+# Büyük emir tamamen dolmayabilir
+Order: 10,000 shares
+Fill 1: 6,000 shares @ 312.50
+Fill 2: 3,000 shares @ 312.75
+Fill 3: 1,000 shares @ 313.00
+Remaining: 0
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Order lifecycle (CREATED → FILLED) çalışıyor
+- [ ] Execution simulator spread/slippage uyguluyor
+- [ ] Transaction cost model gerçekçi
+- [ ] Partial fill destekleniyor
+- [ ] Commission model (broker + BIST + BSMV)
+- [ ] Unit test: order, execution, slippage, commission
+- [ ] Integration test: decision → order → execution → fill
+
+---
+
+### FAZ 12 — Portfolio & Accounting [DEVAM EDİYOR]
+
+**Amaç:** Gerçekçi portföy muhasebesi.
+
+#### 12.1 Portfolio Service (Mevcut — Genişletilecek)
+
+**Dosya:** `services/portfolio/main.py`
+
+- [x] Weighted average cost
+- [x] Oversell protection
+- [x] Atomik transaction
+- [x] Commission model
+- [ ] Multi-currency support (TRY, USD, EUR)
+- [ ] FX conversion
+- [ ] Tax model (stopaj, BSMV)
+- [ ] Dividend handling
+- [ ] Corporate action adjustment
+
+#### 12.2 Portfolio Ledger
+
+**Dosya:** `services/portfolio/ledger.py` [YENİ]
+
+Her financial event immutable kayıt:
+
+```python
+class LedgerEntry:
+    entry_id: str
+    entry_type: str   # BUY, SELL, FEE, DIVIDEND, DEPOSIT, WITHDRAWAL, SPLIT
+    instrument_id: int
+    quantity: int
+    price: float
+    amount: float
+    commission: float
+    tax: float
+    timestamp: datetime
+    order_id: str
+    decision_id: str
+    risk_id: str
+```
+
+#### 12.3 Reconciliation Engine
+
+**Dosya:** `services/portfolio/reconciliation.py` [YENİ]
+
+```python
+class ReconciliationEngine:
+    def reconcile(self, portfolio_id: int) -> ReconciliationResult:
+        """
+        Cash + Position Market Values = Equity (tutarlı mı?)
+        Ledger entries = Position changes (uyuşuyor mu?)
+        Uyuşmazlık varsa RECONCILIATION_FAILURE
+        """
+```
+
+#### 12.4 Performance Metrics
+
+- [ ] Total Return
+- [ ] CAGR
+- [ ] Sharpe Ratio
+- [ ] Sortino Ratio
+- [ ] Calmar Ratio
+- [ ] Max Drawdown
+- [ ] Win Rate
+- [ ] Profit Factor
+- [ ] Average Win / Average Loss
+- [ ] Expectancy
+- [ ] Turnover
+- [ ] Exposure
+
+#### 12.5 Benchmark Comparison
+
+```python
+class BenchmarkEngine:
+    def compare_to_benchmark(
+        self,
+        portfolio_returns: List[float],
+        benchmark_returns: List[float],
+    ) -> BenchmarkComparison:
+        """Alpha, Beta, Information Ratio, Tracking Error"""
+```
+
+#### 12.6 Performance Attribution
+
+```python
+class AttributionEngine:
+    def decompose_return(
+        self,
+        portfolio: Portfolio,
+        benchmark: str,
+    ) -> AttributionResult:
+        """
+        Toplam getiri ayrıştırması:
+        - Hisse seçimi etkisi
+        - Sektör seçimi etkisi
+        - Faktör maruziyeti (momentum, value, vb.)
+        - FX etkisi
+        """
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Portfolio ledger immutable
+- [ ] Reconciliation engine çalışıyor
+- [ ] Performance metrics hesaplanıyor (Sharpe, Sortino, vb.)
+- [ ] Benchmark comparison çalışıyor
+- [ ] Performance attribution çalışıyor
+- [ ] Unit test: ledger, reconciliation, metrics
+- [ ] Integration test: fill → ledger → reconciliation → metrics
+
+---
+
+### FAZ 13 — Backtest & Learning Engine [YENİ]
+
+**Amaç:** Geçmişte test etmek ve sonuçlardan öğrenmek.
+
+#### 13.1 Backtest Engine
+
+**Dosya:** `services/backtest/engine.py`
+
+```python
+class BacktestEngine:
+    def run_backtest(
+        self,
+        strategy: Strategy,
+        universe: List[str],
+        start_date: date,
+        end_date: date,
+        initial_capital: float,
+    ) -> BacktestResult:
+        """
+        strategy → historical market → decision → risk →
+        simulated execution → portfolio → metrics
+        """
+```
+
+#### 13.2 Walk-Forward Validation
+
+```python
+class WalkForwardEngine:
+    def run_walk_forward(
+        self,
+        model: Model,
+        universe: List[str],
+        train_window: int,    # gün
+        test_window: int,     # gün
+        step_size: int,       # gün
+    ) -> WalkForwardResult:
+        """
+        Train → Validate → Test → Move window → Repeat
+        Her adımda model yeniden eğitilir
+        """
+```
+
+#### 13.3 Backtest Metrics
+
+```
+Total Return
+CAGR
+Sharpe Ratio
+Sortino Ratio
+Calmar Ratio
+Max Drawdown
+Max Drawdown Duration
+Win Rate
+Profit Factor
+Average Win
+Average Loss
+Expectancy
+Turnover
+Total Fees
+Total Slippage
+Average Exposure
+```
+
+#### 13.4 No Look-Ahead Bias
+
+Kritik kurallar:
+
+- Feature hesaplama sadece t anına kadar olan veriyle
+- Fundamental data: publication timestamp kullanılmalı (fiscal period değil)
+- Geçmişte bilinmeyen veri kesinlikle kullanılmamalı
+
+#### 13.5 Point-in-Time Data
+
+```python
+class PointInTimeStore:
+    def get(self, ticker: str, field: str, as_of_date: date) -> Any:
+        """
+        as_of_date tarihinde GERÇEKTEN bilinen veriyi döndür.
+        Sonradan düzeltilmiş bilanço geçmişe girmez.
+        """
+```
+
+#### 13.6 Golden Datasets
+
+Sistem için değişmeyen test datasetleri:
+
+```python
+GOLDEN_DATASETS = {
+    "known_market_period": {...},   # Bilinen piyasa dönemi
+    "known_news": {...},            # Bilinen haberler
+    "known_fundamentals": {...},    # Bilinen bilançolar
+    "known_outcomes": {...},        # Bilinen sonuçlar
+}
+```
+
+Yeni kod bunlarla test edilir. Sonuç değişirse regression failure.
+
+#### 13.7 Learning Engine
+
+**Dosya:** `services/learning/engine.py`
+
+```python
+class LearningEngine:
+    def record_prediction(self, prediction: Prediction):
+        """Tahmini kaydet."""
+
+    def record_outcome(self, prediction_id: int, outcome: Outcome):
+        """Gerçek sonucu kaydet."""
+
+    def compute_prediction_error(self, prediction_id: int) -> float:
+        """Tahmin hatası hesapla."""
+
+    def analyze_errors(self, model_version: str) -> ErrorAnalysis:
+        """
+        Hangi feature? Hangi regime? Hangi sektör?
+        Hangi horizon? Hangi model? Daha çok hata yapıyor?
+        """
+```
+
+#### 13.8 Model Evaluation
+
+Her model için:
+
+```
+Accuracy
+Precision
+Recall
+Calibration (Brier Score)
+Profit Factor
+Sharpe Contribution
+Hit Rate
+False Positive Rate
+False Negative Rate
+Regime Performance
+```
+
+#### 13.9 Drift Detection
+
+```python
+class DriftDetector:
+    def detect_feature_drift(self, model_version: str) -> DriftResult
+    def detect_prediction_drift(self, model_version: str) -> DriftResult
+    def detect_outcome_drift(self, model_version: str) -> DriftResult
+    def detect_regime_drift(self) -> DriftResult
+```
+
+#### 13.10 Model Lifecycle
+
+```
+TRAIN
+    ↓
+VALIDATE
+    ↓
+BACKTEST
+    ↓
+WALK-FORWARD
+    ↓
+PAPER TEST
+    ↓
+SHADOW (canlı veriyle eski modelle karşılaştır)
+    ↓
+PROMOTE (canlıya al)
+    ↓
+MONITOR
+    ↓
+ROLLBACK / RETIRE
+```
+
+#### Çıkış Kriterleri
+
+- [ ] Backtest engine çalışıyor
+- [ ] Walk-forward validation çalışıyor
+- [ ] Backtest metrics hesaplanıyor (Sharpe, Sortino, vb.)
+- [ ] No look-ahead bias doğrulanmış
+- [ ] Point-in-time data korunuyor
+- [ ] Golden datasets oluşturulmuş
+- [ ] Learning engine prediction/outcome kaydediyor
+- [ ] Model evaluation çalışıyor
+- [ ] Drift detection çalışıyor
+- [ ] Unit test: backtest, walk-forward, learning, drift
+- [ ] Integration test: strategy → backtest → metrics → learning
+
+---
+
+### FAZ 14 — Dashboard & Production [YENİ]
+
+**Amaç:** Kullanıcı arayüzü ve production hazırlığı.
+
+#### 14.1 Dashboard Sayfaları
+
+| Sayfa | İçerik | Öncelik |
+|-------|--------|---------|
+| **Overview** | BIST durumu, rejim, fırsatlar, portföy, P&L | Kritik |
+| **Market Radar** | 800+ varlık tarama, filtreleme, sıralama | Kritik |
+| **Opportunities** | Fırsat listesi, skor decomposition, detay | Kritik |
+| **Asset Research** | Tek hisse detay: grafik, teknik, fundamental, haber, AI | Yüksek |
+| **World State** | Makro durum, rejim, global faktörler | Yüksek |
+| **Portfolio** | Pozisyonlar, P&L, drawdown, risk | Kritik |
+| **Risk Dashboard** | Risk skoru, konsantrasyon, korelasyon | Yüksek |
+| **AI Research** | Agent sonuçları, reasoning, confidence | Orta |
+| **Scenarios** | Senaryo çalıştırma, sonuçlar | Orta |
+| **Backtest** | Strateji testi, metrics, karşılaştırma | Orta |
+| **Models** | Model registry, performans, drift | Orta |
+| **Events** | Olay akışı, KAP, haber, makro | Orta |
+| **Audit** | Karar geçmişi, lineage | Yüksek |
+| **System Health** | Servis durumu, provider health | Yüksek |
+| **Market Map** | Sektör heatmap, performans | Düşük |
+
+#### 14.2 WebSocket Real-time
+
+```
+/ws/market          → anlık fiyatlar
+/ws/opportunities   → yeni fırsatlar
+/ws/portfolio       → P&L güncelleme
+/ws/risk            → risk alertleri
+/ws/system          → servis durumu
+```
+
+#### 14.3 API Endpoints
+
+```
+GET  /api/universe
+GET  /api/universe/{symbol}
+GET  /api/opportunities
+GET  /api/assets/{symbol}/analysis
+GET  /api/portfolio
+GET  /api/portfolio/positions
+GET  /api/portfolio/pnl
+GET  /api/risk
+POST /api/scenarios
+POST /api/backtests
+GET  /api/system/health
+```
+
+#### 14.4 Observability
+
+- [ ] Structured logging (JSON)
+- [ ] Prometheus metrics
+- [ ] Distributed tracing (correlation_id)
+- [ ] Alert system (critical events)
+- [ ] Cost monitoring (LLM token usage)
+
+#### 14.5 Testing Pyramid
+
+```
+Unit           → her hesaplama, her fonksiyon
+Integration    → servisler arası iletişim
+E2E            → tam pipeline (veri → karar → portföy)
+Replay         → historical event replay
+Failure        → DB down, LLM down, provider down
+Concurrency    → aynı anda emir/event işlemleri
+Regression     → eski davranışların bozulmaması
+Security       → unauthorized access, injection
+```
+
+#### 14.6 Production Hardening
+
+- [ ] Docker deterministic build
+- [ ] Healthcheck'ler
+- [ ] Graceful shutdown
+- [ ] Migration sistemi
+- [ ] CI/CD pipeline
+- [ ] Secret management
+- [ ] Rate limiting
+- [ ] Input validation
+
+#### Çıkış Kriterleri
+
+- [ ] Overview sayfası çalışıyor
+- [ ] Market Radar 800+ hisse gösteriyor
+- [ ] Portfolio sayfası P&L gösteriyor
+- [ ] Risk dashboard çalışıyor
+- [ ] WebSocket real-time güncelleme
+- [ ] API endpoint'leri çalışıyor
+- [ ] Health check endpoint'leri
+- [ ] Docker compose production-ready
+- [ ] E2E test: veri → karar → portföy → P&L
+- [ ] Failure test: DB/LLM/provider down senaryoları
+
+---
+
+## 6. Kabul Kriterleri
+
+Sistem ancak aşağıdaki **uçtan uca akış** başarıyla çalışırsa tamamlanmış kabul edilecek:
+
+```
+BIST Universe (800+ varlık)
+    ↓
+Market Data (OHLCV, KAP, haber, makro)
+    ↓
+Data Quality (validate, clean, normalize)
+    ↓
+Features (teknik, fundamental, makro, sentiment)
+    ↓
+World State (rejim, volatilite, risk appetite)
+    ↓
+AI Intelligence (agent'lar, reasoning, evidence)
+    ↓
+Opportunity Discovery (tarama, skor, ranking)
+    ↓
+Decision (LONG/SHORT/HOLD/NO_TRADE)
+    ↓
+Risk Gate (limit, konsantrasyon, drawdown)
+    ↓
+Simulated Order (CREATED → VALIDATED → FILLED)
+    ↓
+Execution (spread, slippage, commission)
+    ↓
+Portfolio Ledger (immutable kayıt)
+    ↓
+P&L (realized + unrealized)
+    ↓
+Learning (prediction → outcome → error)
+    ↓
+Audit (FILL → ORDER → DECISION → SIGNAL → FEATURES → RAW DATA)
+    ↓
+Snapshot (state kaydetme)
+    ↓
+Restart (sistemi kapat)
+    ↓
+Recovery (snapshot + events → aynı state)
+    ↓
+SAME STATE ✅
+```
+
+### Güvenlik Testleri
+
+Aşağıdaki durumlar test edilmeli:
+
+```
+duplicate event          → iki kez uygulanmamalı
+invalid data             → reddedilmeli
+DB failure               → fail-closed
+Redis failure            → degraded mode
+LLM failure              → rule-based fallback
+execution failure        → retry / alert
+partial fill             → desteklenmeli
+restart                  → recovery çalışmalı
+concurrent orders        → race condition olmamalı
+oversell                 → engellenmeli
+negative cash            → engellenmeli
+look-ahead bias          → tespit edilmeli
+```
+
+---
+
+## 7. Teknoloji Stack
+
+| Katman | Teknoloji | Not |
+|--------|-----------|-----|
+| Backend | Python + FastAPI | Async, Polars (Pandas değil) |
+| Frontend | Next.js + TypeScript + Tailwind | shadcn/ui |
+| Event Bus | Redpanda (Kafka-uyumlu) | Tek node |
+| OLTP | PostgreSQL | pgvector dahil |
+| OLAP | ClickHouse | Time-series |
+| Cache | Redis | Hot state |
+| Data Lake | Parquet + DuckDB | Historical |
+| ML | LightGBM + XGBoost | Ensemble |
+| LLM | Gemma 4 12B (Ollama) | Local |
+| Embeddings | BGE-M3 multilingual | Türkçe+İngilizce |
+| Model Registry | MLflow | Versioning |
+| Monitoring | Prometheus + Grafana | OpenTelemetry |
+| Containers | Docker Compose | Dev + Production ayrı |
+
+---
+
+## 8. Dosya Yapısı
+
+```
+bist-100/
+├── apps/
+│   └── web/                          # Next.js frontend
+│       ├── src/app/
+│       │   ├── page.tsx              # Overview
+│       │   ├── radar/page.tsx        # Market Radar
+│       │   ├── opportunities/        # Fırsatlar
+│       │   ├── asset/                # Hisse araştırma
+│       │   ├── portfolio/            # Portföy
+│       │   ├── risk/                 # Risk dashboard
+│       │   ├── scenarios/            # Senaryo
+│       │   ├── backtest/             # Backtest
+│       │   ├── models/               # Model registry
+│       │   ├── events/               # Olay akışı
+│       │   ├── audit/                # Denetim
+│       │   └── system/               # Sistem sağlığı
+│       └── src/components/
+│           ├── charts/               # Grafik bileşenleri
+│           ├── ui/                   # UI bileşenleri
+│           └── layout/               # Layout bileşenleri
+│
+├── services/
+│   ├── core/                         # Temel servisler
+│   │   ├── config.py                 # ✅ Configuration
+│   │   ├── database.py               # DB bağlantıları
+│   │   ├── database_dev.py           # Dev SQLite adapter
+│   │   ├── event_bus.py              # ✅ Event bus
+│   │   ├── event_schema.py           # ✅ Event schemas
+│   │   ├── data_quality.py           # ✅ Veri kalitesi
+│   │   ├── models.py                 # ✅ Domain modelleri
+│   │   ├── decision_engine.py        # ✅ Karar motoru
+│   │   ├── state_recovery.py         # ✅ State recovery
+│   │   ├── market_calendar.py        # ❌ Trading calendar
+│   │   └── logging.py                # Logging
+│   │
+│   ├── ingestion/                    # Veri toplama
+│   │   ├── main.py                   # Ingestion service
+│   │   ├── bist_universe.py          # BIST evreni
+│   │   ├── corporate_actions.py      # ❌ Şirket olayları
+│   │   └── providers/
+│   │       ├── yfinance_provider.py  # Fiyat verisi
+│   │       ├── kap_provider.py       # KAP bildirimleri
+│   │       ├── tcmb_provider.py      # TCMB makro
+│   │       ├── news_provider.py      # Haberler
+│   │       ├── social_provider.py    # Sosyal medya
+│   │       └── fundamental_provider.py # ❌ Finansal veri
+│   │
+│   ├── features/                     # Özellik hesaplama
+│   │   ├── calculator.py             # ✅ Teknik features
+│   │   ├── fundamental.py            # ❌ Fundamental features
+│   │   ├── macro.py                  # ❌ Makro features
+│   │   ├── sentiment.py              # ❌ Sentiment features
+│   │   ├── store.py                  # ❌ Feature store
+│   │   └── discovery.py              # ❌ Feature discovery
+│   │
+│   ├── intelligence/                 # Analiz motorları
+│   │   ├── world_state.py            # ✅ Dünya durumu
+│   │   ├── regime.py                 # ❌ Rejim motoru
+│   │   ├── spec_engine.py            # ✅ SPEC motoru
+│   │   ├── impact_engine.py          # ✅ Etki yayılımı
+│   │   ├── trade_planner.py          # ✅ İşlem planı
+│   │   ├── macro_sensitivity.py      # ❌ Makro hassasiyet
+│   │   ├── valuation/                # ❌ Değerleme
+│   │   │   ├── multiples.py
+│   │   │   ├── dcf_engine.py
+│   │   │   └── peer_comparison.py
+│   │   ├── monte_carlo.py            # ❌ Monte Carlo
+│   │   ├── probability.py            # ❌ Olasılık motoru
+│   │   ├── scenario.py               # ❌ Senaryo motoru
+│   │   ├── stress_test.py            # ❌ Stres testi
+│   │   └── news_pipeline.py          # Haber pipeline
+│   │
+│   ├── agents/                       # ❌ AI ajanları
+│   │   ├── base.py                   # Base agent
+│   │   ├── orchestrator.py           # Agent orchestrator
+│   │   ├── validation.py             # AI output validation
+│   │   ├── research_agent.py
+│   │   ├── news_agent.py
+│   │   ├── macro_agent.py
+│   │   ├── sentiment_agent.py
+│   │   └── risk_agent.py
+│   │
+│   ├── scanner/                      # Tarama motorları
+│   │   ├── alpha_scanner.py          # ✅ Ana scanner
+│   │   ├── alpha_engine.py           # ✅ Ana motor
+│   │   ├── live_scanner.py           # Canlı tarama
+│   │   ├── event_scanner.py          # Olay tarama
+│   │   └── tiered_scanner.py         # Katmanlı tarama
+│   │
+│   ├── risk/                         # Risk yönetimi
+│   │   ├── main.py                   # ✅ Risk engine
+│   │   ├── position_sizing.py        # ❌ Pozisyon boyutlandırma
+│   │   └── reconciliation.py         # ❌ Uzlaştırma
+│   │
+│   ├── portfolio/                    # Portföy yönetimi
+│   │   ├── main.py                   # ✅ Portfolio service
+│   │   ├── ledger.py                 # ❌ Immutable ledger
+│   │   ├── metrics.py                # ❌ Performance metrics
+│   │   ├── attribution.py            # ❌ Performans ayrıştırma
+│   │   └── benchmark.py              # ❌ Benchmark karşılaştırma
+│   │
+│   ├── simulation/                   # Simülasyon
+│   │   ├── execution_simulator.py    # ❌ Gerçekçi execution
+│   │   └── slippage_model.py         # ❌ Slippage modeli
+│   │
+│   ├── backtest/                     # Backtest
+│   │   ├── engine.py                 # ❌ Backtest engine
+│   │   ├── walk_forward.py           # ❌ Walk-forward
+│   │   └── replay_engine.py          # ⚠️ Temel replay
+│   │
+│   ├── learning/                     # Öğrenme
+│   │   ├── engine.py                 # ❌ Learning engine
+│   │   ├── drift_detector.py         # ❌ Drift detection
+│   │   ├── model_evaluator.py        # ❌ Model evaluation
+│   │   └── attribution.py            # ⚠️ Temel
+│   │
+│   ├── scheduler/                    # Zamanlama
+│   │   └── main.py                   # ✅ Scheduler
+│   │
+│   ├── market_state/                 # Piyasa durumu
+│   │   └── main.py                   # ✅ Market state
+│   │
+│   ├── api/                          # API
+│   │   └── main.py                   # FastAPI app
+│   │
+│   └── ml/                           # ML modelleri
+│       ├── model_loader.py           # Model yükleme
+│       ├── training.py               # Eğitim
+│       └── feature_discovery.py      # Feature keşfi
+│
+├── database/
+│   ├── init/001_schema.sql           # ✅ PostgreSQL schema
+│   └── clickhouse/init/              # ClickHouse schema
+│
+├── infrastructure/
+│   ├── Dockerfile.api
+│   ├── prometheus.yml
+│   └── grafana/
+│
+├── tests/                            # Test pyramid
+│   ├── unit/
+│   ├── integration/
+│   ├── e2e/
+│   ├── replay/
+│   ├── failure/
+│   ├── concurrency/
+│   └── regression/
+│
+├── ml/
+│   └── saved_models/
+│
+├── data/
+│   └── bist_universe_cache.json
+│
+├── docker-compose.yml
+├── run_mvp.py                        # MVP test scripti
+├── ROADMAP.md                        # ← BU DOSYA
+├── ALPHA-ARCHITECTURE-v1.1.md        # Mimari spesifikasyon
+├── Hatalar                           # Hata düzeltme talimatları
+└── Sistem tanımı                     # Sistem vizyonu
+```
+
+---
+
+## 9. Sözleşmeler & Kurallar
+
+### 9.1 Kod Kuralları
+
+- Backend: Python 3.11+, type hints zorunlu
+- Frontend: strict TypeScript, "any" yok
+- Pandas ana pipeline'da kullanılmaz → Polars
+- Her fonksiyon docstring'e sahip olmalı
+- Generic `except Exception: pass` yasak
+
+### 9.2 Veri Kuralları
+
+- Tüm timestamp'ler: UTC + timezone-aware
+- Para hesapları: Decimal veya DB numeric
+- Price precision: asset bazlı tanımlı
+- Missing data: 0 olarak atanmaz
+
+### 9.3 Test Kuralları
+
+- Her faz: unit → integration → failure → regression
+- Test geçmeden sonraki faza geçilmez
+- Golden datasets: değişmeyen test verileri
+- Golden decisions: beklenen kararlar
+
+### 9.4 Git Kuralları
+
+- Her commit: tek konu
+- Commit mesajı: hangi problemi çözüyor
+- PR merge öncesi: testler geçmeli
+- Küçük, anlaşılabilir commit'ler
+
+### 9.5 Güvenlik Kuralları
+
+- Secret'lar kodda olmaz
+- AI risk bypass edemez
+- Audit kayıtları immutable
+- Agent kendi permissions'unu değiştiremez
+
+---
+
+## Son Not
+
+Bu doküman bir "hisse tahmin botu" değil, **BIST'in tamamını izleyen, fırsat keşfeden, piyasa rejimini anlayan, AI destekli araştırma yapan, risk kontrollü karar üreten, gerçekçi sanal işlemler gerçekleştiren, sonuçlarını ölçen ve geçmiş kararlarını denetlenebilir şekilde saklayan bir AI yatırım araştırma/simülasyon terminali** tanımlar.
+
+Her yeni yetenek eklenmeden önce bu mimaride hangi katmana ait olduğu belirlenmeli, contract'ı tanımlanmalı, testleri yazılmalı ve audit/recovery mekanizmasına dahil edilmelidir.
+
+---
+
+*Bu dosya projenin ana rehberidir. Tüm geliştirme bu doküman referans alınarak yapılmalıdır.*
