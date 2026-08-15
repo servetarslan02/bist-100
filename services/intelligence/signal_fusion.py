@@ -102,7 +102,7 @@ class SignalFusionEngine:
         )
 
         # Bileşen yönleri ve skorları
-        for component in ["technical", "fundamental", "momentum", "sentiment", "macro", "valuation", "ai"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai"]:
             comp_data = signals.get(component, {})
             setattr(result, f"{component}_direction", comp_data.get("direction", "NEUTRAL"))
             setattr(result, f"{component}_score", comp_data.get("score", 50))
@@ -164,7 +164,7 @@ class SignalFusionEngine:
         conflicts = []
 
         directions = {}
-        for component in ["technical", "fundamental", "momentum", "sentiment", "macro", "valuation", "ai"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai"]:
             comp_data = signals.get(component, {})
             direction = comp_data.get("direction", "NEUTRAL")
             if direction != "NEUTRAL":
@@ -193,7 +193,7 @@ class SignalFusionEngine:
         """Gerekçe üret."""
         reasons = []
 
-        for component in ["technical", "fundamental", "momentum", "sentiment", "macro", "valuation"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation"]:
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
             score = getattr(result, f"{component}_score", 50)
 
@@ -247,7 +247,7 @@ class SignalFusionEngine:
         # Tüm bileşenler nötr ama yüksek skor
         all_neutral = all(
             getattr(result, f"{c}_direction", "NEUTRAL") == "NEUTRAL"
-            for c in ["technical", "fundamental", "momentum", "sentiment", "macro", "valuation"]
+            for c in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation"]
         )
         if all_neutral and result.fused_score > 70:
             warnings.append("Tüm bileşenler nötr ama yüksek skor")
