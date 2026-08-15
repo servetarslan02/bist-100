@@ -55,9 +55,11 @@ assert result.cvar < result.var_95
 | 10.5 | compute_position_size() çalışıyor mu? | `risk/enhanced_risk.py` | ❓ Test et |
 | 10.6 | VolatilityTargeter sınıfı var mı? | `risk/enhanced_risk.py` | ✅ |
 | 10.7 | compute_leverage() çalışıyor mu? | `risk/enhanced_risk.py` | ❓ Test et |
-| 10.8 | Risk Metrics hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
-| 10.9 | VaR/CVaR hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
-| 10.10 | Max Drawdown hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
+| 10.8 | RiskEngine sınıfı var mı? | `risk/main.py` | ✅ |
+| 10.9 | Risk Metrics hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
+| 10.10 | VaR/CVaR hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
+| 10.11 | Max Drawdown hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
+| 10.12 | Risk Score hesaplanıyor mu? | `risk/main.py` | ❓ Test et |
 
 **Test senaryosu:**
 ```python
@@ -127,10 +129,12 @@ assert result.fused_direction == "LONG"
 |---|---------|-------|------|
 | 13.1 | BacktestEngine sınıfı var mı? | `backtest/engine.py` | ✅ |
 | 13.2 | PurgeEmbargoWalkForward sınıfı var mı? | `backtest/enhanced_walk_forward.py` | ✅ |
-| 13.3 | Walk-forward çalışıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
-| 13.4 | _deflated_sharpe() çalışıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
-| 13.5 | purge/embargo uygulanıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
-| 13.6 | BIST komisyon modeli var mı? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
+| 13.3 | WalkForwardEngine sınıfı var mı? | `backtest/walk_forward.py` | ✅ |
+| 13.4 | Walk-forward çalışıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
+| 13.5 | _deflated_sharpe() çalışıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
+| 13.6 | purge/embargo uygulanıyor mu? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
+| 13.7 | BIST komisyon modeli var mı? | `backtest/enhanced_walk_forward.py` | ❓ Test et |
+| 13.8 | WalkForwardFold/Result var mı? | `backtest/walk_forward.py` | ❓ Test et |
 
 **Test senaryosu:**
 ```python
@@ -152,7 +156,9 @@ assert result.total_folds > 0
 | 14.3 | Slippage hesaplanıyor mu? | `simulation/execution_simulator.py` | ❓ Test et |
 | 14.4 | Komisyon hesaplanıyor mu? | `simulation/execution_simulator.py` | ❓ Test et |
 | 14.5 | Partial fill desteği var mı? | `simulation/execution_simulator.py` | ❓ Test et |
-| 14.6 | Portfolio ledger var mı? | `simulation/main.py` | ❓ Test et |
+| 14.6 | SimulationEngine sınıfı var mı? | `simulation/main.py` | ✅ |
+| 14.7 | Portfolio ledger var mı? | `simulation/main.py` | ❓ Test et |
+| 14.8 | P&L tracking var mı? | `simulation/main.py` | ❓ Test et |
 
 **Test senaryosu:**
 ```python
@@ -176,7 +182,14 @@ assert result.avg_fill_price > 305.25  # slippage
 | 15.4 | Accuracy hesaplanıyor mu? | `learning/integrated_learning.py` | ❓ Test et |
 | 15.5 | Calibration error hesaplanıyor mu? | `learning/integrated_learning.py` | ❓ Test et |
 | 15.6 | Drift detection var mı? | `learning/integrated_learning.py` | ❓ Test et |
-| 15.7 | Outcome tracker var mı? | `learning/outcome_tracker.py` | ❓ Test et |
+| 15.7 | OutcomeTracker sınıfı var mı? | `learning/outcome_tracker.py` | ✅ |
+| 15.8 | Outcome kaydetme çalışıyor mu? | `learning/outcome_tracker.py` | ❓ Test et |
+| 15.9 | AttributionEngine sınıfı var mı? | `learning/attribution.py` | ✅ |
+| 15.10 | Trade attribution çalışıyor mu? | `learning/attribution.py` | ❓ Test et |
+| 15.11 | LearningLoop sınıfı var mı? | `learning/learning_loop.py` | ✅ |
+| 15.12 | Learning loop çalışıyor mu? | `learning/learning_loop.py` | ❓ Test et |
+| 15.13 | LearningService sınıfı var mı? | `learning/main.py` | ✅ |
+| 15.14 | Learning service çalışıyor mu? | `learning/main.py` | ❓ Test et |
 
 **Test senaryosu:**
 ```python
@@ -238,13 +251,18 @@ tests/test_risk/
 tests/test_backtest/
 ├── test_engine.py             # Bölüm 13
 ├── test_walk_forward.py       # Bölüm 13
+├── test_enhanced_walk_forward.py # Bölüm 13
 
 tests/test_simulation/
 ├── test_execution_simulator.py # Bölüm 14
+├── test_simulation_main.py    # Bölüm 14
 
 tests/test_learning/
 ├── test_integrated_learning.py # Bölüm 15
 ├── test_outcome_tracker.py    # Bölüm 15
+├── test_attribution.py        # Bölüm 15
+├── test_learning_loop.py      # Bölüm 15
+├── test_learning_main.py      # Bölüm 15
 
 tests/test_agents/
 ├── test_agent_system.py       # Bölüm 16
@@ -278,6 +296,12 @@ Ancak şu eklemeler gerekebilir:
 | 1 | BIST-specific risk fonksiyonları | Ülke riski, kur riski, siyasi risk (Bölüm 10'da dokümante edildi) |
 | 2 | BIST komisyon modeli | Detaylı fee breakdown (Bölüm 13'te dokümante edildi) |
 | 3 | Drift detection implementasyonu | Feature/prediction drift (Bölüm 15'te dokümante edildi) |
+| 4 | backtest/walk_forward.py | WalkForwardEngine, WalkForwardFold, WalkForwardResult |
+| 5 | learning/attribution.py | TradeAttribution, AttributionEngine |
+| 6 | learning/learning_loop.py | LearningState, LearningLoop |
+| 7 | learning/main.py | LearningService |
+| 8 | risk/main.py | RiskEngine (detaylı test) |
+| 9 | simulation/main.py | SimulationEngine (detaylı test) |
 
 ---
 
@@ -304,5 +328,10 @@ GÜN 6: Aşama 4 (BIST-specific eklemeler)
 - [ ] Execution: slippage + komisyon hesaplanıyor
 - [ ] Learning: prediction→outcome→accuracy döngüsü çalışıyor
 - [ ] Agent: tool erişim kontrolü çalışıyor
-- [ ] 15+ test dosyası yazıl
+- [ ] 20+ test dosyası yazıl
 - [ ] 5 entegrasyon zinciri çalışıyor
+- [ ] backtest/walk_forward.py çalışıyor
+- [ ] learning/attribution.py çalışıyor
+- [ ] learning/learning_loop.py çalışıyor
+- [ ] risk/main.py RiskEngine çalışıyor
+- [ ] simulation/main.py SimulationEngine çalışıyor
