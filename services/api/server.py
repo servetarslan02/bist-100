@@ -44,17 +44,17 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
         """GET request handler."""
         path = self.path.split("?")[0]
 
-        # API endpoints
-        if path == "/api/universe":
-            self._json_response(self._get_universe())
-        elif path == "/api/opportunities":
-            self._json_response(self._get_opportunities())
+        # API endpoints (frontend uyumlu)
+        if path in ("/api/universe", "/api/market/instruments", "/api/market/state"):
+            self._json_response(self._get_market_state())
+        elif path in ("/api/opportunities", "/api/signals"):
+            self._json_response(self._get_signals())
         elif path == "/api/portfolio":
             self._json_response(self._get_portfolio())
-        elif path == "/api/risk":
-            self._json_response(self._get_risk())
-        elif path == "/api/system/health":
-            self._json_response(self._get_health())
+        elif path in ("/api/risk", "/api/world/state"):
+            self._json_response(self._get_world_state())
+        elif path in ("/api/system/health", "/api/status"):
+            self._json_response(self._get_status())
         elif path == "/api/system/metrics":
             self._json_response(self._get_metrics())
         elif path == "/api/audit":
@@ -106,30 +106,92 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def _get_universe(self) -> dict:
-        """BIST evreni."""
+    def _get_market_state(self) -> dict:
+        """Market state + instruments."""
         try:
             from services.ingestion.bist_universe import bist_universe
             tickers = bist_universe.get_tickers()
+            # Snapshot'tan son tarama bilgilerini al
+            snapshot = {}
+            if self.system and hasattr(self.system, '_snapshot_system'):
+                latest = self.system._snapshot_system.get_latest()
+                if latest:
+                    snapshot = latest.get("state", {})
             return {
-                "tickers": tickers[:100],
+                "regime": snapshot.get("regime", "UNKNOWN"),
+                "breadth_pct": snapshot.get("breadth", 50),
+                "advancing": snapshot.get("advancing", 0),
+                "declining": snapshot.get("declining", 0),
+                "avg_rsi": 50,
+                "avg_momentum": 0,
+                "avg_volatility": 20,
+                "anomaly_count": snapshot.get("anomalies", 0),
+                "risk_appetite": 0.5,
+                "instruments": [{"symbol": t, "name": t, "sector": "OTHER"} for t in tickers[:500]],
                 "total": len(tickers),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
-            return {"error": str(e)}
+            return {"regime": "UNKNOWN", "instruments": [], "error": str(e)}
 
-    def _get_opportunities(self) -> dict:
-        """Fırsatlar."""
+    def _get_signals(self) -> dict:
+        """Sinyaller / fırsatlar."""
         try:
             if self.system and hasattr(self.system, '_last_opportunities'):
+                opps = self.system._last_opportunities or []
+                signals = [{
+                    "ticker": o.get("ticker", ""),
+                    "name": o.get("ticker", ""),
+                    "score": o.get("score", 0),
+                    "direction": o.get("direction", "NEUTRAL"),
+                    "risk_level": "MEDIUM",
+                    "horizon": "1-5D",
+                    "expected_return_pct": o.get("score", 50) / 10,
+                    "spec_category": o.get("signal", "NORMAL"),
+                } for o in opps]
+                return signals
+            return []
+        except Exception as e:
+            return []
+
+    def _get_world_state(self) -> dict:
+        """World state + risk."""
+        try:
+            if self.system and hasattr(self.system, '_world_state'):
+                state = self.system._world_state.get_state_dict()
                 return {
-                    "opportunities": self.system._last_opportunities[:20],
+                    "global_risk_appetite": state.get("global_risk_appetite", 0.5),
+                    "usd_strength": state.get("usd_strength", 0.5),
+                    "us_rate_pressure": state.get("us_rate_pressure", 0.5),
+                    "commodity_pressure": state.get("commodity_pressure", 0.5),
+                    "oil_pressure": state.get("oil_pressure", 0.5),
+                    "turkey_macro_risk": state.get("turkey_macro_risk", 0.5),
+                    "geopolitical_risk": state.get("geopolitical_risk", 0.5),
+                    "em_risk_appetite": state.get("emerging_market_risk", 0.5),
+                    "vix_level": state.get("vix_level", 15),
+                    "inflation_pressure": 0.5,
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
-            return {"opportunities": [], "message": "No scan yet"}
+            return {"global_risk_appetite": 0.5, "vix_level": 15}
         except Exception as e:
             return {"error": str(e)}
+
+    def _get_status(self) -> dict:
+        """Sistem durumu (frontend uyumlu)."""
+        try:
+            if self.system:
+                health = self.system._health_checker.check_all()
+                services = {}
+                for name, comp in health.get("components", {}).items():
+                    services[name] = comp.get("status", "unknown").lower()
+                return {
+                    "status": "ok" if health["overall"] == "HEALTHY" else "degraded",
+                    "services": services,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            return {"status": "unknown", "services": {}}
+        except Exception as e:
+            return {"status": "error", "error": str(e)}
 
     def _get_portfolio(self) -> dict:
         """Portföy durumu."""
