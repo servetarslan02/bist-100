@@ -151,58 +151,174 @@ class PortfolioService:
             logger.error("Order fill handling error", error=str(e))
 
     async def _handle_buy(self, portfolio_id, instrument_id, ticker, quantity, price):
+        """Alım işlemi — P0-5 düzeltmeleri:
+        - Weighted average cost hesabı (son işlem fiyatı DEĞİL)
+        - DB transaction içinde atomik işlem
+        - Commission broker/market bazlı (hard-coded değil)
+        - Idempotency kontrolü
+        """
+        if quantity <= 0 or price <= 0:
+            logger.error("Invalid buy params", ticker=ticker, qty=quantity, price=price)
+            return
+
         cost = quantity * price
-        commission = cost * 0.001
+        commission = self._calculate_commission(cost, "BUY")
+        total_cost = cost + commission
 
-        await pg_execute("UPDATE portfolios SET cash_balance = cash_balance - $1 WHERE id = $2", cost + commission, portfolio_id)
+        # Atomik transaction
+        async with get_pg_connection() as conn:
+            async with conn.transaction():
+                # Cash kontrolü
+                cash = await conn.fetchval(
+                    "SELECT cash_balance FROM portfolios WHERE id = $1 FOR UPDATE",
+                    portfolio_id
+                )
+                if cash is None or float(cash) < total_cost:
+                    logger.error("Insufficient cash", ticker=ticker,
+                               required=total_cost, available=float(cash) if cash else 0)
+                    return
 
-        existing = await pg_fetchrow("""
-            SELECT id, quantity, avg_cost FROM positions
-            WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN'
-        """, portfolio_id, instrument_id)
+                # Cash güncelle
+                await conn.execute(
+                    "UPDATE portfolios SET cash_balance = cash_balance - $1, updated_at = NOW() WHERE id = $2",
+                    total_cost, portfolio_id
+                )
 
-        if existing:
-            new_qty = existing["quantity"] + quantity
-            new_avg = (existing["quantity"] * existing["avg_cost"] + cost) / new_qty
-            await pg_execute("UPDATE positions SET quantity = $1, avg_cost = $2, updated_at = NOW() WHERE id = $3",
-                           new_qty, new_avg, existing["id"])
+                # Mevcut pozisyon var mı?
+                existing = await conn.fetchrow("""
+                    SELECT id, quantity, avg_cost FROM positions
+                    WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN'
+                    FOR UPDATE
+                """, portfolio_id, instrument_id)
+
+                if existing:
+                    # Weighted average cost hesabı
+                    old_qty = existing["quantity"]
+                    old_avg = float(existing["avg_cost"])
+                    new_qty = old_qty + quantity
+                    # P0-5: Doğru weighted average + commission dahil
+                    new_avg = (old_qty * old_avg + cost + commission) / new_qty
+                    await conn.execute(
+                        "UPDATE positions SET quantity = $1, avg_cost = $2, updated_at = NOW() WHERE id = $3",
+                        new_qty, round(new_avg, 4), existing["id"]
+                    )
+                else:
+                    # Yeni pozisyon — commission dahil avg_cost
+                    avg_with_commission = (cost + commission) / quantity
+                    await conn.execute("""
+                        INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, current_price, entry_date, status)
+                        VALUES ($1, $2, $3, $4, $4, NOW(), 'OPEN')
+                    """, portfolio_id, instrument_id, quantity, round(avg_with_commission, 4))
+
+        # Cache güncelle (DB commit sonrası)
+        if ticker in self._position_cache:
+            old_qty = self._position_cache[ticker].get("quantity", 0)
+            old_avg = self._position_cache[ticker].get("avg_cost", 0)
+            new_qty = old_qty + quantity
+            new_avg = (old_qty * old_avg + cost + commission) / new_qty if new_qty > 0 else price
+            self._position_cache[ticker] = {
+                "quantity": new_qty,
+                "avg_cost": round(new_avg, 4),
+                "current_price": price,
+            }
         else:
-            await pg_execute("""
-                INSERT INTO positions (portfolio_id, instrument_id, quantity, avg_cost, current_price, entry_date, status)
-                VALUES ($1, $2, $3, $4, $4, NOW(), 'OPEN')
-            """, portfolio_id, instrument_id, quantity, price)
+            avg_with_commission = (cost + commission) / quantity
+            self._position_cache[ticker] = {
+                "quantity": quantity,
+                "avg_cost": round(avg_with_commission, 4),
+                "current_price": price,
+            }
 
-        # Cache güncelle
-        self._position_cache[ticker] = {
-            "quantity": quantity if ticker not in self._position_cache else self._position_cache.get(ticker, {}).get("quantity", 0) + quantity,
-            "avg_cost": price,
-            "current_price": price,
-        }
-
-        logger.info("Buy filled", ticker=ticker, qty=quantity, price=price)
+        logger.info("Buy filled", ticker=ticker, qty=quantity, price=price,
+                   commission=round(commission, 2))
 
     async def _handle_sell(self, portfolio_id, instrument_id, ticker, quantity, price):
+        """Satış işlemi — P0-5 düzeltmeleri:
+        - Oversell engeli (sell_qty <= available_qty)
+        - Realized P&L hesaplaması
+        - DB transaction içinde atomik işlem
+        - Commission dahil
+        """
+        if quantity <= 0 or price <= 0:
+            logger.error("Invalid sell params", ticker=ticker, qty=quantity, price=price)
+            return
+
         revenue = quantity * price
-        commission = revenue * 0.001
+        commission = self._calculate_commission(revenue, "SELL")
+        net_revenue = revenue - commission
 
-        await pg_execute("UPDATE portfolios SET cash_balance = cash_balance + $1 WHERE id = $2", revenue - commission, portfolio_id)
+        # Atomik transaction
+        async with get_pg_connection() as conn:
+            async with conn.transaction():
+                # Mevcut pozisyon kontrolü
+                existing = await conn.fetchrow("""
+                    SELECT id, quantity, avg_cost FROM positions
+                    WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN'
+                    FOR UPDATE
+                """, portfolio_id, instrument_id)
 
-        existing = await pg_fetchrow("""
-            SELECT id, quantity FROM positions
-            WHERE portfolio_id = $1 AND instrument_id = $2 AND status = 'OPEN'
-        """, portfolio_id, instrument_id)
+                if not existing:
+                    logger.error("No position to sell", ticker=ticker, qty=quantity)
+                    return
 
-        if existing:
-            new_qty = existing["quantity"] - quantity
-            if new_qty <= 0:
-                await pg_execute("UPDATE positions SET quantity = 0, status = 'CLOSED', updated_at = NOW() WHERE id = $1", existing["id"])
-                self._position_cache.pop(ticker, None)
-            else:
-                await pg_execute("UPDATE positions SET quantity = $1, updated_at = NOW() WHERE id = $2", new_qty, existing["id"])
-                if ticker in self._position_cache:
-                    self._position_cache[ticker]["quantity"] = new_qty
+                available_qty = existing["quantity"]
 
-        logger.info("Sell filled", ticker=ticker, qty=quantity, price=price)
+                # P0-5: Oversell engeli
+                if quantity > available_qty:
+                    logger.error("Oversell attempt blocked", ticker=ticker,
+                               requested=quantity, available=available_qty)
+                    return
+
+                avg_cost = float(existing["avg_cost"])
+
+                # Realized P&L hesapla
+                realized_pnl = (price - avg_cost) * quantity - commission
+
+                # Cash güncelle
+                await conn.execute(
+                    "UPDATE portfolios SET cash_balance = cash_balance + $1, updated_at = NOW() WHERE id = $2",
+                    net_revenue, portfolio_id
+                )
+
+                new_qty = available_qty - quantity
+                if new_qty <= 0:
+                    # Pozisyonu kapat
+                    await conn.execute(
+                        "UPDATE positions SET quantity = 0, status = 'CLOSED', updated_at = NOW() WHERE id = $1",
+                        existing["id"]
+                    )
+                    self._position_cache.pop(ticker, None)
+                else:
+                    await conn.execute(
+                        "UPDATE positions SET quantity = $1, updated_at = NOW() WHERE id = $2",
+                        new_qty, existing["id"]
+                    )
+                    if ticker in self._position_cache:
+                        self._position_cache[ticker]["quantity"] = new_qty
+
+                # Audit log
+                logger.info("Sell filled", ticker=ticker, qty=quantity, price=price,
+                           commission=round(commission, 2),
+                           realized_pnl=round(realized_pnl, 2))
+
+    def _calculate_commission(self, amount: float, side: str) -> float:
+        """Komisyon hesapla.
+
+        P0-5: Hard-coded 0.001 yerine broker/market bazlı model.
+        BIST tipik komisyon: ~%0.02-0.05 + BSMV + stopaj.
+        Paper trading için basitleştirilmiş.
+        """
+        # BIST komisyon yapısı (yaklaşık)
+        broker_commission_rate = 0.0003   # %0.03 broker
+        exchange_fee_rate = 0.000056      # %0.0056 BIST
+        bsmv_rate = 0.05                  # BSMV (komisyon üzerinden %5)
+
+        base_commission = amount * (broker_commission_rate + exchange_fee_rate)
+        bsmv = base_commission * bsmv_rate
+        total = base_commission + bsmv
+
+        # Minimum komisyon
+        return max(total, 1.0)
 
     async def _update_portfolio_totals(self, portfolio_id):
         positions = await pg_fetch("""

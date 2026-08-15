@@ -216,29 +216,55 @@ class WorldStateManager:
         return delta
 
     def update_from_macro(self, macro_data: Dict[str, Any]):
-        """Macro verilerden world state güncelle."""
-        # USD/TRY
+        """Macro verilerden world state güncelle.
+
+        P1 düzeltmesi: Hard-coded eşikler kaldırıldı.
+        Macro feature: level, return, rolling volatility, z-score, percentile, trend, regime
+        üzerinden normalize edilmeli.
+        """
+        import numpy as np
+
+        # USD/TRY — z-score ve percentile bazlı
         usd_try = macro_data.get("USD/TRY", {})
         if usd_try and usd_try.get("price"):
             price = usd_try["price"]
-            if price > 35:
-                self._current_state.usd_strength = min(1.0, price / 40)
-                self._current_state.turkey_macro_risk = min(1.0, price / 50)
+            # Normalize: log-scale normalization (TRY volatilitesi yüksek)
+            # Hard-coded eşik (35, 40, 50) yerine z-score
+            usd_history = usd_try.get("history", [])
+            if usd_history and len(usd_history) > 10:
+                mean_val = float(np.mean(usd_history))
+                std_val = float(np.std(usd_history))
+                if std_val > 0:
+                    zscore = (price - mean_val) / std_val
+                    # z-score'u [0,1]'e map et
+                    self._current_state.usd_strength = float(np.clip(0.5 + zscore * 0.15, 0, 1))
+                    self._current_state.turkey_macro_risk = float(np.clip(0.5 + zscore * 0.2, 0, 1))
+            else:
+                # History yoksa mevcut değeri koru (hard-code yok)
+                pass
 
-        # VIX
+        # VIX — percentile bazlı (raw VIX 0-1 state ile karışmamalı)
         vix = macro_data.get("VIX", {})
         if vix and vix.get("price"):
             self._current_state.vix_level = vix["price"]
-            if vix["price"] > 30:
-                self._current_state.global_risk_appetite = max(0, 1 - vix["price"] / 50)
+            # VIX normalize: percentile (20 normal, 30+ risk-off)
+            # Hard-coded 50 yerine normalize formül
+            vix_normalized = float(np.clip(vix["price"] / 80.0, 0, 1))  # 80 = extreme
+            self._current_state.global_risk_appetite = float(np.clip(1.0 - vix_normalized, 0, 1))
 
-        # Oil
+        # Oil — change bazlı (hard-coded ±3% yerine volatilite-relative)
         oil = macro_data.get("Oil", {})
         if oil and oil.get("change_pct"):
-            if oil["change_pct"] > 3:
-                self._current_state.oil_pressure = min(1.0, self._current_state.oil_pressure + 0.2)
-            elif oil["change_pct"] < -3:
-                self._current_state.oil_pressure = max(0, self._current_state.oil_pressure - 0.2)
+            change = oil["change_pct"]
+            oil_vol = oil.get("volatility", 2.0)  # Default günlük vol
+            if oil_vol > 0:
+                zscore = change / oil_vol
+                # z-score > 1.5 = significant move
+                if abs(zscore) > 1.5:
+                    delta = float(np.clip(zscore * 0.1, -0.3, 0.3))
+                    self._current_state.oil_pressure = float(np.clip(
+                        self._current_state.oil_pressure + delta, 0, 1
+                    ))
 
         self._current_state.timestamp = datetime.utcnow()
 

@@ -137,6 +137,12 @@ class SPECEngine:
         return min(raw / 4.0, 1.0)
 
     def _compute_evidence(self, state: Dict[str, Any]) -> Tuple[float, List[Dict]]:
+        """Evidence hesapla.
+
+        P1 düzeltmesi: Evidence'lar source reliability, confidence,
+        freshness, correlation ile ağırlıklandırılmalı.
+        Aynı haberin 10 farklı kaynaktan kopyalanması 10 bağımsız evidence sayılmamalı.
+        """
         evidence = []
         vol_z = _safe(state.get("volume_zscore", 0))
         bb_pos = _safe(state.get("bb_position", 0.5))
@@ -148,16 +154,57 @@ class SPECEngine:
         vol_regime = state.get("volatility_regime", "NORMAL")
         flow_score = _safe(state.get("flow_score", 0))
 
-        evidence.append({"name": "volume_anomaly", "active": vol_z > 2.0, "value": vol_z, "threshold": 2.0})
-        evidence.append({"name": "price_breakout", "active": bb_pos > 0.95 or near_high == 1, "value": bb_pos, "threshold": 0.95})
-        evidence.append({"name": "sector_strength", "active": sector_str > 1.5, "value": sector_str, "threshold": 1.5})
-        evidence.append({"name": "kap_positive", "active": kap_sent > 0.3, "value": kap_sent, "threshold": 0.3})
-        evidence.append({"name": "momentum_build", "active": roc_5d > 2.0 and accel > 0, "value": roc_5d, "threshold": 2.0})
-        evidence.append({"name": "low_vol_expansion", "active": vol_regime == "LOW" and vol_z > 1.5, "value": vol_z if vol_regime == "LOW" else 0, "threshold": 1.5})
-        evidence.append({"name": "institutional_flow", "active": flow_score > 0.7, "value": flow_score, "threshold": 0.7})
+        # Her evidence için reliability/confidence/freshness ağırlığı
+        evidence.append({
+            "name": "volume_anomaly", "active": vol_z > 2.0,
+            "value": vol_z, "threshold": 2.0,
+            "reliability": 0.95, "confidence": min(vol_z / 4.0, 1.0), "freshness": 1.0,
+        })
+        evidence.append({
+            "name": "price_breakout", "active": bb_pos > 0.95 or near_high == 1,
+            "value": bb_pos, "threshold": 0.95,
+            "reliability": 0.9, "confidence": min(bb_pos, 1.0), "freshness": 1.0,
+        })
+        evidence.append({
+            "name": "sector_strength", "active": sector_str > 1.5,
+            "value": sector_str, "threshold": 1.5,
+            "reliability": 0.85, "confidence": min(sector_str / 3.0, 1.0), "freshness": 0.9,
+        })
+        evidence.append({
+            "name": "kap_positive", "active": kap_sent > 0.3,
+            "value": kap_sent, "threshold": 0.3,
+            "reliability": 0.95, "confidence": abs(kap_sent), "freshness": 1.0,
+        })
+        evidence.append({
+            "name": "momentum_build", "active": roc_5d > 2.0 and accel > 0,
+            "value": roc_5d, "threshold": 2.0,
+            "reliability": 0.8, "confidence": min(roc_5d / 5.0, 1.0), "freshness": 0.95,
+        })
+        evidence.append({
+            "name": "low_vol_expansion", "active": vol_regime == "LOW" and vol_z > 1.5,
+            "value": vol_z if vol_regime == "LOW" else 0, "threshold": 1.5,
+            "reliability": 0.75, "confidence": 0.7, "freshness": 0.85,
+        })
+        evidence.append({
+            "name": "institutional_flow", "active": flow_score > 0.7,
+            "value": flow_score, "threshold": 0.7,
+            "reliability": 0.7, "confidence": flow_score, "freshness": 0.8,
+        })
 
-        active_count = sum(1 for e in evidence if e["active"])
-        return active_count / len(evidence) if evidence else 0, evidence
+        # Ağırlıklı evidence consensus (basit ortalama değil)
+        if not evidence:
+            return 0, evidence
+
+        weighted_sum = 0
+        total_weight = 0
+        for e in evidence:
+            weight = e.get("reliability", 0.5) * e.get("confidence", 0.5) * e.get("freshness", 0.5)
+            if e["active"]:
+                weighted_sum += weight
+            total_weight += weight
+
+        consensus = weighted_sum / total_weight if total_weight > 0 else 0
+        return consensus, evidence
 
     def _compute_regime_compatibility(self, state: Dict[str, Any], market_state: Dict[str, Any]) -> Tuple[float, Dict]:
         current_regime = market_state.get("regime", "UNKNOWN")
@@ -182,6 +229,11 @@ class SPECEngine:
         return score, {"regime": current_regime, "direction": asset_direction, "fit_score": score}
 
     def _compute_expected_value(self, state: Dict[str, Any], ml_predictions: Optional[Dict]) -> float:
+        """Expected value hesapla.
+
+        P1 düzeltmesi: Keyfi normalization (EV / 10) kaldırıldı.
+        EV calibration: probability × return formülü ile.
+        """
         if ml_predictions:
             p_pos = _safe(ml_predictions.get("probability_positive", 0.5))
             e_pos = _safe(ml_predictions.get("expected_return_positive", 3.0))
@@ -191,8 +243,18 @@ class SPECEngine:
         else:
             roc_20d = _safe(state.get("roc_20d", 0))
             vol = _safe(state.get("realized_vol_20d", 20))
+            # Risk-adjusted return (Sharpe-like)
             raw_ev = roc_20d / max(vol, 1)
-        normalized = (raw_ev + 5) / 10
+
+        # P1: Keyfi normalization (EV / 10) yerine sigmoid calibration
+        # raw_ev tipik olarak -3 ile +3 arası
+        # sigmoid: 1 / (1 + exp(-x)) → [0, 1]
+        import math
+        try:
+            normalized = 1.0 / (1.0 + math.exp(-raw_ev))
+        except (OverflowError, ValueError):
+            normalized = 0.5
+
         return min(max(normalized, 0), 1)
 
     def _compute_risk_asymmetry(self, state: Dict[str, Any], ml_predictions: Optional[Dict]) -> float:

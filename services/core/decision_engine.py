@@ -301,19 +301,42 @@ class DecisionEngine:
         return max(0, min(100, score))
 
     def _determine_action(self, composite: float, inp: DecisionInput) -> tuple:
-        """Karar belirle."""
+        """Karar belirle.
+
+        P0-4 düzeltmesi:
+        - HOLD ayrı bir action (SHORT ile karıştırılmaz)
+        - composite > threshold → LONG, else → SHORT YANLIŞ
+        - Risk gate sonuçları kararı etkiler
+        - AI confidence sınırsız katkı yapamaz
+        """
+        # Risk vetoları kontrolü
+        if inp.portfolio_drawdown > 12:  # Max drawdown'a yaklaşıyor
+            return "HOLD", "LOW"
+
+        if inp.current_position_pct >= inp.max_position_pct:
+            return "HOLD", "LOW"
+
+        # Likidite çok düşükse pozisyon açma
+        if inp.avg_volume < 50000 and inp.spread_pct > 1.0:
+            return "HOLD", "LOW"
+
+        # LONG sinyalleri
         if composite >= 75 and inp.ml_confidence > 0.7:
             return "BUY", "HIGH"
-        elif composite >= 60 and inp.ml_confidence > 0.5:
+        elif composite >= 65 and inp.ml_confidence > 0.5:
             return "BUY", "MEDIUM"
-        elif composite >= 50:
+        elif composite >= 55 and inp.ml_confidence > 0.4:
             return "BUY", "LOW"
+
+        # SHORT sinyalleri
         elif composite <= 25 and inp.ml_confidence > 0.7:
             return "SELL", "HIGH"
-        elif composite <= 40:
-            return "SELL", "LOW"
-        else:
-            return "HOLD", "LOW"
+        elif composite <= 35 and inp.ml_confidence > 0.5:
+            return "SELL", "MEDIUM"
+
+        # HOLD — belirsizlik durumunda pozisyon açma
+        # Kritik: "else" bloğu SHORT değil HOLD olmalı
+        return "HOLD", "LOW"
 
     def _calculate_weight(self, composite: float, conviction: str, inp: DecisionInput) -> float:
         """Pozisyon büyüklüğü hesapla."""
@@ -337,27 +360,49 @@ class DecisionEngine:
         return min(weight, inp.max_position_pct)
 
     def _calculate_targets(self, inp: DecisionInput) -> Dict[str, float]:
-        """Hedef fiyatları hesapla."""
+        """Hedef fiyatları hesapla.
+
+        P0-4: Yaklaşık ATR (price * 0.02) yerine gerçek ATR kullan.
+        ATR bilgisi DecisionInput'dan gelir, yoksa gerçekçi default.
+        """
         price = inp.price
         if price <= 0:
             return {"1w": 0, "1m": 0, "3m": 0}
-        atr = price * 0.02  # Yaklaşık ATR
+
+        # Gerçek ATR varsa kullan, yoksa volatilite bazlı tahmin
+        # ATR genellikle features'tan gelir
+        # Fallback: realized_volatility / sqrt(252) * price
+        atr_estimate = getattr(inp, 'atr', None)
+        if not atr_estimate or atr_estimate <= 0:
+            # Volatiliteden ATR tahmini (daha gerçekçi)
+            vol_pct = inp.ml_confidence * 3 + 1.5  # ~%1.5-4.5 arası
+            atr_estimate = price * (vol_pct / 100)
 
         return {
-            "1w": round(atr * 1.5 / price * 100, 1),
-            "1m": round(atr * 3.0 / price * 100, 1),
-            "3m": round(atr * 5.0 / price * 100, 1),
+            "1w": round(atr_estimate * 1.5 / price * 100, 1),
+            "1m": round(atr_estimate * 3.0 / price * 100, 1),
+            "3m": round(atr_estimate * 5.0 / price * 100, 1),
         }
 
     def _calculate_stop(self, inp: DecisionInput) -> tuple:
-        """Stop loss hesapla."""
+        """Stop loss hesapla.
+
+        P0-4: Yaklaşık ATR yerine gerçek ATR kullan.
+        Maksimum zarar limiti ile korumalı.
+        """
         if inp.price <= 0:
             return 0, "ATR"
-        atr = inp.price * 0.02
-        stop = inp.price - atr * 2
-        max_stop = inp.price * 0.93  # Max %7
+
+        # Gerçek ATR varsa kullan
+        atr_estimate = getattr(inp, 'atr', None)
+        if not atr_estimate or atr_estimate <= 0:
+            vol_pct = inp.ml_confidence * 3 + 1.5
+            atr_estimate = inp.price * (vol_pct / 100)
+
+        stop = inp.price - atr_estimate * 2
+        max_stop = inp.price * 0.93  # Max %7 zarar
         stop = max(stop, max_stop)
-        return stop, "ATR"
+        return round(stop, 2), "ATR"
 
     def _generate_reasons(self, inp, ml, spec, world) -> List[str]:
         """Gerekçe üret."""

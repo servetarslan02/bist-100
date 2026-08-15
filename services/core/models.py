@@ -1,8 +1,8 @@
 """ALPHA BIST - Data Models & Schemas"""
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List, Dict, Any
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from enum import Enum
 
 
@@ -56,6 +56,7 @@ class TimeHorizon(str, Enum):
 # =====================================================
 
 class MarketTick(BaseModel):
+    """P0-8: Invariant validation eklendi."""
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -65,6 +66,27 @@ class MarketTick(BaseModel):
     ask: Optional[float] = None
     source: str = "yfinance"
     quality: float = 1.0
+
+    @field_validator("price")
+    @classmethod
+    def _validate_price(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError(f"Price must be positive, got {v}")
+        return v
+
+    @field_validator("volume")
+    @classmethod
+    def _validate_volume(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError(f"Volume must be non-negative, got {v}")
+        return v
+
+    @field_validator("quality")
+    @classmethod
+    def _validate_quality(cls, v: float) -> float:
+        if not 0 <= v <= 1:
+            raise ValueError(f"Quality must be in [0,1], got {v}")
+        return v
 
 
 class OHLCV(BaseModel):
@@ -95,7 +117,11 @@ class OrderBookSnapshot(BaseModel):
 # =====================================================
 
 class AssetState(BaseModel):
-    """Complete state of a single asset."""
+    """Complete state of a single asset.
+
+    P0-8: Invariant validation eklendi.
+    Missing != 0 != NaN != Invalid ayrımı korunmalı.
+    """
     instrument_id: int
     ticker: str
     timestamp: datetime
@@ -194,7 +220,11 @@ class MarketState(BaseModel):
 
 
 class WorldState(BaseModel):
-    """Global macro state."""
+    """Global macro state.
+
+    P0-8: VIX ayrı normalize edilmeli (0-1 state'lerle karışmamalı).
+    0-1 arası state'ler invariant validation ile korunmalı.
+    """
     timestamp: datetime
     geopolitical_risk: float = 0.0
     global_risk_appetite: float = 0.5
@@ -203,9 +233,22 @@ class WorldState(BaseModel):
     commodity_pressure: float = 0.5
     oil_pressure: float = 0.5
     turkey_macro_risk: float = 0.5
-    vix_level: float = 20.0
+    vix_level: float = 20.0  # RAW VIX (0-100+), 0-1 ile karıştırılmamalı
+    vix_normalized: float = 0.5  # 0-1 arası normalize VIX
     news_shock: float = 0.0
     emerging_market_risk: float = 0.5
+
+    @field_validator(
+        "geopolitical_risk", "global_risk_appetite", "usd_strength",
+        "us_rate_pressure", "commodity_pressure", "oil_pressure",
+        "turkey_macro_risk", "vix_normalized", "emerging_market_risk",
+    )
+    @classmethod
+    def _validate_01_range(cls, v: float, info) -> float:
+        if not 0 <= v <= 1:
+            # Clamp to [0,1] instead of raising (for robustness)
+            return max(0.0, min(1.0, v))
+        return v
 
 
 # =====================================================
@@ -226,7 +269,12 @@ class EdgeDecomposition(BaseModel):
 
 
 class Signal(BaseModel):
-    """Trading signal."""
+    """Trading signal.
+
+    P0-8: Invariant validation eklendi.
+    - score, confidence ∈ [0,1] aralığında olmalı
+    - Timestamp timezone-aware
+    """
     id: Optional[int] = None
     instrument_id: int
     ticker: str
@@ -243,8 +291,22 @@ class Signal(BaseModel):
     model_version: str = ""
     strategy_id: int = 0
     status: SignalStatus = SignalStatus.ACTIVE
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     expires_at: Optional[datetime] = None
+
+    @field_validator("confidence")
+    @classmethod
+    def _validate_confidence(cls, v: float) -> float:
+        if not 0 <= v <= 1:
+            raise ValueError(f"Confidence must be in [0,1], got {v}")
+        return v
+
+    @field_validator("score")
+    @classmethod
+    def _validate_score(cls, v: float) -> float:
+        if not 0 <= v <= 100:
+            raise ValueError(f"Score must be in [0,100], got {v}")
+        return v
 
 
 # =====================================================

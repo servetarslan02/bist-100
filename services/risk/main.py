@@ -29,6 +29,7 @@ class RiskEngine:
         self._running = False
         self._consumer: EventConsumer = None
         self._risk_limits: Dict[str, float] = {}
+        self._risk_limits_loaded: bool = False  # P0-6: Fail-closed flag
         self._portfolio_state: Dict[str, Any] = {}
 
     async def start(self):
@@ -63,12 +64,23 @@ class RiskEngine:
         logger.info("Risk Engine stopped")
 
     async def _load_risk_limits(self):
-        """Load risk limits from database."""
+        """Load risk limits from database.
+
+        P0-6: Risk configuration okunamıyorsa FAIL-CLOSED.
+        Sistem risk limitlerini okuyamıyorsa işlem yapmamalı.
+        """
         try:
             rows = await pg_fetch("""
                 SELECT config_key, config_value FROM system_config
                 WHERE config_key LIKE 'risk.%'
             """)
+            if not rows:
+                # Risk limitleri yoksa → FAIL CLOSED
+                logger.critical("NO RISK LIMITS FOUND IN DATABASE — FAIL CLOSED")
+                self._risk_limits = {}
+                self._risk_limits_loaded = False
+                return
+
             for row in rows:
                 key = row["config_key"].replace("risk.", "")
                 value = row["config_value"]
@@ -79,27 +91,47 @@ class RiskEngine:
                         pass
                 self._risk_limits[key] = float(value) if value else 0
 
+            self._risk_limits_loaded = True
             logger.info("Risk limits loaded", limits=self._risk_limits)
 
         except Exception as e:
-            logger.warning("Failed to load risk limits, using defaults", error=str(e))
-            self._risk_limits = {
-                "max_position_pct": 10.0,
-                "max_sector_pct": 30.0,
-                "max_drawdown_pct": 15.0,
-                "daily_loss_limit_pct": 5.0,
-                "max_correlation": 0.8,
-            }
+            # P0-6: FAIL CLOSED — risk limits yüklenemezse sistem durmalı
+            logger.critical(f"RISK LIMITS LOAD FAILED — FAIL CLOSED: {e}")
+            self._risk_limits = {}
+            self._risk_limits_loaded = False
 
     async def _on_decision(self, event: CanonicalEvent):
-        """Evaluate a trading decision against risk limits."""
+        """Evaluate a trading decision against risk limits.
+
+        P0-6: Risk limits yüklenemezse tüm işlemler BLOCKED.
+        Risk engine fail-open DEĞİL, fail-closed çalışır.
+        """
         try:
             ticker = event.data.get("ticker")
-            action = event.data.get("action")  # BUY/SELL
+            action = event.data.get("action")
             amount = event.data.get("amount", 0)
             portfolio_id = event.data.get("portfolio_id")
 
             if not ticker or not portfolio_id:
+                logger.warning("Decision event missing ticker or portfolio_id",
+                             ticker=ticker, portfolio_id=portfolio_id)
+                return
+
+            # P0-6: FAIL CLOSED — risk limits yüklenmemişse tüm işlemler BLOCKED
+            if not self._risk_limits_loaded:
+                logger.critical("Risk limits not loaded — BLOCKING ALL TRADES",
+                              ticker=ticker, action=action)
+                alert_event = CanonicalEvent(
+                    event_type=EventType.RISK_ALERT,
+                    source="risk-engine",
+                    data={
+                        "ticker": ticker,
+                        "action": action,
+                        "reason": "RISK ENGINE FAIL-CLOSED: limits not loaded",
+                        "approved": False,
+                    },
+                )
+                publish_event(alert_event, key=ticker)
                 return
 
             logger.info("Evaluating decision", ticker=ticker, action=action, amount=amount)
@@ -136,7 +168,6 @@ class RiskEngine:
             }
 
             if not result["approved"]:
-                # Publish risk alert
                 alert_event = CanonicalEvent(
                     event_type=EventType.RISK_ALERT,
                     source="risk-engine",
@@ -150,11 +181,21 @@ class RiskEngine:
                 publish_event(alert_event, key=ticker)
                 logger.warning("Decision BLOCKED by risk", ticker=ticker, checks=blocking_checks)
 
-            # Store result
             await redis_set(f"risk_check:{ticker}", json.dumps(result), ex=300)
 
         except Exception as e:
-            logger.error("Risk evaluation error", error=str(e))
+            # P0-6: Exception durumunda da BLOCK
+            logger.critical(f"Risk evaluation ERROR — BLOCKING: {e}")
+            alert_event = CanonicalEvent(
+                event_type=EventType.RISK_ALERT,
+                source="risk-engine",
+                data={
+                    "ticker": event.data.get("ticker", "UNKNOWN"),
+                    "reason": f"Risk engine exception: {e}",
+                    "approved": False,
+                },
+            )
+            publish_event(alert_event, key=event.data.get("ticker", "unknown"))
 
     async def _on_signal(self, event: CanonicalEvent):
         """Evaluate signal risk."""
@@ -180,16 +221,25 @@ class RiskEngine:
             logger.error("Signal risk check error", error=str(e))
 
     async def _check_position_limit(self, ticker: str, amount: float, portfolio_id: int) -> Dict[str, Any]:
-        """Check if position size exceeds limit."""
+        """Check if position size exceeds limit.
+
+        P0-6: Risk limits yüklenemezse BLOCK.
+        Unknown data = BLOCK (WARN değil).
+        """
+        if not self._risk_limits_loaded:
+            return {"name": "position_limit", "passed": False, "severity": "BLOCK",
+                    "details": "Risk limits not loaded — FAIL CLOSED"}
+
         limit = self._risk_limits.get("max_position_pct", 10.0)
 
-        # Get portfolio value
         portfolio = await pg_fetchrow("""
             SELECT current_capital FROM portfolios WHERE id = $1
         """, portfolio_id)
 
         if not portfolio:
-            return {"name": "position_limit", "passed": True, "severity": "WARN"}
+            # P0-6: Unknown data → BLOCK, not WARN
+            return {"name": "position_limit", "passed": False, "severity": "BLOCK",
+                    "details": "Portfolio not found — BLOCKED"}
 
         portfolio_value = float(portfolio["current_capital"])
         position_pct = (amount / portfolio_value * 100) if portfolio_value > 0 else 0
@@ -204,10 +254,16 @@ class RiskEngine:
         }
 
     async def _check_sector_concentration(self, ticker: str, portfolio_id: int) -> Dict[str, Any]:
-        """Check sector concentration limit."""
+        """Check sector concentration limit.
+
+        P0-6: Unknown sector → BLOCK (WARN değil).
+        """
+        if not self._risk_limits_loaded:
+            return {"name": "sector_concentration", "passed": False, "severity": "BLOCK",
+                    "details": "Risk limits not loaded — FAIL CLOSED"}
+
         limit = self._risk_limits.get("max_sector_pct", 30.0)
 
-        # Get sector for ticker
         sector = await pg_fetchval("""
             SELECT s.code FROM instruments i
             JOIN companies c ON i.company_id = c.id
@@ -216,7 +272,9 @@ class RiskEngine:
         """, ticker)
 
         if not sector:
-            return {"name": "sector_concentration", "passed": True, "severity": "WARN"}
+            # P0-6: Unknown sector → BLOCK
+            return {"name": "sector_concentration", "passed": False, "severity": "BLOCK",
+                    "details": f"Unknown sector for {ticker} — BLOCKED"}
 
         # Get sector exposure
         sector_exposure = await pg_fetchval("""
@@ -247,6 +305,10 @@ class RiskEngine:
 
     async def _check_daily_loss(self, portfolio_id: int) -> Dict[str, Any]:
         """Check daily loss limit."""
+        if not self._risk_limits_loaded:
+            return {"name": "daily_loss", "passed": False, "severity": "BLOCK",
+                    "details": "Risk limits not loaded — FAIL CLOSED"}
+
         limit = self._risk_limits.get("daily_loss_limit_pct", 5.0)
 
         # Get today's P&L
@@ -276,7 +338,15 @@ class RiskEngine:
         }
 
     async def _check_drawdown(self, portfolio_id: int) -> Dict[str, Any]:
-        """Check maximum drawdown limit."""
+        """Check maximum drawdown limit.
+
+        P0-6: Drawdown = peak equity → current equity (initial capital DEĞİL).
+        Portfolio bulunamazsa BLOCK.
+        """
+        if not self._risk_limits_loaded:
+            return {"name": "drawdown", "passed": False, "severity": "BLOCK",
+                    "details": "Risk limits not loaded — FAIL CLOSED"}
+
         limit = self._risk_limits.get("max_drawdown_pct", 15.0)
 
         portfolio = await pg_fetchrow("""
@@ -284,7 +354,9 @@ class RiskEngine:
         """, portfolio_id)
 
         if not portfolio:
-            return {"name": "drawdown", "passed": True, "severity": "WARN"}
+            # P0-6: Unknown → BLOCK
+            return {"name": "drawdown", "passed": False, "severity": "BLOCK",
+                    "details": "Portfolio not found — BLOCKED"}
 
         initial = float(portfolio["initial_capital"])
         current = float(portfolio["current_capital"])

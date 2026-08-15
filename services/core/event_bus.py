@@ -195,13 +195,18 @@ def get_producer():
 
 
 def publish_event(event: CanonicalEvent, key: Optional[str] = None):
-    """Publish to Kafka (if available) + Redis Pub/Sub (always).
-    v1.1: Schema validation — yanlış payload publish edilemez.
+    """Publish to Kafka (if available) + Redis Pub/Sub (always) + Event Ledger.
+
+    v2.0 düzeltmeleri:
+    - Schema validation — yanlış payload publish edilemez
+    - Event ledger (Redis Stream) — subscriber kapalıyken event kaybolmamalı
+    - Idempotency — aynı event_id tekrar publish edilmemeli
     """
     # Schema validation
     missing = event.validate_payload()
     if missing:
-        logger.warning("Event payload validation failed", event_type=event.event_type, missing=missing)
+        logger.warning("Event payload validation failed",
+                      event_type=event.event_type, missing=missing)
         return
 
     # Kafka
@@ -217,11 +222,62 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
         except Exception:
             pass
 
-    # Redis Pub/Sub (push-based, her zaman çalışır)
+    # Redis Pub/Sub (push-based) + Stream (durable ledger)
     try:
-        asyncio.create_task(event_bus.publish(event.event_type, event))
-    except:
+        asyncio.create_task(_publish_with_idempotency(event))
+    except Exception:
         pass
+
+
+async def _publish_with_idempotency(event: CanonicalEvent):
+    """Idempotent publish to Redis Pub/Sub + Stream."""
+    # Idempotency check
+    is_new = await _check_and_mark_published(event.event_id)
+    if not is_new:
+        logger.debug("Duplicate event skipped", event_id=event.event_id)
+        return
+
+    # Pub/Sub (push-based, anlık)
+    await event_bus.publish(event.event_type, event)
+
+    # Stream (durable ledger)
+    await _publish_to_stream(event)
+
+
+async def _check_and_mark_published(event_id: str) -> bool:
+    """Idempotency check — aynı event_id tekrar publish edilmesin.
+    Returns True if this is a new event, False if duplicate.
+    """
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        key = f"event_published:{event_id}"
+        result = await r.set(key, "1", ex=3600, nx=True)  # 1 saat TTL
+        await r.close()
+        return result is not None  # None = already exists = duplicate
+    except Exception:
+        return True  # Redis yoksa publish et (fail-open for publishing)
+
+
+async def _publish_to_stream(event: CanonicalEvent):
+    """Redis Streams'a event yaz (durable ledger).
+
+    Subscriber kapalıyken event kaybolmamalı.
+    Consumer'lar XREADGROUP ile okuyabilir.
+    """
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        stream_key = f"alpha:events:{event.event_type}"
+        await r.xadd(stream_key, {
+            "event_id": event.event_id,
+            "event_type": event.event_type,
+            "data": event.to_json(),
+            "timestamp": event.timestamp.isoformat(),
+        }, maxlen=10000)  # Son 10K event tut
+        await r.close()
+    except Exception as e:
+        logger.debug("Stream publish failed", error=str(e))
 
 
 def flush_producer():
