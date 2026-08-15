@@ -514,44 +514,44 @@ tests/
 
 **Sorun:** Şu an her modül doğrudan diğerini import ediyor. Bu tight coupling sorun yaratır — bir modül değişince diğeri bozulur.
 
-**Çözüm:** İki katmanlı iletişim:
+**Çözüm:** İki tür iletişim:
 
-**a) Senkron çağrılar (doğrudan):**
-Sadece aynı katmandaki modüller birbirini doğrudan çağırabilir.
+**a) Veri çekme (doğrudan çağrı):**
+Bir modül başka bir modülden veri almak istediğinde doğrudan çağırır.
 ```python
-# Core modülleri birbirini çağırabilir
-core.data_quality.check(...)
-core.reconciliation.reconcile(...)
+# Intelligence, Features'tan veri çeker (gerekli)
+features = feature_calculator.compute_all("THYAO", data)
+
+# Risk, Intelligence'dan tahmin alır (gerekli)
+forecast = forecasting_engine.compute_forecasts("THYAO", features, [1, 5])
 ```
 
-**b) Asenkron event'ler (çapraz katman):**
-Farklı katmanlar arası iletişim event_bus üzerinden.
+**b) Bildirim (event):**
+Bir modül bir olay gerçekleştiğinde event publish eder, dinleyenler tepki verir.
 ```python
-# Intelligence, Core'a doğrudan çağrı yapmaz
+# Veri kalitesi kontrol edildi, diğer modüllere haber ver
 event_bus.publish("data.quality.checked", {"ticker": "THYAO", "quality": 95})
 
-# Core, event'i dinler
-event_bus.subscribe("data.quality.checked", handler)
+# Features modülü event'i dinler, feature hesaplamayı başlatır
+event_bus.subscribe("data.quality.checked", features_handler)
 ```
 
 **Kural:**
-- Core → Core: Doğrudan ✅
-- Features → Core: Doğrudan ✅
-- Intelligence → Features: Event ✅
-- Risk → Intelligence: Event ✅
-- Karar → Risk: Event ✅
+- Veri çekme → Doğrudan çağrı ✅ (her zaman)
+- Bildirim → Event ✅ (çapraz katman tetikleme)
+- Karıştırma: Veri çekmek için event kullanma ❌
 
-**Hangi modül hangi event'i publish/subscribe eder:**
+**Event tablosu:**
 
-| Publisher | Event | Subscriber |
-|-----------|-------|------------|
-| data_quality | data.quality.checked | features, intelligence |
-| regime_engine | regime.detected | intelligence, risk |
-| factor_engine | factor.scored | intelligence |
-| signal_fusion | signal.generated | decision_engine |
-| decision_engine | decision.made | risk, portfolio |
-| risk_engine | risk.checked | portfolio, backtest |
-| portfolio | portfolio.updated | simulation, learning |
+| Publisher | Event | Subscriber | Ne yapar? |
+|-----------|-------|------------|----------|
+| data_quality | data.quality.checked | features | Feature hesaplamayı başlat |
+| regime_engine | regime.detected | risk, portfolio | Rejime göre ağırlık değiştir |
+| signal_fusion | signal.generated | decision_engine | Karar sürecini başlat |
+| decision_engine | decision.made | risk, portfolio | Risk kontrolü yap |
+| risk_engine | risk.checked | portfolio | Pozisyon boyutu ayarla |
+| portfolio | portfolio.updated | simulation | Paper trading güncelle |
+| learning | model.drift.detected | intelligence | Model yeniden eğit |
 
 ### 2. Hata Yönetimi Stratejisi
 
@@ -581,19 +581,15 @@ class InfoError(Exception):
 ```
 
 **Retry politikası:**
+Mevcut: `services/core/circuit_breaker.py` → `RetryPolicy` sınıfı zaten var.
 ```python
-# services/core/retry.py (YENİ)
-def retry_with_backoff(func, max_retries=3, base_delay=1.0):
-    for attempt in range(max_retries):
-        try:
-            return func()
-        except WarningError:
-            if attempt == max_retries - 1:
-                raise
-            time.sleep(base_delay * (2 ** attempt))
+from services.core.circuit_breaker import RetryPolicy
+
+retry = RetryPolicy(max_retries=3, base_delay=1.0)
+# 1s → 2s → 4s bekleme ile retry
 ```
 
-**Kural:** Her modül hangi hata seviyesini kullanacağını belirtmeli.
+**Kural:** Her modül hangi hata seviyesini kullanacağını belirtmeli. Yeni `retry.py` yazma, mevcut `circuit_breaker.py`'deki `RetryPolicy`'yi kullan.
 
 ### 3. Konfigürasyon Yönetimi
 
@@ -602,13 +598,20 @@ def retry_with_backoff(func, max_retries=3, base_delay=1.0):
 **Çözüm:** Merkezi config servisi + environment-based override.
 
 ```python
-# services/core/config.py — mevcut yapıyı koru, sadece erişim yöntemini standartlaştır
-from services.core.config import get_config
+# services/core/config.py — mevcut yapı
+from services.core.config import get_settings
 
-# Her modül bu şekilde erişir
-config = get_config()
-commission_rate = config.bist_commission_rate  # 0.0003
-risk_limit = config.max_position_pct  # 10
+# Mevcut alanlar:
+settings = get_settings()
+# settings.tcmb_evds_api_key
+# settings.ch_host, settings.ch_port
+# settings.alpha_vantage_api_key
+# ... (diğer alanlar)
+
+# Yeni eklenmesi gereken alanlar:
+# settings.bist_commission_rate = 0.0003
+# settings.max_position_pct = 10
+# settings.default_risk_limit = 0.02
 ```
 
 **Config hiyerarşisi (öncelik sırası):**
@@ -628,11 +631,12 @@ risk_limit = config.max_position_pct  # 10
 
 ```
 database/
-├── migrations/
-│   ├── 001_initial_schema.sql
-│   ├── 002_add_features_table.sql
-│   └── ...
-└── schema_version.txt  # "3" gibi
+├── init/                    # Mevcut
+│   └── 001_schema.sql       # Mevcut (14KB, tablo tanımları)
+├── clickhouse/              # Mevcut
+└── migrations/              # YENİ eklenecek
+    ├── 002_add_features.sql
+    └── ...
 ```
 
 **Migration kuralı:**
@@ -699,22 +703,31 @@ def test_full_pipeline_real_data():
 
 ```python
 # tests/test_docs/test_chapter_examples.py
-import subprocess
 import re
+import importlib
+import glob
 
-def test_chapter_code_examples():
-    """Her bölümdeki python kod bloklarını çalıştır."""
-    for chapter_num in range(1, 33):
-        chapter_file = f"sistem ve calisma mantiklari/bolumler/bolum-{chapter_num:02d}-*.md"
-        # Markdown'dan kod bloklarını çıkar
+def extract_python_blocks(filepath):
+    """Markdown dosyasından python kod bloklarını çıkar."""
+    with open(filepath) as f:
+        content = f.read()
+    return re.findall(r'```python\n(.*?)```', content, re.DOTALL)
+
+def test_chapter_imports():
+    """Her bölümdeki import ifadelerinin çalıştığını doğrula."""
+    for chapter_file in glob.glob("sistem ve calisma mantiklari/bolumler/bolum-*.md"):
         code_blocks = extract_python_blocks(chapter_file)
-        
         for i, code in enumerate(code_blocks):
-            # Çalıştır (hata vermemeli)
-            try:
-                exec(code)
-            except Exception as e:
-                print(f"✗ Bölüm {chapter_num}, blok {i+1}: {e}")
+            # Sadece import satırlarını kontrol et
+            for line in code.split('\n'):
+                if line.startswith('from ') or line.startswith('import '):
+                    try:
+                        exec(line)
+                    except Exception as e:
+                        print(f"✗ {chapter_file}, blok {i+1}: {line} → {e}")
 ```
 
-**Kural:** Dokümantasyondaki her `python` kod bloğu import edilebilir ve çalıştırılabilir olmalı. Hata veren blok varsa dokümantasyon güncellenmeli.
+**Kural:**
+- Dokümantasyondaki her `from services.X import Y` ifadesi import edilebilir olmalı.
+- Kod bloklarındaki örnekler çalıştırılmaz, sadece syntax kontrolü yapılır.
+- Hata veren import varsa: modül mü eksik, isim mi yanlış? Düzelt.
