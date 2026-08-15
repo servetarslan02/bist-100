@@ -2,74 +2,87 @@
 
 > BIST'teki 800+ hisseyi 7/24 tarayan, otonom piyasa zekâsı platformu.
 
-## 📋 Proje Durumu
+## Hızlı Başlangıç
 
-**Mimari Versiyon:** 1.0 — Kilitli  
-**Aşama:** Tasarım tamamlandı, implementasyona geçilebilir.
+```bash
+# Bağımlılıkları yükle
+pip install -r requirements.txt
 
-## 🏗️ Mimari Özet
+# Sistemi başlat (arka plan)
+./alpha start
+
+# Tek tarama yap
+python3 run_system.py --scan-once
+
+# Durum kontrolü
+./alpha status
+
+# Durdur
+./alpha stop
+```
+
+## Mimari
 
 ```
-Kaynaklar → Adapterler → Redpanda → Realtime State + ClickHouse + Parquet
-                         ↓
-              Feature Engine → ML Ensemble → Gemma 4 12B
-                         ↓
-              Regime → Strategy → Opportunity → Simulation
-                         ↓
-              Risk Gate → Decision → Paper/Execution
-                         ↓
-              Outcome → Attribution → Learning → Model Validation
+Veri (yfinance, KAP, RSS) → Feature'lar (100+) → 7 Motor → Ranking Model
+→ Karar (BUY/SELL/HOLD) → Risk Gate → Execution Simulator → Portfolio → Learning
 ```
 
-## 🛠️ Teknoloji Stack
+## Dosya Yapısı
 
-| Katman | Teknoloji |
-|--------|-----------|
-| Backend | Python + FastAPI |
-| Frontend | Next.js + TypeScript + Tailwind |
-| Event Bus | Redpanda |
-| OLTP | PostgreSQL |
-| OLAP | ClickHouse |
-| Cache | Redis |
-| Data Lake | Parquet + DuckDB |
-| ML | LightGBM + XGBoost + PyTorch |
-| LLM | Gemma 4 12B Q4_0 (Ollama) |
-| Model Registry | MLflow |
-| Monitoring | Prometheus + Grafana |
+```
+bist-100/
+├── alpha                    # Yönetim scripti (start/stop/status)
+├── start.py                 # Ana çalıştırıcı
+├── run_system.py            # Sistem runner
+├── requirements.txt         # Python bağımlılıkları
+├── apps/web/                # Dashboard (Next.js)
+├── services/                # Backend servisleri
+│   ├── core/                # Temel (config, DB, event, quality, security)
+│   ├── ingestion/           # Veri çekme (yfinance, KAP, RSS, fundamental)
+│   ├── features/            # Feature hesaplama (teknik, fundamental, macro, sentiment)
+│   ├── intelligence/        # Analiz motorları (regime, SPEC, valuation, MC, scenario)
+│   ├── scanner/             # Tarama ve sıralama
+│   ├── ml/                  # ML modelleri (LightGBM ranking)
+│   ├── risk/                # Risk yönetimi
+│   ├── portfolio/           # Portföy ve muhasebe
+│   ├── simulation/          # Execution simulator
+│   ├── backtest/            # Backtest ve walk-forward
+│   ├── learning/            # Öğrenme sistemi
+│   ├── agents/              # AI agent'lar
+│   ├── scheduler/           # Zamanlama
+│   └── api/                 # REST API + WebSocket
+├── tests/                   # Testler
+├── data/                    # Veri dosyaları
+├── ml/                      # ML model dosyaları
+├── memory/                  # Araştırma notları ve dokümanlar
+└── sistem ve calisma mantiklari/  # Sistem tanımı ve çalışma kuralları
+```
 
-## 📁 Dosyalar
+## Motorlar
 
-- `bist100.md` — Orijinal AI konuşma kaydı (269KB)
-- `ALPHA-ARCHITECTURE.md` — Nihai teknik mimarî spesifikasyon v1.0
+| # | Motor | Özellik |
+|---|-------|---------|
+| 1 | Relatif Güç | 1d/5d/20d/60d/120d vs BIST + sektör |
+| 2 | Momentum + Trend | Eğim, ivme, değişim yönü |
+| 3 | Hacim + Mikroyapı | Tick rule, VWAP, hacim-fiyat ilişkisi |
+| 4 | Fundamental | Sektörel normalize, FCF, bilanço kalitesi |
+| 5 | KAP + Haber | Yapılandırılmış extraction |
+| 6 | Katalizör | Yaklaşan olaylar |
+| 7 | Neden Düşüyor? | Market/sector/company/liquidity/panic |
 
-## 🎯 Geliştirme Aşamaları
+## Test
 
-### MVP (~4-6 hafta)
-- BIST delayed data + KAP + TCMB EVDS
-- PostgreSQL + ClickHouse + Redis + Redpanda
-- Temel feature engine + LightGBM baseline
-- Gemma 4 12B reasoning
-- Backtest + paper trading
-- Dashboard skeleton
+```bash
+python3 tests/test_phase1.py      # Data Ingestion
+python3 tests/test_phase2.py      # Feature Engine
+python3 tests/test_faz2_motors.py # 7 Motor
+python3 tests/test_faz3_ranking.py # Ranking Model
+# ... (22 test dosyası, 424+ test)
+```
 
-### V1 (~3-4 ay)
-- 800+ asset coverage
-- Tüm finansal motorlar
-- World Intelligence + Knowledge Graph
-- SPEC Engine + Regime Engine
-- Scenario Lab + Walk-forward validation
-- Learning Engine
+## Dokümantasyon
 
-### V2 (~6-12 ay)
-- Lisanslı real-time feed
-- Broker API entegrasyonu
-- Kontrollü otomatik execution
-- LLM LoRA fine-tuning
-
-## ⚠️ Yasal Uyarı
-
-Bu sistem yatırım tavsiyesi vermez. Üretilen sinyaller ve tahminler yalnızca araştırma amaçlıdır. Gerçek para ile işlem yapmadan önce kapsamlı test ve doğrulama gereklidir.
-
----
-
-*Başlangıç: 14 Ağustos 2026*
+- `memory/ROADMAP-v3.md` — Güncel yol haritası
+- `memory/WORKING_RULES.md` — Çalışma kuralları
+- `sistem ve calisma mantiklari/` — Sistem tanımı ve mimari
