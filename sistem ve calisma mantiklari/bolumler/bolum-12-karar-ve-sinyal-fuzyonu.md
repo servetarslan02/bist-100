@@ -141,6 +141,38 @@ Gerçek emir söz konusuysa ayrıca **Risk Gate** kararın önüne geçer.
 
 ---
 
+
+---
+
+**Kaynak:** Signal fusion — not simple average. Weight changes with regime. Conflict detection between signals.
+
+
+### Örnek: Signal fusion
+
+```python
+# services/intelligence/signal_fusion.py
+from services.intelligence.signal_fusion import signal_fusion_engine
+
+signals = {
+    "technical": {"direction": "LONG", "score": 70},
+    "fundamental": {"direction": "LONG", "score": 65},
+    "momentum": {"direction": "LONG", "score": 80},
+    "news": {"direction": "SHORT", "score": 30},  # Çelişki!
+    "macro": {"direction": "NEUTRAL", "score": 50},
+    "valuation": {"direction": "LONG", "score": 75},
+    "ai": {"direction": "LONG", "score": 68},
+    "opportunity": {"score": 72},
+}
+
+result = signal_fusion_engine.fuse_signals("THYAO", signals, "BULL")
+# result.fused_direction = "LONG"
+# result.fused_confidence = 0.65
+# result.has_conflict = True
+# result.conflict_details = ["technical LONG vs news SHORT"]
+# result.reasons = ["Momentum güçlü: 80", "Değerleme cazip: 75"]
+# result.risks = ["Sinyal çakışması var"]
+```
+
 ## Temel prensip
 
 Bu bölüm farklı analizleri basitçe ortalamaz; **hangi sinyalin hangi koşulda daha anlamlı olduğunu** değerlendirip, **çelişkileri ve belirsizliği** de hesaba katarak **açıklanabilir bir karar** üretir.

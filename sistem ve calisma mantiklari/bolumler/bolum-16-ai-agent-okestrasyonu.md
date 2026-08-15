@@ -98,6 +98,28 @@ Her agent sadece izin verilen araçları kullanabilir.
 
 ---
 
+
+---
+
+**Kaynak:** AI Agents — tool access control. Output validation. Hallucination detection. Fallback chain.
+
+
+### Örnek: Agent orchestrator
+
+```python
+# services/agents/agent_system.py
+from services.agents.agent_system import agent_orchestrator
+
+result = await agent_orchestrator.run_research_pipeline(
+    ticker="THYAO",
+    context={"features": features, "market_state": state},
+)
+# result["results"]["TECHNICAL"] = {direction: "LONG", confidence: 0.8}
+# result["results"]["FUNDAMENTAL"] = {direction: "LONG", confidence: 0.7}
+# result["results"]["SYNTHESIS"] = {direction: "LONG", confidence: 0.75}
+# result["overall_direction"] = "LONG"
+```
+
 ## Çıktı
 
 ```

@@ -105,6 +105,41 @@ Bu da Bölüm 8 — Gelecek Tahmini için başlangıç girdilerinden biri olur.
 
 ---
 
+
+---
+
+**Kaynak:** Multiples vs DCF comparison. Bear/Base/Bull scenarios with probability weighting. Margin of Safety concept.
+
+
+### Örnek: Multiples değerleme
+
+```python
+# services/intelligence/valuation/engine.py
+from services.intelligence.valuation.engine import valuation_engine
+
+multiples = valuation_engine.compute_multiples_valuation(
+    ticker="THYAO", current_price=305.25,
+    company_multiples={"pe": 8.5, "pb": 1.4, "ev_ebitda": 5.1},
+    sector_multiples={"pe": {"median": 11.0, "avg": 12.5}},
+)
+# multiples[0].upside_pct = +29.4% (P/E 8.5 vs sektör 11.0)
+```
+
+### Örnek: DCF
+
+```python
+dcf = valuation_engine.compute_dcf(
+    ticker="THYAO", current_price=305.25,
+    revenue_forecast=[60e9, 70e9, 80e9, 90e9, 100e9],
+    margin_forecast=[0.10, 0.11, 0.12, 0.12, 0.13],
+    shares_outstanding=1_373_278_203,
+    total_debt=5e9, total_cash=10e9,
+)
+# dcf.implied_price = 340.50
+# dcf.upside_pct = +11.6%
+# dcf.sensitivity_table = {"17.0%": {"2.0%": 320, "3.0%": 340, "4.0%": 365}}
+```
+
 ## Temel prensip
 
 Sistem sadece "hisse ucuz" demeyecek; "hangi varsayımlarla, hangi yöntemlerle, ne kadar ucuz ve bu hesabın güveni ne?" sorularını cevaplayacak.

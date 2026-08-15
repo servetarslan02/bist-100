@@ -110,6 +110,24 @@ kaydedilir.
 
 ---
 
+
+---
+
+**Kaynak:** Security — RBAC. No-trade gate. Secret redaction. System state machine.
+
+
+### Örnek: Authorization check
+
+```python
+# services/core/security.py
+from services.core.security import authz_service, Role, Permission
+
+user = User(user_id="1", username="analyst", role=Role.ANALYST)
+
+authz_service.check_permission(user, Permission.RUN_BACKTEST)  # True
+authz_service.check_permission(user, Permission.LIVE_EXECUTION)  # False
+```
+
 ## Temel prensip
 
 **AI hiçbir zaman sınırsız yetkiye sahip olmayacak.**

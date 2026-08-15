@@ -107,6 +107,41 @@ Bu sonuç Bölüm 12 — Karar ve Sinyal Füzyonu motoruna gönderilir.
 
 ---
 
+
+---
+
+**Kaynak:** Portfolio optimization — not just individual stock quality, but how it affects the whole portfolio.
+
+
+### Örnek: Concentration risk
+
+```python
+# services/risk/enhanced_risk.py
+from services.risk.enhanced_risk import concentration_risk
+
+hhi = concentration_risk.compute_hhi({"A": 0.5, "B": 0.3, "C": 0.2})
+# hhi = 0.38 (HHI)
+
+sector_conc = concentration_risk.compute_sector_concentration(
+    {"THYAO": 0.3, "ASELS": 0.2, "GARAN": 0.3, "AKBNK": 0.2},
+    {"THYAO": "AVIATION", "ASELS": "TECH", "GARAN": "BANK", "AKBNK": "BANK"},
+)
+# sector_conc = {"AVIATION": 0.3, "TECH": 0.2, "BANK": 0.5}
+```
+
+### Örnek: Rebalance
+
+```python
+from services.risk.enhanced_risk import rebalance_engine
+
+orders = rebalance_engine.compute_rebalance(
+    current_weights={"A": 0.5, "B": 0.3, "C": 0.2},
+    target_weights={"A": 0.3, "B": 0.4, "C": 0.3},
+    portfolio_value=100000,
+)
+# A: SELL 20000, B: BUY 10000, C: BUY 10000
+```
+
 ## Temel prensip
 
 Hisseyi değil, **hisse + mevcut portföyü tek bir sistem olarak** optimize eder.

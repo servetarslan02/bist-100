@@ -132,6 +132,41 @@ Improvement Candidates: 2
 
 ---
 
+
+---
+
+**Kaynak:** Learning — prediction→outcome→feedback loop. Confidence calibration. Drift detection.
+
+
+### Örnek: Prediction recording
+
+```python
+# services/learning/integrated_learning.py
+from services.learning.integrated_learning import integrated_learning
+
+# Her karar anında
+integrated_learning.record_decision(
+    ticker="THYAO",
+    decision={"direction": "LONG", "action": "BUY", "composite_score": 70},
+    features={"momentum_20d": 5, "rsi_14": 60, "price": 305.25},
+    regime="BULL",
+)
+# prediction_id = "THYAO-20260816120000"
+# feature_snapshot = {"price": 305.25, "momentum_20d": 5, ...}
+```
+
+### Örnek: Outcome recording
+
+```python
+# 5 gün sonra
+integrated_learning.record_outcome(
+    ticker="THYAO", actual_price=320.0, entry_price=305.25,
+    holding_days=5, outcome_type="auto",
+)
+# predicted: LONG, actual: LONG → DOĞRU
+# accuracy güncellendi
+```
+
 ## Temel prensip
 
 Sistem geçmiş kararlarını unutmaz; **tahmin → gerçek sonuç → hata → öğrenme → doğrulama → yeni model** döngüsüyle zaman içinde kendini **ölçülebilir şekilde** geliştirir.

@@ -147,6 +147,32 @@ süreci çalışır.
 
 ---
 
+
+---
+
+**Kaynak:** Infrastructure — event-driven architecture. Cache. Job queue. Worker system.
+
+
+### Örnek: Cache system
+
+```python
+# services/core/infrastructure.py
+from services.core.infrastructure import cache_system
+
+cache_system.set("market_state", state_data, ttl_seconds=300)
+cached = cache_system.get("market_state")  # 5 dakika içinde
+```
+
+### Örnek: Job queue
+
+```python
+from services.core.infrastructure import job_queue
+
+job_id = job_queue.enqueue("backtest", {"strategy": "momentum"}, priority="HIGH")
+job = job_queue.dequeue()  # Priority sırasına göre
+job_queue.complete(job_id, {"result": "success"})
+```
+
 ## Temel prensip
 
 Bu bölüm yatırım kararı vermez.

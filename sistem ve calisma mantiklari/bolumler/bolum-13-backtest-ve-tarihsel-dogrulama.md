@@ -123,6 +123,36 @@ Ancak yüksek geçmiş performans tek başına başarılı strateji anlamına ge
 
 ---
 
+
+---
+
+**Kaynak:** Walk-forward with purge+embargo (Du 2026). Precision@K, IC, Deflated Sharpe Ratio for overfitting detection.
+
+
+### Örnek: Walk-forward validation
+
+```python
+# services/backtest/enhanced_walk_forward.py
+from services.backtest.enhanced_walk_forward import PurgeEmbargoWalkForward
+import numpy as np
+
+engine = PurgeEmbargoWalkForward(
+    train_days=252, test_days=63, step_days=21,
+    purge_days=5, embargo_days=5,
+)
+
+# predictions: her gün için tüm hisselerin tahmin skoru
+# actuals: her gün için tüm hisselerin gerçek getirisi
+result = engine.run(predictions, actuals, tickers, dates)
+
+# result.total_folds = 8
+# result.avg_precision_at_5 = 0.72
+# result.avg_ic = 0.15
+# result.avg_sharpe = 1.62
+# result.deflated_sharpe = 1.45
+# result.stability_score = 0.82
+```
+
 ## Temel prensip
 
 Backtest'in amacı güzel bir geçmiş grafik üretmek değil, **stratejinin farklı dönemlerde ve farklı piyasa koşullarında gerçekten dayanıklı olup olmadığını kanıtlamaktır**.

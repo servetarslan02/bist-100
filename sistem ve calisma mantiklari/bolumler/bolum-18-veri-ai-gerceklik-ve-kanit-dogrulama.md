@@ -123,6 +123,28 @@ olarak işaretlenir ve kritik kararların dayanağı yapılamaz.
 
 ---
 
+
+---
+
+**Kaynak:** Evidence verification — claim extraction. Source reliability. FACT/INFERENCE/PREDICTION/OPINION classification.
+
+
+### Örnek: Claim verification
+
+```python
+# services/intelligence/evidence_engine.py
+from services.intelligence.evidence_engine import evidence_engine, Claim, SourceReliability
+
+claim = Claim(
+    claim_id="C1", text="Şirket yeni sözleşme imzaladı",
+    source="kap.org.tr", source_type=SourceReliability.PRIMARY,
+)
+result = evidence_engine.verify_claim(claim)
+# result.result = VERIFIED
+# result.evidence_score = 95
+# result.claim_type = FACT
+```
+
 ## Temel prensip
 
 **AI'nın söylediği şey doğru olduğu için değil, kanıtlanabildiği ölçüde doğru kabul edilir.**

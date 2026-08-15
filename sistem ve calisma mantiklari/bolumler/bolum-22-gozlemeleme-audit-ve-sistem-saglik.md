@@ -124,6 +124,36 @@ Kritik bir bileşen bozulduğunda sistem bunu karar motoruna da bildirecek.
 
 ---
 
+
+---
+
+**Kaynak:** Monitoring — structured logging. Distributed tracing. Prometheus metrics. Health score per component.
+
+
+### Örnek: Prometheus metrics
+
+```python
+# services/core/observability.py
+from services.core.observability import prometheus_metrics
+
+prometheus_metrics.inc("decisions_total", labels={"action": "BUY"})
+prometheus_metrics.observe("api_latency_ms", 150)
+prometheus_metrics.set_gauge("portfolio_equity", 112450)
+```
+
+### Örnek: Health check
+
+```python
+from services.core.observability import health_checker
+
+health_checker.register("database")
+health_checker.update_status("database", "HEALTHY")
+
+result = health_checker.check_all()
+# result["overall"] = "HEALTHY"
+# result["components"]["database"]["status"] = "HEALTHY"
+```
+
 ## Temel prensip
 
 Monitoring sadece "sunucu ayakta mı?" diye bakmayacak.

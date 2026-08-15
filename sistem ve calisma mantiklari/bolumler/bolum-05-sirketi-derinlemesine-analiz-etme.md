@@ -77,6 +77,42 @@ Discovery skorunu oluşturan fundamental faktörlerin gerçek derinlik analizini
 
 ---
 
+
+---
+
+**Kaynak:** Fundamental analysis — FCF-centered approach for inflation-distorted markets (TMS29). Sector-normalized multiples. Earnings quality: net income vs cash flow comparison.
+
+
+### Örnek: Fundamental feature hesaplama
+
+```python
+# services/features/fundamental.py
+from services.features.fundamental import fundamental_feature_engine
+
+fund = {
+    "price": 305.25, "pe_ratio": 8.5, "pb_ratio": 1.4,
+    "roe": 0.15, "profit_margin": 0.10, "debt_to_equity": 0.45,
+    "free_cash_flow": 6800000, "revenue": 100000000, "market_cap": 100000000,
+}
+
+features = fundamental_feature_engine.compute_all_fundamental_features(fund)
+# features["raw_pe_ratio"] = 8.5
+# features["roe"] = 15.0
+# features["fcf_yield_pct"] = 6.8
+# features["balance_sheet_quality"] = 75.0
+# features["growth_quality_score"] = 85.0
+```
+
+### Örnek: Sektörel normalize
+
+```python
+# Aynı P/E farklı sektörlerde farklı anlama gelir
+# Banka P/E 8 = ucuz, Teknoloji P/E 8 = aşırı ucuz
+sector_medians = {"pe_ratio": 11.0, "pb_ratio": 1.8, "ev_ebitda": 7.0}
+features = fundamental_feature_engine.compute_all_fundamental_features(fund)
+# features["sector_norm_pe_ratio"] = 0.77 (8.5 / 11.0 = sektör medyanının altında)
+```
+
 ## Çıktı
 
 ```

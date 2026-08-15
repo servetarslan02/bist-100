@@ -98,6 +98,31 @@ Bu sonuç Bölüm 10 — Risk Motoruna aktarılır.
 
 ---
 
+
+---
+
+**Kaynak:** Monte Carlo — GBM simulation. VaR/CVaR for tail risk. Dynamic scenario count based on volatility.
+
+
+### Örnek: Monte Carlo simülasyon
+
+```python
+# services/intelligence/monte_carlo.py
+from services.intelligence.monte_carlo import monte_carlo_engine
+
+result = monte_carlo_engine.simulate_price_paths(
+    ticker="THYAO", current_price=305.25,
+    expected_return_annual=0.15, volatility_annual=0.25,
+    horizon_days=20, num_simulations=10000,
+)
+# result.p10 = 280.50 (%10 olasılıkla bu fiyatın altında)
+# result.p50 = 315.20 (medyan)
+# result.p90 = 355.80 (%10 olasılıkla bu fiyatın üstünde)
+# result.prob_positive = 0.62
+# result.var_95 = -8.2
+# result.cvar_95 = -11.5
+```
+
 ## Temel prensip
 
 Monte Carlo geleceği tahmin ettiğini iddia etmez; **mevcut varsayımlar altında mümkün geleceklerin dağılımını ve kuyruk risklerini** ölçer.

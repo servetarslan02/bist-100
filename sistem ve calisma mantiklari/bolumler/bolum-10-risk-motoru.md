@@ -99,6 +99,41 @@ Bu çıktı Bölüm 11 — Portföy Etkisi ve Optimizasyon bölümüne gider.
 
 ---
 
+
+---
+
+**Kaynak:** Du (2026) — Ledoit-Wolf covariance estimation. Oxford (2023) — Volatility targeting. Kelly criterion for position sizing.
+
+
+### Örnek: Ledoit-Wolf kovaryans
+
+```python
+# services/risk/enhanced_risk.py
+from services.risk.enhanced_risk import ledoit_wolf
+import numpy as np
+
+returns = np.random.randn(100, 5) * 0.02
+cov = ledoit_wolf.estimate(returns)
+# cov: 5x5 kovaryans matrisi (shrinkage uygulanmış)
+```
+
+### Örnek: Kelly criterion pozisyon boyutu
+
+```python
+from services.risk.enhanced_risk import position_sizer
+
+kelly = position_sizer.kelly_criterion(
+    win_rate=0.6, avg_win=2.0, avg_loss=1.0, fraction=0.5,
+)
+# kelly = 0.20 (yarım Kelly)
+
+size = position_sizer.compute_position_size(
+    capital=100000, kelly_fraction=kelly,
+    price=305.25, stop_distance=15.26, max_position_pct=10,
+)
+# size = 131 lot
+```
+
 ## Temel prensip
 
 Sistem "bu hisse iyi mi?" sorusundan önce **"bu fırsatı hangi riskle ve portföyün ne kadarını kullanarak değerlendirmeliyiz?"** sorusunu cevaplar.

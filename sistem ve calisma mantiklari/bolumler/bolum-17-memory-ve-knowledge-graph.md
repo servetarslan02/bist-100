@@ -132,6 +132,29 @@ diyebilir.
 
 ---
 
+
+---
+
+**Kaynak:** Memory — vector DB for semantic search. Knowledge Graph for entity relationships.
+
+
+### Örnek: Knowledge graph
+
+```python
+# services/intelligence/knowledge_graph.py
+from services.intelligence.knowledge_graph import knowledge_graph
+
+knowledge_graph.load_bist_defaults()
+
+# Enerji → Havacılık zinciri
+path = knowledge_graph.find_path("macro_OIL", "sector_ENERGY")
+# path = ["macro_OIL", "sector_ENERGY"]
+
+# Etki yayılımı
+impacts = knowledge_graph.propagate_impact("macro_OIL", 0.5)
+# impacts = {"sector_ENERGY": 0.5, "sector_AVIATION": -0.3, ...}
+```
+
 ## Temel prensip
 
 **Memory** geçmişi saklar, **Knowledge Graph** ilişkileri saklar, **Embedding** sistemi anlam üzerinden geçmişi bulur; **karar ise güncel analiz motorları tarafından verilir.**

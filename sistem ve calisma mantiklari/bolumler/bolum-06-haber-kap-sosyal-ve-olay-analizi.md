@@ -107,6 +107,39 @@ Bu sonuç Bölüm 7 — Değerleme ve daha sonra Tahmin/Risk motorlarına aktar�
 
 ---
 
+
+---
+
+**Kaynak:** Du (2026) — Adjusted-MSE loss for wrong-direction penalties. KAP: structured extraction (event type, financial impact, surprise, uncertainty). News: multi-source deduplication.
+
+
+### Örnek: KAP sınıflandırma
+
+```python
+# services/intelligence/kap_extractor.py
+from services.intelligence.kap_extractor import kap_extractor
+
+result = kap_extractor.extract(
+    ticker="THYAO", kap_id="K001",
+    title="Şirketimiz yeni büyük sözleşme imzaladı. Tutar: 500M TL",
+)
+# result.event_type = "CONTRACT"
+# result.financial_impact = 0.3
+# result.surprise_score = 0.6
+# result.time_horizon = "MEDIUM"
+# result.affected_sectors = ["AVIATION"]
+```
+
+### Örnek: Sektör zincirleme etki
+
+```python
+from services.intelligence.kap_extractor import sector_chain
+
+impacts = sector_chain.compute_chain_impact("ENERGY", 0.5)
+# Enerji → Havacılık: -0.60 (yakıt maliyeti)
+# Enerji → Perakende: -0.30 (lojistik)
+```
+
 ## Temel prensip
 
 Haberleri sadece "pozitif/negatif" diye etiketlemek değil, olayın şirketin gelecekteki finansal değerini ve riskini nasıl değiştirebileceğini ölçmek.
