@@ -41,6 +41,7 @@ class AlphaSystem:
         # Components (lazy init)
         self._db = None
         self._feature_store = None
+        self._learning = None
         self._opportunity_engine = None
         self._signal_fusion = None
         self._decision_engine = None
@@ -175,6 +176,7 @@ class AlphaSystem:
             universe_enhancements, cross_source_reconciliation,
             outlier_detector, survivorship_bias,
         )
+        from services.learning.integrated_learning import integrated_learning
 
         self._opportunity_engine = opportunity_engine
         self._signal_fusion = signal_fusion_engine
@@ -221,6 +223,7 @@ class AlphaSystem:
         self._outlier_detector = outlier_detector
         self._cross_source_reconciliation = cross_source_reconciliation
         self._universe_enhancements = universe_enhancements
+        self._learning = integrated_learning
 
         # System state
         self._system_state.transition("INITIALIZING", "components loaded")
@@ -455,6 +458,33 @@ class AlphaSystem:
                 decision.composite_score / 100, decision.reasons, decision.risks,
             )
 
+            # Learning: Her kararı tahmin olarak kaydet
+            self._learning.record_decision(
+                ticker=ticker,
+                decision={
+                    "action": decision.action,
+                    "direction": decision.direction,
+                    "composite_score": decision.composite_score,
+                    "conviction": decision.conviction,
+                    "confidence": fused.fused_confidence,
+                    "reasons": decision.reasons,
+                    "risks": decision.risks,
+                },
+                features=features,
+                regime=regime,
+            )
+
+            # Learning feedback: Geçmiş öğrenmeye göre ayarlama
+            adjustment = self._learning.get_decision_adjustment(ticker, regime, opp["score"])
+            if adjustment["should_adjust"]:
+                for warning in adjustment["warnings"]:
+                    logger.warning("Learning adjustment", ticker=ticker, warning=warning)
+                self._notification_system.notify(
+                    "MODEL", "Learning Adjustment",
+                    f"{ticker}: {adjustment.get('reason', 'Confidence reduced')}",
+                    severity="INFO",
+                )
+
             if decision.action == "BUY":
                 # Position sizing
                 from services.risk.position_sizing import position_sizer
@@ -575,6 +605,22 @@ class AlphaSystem:
         print(f"  Knowledge graph  : {len(self._knowledge_graph._entities)} entities")
         print(f"  Feature store    : {len(self._feature_store._store)} tickers")
         print(f"  Config           : {len(self._config.get_all())} keys")
+
+        # Learning insights
+        insights = self._learning.get_insights()
+        if insights.get('total_resolved', 0) > 0:
+            print(f"  ---")
+            print(f"  Öğrenme")
+            print(f"  Tahmin sayısı   : {insights['total_predictions']}")
+            print(f"  Çözümlenen      : {insights['total_resolved']}")
+            print(f"  Genel doğruluk  : %{insights['overall_accuracy']*100:.1f}")
+            print(f"  Son doğruluk    : %{insights['recent_accuracy']*100:.1f}")
+            print(f"  En iyi rejim    : {insights['best_regime']} (%{insights.get('best_regime_accuracy', 0)*100:.0f})")
+            print(f"  En kötü rejim   : {insights['worst_regime']} (%{insights.get('worst_regime_accuracy', 0)*100:.0f})")
+            if insights.get('error_patterns'):
+                errors = insights['error_patterns'].get('total_errors', 0)
+                print(f"  Toplam hata      : {errors}")
+
         print(f"{'=' * 70}")
 
 

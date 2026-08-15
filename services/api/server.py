@@ -63,6 +63,8 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
             self._json_response(self._get_config())
         elif path == "/api/knowledge-graph":
             self._json_response(self._get_knowledge_graph())
+        elif path == "/api/learning":
+            self._json_response(self._get_learning())
         elif path == "/api/regime":
             self._json_response(self._get_regime())
         elif path == "/":
@@ -215,6 +217,21 @@ class AlphaAPIHandler(SimpleHTTPRequestHandler):
                 stats = self.system._knowledge_graph.get_stats()
                 return stats
             return {}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_learning(self) -> dict:
+        """Öğrenme durumu."""
+        try:
+            if self.system and hasattr(self.system, '_learning'):
+                insights = self.system._learning.get_insights()
+                pending = self.system._learning.get_pending_outcomes()
+                return {
+                    "insights": insights,
+                    "pending_outcomes": len(pending),
+                    "recent_predictions": self.system._learning.get_prediction_history(10),
+                }
+            return {"error": "Learning system not available"}
         except Exception as e:
             return {"error": str(e)}
 
