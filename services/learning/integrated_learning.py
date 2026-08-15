@@ -184,7 +184,16 @@ class IntegratedLearningSystem:
     def _update_insights(self):
         """Öğrenme içgörüleri güncelle."""
         resolved = [p for p in self._predictions if p["resolved"]]
+        pending = [p for p in self._predictions if not p["resolved"]]
+
+        # Temel metrikler her zaman güncellenmeli
+        self._learning_insights["total_predictions"] = len(self._predictions)
+        self._learning_insights["total_resolved"] = len(resolved)
+        self._learning_insights["total_pending"] = len(pending)
+
         if not resolved:
+            self._learning_insights["overall_accuracy"] = 0
+            self._learning_insights["recent_accuracy"] = 0
             return
 
         # Genel doğruluk

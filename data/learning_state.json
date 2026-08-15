@@ -237,10 +237,2427 @@
       "risks": [],
       "outcome": null,
       "resolved": false
+    },
+    {
+      "prediction_id": "AFYON-20260815172105",
+      "ticker": "AFYON",
+      "timestamp": "2026-08-15T17:21:05.493299+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.004805601947095328,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 12.550000190734863,
+        "momentum_20d": -0.3000001907348633,
+        "rsi_14": 47.52530755997159,
+        "volume_zscore": -0.5236268964110986,
+        "realized_vol_20d": 25.82145939970802,
+        "bb_position": 0.4290901688553135,
+        "trend_slope_20d": -0.16325665926214003
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ADESE-20260815172105",
+      "ticker": "ADESE",
+      "timestamp": "2026-08-15T17:21:05.516005+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 61.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06772990177624146,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 0.8600000143051147,
+        "momentum_20d": -0.06000000238418579,
+        "rsi_14": 40.13306149451518,
+        "volume_zscore": -0.5417788307644668,
+        "realized_vol_20d": 26.496643680798194,
+        "bb_position": 0.36769184190651927,
+        "trend_slope_20d": -0.4686134343057754
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BRISA-20260815172105",
+      "ticker": "BRISA",
+      "timestamp": "2026-08-15T17:21:05.533306+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.0957665433621045,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 81.44999694824219,
+        "momentum_20d": -2.100006103515625,
+        "rsi_14": 51.00593775249473,
+        "volume_zscore": 2.8850227961792365,
+        "realized_vol_20d": 23.187483694836864,
+        "bb_position": 0.675252936265736,
+        "trend_slope_20d": -0.22884103129881084
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KAYSE-20260815172105",
+      "ticker": "KAYSE",
+      "timestamp": "2026-08-15T17:21:05.551374+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.13135035535667283,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3.809999942779541,
+        "momentum_20d": -0.26000022888183594,
+        "rsi_14": 29.942753748109197,
+        "volume_zscore": 1.3873168788294614,
+        "realized_vol_20d": 15.406489201140683,
+        "bb_position": 0.2661481184844836,
+        "trend_slope_20d": -0.4706650868378468
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "UMPAS-20260815172105",
+      "ticker": "UMPAS",
+      "timestamp": "2026-08-15T17:21:05.568665+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.04940227567334006,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 9.300000190734863,
+        "momentum_20d": 0.0,
+        "rsi_14": 100.0,
+        "volume_zscore": 0,
+        "realized_vol_20d": 0.0,
+        "bb_position": 0.5,
+        "trend_slope_20d": 6.72560880940643e-17
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ENKAI-20260815172105",
+      "ticker": "ENKAI",
+      "timestamp": "2026-08-15T17:21:05.586445+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1327201051248358,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 87.6500015258789,
+        "momentum_20d": -2.0499954223632812,
+        "rsi_14": 47.53451309679372,
+        "volume_zscore": 1.4533228628122359,
+        "realized_vol_20d": 21.25178697046622,
+        "bb_position": 0.5003575362627052,
+        "trend_slope_20d": -0.27377340077091167
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MNDRS-20260815172105",
+      "ticker": "MNDRS",
+      "timestamp": "2026-08-15T17:21:05.606001+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.14363565589723631,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 10.8100004196167,
+        "momentum_20d": -0.25,
+        "rsi_14": 52.75250920378459,
+        "volume_zscore": 0.0558899406220432,
+        "realized_vol_20d": 18.698995591788666,
+        "bb_position": 0.667436309442564,
+        "trend_slope_20d": -0.2723736937292272
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "OSTIM-20260815172105",
+      "ticker": "OSTIM",
+      "timestamp": "2026-08-15T17:21:05.624979+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.13916786226685798,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.6100000143051147,
+        "momentum_20d": -0.1499999761581421,
+        "rsi_14": 40.401461382935274,
+        "volume_zscore": 1.1486833115741026,
+        "realized_vol_20d": 24.055337663278607,
+        "bb_position": 0.4406990531606622,
+        "trend_slope_20d": -0.6944378799292592
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ISYAT-20260815172105",
+      "ticker": "ISYAT",
+      "timestamp": "2026-08-15T17:21:05.643019+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.7,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06170031276656241,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 7.429999828338623,
+        "momentum_20d": -0.4500002861022949,
+        "rsi_14": 31.094613656988756,
+        "volume_zscore": -0.2647144995337723,
+        "realized_vol_20d": 10.270424669209497,
+        "bb_position": 0.127930585426975,
+        "trend_slope_20d": -0.3114785807852567
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ACSEL-20260815172105",
+      "ticker": "ACSEL",
+      "timestamp": "2026-08-15T17:21:05.659249+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.7,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.10675873215834944,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 122.5999984741211,
+        "momentum_20d": -6.700004577636719,
+        "rsi_14": 39.265982982181825,
+        "volume_zscore": -0.5322658111326971,
+        "realized_vol_20d": 29.765853113674655,
+        "bb_position": 0.2779068180145115,
+        "trend_slope_20d": -0.30933776771827115
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MAALT-20260815172105",
+      "ticker": "MAALT",
+      "timestamp": "2026-08-15T17:21:05.680267+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 65.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.15730337078651696,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1043.0,
+        "momentum_20d": -44.0,
+        "rsi_14": 49.58605714901104,
+        "volume_zscore": 3.98508175213575,
+        "realized_vol_20d": 30.903852956853335,
+        "bb_position": 0.6594022246673509,
+        "trend_slope_20d": -0.4868475118765297
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ALGYO-20260815172105",
+      "ticker": "ALGYO",
+      "timestamp": "2026-08-15T17:21:05.701445+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.17386406308674432,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3.6700000762939453,
+        "momentum_20d": -0.12999987602233887,
+        "rsi_14": 51.76208698699883,
+        "volume_zscore": 2.4498566372609263,
+        "realized_vol_20d": 37.959312574773065,
+        "bb_position": 0.8885207137493967,
+        "trend_slope_20d": -0.3597549304214795
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BAGFS-20260815172105",
+      "ticker": "BAGFS",
+      "timestamp": "2026-08-15T17:21:05.719206+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1428571428571429,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 24.84000015258789,
+        "momentum_20d": -0.05999946594238281,
+        "rsi_14": 53.31724164312823,
+        "volume_zscore": 0.15982080087236775,
+        "realized_vol_20d": 22.517225018246428,
+        "bb_position": 0.7789906628258827,
+        "trend_slope_20d": -0.15679290486912306
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ZOREN-20260815172105",
+      "ticker": "ZOREN",
+      "timestamp": "2026-08-15T17:21:05.736727+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1083490948392327,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.2799999713897705,
+        "momentum_20d": -0.38000011444091797,
+        "rsi_14": 28.045331139518808,
+        "volume_zscore": -0.5871229647457713,
+        "realized_vol_20d": 18.11137896186848,
+        "bb_position": 0.25425010959971506,
+        "trend_slope_20d": -0.9804115602729606
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ULKER-20260815172105",
+      "ticker": "ULKER",
+      "timestamp": "2026-08-15T17:21:05.755108+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.10044977511244377,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 90.69999694824219,
+        "momentum_20d": -6.850006103515625,
+        "rsi_14": 45.03784324981747,
+        "volume_zscore": 1.399534765266764,
+        "realized_vol_20d": 22.327467462064472,
+        "bb_position": 0.5496300178209313,
+        "trend_slope_20d": -0.44565671035000304
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ARSAN-20260815172105",
+      "ticker": "ARSAN",
+      "timestamp": "2026-08-15T17:21:05.774092+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.14915560139229087,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3.4700000286102295,
+        "momentum_20d": -0.06999993324279785,
+        "rsi_14": 55.55390648404074,
+        "volume_zscore": 0.31872260370707,
+        "realized_vol_20d": 27.752611906097258,
+        "bb_position": 0.6752038294062113,
+        "trend_slope_20d": -0.3131025984527875
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "CEMAS-20260815172105",
+      "ticker": "CEMAS",
+      "timestamp": "2026-08-15T17:21:05.793184+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11492557328684465,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 4.079999923706055,
+        "momentum_20d": -0.11999988555908203,
+        "rsi_14": 40.0200134276435,
+        "volume_zscore": -0.6357857095701497,
+        "realized_vol_20d": 16.002346684876414,
+        "bb_position": 0.38046249443746627,
+        "trend_slope_20d": -0.15277144380167604
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KLKIM-20260815172105",
+      "ticker": "KLKIM",
+      "timestamp": "2026-08-15T17:21:05.810866+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11492557328684465,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 26.239999771118164,
+        "momentum_20d": -0.8600006103515625,
+        "rsi_14": 46.73963069527761,
+        "volume_zscore": 0.5780338668892917,
+        "realized_vol_20d": 22.580084738786194,
+        "bb_position": 0.6344470696715601,
+        "trend_slope_20d": -0.2590317978709792
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KONYA-20260815172105",
+      "ticker": "KONYA",
+      "timestamp": "2026-08-15T17:21:05.828356+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.6,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11492557328684465,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 3717.5,
+        "momentum_20d": -82.5,
+        "rsi_14": 48.00961802602944,
+        "volume_zscore": 0.021396288645778905,
+        "realized_vol_20d": 19.724960095276646,
+        "bb_position": 0.5336394775172457,
+        "trend_slope_20d": -0.19638875264826436
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKFGY-20260815172105",
+      "ticker": "AKFGY",
+      "timestamp": "2026-08-15T17:21:05.844534+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.015334690761007921,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.609999895095825,
+        "momentum_20d": -0.16000008583068848,
+        "rsi_14": 34.44942079802655,
+        "volume_zscore": 1.4841029668712025,
+        "realized_vol_20d": 15.81342730614864,
+        "bb_position": 0.03666835297768055,
+        "trend_slope_20d": -0.35836698545926055
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BYDNR-20260815172105",
+      "ticker": "BYDNR",
+      "timestamp": "2026-08-15T17:21:05.861858+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.12790697674418613,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 38.779998779296875,
+        "momentum_20d": -0.8400001525878906,
+        "rsi_14": 53.08887186994946,
+        "volume_zscore": -0.32514725961880964,
+        "realized_vol_20d": 17.69327881640744,
+        "bb_position": 0.5941881840469652,
+        "trend_slope_20d": -0.18279333843519674
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TRGYO-20260815172105",
+      "ticker": "TRGYO",
+      "timestamp": "2026-08-15T17:21:05.882666+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08688433868289988,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 93.44999694824219,
+        "momentum_20d": -5.0,
+        "rsi_14": 45.46465452366351,
+        "volume_zscore": 1.4689563533996228,
+        "realized_vol_20d": 16.805635934417758,
+        "bb_position": 0.4332583895120134,
+        "trend_slope_20d": -0.36825612950880976
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MAKTK-20260815172105",
+      "ticker": "MAKTK",
+      "timestamp": "2026-08-15T17:21:05.902475+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 66.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.13306186785761207,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 9.65999984741211,
+        "momentum_20d": -1.9200000762939453,
+        "rsi_14": 29.54680367215859,
+        "volume_zscore": -0.4500326705909984,
+        "realized_vol_20d": 29.482483250832264,
+        "bb_position": 0.3391034319637196,
+        "trend_slope_20d": -1.2897928776241636
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AYCES-20260815172105",
+      "ticker": "AYCES",
+      "timestamp": "2026-08-15T17:21:05.920563+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 65.8,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.15687276443536036,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 495.0,
+        "momentum_20d": -10.5,
+        "rsi_14": 50.957930830664566,
+        "volume_zscore": 3.92474282897625,
+        "realized_vol_20d": 37.50307927298864,
+        "bb_position": 0.7090669366180424,
+        "trend_slope_20d": -0.4918736234525701
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "CEMTS-20260815172105",
+      "ticker": "CEMTS",
+      "timestamp": "2026-08-15T17:21:05.940249+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1010623808226642,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 8.890000343322754,
+        "momentum_20d": -0.4699993133544922,
+        "rsi_14": 42.106688735226506,
+        "volume_zscore": -0.49983965890873056,
+        "realized_vol_20d": 16.768360206493444,
+        "bb_position": 0.4346986264033828,
+        "trend_slope_20d": -0.33635810425400803
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TTRAK-20260815172105",
+      "ticker": "TTRAK",
+      "timestamp": "2026-08-15T17:21:05.958822+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1010623808226642,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 414.0,
+        "momentum_20d": -23.5,
+        "rsi_14": 45.87202766192951,
+        "volume_zscore": -0.41767863166928615,
+        "realized_vol_20d": 19.8610879409098,
+        "bb_position": 0.5471800916205719,
+        "trend_slope_20d": -0.22143220369764874
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BUCIM-20260815172105",
+      "ticker": "BUCIM",
+      "timestamp": "2026-08-15T17:21:05.982399+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.09823746413444462,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 5.070000171661377,
+        "momentum_20d": -0.309999942779541,
+        "rsi_14": 42.343049892964935,
+        "volume_zscore": 1.0512604805066186,
+        "realized_vol_20d": 25.65482255085409,
+        "bb_position": 0.4140975151770273,
+        "trend_slope_20d": -0.3720839964589621
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "EKGYO-20260815172106",
+      "ticker": "EKGYO",
+      "timestamp": "2026-08-15T17:21:06.001196+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.10520607375271152,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 18.299999237060547,
+        "momentum_20d": -1.9000015258789062,
+        "rsi_14": 42.33074391059308,
+        "volume_zscore": 0.035373409362232225,
+        "realized_vol_20d": 26.390482886153265,
+        "bb_position": 0.42162389059319866,
+        "trend_slope_20d": -0.4360080667081644
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PETUN-20260815172106",
+      "ticker": "PETUN",
+      "timestamp": "2026-08-15T17:21:06.020604+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.09539473684210532,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 11.109999656677246,
+        "momentum_20d": -0.8299999237060547,
+        "rsi_14": 47.0788798470364,
+        "volume_zscore": -0.2400272313906868,
+        "realized_vol_20d": 23.755755669642983,
+        "bb_position": 0.5236578313427493,
+        "trend_slope_20d": -0.4470672475020154
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "FROTO-20260815172106",
+      "ticker": "FROTO",
+      "timestamp": "2026-08-15T17:21:06.038736+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1265219692959238,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 79.0999984741211,
+        "momentum_20d": -3.5500030517578125,
+        "rsi_14": 45.281888262767836,
+        "volume_zscore": -1.3912569589487334,
+        "realized_vol_20d": 25.65487577518486,
+        "bb_position": 0.4853525110645846,
+        "trend_slope_20d": -0.0981436779792228
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "POLHO-20260815172106",
+      "ticker": "POLHO",
+      "timestamp": "2026-08-15T17:21:06.056095+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 69.3,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 22.31999969482422,
+        "momentum_20d": 0.4200000762939453,
+        "rsi_14": 65.40671790532832,
+        "volume_zscore": 0.5441912436233869,
+        "realized_vol_20d": 21.839578883642865,
+        "bb_position": 0.8661302107440878,
+        "trend_slope_20d": 0.07330156087731163
+      },
+      "reasons": [
+        "ML pozitif: 61",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "CIMSA-20260815172106",
+      "ticker": "CIMSA",
+      "timestamp": "2026-08-15T17:21:06.076463+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.09253402997387603,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 45.63999938964844,
+        "momentum_20d": -4.220001220703125,
+        "rsi_14": 42.605697311028095,
+        "volume_zscore": -0.4440289622638724,
+        "realized_vol_20d": 24.2489940014482,
+        "bb_position": 0.36196038066159053,
+        "trend_slope_20d": -0.6859174395310603
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "INVES-20260815172106",
+      "ticker": "INVES",
+      "timestamp": "2026-08-15T17:21:06.096015+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 71.8,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 814.0,
+        "momentum_20d": 147.5,
+        "rsi_14": 77.52389411195217,
+        "volume_zscore": -0.5034480611507481,
+        "realized_vol_20d": 20.478463432726333,
+        "bb_position": 0.920009337565497,
+        "trend_slope_20d": 1.1508654929707551
+      },
+      "reasons": [
+        "ML pozitif: 82",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "GARAN-20260815172106",
+      "ticker": "GARAN",
+      "timestamp": "2026-08-15T17:21:06.116762+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.2,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 131.0,
+        "momentum_20d": 6.6999969482421875,
+        "rsi_14": 55.01143396609901,
+        "volume_zscore": 0.10606262139517772,
+        "realized_vol_20d": 26.63020526167096,
+        "bb_position": 0.8984396840234055,
+        "trend_slope_20d": 0.21305175091131884
+      },
+      "reasons": [
+        "ML pozitif: 66",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "CLEBI-20260815172106",
+      "ticker": "CLEBI",
+      "timestamp": "2026-08-15T17:21:06.135647+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.5,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08675799086758003,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1509.0,
+        "momentum_20d": -9.0,
+        "rsi_14": 51.99643899206693,
+        "volume_zscore": 0.9411776216230083,
+        "realized_vol_20d": 21.350195373209864,
+        "bb_position": 0.8167583641085877,
+        "trend_slope_20d": -0.11255773628903526
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "IHEVA-20260815172106",
+      "ticker": "IHEVA",
+      "timestamp": "2026-08-15T17:21:06.160854+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08675799086758003,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.009999990463257,
+        "momentum_20d": -0.029999971389770508,
+        "rsi_14": 49.34172364819767,
+        "volume_zscore": 0.30051417005241154,
+        "realized_vol_20d": 16.80881165930227,
+        "bb_position": 0.6415880191220703,
+        "trend_slope_20d": -0.062095473967287484
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "RAYSG-20260815172106",
+      "ticker": "RAYSG",
+      "timestamp": "2026-08-15T17:21:06.181764+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.5,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11135047798572784,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 163.0,
+        "momentum_20d": -8.100006103515625,
+        "rsi_14": 40.68004961026364,
+        "volume_zscore": -1.3522425023522073,
+        "realized_vol_20d": 21.268961222798914,
+        "bb_position": 0.40287313117588724,
+        "trend_slope_20d": -0.427003096179267
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BAYRK-20260815172106",
+      "ticker": "BAYRK",
+      "timestamp": "2026-08-15T17:21:06.200017+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.5,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.123156636110004,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 4.320000171661377,
+        "momentum_20d": -0.28999996185302734,
+        "rsi_14": 45.66328178380468,
+        "volume_zscore": -0.40557354329554174,
+        "realized_vol_20d": 28.17111027222684,
+        "bb_position": 0.4891958929695024,
+        "trend_slope_20d": -0.5729600488945972
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "EGPRO-20260815172106",
+      "ticker": "EGPRO",
+      "timestamp": "2026-08-15T17:21:06.221290+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 65.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.14363565589723631,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 35.400001525878906,
+        "momentum_20d": -1.3799972534179688,
+        "rsi_14": 50.00060367456292,
+        "volume_zscore": -1.0471900681115227,
+        "realized_vol_20d": 29.290003194984536,
+        "bb_position": 0.6767170838848887,
+        "trend_slope_20d": -0.19285479831166885
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKMGY-20260815172106",
+      "ticker": "AKMGY",
+      "timestamp": "2026-08-15T17:21:06.240334+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 73.6,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 275.0,
+        "momentum_20d": 25.378372192382812,
+        "rsi_14": 70.01590648213518,
+        "volume_zscore": 3.2827424858846075,
+        "realized_vol_20d": 36.94297631494591,
+        "bb_position": 1.2077790923012326,
+        "trend_slope_20d": 0.41352088912578033
+      },
+      "reasons": [
+        "ML pozitif: 87",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKSGY-20260815172106",
+      "ticker": "AKSGY",
+      "timestamp": "2026-08-15T17:21:06.259129+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 66.9,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 9.800000190734863,
+        "momentum_20d": 0.1400003433227539,
+        "rsi_14": 60.32466890050043,
+        "volume_zscore": 2.034780059827971,
+        "realized_vol_20d": 18.45692335663456,
+        "bb_position": 0.7961527609612506,
+        "trend_slope_20d": 0.1922666138519089
+      },
+      "reasons": [
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PARSN-20260815172106",
+      "ticker": "PARSN",
+      "timestamp": "2026-08-15T17:21:06.282428+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07834101382488486,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 70.94999694824219,
+        "momentum_20d": -10.450004577636719,
+        "rsi_14": 25.808182793745388,
+        "volume_zscore": 0.13897121351472078,
+        "realized_vol_20d": 18.015588525004585,
+        "bb_position": 0.1969792555388737,
+        "trend_slope_20d": -0.8441824044844625
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PGSUS-20260815172106",
+      "ticker": "PGSUS",
+      "timestamp": "2026-08-15T17:21:06.301876+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.09103429279713544,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 151.6999969482422,
+        "momentum_20d": -13.0,
+        "rsi_14": 36.82721153368027,
+        "volume_zscore": -0.9087788269996802,
+        "realized_vol_20d": 25.900610057366,
+        "bb_position": 0.26074230347501326,
+        "trend_slope_20d": -0.4529122556355967
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "SRVGY-20260815172106",
+      "ticker": "SRVGY",
+      "timestamp": "2026-08-15T17:21:06.320276+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.110272310595848,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.5299999713897705,
+        "momentum_20d": -0.15000009536743164,
+        "rsi_14": 45.556831144640114,
+        "volume_zscore": -0.5348264143099433,
+        "realized_vol_20d": 27.979765494159675,
+        "bb_position": 0.5479940617392657,
+        "trend_slope_20d": -0.33403661300115417
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TLMAN-20260815172106",
+      "ticker": "TLMAN",
+      "timestamp": "2026-08-15T17:21:06.338778+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08052382279186406,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 79.69999694824219,
+        "momentum_20d": -5.200004577636719,
+        "rsi_14": 35.7170490888318,
+        "volume_zscore": -0.5958444138562629,
+        "realized_vol_20d": 20.77328569585252,
+        "bb_position": 0.364712627140451,
+        "trend_slope_20d": -0.4086754242166564
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "FORMT-20260815172106",
+      "ticker": "FORMT",
+      "timestamp": "2026-08-15T17:21:06.357653+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.0756302521008404,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.6799999475479126,
+        "momentum_20d": -0.2900000810623169,
+        "rsi_14": 20.223599166732697,
+        "volume_zscore": 1.059274313650001,
+        "realized_vol_20d": 22.220864458770464,
+        "bb_position": 0.1932334080671386,
+        "trend_slope_20d": -1.0105621157103202
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PLTUR-20260815172106",
+      "ticker": "PLTUR",
+      "timestamp": "2026-08-15T17:21:06.378067+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07756813417190776,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 20.65999984741211,
+        "momentum_20d": -1.6399993896484375,
+        "rsi_14": 37.511278973519886,
+        "volume_zscore": 0.43261857269040427,
+        "realized_vol_20d": 19.16060790765834,
+        "bb_position": 0.31046611231613885,
+        "trend_slope_20d": -0.5523730840535402
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "GLYHO-20260815172106",
+      "ticker": "GLYHO",
+      "timestamp": "2026-08-15T17:21:06.396979+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08523908523908538,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 17.1299991607666,
+        "momentum_20d": -0.09000015258789062,
+        "rsi_14": 51.12771718347035,
+        "volume_zscore": -0.18643384070421012,
+        "realized_vol_20d": 27.451509953722763,
+        "bb_position": 0.5940964991524285,
+        "trend_slope_20d": 0.03871332973598985
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TSKB-20260815172106",
+      "ticker": "TSKB",
+      "timestamp": "2026-08-15T17:21:06.417865+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08205841446453416,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 11.0,
+        "momentum_20d": -0.5,
+        "rsi_14": 42.93496313498967,
+        "volume_zscore": -0.929808592361631,
+        "realized_vol_20d": 23.11727510732748,
+        "bb_position": 0.30941694799799946,
+        "trend_slope_20d": -0.16780577533797625
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "OZKGY-20260815172106",
+      "ticker": "OZKGY",
+      "timestamp": "2026-08-15T17:21:06.436929+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06937394247038921,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 12.710000038146973,
+        "momentum_20d": -0.7799997329711914,
+        "rsi_14": 43.09264779465218,
+        "volume_zscore": 0.23395605688307586,
+        "realized_vol_20d": 22.51297314001694,
+        "bb_position": 0.45410420247179345,
+        "trend_slope_20d": -0.293889693082221
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "GOLTS-20260815172106",
+      "ticker": "GOLTS",
+      "timestamp": "2026-08-15T17:21:06.456292+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06898011002962344,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 293.5,
+        "momentum_20d": -19.5,
+        "rsi_14": 39.96747508430798,
+        "volume_zscore": -0.9737893771707593,
+        "realized_vol_20d": 16.16091910494129,
+        "bb_position": 0.41902487318987225,
+        "trend_slope_20d": -0.433963955886309
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MEDTR-20260815172106",
+      "ticker": "MEDTR",
+      "timestamp": "2026-08-15T17:21:06.480171+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06898011002962344,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 25.1200008392334,
+        "momentum_20d": -1.6820869445800781,
+        "rsi_14": 34.54892353124859,
+        "volume_zscore": 0.12369124877840638,
+        "realized_vol_20d": 18.88592800950398,
+        "bb_position": 0.23858284675107153,
+        "trend_slope_20d": -0.3223547476802116
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ELITE-20260815172106",
+      "ticker": "ELITE",
+      "timestamp": "2026-08-15T17:21:06.496979+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08511228167452178,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 27.81999969482422,
+        "momentum_20d": -3.559999465942383,
+        "rsi_14": 27.598642107539334,
+        "volume_zscore": 0.6789644949533619,
+        "realized_vol_20d": 24.345527121158486,
+        "bb_position": 0.22851361926297625,
+        "trend_slope_20d": -0.9153905836474505
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKCNS-20260815172106",
+      "ticker": "AKCNS",
+      "timestamp": "2026-08-15T17:21:06.517702+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 66.0,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 241.6999969482422,
+        "momentum_20d": 2.5999908447265625,
+        "rsi_14": 57.06437202741008,
+        "volume_zscore": -0.20882337733473522,
+        "realized_vol_20d": 17.278480302106615,
+        "bb_position": 0.6650463550957239,
+        "trend_slope_20d": 0.1345730885882978
+      },
+      "reasons": [
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "GEDZA-20260815172106",
+      "ticker": "GEDZA",
+      "timestamp": "2026-08-15T17:21:06.535732+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06898011002962344,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 28.059999465942383,
+        "momentum_20d": -1.9400005340576172,
+        "rsi_14": 43.827185230854056,
+        "volume_zscore": -0.9463393700131278,
+        "realized_vol_20d": 24.32554535629075,
+        "bb_position": 0.4550989844574921,
+        "trend_slope_20d": -0.4293164704503848
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "SISE-20260815172106",
+      "ticker": "SISE",
+      "timestamp": "2026-08-15T17:21:06.556095+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06303236797274277,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 41.400001525878906,
+        "momentum_20d": -3.0999984741210938,
+        "rsi_14": 41.130825814874115,
+        "volume_zscore": 1.0454449122315954,
+        "realized_vol_20d": 18.265080750901507,
+        "bb_position": 0.2798626193456448,
+        "trend_slope_20d": -0.3552358515165034
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TUKAS-20260815172106",
+      "ticker": "TUKAS",
+      "timestamp": "2026-08-15T17:21:06.582565+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06634601782430337,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.9800000190734863,
+        "momentum_20d": -0.15000009536743164,
+        "rsi_14": 30.497384252469942,
+        "volume_zscore": 0.522515053190433,
+        "realized_vol_20d": 16.777530490418496,
+        "bb_position": 0.2763158474070842,
+        "trend_slope_20d": -0.39568611181623364
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "DOCO-20260815172106",
+      "ticker": "DOCO",
+      "timestamp": "2026-08-15T17:21:06.602847+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.3,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 11607.5,
+        "momentum_20d": 715.0107421875,
+        "rsi_14": 61.04526421713397,
+        "volume_zscore": 0.4453731441986126,
+        "realized_vol_20d": 18.43390367061004,
+        "bb_position": 0.9383999740726264,
+        "trend_slope_20d": 0.3366261364528845
+      },
+      "reasons": [
+        "ML pozitif: 75",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "UNLU-20260815172106",
+      "ticker": "UNLU",
+      "timestamp": "2026-08-15T17:21:06.622126+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08877536932210414,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 11.010000228881836,
+        "momentum_20d": -1.0,
+        "rsi_14": 37.167374493051234,
+        "volume_zscore": -1.826550198185761,
+        "realized_vol_20d": 19.725212572158377,
+        "bb_position": 0.32999489224745027,
+        "trend_slope_20d": -0.5820409311956858
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "VAKFN-20260815172106",
+      "ticker": "VAKFN",
+      "timestamp": "2026-08-15T17:21:06.652920+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08625224975771852,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.190000057220459,
+        "momentum_20d": -0.11833298206329346,
+        "rsi_14": 32.33528368503566,
+        "volume_zscore": -0.12076859433381487,
+        "realized_vol_20d": 20.214806769187078,
+        "bb_position": 0.3002888066495491,
+        "trend_slope_20d": -0.6386757930568775
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ERBOS-20260815172106",
+      "ticker": "ERBOS",
+      "timestamp": "2026-08-15T17:21:06.671656+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.049402275673340136,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 153.89999389648438,
+        "momentum_20d": -11.20001220703125,
+        "rsi_14": 39.248053351573624,
+        "volume_zscore": 1.1190031531872373,
+        "realized_vol_20d": 23.249073094868308,
+        "bb_position": 0.2922359249547374,
+        "trend_slope_20d": -0.5640807851182414
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KARSN-20260815172106",
+      "ticker": "KARSN",
+      "timestamp": "2026-08-15T17:21:06.691529+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.0756302521008404,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 10.130000114440918,
+        "momentum_20d": -0.75,
+        "rsi_14": 39.660262642182765,
+        "volume_zscore": 0.24289692914625755,
+        "realized_vol_20d": 26.2939606242217,
+        "bb_position": 0.44619373058912104,
+        "trend_slope_20d": -0.5744865809055377
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BIZIM-20260815172106",
+      "ticker": "BIZIM",
+      "timestamp": "2026-08-15T17:21:06.710701+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.2,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08333333333333341,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 24.239999771118164,
+        "momentum_20d": -0.7399997711181641,
+        "rsi_14": 44.35788972019354,
+        "volume_zscore": -1.1666024373631576,
+        "realized_vol_20d": 22.86375587007566,
+        "bb_position": 0.4406641986667552,
+        "trend_slope_20d": -0.2979603370530329
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "GSRAY-20260815172106",
+      "ticker": "GSRAY",
+      "timestamp": "2026-08-15T17:21:06.729966+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08333333333333341,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.0199999809265137,
+        "momentum_20d": 0.0,
+        "rsi_14": 55.07493391512317,
+        "volume_zscore": -1.2902351478657708,
+        "realized_vol_20d": 18.7516103024944,
+        "bb_position": 0.7454951265154923,
+        "trend_slope_20d": 0.08993062504280461
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ISSEN-20260815172106",
+      "ticker": "ISSEN",
+      "timestamp": "2026-08-15T17:21:06.750382+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08333333333333341,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 6.940000057220459,
+        "momentum_20d": -0.1700000762939453,
+        "rsi_14": 42.367104732650425,
+        "volume_zscore": 0.14546093689675607,
+        "realized_vol_20d": 21.230530182663678,
+        "bb_position": 0.40208606228386484,
+        "trend_slope_20d": -0.25503242731062475
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KLMSN-20260815172106",
+      "ticker": "KLMSN",
+      "timestamp": "2026-08-15T17:21:06.769612+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08333333333333341,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 29.280000686645508,
+        "momentum_20d": -0.6399993896484375,
+        "rsi_14": 50.76765907407994,
+        "volume_zscore": 0.8201029596591599,
+        "realized_vol_20d": 24.934102619806527,
+        "bb_position": 0.7161287948685805,
+        "trend_slope_20d": -0.2304942930276787
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "LOGO-20260815172106",
+      "ticker": "LOGO",
+      "timestamp": "2026-08-15T17:21:06.789228+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08333333333333341,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 136.5,
+        "momentum_20d": -1.3000030517578125,
+        "rsi_14": 50.10859498054717,
+        "volume_zscore": -0.3749744720410749,
+        "realized_vol_20d": 23.836076179697063,
+        "bb_position": 0.6355995923934133,
+        "trend_slope_20d": 0.005232643846696503
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "VAKKO-20260815172106",
+      "ticker": "VAKKO",
+      "timestamp": "2026-08-15T17:21:06.809750+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.7,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.1200000000000001,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 68.94999694824219,
+        "momentum_20d": -3.6500015258789062,
+        "rsi_14": 49.642296051059624,
+        "volume_zscore": -1.4277502020804096,
+        "realized_vol_20d": 27.357366033835696,
+        "bb_position": 0.6009116337787102,
+        "trend_slope_20d": -0.28477633691842985
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PENTA-20260815172106",
+      "ticker": "PENTA",
+      "timestamp": "2026-08-15T17:21:06.829287+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.8,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.05403468539486895,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 13.229999542236328,
+        "momentum_20d": -0.1400003433227539,
+        "rsi_14": 44.42619400760887,
+        "volume_zscore": -0.06366062245012157,
+        "realized_vol_20d": 22.54364963324386,
+        "bb_position": 0.4054881256819716,
+        "trend_slope_20d": 0.01642426149626133
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "NTHOL-20260815172106",
+      "ticker": "NTHOL",
+      "timestamp": "2026-08-15T17:21:06.880766+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.4,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 46.279998779296875,
+        "momentum_20d": 2.1800003051757812,
+        "rsi_14": 59.31553573242262,
+        "volume_zscore": 0.5591242242700555,
+        "realized_vol_20d": 28.54973016788922,
+        "bb_position": 0.9060495751408951,
+        "trend_slope_20d": 0.2635152847866532
+      },
+      "reasons": [
+        "ML pozitif: 68",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ZEDUR-20260815172106",
+      "ticker": "ZEDUR",
+      "timestamp": "2026-08-15T17:21:06.900086+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.08218606591572805,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 7.920000076293945,
+        "momentum_20d": -0.48999977111816406,
+        "rsi_14": 40.23712212565263,
+        "volume_zscore": -0.8435040623386647,
+        "realized_vol_20d": 25.505738017187518,
+        "bb_position": 0.4047851288562697,
+        "trend_slope_20d": -0.35078235307720584
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "DYOBY-20260815172106",
+      "ticker": "DYOBY",
+      "timestamp": "2026-08-15T17:21:06.921050+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.1,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 13.5,
+        "momentum_20d": 0.09000015258789062,
+        "rsi_14": 54.049813097484616,
+        "volume_zscore": 4.272035719875683,
+        "realized_vol_20d": 37.61227346974178,
+        "bb_position": 0.7587291941500384,
+        "trend_slope_20d": -0.3187970602555518
+      },
+      "reasons": [
+        "ML pozitif: 67",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MERKO-20260815172106",
+      "ticker": "MERKO",
+      "timestamp": "2026-08-15T17:21:06.940324+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07407407407407411,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.3899999856948853,
+        "momentum_20d": -0.10000002384185791,
+        "rsi_14": 37.509840295303455,
+        "volume_zscore": -1.5002230611100653,
+        "realized_vol_20d": 21.246163262931134,
+        "bb_position": 0.407495138618371,
+        "trend_slope_20d": -0.4008223629097917
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BFREN-20260815172106",
+      "ticker": "BFREN",
+      "timestamp": "2026-08-15T17:21:06.964615+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 67.9,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 130.60000610351562,
+        "momentum_20d": 1.3000030517578125,
+        "rsi_14": 53.39620613504123,
+        "volume_zscore": -0.41166716568095896,
+        "realized_vol_20d": 25.080724739916338,
+        "bb_position": 0.797769581936333,
+        "trend_slope_20d": 0.03742115984490831
+      },
+      "reasons": [
+        "ML pozitif: 60",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "NATEN-20260815172106",
+      "ticker": "NATEN",
+      "timestamp": "2026-08-15T17:21:06.983644+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 60.0,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07238229093464518,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 5.619999885559082,
+        "momentum_20d": -0.6800003051757812,
+        "rsi_14": 35.95709138285039,
+        "volume_zscore": 1.4232877313016026,
+        "realized_vol_20d": 26.599816690909716,
+        "bb_position": 0.29957178159896003,
+        "trend_slope_20d": -1.0071441672872035
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "NUHCM-20260815172107",
+      "ticker": "NUHCM",
+      "timestamp": "2026-08-15T17:21:07.003293+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.4,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.05172413793103453,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 218.10000610351562,
+        "momentum_20d": -3.6999969482421875,
+        "rsi_14": 45.7918843778924,
+        "volume_zscore": -0.55720891313814,
+        "realized_vol_20d": 15.185395823063594,
+        "bb_position": 0.3098176054012458,
+        "trend_slope_20d": -0.017754114222025368
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "SAHOL-20260815172107",
+      "ticker": "SAHOL",
+      "timestamp": "2026-08-15T17:21:07.022399+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 66.6,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 89.4000015258789,
+        "momentum_20d": 0.40000152587890625,
+        "rsi_14": 51.6433082855263,
+        "volume_zscore": 1.5250415941492415,
+        "realized_vol_20d": 24.027725143344732,
+        "bb_position": 0.7628663470451847,
+        "trend_slope_20d": 0.058577761548836385
+      },
+      "reasons": [
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "IHLGM-20260815172107",
+      "ticker": "IHLGM",
+      "timestamp": "2026-08-15T17:21:07.042533+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.9,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07107670654468684,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.5700000524520874,
+        "momentum_20d": -0.12999999523162842,
+        "rsi_14": 35.22983840289341,
+        "volume_zscore": -0.17649033745909085,
+        "realized_vol_20d": 20.586461033311352,
+        "bb_position": 0.31131721657357536,
+        "trend_slope_20d": -0.5909679786851894
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "MZHLD-20260815172107",
+      "ticker": "MZHLD",
+      "timestamp": "2026-08-15T17:21:07.062606+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.09115946020380067,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 5.260000228881836,
+        "momentum_20d": -0.3299999237060547,
+        "rsi_14": 36.62263740684953,
+        "volume_zscore": -1.249480782183346,
+        "realized_vol_20d": 18.20127220451534,
+        "bb_position": 0.28498183660791454,
+        "trend_slope_20d": -0.4109607557405836
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "KZBGY-20260815172107",
+      "ticker": "KZBGY",
+      "timestamp": "2026-08-15T17:21:07.081320+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.8,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.07846970120078203,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 2.0399999618530273,
+        "momentum_20d": -0.25,
+        "rsi_14": 33.590627350695385,
+        "volume_zscore": -0.39462880609715645,
+        "realized_vol_20d": 26.70682199197095,
+        "bb_position": 0.3598378733044003,
+        "trend_slope_20d": -0.6954888711895908
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "COSMO-20260815172107",
+      "ticker": "COSMO",
+      "timestamp": "2026-08-15T17:21:07.103664+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.3,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.11551862771374974,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 118.0999984741211,
+        "momentum_20d": -12.599998474121094,
+        "rsi_14": 36.54683541074566,
+        "volume_zscore": -0.5456363252227785,
+        "realized_vol_20d": 27.787254603193922,
+        "bb_position": 0.41086580963050356,
+        "trend_slope_20d": -0.6735720237009307
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "AKBNK-20260815172107",
+      "ticker": "AKBNK",
+      "timestamp": "2026-08-15T17:21:07.124670+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 66.6,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 68.80000305175781,
+        "momentum_20d": 1.9500045776367188,
+        "rsi_14": 52.82623733572972,
+        "volume_zscore": -0.5119150757902233,
+        "realized_vol_20d": 31.8206658984312,
+        "bb_position": 0.8039332358463852,
+        "trend_slope_20d": 0.16529358415623804
+      },
+      "reasons": [
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "TABGD-20260815172107",
+      "ticker": "TABGD",
+      "timestamp": "2026-08-15T17:21:07.144803+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 69.4,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 262.0,
+        "momentum_20d": 30.699996948242188,
+        "rsi_14": 64.7786819218845,
+        "volume_zscore": 0.0126526566525318,
+        "realized_vol_20d": 24.47963283634892,
+        "bb_position": 0.8433268229417776,
+        "trend_slope_20d": 0.7351345773173729
+      },
+      "reasons": [
+        "ML pozitif: 64",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "IHGZT-20260815172107",
+      "ticker": "IHGZT",
+      "timestamp": "2026-08-15T17:21:07.164196+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.8,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.06805987009319404,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.1699999570846558,
+        "momentum_20d": -0.12000000476837158,
+        "rsi_14": 35.66827941206843,
+        "volume_zscore": -0.5628480692958243,
+        "realized_vol_20d": 18.985213993335464,
+        "bb_position": 0.30028994376744933,
+        "trend_slope_20d": -0.6497012850356644
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "OYLUM-20260815172107",
+      "ticker": "OYLUM",
+      "timestamp": "2026-08-15T17:21:07.189929+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.7,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.021830004644681843,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 7.369999885559082,
+        "momentum_20d": -0.880000114440918,
+        "rsi_14": 32.82020830259168,
+        "volume_zscore": 3.990654573344861,
+        "realized_vol_20d": 29.73314936250447,
+        "bb_position": 0.15616198943599147,
+        "trend_slope_20d": -0.40389302683254724
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "CANTE-20260815172107",
+      "ticker": "CANTE",
+      "timestamp": "2026-08-15T17:21:07.213776+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.8,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.05969511326399779,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 1.190000057220459,
+        "momentum_20d": -0.09999990463256836,
+        "rsi_14": 37.6101259060413,
+        "volume_zscore": -1.215307778792511,
+        "realized_vol_20d": 23.15387667735275,
+        "bb_position": 0.3090906043674474,
+        "trend_slope_20d": -0.5054650109145166
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "OBAMS-20260815172107",
+      "ticker": "OBAMS",
+      "timestamp": "2026-08-15T17:21:07.234111+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 65.6,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.14463452566096427,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 5.039999961853027,
+        "momentum_20d": -0.2800002098083496,
+        "rsi_14": 43.442232014157526,
+        "volume_zscore": 1.9418957553447294,
+        "realized_vol_20d": 39.30659373174926,
+        "bb_position": 0.5474346281681746,
+        "trend_slope_20d": -0.5433225191959429
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "LUKSK-20260815172107",
+      "ticker": "LUKSK",
+      "timestamp": "2026-08-15T17:21:07.254620+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 58.1,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.061967026719727154,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 89.0999984741211,
+        "momentum_20d": -10.5,
+        "rsi_14": 36.15040251999381,
+        "volume_zscore": -0.1801301849865784,
+        "realized_vol_20d": 20.139277427149004,
+        "bb_position": 0.3084397866445042,
+        "trend_slope_20d": -0.6531479812493787
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "YATAS-20260815172107",
+      "ticker": "YATAS",
+      "timestamp": "2026-08-15T17:21:07.274272+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 65.6,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.16381603952869642,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 35.02000045776367,
+        "momentum_20d": -0.8600006103515625,
+        "rsi_14": 52.476645151538904,
+        "volume_zscore": -0.5369990726604272,
+        "realized_vol_20d": 30.627459925426294,
+        "bb_position": 0.7613448019357568,
+        "trend_slope_20d": -0.38508621286880196
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "ALBRK-20260815172107",
+      "ticker": "ALBRK",
+      "timestamp": "2026-08-15T17:21:07.295975+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 66.5,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 8.260000228881836,
+        "momentum_20d": 0.15999984741210938,
+        "rsi_14": 52.761209029483894,
+        "volume_zscore": -0.4187856085256214,
+        "realized_vol_20d": 24.768368086787483,
+        "bb_position": 0.6346807966543635,
+        "trend_slope_20d": 0.13126036001378924
+      },
+      "reasons": [
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "BIMAS-20260815172107",
+      "ticker": "BIMAS",
+      "timestamp": "2026-08-15T17:21:07.315941+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "HOLD",
+      "predicted_score": 59.6,
+      "predicted_conviction": "LOW",
+      "predicted_confidence": 0.04967602591792669,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 374.75,
+        "momentum_20d": -11.25,
+        "rsi_14": 45.034555661688835,
+        "volume_zscore": -0.6000507026579266,
+        "realized_vol_20d": 27.01073091492167,
+        "bb_position": 0.10720739097844005,
+        "trend_slope_20d": -0.2226045433797992
+      },
+      "reasons": [
+        "World alignment pozitif"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
+    },
+    {
+      "prediction_id": "PEKGY-20260815172107",
+      "ticker": "PEKGY",
+      "timestamp": "2026-08-15T17:21:07.339713+00:00",
+      "predicted_direction": "LONG",
+      "predicted_action": "BUY",
+      "predicted_score": 70.4,
+      "predicted_conviction": "MEDIUM",
+      "predicted_confidence": 0.95,
+      "regime": "HIGH-VOLATILITY",
+      "feature_snapshot": {
+        "price": 15.399999618530273,
+        "momentum_20d": 0.39999961853027344,
+        "rsi_14": 71.45533347196809,
+        "volume_zscore": -0.7930171539338426,
+        "realized_vol_20d": 18.574400371562575,
+        "bb_position": 1.0897969621375507,
+        "trend_slope_20d": -0.023630510820002126
+      },
+      "reasons": [
+        "ML pozitif: 70",
+        "World alignment pozitif",
+        "AI onay\u0131: %95"
+      ],
+      "risks": [],
+      "outcome": null,
+      "resolved": false
     }
   ],
   "regime_accuracy": {},
   "feature_importance_feedback": {},
   "accuracy_window": [],
-  "saved_at": "2026-08-15T15:40:05.122832+00:00"
+  "saved_at": "2026-08-15T17:21:07.339814+00:00"
 }

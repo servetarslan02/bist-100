@@ -155,7 +155,9 @@ class AlphaSystem:
         from services.scanner.opportunity_engine import opportunity_engine
         from services.intelligence.signal_fusion import signal_fusion_engine
         from services.core.decision_engine import DecisionEngine
-        from services.simulation.execution_simulator import execution_simulator
+        from services.simulation.execution_simulator import (
+            execution_simulator, Order, OrderSide, OrderType, OrderStatus
+        )
         from services.core.audit_log import audit_log
         from services.core.observability import (
             prometheus_metrics, distributed_tracing, performance_monitor,
@@ -306,6 +308,9 @@ class AlphaSystem:
 
     async def _run_scan(self):
         """Tam tarama çalıştır."""
+        from services.simulation.execution_simulator import (
+            Order, OrderSide, OrderType, OrderStatus
+        )
         print("\n🔍 [3/8] Veri çekiliyor...")
         start = time.time()
 
@@ -571,13 +576,13 @@ class AlphaSystem:
 
                 if pos_size.shares > 0:
                     # Execute
-                    order = self._execution_simulator.Order(
+                    order = Order(
                         order_id=f"ORD-{self._scan_count}-{ticker}",
                         portfolio_id=self._portfolio_id,
                         instrument_id=1,
                         ticker=ticker,
-                        side=self._execution_simulator.OrderSide.BUY,
-                        order_type=self._execution_simulator.OrderType.MARKET,
+                        side=OrderSide.BUY,
+                        order_type=OrderType.MARKET,
                         quantity=pos_size.shares,
                     )
                     result = self._execution_simulator.execute_order(order, market_price=price)
