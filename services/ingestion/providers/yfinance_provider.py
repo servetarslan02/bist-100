@@ -170,10 +170,13 @@ class YFinanceProvider:
             return None
 
     def fetch_macro(self) -> Dict[str, Any]:
-        """Fetch macro indicators (USD/TRY, Gold, Oil, VIX)."""
+        """Fetch macro indicators (USD/TRY, Gold, Oil, VIX).
+
+        Düzeltme: USD/TRY ve EUR/TRY için doğru yfinance symbol'leri kullanılır.
+        """
         macro_tickers = {
-            "USDTRY": "USD/TRY",
-            "EURTRY": "EUR/TRY",
+            "USDTRY=X": "USD/TRY",
+            "EURTRY=X": "EUR/TRY",
             "GC=F": "Gold",
             "CL=F": "Oil",
             "^VIX": "VIX",
