@@ -15,51 +15,81 @@ import structlog
 
 logger = structlog.get_logger()
 
-# BIST şirket adı → ticker eşleme
+# BIST şirket adı → ticker eşleme (tekil, tekrarsız)
+# Key'ler küçük harf, value'lar BIST ticker formatı
 COMPANY_NAME_MAP = {
-    "thyao": "THYAO", "thy": "THYAO", "türk hava yolları": "THYAO", "turkish airlines": "THYAO",
-    "asels": "ASELS", "aselsan": "ASELS",
-    "garan": "GARAN", "garanti": "GARAN", "garanti bankası": "GARAN",
-    "akbnk": "AKBNK", "akbank": "AKBNK",
-    "eregl": "EREGL", "ereğli": "EREGL", "erdemir": "EREGL",
-    "tuprs": "TUPRS", "tüpraş": "TUPRS", "tupras": "TUPRS",
-    "sasa": "SASA", "sasa polyester": "SASA",
-    "bimas": "BİM", "bim": "BİM",
-    "arclk": "ARCLK", "arçelik": "ARCLK",
-    "kchol": "KCHOL", "koç holding": "KCHOL",
-    "sahol": "SAHOL", "sabancı": "SAHOL", "sabancı holding": "SAHOL",
+    # Ulaşım
+    "thy": "THYAO", "thyao": "THYAO", "türk hava yolları": "THYAO", "turkish airlines": "THYAO",
     "pgsus": "PGSUS", "pegasus": "PGSUS",
     "tavhl": "TAVHL", "tav": "TAVHL",
-    "vestel": "VESTEL", "vestel": "VESTEL",
-    "froto": "FROTO", "ford otosan": "FROTO",
-    "toaso": "TOASO", "tofaş": "TOASO",
-    "iş bankası": "ISCTR", "isctr": "ISCTR",
-    "halkbank": "HALKB", "halbk": "HALKB",
-    "vakıfbank": "VAKBN", "vakbn": "VAKBN",
-    "tcell": "TCELL", "turkcell": "TCELL",
-    "ttkom": "TTKOM", "türk telekom": "TTKOM",
-    "enka": "ENKAI", "enkai": "ENKAI",
-    "şok": "SOKM", "sokm": "SOKM",
-    "migros": "MGROS", "mgros": "MGROS",
+    "sunexpress": "SXS",
+    # Savunma
+    "asels": "ASELS", "aselsan": "ASELS",
+    "havelsan": "HVLSN",
+    "tai": "TAI", "tusaş": "TAI",
+    "roketsan": "ROKETSAN",
+    "pgsus": "PGSUS",
+    # Bankacılık
+    "garan": "GARAN", "garanti": "GARAN", "garanti bankası": "GARAN", "garanti bank": "GARAN",
+    "akbnk": "AKBNK", "akbank": "AKBNK",
+    "isctr": "ISCTR", "iş bankası": "ISCTR", "is bankası": "ISCTR", "turkiye is bankasi": "ISCTR",
+    "halbk": "HALKB", "halkbank": "HALKB",
+    "vakbn": "VAKBN", "vakıfbank": "VAKBN", "vakifbank": "VAKBN",
+    "ykbnk": "YKBNK", "yapı kredi": "YKBNK", "yapi kredi": "YKBNK",
+    "qnbfb": "QNBFB", "finansbank": "QNBFB",
+    "tskb": "TSKB", "turkiye sinai kalkinma": "TSKB",
+    # Holding
+    "kchol": "KCHOL", "koç holding": "KCHOL", "koc holding": "KCHOL",
+    "sahol": "SAHOL", "sabancı": "SAHOL", "sabancı holding": "SAHOL", "sabanci": "SAHOL",
+    "toaso": "TOASO", "tofaş": "TOASO", "tofas": "TOASO",
+    "tuprs": "TUPRS", "tüpraş": "TUPRS", "tupras": "TUPRS",
+    # Enerji
+    "petkm": "PETKM", "petkim": "PETKM",
+    "aygaz": "AYGAZ",
+    "opet": "OPET",
+    "ayen": "AYEN", "ayen enerji": "AYEN",
+    "odas": "ODAS", "odaş": "ODAS",
+    "akener": "AKENR", "akenerji": "AKENR",
+    # Perakende
+    "bimas": "BIMAS", "bim": "BIMAS", "bim market": "BIMAS",
+    "mgros": "MGROS", "migros": "MGROS",
+    "sokm": "SOKM", "şok": "SOKM", "sok market": "SOKM",
     "aefes": "AEFES", "efes": "AEFES",
-    "tuprs": "TUPRS", "petkim": "PETKM", "petkm": "PETKM",
-    "tocl": "TOCL", "uşak seramik": "USAK",
+    # Sanayi
+    "eregl": "EREGL", "ereğli": "EREGL", "erdemir": "EREGL",
+    "arclk": "ARCLK", "arçelik": "ARCLK", "arcelik": "ARCLK",
+    "froto": "FROTO", "ford otosan": "FROTO",
+    "vestel": "VESTEL",
+    "sise": "SISE", "şişecam": "SISE", "sisecam": "SISE",
+    "brsa": "BRSA", "borusan": "BRSA",
+    "krdma": "KRDMA", "kardemir": "KRDMA",
+    "tcell": "TCELL", "turkcell": "TCELL",
+    "ttkom": "TTKOM", "türk telekom": "TTKOM", "turk telekom": "TTKOM",
+    "enka": "ENKAI", "enkai": "ENKAI",
+    "alark": "ALARK", "alarko": "ALARK",
+    # Gayrimenkul
+    "ekgyo": "EKGYO", "emlak konut": "EKGYO",
+    "trgyo": "TRGYO", "torunlar": "TRGYO",
+    # Gıda
+    "tukaş": "TUKAS", "tukas": "TUKAS",
+    "konfr": "KONFR", "konfrüt": "KONFR",
+    # Teknoloji
+    "logo": "LOGO", "yazılım": "LOGO",
+    # İndeksler
     "xu100": "BIST100", "bist 100": "BIST100", "bist100": "BIST100",
     "borsa istanbul": "BIST100", "borsa": "BIST100",
-    "akbank": "AKBNK", "garanti bank": "GARAN", "yapi kredi": "YKBNK",
-    "halkbank": "HALKB", "vakifbank": "VAKBN", "ziraat": "ZIRAAT",
-    "turkcell": "TCELL", "turk telekom": "TTKOM",
-    "aselsan": "ASELS", "havelsan": "HVLSN", "tai": "TAI",
-    "ford otosan": "FROTO", "tofas": "TOASO", "arcelik": "ARCLK",
-    "bim": "BIMAS", "migros": "MGROS", "sok market": "SOKM",
-    "pegasus": "PGSUS", "sunexpress": "SXS",
-    "emlak konut": "EKGYO", "torunlar": "TRGYO",
-    "alarko": "ALARK", "enka": "ENKAI",
-    "sisecam": "SISE", "borusan": "BRSA",
-    "kardemir": "KRDMA", "tupras": "TUPRS", "petkim": "PETKM",
-    "aygaz": "AYGAZ", "opet": "OPET",
-    "sabanci": "SAHOL", "koc holding": "KCHOL",
-    "turkiye is bankasi": "ISCTR", "is bankasi": "ISCTR",
+    "xu030": "BIST30", "bist 30": "BIST30", "bist30": "BIST30",
+    # Sektör isimleri (haber eşleştirme için)
+    "havacılık": "SECTOR_AVIATION",
+    "bankacılık": "SECTOR_BANKING",
+    "enerji": "SECTOR_ENERGY",
+    "perakende": "SECTOR_RETAIL",
+    "teknoloji": "SECTOR_TECH",
+    "savunma": "SECTOR_DEFENSE",
+    "otomotiv": "SECTOR_AUTOMOTIVE",
+    "gıda": "SECTOR_FOOD",
+    "gayrimenkul": "SECTOR_REALESTATE",
+    "sigorta": "SECTOR_INSURANCE",
 }
 
 
@@ -157,15 +187,26 @@ class NewsProvider:
         text_lower = text.lower()
         found = set()
 
-        for name, ticker in COMPANY_NAME_MAP.items():
+        # 1. COMPANY_NAME_MAP ile eşleştir (uzun isimler önce)
+        # Uzun isimlerin önce eşleşmesi için sırala ("garanti bankası" > "garanti")
+        sorted_names = sorted(COMPANY_NAME_MAP.keys(), key=len, reverse=True)
+        for name in sorted_names:
             if name in text_lower:
-                found.add(ticker)
+                ticker = COMPANY_NAME_MAP[name]
+                # Sektör eşleme ise atla (sadece ticker olanları al)
+                if not ticker.startswith("SECTOR_"):
+                    found.add(ticker)
+                # Eşleşen metni işaretle (çift eşleşmeyi önle)
+                text_lower = text_lower.replace(name, " " * len(name))
 
-        # Regex: BIST ticker formatı (4-5 harf, büyük harf)
-        ticker_pattern = re.findall(r'\b([A-Z]{4,5})\b', text)
+        # 2. Regex: Doğrudan ticker yazımı (büyük harf, 4-6 karakter)
+        # "THYAO hisseleri" gibi
+        ticker_pattern = re.findall(r'\b([A-Z]{4,6})\b', text)
         for t in ticker_pattern:
-            if t in COMPANY_NAME_MAP.values():
-                found.add(t)
+            t_upper = t.upper()
+            # Sadece bilinen ticker'ları kabul et
+            if t_upper in set(COMPANY_NAME_MAP.values()) and not t_upper.startswith("SECTOR_"):
+                found.add(t_upper)
 
         return list(found)
 
