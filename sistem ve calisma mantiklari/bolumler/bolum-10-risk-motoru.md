@@ -138,3 +138,43 @@ def compute_political_risk(events):
     
     return min(risk_score, 100)
 ```
+
+---
+
+## Options/VIOP Entegrasyonu
+
+**Kaynak:** Bölüm 32 — Options ve VIOP
+
+Bu bölümün risk motoru, Bölüm 32'deki türev araçlarla genişler:
+
+| Risk Ölçümü | Bölüm 32 Motoru | Bölüm 10 Kullanımı |
+|-------------|----------------|-------------------|
+| Greeks | `viop/greeks.py` | Delta, Gamma, Vega riski |
+| Options Pricing | `viop/options_pricing.py` | Opsiyon değerleme |
+| Hedging | `viop/hedging.py` | Portföy korunma |
+| Margin | `viop/margin.py` | Teminat hesaplama |
+
+### Örnek: Greeks → Risk skoru
+
+```python
+from services.viop.greeks import calculate_greeks
+
+greeks = calculate_greeks(S=305.25, K=310, T=30/365, r=0.42, sigma=0.25)
+# delta: 0.55 → fiyat riski
+# gamma: 0.02 → delta değişimi
+# theta: -0.15 → zaman aşınması
+# vega: 1.20 → volatilite riski
+
+# Risk skoruna ekle
+portfolio_risk["options_delta"] = greeks["delta"]
+portfolio_risk["options_vega"] = greeks["vega"]
+```
+
+### UYARI: Black-Scholes sınırlamaları
+
+Bölüm 32'deki Black-Scholes formülü varsayımları:
+- Sabit volatilite (gerçek: volatilite yüzeyi)
+- Sürekli trading (gerçek: BIST seans saatleri)
+- Sabit faiz (gerçek: TCMB değişken)
+
+Production'da volatilite yüzeyi ve gerçek VIOP sözleşme özellikleri kullanılmalı.

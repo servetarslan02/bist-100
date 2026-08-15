@@ -155,3 +155,35 @@ def account_for_circuit_breaker(trades, halts):
     
     return adjusted_trades
 ```
+
+---
+
+## BIST Komisyon Modeli Entegrasyonu
+
+**Kaynak:** Bölüm 23 — BIST Piyasa Kuralları
+
+Bu bölümün backtest motoru, Bölüm 23'teki BIST-specific modelleri kullanır:
+
+| Model | Bölüm 23 Motoru | Bölüm 13 Kullanımı |
+|-------|----------------|-------------------|
+| Komisyon | `core/fee_calculator.py` | Gerçekçi işlem maliyeti |
+| Slippage | `core/price_limits.py` | Fiyat limiti etkisi |
+| Devre kesici | `core/halt_monitor.py` | Durdurma etkisi |
+| Açığa satış | `core/short_selling.py` | Short satış kısıtlaması |
+
+### Örnek: BIST komisyon ile backtest
+
+```python
+from services.core.fee_calculator import calculate_commission
+
+# Backtest'te gerçekçi komisyon
+commission = calculate_commission(amount=305250, broker_rate=0.0003)
+# broker_fee: 91.58
+# bist_fee: 12.21
+# mkk_fee: 3.05
+# bsmv: 5.34
+# total: 112.18
+
+# Backtest'e uygula
+capital -= (cost + commission["total"])
+```

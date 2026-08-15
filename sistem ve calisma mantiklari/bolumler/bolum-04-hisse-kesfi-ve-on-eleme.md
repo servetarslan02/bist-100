@@ -156,3 +156,37 @@ result = streaming_anomaly_detector.check_all(
 ## Temel prensip
 
 Bu bölüm **hızlı ve geniş tarama** yapar; **nihai hisse önerisini vermez**.
+
+---
+
+## Factor Investing Entegrasyonu
+
+**Kaynak:** Bölüm 30 — BIST Alpha Anomalileri
+
+Bu bölümün hisse keşfi, Bölüm 30'daki faktör skorlarını kullanır:
+
+| Faktör | Bölüm 30 Motoru | Bölüm 4 Kullanımı |
+|--------|----------------|-------------------|
+| Piotroski F-Score | `factors/piotroski.py` | Şirket kalitesi filtresi |
+| Beneish M-Score | `factors/beneish.py` | Dolandırıcılık filtresi |
+| Altman Z-Score | `factors/altman.py` | İflas riski filtresi |
+| Fama-French | `factors/fama_french.py` | Çok faktörlü sıralama |
+| BIST Anomalileri | `factors/bist_anomalies.py` | Temettü, likidite, kur |
+
+### Örnek: Faktör → Sıralama zinciri
+
+```python
+from services.factors.piotroski import calculate_f_score
+from services.factors.beneish import calculate_m_score
+from services.factors.altman import calculate_z_score
+from services.factors.fama_french import calculate_factor_scores
+
+f_score = calculate_f_score(financials)  # 0-9
+m_score = calculate_m_score(financials)  # < -1.78 güvenli
+z_score = calculate_z_score(financials)  # > 2.99 güvenli
+
+# Filtreleme
+if f_score >= 7 and m_score < -1.78 and z_score > 2.99:
+    factor_scores = calculate_factor_scores(stock, universe)
+    # Sıralamaya dahil et
+```

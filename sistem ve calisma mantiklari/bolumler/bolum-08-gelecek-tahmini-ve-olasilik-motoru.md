@@ -107,3 +107,48 @@ Uncertainty:       Orta
 ## Temel prensip
 
 Sistem geleceği "bilmiş gibi" davranmaz; **olasılık dağılımı + belirsizlik + güven seviyesi** üretir.
+
+---
+
+## ML Model Seçimi Entegrasyonu
+
+**Kaynak:** Bölüm 25 — ML Model Seçimi ve Karşılaştırması
+
+Bu bölümün tahmin motoru, Bölüm 25'teki modellerden girdi alır:
+
+| Model | Bölüm 25 Motoru | Bölüm 8 Kullanımı |
+|-------|----------------|-------------------|
+| XGBoost | `ml/xgboost_model.py` | Hızlı tahmin |
+| LightGBM | `ml/lightgbm_model.py` | Hızlı tahmin |
+| LSTM | `ml/lstm_model.py` | Zaman serisi |
+| Transformer | `ml/transformer_model.py` | Uzun vadeli |
+| Ensemble | `ml/ensemble.py` | Birleşik tahmin |
+| Karşılaştırma | `ml/model_comparator.py` | En iyi model seçimi |
+
+### Örnek: Model → Tahmin zinciri
+
+```python
+from services.ml.model_comparator import compare_models
+from services.ml.ensemble import ensemble_predict
+
+# Modelleri karşılaştır
+results = compare_models(models, X_train, y_train, X_test, y_test)
+best_model = max(results, key=lambda k: results[k]["ic"])
+
+# Ensemble tahmin
+weights = {"xgboost": 0.4, "lightgbm": 0.3, "lstm": 0.3}
+prediction = ensemble_predict(models, weights, X)
+```
+
+### FinRL/FinGPT Entegrasyonu
+
+**Kaynak:** Bölüm 29 — FinRL ve FinGPT
+
+Ayrıca Bölüm 29'daki RL agent ve LLM sentiment de bu bölüme entegre edilir:
+
+| Motor | Bölüm 29 | Bölüm 8 Kullanımı |
+|-------|----------|-------------------|
+| BISTTradingEnv | `ml/finrl_bist.py` | RL ortamı |
+| FinGPTSentiment | `ml/fingpt.py` | Haber sentiment |
+| Hybrid Model | `ml/hybrid_model.py` | RL + LLM birleşik |
+| RL Agent | `ml/rl_agent.py` | PPO agent |

@@ -213,3 +213,39 @@ def compute_fx_regime(usdtry_data):
     else:
         return "LOW_VOLATILITY"
 ```
+
+---
+
+## Feature Engineering Entegrasyonu
+
+**Kaynak:** Bölüm 24 — Feature Engineering Derinlemesine
+
+Bu bölümün rejim tespiti, Bölüm 24'teki 63 feature'dan girdi alır:
+
+| Feature Grubu | Bölüm 24 Motoru | Bölüm 3 Kullanımı |
+|---------------|----------------|-------------------|
+| Trend | `technical_features.py` | Trend yönü + gücü |
+| Momentum | `technical_features.py` | Hız değişimi |
+| Volatility | `technical_features.py` | Volatilite rejimi |
+| Volume | `technical_features.py` | Hacim anomalisi |
+| BIST-specific | `technical_features.py` | USDTRY, TCMB, CDS |
+
+### Örnek: Feature → Rejim zinciri
+
+```python
+from services.features.technical_features import (
+    compute_trend_features, compute_momentum_features,
+    compute_volatility_features, compute_volume_features,
+    compute_bist_specific_features
+)
+
+features = {
+    **compute_trend_features(prices),
+    **compute_momentum_features(prices, highs, lows),
+    **compute_volatility_features(prices, highs, lows, closes),
+    **compute_volume_features(prices, volumes),
+    **compute_bist_specific_features(market_data),
+}
+
+regime = regime_engine.detect_regime(features)
+```

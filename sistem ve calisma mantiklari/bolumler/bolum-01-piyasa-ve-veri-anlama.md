@@ -275,3 +275,71 @@ Sadece:
 > "Elimizde hangi güvenilir bilgiler var?"
 
 sorusunun cevabını oluşturur.
+
+---
+
+## Türkiye Makro Göstergeleri Entegrasyonu
+
+**Kaynak:** Bölüm 28 — Turkish Macro Indicators
+
+Bu bölümün topladığı makro veriler, Bölüm 28'deki detaylı analiz motorlarına girdi sağlar:
+
+| Veri | Bölüm 28 Motoru | Kullanım |
+|------|----------------|----------|
+| TCMB faiz | `macro/tcmb.py` | Reel faiz, policy stance |
+| TÜFE/ÜFE | `macro/inflation.py` | Enflasyon trendi, TMS29 |
+| USDTRY | `macro/fx.py` | Kur volatilitesi, BIST korelasyon |
+| CDS | `macro/cds.py` | Ülke riski seviyesi |
+| Kredi büyümesi | `macro/credit.py` | Ekonomik aktivite |
+| Cari açık | `macro/current_account.py` | Döviz dengesi |
+| Makro takvim | `macro/calendar.py` | TCMB PPK, TÜFE açıklama tarihleri |
+
+### Örnek: Makro → Piyasa rejimi zinciri
+
+```python
+# 1. Veri çek (Bölüm 1)
+tcmb_data = tcmb_provider.get_data()
+inflation_data = macro_provider.get_inflation()
+
+# 2. Makro feature hesapla (Bölüm 28)
+from services.macro.tcmb import compute_tcmb_features
+from services.macro.inflation import compute_inflation_features
+from services.macro.fx import compute_fx_features
+
+tcmb_features = compute_tcmb_features(tcmb_data)
+inflation_features = compute_inflation_features(inflation_data)
+fx_features = compute_fx_features(fx_data, stock_data)
+
+# 3. Rejim tespitine girdi olarak kullan (Bölüm 3)
+regime_input = {**tcmb_features, **inflation_features, **fx_features}
+regime = regime_engine.detect_regime(regime_input)
+```
+
+---
+
+## Alternative Data Entegrasyonu
+
+**Kaynak:** Bölüm 26 — Alternative Data
+
+Bu bölümün veri toplama motoru, Bölüm 26'daki alternatif kaynaklarla genişler:
+
+| Veri | Bölüm 26 Motoru | Bölüm 1 Kullanımı |
+|------|----------------|-------------------|
+| Web scraping | `alternative/web_scraping.py` | İş ilanı, fiyat |
+| Social | `alternative/social.py` | Sentiment |
+| Jobs | `alternative/jobs.py` | Büyüme sinyali |
+| Credit card | `alternative/credit_card.py` | Satış verisi |
+| Satellite | `alternative/satellite.py` | Fabrika trafiği |
+
+### Örnek: Alt data → Market state
+
+```python
+from services.alternative.web_scraping import compute_web_features
+from services.alternative.jobs import compute_job_features
+
+web_features = compute_web_features(scraped_data, "THYAO")
+job_features = compute_job_features(job_data, "THYAO")
+
+# Market state'e ekle
+market_state["alt_data"] = {**web_features, **job_features}
+```

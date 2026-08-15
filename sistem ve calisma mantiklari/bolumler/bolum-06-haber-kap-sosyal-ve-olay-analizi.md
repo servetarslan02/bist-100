@@ -144,3 +144,38 @@ Overall Event Impact:  Pozitif
 ## Temel prensip
 
 Haberleri sadece "pozitif/negatif" diye etiketlemek değil, olayın şirketin gelecekteki finansal değerini ve riskini nasıl değiştirebileceğini ölçmek.
+
+---
+
+## Event Study Entegrasyonu
+
+**Kaynak:** Bölüm 31 — Event Study Methodology
+
+Bu bölümün olay analizi, Bölüm 31'deki istatistiksel yöntemlerle derinleştirilir:
+
+| Analiz | Bölüm 31 Motoru | Bölüm 6 Kullanımı |
+|--------|----------------|-------------------|
+| Expected Return | `event_study/expected_return.py` | Normal getiri tahmini |
+| Abnormal Return | `event_study/abnormal_return.py` | Olağandışı getiri |
+| CAR | `event_study/car.py` | Kümülatif etki |
+| Statistical Test | `event_study/statistical_test.py` | Anlamlılık testi |
+| KAP Event | `event_study/kap_event.py` | KAP açıklaması etkisi |
+
+### Örnek: KAP → Event Study zinciri
+
+```python
+from services.event_study.kap_event import analyze_kap_event
+
+# KAP açıklaması geldiğinde
+result = analyze_kap_event("THYAO", "CONTRACT", event_date)
+# result["car_5d"]: +3.2% (kümülatif abnormal getiri)
+# result["significant"]: True (p < 0.05)
+
+# Bu sonucu sentiment skoruna ekle
+event_impact = result["car_5d"] * (1.5 if result["significant"] else 0.5)
+```
+
+### UYARI: Araştırma sonuçları production kuralı OLMAZ
+
+Bölüm 31'deki CAR değerleri (örn. +1.2%) sabit olarak kullanılmamalı.
+Her KAP açıklaması için event study yeniden hesaplanmalı.

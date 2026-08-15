@@ -92,3 +92,29 @@ Monitoring:           Active
 ## Temel prensip
 
 Bu bölüm yatırım kararı vermez; diğer bölümlerin **hızlı, ölçeklenebilir, event-driven ve hata durumunda toparlanabilir** şekilde çalışmasını sağlar.
+
+---
+
+## BIST Piyasa Kuralları Entegrasyonu
+
+**Kaynak:** Bölüm 23 — BIST Piyasa Kuralları
+
+Bu bölümün altyapı motoru, Bölüm 23'teki BIST-specific mekanizmalarla genişler:
+
+| Mekanizma | Bölüm 23 Motoru | Bölüm 20 Kullanımı |
+|-----------|----------------|-------------------|
+| Devre kesici | `core/circuit_breaker.py` | BIST-specific eşikler |
+| Brüt takas | `core/gross_settlement.py` | T+0 kısıtlaması |
+| VIOP monitor | `core/viop_monitor.py` | Teminat takibi |
+| Seans saatleri | `core/market_calendar.py` | BIST seans yapısı |
+
+### Örnek: BIST devre kesici
+
+```python
+from services.core.market_calendar import market_calendar
+
+# BIST-specific halt
+market_calendar.add_halt(date(2026, 8, 16), time(11, 0), time(11, 30))
+is_open = market_calendar.is_market_open(datetime(2026, 8, 16, 11, 15))
+# is_open: False (devre kesici aktif)
+```

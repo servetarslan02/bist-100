@@ -103,3 +103,36 @@ System State:         READY
 **AI hiçbir zaman sınırsız yetkiye sahip olmayacak.**
 
 > "Human decision authority, safety, security, and privacy." — arXiv (2026)
+
+---
+
+## SPK Regülasyon Entegrasyonu
+
+**Kaynak:** Bölüm 27 — Regülasyon Uyumu (SPK)
+
+Bu bölümün güvenlik motoru, Bölüm 27'deki SPK-specific kontrollerle genişler:
+
+| Kontrol | Bölüm 27 Motoru | Bölüm 19 Kullanımı |
+|---------|----------------|-------------------|
+| Bildirim | `core/compliance.py` | %5 kuralı |
+| Manipülasyon | `core/manipulation_detector.py` | Wash trading, spoofing |
+| Insider | `core/insider_detector.py` | İçerden bilgi |
+| Algo bildirim | `core/algo_notification.py` | SPK bildirim |
+| Vergi | `core/tax.py` | Stopaj hesaplama |
+| Raporlama | `core/reporting.py` | Günlük rapor |
+
+### Örnek: SPK uyumluluk kontrolü
+
+```python
+from services.core.compliance import check_spk_compliance
+
+result = check_spk_compliance("BUY", "THYAO", 50000, portfolio)
+# notification_required: True (%5 aşıldı)
+# authority: "SPK"
+# deadline: "2 business days"
+```
+
+### UYARI: Hukuki doğrulama gerekli
+
+Bölüm 27'deki SPK kuralları ve vergi oranları güncel mevzuattan doğrulanmalı.
+Kodlanmadan önce güncel SPK tebliğleri ve vergi kanunları kontrol edilmeli.
