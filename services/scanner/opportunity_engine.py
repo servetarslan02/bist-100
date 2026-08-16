@@ -150,16 +150,16 @@ class OpportunityDiscoveryEngine:
 
         # Decomposition
         score.decomposition = {
-            "technical": round(score.technical_score * weights.get("technical", 0.15), 1),
-            "fundamental": round(score.fundamental_score * weights.get("fundamental", 0.10), 1),
-            "momentum": round(score.momentum_score * weights.get("momentum", 0.20), 1),
-            "volume": round(score.volume_score * weights.get("volume", 0.10), 1),
-            "volatility": round(score.volatility_score * weights.get("volatility", 0.05), 1),
-            "sentiment": round(score.sentiment_score * weights.get("sentiment", 0.08), 1),
-            "valuation": round(score.valuation_score * weights.get("valuation", 0.10), 1),
-            "macro": round(score.macro_score * weights.get("macro", 0.07), 1),
-            "regime": round(score.regime_score * weights.get("regime", 0.10), 1),
-            "risk": round(score.risk_score * weights.get("risk", 0.05), 1),
+            "technical": round(float(score.technical_score) * weights.get("technical", 0.15), 1),
+            "fundamental": round(float(score.fundamental_score) * weights.get("fundamental", 0.10), 1),
+            "momentum": round(float(score.momentum_score) * weights.get("momentum", 0.20), 1),
+            "volume": round(float(score.volume_score) * weights.get("volume", 0.10), 1),
+            "volatility": round(float(score.volatility_score) * weights.get("volatility", 0.05), 1),
+            "sentiment": round(float(score.sentiment_score) * weights.get("sentiment", 0.08), 1),
+            "valuation": round(float(score.valuation_score) * weights.get("valuation", 0.10), 1),
+            "macro": round(float(score.macro_score) * weights.get("macro", 0.07), 1),
+            "regime": round(float(score.regime_score) * weights.get("regime", 0.10), 1),
+            "risk": round(float(score.risk_score) * weights.get("risk", 0.05), 1),
         }
 
         # Signal type belirle
@@ -442,10 +442,10 @@ class OpportunityDiscoveryEngine:
             {
                 "rank": r.rank,
                 "ticker": r.ticker,
-                "score": round(r.risk_adjusted_score, 1),
+                "score": round(float(r.risk_adjusted_score), 1),
                 "signal": r.signal_type,
                 "direction": r.signal_direction,
-                "confidence": round(r.confidence, 2),
+                "confidence": round(float(r.confidence), 2),
                 "price": r.price,
                 "change_1d": r.change_1d_pct,
                 "decomposition": r.decomposition,

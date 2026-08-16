@@ -300,7 +300,7 @@ class AlphaScanner:
             + ml_score * 0.10
         )
 
-        return round(max(0, min(100, score)), 1)
+        return round(float(max(0, min(100, score))), 1)
 
     def _generate_signal(self, r: ScannerResult):
         """Sinyal üret."""
