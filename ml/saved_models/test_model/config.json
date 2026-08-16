@@ -1,0 +1,17 @@
+{
+  "model_name": "test_model",
+  "target": "return_5d",
+  "features": [
+    "feature_1",
+    "feature_2",
+    "feature_3"
+  ],
+  "metrics": {
+    "avg_direction_accuracy": 49.0,
+    "avg_sharpe": 15.498,
+    "avg_metric": -0.1718,
+    "splits": 10
+  },
+  "confidence": 0.556,
+  "training_date": "2026-08-13T20:44:05.364447"
+}

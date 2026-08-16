@@ -1,0 +1,355 @@
+version: '3.8'
+
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - alpha-net
+
+services:
+  # === Data Stores ===
+  postgres:
+    <<: *common
+    image: postgres:16-alpine
+    container_name: alpha-postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: alpha_bist
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: alpha_secure_2026
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clickhouse:
+    <<: *common
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: alpha-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./database/clickhouse/init:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: alpha_bist
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+    mem_limit: 2g
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    <<: *common
+    image: redis:7-alpine
+    container_name: alpha-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redpanda:
+    <<: *common
+    image: redpandadata/redpanda:v24.2.8
+    container_name: alpha-redpanda
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    volumes:
+      - redpanda_data:/var/lib/redpanda/data
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp 2
+      - --memory 1G
+      - --reserve-memory 0M
+      - --node-id 0
+      - --check=false
+      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:9093
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:9093
+      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:8083
+      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:8083
+      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:8084
+    mem_limit: 1g
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === Application Services ===
+  api:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services:/app/services
+      - ./ml:/app/ml
+      - ./ai:/app/ai
+      - ./backtest:/app/backtest
+      - ./.env:/app/.env:ro
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  ingestion:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-ingestion
+    command: python -m services.ingestion.main
+    volumes:
+      - ./services:/app/services
+      - ./.env:/app/.env:ro
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  feature-engine:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-feature-engine
+    command: python -m services.features.main
+    volumes:
+      - ./services:/app/services
+      - ./ml:/app/ml
+      - ./.env:/app/.env:ro
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  market-state:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-market-state
+    command: python -m services.market_state.main
+    volumes:
+      - ./services:/app/services
+      - ./.env:/app/.env:ro
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  intelligence:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-intelligence
+    command: python -m services.intelligence.main
+    volumes:
+      - ./services:/app/services
+      - ./ml:/app/ml
+      - ./ai:/app/ai
+      - ./.env:/app/.env:ro
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  simulation:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-simulation
+    command: python -m services.simulation.main
+    volumes:
+      - ./services:/app/services
+      - ./ml:/app/ml
+      - ./.env:/app/.env:ro
+    mem_limit: 512m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  risk:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-risk
+    command: python -m services.risk.main
+    volumes:
+      - ./services:/app/services
+      - ./.env:/app/.env:ro
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+  portfolio:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-portfolio
+    command: python -m services.portfolio.main
+    volumes:
+      - ./services:/app/services
+      - ./.env:/app/.env:ro
+    mem_limit: 256m
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  learning:
+    <<: *common
+    build:
+      context: .
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: alpha-learning
+    command: python -m services.learning.main
+    volumes:
+      - ./services:/app/services
+      - ./ml:/app/ml
+      - ./.env:/app/.env:ro
+    mem_limit: 1g
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # === Frontend ===
+  dashboard:
+    <<: *common
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: alpha-dashboard
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    mem_limit: 512m
+    depends_on:
+      - api
+
+  # === Monitoring ===
+  prometheus:
+    <<: *common
+    image: prom/prometheus:v2.53.0
+    container_name: alpha-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    mem_limit: 256m
+
+  grafana:
+    <<: *common
+    image: grafana/grafana:11.1.0
+    container_name: alpha-grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: alpha_admin_2026
+    mem_limit: 256m
+
+  mlflow:
+    <<: *common
+    image: ghcr.io/mlflow/mlflow:v2.15.0
+    container_name: alpha-mlflow
+    ports:
+      - "5000:5000"
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts
+    volumes:
+      - mlflow_data:/mlflow
+    mem_limit: 256m
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  redis_data:
+  redpanda_data:
+  prometheus_data:
+  grafana_data:
+  mlflow_data:
+
+networks:
+  alpha-net:
+    driver: bridge
