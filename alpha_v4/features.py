@@ -27,14 +27,17 @@ class FeatureRecord:
     def __post_init__(self) -> None:
         if not self.instrument_id.strip() or not self.feature_id.strip():
             raise ValueError("instrument_id and feature_id are required")
-        if not self.source_ids:
-            raise ValueError("feature provenance source_ids are required")
-        if not self.input_timestamps:
-            raise ValueError("input_timestamps are required")
         if self.status not in {"VALID", "MASKED", "INSUFFICIENT_DATA"}:
             raise ValueError("invalid feature status")
         if self.status == "VALID" and self.value is None:
             raise ValueError("VALID feature requires a value")
+        if self.status in {"VALID", "MASKED"}:
+            if not self.source_ids:
+                raise ValueError("computed feature provenance source_ids are required")
+            if not self.input_timestamps:
+                raise ValueError("computed feature input_timestamps are required")
+        if self.status == "INSUFFICIENT_DATA" and self.value is not None:
+            raise ValueError("INSUFFICIENT_DATA cannot carry a value")
 
 
 class FeatureStore:
@@ -131,10 +134,10 @@ def compute_log_return_feature(
     lookback_bars: int,
     feature_version: str = "1.0",
 ) -> FeatureRecord:
-    """Compute a point-in-time log return from valid historical endpoints.
+    """Compute a point-in-time log return from a fully valid lookback window.
 
-    Intermediate invalid observations intentionally cause the feature to be MASKED
-    rather than silently bridging across an untradable/corrupt period.
+    Intermediate invalid observations cause the feature to be MASKED rather than
+    silently bridging across an untradable/corrupt period.
     """
     if lookback_bars <= 0:
         raise ValueError("lookback_bars must be positive")
@@ -142,16 +145,14 @@ def compute_log_return_feature(
     bars = list(market_store.bars_as_of(ticker, decision_time))
     feature_id = f"log_return_{lookback_bars}b@{feature_version}"
     if len(bars) < lookback_bars + 1:
-        available = tuple(bar.timestamp for bar in bars) or (decision_time,)
-        sources = tuple(sorted({bar.source_id for bar in bars})) or ("no-source",)
         return FeatureRecord(
             instrument_id=instrument_id,
             feature_id=feature_id,
             value=None,
-            effective_at=decision_time,
-            known_at=decision_time,
-            source_ids=sources,
-            input_timestamps=available,
+            effective_at=bars[-1].timestamp if bars else decision_time,
+            known_at=max((bar.observed_at for bar in bars), default=decision_time),
+            source_ids=tuple(sorted({bar.source_id for bar in bars})),
+            input_timestamps=tuple(bar.timestamp for bar in bars),
             status="INSUFFICIENT_DATA",
         )
 
