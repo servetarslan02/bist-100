@@ -54,12 +54,12 @@ def test_state_snapshot_requires_provenance():
 
 
 def test_snapshot_id_is_deterministic():
-    kwargs = dict(
-        state_type="MarketState",
-        entity_id="BIST",
-        effective_at=T0,
-        known_at=T0,
-        payload={"breadth": 0.55, "regime": "RANGE"},
-        source_event_ids=("e1", "e2"),
-    )
+    kwargs = {
+        "state_type": "MarketState",
+        "entity_id": "BIST",
+        "effective_at": T0,
+        "known_at": T0,
+        "payload": {"breadth": 0.55, "regime": "RANGE"},
+        "source_event_ids": ("e1", "e2"),
+    }
     assert StateSnapshot(**kwargs).snapshot_id == StateSnapshot(**kwargs).snapshot_id
