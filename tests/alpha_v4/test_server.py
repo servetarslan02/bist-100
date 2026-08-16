@@ -35,6 +35,8 @@ def test_health_server_runs_as_real_process_surface(tmp_path):
         assert payload["registered_sources"] > 0
         assert payload["real_money_execution"] is False
         assert payload["checks"]["database"]["integrity"] == "ok"
+        assert payload["checks"]["schema"]["ok"] is True
+        assert payload["checks"]["schema"]["missing_tables"] == []
         assert all(value == "ready" for value in payload["stores"].values())
 
         live_status, live_payload = _request(server, "/health/live")
@@ -76,8 +78,38 @@ def test_readiness_fails_closed_when_audit_history_is_tampered(tmp_path):
         assert ready_status == 503
         assert ready_payload["ready"] is False
         assert ready_payload["checks"]["database"]["ok"] is True
+        assert ready_payload["checks"]["schema"]["ok"] is True
         assert ready_payload["checks"]["audit_chain"]["ok"] is False
         assert ready_payload["stores"]["audit"] == "corrupt"
+
+        live_status, live_payload = _request(server, "/health/live")
+        assert live_status == 200
+        assert live_payload["alive"] is True
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+def test_readiness_fails_closed_when_critical_table_is_missing(tmp_path):
+    database = tmp_path / "alpha.sqlite3"
+    runtime = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
+    with sqlite3.connect(database) as connection:
+        connection.execute("DROP TABLE canonical_events")
+
+    server = build_server(runtime, "127.0.0.1", 0)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    try:
+        ready_status, ready_payload = _request(server, "/health/ready")
+        assert ready_status == 503
+        assert ready_payload["ready"] is False
+        assert ready_payload["checks"]["database"]["ok"] is True
+        assert ready_payload["checks"]["schema"]["ok"] is False
+        assert "canonical_events" in ready_payload["checks"]["schema"]["missing_tables"]
+        assert ready_payload["event_count"] is None
+        assert ready_payload["stores"]["events"] == "unavailable"
 
         live_status, live_payload = _request(server, "/health/live")
         assert live_status == 200
