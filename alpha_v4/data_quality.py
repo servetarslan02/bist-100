@@ -25,12 +25,17 @@ def validate_raw_bar(
     *,
     decision_time: Optional[datetime] = None,
     freshness_limit: timedelta = timedelta(days=5),
+    enforce_freshness: bool = True,
 ) -> BarValidation:
-    """Validate *before* any dependent feature is calculated.
+    """Validate a raw observation before dependent features are calculated.
 
-    This deliberately avoids guessing exchange-specific price-limit rules from OHLC
-    alone. Tradability is an explicit upstream fact until an authoritative market
-    status source is integrated.
+    ``freshness`` is a state/serving concept, not a reason to invalidate legitimate
+    historical observations inside a lookback window. Callers computing historical
+    series therefore disable freshness while retaining point-in-time, structural and
+    tradability checks.
+
+    Exchange-specific price-limit rules are deliberately not guessed from OHLC alone;
+    authoritative market-status data must set ``is_tradable`` upstream.
     """
     decision_time = decision_time or datetime.now(timezone.utc)
     reasons: List[str] = []
@@ -65,7 +70,7 @@ def validate_raw_bar(
     if not bar.is_tradable:
         return BarValidation(ValidationStatus.UNTRADABLE, ("upstream_market_status_untradable",))
 
-    if decision_time - bar.observed_at > freshness_limit:
+    if enforce_freshness and decision_time - bar.observed_at > freshness_limit:
         return BarValidation(ValidationStatus.STALE, ("observation_stale",))
 
     return BarValidation(ValidationStatus.VALID, ())
@@ -79,14 +84,21 @@ def masked_log_returns(
 ) -> List[Optional[float]]:
     """Compute returns only when both adjacent observations were valid first.
 
-    Invalid/stale/not-yet-known/untradable observations yield ``None`` and cannot
-    contaminate downstream features.
+    Historical observations are not rejected merely because they are older than the
+    serving freshness limit. They are still rejected for future knowledge, missing or
+    invalid values, or explicit untradability. Freshness of the *current state* should
+    be checked separately with ``validate_raw_bar(..., enforce_freshness=True)``.
     """
     ordered = sorted(bars, key=lambda b: b.timestamp)
     result: List[Optional[float]] = [None] * len(ordered)
 
     validations = [
-        validate_raw_bar(b, decision_time=decision_time, freshness_limit=freshness_limit)
+        validate_raw_bar(
+            b,
+            decision_time=decision_time,
+            freshness_limit=freshness_limit,
+            enforce_freshness=False,
+        )
         for b in ordered
     ]
 
