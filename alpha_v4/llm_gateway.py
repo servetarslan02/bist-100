@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, Mapping, Tuple
 
 
 class LLMProtocolError(RuntimeError):
@@ -94,9 +94,13 @@ class EventExtraction:
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any]) -> "EventExtraction":
-        forbidden = FORBIDDEN_DECISION_KEYS & {str(key).lower() for key in mapping.keys()}
+        top_level_keys = {str(key).lower() for key in mapping.keys()}
+        forbidden = FORBIDDEN_DECISION_KEYS & top_level_keys
         if forbidden:
-            raise LLMProtocolError("LLM event output contains forbidden decision keys: " + ",".join(sorted(forbidden)))
+            raise LLMProtocolError(
+                "LLM event output contains forbidden decision keys: "
+                + ",".join(sorted(forbidden))
+            )
 
         required = {"event_type", "entity_ids", "facts", "key_unknowns", "uncertainties"}
         missing = required - set(mapping)
@@ -111,6 +115,14 @@ class EventExtraction:
         raw_facts = mapping["facts"]
         if not isinstance(raw_facts, Mapping):
             raise LLMProtocolError("facts must be an object")
+        forbidden_fact_names = FORBIDDEN_DECISION_KEYS & {
+            str(name).lower() for name in raw_facts.keys()
+        }
+        if forbidden_fact_names:
+            raise LLMProtocolError(
+                "LLM event facts contain forbidden decision keys: "
+                + ",".join(sorted(forbidden_fact_names))
+            )
         facts = {
             str(name): EvidenceBoundFact.from_mapping(value)
             for name, value in raw_facts.items()
