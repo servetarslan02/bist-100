@@ -54,9 +54,7 @@ def test_health_server_runs_as_real_process_surface(tmp_path):
 
 def test_readiness_fails_closed_when_audit_history_is_tampered(tmp_path):
     database = tmp_path / "alpha.sqlite3"
-    runtime = AlphaRuntime(
-        RuntimeConfig(mode=RuntimeMode.TEST, database_path=database)
-    )
+    runtime = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
     runtime.audit.append(
         "TEST_AUDIT",
         {"value": 1},
