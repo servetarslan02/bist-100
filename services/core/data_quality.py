@@ -72,12 +72,15 @@ class DataQualityEngine:
                 price_mask = 0.0
                 is_tradable = False
 
-        # 2. Halt edilmiş hisse (fiyat değişmemiş ve hacim 0)
-        if volume == 0 and close == open_price and close == high and close == low:
-            reasons.append("Halt edilmiş (işlem yok)")
-            price_mask = 0.0
+        # 2. Sıfır hacim — işlem gerçekleşmemiş (BIST'te hacim=0 = tradable değil)
+        if volume == 0:
+            reasons.append("Sıfır hacim (işlem yok)")
             volume_mask = 0.0
             is_tradable = False
+            # OHLC de aynıysa tam halt
+            if close == open_price and close == high and close == low:
+                reasons.append("Halt edilmiş")
+                price_mask = 0.0
 
         # 3. Anormal fiyat (high < low, open > high, vb.)
         if high < low or open_price > high or open_price < low or close > high or close < low:

@@ -23,13 +23,18 @@ import structlog
 logger = structlog.get_logger()
 
 
+# Standart histogram bucket'ları (saniye cinsinden)
+DEFAULT_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
+
+
 class PrometheusMetrics:
-    """Prometheus uyumlu metric sistemi."""
+    """Prometheus uyumlu metric sistemi — histogram bucket desteği ile."""
 
     def __init__(self):
         self._counters: Dict[str, int] = defaultdict(int)
         self._gauges: Dict[str, float] = {}
         self._histograms: Dict[str, List[float]] = defaultdict(list)
+        self._histogram_buckets: Dict[str, tuple] = {}
 
     def inc(self, name: str, value: int = 1, labels: Dict[str, str] = None):
         """Counter artır."""
@@ -41,12 +46,32 @@ class PrometheusMetrics:
         key = self._make_key(name, labels)
         self._gauges[key] = value
 
-    def observe(self, name: str, value: float, labels: Dict[str, str] = None):
-        """Histogram gözlem."""
+    def observe(self, name: str, value: float, labels: Dict[str, str] = None,
+                buckets: tuple = None):
+        """Histogram gözlem (bucket desteği ile)."""
         key = self._make_key(name, labels)
         self._histograms[key].append(value)
-        # Son 1000 gözlem tut
         self._histograms[key] = self._histograms[key][-1000:]
+        if buckets:
+            self._histogram_buckets[name] = buckets
+
+    def timed(self, name: str, labels: Dict[str, str] = None, buckets: tuple = None):
+        """Context manager — işlem süresini ölçer."""
+        import time as _time
+        class _Timer:
+            def __init__(self, metrics, n, l, b):
+                self._metrics = metrics
+                self._name = n
+                self._labels = l
+                self._buckets = b
+                self._start = None
+            def __enter__(self):
+                self._start = _time.monotonic()
+                return self
+            def __exit__(self, *args):
+                elapsed = _time.monotonic() - self._start
+                self._metrics.observe(self._name, elapsed, self._labels, self._buckets)
+        return _Timer(self, name, labels, buckets)
 
     def get_metrics(self) -> Dict[str, Any]:
         """Tüm metrikleri döndür."""
@@ -57,6 +82,12 @@ class PrometheusMetrics:
         }
         for key, values in self._histograms.items():
             if values:
+                base_name = key.split("{")[0]
+                buckets = self._histogram_buckets.get(base_name, DEFAULT_BUCKETS)
+                bucket_counts = {}
+                for b in buckets:
+                    bucket_counts[str(b)] = sum(1 for v in values if v <= b)
+                bucket_counts["+Inf"] = len(values)
                 result["histograms"][key] = {
                     "count": len(values),
                     "sum": sum(values),
@@ -66,8 +97,29 @@ class PrometheusMetrics:
                     "p50": sorted(values)[len(values) // 2],
                     "p95": sorted(values)[int(len(values) * 0.95)],
                     "p99": sorted(values)[int(len(values) * 0.99)],
+                    "buckets": bucket_counts,
                 }
         return result
+
+    def get_prometheus_text(self) -> str:
+        """Prometheus text exposition format."""
+        lines = []
+        for key, value in self._counters.items():
+            name = key.split("{")[0]
+            lines.append(f"# TYPE {name} counter")
+            lines.append(f"{key} {value}")
+        for key, value in self._gauges.items():
+            name = key.split("{")[0]
+            lines.append(f"# TYPE {name} gauge")
+            lines.append(f"{key} {value}")
+        for key, stats in self.get_metrics()["histograms"].items():
+            name = key.split("{")[0]
+            lines.append(f"# TYPE {name} histogram")
+            for b, count in stats.get("buckets", {}).items():
+                lines.append(f'{name}_bucket{{le="{b}"}} {count}')
+            lines.append(f"{name}_count {stats['count']}")
+            lines.append(f"{name}_sum {stats['sum']:.6f}")
+        return "\n".join(lines) + "\n"
 
     def _make_key(self, name: str, labels: Dict[str, str] = None) -> str:
         if labels:

@@ -256,24 +256,24 @@ class RankingModel:
                 self._ensemble_weights["rule_based"] * rule_norm
             )
 
-        # Sırala (düşük skor = üst sıra, çünkü LambdaRank'te düşük label = iyi)
-        sorted_scores = sorted(ensemble_scores.items(), key=lambda x: x[1])
+        # Sırala (yüksek skor = üst sıra — label: future return, yüksek = iyi)
+        sorted_scores = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
 
         scores = []
         for rank, (ticker, score) in enumerate(sorted_scores, 1):
             features = features_map.get(ticker, {})
 
-            # Yön belirle
-            momentum = features.get("momentum_20d", 0)
-            roc = features.get("roc_5d", 0)
-            rsi = features.get("rsi_14", 50)
+            # Yön belirle (scalar'a çevir — numpy array gelebilir)
+            momentum = self._scalar(features.get("momentum_20d", 0))
+            roc = self._scalar(features.get("roc_5d", 0))
+            rsi = self._scalar(features.get("rsi_14", 50))
 
             if momentum > 0 and roc > 0 and rsi > 50:
                 direction = "LONG"
             elif momentum < 0 and roc < 0 and rsi < 50:
                 direction = "SHORT"
             else:
-                direction = "LONG" if score < np.median(list(ensemble_scores.values())) else "SHORT"
+                direction = "LONG" if score > np.median(list(ensemble_scores.values())) else "SHORT"
 
             # Guven: rank bazli (en ust siradakiler en yuksek guven)
             # Score semantigi: dusuk score = iyi (LambdaRank)
@@ -285,16 +285,16 @@ class RankingModel:
             lgbm_norm, rule_norm = normalized_scores.get(ticker, (0, 0))
             opp = OpportunityScore(
                 ticker=ticker,
-                score=round(score, 4),
+                score=round(float(score), 4),
                 rank=rank,
                 direction=direction,
-                confidence=round(confidence, 2),
+                confidence=round(float(confidence), 2),
                 regime=regime,
                 signals={},
                 features=features,
                 model_contribution={
-                    "lgbm": round(self._ensemble_weights["lgbm"] * lgbm_norm, 4) if ticker in lgbm_scores else 0,
-                    "rule_based": round(self._ensemble_weights["rule_based"] * rule_norm, 4) if ticker in rule_scores else 0,
+                    "lgbm": round(float(self._ensemble_weights["lgbm"] * lgbm_norm), 4) if ticker in lgbm_scores else 0,
+                    "rule_based": round(float(self._ensemble_weights["rule_based"] * rule_norm), 4) if ticker in rule_scores else 0,
                 }
             )
             scores.append(opp)
@@ -349,28 +349,36 @@ class RankingModel:
 
         return X_weighted
 
+    @staticmethod
+    def _scalar(val) -> float:
+        """numpy array veya scalar değerden float elde et."""
+        if isinstance(val, np.ndarray):
+            return float(val.flat[0]) if val.size > 0 else 0.0
+        return float(val)
+
     def _rule_based_score(self, features: Dict, regime: str) -> float:
         """Rejim-aware rule-based skor."""
+        _s = self._scalar  # shorthand
         score = 50.0
 
         # Momentum ağırlığı rejime göre değişir
         mom_weight = 0.15 if regime == "BULL" else 0.08 if regime == "BEAR" else 0.12
-        score += features.get("momentum_20d", 0) * mom_weight
-        score += features.get("roc_5d", 0) * 0.10
-        score += features.get("rs_vs_bist_5d", 0) * 0.08
-        score += features.get("volume_zscore", 0) * 0.06
-        score += features.get("sector_rel_return_5d", 0) * 0.08
+        score += _s(features.get("momentum_20d", 0)) * mom_weight
+        score += _s(features.get("roc_5d", 0)) * 0.10
+        score += _s(features.get("rs_vs_bist_5d", 0)) * 0.08
+        score += _s(features.get("volume_zscore", 0)) * 0.06
+        score += _s(features.get("sector_rel_return_5d", 0)) * 0.08
 
         # Risk cezası
-        score -= features.get("atr_pct", 0) * 0.03
-        score -= features.get("drawdown_20d", 0) * 0.02
+        score -= _s(features.get("atr_pct", 0)) * 0.03
+        score -= _s(features.get("drawdown_20d", 0)) * 0.02
 
         # Fundamental
-        score += features.get("fcf_yield_pct", 0) * 0.05
-        score += features.get("balance_sheet_quality", 0) * 0.02
+        score += _s(features.get("fcf_yield_pct", 0)) * 0.05
+        score += _s(features.get("balance_sheet_quality", 0)) * 0.02
 
         # Sınırla
-        return max(0, min(100, score))
+        return max(0.0, min(100.0, float(score)))
 
     def _normalize_score(self, score: float) -> float:
         """Skoru 0-100 arası normalize et."""

@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 import structlog
@@ -51,6 +51,9 @@ from services.core.decision_engine import decision_engine
 from services.risk.position_sizing import position_sizer
 from services.simulation.execution_simulator import execution_simulator
 from services.portfolio.portfolio_manager import portfolio_manager
+from services.core.monitoring import portfolio_monitor
+from services.core.monitoring_security import monitoring_auth, extract_bearer_token, extract_api_key
+from services.core.alerting import alerting
 from services.learning.integrated_learning import learning_system
 from services.learning.outcome_tracker import outcome_tracker
 
@@ -529,6 +532,99 @@ async def general_exception_handler(request, exc):
             "timestamp": datetime.now(timezone.utc).isoformat(),
         },
     )
+
+# ===================== MONITORING ENDPOINTS =====================
+
+@app.get("/health/detailed")
+async def health_detailed():
+    """Detaylı sağlık raporu (portfolio + locks + components)."""
+    start = datetime.now(timezone.utc)
+    result = await portfolio_monitor.get_health_detailed()
+    latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+    result["latency_ms"] = round(latency_ms, 2)
+    prometheus_metrics.inc("health_detailed_total")
+    return result
+
+
+@app.get("/metrics")
+async def prometheus_metrics_endpoint(request: Request):
+    """Prometheus text format metrics (Bearer token gerekli)."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not monitoring_auth.check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_metrics_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        monitoring_auth.record_failed_attempt(client_ip)
+        raise HTTPException(status_code=401, detail="Invalid or missing credentials")
+
+    text = await portfolio_monitor.get_prometheus_text()
+    return JSONResponse(
+        content=text,
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
+@app.get("/admin/lock-metrics")
+async def admin_lock_metrics(request: Request):
+    """Lock performans metrikleri (admin — token gerekli)."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not monitoring_auth.check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        monitoring_auth.record_failed_attempt(client_ip)
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    prometheus_metrics.inc("admin_lock_metrics_total")
+    return await portfolio_monitor.get_lock_metrics_api()
+
+
+@app.get("/admin/portfolio")
+async def admin_portfolio(request: Request):
+    """Portfolio sağlık ve muhasebe durumu (admin — token gerekli)."""
+    client_ip = request.client.host if request.client else "unknown"
+    if not monitoring_auth.check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        monitoring_auth.record_failed_attempt(client_ip)
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    prometheus_metrics.inc("admin_portfolio_total")
+    return await portfolio_monitor.get_portfolio_api()
+
+
+@app.get("/admin/alerts")
+async def admin_alerts(request: Request):
+    """Aktif alert'ler (admin — token gerekli)."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    return {
+        "summary": alerting.get_alert_summary(),
+        "active": alerting.get_active_alerts(),
+        "recent": alerting.get_all_alerts(limit=50),
+    }
+
+
+@app.get("/admin/auth-status")
+async def admin_auth_status():
+    """Authentication durumu (public)."""
+    return monitoring_auth.get_auth_status()
+
 
 # ===================== MAIN =====================
 if __name__ == "__main__":

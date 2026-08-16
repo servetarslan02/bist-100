@@ -1,0 +1,246 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "ALPHA BIST — Portfolio & Lock Monitoring",
+    "tags": ["alpha", "bist", "portfolio", "trading"],
+    "timezone": "browser",
+    "refresh": "10s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Portfolio Equity",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [
+          {
+            "expr": "portfolio_equity",
+            "legendFormat": "Equity (TL)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyTRY",
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 90000, "color": "yellow"},
+                {"value": 80000, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Cash Balance",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [
+          {
+            "expr": "portfolio_cash",
+            "legendFormat": "Cash (TL)"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyTRY",
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 0, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Unrealized P&L",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "portfolio_unrealized_pnl",
+            "legendFormat": "Unrealized P&L"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyTRY",
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 0, "color": "yellow"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Realized P&L",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 8, "y": 8},
+        "targets": [
+          {
+            "expr": "portfolio_realized_pnl",
+            "legendFormat": "Realized P&L"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyTRY"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Drawdown %",
+        "type": "gauge",
+        "gridPos": {"h": 8, "w": 8, "x": 16, "y": 8},
+        "targets": [
+          {
+            "expr": "portfolio_drawdown_pct",
+            "legendFormat": "Drawdown"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "percent",
+            "max": 30,
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 5, "color": "yellow"},
+                {"value": 15, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Position Count",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+        "targets": [
+          {
+            "expr": "portfolio_positions_count",
+            "legendFormat": "Positions"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "blue"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Invariant Failures",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+        "targets": [
+          {
+            "expr": "portfolio_invariant_failures",
+            "legendFormat": "Failures"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Lock Acquisitions",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 12, "y": 16},
+        "targets": [
+          {
+            "expr": "lock_acquisition_total",
+            "legendFormat": "{{key}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Lock Wait Time",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 8, "x": 0, "y": 24},
+        "targets": [
+          {
+            "expr": "lock_wait_seconds",
+            "legendFormat": "{{key}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s",
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"},
+                {"value": 1, "color": "yellow"},
+                {"value": 5, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Commission Total",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 8, "y": 24},
+        "targets": [
+          {
+            "expr": "portfolio_commission_total",
+            "legendFormat": "Commission"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currencyTRY"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Health Status",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
+        "targets": [
+          {
+            "expr": "health_check_total",
+            "legendFormat": "Checks"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "thresholds": {
+              "steps": [
+                {"value": null, "color": "green"}
+              ]
+            }
+          }
+        }
+      }
+    ],
+    "schemaVersion": 39,
+    "version": 1
+  }
+}

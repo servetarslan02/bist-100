@@ -139,10 +139,15 @@ class PositionSizer:
 
                 base_weight = kelly
             else:
-                # Cold-start: Kelly devre disi, score-based proportional weight
+                # Cold-start: Kelly devre disi
+                # Negatif expected_return → NO TRADE
+                if expected_return < 0:
+                    print(f"    -> SKIP: expected_return<0 (NO TRADE)")
+                    continue
+
                 print(f"    COLD-START: Kelly disabled, using score-based weight")
-                # Score semantigi: dusuk = iyi. En iyi score = 1.0, en kotu = 0.1
-                base_weight = max(0.1, 1.0 - score / 20.0)
+                # Score semantigi: yuksek = iyi. En iyi score = 1.0, en kotu = 0.1
+                base_weight = max(0.1, min(1.0, score / 20.0))
                 kelly = 0.0  # Kelly uygulanmadi
                 print(f"    base_weight={base_weight:.4f}")
 

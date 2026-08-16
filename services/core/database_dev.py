@@ -32,180 +32,76 @@ class DevDatabase:
 
     async def init(self):
         """Initialize SQLite database."""
+        if self._db is not None:
+            return  # Zaten başlatılmış
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        self._db = sqlite3.connect(str(DB_PATH))
+        self._db = sqlite3.connect(str(DB_PATH), timeout=10)
         self._db.row_factory = sqlite3.Row
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA foreign_keys=ON")
-        await self._create_tables()
+        await self._run_migrations()
+        await self._seed_default_data()
         logger.info("Dev database initialized", path=str(DB_PATH))
 
+    async def _run_migrations(self):
+        """Migration runner'ı çalıştır."""
+        from .migrations.runner import MigrationRunner
+        runner = MigrationRunner(self._db, dialect="sqlite")
+        applied = await runner.run_pending()
+        if applied:
+            logger.info("Migrations applied", versions=applied)
+
+    async def _seed_default_data(self):
+        """Varsayılan verileri ekle (idempotent)."""
+        # Sektörler
+        sectors = [
+            ('BANK', 'Bankacılık'), ('INDUST', 'Sanayi'), ('TECH', 'Teknoloji'),
+            ('ENERGY', 'Enerji'), ('RETAIL', 'Perakende'), ('CONSTR', 'İnşaat'),
+            ('FOOD', 'Gıda'), ('CHEM', 'Kimya'), ('METAL', 'Metal'),
+            ('TELECOM', 'Telekomünikasyon'), ('HEALTH', 'Sağlık'),
+            ('REAL', 'Gayrimenkul'), ('AUTO', 'Otomotiv'), ('TEXTIL', 'Tekstil'),
+            ('AVIATION', 'Havacılık'), ('HOLDING', 'Holding'), ('OTHER', 'Diğer'),
+        ]
+        for code, name in sectors:
+            self._db.execute(
+                "INSERT OR IGNORE INTO sectors (code, name) VALUES (?, ?)",
+                (code, name)
+            )
+
+        # Stratejiler
+        strategies = [
+            ('Momentum', 'Kısa-orta vadeli momentum', 'MOMENTUM'),
+            ('Breakout', 'Fiyat sıkışması kırılım', 'BREAKOUT'),
+            ('Mean Reversion', 'Ortalama dönüş', 'MEAN_REVERSION'),
+            ('Event Driven', 'KAP/haber bazlı', 'EVENT_DRIVEN'),
+            ('SPEC', 'Olağandışı hareket tespiti', 'SPEC'),
+            ('Value', 'Fundamental değer', 'VALUE'),
+            ('Defensive', 'Korunma odaklı', 'DEFENSIVE'),
+        ]
+        for name, desc, stype in strategies:
+            self._db.execute(
+                "INSERT OR IGNORE INTO strategies (name, description, strategy_type) VALUES (?, ?, ?)",
+                (name, desc, stype)
+            )
+
+        # Risk config
+        risk_configs = [
+            ('risk.max_position_pct', '10', 'Max position %'),
+            ('risk.max_sector_pct', '30', 'Max sector %'),
+            ('risk.max_drawdown_pct', '15', 'Max drawdown %'),
+            ('risk.daily_loss_limit_pct', '5', 'Daily loss limit %'),
+        ]
+        for key, val, desc in risk_configs:
+            self._db.execute(
+                "INSERT OR IGNORE INTO system_config (config_key, config_value, description) VALUES (?, ?, ?)",
+                (key, val, desc)
+            )
+
+        self._db.commit()
+
     async def _create_tables(self):
-        """Create tables matching PostgreSQL schema."""
-        self._db.executescript("""
-            CREATE TABLE IF NOT EXISTS sectors (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS companies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                ticker TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                sector_id INTEGER REFERENCES sectors(id),
-                active BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS instruments (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                company_id INTEGER REFERENCES companies(id),
-                symbol TEXT UNIQUE NOT NULL,
-                instrument_type TEXT DEFAULT 'EQUITY',
-                exchange TEXT DEFAULT 'BIST',
-                active BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS portfolios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                description TEXT,
-                initial_capital REAL NOT NULL DEFAULT 100000,
-                current_capital REAL NOT NULL DEFAULT 100000,
-                cash_balance REAL NOT NULL DEFAULT 100000,
-                invested_value REAL DEFAULT 0,
-                total_pnl REAL DEFAULT 0,
-                total_return_pct REAL DEFAULT 0,
-                status TEXT DEFAULT 'ACTIVE',
-                is_paper BOOLEAN DEFAULT 1,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS positions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                portfolio_id INTEGER REFERENCES portfolios(id),
-                instrument_id INTEGER REFERENCES instruments(id),
-                quantity INTEGER NOT NULL DEFAULT 0,
-                avg_cost REAL NOT NULL,
-                current_price REAL,
-                market_value REAL,
-                unrealized_pnl REAL DEFAULT 0,
-                unrealized_pnl_pct REAL DEFAULT 0,
-                weight_pct REAL,
-                entry_date TIMESTAMP,
-                status TEXT DEFAULT 'OPEN',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(portfolio_id, instrument_id)
-            );
-
-            CREATE TABLE IF NOT EXISTS orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                portfolio_id INTEGER REFERENCES portfolios(id),
-                instrument_id INTEGER REFERENCES instruments(id),
-                order_type TEXT NOT NULL,
-                side TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                price REAL,
-                filled_quantity INTEGER DEFAULT 0,
-                avg_fill_price REAL,
-                status TEXT DEFAULT 'PENDING',
-                source TEXT DEFAULT 'MANUAL',
-                signal_id INTEGER,
-                placed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                filled_at TIMESTAMP,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS fills (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id INTEGER REFERENCES orders(id),
-                instrument_id INTEGER REFERENCES instruments(id),
-                side TEXT NOT NULL,
-                quantity INTEGER NOT NULL,
-                price REAL NOT NULL,
-                commission REAL DEFAULT 0,
-                filled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS signals (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                instrument_id INTEGER REFERENCES instruments(id),
-                signal_type TEXT NOT NULL,
-                direction TEXT,
-                score REAL,
-                confidence REAL,
-                risk_level TEXT,
-                horizon TEXT,
-                expected_return_pct REAL,
-                reasoning TEXT,
-                model_version TEXT,
-                status TEXT DEFAULT 'ACTIVE',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS system_config (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                config_key TEXT UNIQUE NOT NULL,
-                config_value TEXT NOT NULL,
-                description TEXT,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS strategies (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT,
-                strategy_type TEXT,
-                status TEXT DEFAULT 'ACTIVE',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS models (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                description TEXT,
-                model_type TEXT,
-                status TEXT DEFAULT 'DRAFT',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS model_versions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                model_id INTEGER REFERENCES models(id),
-                version TEXT NOT NULL,
-                metrics TEXT DEFAULT '{}',
-                status TEXT DEFAULT 'CANDIDATE',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(model_id, version)
-            );
-
-            CREATE TABLE IF NOT EXISTS alerts (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                alert_type TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                title TEXT NOT NULL,
-                message TEXT,
-                instrument_id INTEGER,
-                data TEXT DEFAULT '{}',
-                acknowledged BOOLEAN DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS audit_logs (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                action TEXT NOT NULL,
-                entity_type TEXT,
-                entity_id INTEGER,
-                actor TEXT DEFAULT 'SYSTEM',
-                details TEXT DEFAULT '{}',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-        """)
+        """Artık migration runner tarafından yönetiliyor."""
+        pass
 
         # Seed default data
         self._db.execute("""

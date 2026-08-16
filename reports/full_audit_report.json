@@ -1,0 +1,121 @@
+{
+  "timestamp": "2026-08-17T03:43:40.942876",
+  "system_status": "CONDITIONAL PASS",
+  "modules": {
+    "Data": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "Veri \u00e7ekilen: 11 hisse\n  AEFES: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AGHOL: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AKBNK: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AKFGY: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AKFYE: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AKSA: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  AKSEN: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  ALARK: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  ALBRK: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  ALFAS: 125 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  XU100: 122 g\u00fcn, 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  XU100: 122 g\u00fcn\n  Bozuk veri testi: PASS (is_tradable=False)"
+    },
+    "Data Quality": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  \u2705 Normal g\u00fcn: tradable=True\n  \u2705 S\u0131f\u0131r kapan\u0131\u015f: tradable=False\n  \u2705 T\u00fcm fiyatlar s\u0131f\u0131r: tradable=False\n  \u2705 High < Low: tradable=False\n  \u2705 S\u0131f\u0131r hacim + halt: tradable=False\n  \u2705 Normal: tradable=True\n  \u2705 Tavan fiyat (%18+): tradable=False\n  \u2705 Taban fiyat (%-18): tradable=False\n  \u2705 Extreme anomaly: correctly rejected"
+    },
+    "Look-Ahead": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  \u2705 IncrementalStateManager mod\u00fcl\u00fc mevcut\n  \u2705 PointInTimeStore mod\u00fcl\u00fc mevcut\n  \u2705 Future data injection testi: Leakage tespit edilmedi"
+    },
+    "Tradability Mask": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  \u2705 Missing price: correctly masked\n  \u2705 Zero volume: correctly masked\n  \u2705 Limit-up: correctly masked\n  \u2705 Invalid OHLC: correctly masked\n  \u2705 Feature masking: correctly applied"
+    },
+    "Features": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  Hesaplanan feature say\u0131s\u0131: 40\n  \u2705 rsi_14: scalar=67.3271\n  \u2705 macd: scalar=0.0094\n  \u2705 macd_signal: scalar=-0.1478\n  \u2705 macd_hist: scalar=0.1572\n  \u2705 bb_upper: scalar=95.4291\n  \u2705 bb_lower: scalar=93.0045\n  \u2705 bb_position: scalar=0.9261\n  \u2705 atr_14: scalar=0.9102\n  \u2705 adx: scalar=78.5714\n  \u2705 obv: scalar=-3527884.0000\n  \u2705 volume_zscore: scalar=-0.3713\n  \u2705 momentum_20d: scalar=0.4664\n  \u2705 roc_5d: scalar=0.5239\n  \u2705 roc_20d: scalar=0.4664"
+    },
+    "Cross Sectional": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  Cross-sectional feature say\u0131s\u0131: 11\n  \u26a0\ufe0f Rank features hesaplanamad\u0131"
+    },
+    "Regime": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  BULL test: regime=BULL, confidence=0.90\n  BEAR test: regime=BEAR, confidence=0.90\n  SIDEWAYS test: regime=HIGH_VOL, confidence=0.50\n  Factors: ['trend_score', 'volatility_score', 'vol_20d_annual', 'vol_60d_annual', 'momentum_score', 'breadth_score', 'advancing_ratio', 'avg_correlation', 'dispersion_score', 'volume_trend']\n    trend_score: 20\n    volatility_score: 100\n    vol_20d_annual: 27.93\n    vol_60d_annual: 0\n    momentum_score: 0\n    breadth_score: 100.0\n    advancing_ratio: 1.0\n    avg_correlation: 0.5\n    dispersion_score: 50.0\n    volume_trend: -12.13"
+    },
+    "Ranking": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  Ranking sonucu: 3 hisse\n    #1 A: score=15.0045, dir=LONG\n    #2 B: score=15.0023, dir=SHORT\n    #3 C: score=14.9977, dir=SHORT\n  \u2705 S\u0131ralama do\u011fru: A > B > C (rank)\n  Score y\u00f6n\u00fc: best=15.0045, worst=14.9977"
+    },
+    "Walk Forward": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  Fold say\u0131s\u0131: 33\n  Fold 1: train=247 g\u00fcn, test=63 g\u00fcn\n    \u2705 Train/Test ayr\u0131m\u0131 do\u011fru (gap=8 g\u00fcn)\n  Fold 2: train=247 g\u00fcn, test=63 g\u00fcn\n    \u2705 Train/Test ayr\u0131m\u0131 do\u011fru (gap=10 g\u00fcn)\n  Fold 3: train=247 g\u00fcn, test=63 g\u00fcn\n    \u2705 Train/Test ayr\u0131m\u0131 do\u011fru (gap=8 g\u00fcn)"
+    },
+    "Calibration": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  score=0 \u2192 win_prob=0.9241\n  score=1 \u2192 win_prob=0.8808\n  score=2 \u2192 win_prob=0.8176\n  score=3 \u2192 win_prob=0.7311\n  score=5 \u2192 win_prob=0.5000\n  score=10 \u2192 win_prob=0.0759\n  score=20 \u2192 win_prob=0.0500\n  Calibrator fitted: False (cold start)\n  \u2705 add_trade \u00e7al\u0131\u015ft\u0131\n  Trade history: 1 kay\u0131t"
+    },
+    "Position Sizing": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  Manuel Kelly: p=0.6, q=0.4, b=1.6667\n  raw_kelly=0.3600, fractional=0.1800\n  Sistem sonucu: weight=0.0607, kelly=0.0000\n  win_prob=0.8176, avg_win=0.0500, avg_loss=0.0500\n  \u2705 Negative expectation: correctly rejected (NO TRADE)"
+    },
+    "Risk Engine": {
+      "status": "CONDITIONAL PASS",
+      "issues": 6,
+      "details": "  \u2705 Risk limits y\u00fcklenmemi\u015f \u2192 fail-closed (correct)"
+    },
+    "Execution": {
+      "status": "CONDITIONAL PASS",
+      "issues": 1,
+      "details": "  \u2705 ExecutionSimulator mod\u00fcl\u00fc mevcut\n  \u26a0\ufe0f Impossible fill testi: Manuel do\u011frulama gerekli"
+    },
+    "Portfolio": {
+      "status": "CONDITIONAL PASS",
+      "issues": 3,
+      "details": ""
+    },
+    "Performance": {
+      "status": "CONDITIONAL PASS",
+      "issues": 1,
+      "details": "  CAGR: 5.04%\n  Sharpe: 0.4314\n  Sortino: 0.7820\n  Max DD: -14.40%\n  Calmar: 0.3497\n  Win Rate: 52.38%\n  Profit Factor: 1.0710"
+    },
+    "Benchmark": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  XU100 verisi: 122 g\u00fcn\n  Tarih aral\u0131\u011f\u0131: 2026-02-16 00:00:00+03:00 \u2192 2026-08-14 00:00:00+03:00\n  Toplam getiri: -1.16%\n  G\u00fcnl\u00fck ortalama return: 0.0031%\n  Timezone: UTC+03:00"
+    },
+    "Survivorship": {
+      "status": "CONDITIONAL PASS",
+      "issues": 2,
+      "details": "  Mevcut BIST 100: 100 hisse\n  \u2705 Corporate actions mod\u00fcl\u00fc mevcut"
+    },
+    "Quality Gate": {
+      "status": "CONDITIONAL PASS",
+      "issues": 1,
+      "details": "  \u26a0\ufe0f Challenger lifecycle s\u00fcreci: Manuel do\u011frulama gerekli"
+    },
+    "Self Learning": {
+      "status": "CONDITIONAL PASS",
+      "issues": 1,
+      "details": "  Drift detected: False\n  Retrain needed: N/A\n  Total cycles: 0\n  \u26a0\ufe0f Future data learning kontrol\u00fc: Manuel do\u011frulama gerekli"
+    },
+    "Fail Safe": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  \u2705 Circuit breaker mod\u00fcl\u00fc mevcut (state=CircuitState.CLOSED)\n  \u2705 StartupRecovery mod\u00fcl\u00fc mevcut\n  \u2705 State recovery mod\u00fcl\u00fc mevcut\n  \u2705 Streaming anomaly detector mevcut\n  \u2705 Ge\u00e7ersiz ticker: bo\u015f sonu\u00e7 (correct)\n  \u2705 NaN feature masking: correct"
+    },
+    "Security/Audit": {
+      "status": "PASS",
+      "issues": 0,
+      "details": "  \u2705 SafetyGovernance mod\u00fcl\u00fc mevcut\n  \u2705 AuthenticationService mod\u00fcl\u00fc mevcut\n  \u2705 AuditLog mod\u00fcl\u00fc mevcut\n  Ortam: development (security check relaxed)\n  \u26a0\ufe0f Immutable audit: Manuel do\u011frulama gerekli (append-only)"
+    }
+  },
+  "summary": {
+    "critical_bugs": 0,
+    "logic_bugs": 0,
+    "financial_math_bugs": 1,
+    "data_bugs": 0,
+    "leakage_risks": 1,
+    "security_bugs": 0,
+    "performance_issues": 0,
+    "missing_features": 13
+  }
+}
