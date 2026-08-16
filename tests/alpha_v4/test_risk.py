@@ -14,19 +14,19 @@ def _policy():
 
 
 def _request(**overrides):
-    values = dict(
-        instrument_id="inst-a",
-        sector_id="sector-x",
-        requested_notional=8_000.0,
-        portfolio_equity=100_000.0,
-        current_instrument_notional=0.0,
-        current_sector_notional=10_000.0,
-        current_gross_exposure=20_000.0,
-        liquidity_score=0.80,
-        data_integrity_ok=True,
-        model_integrity_ok=True,
-        kill_switch_active=False,
-    )
+    values = {
+        "instrument_id": "inst-a",
+        "sector_id": "sector-x",
+        "requested_notional": 8_000.0,
+        "portfolio_equity": 100_000.0,
+        "current_instrument_notional": 0.0,
+        "current_sector_notional": 10_000.0,
+        "current_gross_exposure": 20_000.0,
+        "liquidity_score": 0.80,
+        "data_integrity_ok": True,
+        "model_integrity_ok": True,
+        "kill_switch_active": False,
+    }
     values.update(overrides)
     return RiskRequest(**values)
 
