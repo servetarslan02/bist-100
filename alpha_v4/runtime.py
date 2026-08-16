@@ -8,10 +8,14 @@ from pathlib import Path
 from typing import Optional, Protocol
 
 from .acquisition import RawDocumentStore
+from .audit import AuditLedger
 from .contracts import CanonicalEvent
 from .features import FeatureStore
 from .market_data import RawBarStore
+from .model_registry import ModelRegistry
 from .paper_ledger import PaperLedger
+from .relations import RelationStore
+from .research_queue import ResearchQueue
 from .source_history import PersistentSourceRegistry
 from .state import StateStore
 from .storage import AppendOnlyEventStore
@@ -69,6 +73,10 @@ class AlphaRuntime:
         self.market_data = RawBarStore(config.database_path)
         self.states = StateStore(config.database_path)
         self.features = FeatureStore(config.database_path)
+        self.relations = RelationStore(config.database_path)
+        self.models = ModelRegistry(config.database_path)
+        self.research = ResearchQueue(config.database_path)
+        self.audit = AuditLedger(config.database_path)
         self.paper = PaperLedger(config.database_path)
 
     def ingest_event(self, event: CanonicalEvent) -> None:
@@ -90,9 +98,14 @@ class AlphaRuntime:
                 "market_data": "ready",
                 "states": "ready",
                 "features": "ready",
+                "relations": "ready",
+                "models": "ready",
+                "research": "ready",
+                "audit": "ready",
                 "paper_ledger": "ready",
             },
             "event_count": self.events.count(),
             "registered_sources": len(self.source_registry.enabled_sources()),
+            "audit_chain_valid": self.audit.verify_chain().valid,
             "real_money_execution": False,
         }
