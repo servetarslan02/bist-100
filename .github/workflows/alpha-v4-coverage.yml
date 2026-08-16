@@ -1,0 +1,57 @@
+name: ALPHA v4 Coverage
+
+on:
+  push:
+    branches: ["alpha-rebuild-v4"]
+    paths:
+      - "alpha_v4/**"
+      - "tests/alpha_v4/**"
+      - ".github/workflows/alpha-v4-coverage.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "alpha_v4/**"
+      - "tests/alpha_v4/**"
+      - ".github/workflows/alpha-v4-coverage.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install coverage and test dependencies
+        run: python -m pip install --upgrade pytest coverage
+
+      - name: Run branch coverage
+        run: coverage run --branch --source=alpha_v4 -m pytest -q tests/alpha_v4 --disable-warnings --maxfail=1
+
+      - name: Report measured coverage
+        run: |
+          coverage report -m
+          coverage json -o coverage.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path("coverage.json").read_text(encoding="utf-8"))
+          totals = payload["totals"]
+          print(
+              "COVERAGE_TOTAL "
+              f"percent={totals['percent_covered']:.2f} "
+              f"statements={totals['num_statements']} "
+              f"missing={totals['missing_lines']} "
+              f"branches={totals['num_branches']} "
+              f"partial_branches={totals['num_partial_branches']}"
+          )
+          PY
