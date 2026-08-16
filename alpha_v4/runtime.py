@@ -16,6 +16,7 @@ from .model_registry import ModelRegistry
 from .paper_ledger import PaperLedger
 from .relations import RelationStore
 from .research_queue import ResearchQueue
+from .source_catalog import OFFICIAL_SOURCE_SEEDS
 from .source_history import PersistentSourceRegistry
 from .state import StateStore
 from .storage import AppendOnlyEventStore
@@ -64,9 +65,14 @@ class AlphaRuntime:
         self.config = config
         config.database_path.parent.mkdir(parents=True, exist_ok=True)
 
-        self.source_registry: SourceRegistryLike = (
-            source_registry or PersistentSourceRegistry(config.database_path)
-        )
+        if source_registry is None:
+            persistent_sources = PersistentSourceRegistry(config.database_path)
+            for seed in OFFICIAL_SOURCE_SEEDS:
+                persistent_sources.register_if_missing(seed.record)
+            self.source_registry: SourceRegistryLike = persistent_sources
+        else:
+            self.source_registry = source_registry
+
         self.raw_documents = RawDocumentStore(config.database_path)
         self.events = AppendOnlyEventStore(config.database_path)
         self.universe = UniverseStore(config.database_path)
