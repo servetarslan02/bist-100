@@ -20,13 +20,13 @@ def simulator():
 
 
 def market(**overrides):
-    values = dict(
-        bid=99.0,
-        ask=101.0,
-        last=100.0,
-        available_volume=1_000.0,
-        data_integrity_ok=True,
-    )
+    values = {
+        "bid": 99.0,
+        "ask": 101.0,
+        "last": 100.0,
+        "available_volume": 1_000.0,
+        "data_integrity_ok": True,
+    }
     values.update(overrides)
     return MarketExecutionState(**values)
 
