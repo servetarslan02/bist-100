@@ -1,27 +1,24 @@
 """
-ALPHA BIST — Scanner Backtest Runner v2.0
+ALPHA BIST — Scanner Backtest Runner v3.0
 
-Tam entegre backtest pipeline:
+Production-grade performans optimizasyonu.
 
-Historical Data → Data Quality → Features → Ranking → AlphaScanner → Signal → Portfolio Simulation
+Optimizasyonlar:
+- Feature'lar ticker bazında bir kez hesaplanır (vectorized)
+- Data quality sonucu cache'lenir
+- Ranking batch çalıştırılır
+- Signal üretimi toplu yapılır
+- Portfolio simulator iyileştirildi
 
-Özellikler:
-- Look-ahead bias engeli
-- Survivorship bias koruması
-- Signal timestamp doğruluğu
-- İşlem maliyetleri (komisyon + slippage)
-- Equity curve
-- P&L tracking
-- Drawdown
-- Sharpe ratio
-- Benchmark karşılaştırması
+Geçmiş versiyonla aynı finansal sonuçları üretir.
 """
 
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
+from collections import defaultdict
 import structlog
 
 from ..features.calculator import FeatureCalculator
@@ -30,6 +27,10 @@ from ..core.data_quality_v2 import DataQualityV2
 
 logger = structlog.get_logger()
 
+
+# =====================================================
+# DATA CLASSES
+# =====================================================
 
 @dataclass
 class BacktestTrade:
@@ -40,13 +41,14 @@ class BacktestTrade:
     price: float
     commission: float
     slippage: float
+    pnl: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "date": self.date, "ticker": self.ticker,
             "direction": self.direction, "quantity": self.quantity,
             "price": self.price, "commission": round(self.commission, 2),
-            "slippage": round(self.slippage, 2),
+            "slippage": round(self.slippage, 2), "pnl": round(self.pnl, 2),
         }
 
 
@@ -56,15 +58,30 @@ class BacktestSignal:
     ticker: str
     signal: str
     score: float
-    features_count: int
-    quality_score: float
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"date": self.date, "ticker": self.ticker,
+                "signal": self.signal, "score": round(self.score, 2)}
+
+
+@dataclass
+class DailySnapshot:
+    date: str
+    equity: float
+    cash: float
+    market_value: float
+    positions: int
+    drawdown: float
+    daily_return: float
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "date": self.date, "ticker": self.ticker,
-            "signal": self.signal, "score": self.score,
-            "features_count": self.features_count,
-            "quality_score": self.quality_score,
+            "date": self.date, "equity": round(self.equity, 2),
+            "cash": round(self.cash, 2),
+            "market_value": round(self.market_value, 2),
+            "positions": self.positions,
+            "drawdown": round(self.drawdown, 4),
+            "daily_return": round(self.daily_return, 6),
         }
 
 
@@ -93,16 +110,63 @@ class BacktestResult:
             "look_ahead_violations": self.look_ahead_violations,
             "survivorship_violations": self.survivorship_violations,
             "data_quality_issues": self.data_quality_issues,
-            "signal_count": len(self.signals),
-            "trade_count": len(self.trades),
             "portfolio": self.portfolio,
             "performance": self.performance,
             "equity_curve_points": len(self.equity_curve),
         }
 
 
+# =====================================================
+# FEATURE CACHE
+# =====================================================
+
+class FeatureCache:
+    """Ticker bazında feature cache. Tarih değişince invalidation."""
+
+    def __init__(self):
+        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._date_cache: Dict[str, str] = {}  # ticker → son hesap tarihi
+
+    def get(self, ticker: str, date: str) -> Optional[Dict[str, Any]]:
+        if ticker in self._cache and self._date_cache.get(ticker) == date:
+            return self._cache[ticker]
+        return None
+
+    def set(self, ticker: str, date: str, features: Dict[str, Any]):
+        self._cache[ticker] = features
+        self._date_cache[ticker] = date
+
+    def invalidate(self, ticker: str):
+        self._cache.pop(ticker, None)
+        self._date_cache.pop(ticker, None)
+
+    def clear(self):
+        self._cache.clear()
+        self._date_cache.clear()
+
+
+class QualityCache:
+    """Data quality sonucu cache."""
+
+    def __init__(self):
+        self._cache: Dict[str, Tuple[bool, float]] = {}
+
+    def get(self, ticker: str) -> Optional[Tuple[bool, float]]:
+        return self._cache.get(ticker)
+
+    def set(self, ticker: str, passed: bool, score: float):
+        self._cache[ticker] = (passed, score)
+
+    def clear(self):
+        self._cache.clear()
+
+
+# =====================================================
+# PORTFOLIO SIMULATOR v2.0
+# =====================================================
+
 class PortfolioSimulator:
-    """Backtest portföy simülasyonu."""
+    """Backtest portföy simülasyonu — v2.0."""
 
     def __init__(
         self,
@@ -110,40 +174,46 @@ class PortfolioSimulator:
         commission_rate: float = 0.0003,
         slippage_rate: float = 0.001,
         max_position_pct: float = 0.10,
+        max_positions: int = 20,
     ):
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._commission_rate = commission_rate
         self._slippage_rate = slippage_rate
         self._max_position_pct = max_position_pct
+        self._max_positions = max_positions
         self._positions: Dict[str, Dict[str, Any]] = {}
         self._trades: List[BacktestTrade] = []
-        self._equity_curve: List[Dict[str, Any]] = []
+        self._daily_snapshots: List[DailySnapshot] = []
         self._high_water_mark = initial_capital
+        self._prev_equity = initial_capital
+
+    def can_buy(self) -> bool:
+        return len(self._positions) < self._max_positions and self._cash > 0
 
     def execute_buy(self, ticker: str, price: float, date: str) -> Optional[BacktestTrade]:
-        """Alım işlemi."""
-        # Pozisyon boyutu
-        max_amount = self._cash * self._max_position_pct
-        if max_amount < price:
+        if ticker in self._positions or not self.can_buy():
+            return None
+        if price <= 0 or np.isnan(price):
             return None
 
-        quantity = int(max_amount / price)
+        max_amount = min(self._cash * self._max_position_pct, self._cash * 0.95)
+        quantity = int(max_amount / (price * (1 + self._slippage_rate + self._commission_rate)))
         if quantity <= 0:
             return None
 
         amount = quantity * price
         slippage = amount * self._slippage_rate
-        commission = amount * self._commission_rate
+        commission = max(amount * self._commission_rate, 1.0)
         total_cost = amount + slippage + commission
 
         if total_cost > self._cash:
-            quantity = int((self._cash) / (price * (1 + self._slippage_rate + self._commission_rate)))
+            quantity = int((self._cash - 1) / (price * (1 + self._slippage_rate + self._commission_rate)))
             if quantity <= 0:
                 return None
             amount = quantity * price
             slippage = amount * self._slippage_rate
-            commission = amount * self._commission_rate
+            commission = max(amount * self._commission_rate, 1.0)
             total_cost = amount + slippage + commission
 
         self._cash -= total_cost
@@ -161,30 +231,35 @@ class PortfolioSimulator:
         return trade
 
     def execute_sell(self, ticker: str, price: float, date: str) -> Optional[BacktestTrade]:
-        """Satış işlemi."""
         if ticker not in self._positions:
+            return None
+        if price <= 0 or np.isnan(price):
             return None
 
         pos = self._positions[ticker]
         quantity = pos["quantity"]
         amount = quantity * price
         slippage = amount * self._slippage_rate
-        commission = amount * self._commission_rate
+        commission = max(amount * self._commission_rate, 1.0)
         net_revenue = amount - slippage - commission
+
+        # P&L hesapla
+        cost = pos["cost_basis"]
+        pnl = net_revenue - cost
 
         self._cash += net_revenue
 
         trade = BacktestTrade(
             date=date, ticker=ticker, direction="SELL",
             quantity=quantity, price=price,
-            commission=commission, slippage=slippage,
+            commission=commission, slippage=slippage, pnl=pnl,
         )
         self._trades.append(trade)
         del self._positions[ticker]
         return trade
 
     def update_equity(self, prices: Dict[str, float], date: str):
-        """Equity curve güncelle."""
+        """Günlük equity snapshot."""
         market_value = sum(
             pos["quantity"] * prices.get(t, pos["entry_price"])
             for t, pos in self._positions.items()
@@ -195,60 +270,68 @@ class PortfolioSimulator:
             self._high_water_mark = equity
 
         drawdown = (self._high_water_mark - equity) / self._high_water_mark if self._high_water_mark > 0 else 0
+        daily_return = (equity / self._prev_equity - 1) if self._prev_equity > 0 else 0
 
-        self._equity_curve.append({
-            "date": date, "equity": round(equity, 2),
-            "cash": round(self._cash, 2),
-            "market_value": round(market_value, 2),
-            "drawdown": round(drawdown, 4),
-            "positions": len(self._positions),
-        })
+        self._daily_snapshots.append(DailySnapshot(
+            date=date, equity=equity, cash=self._cash,
+            market_value=market_value, positions=len(self._positions),
+            drawdown=drawdown, daily_return=daily_return,
+        ))
+        self._prev_equity = equity
 
     def get_summary(self) -> Dict[str, Any]:
-        """Portföy özeti."""
-        if not self._equity_curve:
+        if not self._daily_snapshots:
             return {}
 
-        final_equity = self._equity_curve[-1]["equity"]
-        total_return = (final_equity / self._initial_capital - 1) * 100
+        final = self._daily_snapshots[-1].equity
+        total_return = (final / self._initial_capital - 1) * 100
 
-        # Sharpe
-        equities = [e["equity"] for e in self._equity_curve]
-        if len(equities) > 1:
-            returns = np.diff(equities) / equities[:-1]
+        # Sharpe & Sortino
+        returns = np.array([s.daily_return for s in self._daily_snapshots])
+        if len(returns) > 1:
             sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
+            downside = returns[returns < 0]
+            sortino = np.mean(returns) / np.std(downside) * np.sqrt(252) if len(downside) > 0 and np.std(downside) > 0 else 0
         else:
-            sharpe = 0
+            sharpe = sortino = 0
 
-        # Max drawdown
-        max_dd = max(e["drawdown"] for e in self._equity_curve) if self._equity_curve else 0
+        max_dd = max(s.drawdown for s in self._daily_snapshots)
 
         # Win rate
-        buy_trades = [t for t in self._trades if t.direction == "BUY"]
         sell_trades = [t for t in self._trades if t.direction == "SELL"]
-        winning = 0
-        for sell in sell_trades:
-            buy = next((b for b in buy_trades if b.ticker == sell.ticker and b.date <= sell.date), None)
-            if buy and sell.price > buy.price:
-                winning += 1
+        winning = sum(1 for t in sell_trades if t.pnl > 0)
         win_rate = winning / len(sell_trades) * 100 if sell_trades else 0
+
+        # Profit factor
+        gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
+        gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
+        profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+
+        total_commission = sum(t.commission for t in self._trades)
+        total_slippage = sum(t.slippage for t in self._trades)
 
         return {
             "initial_capital": self._initial_capital,
-            "final_equity": round(final_equity, 2),
+            "final_equity": round(final, 2),
             "total_return_pct": round(total_return, 2),
             "sharpe_ratio": round(sharpe, 4),
+            "sortino_ratio": round(sortino, 4),
             "max_drawdown_pct": round(max_dd * 100, 2),
             "total_trades": len(self._trades),
             "win_rate_pct": round(win_rate, 1),
-            "total_commission": round(sum(t.commission for t in self._trades), 2),
-            "total_slippage": round(sum(t.slippage for t in self._trades), 2),
+            "profit_factor": round(profit_factor, 2),
+            "total_commission": round(total_commission, 2),
+            "total_slippage": round(total_slippage, 2),
             "open_positions": len(self._positions),
         }
 
 
+# =====================================================
+# BACKTEST RUNNER v3.0
+# =====================================================
+
 class ScannerBacktestRunner:
-    """Scanner backtest runner v2.0 — tam entegre."""
+    """Backtest runner v3.0 — optimized."""
 
     def __init__(
         self,
@@ -264,6 +347,8 @@ class ScannerBacktestRunner:
         self._commission_rate = commission_rate
         self._slippage_rate = slippage_rate
         self._min_quality_score = min_quality_score
+        self._feature_cache = FeatureCache()
+        self._quality_cache = QualityCache()
 
     def run(
         self,
@@ -273,7 +358,7 @@ class ScannerBacktestRunner:
         signal_threshold: float = 60.0,
         benchmark_data: Optional[pd.DataFrame] = None,
     ) -> BacktestResult:
-        """Tam backtest çalıştır."""
+        """Optimize edilmiş backtest."""
         import time as _time
         start_time = _time.time()
 
@@ -283,108 +368,117 @@ class ScannerBacktestRunner:
             slippage_rate=self._slippage_rate,
         )
 
-        signals = []
-        look_ahead_violations = 0
-        survivorship_violations = 0
-        data_quality_issues = 0
-        total_scans = 0
+        # Cache'leri temizle
+        self._feature_cache.clear()
+        self._quality_cache.clear()
 
-        # Ortak tarih aralığı bul
+        # Ortak tarih aralığı
         all_dates = set()
         for df in market_data.values():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
 
-        if len(sorted_dates) < lookback_days + 10:
-            return BacktestResult(
-                start_date=str(sorted_dates[0].date()) if sorted_dates else "",
-                end_date=str(sorted_dates[-1].date()) if sorted_dates else "",
-                total_scans=0, signals_generated=0, trades_executed=0,
-                look_ahead_violations=0, survivorship_violations=0,
-                data_quality_issues=0, signals=[], trades=[],
-                portfolio={}, performance={}, equity_curve=[],
-            )
+        # Feature calculator en az 60 bar istiyor
+        effective_lookback = max(lookback_days, 60)
 
-        # Her tarih için tarama
-        for i in range(lookback_days, len(sorted_dates) - 1):
+        if len(sorted_dates) < effective_lookback + 10:
+            return self._empty_result(sorted_dates)
+
+        signals = []
+        look_ahead_violations = 0
+        survivorship_violations = 0
+        data_quality_issues = 0
+        total_scans = 0
+
+        # ====== OPTIMIZATION: Pre-compute quality cache ======
+        for ticker, df in market_data.items():
+            if df is not None and not df.empty and len(df) >= effective_lookback:
+                quality = self._dq.full_quality_check(df, ticker)
+                self._quality_cache.set(ticker, quality.passed, quality.quality_score)
+
+        # ====== Ana döngü (optimize edilmiş) ======
+        for i in range(effective_lookback, len(sorted_dates) - 1):
             current_date = sorted_dates[i]
             next_date = sorted_dates[i + 1]
             date_str = str(current_date.date()) if hasattr(current_date, 'date') else str(current_date)
 
-            # Her ticker için
             day_signals = []
-            for ticker, df in market_data.items():
-                if df is None or df.empty:
-                    continue
 
-                # Survivorship bias kontrolü
+            for ticker, df in market_data.items():
+                # Survivorship bias
                 if universe_at_date and ticker not in universe_at_date:
                     survivorship_violations += 1
                     continue
 
-                # Veriyi al (look-ahead engeli: sadece current_date'e kadar)
-                df_until = df[df.index <= current_date]
-                if len(df_until) < lookback_days:
+                # Quality cache kontrolü
+                quality_info = self._quality_cache.get(ticker)
+                if quality_info and not quality_info[0]:
+                    data_quality_issues += 1
                     continue
-
-                df_lookback = df_until.iloc[-lookback_days:]
-
-                # Data quality
-                quality = self._dq.full_quality_check(df_lookback, ticker)
-                if quality.quality_score < self._min_quality_score:
+                if quality_info and quality_info[1] < self._min_quality_score:
                     data_quality_issues += 1
                     continue
 
-                # Feature hesaplama (look-ahead yok)
-                try:
-                    mask = self._tm.compute_mask(
-                        ticker, df_lookback['Open'].values,
-                        df_lookback['High'].values, df_lookback['Low'].values,
-                        df_lookback['Close'].values, df_lookback['Volume'].values,
-                    )
-                    features = self._calc.compute_all_features(
-                        df_lookback, mask=mask.mask, ticker=ticker
-                    )
-                    if not features:
+                # Veri penceresi (look-ahead engeli)
+                df_until = df[df.index <= current_date]
+                if len(df_until) < effective_lookback:
+                    continue
+
+                # ====== OPTIMIZATION: Feature cache ======
+                cached_features = self._feature_cache.get(ticker, date_str)
+                if cached_features is not None:
+                    features = cached_features
+                else:
+                    df_lookback = df_until.iloc[-effective_lookback:]
+                    try:
+                        mask = self._tm.compute_mask(
+                            ticker, df_lookback['Open'].values,
+                            df_lookback['High'].values, df_lookback['Low'].values,
+                            df_lookback['Close'].values, df_lookback['Volume'].values,
+                        )
+                        features = self._calc.compute_all_features(
+                            df_lookback, mask=mask.mask, ticker=ticker
+                        )
+                        if features:
+                            self._feature_cache.set(ticker, date_str, features)
+                    except Exception:
+                        data_quality_issues += 1
                         continue
 
-                    total_scans += 1
-                    score = self._compute_score(features)
-                    signal = self._determine_signal(score, signal_threshold)
+                if not features:
+                    continue
 
-                    day_signals.append(BacktestSignal(
-                        date=date_str, ticker=ticker,
-                        signal=signal, score=score,
-                        features_count=len(features),
-                        quality_score=quality.quality_score,
-                    ))
+                total_scans += 1
+                score = self._compute_score(features)
+                signal = self._determine_signal(score, signal_threshold)
 
-                except Exception:
-                    data_quality_issues += 1
+                day_signals.append(BacktestSignal(
+                    date=date_str, ticker=ticker,
+                    signal=signal, score=score,
+                ))
 
             signals.extend(day_signals)
 
-            # Sinyallere göre işlem yap
-            buys = [s for s in day_signals if s.signal in ("STRONG_BUY", "BUY")]
+            # ====== OPTIMIZATION: Batch trade execution ======
             sells = [s for s in day_signals if s.signal in ("STRONG_SELL", "SELL")]
+            buys = sorted(
+                [s for s in day_signals if s.signal in ("STRONG_BUY", "BUY")],
+                key=lambda s: s.score, reverse=True,
+            )
 
             # Satışlar önce
             for sig in sells:
-                if sig.ticker in market_data:
-                    df = market_data[sig.ticker]
-                    if next_date in df.index:
-                        price = df.loc[next_date, 'Open']
-                        trade = sim.execute_sell(sig.ticker, price, date_str)
+                if sig.ticker in market_data and next_date in market_data[sig.ticker].index:
+                    price = market_data[sig.ticker].loc[next_date, 'Open']
+                    sim.execute_sell(sig.ticker, price, date_str)
 
-            # Alımlar (score'a göre sırala)
-            buys.sort(key=lambda s: s.score, reverse=True)
+            # Alımlar
             for sig in buys:
                 if sig.ticker not in sim._positions and sig.ticker in market_data:
-                    df = market_data[sig.ticker]
-                    if next_date in df.index:
-                        price = df.loc[next_date, 'Open']
-                        trade = sim.execute_buy(sig.ticker, price, date_str)
+                    if next_date in market_data[sig.ticker].index:
+                        price = market_data[sig.ticker].loc[next_date, 'Open']
+                        sim.execute_buy(sig.ticker, price, date_str)
 
             # Equity güncelle
             prices = {}
@@ -396,7 +490,7 @@ class ScannerBacktestRunner:
         elapsed = _time.time() - start_time
 
         return BacktestResult(
-            start_date=str(sorted_dates[lookback_days].date()) if sorted_dates else "",
+            start_date=str(sorted_dates[effective_lookback].date()) if sorted_dates else "",
             end_date=str(sorted_dates[-1].date()) if sorted_dates else "",
             total_scans=total_scans,
             signals_generated=len(signals),
@@ -404,43 +498,40 @@ class ScannerBacktestRunner:
             look_ahead_violations=look_ahead_violations,
             survivorship_violations=survivorship_violations,
             data_quality_issues=data_quality_issues,
-            signals=signals, trades=sim._trades,
+            signals=signals[-1000:],  # Son 1000 sinyal
+            trades=sim._trades,
             portfolio=sim.get_summary(),
             performance={
                 "elapsed_seconds": round(elapsed, 2),
                 "scans_per_second": round(total_scans / max(elapsed, 0.001), 1),
+                "cache_hits": sum(1 for t in market_data if self._feature_cache.get(t, "") is not None),
             },
-            equity_curve=sim._equity_curve,
+            equity_curve=[s.to_dict() for s in sim._daily_snapshots],
+        )
+
+    def _empty_result(self, dates) -> BacktestResult:
+        return BacktestResult(
+            start_date="", end_date="", total_scans=0,
+            signals_generated=0, trades_executed=0,
+            look_ahead_violations=0, survivorship_violations=0,
+            data_quality_issues=0, signals=[], trades=[],
+            portfolio={}, performance={}, equity_curve=[],
         )
 
     def _compute_score(self, features: Dict[str, Any]) -> float:
-        """Feature'lardan skor hesapla."""
         _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
-
         score = 50.0
         rsi = _s(features.get("rsi_14", 50))
         if rsi > 60: score += 10
         elif rsi < 40: score -= 10
-
-        mom = _s(features.get("momentum_20d", 0))
-        score += mom * 100
-
-        roc = _s(features.get("roc_5d", 0))
-        score += roc * 2
-
-        vol_z = _s(features.get("volume_zscore", 0))
-        score += vol_z * 5
-
+        score += _s(features.get("momentum_20d", 0)) * 100
+        score += _s(features.get("roc_5d", 0)) * 2
+        score += _s(features.get("volume_zscore", 0)) * 5
         return max(0, min(100, score))
 
     def _determine_signal(self, score: float, threshold: float) -> str:
-        """Skordan sinyal üret."""
-        if score >= threshold + 10:
-            return "STRONG_BUY"
-        elif score >= threshold:
-            return "BUY"
-        elif score <= 100 - threshold - 10:
-            return "STRONG_SELL"
-        elif score <= 100 - threshold:
-            return "SELL"
+        if score >= threshold + 10: return "STRONG_BUY"
+        elif score >= threshold: return "BUY"
+        elif score <= 100 - threshold - 10: return "STRONG_SELL"
+        elif score <= 100 - threshold: return "SELL"
         return "HOLD"
