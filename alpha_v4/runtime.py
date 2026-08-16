@@ -6,7 +6,7 @@ import sqlite3
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Protocol
+from typing import ClassVar, Protocol
 
 from .acquisition import RawDocumentStore
 from .audit import AuditLedger
@@ -59,7 +59,7 @@ class AlphaRuntime:
     storage engines may later split by measured workload without changing contracts.
     """
 
-    STORE_NAMES = (
+    STORE_NAMES: ClassVar[tuple[str, ...]] = (
         "raw_documents",
         "events",
         "universe",
@@ -72,6 +72,27 @@ class AlphaRuntime:
         "jobs",
         "audit",
         "paper_ledger",
+    )
+    REQUIRED_TABLES: ClassVar[frozenset[str]] = frozenset(
+        {
+            "raw_documents",
+            "canonical_events",
+            "instrument_versions",
+            "universe_membership_versions",
+            "raw_bars",
+            "state_snapshots",
+            "feature_records",
+            "relation_versions",
+            "model_artifacts",
+            "model_evaluations",
+            "model_transitions",
+            "research_tasks",
+            "research_task_transitions",
+            "job_leases",
+            "job_runs",
+            "audit_entries",
+            "paper_ledger_events",
+        }
     )
 
     def __init__(
@@ -124,12 +145,20 @@ class AlphaRuntime:
         """Fail closed when durable state or governance integrity is not usable."""
         database_ok = False
         database_integrity = "unavailable"
+        schema_ok = False
+        missing_tables: list[str] = []
         try:
             with sqlite3.connect(self.config.database_path, timeout=2.0) as connection:
                 connection.execute("SELECT 1").fetchone()
                 row = connection.execute("PRAGMA quick_check(1)").fetchone()
                 database_integrity = "unknown" if row is None else str(row[0])
                 database_ok = database_integrity.lower() == "ok"
+                table_rows = connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table'"
+                ).fetchall()
+                table_names = {str(item[0]) for item in table_rows}
+                missing_tables = sorted(self.REQUIRED_TABLES - table_names)
+                schema_ok = not missing_tables
         except sqlite3.Error as exc:
             database_integrity = f"sqlite_error:{type(exc).__name__}"
 
@@ -153,13 +182,17 @@ class AlphaRuntime:
         else:
             source_error = None
 
-        ready = database_ok and audit_ok and sources_ok
+        ready = database_ok and schema_ok and audit_ok and sources_ok
         return {
             "ready": ready,
             "checks": {
                 "database": {
                     "ok": database_ok,
                     "integrity": database_integrity,
+                },
+                "schema": {
+                    "ok": schema_ok,
+                    "missing_tables": missing_tables,
                 },
                 "audit_chain": {
                     "ok": audit_ok,
@@ -178,14 +211,18 @@ class AlphaRuntime:
         readiness = self.readiness()
         checks = readiness["checks"]
         database_check = checks["database"]
+        schema_check = checks["schema"]
         audit_check = checks["audit_chain"]
         source_check = checks["source_registry"]
         database_ok = bool(database_check["ok"])
+        schema_ok = bool(schema_check["ok"])
         audit_ok = bool(audit_check["ok"])
+        storage_ready = database_ok and schema_ok
         stores = {
-            name: "ready" if database_ok else "unavailable" for name in self.STORE_NAMES
+            name: "ready" if storage_ready else "unavailable"
+            for name in self.STORE_NAMES
         }
-        if not audit_ok:
+        if storage_ready and not audit_ok:
             stores["audit"] = "corrupt"
 
         return {
@@ -193,7 +230,7 @@ class AlphaRuntime:
             "ready": readiness["ready"],
             "checks": checks,
             "stores": stores,
-            "event_count": self.events.count() if database_ok else None,
+            "event_count": self.events.count() if storage_ready else None,
             "registered_sources": source_check["registered_sources"],
             "audit_chain_valid": audit_ok,
             "real_money_execution": False,
