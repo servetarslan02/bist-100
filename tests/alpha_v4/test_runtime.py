@@ -10,7 +10,7 @@ from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode, UnknownSo
 from alpha_v4.source_registry import SourceKind, SourceRecord, SourceRegistry
 
 
-def test_cli_status_bootstraps_fresh_database(tmp_path):
+def test_cli_status_bootstraps_all_v4_stores_in_fresh_database(tmp_path):
     database = tmp_path / "runtime.sqlite3"
     result = subprocess.run(
         [
@@ -30,9 +30,18 @@ def test_cli_status_bootstraps_fresh_database(tmp_path):
     payload = json.loads(result.stdout)
 
     assert payload["mode"] == "test"
-    assert payload["event_store"] == "ready"
     assert payload["event_count"] == 0
     assert payload["real_money_execution"] is False
+    assert set(payload["stores"]) == {
+        "raw_documents",
+        "events",
+        "universe",
+        "market_data",
+        "states",
+        "features",
+        "paper_ledger",
+    }
+    assert all(status == "ready" for status in payload["stores"].values())
     assert database.exists()
 
 
@@ -67,10 +76,11 @@ def test_runtime_rejects_unregistered_event_source(tmp_path):
     assert runtime.events.count() == 0
 
 
-def test_runtime_ingests_only_registered_enabled_source(tmp_path):
+def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_restart(tmp_path):
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
+    database = tmp_path / "runtime.sqlite3"
     registry = SourceRegistry(
         [
             SourceRecord(
@@ -101,11 +111,14 @@ def test_runtime_ingests_only_registered_enabled_source(tmp_path):
         ),
     )
     runtime = AlphaRuntime(
-        RuntimeConfig(mode=RuntimeMode.TEST, database_path=tmp_path / "runtime.sqlite3"),
+        RuntimeConfig(mode=RuntimeMode.TEST, database_path=database),
         source_registry=registry,
     )
 
     runtime.ingest_event(event)
-
     assert runtime.events.count() == 1
     assert runtime.health()["registered_sources"] == 1
+
+    # Persistence is independent of the in-memory registry object.
+    restarted = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
+    assert restarted.events.count() == 1
