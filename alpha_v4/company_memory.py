@@ -38,18 +38,20 @@ class CompanyMemory:
         eligible = [
             snapshot
             for snapshot in self._snapshots
-            if snapshot.company_id == company_id and snapshot.known_at <= decision_time
+            if snapshot.company_id == company_id
+            and snapshot.known_at <= decision_time
+            and snapshot.effective_at <= decision_time
         ]
         if not eligible:
             return None
-        # Knowledge time controls availability; effective time helps order revisions that
-        # became known simultaneously.
-        return max(eligible, key=lambda item: (item.known_at, item.effective_at))
+        # Prefer the most recently effective fact, then the newest correction that was
+        # actually known by the decision timestamp.
+        return max(eligible, key=lambda item: (item.effective_at, item.known_at))
 
     def history(self, company_id: str) -> tuple[CompanySnapshot, ...]:
         return tuple(
             sorted(
                 (s for s in self._snapshots if s.company_id == company_id),
-                key=lambda item: (item.known_at, item.effective_at),
+                key=lambda item: (item.effective_at, item.known_at),
             )
         )
