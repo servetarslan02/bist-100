@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import ClassVar
 
 
 @dataclass(frozen=True)
@@ -23,7 +24,9 @@ class JobRun:
 class JobCoordinator:
     """Serialize logical jobs across processes with durable SQLite leases."""
 
-    FINAL_STATUSES = {"SUCCEEDED", "FAILED", "CANCELLED"}
+    FINAL_STATUSES: ClassVar[frozenset[str]] = frozenset(
+        {"SUCCEEDED", "FAILED", "CANCELLED"}
+    )
 
     def __init__(self, database_path: str | Path):
         self.database_path = str(database_path)
