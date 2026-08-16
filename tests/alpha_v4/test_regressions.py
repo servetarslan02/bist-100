@@ -20,15 +20,15 @@ def _evidence():
 
 
 def test_canonical_event_nested_payload_order_does_not_change_id():
-    base = dict(
-        event_type="contract_award",
-        source_id="kap",
-        source_timestamp=T0,
-        ingest_timestamp=T0 + timedelta(minutes=1),
-        effective_timestamp=T0,
-        entities=("TEST",),
-        evidence=(_evidence(),),
-    )
+    base = {
+        "event_type": "contract_award",
+        "source_id": "kap",
+        "source_timestamp": T0,
+        "ingest_timestamp": T0 + timedelta(minutes=1),
+        "effective_timestamp": T0,
+        "entities": ("TEST",),
+        "evidence": (_evidence(),),
+    }
     first = CanonicalEvent(
         **base,
         payload={"terms": {"currency": "TRY", "value": 100}, "flags": ["a", "b"]},
