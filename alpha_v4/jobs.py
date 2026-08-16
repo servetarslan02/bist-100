@@ -25,7 +25,7 @@ class JobCoordinator:
     """Serialize logical jobs across processes with durable SQLite leases."""
 
     FINAL_STATUSES: ClassVar[frozenset[str]] = frozenset(
-        {"SUCCEEDED", "FAILED", "CANCELLED"}
+        {"SUCCEEDED", "FAILED", "CANCELLED", "EXPIRED"}
     )
 
     def __init__(self, database_path: str | Path):
@@ -105,7 +105,11 @@ class JobCoordinator:
                 return None
 
             lease = connection.execute(
-                "SELECT owner_id, lease_until FROM job_leases WHERE job_name = ?",
+                """
+                SELECT owner_id, run_id, lease_until
+                FROM job_leases
+                WHERE job_name = ?
+                """,
                 (job_name,),
             ).fetchone()
             if lease is not None:
@@ -113,6 +117,14 @@ class JobCoordinator:
                 if current_lease_until > started_at:
                     connection.execute("ROLLBACK")
                     return None
+                connection.execute(
+                    """
+                    UPDATE job_runs
+                    SET status = 'EXPIRED', finished_at = ?
+                    WHERE run_id = ? AND status = 'RUNNING'
+                    """,
+                    (started_at.isoformat(), lease["run_id"]),
+                )
 
             connection.execute(
                 """
