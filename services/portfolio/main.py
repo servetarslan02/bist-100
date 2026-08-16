@@ -8,6 +8,7 @@ v2.0: PortfolioManager v2.0 muhasebe altyapısıyla uyumlu.
 """
 
 import asyncio
+import os
 import json
 from datetime import datetime, timezone, date
 from typing import Dict, List, Any, Optional
@@ -16,6 +17,7 @@ import structlog
 from ..core.config import settings
 from ..core.database_dev import dev_db
 from ..core.db_lock import CoordinatedLock, get_lock_metrics, get_all_metrics, get_health_report, portfolio_trade_lock
+from ..core.config_watcher import ConfigWatcher
 from ..portfolio.portfolio_manager import (
     PortfolioManager, CommissionModel,
 )
@@ -66,17 +68,42 @@ class PortfolioService:
             await self._load_state()
             self._running = True
 
+        # Config watcher başlat
+        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                                   "..", "config", "alpha_config.json")
+        if os.path.exists(config_path):
+            self._config_watcher = ConfigWatcher(
+                config_path, reload_fn=self._on_config_change, watch_interval_s=5.0
+            )
+            self._config_watcher.start()
+
         logger.info("Portfolio Service v2.0 started", portfolio_id=self._portfolio_id)
 
     async def stop(self):
         """Servisi durdur."""
         self._running = False
+        if self._config_watcher:
+            self._config_watcher.stop()
         if self._portfolio_id:
             try:
                 await self._save_equity_snapshot()
             except Exception:
                 pass
         logger.info("Portfolio Service v2.0 stopped")
+
+    def _on_config_change(self, new_config: Dict[str, Any]):
+        """Config değişikliğinde çağrılır."""
+        try:
+            # Risk limitlerini güncelle
+            risk = new_config.get("risk", {})
+            if risk:
+                logger.info("Risk config updated", risk=risk)
+            # Portfolio ayarlarını güncelle
+            pf_config = new_config.get("portfolio", {})
+            if pf_config:
+                logger.info("Portfolio config updated", portfolio=pf_config)
+        except Exception as e:
+            logger.warning("Config change handler failed", error=str(e))
 
     # =====================================================
     # STATE LOAD / SAVE

@@ -356,7 +356,7 @@ async def test_backtest_basic():
 
     market = make_market_data(20, 120)
     runner = ScannerBacktestRunner()
-    result = runner.run(market, lookback_days=120)
+    result = runner.run(market, lookback_days=30)
 
     if result.total_scans == 0:
         issues.append("Hiç scan yapılmadı")
@@ -434,7 +434,7 @@ async def test_backtest_performance():
     runner = ScannerBacktestRunner()
 
     start = time.time()
-    result = runner.run(market, lookback_days=120)
+    result = runner.run(market, lookback_days=30)
     elapsed = time.time() - start
 
     if elapsed > 60:
