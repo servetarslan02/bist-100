@@ -1,0 +1,87 @@
+name: ALPHA v4 External Source Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
+  push:
+    branches: ["alpha-rebuild-v4"]
+    paths:
+      - "alpha_v4/providers.py"
+      - "alpha_v4/source_catalog.py"
+      - ".github/workflows/alpha-v4-external-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  official-source-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - source_id: kap-official
+            surface: company-directory
+          - source_id: bist-official-public
+            surface: equity-market-data
+          - source_id: tcmb-evds
+            surface: documentation
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch, persist, hash and verify official source
+        env:
+          SOURCE_ID: ${{ matrix.source_id }}
+          SURFACE: ${{ matrix.surface }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import tempfile
+          from pathlib import Path
+
+          from alpha_v4.providers import official_snapshot_provider
+          from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode
+
+          source_id = os.environ["SOURCE_ID"]
+          surface = os.environ["SURFACE"]
+          with tempfile.TemporaryDirectory() as directory:
+              database = Path(directory) / "external-smoke.sqlite3"
+              runtime = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
+              provider = official_snapshot_provider(
+                  source_id,
+                  raw_store=runtime.raw_documents,
+                  source_history=runtime.source_registry,
+              )
+              document = provider.snapshot(surface)
+              persisted = runtime.raw_documents.get(document.document_id)
+              assert persisted is not None
+              assert persisted.body == document.body
+              assert persisted.body_sha256 == document.body_sha256
+              assert document.status_code == 200
+              assert len(document.body) > 100
+              source = runtime.source_registry.get(source_id)
+              assert source.successful_observations == 1
+              print(
+                  json.dumps(
+                      {
+                          "source_id": source_id,
+                          "surface": surface,
+                          "status_code": document.status_code,
+                          "bytes": len(document.body),
+                          "sha256": document.body_sha256,
+                          "url": document.url,
+                      },
+                      sort_keys=True,
+                  )
+              )
+          PY
