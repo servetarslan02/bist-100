@@ -117,13 +117,14 @@ def test_job_history_survives_restart_and_rejects_double_finish(tmp_path):
 
 def test_naive_timestamps_and_nonpositive_leases_are_rejected(tmp_path):
     coordinator = JobCoordinator(tmp_path / "jobs.sqlite3")
+    naive_time = T0.replace(tzinfo=None)
 
     with pytest.raises(ValueError, match="timezone-aware"):
         coordinator.try_start(
             job_name="x",
             owner_id="worker",
             idempotency_key="key",
-            started_at=datetime(2026, 8, 16, 12, 0),
+            started_at=naive_time,
             lease_for=timedelta(minutes=1),
         )
 
