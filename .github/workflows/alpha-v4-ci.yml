@@ -44,5 +44,55 @@ jobs:
       - name: Static quality gate
         run: ruff check alpha_v4 tests/alpha_v4
 
+      - name: Formatting gate
+        run: ruff format --check alpha_v4 tests/alpha_v4
+
       - name: Run ALPHA v4 tests
         run: python -m pytest -q tests/alpha_v4 --disable-warnings --maxfail=1
+
+      - name: Launch runtime and verify live health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          DB_PATH="/tmp/alpha-v4-smoke-${{ matrix.python-version }}.sqlite3"
+          HEALTH_JSON="/tmp/alpha-v4-health-${{ matrix.python-version }}.json"
+          rm -f "$DB_PATH" "$HEALTH_JSON"
+
+          python -m alpha_v4 init --mode test --db "$DB_PATH"
+          python -m alpha_v4 serve --mode test --db "$DB_PATH" --host 127.0.0.1 --port 8765 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          READY=0
+          for _ in {1..20}; do
+            if curl --fail --silent --show-error http://127.0.0.1:8765/health > "$HEALTH_JSON"; then
+              READY=1
+              break
+            fi
+            sleep 0.25
+          done
+
+          if [[ "$READY" -ne 1 ]]; then
+            echo "ALPHA v4 health endpoint did not become ready"
+            exit 1
+          fi
+
+          python - "$HEALTH_JSON" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+
+          assert payload["mode"] == "test"
+          assert payload["audit_chain_valid"] is True
+          assert payload["registered_sources"] > 0
+          assert payload["real_money_execution"] is False
+          assert payload["stores"]
+          assert all(value == "ready" for value in payload["stores"].values())
+          print(json.dumps(payload, sort_keys=True))
+          PY
+
+          kill "$SERVER_PID"
+          wait "$SERVER_PID" || true
+          trap - EXIT
