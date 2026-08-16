@@ -49,3 +49,5 @@ jobs:
           git add alpha_v4 tests/alpha_v4
           git commit -m "Apply safe Ruff fixes and formatting"
           git push origin HEAD:alpha-rebuild-v4
+
+# rerun-safe-format: 2
