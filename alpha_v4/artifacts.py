@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from hashlib import sha256
-from typing import Mapping, Optional, Tuple
 
 
 class MissingPolicy(str, Enum):
@@ -32,7 +32,7 @@ class ModelLifecycle(str, Enum):
 class FeatureDefinition:
     name: str
     version: str
-    inputs: Tuple[str, ...]
+    inputs: tuple[str, ...]
     lookback: str
     availability_rule: str
     missing_policy: MissingPolicy
@@ -57,7 +57,7 @@ class LabelDefinition:
     version: str
     horizon: str
     target: str
-    benchmark: Optional[str]
+    benchmark: str | None
     execution_adjusted: bool = False
 
     @property
@@ -68,8 +68,8 @@ class LabelDefinition:
 @dataclass(frozen=True)
 class DatasetManifest:
     universe_snapshot_id: str
-    feature_ids: Tuple[str, ...]
-    label_ids: Tuple[str, ...]
+    feature_ids: tuple[str, ...]
+    label_ids: tuple[str, ...]
     start_time: datetime
     end_time: datetime
     code_commit: str
@@ -97,7 +97,9 @@ class DatasetManifest:
                 "mask_policy_version": self.mask_policy_version,
             }
             encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-            object.__setattr__(self, "manifest_id", sha256(encoded.encode("utf-8")).hexdigest())
+            object.__setattr__(
+                self, "manifest_id", sha256(encoded.encode("utf-8")).hexdigest()
+            )
 
 
 @dataclass(frozen=True)
@@ -108,20 +110,32 @@ class ModelArtifact:
     dataset_manifest_id: str
     code_commit: str
     hyperparameters: Mapping[str, object]
-    random_seed: Optional[int]
-    calibration_method: Optional[str]
+    random_seed: int | None
+    calibration_method: str | None
     lifecycle: ModelLifecycle
     created_at: datetime
 
     def __post_init__(self) -> None:
-        for field_name in ("model_id", "model_type", "horizon", "dataset_manifest_id", "code_commit"):
+        for field_name in (
+            "model_id",
+            "model_type",
+            "horizon",
+            "dataset_manifest_id",
+            "code_commit",
+        ):
             if not str(getattr(self, field_name)).strip():
                 raise ValueError(f"{field_name} is required")
-        if self.lifecycle in {
-            ModelLifecycle.PAPER_ELIGIBLE,
-            ModelLifecycle.CHAMPION,
-        } and self.random_seed is None:
-            raise ValueError("promotable deterministic models require a recorded random_seed")
+        if (
+            self.lifecycle
+            in {
+                ModelLifecycle.PAPER_ELIGIBLE,
+                ModelLifecycle.CHAMPION,
+            }
+            and self.random_seed is None
+        ):
+            raise ValueError(
+                "promotable deterministic models require a recorded random_seed"
+            )
 
 
 @dataclass(frozen=True)
@@ -129,7 +143,7 @@ class EvaluationArtifact:
     model_id: str
     dataset_manifest_id: str
     evaluator_code_commit: str
-    fold_ids: Tuple[str, ...]
+    fold_ids: tuple[str, ...]
     metrics: Mapping[str, float]
     cost_assumptions: Mapping[str, float]
     independently_recomputed: bool

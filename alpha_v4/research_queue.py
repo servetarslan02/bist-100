@@ -5,11 +5,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any
 
 
 class ResearchStatus(str, Enum):
@@ -27,7 +28,7 @@ class ResearchTask:
     trigger_type: str
     hypothesis: str
     experiment_type: str
-    trigger_evidence_ids: Tuple[str, ...]
+    trigger_evidence_ids: tuple[str, ...]
     priority: int
     status: ResearchStatus
     metadata: Mapping[str, Any]
@@ -86,10 +87,10 @@ class ResearchQueue:
         trigger_type: str,
         hypothesis: str,
         experiment_type: str,
-        trigger_evidence_ids: Tuple[str, ...],
+        trigger_evidence_ids: tuple[str, ...],
         priority: int,
-        metadata: Optional[Mapping[str, Any]] = None,
-        task_id: Optional[str] = None,
+        metadata: Mapping[str, Any] | None = None,
+        task_id: str | None = None,
     ) -> ResearchTask:
         task = ResearchTask(
             task_id=task_id or uuid.uuid4().hex,
@@ -127,7 +128,13 @@ class ResearchQueue:
                     task_id, transitioned_at, from_status, to_status, reason
                 ) VALUES (?, ?, ?, ?, ?)
                 """,
-                (task.task_id, created_at.isoformat(), None, ResearchStatus.NEW.value, "created"),
+                (
+                    task.task_id,
+                    created_at.isoformat(),
+                    None,
+                    ResearchStatus.NEW.value,
+                    "created",
+                ),
             )
         return task
 
@@ -156,14 +163,24 @@ class ResearchQueue:
             raise ValueError("transition reason is required")
         current = self._current_status(task_id)
         allowed = {
-            ResearchStatus.NEW: {ResearchStatus.RUNNING, ResearchStatus.REJECTED, ResearchStatus.BLOCKED},
-            ResearchStatus.RUNNING: {ResearchStatus.COMPLETED, ResearchStatus.REJECTED, ResearchStatus.BLOCKED},
+            ResearchStatus.NEW: {
+                ResearchStatus.RUNNING,
+                ResearchStatus.REJECTED,
+                ResearchStatus.BLOCKED,
+            },
+            ResearchStatus.RUNNING: {
+                ResearchStatus.COMPLETED,
+                ResearchStatus.REJECTED,
+                ResearchStatus.BLOCKED,
+            },
             ResearchStatus.BLOCKED: {ResearchStatus.RUNNING, ResearchStatus.REJECTED},
             ResearchStatus.COMPLETED: set(),
             ResearchStatus.REJECTED: set(),
         }
         if to_status not in allowed[current]:
-            raise ValueError(f"invalid research transition: {current.value}->{to_status.value}")
+            raise ValueError(
+                f"invalid research transition: {current.value}->{to_status.value}"
+            )
         with self._connect() as connection:
             connection.execute(
                 """
@@ -180,7 +197,7 @@ class ResearchQueue:
                 ),
             )
 
-    def pending(self, *, limit: Optional[int] = None) -> Tuple[ResearchTask, ...]:
+    def pending(self, *, limit: int | None = None) -> tuple[ResearchTask, ...]:
         """Priority scheduling limit is compute batching, never task eligibility."""
         with self._connect() as connection:
             rows = connection.execute(
@@ -199,7 +216,9 @@ class ResearchQueue:
                     trigger_type=row["trigger_type"],
                     hypothesis=row["hypothesis"],
                     experiment_type=row["experiment_type"],
-                    trigger_evidence_ids=tuple(json.loads(row["trigger_evidence_ids_json"])),
+                    trigger_evidence_ids=tuple(
+                        json.loads(row["trigger_evidence_ids_json"])
+                    ),
                     priority=int(row["priority"]),
                     status=status,
                     metadata=json.loads(row["metadata_json"]),

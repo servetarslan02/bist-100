@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import Optional, Tuple
 
 from .acquisition import HttpSourceConfig
 from .source_registry import SourceKind, SourceRecord
@@ -19,11 +18,11 @@ from .source_registry import SourceKind, SourceRecord
 class SourceSeed:
     record: SourceRecord
     http: HttpSourceConfig
-    credential_env: Optional[str]
+    credential_env: str | None
     role: str
 
 
-OFFICIAL_SOURCE_SEEDS: Tuple[SourceSeed, ...] = (
+OFFICIAL_SOURCE_SEEDS: tuple[SourceSeed, ...] = (
     SourceSeed(
         record=SourceRecord(
             source_id="bist-official-public",

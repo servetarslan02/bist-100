@@ -7,9 +7,10 @@ after the OOS boundary is excluded even if its feature timestamp is historically
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Iterable, Sequence, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -30,15 +31,20 @@ class TemporalSample:
 @dataclass(frozen=True)
 class TemporalFold:
     fold_id: str
-    train_ids: Tuple[str, ...]
-    test_ids: Tuple[str, ...]
-    purged_ids: Tuple[str, ...]
-    embargoed_ids: Tuple[str, ...]
+    train_ids: tuple[str, ...]
+    test_ids: tuple[str, ...]
+    purged_ids: tuple[str, ...]
+    embargoed_ids: tuple[str, ...]
     test_start: datetime
     test_end: datetime
 
     def __post_init__(self) -> None:
-        groups = [set(self.train_ids), set(self.test_ids), set(self.purged_ids), set(self.embargoed_ids)]
+        groups = [
+            set(self.train_ids),
+            set(self.test_ids),
+            set(self.purged_ids),
+            set(self.embargoed_ids),
+        ]
         for index, left in enumerate(groups):
             for right in groups[index + 1 :]:
                 if left & right:
@@ -112,7 +118,7 @@ class TemporalFoldResult:
 
 @dataclass(frozen=True)
 class TemporalValidationResult:
-    folds: Tuple[TemporalFoldResult, ...]
+    folds: tuple[TemporalFoldResult, ...]
     trainer_calls: int
 
 
@@ -137,7 +143,10 @@ def run_temporal_validation(
         train_samples = [sample_map[sample_id] for sample_id in fold.train_ids]
         test_samples = [sample_map[sample_id] for sample_id in fold.test_ids]
 
-        model = trainer([sample.X for sample in train_samples], [sample.y for sample in train_samples])
+        model = trainer(
+            [sample.X for sample in train_samples],
+            [sample.y for sample in train_samples],
+        )
         trainer_calls += 1
         predictions = list(predictor(model, [sample.X for sample in test_samples]))
         if len(predictions) != len(test_samples):

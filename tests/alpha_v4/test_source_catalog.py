@@ -3,7 +3,9 @@ from alpha_v4.source_catalog import OFFICIAL_SOURCE_SEEDS, seed_by_id
 
 def test_official_source_seed_catalog_has_no_pre_awarded_reliability():
     assert len(OFFICIAL_SOURCE_SEEDS) >= 3
-    assert all(seed.record.measured_reliability is None for seed in OFFICIAL_SOURCE_SEEDS)
+    assert all(
+        seed.record.measured_reliability is None for seed in OFFICIAL_SOURCE_SEEDS
+    )
 
 
 def test_seed_catalog_contains_no_secret_values():

@@ -6,9 +6,9 @@ model by itself.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from statistics import fmean, pstdev
-from typing import Iterable, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -36,11 +36,11 @@ class DriftAssessment:
     detected: bool
     reference_count: int
     recent_count: int
-    reference_mean: Optional[float]
-    recent_mean: Optional[float]
-    standardized_mean_shift: Optional[float]
-    std_ratio: Optional[float]
-    reasons: Tuple[str, ...]
+    reference_mean: float | None
+    recent_mean: float | None
+    standardized_mean_shift: float | None
+    std_ratio: float | None
+    reasons: tuple[str, ...]
     policy_version: str
 
 
@@ -53,7 +53,10 @@ def assess_numeric_drift(
     ref = tuple(float(value) for value in reference)
     rec = tuple(float(value) for value in recent)
 
-    if len(ref) < policy.minimum_reference_samples or len(rec) < policy.minimum_recent_samples:
+    if (
+        len(ref) < policy.minimum_reference_samples
+        or len(rec) < policy.minimum_recent_samples
+    ):
         return DriftAssessment(
             status="INSUFFICIENT_DATA",
             detected=False,

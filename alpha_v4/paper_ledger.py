@@ -10,10 +10,10 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Mapping, Optional, Tuple
 
 
 class PaperLedgerError(RuntimeError):
@@ -94,10 +94,10 @@ class PaperLedger:
         event_type: str,
         event_time: datetime,
         payload: Mapping[str, object],
-        decision_id: Optional[str] = None,
-        risk_decision_id: Optional[str] = None,
-        model_id: Optional[str] = None,
-        event_id: Optional[str] = None,
+        decision_id: str | None = None,
+        risk_decision_id: str | None = None,
+        model_id: str | None = None,
+        event_id: str | None = None,
     ) -> str:
         if not account_id.strip():
             raise ValueError("account_id is required")
@@ -129,7 +129,7 @@ class PaperLedger:
         amount: float,
         *,
         event_time: datetime,
-        event_id: Optional[str] = None,
+        event_id: str | None = None,
     ) -> str:
         if amount <= 0:
             raise ValueError("deposit amount must be positive")
@@ -154,7 +154,7 @@ class PaperLedger:
         decision_id: str,
         risk_decision_id: str,
         model_id: str,
-        event_id: Optional[str] = None,
+        event_id: str | None = None,
     ) -> str:
         """Record a simulated fill only after portfolio constraints are checked."""
         if not ticker.strip():
@@ -211,7 +211,7 @@ class PaperLedger:
         cash = 0.0
         realized_pnl = 0.0
         fees_paid = 0.0
-        positions: Dict[str, PositionState] = {}
+        positions: dict[str, PositionState] = {}
 
         with self._connect() as connection:
             rows = connection.execute(
@@ -240,7 +240,11 @@ class PaperLedger:
                 cash -= quantity * price + commission
                 previous = positions.get(ticker)
                 previous_qty = 0.0 if previous is None else previous.quantity
-                previous_cost = 0.0 if previous is None else previous.average_cost * previous.quantity
+                previous_cost = (
+                    0.0
+                    if previous is None
+                    else previous.average_cost * previous.quantity
+                )
                 # Buy commission is part of economic acquisition cost.
                 new_qty = previous_qty + quantity
                 new_total_cost = previous_cost + quantity * price + commission
@@ -277,7 +281,9 @@ class PaperLedger:
             event_count=len(rows),
         )
 
-    def mark_to_market(self, account_id: str, marks: Mapping[str, float]) -> MarkedPaperState:
+    def mark_to_market(
+        self, account_id: str, marks: Mapping[str, float]
+    ) -> MarkedPaperState:
         state = self.reconstruct(account_id)
         market_value = 0.0
         unrealized = 0.0

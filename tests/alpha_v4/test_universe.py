@@ -1,7 +1,10 @@
 from datetime import datetime, timedelta, timezone
 
-from alpha_v4.universe import InstrumentVersion, UniverseMembershipVersion, UniverseStore
-
+from alpha_v4.universe import (
+    InstrumentVersion,
+    UniverseMembershipVersion,
+    UniverseStore,
+)
 
 UTC = timezone.utc
 T0 = datetime(2020, 1, 1, tzinfo=UTC)

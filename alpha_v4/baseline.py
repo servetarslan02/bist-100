@@ -6,9 +6,9 @@ establish a reproducible bar that future ML models must beat out-of-sample.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, Tuple
 
 from .features import FeatureRecord
 
@@ -27,7 +27,7 @@ class BaselineRanking:
     feature_id: str
     effective_at: datetime
     direction: str
-    ranks: Tuple[BaselineRank, ...]
+    ranks: tuple[BaselineRank, ...]
 
 
 def rank_single_feature(
@@ -36,7 +36,11 @@ def rank_single_feature(
     higher_is_better: bool,
 ) -> BaselineRanking:
     """Rank comparable VALID feature records with no fabricated probability."""
-    valid = [record for record in records if record.status == "VALID" and record.value is not None]
+    valid = [
+        record
+        for record in records
+        if record.status == "VALID" and record.value is not None
+    ]
     if not valid:
         raise ValueError("at least one VALID feature record is required")
 

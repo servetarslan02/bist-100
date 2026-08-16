@@ -7,7 +7,6 @@ inputs are unavailable and makes every cost assumption explicit/versionable.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -31,10 +30,10 @@ class ExecutionPolicy:
 
 @dataclass(frozen=True)
 class MarketExecutionState:
-    bid: Optional[float]
-    ask: Optional[float]
-    last: Optional[float]
-    available_volume: Optional[float]
+    bid: float | None
+    ask: float | None
+    last: float | None
+    available_volume: float | None
     data_integrity_ok: bool
 
 
@@ -43,11 +42,11 @@ class SimulatedFill:
     status: str
     requested_quantity: float
     filled_quantity: float
-    fill_price: Optional[float]
+    fill_price: float | None
     commission: float
     spread_cost: float
     slippage_cost: float
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     policy_version: str
 
 
@@ -97,7 +96,11 @@ class ExecutionSimulator:
         spread_per_unit = abs(touch - mid)
         spread_cost = spread_per_unit * filled_quantity
         slippage_cost = abs(fill_price - touch) * filled_quantity
-        status = "FILLED" if filled_quantity >= requested_quantity - 1e-12 else "PARTIAL_FILL"
+        status = (
+            "FILLED"
+            if filled_quantity >= requested_quantity - 1e-12
+            else "PARTIAL_FILL"
+        )
 
         return SimulatedFill(
             status=status,

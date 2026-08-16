@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 
 from .acquisition import RawDocumentStore
 from .audit import AuditLedger
@@ -60,7 +60,7 @@ class AlphaRuntime:
     def __init__(
         self,
         config: RuntimeConfig,
-        source_registry: Optional[SourceRegistryLike] = None,
+        source_registry: SourceRegistryLike | None = None,
     ):
         self.config = config
         config.database_path.parent.mkdir(parents=True, exist_ok=True)

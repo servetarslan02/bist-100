@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 from alpha_v4.contracts import RawBar
 from alpha_v4.market_data import RawBarStore
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
 

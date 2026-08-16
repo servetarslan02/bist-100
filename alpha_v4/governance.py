@@ -8,19 +8,45 @@ magic constants inside a model.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Mapping, Optional, Tuple
 
 from .artifacts import EvaluationArtifact, ModelArtifact, ModelLifecycle
 
-
 _ALLOWED_TRANSITIONS = {
-    ModelLifecycle.RESEARCH: {ModelLifecycle.VALIDATED, ModelLifecycle.QUARANTINED, ModelLifecycle.RETIRED},
-    ModelLifecycle.VALIDATED: {ModelLifecycle.SHADOW, ModelLifecycle.QUARANTINED, ModelLifecycle.RETIRED},
-    ModelLifecycle.SHADOW: {ModelLifecycle.CHALLENGER, ModelLifecycle.DEGRADED, ModelLifecycle.QUARANTINED},
-    ModelLifecycle.CHALLENGER: {ModelLifecycle.PAPER_ELIGIBLE, ModelLifecycle.DEGRADED, ModelLifecycle.QUARANTINED},
-    ModelLifecycle.PAPER_ELIGIBLE: {ModelLifecycle.CHAMPION, ModelLifecycle.DEGRADED, ModelLifecycle.QUARANTINED},
-    ModelLifecycle.CHAMPION: {ModelLifecycle.DEGRADED, ModelLifecycle.RETIRED, ModelLifecycle.QUARANTINED},
-    ModelLifecycle.DEGRADED: {ModelLifecycle.SHADOW, ModelLifecycle.RETIRED, ModelLifecycle.QUARANTINED},
+    ModelLifecycle.RESEARCH: {
+        ModelLifecycle.VALIDATED,
+        ModelLifecycle.QUARANTINED,
+        ModelLifecycle.RETIRED,
+    },
+    ModelLifecycle.VALIDATED: {
+        ModelLifecycle.SHADOW,
+        ModelLifecycle.QUARANTINED,
+        ModelLifecycle.RETIRED,
+    },
+    ModelLifecycle.SHADOW: {
+        ModelLifecycle.CHALLENGER,
+        ModelLifecycle.DEGRADED,
+        ModelLifecycle.QUARANTINED,
+    },
+    ModelLifecycle.CHALLENGER: {
+        ModelLifecycle.PAPER_ELIGIBLE,
+        ModelLifecycle.DEGRADED,
+        ModelLifecycle.QUARANTINED,
+    },
+    ModelLifecycle.PAPER_ELIGIBLE: {
+        ModelLifecycle.CHAMPION,
+        ModelLifecycle.DEGRADED,
+        ModelLifecycle.QUARANTINED,
+    },
+    ModelLifecycle.CHAMPION: {
+        ModelLifecycle.DEGRADED,
+        ModelLifecycle.RETIRED,
+        ModelLifecycle.QUARANTINED,
+    },
+    ModelLifecycle.DEGRADED: {
+        ModelLifecycle.SHADOW,
+        ModelLifecycle.RETIRED,
+        ModelLifecycle.QUARANTINED,
+    },
     ModelLifecycle.RETIRED: set(),
     ModelLifecycle.QUARANTINED: {ModelLifecycle.RESEARCH, ModelLifecycle.RETIRED},
 }
@@ -29,7 +55,7 @@ _ALLOWED_TRANSITIONS = {
 @dataclass(frozen=True)
 class GovernancePolicy:
     policy_version: str
-    required_metric_names: Tuple[str, ...]
+    required_metric_names: tuple[str, ...]
     minimum_fold_count: int
     require_independent_recompute: bool = True
 
@@ -44,7 +70,7 @@ class GovernancePolicy:
 class GovernanceDecision:
     approved: bool
     requested_state: ModelLifecycle
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     policy_version: str
 
 
@@ -53,12 +79,14 @@ def evaluate_transition(
     requested_state: ModelLifecycle,
     *,
     policy: GovernancePolicy,
-    evaluation: Optional[EvaluationArtifact] = None,
+    evaluation: EvaluationArtifact | None = None,
 ) -> GovernanceDecision:
     reasons = []
 
     if requested_state not in _ALLOWED_TRANSITIONS[model.lifecycle]:
-        reasons.append(f"transition_not_allowed:{model.lifecycle.value}->{requested_state.value}")
+        reasons.append(
+            f"transition_not_allowed:{model.lifecycle.value}->{requested_state.value}"
+        )
 
     evidence_required = requested_state in {
         ModelLifecycle.VALIDATED,
@@ -75,11 +103,18 @@ def evaluate_transition(
                 reasons.append("evaluation_model_mismatch")
             if evaluation.dataset_manifest_id != model.dataset_manifest_id:
                 reasons.append("evaluation_dataset_mismatch")
-            if policy.require_independent_recompute and not evaluation.independently_recomputed:
+            if (
+                policy.require_independent_recompute
+                and not evaluation.independently_recomputed
+            ):
                 reasons.append("independent_recompute_required")
             if len(evaluation.fold_ids) < policy.minimum_fold_count:
                 reasons.append("insufficient_fold_evidence")
-            missing_metrics = [name for name in policy.required_metric_names if name not in evaluation.metrics]
+            missing_metrics = [
+                name
+                for name in policy.required_metric_names
+                if name not in evaluation.metrics
+            ]
             if missing_metrics:
                 reasons.append("missing_metrics:" + ",".join(sorted(missing_metrics)))
 

@@ -8,9 +8,8 @@ There is no broker or real-money execution path in this module.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Tuple
 
 from .audit import AuditLedger
 from .paper_ledger import PaperLedger, PaperLedgerError
@@ -27,12 +26,18 @@ class PaperDecisionRequest:
     price: float
     requested_notional: float
     commission_bps: float
-    state_snapshot_ids: Tuple[str, ...]
-    feature_refs: Tuple[str, ...]
+    state_snapshot_ids: tuple[str, ...]
+    feature_refs: tuple[str, ...]
     risk_request: RiskRequest
 
     def __post_init__(self) -> None:
-        for name in ("decision_id", "account_id", "instrument_id", "ticker", "model_id"):
+        for name in (
+            "decision_id",
+            "account_id",
+            "instrument_id",
+            "ticker",
+            "model_id",
+        ):
             if not str(getattr(self, name)).strip():
                 raise ValueError(f"{name} is required")
         if self.price <= 0 or self.requested_notional <= 0:

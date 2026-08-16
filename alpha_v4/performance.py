@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from math import sqrt
 from statistics import stdev
-from typing import Iterable, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -22,18 +22,18 @@ class EquityPoint:
 @dataclass(frozen=True)
 class PerformanceSummary:
     total_return: float
-    cagr: Optional[float]
-    annualized_volatility: Optional[float]
-    sharpe: Optional[float]
-    sortino: Optional[float]
+    cagr: float | None
+    annualized_volatility: float | None
+    sharpe: float | None
+    sortino: float | None
     max_drawdown: float
     max_drawdown_start: datetime
     max_drawdown_end: datetime
-    calmar: Optional[float]
+    calmar: float | None
     observation_count: int
 
 
-def _ordered_points(points: Iterable[EquityPoint]) -> Tuple[EquityPoint, ...]:
+def _ordered_points(points: Iterable[EquityPoint]) -> tuple[EquityPoint, ...]:
     ordered = tuple(sorted(points, key=lambda item: item.timestamp))
     if len(ordered) < 2:
         raise ValueError("at least two equity points are required")
@@ -62,7 +62,11 @@ def summarize_performance(
     if elapsed_seconds <= 0:
         raise ValueError("equity time range must be positive")
     years = elapsed_seconds / (365.2425 * 24 * 60 * 60)
-    cagr = (ordered[-1].equity / ordered[0].equity) ** (1.0 / years) - 1.0 if years > 0 else None
+    cagr = (
+        (ordered[-1].equity / ordered[0].equity) ** (1.0 / years) - 1.0
+        if years > 0
+        else None
+    )
 
     annualized_volatility = None
     sharpe = None
@@ -79,7 +83,11 @@ def summarize_performance(
         downside_squares = [min(value, 0.0) ** 2 for value in excess]
         downside_deviation = sqrt(sum(downside_squares) / len(downside_squares))
         if downside_deviation > 0:
-            sortino = (sum(excess) / len(excess)) / downside_deviation * sqrt(periods_per_year)
+            sortino = (
+                (sum(excess) / len(excess))
+                / downside_deviation
+                * sqrt(periods_per_year)
+            )
 
     peak_equity = ordered[0].equity
     peak_time = ordered[0].timestamp

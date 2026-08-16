@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -12,7 +11,7 @@ class NumericExpectation:
     metric: str
     expected_value: float
     known_at: datetime
-    source_event_ids: Tuple[str, ...]
+    source_event_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not self.metric.strip():
@@ -27,7 +26,7 @@ class NumericObservation:
     observed_value: float
     event_time: datetime
     known_at: datetime
-    source_event_ids: Tuple[str, ...]
+    source_event_ids: tuple[str, ...]
 
     def __post_init__(self) -> None:
         if not self.metric.strip():
@@ -44,7 +43,7 @@ class SurpriseResult:
     expected_value: float
     observed_value: float
     absolute_surprise: float
-    relative_surprise: Optional[float]
+    relative_surprise: float | None
     classification: str
 
 

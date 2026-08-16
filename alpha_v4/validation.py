@@ -6,16 +6,17 @@ accept a precomputed all-history prediction vector and call slicing 'walk-forwar
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Iterable, List, Sequence, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
 class WalkForwardFold:
     fold_id: str
-    train_indices: Tuple[int, ...]
-    purge_indices: Tuple[int, ...]
-    test_indices: Tuple[int, ...]
+    train_indices: tuple[int, ...]
+    purge_indices: tuple[int, ...]
+    test_indices: tuple[int, ...]
 
     def __post_init__(self) -> None:
         train = set(self.train_indices)
@@ -36,7 +37,7 @@ def expanding_walk_forward_folds(
     test_size: int,
     purge_size: int,
     step_size: int | None = None,
-) -> Tuple[WalkForwardFold, ...]:
+) -> tuple[WalkForwardFold, ...]:
     if n_samples <= 0:
         raise ValueError("n_samples must be positive")
     if min_train_size <= 0 or test_size <= 0 or purge_size < 0:
@@ -45,12 +46,12 @@ def expanding_walk_forward_folds(
     if step <= 0:
         raise ValueError("step_size must be positive")
 
-    folds: List[WalkForwardFold] = []
+    folds: list[WalkForwardFold] = []
     test_start = min_train_size + purge_size
     fold_number = 1
     while test_start + test_size <= n_samples:
         train_end = test_start - purge_size
-        train_indices = tuple(range(0, train_end))
+        train_indices = tuple(range(train_end))
         purge_indices = tuple(range(train_end, test_start))
         test_indices = tuple(range(test_start, test_start + test_size))
         folds.append(
@@ -76,7 +77,7 @@ class FoldEvaluation:
 
 @dataclass(frozen=True)
 class WalkForwardResult:
-    folds: Tuple[FoldEvaluation, ...]
+    folds: tuple[FoldEvaluation, ...]
     trainer_calls: int
 
 
@@ -97,7 +98,7 @@ def run_walk_forward(
     if len(X) != len(y):
         raise ValueError("X and y length mismatch")
 
-    evaluations: List[FoldEvaluation] = []
+    evaluations: list[FoldEvaluation] = []
     trainer_calls = 0
 
     for fold in folds:

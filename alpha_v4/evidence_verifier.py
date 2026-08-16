@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping, Tuple
 
 from .acquisition import FetchedDocument
 from .llm_gateway import EventExtraction
@@ -12,7 +12,7 @@ from .llm_gateway import EventExtraction
 @dataclass(frozen=True)
 class EvidenceVerification:
     verified: bool
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
 
 
 def verify_event_evidence(

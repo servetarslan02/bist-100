@@ -8,7 +8,6 @@ from alpha_v4.temporal_validation import (
     run_temporal_validation,
 )
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 DAY = timedelta(days=1)

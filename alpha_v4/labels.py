@@ -6,10 +6,10 @@ validation, never production-time features at their anchor timestamp.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from math import log
-from typing import Dict, Iterable, Optional, Tuple
 
 from .contracts import RawBar
 from .data_quality import validate_raw_bar
@@ -22,8 +22,8 @@ class ForwardReturnLabel:
     anchor_time: datetime
     outcome_time: datetime
     known_at: datetime
-    value: Optional[float]
-    source_ids: Tuple[str, ...]
+    value: float | None
+    source_ids: tuple[str, ...]
     status: str
 
     def __post_init__(self) -> None:
@@ -53,7 +53,9 @@ def compute_forward_log_return_label(
     if outcome_bar.timestamp <= anchor_bar.timestamp:
         raise ValueError("outcome bar must follow anchor bar")
 
-    known_at = max(anchor_bar.observed_at, outcome_bar.observed_at, outcome_bar.timestamp)
+    known_at = max(
+        anchor_bar.observed_at, outcome_bar.observed_at, outcome_bar.timestamp
+    )
     anchor_validation = validate_raw_bar(
         anchor_bar,
         decision_time=known_at,
@@ -67,7 +69,9 @@ def compute_forward_log_return_label(
     label_id = f"forward_log_return_{horizon_name}@{label_version}"
     sources = tuple(sorted({anchor_bar.source_id, outcome_bar.source_id}))
 
-    if not (anchor_validation.usable_for_features and outcome_validation.usable_for_features):
+    if not (
+        anchor_validation.usable_for_features and outcome_validation.usable_for_features
+    ):
         return ForwardReturnLabel(
             instrument_id=instrument_id,
             label_id=label_id,
@@ -94,9 +98,11 @@ def compute_forward_log_return_label(
 
 def cross_sectional_percentile_labels(
     labels: Iterable[ForwardReturnLabel],
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Rank valid outcomes only when anchor/outcome/label definition are comparable."""
-    valid = [label for label in labels if label.status == "VALID" and label.value is not None]
+    valid = [
+        label for label in labels if label.status == "VALID" and label.value is not None
+    ]
     if not valid:
         return {}
 

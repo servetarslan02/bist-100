@@ -7,7 +7,6 @@ from alpha_v4.paper_engine import PaperDecisionRequest, PaperEngine
 from alpha_v4.paper_ledger import PaperLedger
 from alpha_v4.risk import RiskAction, RiskPolicy, RiskRequest
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

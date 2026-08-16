@@ -11,7 +11,6 @@ from alpha_v4.event_intelligence import (
     analyze_contract_event,
 )
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
@@ -144,7 +143,10 @@ def test_contract_materiality_is_relative_to_company_scale():
 
     assert small_result.materiality["revenue_ratio"] == pytest.approx(0.5)
     assert large_result.materiality["revenue_ratio"] == pytest.approx(0.01)
-    assert small_result.materiality["gross_profit_to_ebitda"] > large_result.materiality["gross_profit_to_ebitda"]
+    assert (
+        small_result.materiality["gross_profit_to_ebitda"]
+        > large_result.materiality["gross_profit_to_ebitda"]
+    )
 
 
 def test_contract_interpretation_does_not_fake_missing_financials():

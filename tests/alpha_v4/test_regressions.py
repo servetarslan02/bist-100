@@ -6,7 +6,6 @@ from alpha_v4.company_memory import CompanyMemory, CompanySnapshot
 from alpha_v4.contracts import CanonicalEvent, EvidenceRef, RawBar, ValidationStatus
 from alpha_v4.data_quality import masked_log_returns, validate_raw_bar
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

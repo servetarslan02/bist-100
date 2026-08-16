@@ -10,7 +10,6 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -21,8 +20,8 @@ class InstrumentVersion:
     effective_from: datetime
     known_at: datetime
     listed_at: datetime
-    delisted_at: Optional[datetime]
-    sector: Optional[str]
+    delisted_at: datetime | None
+    sector: str | None
     source_event_id: str
 
     def __post_init__(self) -> None:
@@ -38,7 +37,7 @@ class UniverseMembershipVersion:
     universe_name: str
     instrument_id: str
     effective_from: datetime
-    effective_to: Optional[datetime]
+    effective_to: datetime | None
     known_at: datetime
     source_event_id: str
 
@@ -148,12 +147,16 @@ class UniverseStore:
             effective_from=datetime.fromisoformat(row["effective_from"]),
             known_at=datetime.fromisoformat(row["known_at"]),
             listed_at=datetime.fromisoformat(row["listed_at"]),
-            delisted_at=datetime.fromisoformat(row["delisted_at"]) if row["delisted_at"] else None,
+            delisted_at=datetime.fromisoformat(row["delisted_at"])
+            if row["delisted_at"]
+            else None,
             sector=row["sector"],
             source_event_id=row["source_event_id"],
         )
 
-    def instruments_as_of(self, decision_time: datetime) -> Tuple[InstrumentVersion, ...]:
+    def instruments_as_of(
+        self, decision_time: datetime
+    ) -> tuple[InstrumentVersion, ...]:
         """Return every active instrument known at decision_time; no business cap."""
         with self._connect() as connection:
             rows = connection.execute(
@@ -183,7 +186,9 @@ class UniverseStore:
         ]
         return tuple(sorted(active, key=lambda item: item.symbol))
 
-    def members_as_of(self, universe_name: str, decision_time: datetime) -> Tuple[str, ...]:
+    def members_as_of(
+        self, universe_name: str, decision_time: datetime
+    ) -> tuple[str, ...]:
         """Return point-in-time membership for an index/peer universe."""
         with self._connect() as connection:
             rows = connection.execute(
@@ -200,13 +205,21 @@ class UniverseStore:
             instrument_id = row["instrument_id"]
             current = latest.get(instrument_id)
             row_key = (row["effective_from"], row["known_at"])
-            current_key = None if current is None else (current["effective_from"], current["known_at"])
+            current_key = (
+                None
+                if current is None
+                else (current["effective_from"], current["known_at"])
+            )
             if current_key is None or row_key >= current_key:
                 latest[instrument_id] = row
 
         members = []
         for instrument_id, row in latest.items():
-            effective_to = datetime.fromisoformat(row["effective_to"]) if row["effective_to"] else None
+            effective_to = (
+                datetime.fromisoformat(row["effective_to"])
+                if row["effective_to"]
+                else None
+            )
             if effective_to is None or decision_time < effective_to:
                 members.append(instrument_id)
         return tuple(sorted(members))

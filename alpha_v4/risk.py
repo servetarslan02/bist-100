@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Tuple
 
 
 class RiskAction(str, Enum):
@@ -42,15 +41,15 @@ class RiskPolicy:
 @dataclass(frozen=True)
 class RiskRequest:
     instrument_id: str
-    sector_id: Optional[str]
+    sector_id: str | None
     requested_notional: float
-    portfolio_equity: Optional[float]
-    current_instrument_notional: Optional[float]
-    current_sector_notional: Optional[float]
-    current_gross_exposure: Optional[float]
-    liquidity_score: Optional[float]
-    data_integrity_ok: Optional[bool]
-    model_integrity_ok: Optional[bool]
+    portfolio_equity: float | None
+    current_instrument_notional: float | None
+    current_sector_notional: float | None
+    current_gross_exposure: float | None
+    liquidity_score: float | None
+    data_integrity_ok: bool | None
+    model_integrity_ok: bool | None
     kill_switch_active: bool = False
 
 
@@ -58,7 +57,7 @@ class RiskRequest:
 class RiskDecision:
     action: RiskAction
     approved_notional: float
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
     policy_version: str
 
 
@@ -127,7 +126,9 @@ def evaluate_risk(request: RiskRequest, policy: RiskPolicy) -> RiskDecision:
         0.0,
         equity * policy.max_gross_exposure_fraction - request.current_gross_exposure,
     )
-    approved = min(request.requested_notional, position_capacity, sector_capacity, gross_capacity)
+    approved = min(
+        request.requested_notional, position_capacity, sector_capacity, gross_capacity
+    )
 
     if approved <= 0:
         limiting = []

@@ -9,7 +9,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 from hashlib import sha256
-from typing import Tuple
 
 
 class EventStage(IntEnum):
@@ -48,7 +47,7 @@ class ThreadUpdate:
     thread_id: str
     classification: str
     current_stage: EventStage
-    event_ids: Tuple[str, ...]
+    event_ids: tuple[str, ...]
 
 
 class EventThreadTracker:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 
 from .drift import DriftAssessment
 from .research_queue import ResearchQueue, ResearchTask
@@ -17,7 +16,7 @@ def enqueue_drift_research(
     subject: str,
     created_at: datetime,
     priority: int,
-) -> Optional[ResearchTask]:
+) -> ResearchTask | None:
     if not evidence_id.strip() or not subject.strip():
         raise ValueError("evidence_id and subject are required")
     if not assessment.detected:

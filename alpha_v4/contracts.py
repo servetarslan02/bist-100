@@ -7,11 +7,12 @@ service can depend on without silently fabricating market state.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from hashlib import sha256
-from typing import Any, Mapping, Optional, Tuple
+from typing import Any
 
 
 class ValidationStatus(str, Enum):
@@ -30,7 +31,7 @@ class EvidenceRef:
     source_timestamp: datetime
     ingest_timestamp: datetime
     locator: str
-    evidence_text: Optional[str] = None
+    evidence_text: str | None = None
 
     def __post_init__(self) -> None:
         if not self.source_id.strip():
@@ -45,11 +46,11 @@ class EvidenceRef:
 class RawBar:
     ticker: str
     timestamp: datetime
-    open: Optional[float]
-    high: Optional[float]
-    low: Optional[float]
-    close: Optional[float]
-    volume: Optional[float]
+    open: float | None
+    high: float | None
+    low: float | None
+    close: float | None
+    volume: float | None
     source_id: str
     observed_at: datetime
     is_tradable: bool = True
@@ -68,9 +69,9 @@ class CanonicalEvent:
     source_timestamp: datetime
     ingest_timestamp: datetime
     effective_timestamp: datetime
-    entities: Tuple[str, ...]
+    entities: tuple[str, ...]
     payload: Mapping[str, Any]
-    evidence: Tuple[EvidenceRef, ...]
+    evidence: tuple[EvidenceRef, ...]
     schema_version: str = "1.0"
     event_id: str = field(default="")
 
@@ -92,7 +93,9 @@ class CanonicalEvent:
                 ensure_ascii=False,
             )
         except (TypeError, ValueError) as exc:
-            raise ValueError("canonical event payload must be JSON-serializable") from exc
+            raise ValueError(
+                "canonical event payload must be JSON-serializable"
+            ) from exc
 
         if not self.event_id:
             stable = "|".join(
@@ -105,7 +108,9 @@ class CanonicalEvent:
                     canonical_payload,
                 ]
             )
-            object.__setattr__(self, "event_id", sha256(stable.encode("utf-8")).hexdigest())
+            object.__setattr__(
+                self, "event_id", sha256(stable.encode("utf-8")).hexdigest()
+            )
 
     def was_known_at(self, decision_time: datetime) -> bool:
         """Point-in-time availability gate.

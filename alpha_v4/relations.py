@@ -7,7 +7,6 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -17,11 +16,15 @@ class RelationVersion:
     target_entity: str
     effective_from: datetime
     known_at: datetime
-    source_event_ids: Tuple[str, ...]
-    effective_to: Optional[datetime] = None
+    source_event_ids: tuple[str, ...]
+    effective_to: datetime | None = None
 
     def __post_init__(self) -> None:
-        if not self.source_entity.strip() or not self.relation.strip() or not self.target_entity.strip():
+        if (
+            not self.source_entity.strip()
+            or not self.relation.strip()
+            or not self.target_entity.strip()
+        ):
             raise ValueError("source, relation and target are required")
         if not self.source_event_ids:
             raise ValueError("relation evidence is required")
@@ -73,7 +76,9 @@ class RelationStore:
                 ),
             )
 
-    def outgoing_as_of(self, source_entity: str, decision_time: datetime) -> Tuple[RelationVersion, ...]:
+    def outgoing_as_of(
+        self, source_entity: str, decision_time: datetime
+    ) -> tuple[RelationVersion, ...]:
         with sqlite3.connect(self.database_path) as connection:
             connection.row_factory = sqlite3.Row
             rows = connection.execute(
@@ -92,16 +97,22 @@ class RelationStore:
                 relation=row["relation"],
                 target_entity=row["target_entity"],
                 effective_from=datetime.fromisoformat(row["effective_from"]),
-                effective_to=datetime.fromisoformat(row["effective_to"]) if row["effective_to"] else None,
+                effective_to=datetime.fromisoformat(row["effective_to"])
+                if row["effective_to"]
+                else None,
                 known_at=datetime.fromisoformat(row["known_at"]),
                 source_event_ids=tuple(json.loads(row["source_event_ids_json"])),
             )
             key = (item.relation, item.target_entity)
             current = latest.get(key)
-            if current is None or (item.effective_from, item.known_at) >= (current.effective_from, current.known_at):
+            if current is None or (item.effective_from, item.known_at) >= (
+                current.effective_from,
+                current.known_at,
+            ):
                 latest[key] = item
 
         return tuple(
-            item for item in latest.values()
+            item
+            for item in latest.values()
             if item.effective_to is None or decision_time < item.effective_to
         )

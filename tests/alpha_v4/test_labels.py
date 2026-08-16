@@ -3,8 +3,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from alpha_v4.contracts import RawBar
-from alpha_v4.labels import compute_forward_log_return_label, cross_sectional_percentile_labels
-
+from alpha_v4.labels import (
+    compute_forward_log_return_label,
+    cross_sectional_percentile_labels,
+)
 
 UTC = timezone.utc
 T0 = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)

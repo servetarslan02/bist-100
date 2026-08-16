@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Dict, Iterable, Optional, Tuple
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -12,8 +13,8 @@ class CompanySnapshot:
     company_id: str
     effective_at: datetime
     known_at: datetime
-    values: Dict[str, Any]
-    source_event_ids: Tuple[str, ...]
+    values: dict[str, Any]
+    source_event_ids: tuple[str, ...]
     version: str = "1.0"
 
     def __post_init__(self) -> None:
@@ -34,7 +35,7 @@ class CompanyMemory:
     def append(self, snapshot: CompanySnapshot) -> None:
         self._snapshots.append(snapshot)
 
-    def as_of(self, company_id: str, decision_time: datetime) -> Optional[CompanySnapshot]:
+    def as_of(self, company_id: str, decision_time: datetime) -> CompanySnapshot | None:
         eligible = [
             snapshot
             for snapshot in self._snapshots

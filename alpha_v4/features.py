@@ -8,7 +8,6 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple
 
 from .market_data import RawBarStore
 
@@ -17,11 +16,11 @@ from .market_data import RawBarStore
 class FeatureRecord:
     instrument_id: str
     feature_id: str
-    value: Optional[float]
+    value: float | None
     effective_at: datetime
     known_at: datetime
-    source_ids: Tuple[str, ...]
-    input_timestamps: Tuple[datetime, ...]
+    source_ids: tuple[str, ...]
+    input_timestamps: tuple[datetime, ...]
     status: str
 
     def __post_init__(self) -> None:
@@ -87,7 +86,10 @@ class FeatureStore:
                     record.effective_at.isoformat(),
                     record.known_at.isoformat(),
                     json.dumps(record.source_ids, separators=(",", ":")),
-                    json.dumps([ts.isoformat() for ts in record.input_timestamps], separators=(",", ":")),
+                    json.dumps(
+                        [ts.isoformat() for ts in record.input_timestamps],
+                        separators=(",", ":"),
+                    ),
                     record.status,
                 ),
             )
@@ -101,7 +103,10 @@ class FeatureStore:
             effective_at=datetime.fromisoformat(row["effective_at"]),
             known_at=datetime.fromisoformat(row["known_at"]),
             source_ids=tuple(json.loads(row["source_ids_json"])),
-            input_timestamps=tuple(datetime.fromisoformat(x) for x in json.loads(row["input_timestamps_json"])),
+            input_timestamps=tuple(
+                datetime.fromisoformat(x)
+                for x in json.loads(row["input_timestamps_json"])
+            ),
             status=row["status"],
         )
 
@@ -110,7 +115,7 @@ class FeatureStore:
         instrument_id: str,
         feature_id: str,
         decision_time: datetime,
-    ) -> Optional[FeatureRecord]:
+    ) -> FeatureRecord | None:
         with self._connect() as connection:
             row = connection.execute(
                 """
@@ -120,7 +125,12 @@ class FeatureStore:
                 ORDER BY effective_at DESC, known_at DESC
                 LIMIT 1
                 """,
-                (instrument_id, feature_id, decision_time.isoformat(), decision_time.isoformat()),
+                (
+                    instrument_id,
+                    feature_id,
+                    decision_time.isoformat(),
+                    decision_time.isoformat(),
+                ),
             ).fetchone()
         return None if row is None else self._from_row(row)
 
@@ -156,7 +166,7 @@ def compute_log_return_feature(
             status="INSUFFICIENT_DATA",
         )
 
-    window = bars[-(lookback_bars + 1):]
+    window = bars[-(lookback_bars + 1) :]
     from .data_quality import masked_log_returns
 
     returns = masked_log_returns(

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -17,7 +17,7 @@ class StateSnapshot:
     entity_id: str
     effective_at: datetime
     known_at: datetime
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     source_event_ids: tuple[str, ...]
     schema_version: str = "1.0"
     snapshot_id: str = ""
@@ -44,7 +44,9 @@ class StateSnapshot:
                 separators=(",", ":"),
                 default=str,
             )
-            object.__setattr__(self, "snapshot_id", sha256(stable.encode("utf-8")).hexdigest())
+            object.__setattr__(
+                self, "snapshot_id", sha256(stable.encode("utf-8")).hexdigest()
+            )
 
 
 class StateStore:
@@ -92,8 +94,15 @@ class StateStore:
                     snapshot.entity_id,
                     snapshot.effective_at.isoformat(),
                     snapshot.known_at.isoformat(),
-                    json.dumps(snapshot.payload, sort_keys=True, separators=(",", ":"), default=str),
-                    json.dumps(snapshot.source_event_ids, sort_keys=True, separators=(",", ":")),
+                    json.dumps(
+                        snapshot.payload,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    ),
+                    json.dumps(
+                        snapshot.source_event_ids, sort_keys=True, separators=(",", ":")
+                    ),
                 ),
             )
 
@@ -110,7 +119,9 @@ class StateStore:
             source_event_ids=tuple(json.loads(row["source_event_ids_json"])),
         )
 
-    def as_of(self, state_type: str, entity_id: str, decision_time: datetime) -> Optional[StateSnapshot]:
+    def as_of(
+        self, state_type: str, entity_id: str, decision_time: datetime
+    ) -> StateSnapshot | None:
         with self._connect() as connection:
             rows = connection.execute(
                 """

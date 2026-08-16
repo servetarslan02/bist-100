@@ -14,7 +14,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
-from typing import Optional
 
 
 class SourceFetchError(RuntimeError):
@@ -44,7 +43,7 @@ class FetchedDocument:
     url: str
     fetched_at: datetime
     status_code: int
-    content_type: Optional[str]
+    content_type: str | None
     body_sha256: str
     body: bytes
 
@@ -53,7 +52,9 @@ class HttpFetcher:
     def __init__(self, config: HttpSourceConfig):
         self.config = config
 
-    def fetch(self, path_or_url: str, *, fetched_at: Optional[datetime] = None) -> FetchedDocument:
+    def fetch(
+        self, path_or_url: str, *, fetched_at: datetime | None = None
+    ) -> FetchedDocument:
         if path_or_url.startswith(("http://", "https://")):
             url = path_or_url
             if not url.startswith(self.config.base_url):
@@ -67,17 +68,26 @@ class HttpFetcher:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.config.timeout_seconds) as response:
+            with urllib.request.urlopen(
+                request, timeout=self.config.timeout_seconds
+            ) as response:
                 body = response.read()
                 status = int(getattr(response, "status", 200))
                 content_type = response.headers.get("Content-Type")
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
-            raise SourceFetchError(f"fetch failed for {self.config.source_id}: {exc}") from exc
+            raise SourceFetchError(
+                f"fetch failed for {self.config.source_id}: {exc}"
+            ) from exc
 
         observed = fetched_at or datetime.now(timezone.utc)
         body_hash = sha256(body).hexdigest()
         identity = "|".join(
-            [self.config.source_id, url, observed.astimezone(timezone.utc).isoformat(), body_hash]
+            [
+                self.config.source_id,
+                url,
+                observed.astimezone(timezone.utc).isoformat(),
+                body_hash,
+            ]
         )
         return FetchedDocument(
             document_id=sha256(identity.encode("utf-8")).hexdigest(),
@@ -144,7 +154,7 @@ class RawDocumentStore:
                 ),
             )
 
-    def get(self, document_id: str) -> Optional[FetchedDocument]:
+    def get(self, document_id: str) -> FetchedDocument | None:
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM raw_documents WHERE document_id = ?", (document_id,)

@@ -4,10 +4,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Tuple
 
 from .artifacts import EvaluationArtifact, ModelArtifact, ModelLifecycle
 from .governance import GovernanceDecision, GovernancePolicy, evaluate_transition
@@ -159,7 +157,9 @@ class ModelRegistry:
                     artifact.evaluator_code_commit,
                     json.dumps(artifact.fold_ids, separators=(",", ":")),
                     json.dumps(artifact.metrics, sort_keys=True, separators=(",", ":")),
-                    json.dumps(artifact.cost_assumptions, sort_keys=True, separators=(",", ":")),
+                    json.dumps(
+                        artifact.cost_assumptions, sort_keys=True, separators=(",", ":")
+                    ),
                     1 if artifact.independently_recomputed else 0,
                     artifact.created_at.isoformat(),
                 ),
@@ -191,10 +191,12 @@ class ModelRegistry:
         *,
         requested_at: datetime,
         policy: GovernancePolicy,
-        evaluation_id: Optional[str] = None,
+        evaluation_id: str | None = None,
     ) -> GovernanceDecision:
         model = self.get(model_id)
-        evaluation = None if evaluation_id is None else self.get_evaluation(evaluation_id)
+        evaluation = (
+            None if evaluation_id is None else self.get_evaluation(evaluation_id)
+        )
         decision = evaluate_transition(
             model,
             requested_lifecycle,
@@ -222,7 +224,7 @@ class ModelRegistry:
             )
         return decision
 
-    def transition_history(self, model_id: str) -> Tuple[dict, ...]:
+    def transition_history(self, model_id: str) -> tuple[dict, ...]:
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM model_transitions WHERE model_id = ? ORDER BY sequence ASC",

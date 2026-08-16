@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from math import log
-from typing import Iterable, List, Optional, Tuple
 
 from .contracts import RawBar, ValidationStatus
 
@@ -13,7 +13,7 @@ from .contracts import RawBar, ValidationStatus
 @dataclass(frozen=True)
 class BarValidation:
     status: ValidationStatus
-    reasons: Tuple[str, ...]
+    reasons: tuple[str, ...]
 
     @property
     def usable_for_features(self) -> bool:
@@ -23,7 +23,7 @@ class BarValidation:
 def validate_raw_bar(
     bar: RawBar,
     *,
-    decision_time: Optional[datetime] = None,
+    decision_time: datetime | None = None,
     freshness_limit: timedelta = timedelta(days=5),
     enforce_freshness: bool = True,
 ) -> BarValidation:
@@ -38,10 +38,12 @@ def validate_raw_bar(
     authoritative market-status data must set ``is_tradable`` upstream.
     """
     decision_time = decision_time or datetime.now(timezone.utc)
-    reasons: List[str] = []
+    reasons: list[str] = []
 
     if bar.observed_at > decision_time:
-        return BarValidation(ValidationStatus.NOT_YET_KNOWN, ("observed_after_decision_time",))
+        return BarValidation(
+            ValidationStatus.NOT_YET_KNOWN, ("observed_after_decision_time",)
+        )
 
     values = (bar.open, bar.high, bar.low, bar.close, bar.volume)
     if any(v is None for v in values):
@@ -68,7 +70,9 @@ def validate_raw_bar(
         return BarValidation(ValidationStatus.INVALID, tuple(reasons))
 
     if not bar.is_tradable:
-        return BarValidation(ValidationStatus.UNTRADABLE, ("upstream_market_status_untradable",))
+        return BarValidation(
+            ValidationStatus.UNTRADABLE, ("upstream_market_status_untradable",)
+        )
 
     if enforce_freshness and decision_time - bar.observed_at > freshness_limit:
         return BarValidation(ValidationStatus.STALE, ("observation_stale",))
@@ -81,7 +85,7 @@ def masked_log_returns(
     *,
     decision_time: datetime,
     freshness_limit: timedelta = timedelta(days=5),
-) -> List[Optional[float]]:
+) -> list[float | None]:
     """Compute returns only when both adjacent observations were valid first.
 
     Historical observations are not rejected merely because they are older than the
@@ -90,7 +94,7 @@ def masked_log_returns(
     be checked separately with ``validate_raw_bar(..., enforce_freshness=True)``.
     """
     ordered = sorted(bars, key=lambda b: b.timestamp)
-    result: List[Optional[float]] = [None] * len(ordered)
+    result: list[float | None] = [None] * len(ordered)
 
     validations = [
         validate_raw_bar(
@@ -105,7 +109,10 @@ def masked_log_returns(
     for idx in range(1, len(ordered)):
         previous = ordered[idx - 1]
         current = ordered[idx]
-        if not (validations[idx - 1].usable_for_features and validations[idx].usable_for_features):
+        if not (
+            validations[idx - 1].usable_for_features
+            and validations[idx].usable_for_features
+        ):
             continue
         assert previous.close is not None and current.close is not None
         result[idx] = log(current.close / previous.close)

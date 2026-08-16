@@ -9,7 +9,6 @@ from alpha_v4.paper_ledger import (
     PaperLedger,
 )
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
@@ -48,7 +47,15 @@ def test_paper_ledger_reconstructs_cash_cost_basis_and_pnl_after_restart(tmp_pat
     assert marked.equity == pytest.approx(1045.0)
     assert marked.unrealized_pnl == pytest.approx(45.0)
 
-    _fill(PaperLedger(db), "paper-1", side="SELL", quantity=2, price=120, commission=2, minutes=2)
+    _fill(
+        PaperLedger(db),
+        "paper-1",
+        side="SELL",
+        quantity=2,
+        price=120,
+        commission=2,
+        minutes=2,
+    )
     after_sell = PaperLedger(db).reconstruct("paper-1")
 
     assert after_sell.cash == pytest.approx(733.0)
@@ -63,7 +70,15 @@ def test_buy_fill_fails_closed_when_cash_is_insufficient(tmp_path):
     ledger.deposit("paper-1", 100.0, event_time=T0)
 
     with pytest.raises(InsufficientCashError):
-        _fill(ledger, "paper-1", side="BUY", quantity=2, price=100, commission=1, minutes=1)
+        _fill(
+            ledger,
+            "paper-1",
+            side="BUY",
+            quantity=2,
+            price=100,
+            commission=1,
+            minutes=1,
+        )
 
     assert ledger.reconstruct("paper-1").event_count == 1
 
@@ -74,7 +89,15 @@ def test_sell_fill_fails_closed_when_position_is_insufficient(tmp_path):
     _fill(ledger, "paper-1", side="BUY", quantity=1, price=100, commission=0, minutes=1)
 
     with pytest.raises(InsufficientPositionError):
-        _fill(ledger, "paper-1", side="SELL", quantity=2, price=110, commission=0, minutes=2)
+        _fill(
+            ledger,
+            "paper-1",
+            side="SELL",
+            quantity=2,
+            price=110,
+            commission=0,
+            minutes=2,
+        )
 
     assert ledger.reconstruct("paper-1").positions["AAA"].quantity == pytest.approx(1.0)
 

@@ -6,7 +6,6 @@ import pytest
 
 from alpha_v4.acquisition import HttpFetcher, HttpSourceConfig, RawDocumentStore
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 BODY = b'{"source":"official-test","value":123}'
@@ -39,7 +38,9 @@ def test_http_acquisition_uses_real_socket_and_preserves_exact_raw_bytes(tmp_pat
     server, thread = _server()
     try:
         base = f"http://127.0.0.1:{server.server_port}"
-        fetcher = HttpFetcher(HttpSourceConfig(source_id="official-test", base_url=base))
+        fetcher = HttpFetcher(
+            HttpSourceConfig(source_id="official-test", base_url=base)
+        )
         document = fetcher.fetch("/data", fetched_at=T0)
 
         assert document.status_code == 200

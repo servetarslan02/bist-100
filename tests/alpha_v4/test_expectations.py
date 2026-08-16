@@ -8,7 +8,6 @@ from alpha_v4.expectations import (
     compare_expectation,
 )
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
@@ -75,8 +74,12 @@ def test_zero_expected_value_does_not_fake_relative_surprise():
 
 
 def test_tolerance_is_explicit_policy_not_hidden_magic_number():
-    tight = compare_expectation(expectation(100.0), observation(101.0), absolute_tolerance=0.5)
-    loose = compare_expectation(expectation(100.0), observation(101.0), absolute_tolerance=2.0)
+    tight = compare_expectation(
+        expectation(100.0), observation(101.0), absolute_tolerance=0.5
+    )
+    loose = compare_expectation(
+        expectation(100.0), observation(101.0), absolute_tolerance=2.0
+    )
 
     assert tight.classification == "ABOVE_EXPECTATION"
     assert loose.classification == "IN_LINE"

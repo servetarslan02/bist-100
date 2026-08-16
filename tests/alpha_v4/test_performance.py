@@ -4,7 +4,6 @@ import pytest
 
 from alpha_v4.performance import EquityPoint, summarize_performance
 
-
 UTC = timezone.utc
 T0 = datetime(2025, 1, 1, tzinfo=UTC)
 

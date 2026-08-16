@@ -5,13 +5,11 @@ import pytest
 from alpha_v4.artifacts import (
     DatasetManifest,
     FeatureDefinition,
-    LabelDefinition,
     MissingPolicy,
     ModelArtifact,
     ModelLifecycle,
 )
 from alpha_v4.validation import expanding_walk_forward_folds, run_walk_forward
-
 
 UTC = timezone.utc
 T0 = datetime(2020, 1, 1, tzinfo=UTC)

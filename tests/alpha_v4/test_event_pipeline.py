@@ -8,13 +8,12 @@ from alpha_v4.event_pipeline import EvidenceIntegrityError, canonicalize_extract
 from alpha_v4.llm_gateway import EventExtraction
 from alpha_v4.storage import AppendOnlyEventStore
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 BODY = (
-    "Project highest offer: company total revenue share 15,397,620,000 TRY. "
-    "The evaluation process is ongoing."
-).encode("utf-8")
+    b"Project highest offer: company total revenue share 15,397,620,000 TRY. "
+    b"The evaluation process is ongoing."
+)
 
 
 def _document():

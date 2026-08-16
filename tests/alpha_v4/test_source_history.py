@@ -5,7 +5,6 @@ import pytest
 from alpha_v4.source_history import PersistentSourceRegistry
 from alpha_v4.source_registry import SourceKind, SourceRecord
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
@@ -26,9 +25,15 @@ def test_source_reliability_history_survives_restart(tmp_path):
     registry = PersistentSourceRegistry(db)
     registry.register(_record())
     registry.record_observation("kap-official", "SUCCESS", observed_at=T0)
-    registry.record_observation("kap-official", "SUCCESS", observed_at=T0 + timedelta(minutes=1))
-    registry.record_observation("kap-official", "FAILURE", observed_at=T0 + timedelta(minutes=2))
-    registry.record_observation("kap-official", "CONTRADICTION", observed_at=T0 + timedelta(minutes=3))
+    registry.record_observation(
+        "kap-official", "SUCCESS", observed_at=T0 + timedelta(minutes=1)
+    )
+    registry.record_observation(
+        "kap-official", "FAILURE", observed_at=T0 + timedelta(minutes=2)
+    )
+    registry.record_observation(
+        "kap-official", "CONTRADICTION", observed_at=T0 + timedelta(minutes=3)
+    )
 
     loaded = PersistentSourceRegistry(db).get("kap-official")
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Optional, Tuple
 
 
 class BindingStatus(str, Enum):
@@ -36,27 +35,27 @@ _EXECUTION_PRIOR = {
 @dataclass(frozen=True)
 class CompanyContext:
     ticker: str
-    ttm_revenue: Optional[float]
-    market_cap: Optional[float]
-    backlog: Optional[float] = None
-    ebitda: Optional[float] = None
-    free_cash_flow: Optional[float] = None
-    cash: Optional[float] = None
+    ttm_revenue: float | None
+    market_cap: float | None
+    backlog: float | None = None
+    ebitda: float | None = None
+    free_cash_flow: float | None = None
+    cash: float | None = None
 
 
 @dataclass(frozen=True)
 class ContractFacts:
-    headline_value: Optional[float]
-    company_share: Optional[float]
-    duration_months: Optional[int]
+    headline_value: float | None
+    company_share: float | None
+    duration_months: int | None
     binding_status: BindingStatus
-    expected_gross_margin: Optional[float] = None
-    capex_required: Optional[float] = None
-    advance_payment: Optional[float] = None
-    currency: Optional[str] = None
+    expected_gross_margin: float | None = None
+    capex_required: float | None = None
+    advance_payment: float | None = None
+    currency: str | None = None
     previously_announced: bool = False
 
-    def attributable_value(self) -> Optional[float]:
+    def attributable_value(self) -> float | None:
         if self.headline_value is None:
             return None
         if self.company_share is None:
@@ -68,21 +67,23 @@ class ContractFacts:
 
 @dataclass(frozen=True)
 class ContractInterpretation:
-    attributable_value: Optional[float]
+    attributable_value: float | None
     execution_probability_prior: float
-    materiality: Dict[str, Optional[float]]
+    materiality: dict[str, float | None]
     novelty_state: str
-    key_unknowns: Tuple[str, ...]
-    cautions: Tuple[str, ...]
+    key_unknowns: tuple[str, ...]
+    cautions: tuple[str, ...]
 
 
-def _safe_ratio(numerator: Optional[float], denominator: Optional[float]) -> Optional[float]:
+def _safe_ratio(numerator: float | None, denominator: float | None) -> float | None:
     if numerator is None or denominator is None or denominator <= 0:
         return None
     return numerator / denominator
 
 
-def analyze_contract_event(company: CompanyContext, facts: ContractFacts) -> ContractInterpretation:
+def analyze_contract_event(
+    company: CompanyContext, facts: ContractFacts
+) -> ContractInterpretation:
     """Interpret contract economics without collapsing them into a sentiment score."""
     value = facts.attributable_value()
     expected_gross_profit = None
@@ -115,14 +116,20 @@ def analyze_contract_event(company: CompanyContext, facts: ContractFacts) -> Con
         unknowns.append("currency")
 
     cautions = []
-    if facts.binding_status in {BindingStatus.RUMOR, BindingStatus.INTENTION, BindingStatus.MOU}:
+    if facts.binding_status in {
+        BindingStatus.RUMOR,
+        BindingStatus.INTENTION,
+        BindingStatus.MOU,
+    }:
         cautions.append("not_fully_binding")
     if facts.previously_announced:
         cautions.append("potentially_already_known")
     if materiality["capex_to_cash"] is not None and materiality["capex_to_cash"] > 1:
         cautions.append("capex_exceeds_current_cash")
 
-    novelty_state = "previously_known" if facts.previously_announced else "new_information"
+    novelty_state = (
+        "previously_known" if facts.previously_announced else "new_information"
+    )
 
     return ContractInterpretation(
         attributable_value=value,

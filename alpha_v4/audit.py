@@ -11,12 +11,12 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Mapping, Optional, Tuple
-
+from typing import Any
 
 GENESIS_HASH = "0" * 64
 
@@ -36,8 +36,8 @@ class AuditEntry:
 class AuditVerification:
     valid: bool
     checked_entries: int
-    first_invalid_sequence: Optional[int]
-    reason: Optional[str]
+    first_invalid_sequence: int | None
+    reason: str | None
 
 
 class AuditLedger:
@@ -106,7 +106,7 @@ class AuditLedger:
         payload: Mapping[str, Any],
         *,
         created_at: datetime,
-        entry_id: Optional[str] = None,
+        entry_id: str | None = None,
     ) -> AuditEntry:
         if not event_type.strip():
             raise ValueError("event_type is required")
@@ -117,7 +117,9 @@ class AuditLedger:
             previous = connection.execute(
                 "SELECT entry_hash FROM audit_entries ORDER BY sequence DESC LIMIT 1"
             ).fetchone()
-            previous_hash = GENESIS_HASH if previous is None else str(previous["entry_hash"])
+            previous_hash = (
+                GENESIS_HASH if previous is None else str(previous["entry_hash"])
+            )
             entry_hash = self._hash_entry(
                 entry_id=entry_id,
                 event_type=event_type,
@@ -153,7 +155,7 @@ class AuditLedger:
             entry_hash=entry_hash,
         )
 
-    def entries(self) -> Tuple[AuditEntry, ...]:
+    def entries(self) -> tuple[AuditEntry, ...]:
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM audit_entries ORDER BY sequence ASC"

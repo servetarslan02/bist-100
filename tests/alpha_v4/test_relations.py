@@ -4,7 +4,6 @@ import pytest
 
 from alpha_v4.relations import RelationStore, RelationVersion
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -82,8 +81,12 @@ def test_relation_correction_is_bitemporal_and_restart_safe(tmp_path):
         )
     )
 
-    before_correction = RelationStore(db).outgoing_as_of("company:A", T0 + timedelta(days=10))
-    after_correction = RelationStore(db).outgoing_as_of("company:A", T0 + timedelta(days=30))
+    before_correction = RelationStore(db).outgoing_as_of(
+        "company:A", T0 + timedelta(days=10)
+    )
+    after_correction = RelationStore(db).outgoing_as_of(
+        "company:A", T0 + timedelta(days=30)
+    )
     after_end = RelationStore(db).outgoing_as_of("company:A", T0 + timedelta(days=101))
 
     assert len(before_correction) == 1

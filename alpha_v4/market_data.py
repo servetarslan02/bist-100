@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, Tuple
 
 from .contracts import RawBar
 from .data_quality import masked_log_returns
@@ -82,7 +81,7 @@ class RawBarStore:
             is_tradable=bool(row["is_tradable"]),
         )
 
-    def bars_as_of(self, ticker: str, decision_time: datetime) -> Tuple[RawBar, ...]:
+    def bars_as_of(self, ticker: str, decision_time: datetime) -> tuple[RawBar, ...]:
         """Return latest known correction for every timestamp as of decision_time."""
         with self._connect() as connection:
             rows = connection.execute(
@@ -101,7 +100,9 @@ class RawBarStore:
             current = latest_by_timestamp.get(key)
             if current is None or bar.observed_at >= current.observed_at:
                 latest_by_timestamp[key] = bar
-        return tuple(sorted(latest_by_timestamp.values(), key=lambda item: item.timestamp))
+        return tuple(
+            sorted(latest_by_timestamp.values(), key=lambda item: item.timestamp)
+        )
 
     def masked_returns_as_of(
         self,
@@ -109,7 +110,7 @@ class RawBarStore:
         decision_time: datetime,
         *,
         freshness_limit: timedelta,
-    ) -> list[Optional[float]]:
+    ) -> list[float | None]:
         return masked_log_returns(
             self.bars_as_of(ticker, decision_time),
             decision_time=decision_time,

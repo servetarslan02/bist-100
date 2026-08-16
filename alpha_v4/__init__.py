@@ -5,17 +5,17 @@ is migrated under memory/SYSTEM-CONSTITUTION.md and memory/TARGET-ARCHITECTURE.m
 """
 
 from .contracts import CanonicalEvent, EvidenceRef, RawBar, ValidationStatus
-from .data_quality import validate_raw_bar, masked_log_returns
+from .data_quality import masked_log_returns, validate_raw_bar
 from .event_intelligence import CompanyContext, ContractFacts, analyze_contract_event
 
 __all__ = [
     "CanonicalEvent",
+    "CompanyContext",
+    "ContractFacts",
     "EvidenceRef",
     "RawBar",
     "ValidationStatus",
-    "validate_raw_bar",
-    "masked_log_returns",
-    "CompanyContext",
-    "ContractFacts",
     "analyze_contract_event",
+    "masked_log_returns",
+    "validate_raw_bar",
 ]

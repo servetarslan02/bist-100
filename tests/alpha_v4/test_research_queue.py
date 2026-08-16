@@ -4,7 +4,6 @@ import pytest
 
 from alpha_v4.research_queue import ResearchQueue, ResearchStatus
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
@@ -54,12 +53,27 @@ def test_completed_research_cannot_self_reopen_or_promote(tmp_path):
         trigger_evidence_ids=("drift-artifact",),
         priority=90,
     )
-    queue.transition(task.task_id, ResearchStatus.RUNNING, transitioned_at=T0 + timedelta(minutes=1), reason="worker claimed")
-    queue.transition(task.task_id, ResearchStatus.COMPLETED, transitioned_at=T0 + timedelta(minutes=2), reason="experiment artifact recorded")
+    queue.transition(
+        task.task_id,
+        ResearchStatus.RUNNING,
+        transitioned_at=T0 + timedelta(minutes=1),
+        reason="worker claimed",
+    )
+    queue.transition(
+        task.task_id,
+        ResearchStatus.COMPLETED,
+        transitioned_at=T0 + timedelta(minutes=2),
+        reason="experiment artifact recorded",
+    )
 
     assert queue.pending() == ()
     with pytest.raises(ValueError, match="invalid research transition"):
-        queue.transition(task.task_id, ResearchStatus.RUNNING, transitioned_at=T0 + timedelta(minutes=3), reason="self reopen")
+        queue.transition(
+            task.task_id,
+            ResearchStatus.RUNNING,
+            transitioned_at=T0 + timedelta(minutes=3),
+            reason="self reopen",
+        )
 
 
 def test_research_status_survives_restart(tmp_path):
@@ -73,7 +87,12 @@ def test_research_status_survives_restart(tmp_path):
         trigger_evidence_ids=("source-incident",),
         priority=60,
     )
-    queue.transition(task.task_id, ResearchStatus.BLOCKED, transitioned_at=T0 + timedelta(minutes=1), reason="credential unavailable")
+    queue.transition(
+        task.task_id,
+        ResearchStatus.BLOCKED,
+        transitioned_at=T0 + timedelta(minutes=1),
+        reason="credential unavailable",
+    )
 
     pending = ResearchQueue(db).pending()
 

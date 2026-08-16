@@ -11,7 +11,6 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
 
 from .contracts import CanonicalEvent, EvidenceRef
 
@@ -113,22 +112,26 @@ class AppendOnlyEventStore:
                         event.source_timestamp.isoformat(),
                         event.ingest_timestamp.isoformat(),
                         event.effective_timestamp.isoformat(),
-                        json.dumps(event.entities, sort_keys=True, separators=(",", ":")),
-                        json.dumps(event.payload, sort_keys=True, separators=(",", ":")),
+                        json.dumps(
+                            event.entities, sort_keys=True, separators=(",", ":")
+                        ),
+                        json.dumps(
+                            event.payload, sort_keys=True, separators=(",", ":")
+                        ),
                         self._evidence_to_json(event.evidence),
                     ),
                 )
         except sqlite3.IntegrityError as exc:
             raise DuplicateEventError(event.event_id) from exc
 
-    def get(self, event_id: str) -> Optional[CanonicalEvent]:
+    def get(self, event_id: str) -> CanonicalEvent | None:
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT * FROM canonical_events WHERE event_id = ?", (event_id,)
             ).fetchone()
         return None if row is None else self._row_to_event(row)
 
-    def list_known_at(self, decision_time: datetime) -> List[CanonicalEvent]:
+    def list_known_at(self, decision_time: datetime) -> list[CanonicalEvent]:
         """Return only information that had actually been ingested by decision_time."""
         with self._connect() as connection:
             rows = connection.execute(
@@ -143,6 +146,8 @@ class AppendOnlyEventStore:
 
     def count(self) -> int:
         with self._connect() as connection:
-            row = connection.execute("SELECT COUNT(*) AS count FROM canonical_events").fetchone()
+            row = connection.execute(
+                "SELECT COUNT(*) AS count FROM canonical_events"
+            ).fetchone()
         assert row is not None
         return int(row["count"])

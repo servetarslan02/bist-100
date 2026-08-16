@@ -10,9 +10,10 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from hashlib import sha256
-from typing import Any, Dict, Iterable, Mapping, Tuple
+from typing import Any
 
 
 class LLMProtocolError(RuntimeError):
@@ -30,7 +31,7 @@ FORBIDDEN_DECISION_KEYS = {
 }
 
 
-EVENT_EXTRACTION_SCHEMA: Dict[str, Any] = {
+EVENT_EXTRACTION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
@@ -67,11 +68,13 @@ class EvidenceBoundFact:
     evidence_sha256: str
 
     @classmethod
-    def from_mapping(cls, mapping: Mapping[str, Any]) -> "EvidenceBoundFact":
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> EvidenceBoundFact:
         required = {"value", "source_document_id", "evidence_text"}
         missing = required - set(mapping)
         if missing:
-            raise LLMProtocolError("fact missing evidence fields: " + ",".join(sorted(missing)))
+            raise LLMProtocolError(
+                "fact missing evidence fields: " + ",".join(sorted(missing))
+            )
         source_document_id = str(mapping["source_document_id"]).strip()
         evidence_text = str(mapping["evidence_text"]).strip()
         if not source_document_id or not evidence_text:
@@ -87,13 +90,13 @@ class EvidenceBoundFact:
 @dataclass(frozen=True)
 class EventExtraction:
     event_type: str
-    entity_ids: Tuple[str, ...]
+    entity_ids: tuple[str, ...]
     facts: Mapping[str, EvidenceBoundFact]
-    key_unknowns: Tuple[str, ...]
+    key_unknowns: tuple[str, ...]
     uncertainties: Mapping[str, float]
 
     @classmethod
-    def from_mapping(cls, mapping: Mapping[str, Any]) -> "EventExtraction":
+    def from_mapping(cls, mapping: Mapping[str, Any]) -> EventExtraction:
         top_level_keys = {str(key).lower() for key in mapping.keys()}
         forbidden = FORBIDDEN_DECISION_KEYS & top_level_keys
         if forbidden:
@@ -102,10 +105,18 @@ class EventExtraction:
                 + ",".join(sorted(forbidden))
             )
 
-        required = {"event_type", "entity_ids", "facts", "key_unknowns", "uncertainties"}
+        required = {
+            "event_type",
+            "entity_ids",
+            "facts",
+            "key_unknowns",
+            "uncertainties",
+        }
         missing = required - set(mapping)
         if missing:
-            raise LLMProtocolError("event extraction missing fields: " + ",".join(sorted(missing)))
+            raise LLMProtocolError(
+                "event extraction missing fields: " + ",".join(sorted(missing))
+            )
 
         event_type = str(mapping["event_type"]).strip()
         entity_ids = tuple(str(item).strip() for item in mapping["entity_ids"])
@@ -134,7 +145,7 @@ class EventExtraction:
         raw_uncertainties = mapping["uncertainties"]
         if not isinstance(raw_uncertainties, Mapping):
             raise LLMProtocolError("uncertainties must be an object")
-        uncertainties: Dict[str, float] = {}
+        uncertainties: dict[str, float] = {}
         for name, value in raw_uncertainties.items():
             number = float(value)
             if not 0 <= number <= 1:
@@ -186,7 +197,9 @@ class OllamaStructuredClient:
             method="POST",
         )
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
+            with urllib.request.urlopen(
+                request, timeout=self.timeout_seconds
+            ) as response:
                 response_body = response.read()
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
             raise LLMProtocolError(f"ollama request failed: {exc}") from exc
@@ -196,7 +209,9 @@ class OllamaStructuredClient:
             content = envelope["message"]["content"]
             structured = json.loads(content)
         except (KeyError, TypeError, ValueError, UnicodeDecodeError) as exc:
-            raise LLMProtocolError("ollama returned invalid structured response") from exc
+            raise LLMProtocolError(
+                "ollama returned invalid structured response"
+            ) from exc
         if not isinstance(structured, Mapping):
             raise LLMProtocolError("structured response must be a JSON object")
         return structured

@@ -11,7 +11,6 @@ from alpha_v4.llm_gateway import (
     OllamaStructuredClient,
 )
 
-
 VALID_EVENT = {
     "event_type": "contract_award",
     "entity_ids": ["EKGYO"],

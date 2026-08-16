@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from enum import Enum
-from typing import Dict, Iterable
 
 
 class SourceKind(str, Enum):
@@ -33,7 +33,11 @@ class SourceRecord:
 
     @property
     def measured_reliability(self) -> float | None:
-        total = self.successful_observations + self.failed_observations + self.contradictions
+        total = (
+            self.successful_observations
+            + self.failed_observations
+            + self.contradictions
+        )
         if total == 0:
             return None
         return self.successful_observations / total
@@ -41,7 +45,7 @@ class SourceRecord:
 
 class SourceRegistry:
     def __init__(self, records: Iterable[SourceRecord] = ()):
-        self._records: Dict[str, SourceRecord] = {}
+        self._records: dict[str, SourceRecord] = {}
         for record in records:
             self.register(record)
 
@@ -60,7 +64,9 @@ class SourceRegistry:
 
     def record_success(self, source_id: str) -> SourceRecord:
         current = self.get(source_id)
-        updated = replace(current, successful_observations=current.successful_observations + 1)
+        updated = replace(
+            current, successful_observations=current.successful_observations + 1
+        )
         self._records[source_id] = updated
         return updated
 

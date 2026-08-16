@@ -4,7 +4,6 @@ from alpha_v4.artifacts import EvaluationArtifact, ModelArtifact, ModelLifecycle
 from alpha_v4.governance import GovernancePolicy
 from alpha_v4.model_registry import ModelRegistry
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

@@ -5,7 +5,6 @@ from alpha_v4.baseline import rank_single_feature
 from alpha_v4.features import FeatureRecord
 from alpha_v4.governance import GovernancePolicy, evaluate_transition
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

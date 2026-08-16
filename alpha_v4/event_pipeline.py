@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import datetime
-from typing import Mapping
 
 from .acquisition import FetchedDocument
 from .contracts import CanonicalEvent, EvidenceRef
@@ -32,7 +32,9 @@ def canonicalize_extraction(
         for fact in extraction.facts.values()
     }
     if len(source_ids) != 1:
-        raise EvidenceIntegrityError("single canonical extraction must have one primary source")
+        raise EvidenceIntegrityError(
+            "single canonical extraction must have one primary source"
+        )
     source_id = next(iter(source_ids))
 
     evidence = tuple(

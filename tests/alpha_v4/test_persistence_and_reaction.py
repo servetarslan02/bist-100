@@ -7,7 +7,6 @@ from alpha_v4.reaction import classify_reaction
 from alpha_v4.source_registry import SourceKind, SourceRecord, SourceRegistry
 from alpha_v4.storage import AppendOnlyEventStore, DuplicateEventError
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

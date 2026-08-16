@@ -3,7 +3,6 @@ from datetime import datetime, timedelta, timezone
 
 from alpha_v4.audit import AuditLedger
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 

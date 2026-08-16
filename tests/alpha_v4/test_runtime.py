@@ -6,7 +6,12 @@ from datetime import timedelta
 import pytest
 
 from alpha_v4.contracts import CanonicalEvent, EvidenceRef
-from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode, UnknownSourceError
+from alpha_v4.runtime import (
+    AlphaRuntime,
+    RuntimeConfig,
+    RuntimeMode,
+    UnknownSourceError,
+)
 from alpha_v4.source_registry import SourceKind, SourceRecord, SourceRegistry
 
 
@@ -81,7 +86,9 @@ def test_runtime_rejects_unregistered_event_source(tmp_path):
     assert runtime.events.count() == 0
 
 
-def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_restart(tmp_path):
+def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_restart(
+    tmp_path,
+):
     from datetime import datetime, timezone
 
     now = datetime.now(timezone.utc)
@@ -130,7 +137,9 @@ def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_resta
         entry_id="audit-test-event",
     )
 
-    restarted = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
+    restarted = AlphaRuntime(
+        RuntimeConfig(mode=RuntimeMode.TEST, database_path=database)
+    )
     assert restarted.events.count() == 1
     assert restarted.audit.verify_chain().valid
     assert len(restarted.audit.entries()) == 1

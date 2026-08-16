@@ -5,7 +5,6 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Tuple
 
 from .source_registry import SourceKind, SourceRecord
 
@@ -150,7 +149,7 @@ class PersistentSourceRegistry:
             contradictions=int(counts["contradictions"] or 0),
         )
 
-    def enabled_sources(self) -> Tuple[SourceRecord, ...]:
+    def enabled_sources(self) -> tuple[SourceRecord, ...]:
         with self._connect() as connection:
             rows = connection.execute(
                 "SELECT source_id FROM source_definitions WHERE enabled = 1 ORDER BY source_id"

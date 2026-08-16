@@ -4,7 +4,6 @@ from alpha_v4.drift import DriftAssessment
 from alpha_v4.research_bridge import enqueue_drift_research
 from alpha_v4.research_queue import ResearchQueue, ResearchStatus
 
-
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
