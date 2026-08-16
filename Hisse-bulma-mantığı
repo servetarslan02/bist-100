@@ -1,0 +1,872 @@
+Anladım. Senin sorduğun şey “bu mevcut davranışı nasıl düzeltiriz?” değil; BIST'te gerçekten işlem yapacak olsaydım, tarama ve karar motorunu nasıl tasarlardım?
+
+Ben tek bir indikatöre veya “en çok düşenler” gibi basit kurallara güvenmezdim. BIST için en başarılı modelin rejim farkındalığı olan, çok ufuklu, cross-sectional ve katalizör duyarlı bir ranking sistemi olması gerektiğini düşünürüm.
+
+Benim ana mimarim
+
+Her hisseyi tek bir “al/sat” modeliyle değil, birkaç ayrı motorla değerlendirirdim:
+
+1. Piyasa rejimi
+
+Önce BIST'in kendisini değerlendirirdim:
+
+BIST trendi ve trend gücü
+
+volatilite rejimi
+
+faiz / tahvil
+
+USD/TRY
+
+yabancı para akımları
+
+endeks breadth
+
+sektör rotasyonu
+
+risk-on / risk-off durumu
+
+küresel endeksler
+
+emtia
+
+VİOP ve endeks vadeli yapı
+
+
+Çünkü aynı hisse aynı sinyali farklı rejimlerde tamamen farklı sonuç verebilir.
+
+Örneğin:
+
+> Güçlü boğa rejimi + sektör güçlü + hisse kısa vadeli düzeltme
+
+
+
+ile
+
+> Ayı rejimi + sektör zayıf + hisse sert düşüyor
+
+
+
+aynı “%15 düştü” bilgisini taşımamalı.
+
+
+---
+
+2. Hissenin relatif gücü
+
+Mutlak getiriden çok BIST'e ve kendi sektörüne göre performansı önemserdim.
+
+Örneğin:
+
+Hisse       -8%
+BIST        -14%
+Sektör      -12%
+
+Bu hisse aslında düşmesine rağmen relatif güçlü.
+
+Tersi:
+
+Hisse       -18%
+BIST        -5%
+Sektör      -4%
+
+çok daha tehlikeli.
+
+Burada özellikle:
+
+1 gün
+
+5 gün
+
+20 gün
+
+60 gün
+
+120 gün
+
+
+relatif performanslarını ayrı ayrı tutardım.
+
+
+---
+
+3. Momentum + trend
+
+Klasik “momentum yükseldiyse al” şeklinde değil.
+
+Şunları birlikte ölçerdim:
+
+trend eğimi
+
+trend sürekliliği
+
+yeni yüksek/düşükler
+
+fiyatın hareketli ortalamalara göre konumu
+
+momentum ivmesi
+
+momentumun hızlanıp/yavaşlaması
+
+hacim destekli kırılım
+
+breakout başarısızlıkları
+
+drawdown
+
+toparlanma gücü
+
+
+Özellikle momentumun değişim yönü çok değerli.
+
+Hisse hâlâ düşüyor olabilir ama:
+
+-12%
+-7%
+-3%
++1%
+
+şeklinde satış ivmesi zayıflıyorsa model bunu fark etmeli.
+
+
+---
+
+4. Hacim ve emir davranışı
+
+BIST'te bunu çok önemserdim.
+
+Sadece “hacim yüksek” demek yetmez.
+
+Model:
+
+normalleştirilmiş hacim
+
+hacim/fiyat ilişkisi
+
+yükseliş günlerinde hacim
+
+düşüş günlerinde hacim
+
+hacim anomalisi
+
+turnover
+
+likidite
+
+spread
+
+mümkünse emir defteri dengesini
+
+
+izlemeli.
+
+Örneğin:
+
+fiyat düşüyor + hacim patlıyor
+
+ile
+
+fiyat düşüyor + hacim azalıyor
+
+aynı olay değildir.
+
+
+---
+
+5. Fundamental motor
+
+Burada şirketi sadece FK ile değerlendirmezdim.
+
+Daha geniş bir feature set:
+
+F/K
+
+PD/DD
+
+FD/FAVÖK
+
+F/Satış
+
+ROE
+
+ROIC
+
+borçluluk
+
+net borç/FAVÖK
+
+EBITDA marjı
+
+FCF
+
+faaliyet nakit akışı
+
+kârlılık büyümesi
+
+satış büyümesi
+
+marj trendi
+
+bilanço kalitesi
+
+analist beklentisi varsa beklenti revizyonları
+
+
+Ama bunları sektörel normalize ederdim.
+
+Bankayı sanayi şirketiyle aynı valuation mantığıyla karşılaştırmazdım.
+
+
+---
+
+6. KAP + haber motoru
+
+Bence senin kurmak istediğin sistemin en büyük avantajı burada olabilir.
+
+KAP metnini sadece:
+
+> olumlu / olumsuz
+
+
+
+diye sınıflandırmazdım.
+
+LLM/embedding tarafında:
+
+Şirket
+↓
+KAP
+↓
+Olay türü
+↓
+Beklenmediklik
+↓
+Finansal etkisi
+↓
+Etkinin büyüklüğü
+↓
+Etkinin süresi
+↓
+Belirsizlik
+
+çıkarırdım.
+
+Örneğin:
+
+> “Yeni yatırım yapılacak.”
+
+
+
+tek başına pozitif değildir.
+
+Model bunun:
+
+gelir etkisini
+
+CAPEX etkisini
+
+borç etkisini
+
+zamanlamasını
+
+sektör koşullarını
+
+
+anlamalı.
+
+
+---
+
+7. Katalizör modeli
+
+Ben bunu ayrı bir skor yapardım.
+
+Çünkü bazen teknik/fundamental olarak orta seviyede olan hisse, yaklaşan katalizör nedeniyle çok güçlü aday olabilir.
+
+Örneğin:
+
+bilanço
+
+temettü
+
+bedelsiz/bedelli
+
+ihale
+
+yeni sözleşme
+
+kapasite artışı
+
+regülasyon
+
+şirket birleşmesi
+
+geri alım
+
+önemli yatırım
+
+dava sonucu
+
+sektör değişikliği
+
+
+gibi olayları zaman eksenine koyardım.
+
+
+---
+
+8. “Neden düşüyor?” motoru
+
+Senin sisteminde özellikle bunu isterdim.
+
+Bir hisse %25 düşmüşse model hemen ucuz dememeli.
+
+Önce:
+
+> Bu düşüşün nedeni nedir?
+
+
+
+diye sınıflandırmalı.
+
+Örneğin:
+
+Market selloff
+Sector selloff
+Company-specific bad news
+Earnings deterioration
+Liquidity event
+Technical breakdown
+Temporary panic
+Unknown
+
+Sonra olasılık hesaplamalı.
+
+Bence “dipten alma” modeli ancak düşüş nedeni geçici olma ihtimali yüksekse devreye girmeli.
+
+
+---
+
+Sonra bütün bunları tek modele beslerdim
+
+Burada önemli nokta şu:
+
+Ben doğrudan “yarın % kaç artacak?” tahmin etmeye çalışmazdım.
+
+Bu çok gürültülü bir problem.
+
+Bunun yerine farklı hedefler oluştururdum:
+
+P(5 günlük relatif pozitif getiri)
+P(20 günlük relatif pozitif getiri)
+P(20 günlük > +5%)
+P(20 günlük > sektör)
+P(max drawdown > X)
+P(yukarı hareket devamı)
+P(aşağı hareket devamı)
+
+Sonra bunları bir ranking engine içinde birleştirirdim.
+
+
+---
+
+Benim ideal çıktım böyle olurdu
+
+Sistem:
+
+ASELS
+Opportunity      87
+Trend            82
+Momentum         91
+Relative Strength 94
+Fundamental      76
+Catalyst         88
+News             81
+Risk             31
+Regime Fit       93
+
+Expected horizon: 5–20 days
+Confidence: 78%
+
+gibi bir sonuç üretirdi.
+
+Ama daha önemlisi:
+
+> “Neden?”
+
+
+
+kısmını da açıklardı.
+
+Örneğin:
+
+> Güçlü sektör rotasyonu + endekse göre belirgin relatif güç + pozitif hacim anomalisi + yeni KAP katalizörü + düşük downside risk.
+
+
+
+
+---
+
+En önemli nokta: Tek model değil, ensemble
+
+Ben BIST için yaklaşık şöyle bir yapı kurardım:
+
+MARKET REGIME
+                       ↓
+              ┌───────────────┐
+              │               │
+        Technical        Fundamental
+              │               │
+        Microstructure       KAP/News
+              │               │
+              └───────┬───────┘
+                      ↓
+                 CATALYST
+                      ↓
+              CROSS-SECTIONAL
+                   RANKING
+                      ↓
+                RISK ENGINE
+                      ↓
+             PORTFOLIO ENGINE
+                      ↓
+                  BUY/SELL
+
+Ve her katmanın ayrı modeli olurdu.
+
+
+---
+
+Bir de çok kritik bir şey yapardım
+
+Modelin başarısını:
+
+> “Hisse yükseldi mi?”
+
+
+
+ile ölçmezdim.
+
+Şunları ölçerdim:
+
+Alpha
+
+Hisse BIST'ten ne kadar fazla kazandırdı?
+
+Hit rate
+
+Tahminlerin kaç tanesi doğru?
+
+Precision@K
+
+Modelin seçtiği ilk 5/10/20 hisseden kaç tanesi gerçekten iyi?
+
+IC
+
+Model skoru gelecekteki getiriyi ne kadar açıklıyor?
+
+Sharpe
+
+Risk düzeltilmiş performans.
+
+Max drawdown
+
+En kötü dönem.
+
+Turnover
+
+Model sürekli gereksiz işlem yapıyor mu?
+
+Ve en önemlisi:
+
+Walk-forward backtest + out-of-sample test
+
+Yani model geçmişi ezberleyip:
+
+> “2023'te bu koşul yükselmişti.”
+
+
+
+diye kendini kandıramamalı.
+
+
+---
+
+Ben olsam senin projenin hedefini şöyle koyardım:
+
+“BIST'te en fazla yükselecek hisseyi tahmin eden yapay zekâ”
+
+değil.
+
+Şöyle:
+
+> “Her gün BIST evrenindeki tüm hisseleri mevcut piyasa rejimi altında değerlendirip, gelecek belirli zaman ufuklarında risk-getiri açısından en avantajlı fırsatları sıralayan adaptif piyasa istihbarat sistemi.”
+
+
+
+Bu çok daha sağlam bir hedef.
+
+Ve senin daha önce konuştuğumuz sayısal market state + embedding tabanlı KAP/haber + rolling state mimarin de aslında bu hedefe oldukça iyi oturuyor.
+
+Bence sistemin sonraki aşamasında en kritik konu hangi feature'ları kullanacağımızdan bile önce, “model tam olarak neyi tahmin edecek?” hedef fonksiyonunu doğru tasarlamak.
+
+
+hedef fonksiyon:
+Evet. Ben bu proje için hedef fonksiyonunu tek bir “yarın kaç % yükselecek?” hedefi olarak tasarlamazdım. BIST'in yapısına daha uygun bir çoklu hedef + sıralama + risk cezası sistemi kurardım.
+
+1. Ana hedef: gelecekteki relatif alpha
+
+Her hisse için önce gelecekteki getiriyi hesaplarız:
+
+\[
+R_{i,t\rightarrow t+h}=\frac{P_{i,t+h}}{P_{i,t}}-1
+\]
+
+Ama asıl hedef:
+
+\[
+Alpha_{i,h}=R_{i,h}-R_{BIST,h}
+\]
+
+Yani model:
+
+> “Bu hisse yükselecek mi?”
+
+
+
+yerine:
+
+> “Bu hisse aynı dönemde BIST'ten daha iyi performans gösterecek mi?”
+
+
+
+sorusunu öğrenir.
+
+Ben ana hedefi kesinlikle buna bağlardım.
+
+
+---
+
+2. Tek zaman ufku kullanma
+
+Aynı anda üç ufuk:
+
+Ufuk	Hedef
+
+1–3 gün	kısa vadeli fırsat
+5–20 gün	ana trading hedefi
+40–60 gün	orta vadeli trend
+
+
+Ama ağırlığı şöyle verirdim:
+
+5–20 gün       %50
+40–60 gün      %30
+1–3 gün        %20
+
+Çünkü günlük tahmin BIST'te çok gürültülü.
+
+
+---
+
+3. Yön hedefi
+
+Her ufuk için:
+
+Y = 1  → relatif olarak pozitif
+Y = 0  → relatif olarak negatif
+
+Ama sıfırın hemen üzerindeki hareketleri pozitif kabul etmem.
+
+Örneğin:
+
+Alpha > +2%  → güçlü pozitif
+-2% < Alpha < +2% → nötr
+Alpha < -2% → negatif
+
+Bu dead zone, modelin piyasa gürültüsünü öğrenmesini ciddi şekilde azaltabilir.
+
+
+---
+
+4. Asıl güçlü hedef: ranking
+
+Ben sistemin merkezine bunu koyardım.
+
+Her gün BIST'teki bütün hisseleri gelecekteki gerçekleşmiş alpha'larına göre sıralarız.
+
+Örneğin:
+
+1   ASELS     +12.4%
+2   THYAO      +9.1%
+3   TUPRS      +7.8%
+...
+180 XYZ        -14.3%
+
+Modelin görevi:
+
+> Doğru hisseleri doğru sıraya koymak.
+
+
+
+Bunun için ranking loss kullanılabilir.
+
+Örneğin LambdaMART/LightGBM ranking veya neural ranking yaklaşımı.
+
+Bu, “yarın %3.27 yükselecek” tahmininden çok daha kullanışlı.
+
+
+---
+
+5. Büyük hareket hedefi
+
+Ayrıca modelin “büyük fırsat” anlayışı olmalı.
+
+Örneğin:
+
+Y_big = 1  → 20 günlük relatif alpha > +7%
+Y_big = 0  → değil
+
+Bunun karşılığı:
+
+> “Bu hisse ciddi bir outperform yapabilir mi?”
+
+
+
+Bu hedef portföy seçiminde çok değerli olur.
+
+
+---
+
+6. Downside hedefi
+
+Bunu kesinlikle eklerdim.
+
+Model sadece upside öğrenirse tehlikeli hale gelir.
+
+Örneğin:
+
+\[
+MDD_{20} = \min_{1..20} \frac{P_{t+k}}{P_t}-1
+\]
+
+ve:
+
+Y_downside = gelecekteki maksimum negatif hareket
+
+Model böylece:
+
+> “%10 yükselme ihtimali var.”
+
+
+
+demekle kalmaz.
+
+Aynı zamanda:
+
+> “Bu tahminin altında %12 downside riski var.”
+
+
+
+diyebilir.
+
+
+---
+
+7. Risk-adjusted target
+
+Ben nihai fırsat skorunu yaklaşık şu mantıkta kurardım:
+
+\[
+Opportunity =
+ExpectedAlpha
+-
+\lambda \times DownsideRisk
+\]
+
+Örneğin:
+
+Hisse A
+Expected Alpha = +9%
+Downside = -4%
+
+Hisse B
+Expected Alpha = +12%
+Downside = -15%
+
+Model B'yi otomatik olarak A'nın üzerine koymamalı.
+
+
+---
+
+8. Rejim koşullu hedef
+
+Burada senin sistemimizin en önemli farklarından biri ortaya çıkar.
+
+Aynı hedef bütün piyasa koşullarında aynı şekilde değerlendirilmemeli.
+
+Örneğin:
+
+BIST güçlü trend
+→ momentum daha önemli
+
+BIST yatay
+→ mean reversion daha önemli
+
+BIST panik
+→ downside risk daha önemli
+
+BIST toparlanıyor
+→ early reversal + relative strength daha önemli
+
+Dolayısıyla modelin input'unda:
+
+market_regime
+sector_regime
+volatility_regime
+liquidity_regime
+
+olmalı.
+
+Hedef değişkenin kendisini her rejime göre değiştirmek zorunda değiliz; modelin koşullu tahmin yapmasını sağlayabiliriz.
+
+
+---
+
+9. KAP/haber için ayrı hedef
+
+Bunu fiyat modeliyle tamamen karıştırmazdım.
+
+KAP geldiğinde:
+
+Event
+↓
++/- yön
+↓
+1 gün alpha
+5 gün alpha
+20 gün alpha
+
+öğrenilir.
+
+Böylece sistem zamanla:
+
+> “Bu tip KAP olayları genellikle 5 günlük süreçte sektöre göre +%4 alpha yaratıyor.”
+
+
+
+gibi bir event-response modeli oluşturabilir.
+
+Bu çok güçlü olur.
+
+
+---
+
+10. Nihai model çıktısı
+
+Ben modelden tek skor değil, şu çıktıları isterdim:
+
+5D Alpha Probability       78%
+20D Alpha Probability      84%
+
+Expected 5D Alpha          +3.8%
+Expected 20D Alpha         +9.4%
+
+Probability > +5%          67%
+
+Downside Risk              -4.1%
+Probability of -8%         11%
+
+Regime Fit                 91/100
+
+Confidence                 82/100
+
+Sonra:
+
+Opportunity Score
+
+örneğin:
+
+\[
+Score =
+0.40E[\alpha_{20}]
++0.20E[\alpha_{5}]
++0.15P(\alpha>5\%)
++0.10RegimeFit
++0.15Confidence
+-\lambda Risk
+\]
+
+Bu nihai portföy sıralama skorudur.
+
+Modelin doğrudan optimize ettiği şey olmak zorunda değil; tahminlerden türetilmiş karar skorudur.
+
+
+---
+
+11. Çok önemli: veri sızıntısı
+
+Burada sistemi batırabilecek en büyük hata bu.
+
+Örneğin 15 Ağustos'ta tahmin yapıyorsak:
+
+15 Ağustos kapanışından sonra öğrenilen hiçbir bilgi feature'a giremez.
+
+Dolayısıyla:
+
+Feature timestamp
+        ↓
+Prediction timestamp
+        ↓
+Future window
+        ↓
+Target
+
+kesin olarak ayrılmalı.
+
+KAP için de aynı:
+
+KAP'ın yayınlanma zamanı kullanılmalı; raporun dönem tarihi değil.
+
+
+---
+
+Benim önerdiğim nihai hedef mimarisi
+
+MARKET DATA
+                         │
+              ┌──────────┴──────────┐
+              ↓                     ↓
+         PRICE TARGETS         RISK TARGETS
+              │                     │
+       ┌──────┼──────┐        ┌─────┼─────┐
+       ↓      ↓      ↓        ↓     ↓     ↓
+      3D     20D    60D      MDD   VaR  Tail
+       │      │      │
+       └──────┼──────┘
+              ↓
+        RELATIVE ALPHA
+              ↓
+          RANKING MODEL
+              ↑
+       KAP / NEWS EVENT
+              ↑
+       MARKET REGIME
+              ↓
+       OPPORTUNITY SCORE
+              ↓
+       PORTFOLIO / RISK
+
+En kritik kararım
+
+Modelin ana hedefi:
+
+> 5–20 günlük risk-düzeltilmiş relatif alpha'yı doğru sıralamak.
+
+
+
+Diğer hedefler bunu destekler.
+
+Böyle tasarlarsak sistemin “son dönemde en çok düşen hisseleri al” gibi basit bir davranışa sıkışma ihtimali ciddi şekilde azalır. Model, düşüşü fırsat mı yoksa devam eden bozulma mı olduğunu öğrenmeye başlar.
+
+Ve bence bundan sonraki aşama doğrudan bu hedef fonksiyonuna göre feature/label dataset şemasını tasarlamak olmalı. Bu yapılmadan model seçmek erken olur.

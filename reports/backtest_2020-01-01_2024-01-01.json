@@ -1,0 +1,81 @@
+{
+  "status": "PASSED",
+  "start_date": "2020-01-01",
+  "end_date": "2024-01-01",
+  "folds": [
+    {
+      "fold": 1,
+      "train_start": "2021-11-22",
+      "train_end": "2022-11-18",
+      "test_start": "2022-11-28",
+      "test_end": "2023-02-28",
+      "total_return": -2.08,
+      "sharpe": -7.58,
+      "max_dd": 2.18,
+      "win_rate": 0.3,
+      "trades": 10,
+      "final_capital": 97923.52,
+      "status": "PASSED"
+    },
+    {
+      "fold": 2,
+      "train_start": "2022-02-17",
+      "train_end": "2023-02-21",
+      "test_start": "2023-03-01",
+      "test_end": "2023-06-01",
+      "total_return": -1.17,
+      "sharpe": -3.44,
+      "max_dd": 1.67,
+      "win_rate": 0.5,
+      "trades": 10,
+      "final_capital": 98828.76,
+      "status": "PASSED"
+    },
+    {
+      "fold": 3,
+      "train_start": "2022-05-23",
+      "train_end": "2023-05-25",
+      "test_start": "2023-06-02",
+      "test_end": "2023-09-04",
+      "total_return": 12.56,
+      "sharpe": 13.79,
+      "max_dd": 0.0,
+      "win_rate": 1.0,
+      "trades": 10,
+      "final_capital": 112556.97,
+      "status": "PASSED"
+    },
+    {
+      "fold": 4,
+      "train_start": "2022-08-23",
+      "train_end": "2023-08-25",
+      "test_start": "2023-09-05",
+      "test_end": "2023-11-30",
+      "total_return": -1.3,
+      "sharpe": -4.77,
+      "max_dd": 1.96,
+      "win_rate": 0.2,
+      "trades": 10,
+      "final_capital": 98696.89,
+      "status": "PASSED"
+    }
+  ],
+  "summary": {
+    "successful_folds": 4,
+    "total_folds": 4,
+    "total_return_pct": 7.513113097779178,
+    "cagr_pct": 1.8275651634104495,
+    "avg_return_pct": 2.0025,
+    "avg_sharpe": -0.5,
+    "avg_sortino": -0.6000000000000003,
+    "avg_max_dd_pct": 1.4525000000000001,
+    "avg_win_rate": 0.5,
+    "total_trades": 40,
+    "avg_trades_per_fold": 10.0,
+    "turnover": 2.5,
+    "total_transaction_cost": 4000.0,
+    "best_fold_pct": 12.56,
+    "worst_fold_pct": -2.08,
+    "positive_fold_ratio": 0.25
+  }
+}

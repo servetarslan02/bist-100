@@ -1,0 +1,386 @@
+"""
+ALPHA BIST — Continuous Learning Pipeline v3.0
+
+ROADMAP v3.0 FAZ 7:
+- Her gün otomatik güncelleme
+- Drift tespiti
+- A/B test
+- Model versiyonlama
+- Meta-learning
+- Self-healing
+
+KURAL: Sistem durmadan kendini güncellemeli, dünkü model bugünün piyasasına uymayabilir.
+"""
+
+import json
+import numpy as np
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
+from datetime import datetime, timezone, timedelta
+from collections import deque, defaultdict
+import structlog
+
+logger = structlog.get_logger()
+
+
+@dataclass
+class LearningCycle:
+    """Tek öğrenme döngüsü kaydı."""
+    cycle_id: str
+    timestamp: str
+    regime: str
+    action: str  # RETRAIN, DRIFT_DETECTED, A_B_TEST, HEALTH_CHECK
+    status: str  # SUCCESS, FAILED, PENDING
+    metrics_before: Dict[str, float]
+    metrics_after: Dict[str, float]
+    model_version: str
+    notes: str = ""
+
+
+@dataclass
+class ModelRegistry:
+    """Model kayıt defteri."""
+    versions: List[Dict] = field(default_factory=list)
+    active_version: str = ""
+    champion_version: str = ""
+    performance_history: List[Dict] = field(default_factory=list)
+
+
+class ContinuousLearningPipeline:
+    """Sürekli öğrenme pipeline'ı — tam otomatik."""
+
+    def __init__(
+        self,
+        retrain_interval_days: int = 7,
+        drift_check_interval: int = 1,
+        performance_window: int = 21,
+        min_samples_for_retrain: int = 500,
+    ):
+        self.retrain_interval_days = retrain_interval_days
+        self.drift_check_interval = drift_check_interval
+        self.performance_window = performance_window
+        self.min_samples_for_retrain = min_samples_for_retrain
+
+        # Öğrenme döngüsü geçmişi
+        self._cycles: deque = deque(maxlen=100)
+
+        # Model kayıt defteri
+        self._registry = ModelRegistry()
+
+        # Performans geçmişi
+        self._daily_performance: deque = deque(maxlen=252)
+
+        # Son eğitim tarihi
+        self._last_retrain_date: Optional[datetime] = None
+
+        # Drift durumu
+        self._drift_detected = False
+        self._drift_features: List[str] = []
+
+        logger.info("ContinuousLearningPipeline v3.0 initialized",
+                   retrain_interval=retrain_interval_days,
+                   drift_interval=drift_check_interval)
+
+    def run_daily_pipeline(
+        self,
+        date: str,
+        features_map: Dict[str, Dict],
+        predictions: List[Dict],
+        actual_returns: Dict[str, float],
+        regime: str = "UNKNOWN",
+    ) -> Dict[str, Any]:
+        """Günlük pipeline çalıştır.
+
+        Her gün sabah çalıştırılır:
+        1. Dünkü performansı kaydet
+        2. Drift kontrolü
+        3. Retrain gerekli mi?
+        4. A/B test değerlendirme
+        5. Model kayıt defterini güncelle
+        """
+        results = {
+            "date": date,
+            "regime": regime,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        # 1. Performans kaydet
+        daily_metrics = self._record_daily_performance(date, predictions, actual_returns)
+        results["daily_metrics"] = daily_metrics
+        self._daily_performance.append(daily_metrics)
+
+        # 2. Drift kontrolü
+        if self._should_check_drift(date):
+            drift_result = self._check_drift(features_map)
+            results["drift_check"] = drift_result
+            self._drift_detected = drift_result.get("drift_detected", False)
+
+        # 3. Retrain kararı
+        should_retrain = self._should_retrain(date, daily_metrics)
+        results["should_retrain"] = should_retrain
+
+        if should_retrain:
+            retrain_result = self._execute_retrain(features_map, actual_returns, regime)
+            results["retrain_result"] = retrain_result
+
+            cycle = LearningCycle(
+                cycle_id=f"retrain_{date}",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                regime=regime,
+                action="RETRAIN",
+                status="SUCCESS" if retrain_result.get("success") else "FAILED",
+                metrics_before=daily_metrics,
+                metrics_after=retrain_result.get("metrics", {}),
+                model_version=retrain_result.get("version_id", ""),
+            )
+            self._cycles.append(cycle)
+
+        # 4. A/B test değerlendirme
+        ab_result = self._evaluate_ab_test(date)
+        if ab_result:
+            results["ab_test"] = ab_result
+
+        # 5. Kayıt defteri güncelle
+        self._update_registry(date, results)
+
+        logger.info("Daily pipeline completed",
+                   date=date, regime=regime,
+                   retrain=should_retrain, drift=self._drift_detected)
+
+        return results
+
+    def _record_daily_performance(
+        self,
+        date: str,
+        predictions: List[Dict],
+        actual_returns: Dict[str, float],
+    ) -> Dict[str, float]:
+        """Günlük performans kaydet."""
+        if not predictions or not actual_returns:
+            return {"date": date, "sharpe": 0, "ic": 0, "win_rate": 0, "return": 0}
+
+        returns = []
+        wins = 0
+        scores = []
+        actuals = []
+
+        for pred in predictions:
+            ticker = pred.get("ticker", "")
+            if ticker in actual_returns:
+                actual = actual_returns[ticker]
+                returns.append(actual)
+                scores.append(pred.get("score", 0))
+                actuals.append(actual)
+                if actual > 0:
+                    wins += 1
+
+        if not returns:
+            return {"date": date, "sharpe": 0, "ic": 0, "win_rate": 0, "return": 0}
+
+        returns_arr = np.array(returns)
+        sharpe = np.mean(returns_arr) / (np.std(returns_arr) + 1e-10) * np.sqrt(252)
+
+        ic = 0
+        if len(scores) > 5:
+            try:
+                ic = np.corrcoef(scores, actuals)[0, 1]
+                if np.isnan(ic):
+                    ic = 0
+            except:
+                ic = 0
+
+        win_rate = wins / len(returns) if returns else 0
+        total_return = np.sum(returns_arr)
+
+        metrics = {
+            "date": date,
+            "sharpe": round(float(sharpe), 4),
+            "ic": round(float(ic), 4),
+            "win_rate": round(float(win_rate), 4),
+            "return": round(float(total_return), 4),
+            "n_predictions": len(predictions),
+        }
+
+        logger.info("Daily performance recorded", date=date,
+                   sharpe=metrics["sharpe"], ic=metrics["ic"])
+
+        return metrics
+
+    def _should_check_drift(self, date: str) -> bool:
+        """Drift kontrolü yapılması gerekli mi?"""
+        # Her gün kontrol et
+        return True
+
+    def _check_drift(self, features_map: Dict[str, Dict]) -> Dict[str, Any]:
+        """Feature drift kontrolü."""
+        from services.learning.super_intelligence import super_intelligence
+
+        return super_intelligence.detect_drift(features_map)
+
+    def _should_retrain(
+        self,
+        date: str,
+        daily_metrics: Dict[str, float],
+    ) -> bool:
+        """Yeniden eğitim gerekli mi?"""
+
+        # Zorunlu interval
+        if self._last_retrain_date:
+            days_since = (datetime.strptime(date, "%Y-%m-%d") - self._last_retrain_date).days
+            if days_since < self.retrain_interval_days:
+                return False
+
+        # Performans düşüşü
+        recent_sharpes = [m["sharpe"] for m in list(self._daily_performance)[-self.performance_window:]]
+        if recent_sharpes:
+            avg_sharpe = np.mean(recent_sharpes)
+            if avg_sharpe < 0.3:  # Sharpe < 0.3 ise retrain
+                logger.warning("Retrain triggered: low Sharpe", avg_sharpe=round(avg_sharpe, 4))
+                return True
+
+        # Drift tespiti
+        if self._drift_detected:
+            logger.warning("Retrain triggered: drift detected")
+            return True
+
+        # Win rate düşüşü
+        recent_win_rates = [m["win_rate"] for m in list(self._daily_performance)[-self.performance_window:]]
+        if recent_win_rates and np.mean(recent_win_rates) < 0.45:
+            logger.warning("Retrain triggered: low win rate")
+            return True
+
+        # Zorunlu interval doldu
+        if self._last_retrain_date:
+            days_since = (datetime.strptime(date, "%Y-%m-%d") - self._last_retrain_date).days
+            if days_since >= self.retrain_interval_days * 2:  # 2x interval
+                logger.warning("Retrain triggered: max interval exceeded")
+                return True
+
+        return False
+
+    def _execute_retrain(
+        self,
+        features_map: Dict[str, Dict],
+        actual_returns: Dict[str, float],
+        regime: str,
+    ) -> Dict[str, Any]:
+        """Yeniden eğitim çalıştır."""
+        from services.learning.super_intelligence import super_intelligence
+        from services.ml.ranking_model import ranking_model
+
+        logger.info("Executing retrain", regime=regime)
+
+        # Eğitim verisi hazırla
+        # Son N günün verilerini kullan
+        training_data = {
+            "features": features_map,
+            "returns": actual_returns,
+            "regime": regime,
+        }
+
+        # Model eğit
+        result = ranking_model.train(
+            features_map=features_map,
+            returns=actual_returns,
+            date_groups={t: datetime.now(timezone.utc).strftime("%Y-%m-%d") for t in features_map},
+            regime=regime,
+        )
+
+        if result.get("success"):
+            self._last_retrain_date = datetime.now(timezone.utc)
+
+            # Super intelligence'a bildir
+            super_intelligence.auto_retrain(training_data, {})
+
+        return result
+
+    def _evaluate_ab_test(self, date: str) -> Optional[Dict]:
+        """A/B test değerlendir."""
+        from services.learning.super_intelligence import super_intelligence
+
+        if not super_intelligence._ab_test_active:
+            return None
+
+        # A/B test sonuçlarını topla
+        # Gerçek implementasyonda son N günün sonuçları kullanılır
+        return {
+            "active": True,
+            "champion": super_intelligence._ab_test_champion,
+            "challenger": super_intelligence._ab_test_challenger,
+            "date": date,
+        }
+
+    def _update_registry(self, date: str, results: Dict):
+        """Model kayıt defterini güncelle."""
+        self._registry.performance_history.append({
+            "date": date,
+            "metrics": results.get("daily_metrics", {}),
+            "retrain": results.get("should_retrain", False),
+            "drift": results.get("drift_check", {}).get("drift_detected", False),
+        })
+
+    def get_learning_report(self) -> Dict[str, Any]:
+        """Öğrenme raporu oluştur."""
+        recent_cycles = list(self._cycles)[-10:]
+        recent_performance = list(self._daily_performance)[-30:]
+
+        return {
+            "total_cycles": len(self._cycles),
+            "recent_cycles": [{
+                "cycle_id": c.cycle_id,
+                "action": c.action,
+                "status": c.status,
+                "regime": c.regime,
+                "model_version": c.model_version,
+            } for c in recent_cycles],
+            "performance_summary": {
+                "avg_sharpe_30d": round(np.mean([m["sharpe"] for m in recent_performance]), 4) if recent_performance else 0,
+                "avg_ic_30d": round(np.mean([m["ic"] for m in recent_performance]), 4) if recent_performance else 0,
+                "avg_win_rate_30d": round(np.mean([m["win_rate"] for m in recent_performance]), 4) if recent_performance else 0,
+            },
+            "registry": {
+                "versions": len(self._registry.versions),
+                "active_version": self._registry.active_version,
+                "champion_version": self._registry.champion_version,
+            },
+            "drift_status": {
+                "detected": self._drift_detected,
+                "features": self._drift_features,
+            },
+            "last_retrain": self._last_retrain_date.isoformat() if self._last_retrain_date else None,
+        }
+
+    def export_state(self) -> Dict[str, Any]:
+        """Pipeline durumunu dışa aktar."""
+        return {
+            "cycles": [{
+                "cycle_id": c.cycle_id,
+                "timestamp": c.timestamp,
+                "regime": c.regime,
+                "action": c.action,
+                "status": c.status,
+                "model_version": c.model_version,
+            } for c in self._cycles],
+            "registry": {
+                "versions": self._registry.versions,
+                "active_version": self._registry.active_version,
+                "champion_version": self._registry.champion_version,
+            },
+            "daily_performance": list(self._daily_performance),
+            "last_retrain": self._last_retrain_date.isoformat() if self._last_retrain_date else None,
+            "drift_detected": self._drift_detected,
+        }
+
+    def import_state(self, state: Dict[str, Any]):
+        """Pipeline durumunu içe aktar."""
+        self._registry.versions = state.get("registry", {}).get("versions", [])
+        self._registry.active_version = state.get("registry", {}).get("active_version", "")
+        self._registry.champion_version = state.get("registry", {}).get("champion_version", "")
+        self._daily_performance = deque(state.get("daily_performance", []), maxlen=252)
+        if state.get("last_retrain"):
+            self._last_retrain_date = datetime.fromisoformat(state["last_retrain"])
+        self._drift_detected = state.get("drift_detected", False)
+
+
+# Singleton
+continuous_learning = ContinuousLearningPipeline()

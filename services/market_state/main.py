@@ -1,0 +1,354 @@
+"""ALPHA BIST - Market State Engine (Main Entry Point)"""
+
+import asyncio
+import json
+from datetime import datetime, timezone
+from typing import Dict, List, Any, Optional
+import numpy as np
+import structlog
+
+from ..core.config import settings
+from ..core.database import (
+    init_databases, close_databases, get_pg_pool,
+    ch_insert, ch_execute, redis_get, redis_set,
+    redis_hgetall, redis_hset,
+)
+from ..core.event_schema import CanonicalEvent
+from ..core.event_bus import (
+    ensure_topics, EventType,
+    EventConsumer, publish_event, flush_producer,
+)
+from ..core.logging import setup_logging
+
+logger = structlog.get_logger()
+
+
+class MarketStateService:
+    """Computes overall market state and regime detection."""
+
+    def __init__(self):
+        self._running = False
+        self._consumer: EventConsumer = None
+        self._instrument_states: Dict[int, Dict] = {}  # instrument_id -> state
+        self._ticker_map: Dict[str, int] = {}  # ticker -> instrument_id
+        self._current_regime: str = "UNKNOWN"
+        self._last_update: Optional[datetime] = None
+
+    async def start(self):
+        """Start the market state service."""
+        setup_logging()
+        logger.info("Starting Market State Service")
+
+        await init_databases()
+        ensure_topics()
+
+        # Load instrument map
+        await self._load_instruments()
+
+        self._running = True
+
+        # Set up event consumer
+        self._consumer = EventConsumer(
+            group_id="market-state",
+            topics=["feature.updated", "market.tick"],
+            auto_offset_reset="latest",
+        )
+        self._consumer.on(EventType.FEATURE_UPDATED, self._on_feature_update)
+        self._consumer.on(EventType.MARKET_TICK, self._on_tick)
+
+        logger.info("Market State Service started", instruments=len(self._ticker_map))
+        await self._consumer.consume_loop()
+
+    async def stop(self):
+        """Stop the market state service."""
+        self._running = False
+        if self._consumer:
+            self._consumer.stop()
+        await close_databases()
+        logger.info("Market State Service stopped")
+
+    async def _load_instruments(self):
+        """Load instrument mapping — BIST universe'un tamamını yükle."""
+        try:
+            from ..ingestion.bist_universe import bist_universe
+            tickers = bist_universe.get_tickers()
+        except Exception as e:
+            logger.error("Failed to load BIST universe", error=str(e))
+            tickers = []
+
+        # BIST universe'un tamamını kaydet
+        for i, ticker in enumerate(tickers):
+            self._ticker_map[ticker] = i + 1
+            # Başlangıç state'i oluştur
+            self._instrument_states[i + 1] = {
+                "ticker": ticker,
+                "price": 0,
+                "previous_price": 0,
+                "volume": 0,
+                "change_pct": 0,
+                "rsi": 50,
+                "momentum": 0,
+                "volatility": 0,
+                "volume_zscore": 0,
+                "anomaly_score": 0,
+            }
+
+        logger.info("Instruments loaded", count=len(self._ticker_map))
+
+    async def _on_tick(self, event: CanonicalEvent):
+        """Handle tick events for real-time state updates."""
+        try:
+            ticker = event.data.get("ticker")
+            price = event.data.get("price", 0)
+            volume = event.data.get("volume", 0)
+
+            if not ticker or not price:
+                return
+
+            instrument_id = self._ticker_map.get(ticker)
+            if not instrument_id:
+                return
+
+            # Update instrument state
+            if instrument_id not in self._instrument_states:
+                self._instrument_states[instrument_id] = {
+                    "ticker": ticker,
+                    "price": 0,
+                    "previous_price": 0,
+                    "volume": 0,
+                    "change_pct": 0,
+                }
+
+            state = self._instrument_states[instrument_id]
+            state["previous_price"] = state["price"]
+            state["price"] = price
+            state["volume"] = volume
+            state["last_update"] = event.timestamp.isoformat()
+
+            if state["previous_price"] > 0:
+                state["change_pct"] = (price / state["previous_price"] - 1) * 100
+
+        except Exception as e:
+            logger.error("Tick processing error", error=str(e))
+
+    async def _on_feature_update(self, event: CanonicalEvent):
+        """Handle feature updates to recompute market state."""
+        try:
+            ticker = event.data.get("ticker")
+            features = event.data.get("features", {})
+
+            if not ticker or not features:
+                return
+
+            instrument_id = self._ticker_map.get(ticker)
+            if not instrument_id:
+                return
+
+            # Update instrument state with features
+            if instrument_id in self._instrument_states:
+                self._instrument_states[instrument_id].update({
+                    "rsi": features.get("rsi_14", 50),
+                    "momentum": features.get("momentum_20d", 0),
+                    "volatility": features.get("realized_vol_20d", 0),
+                    "volume_zscore": features.get("volume_zscore", 0),
+                    "anomaly_score": features.get("anomaly_score", 0),
+                })
+
+            # Recompute market state periodically
+            now = datetime.now(timezone.utc)
+            if self._last_update is None or (now - self._last_update).seconds > 30:
+                await self._compute_market_state()
+                self._last_update = now
+
+        except Exception as e:
+            logger.error("Feature update processing error", error=str(e))
+
+    async def _compute_market_state(self):
+        """Compute overall market state from all instrument states."""
+        if not self._instrument_states:
+            return
+
+        try:
+            states = list(self._instrument_states.values())
+
+            # Market breadth
+            advancing = sum(1 for s in states if s.get("change_pct", 0) > 0)
+            declining = sum(1 for s in states if s.get("change_pct", 0) < 0)
+            total = len(states)
+
+            breadth_pct = (advancing / total * 100) if total > 0 else 50
+
+            # Average momentum
+            momentums = [s.get("momentum", 0) for s in states if s.get("momentum")]
+            avg_momentum = np.mean(momentums) if momentums else 0
+
+            # Average volatility
+            volatilities = [s.get("volatility", 0) for s in states if s.get("volatility")]
+            avg_volatility = np.mean(volatilities) if volatilities else 0
+
+            # Average RSI
+            rsis = [s.get("rsi", 50) for s in states if s.get("rsi")]
+            avg_rsi = np.mean(rsis) if rsis else 50
+
+            # Anomaly count
+            anomaly_count = sum(1 for s in states if s.get("anomaly_score", 0) > 0.7)
+
+            # Regime detection
+            regime = self._detect_regime(breadth_pct, avg_momentum, avg_volatility, avg_rsi)
+
+            # Market state
+            market_state = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "regime": regime,
+                "breadth_pct": round(breadth_pct, 2),
+                "advancing": advancing,
+                "declining": declining,
+                "total_instruments": total,
+                "avg_momentum": round(avg_momentum, 4),
+                "avg_volatility": round(avg_volatility, 4),
+                "avg_rsi": round(avg_rsi, 2),
+                "anomaly_count": anomaly_count,
+                "risk_appetite": round(self._compute_risk_appetite(
+                    breadth_pct, avg_momentum, avg_volatility, avg_rsi
+                ), 4),
+            }
+
+            # Store in Redis
+            await redis_set("market_state", json.dumps(market_state, default=str), ex=60)
+
+            # Store in ClickHouse
+            ch_insert("market_states", [[
+                datetime.now(timezone.utc),
+                regime,
+                0.8,  # confidence
+                float(avg_momentum),
+                float(breadth_pct),
+                float(avg_volatility),
+                "NORMAL",
+                float(breadth_pct / 100),
+                {},
+            ]], column_names=[
+                "timestamp", "regime", "regime_confidence", "trend_score",
+                "breadth_pct", "volatility_regime", "liquidity_level",
+                "risk_appetite", "details",
+            ])
+
+            # Publish market state change event
+            if regime != self._current_regime:
+                old_regime = self._current_regime
+                self._current_regime = regime
+
+                event = CanonicalEvent(
+                    event_type=EventType.MARKET_STATE_CHANGED,
+                    source="market-state",
+                    data={
+                        "old_regime": old_regime,
+                        "new_regime": regime,
+                        "market_state": market_state,
+                    },
+                )
+                publish_event(event, key="market")
+                logger.info("Market regime changed", old=old_regime, new=regime)
+
+        except Exception as e:
+            logger.error("Market state computation error", error=str(e))
+
+    def _compute_risk_appetite(self, breadth: float, momentum: float,
+                                 volatility: float, rsi: float) -> float:
+        """Compute risk appetite from multiple factors.
+        
+        Risk appetite = weighted combination of:
+        - breadth (piyasa genişliği)
+        - momentum (güç)
+        - volatility (düşük vol = yüksek risk appetite)
+        - RSI (aşırı alım/satım)
+        """
+        # Breadth: 0-100 → 0-1
+        breadth_score = breadth / 100
+
+        # Momentum: normalize ([-50, 50] → [0, 1])
+        momentum_score = max(0, min(1, (momentum + 50) / 100))
+
+        # Volatility: düşük vol = yüksek risk appetite
+        # annualized vol 0-100 arası, 20 normal
+        vol_score = max(0, min(1, 1 - (volatility - 10) / 40)) if volatility > 0 else 0.5
+
+        # RSI: 30-70 arası normal, extremes risk-off
+        if rsi > 70:
+            rsi_score = max(0, 1 - (rsi - 70) / 30)  # Aşırı alım → risk-off
+        elif rsi < 30:
+            rsi_score = max(0, (rsi - 10) / 20)  # Aşırı satım → risk-on
+        else:
+            rsi_score = 0.5  # Normal
+
+        # Weighted average
+        risk_appetite = (
+            breadth_score * 0.35 +
+            momentum_score * 0.25 +
+            vol_score * 0.25 +
+            rsi_score * 0.15
+        )
+
+        return max(0, min(1, risk_appetite))
+
+    def _detect_regime(self, breadth: float, momentum: float, volatility: float, rsi: float) -> str:
+        """Detect current market regime.
+        
+        volatility = annualized realized volatility (örn: 20.0 = %20)
+        Eşikler bu formata göre ayarlanmalı.
+        """
+        # Panic
+        if breadth < 20 and volatility > 40:
+            return "PANIC"
+
+        # Risk-off
+        if breadth < 35:
+            return "RISK-OFF"
+
+        # High volatility
+        if volatility > 35:
+            return "HIGH-VOLATILITY"
+
+        # Trending up
+        if breadth > 65 and momentum > 0:
+            return "TRENDING-UP"
+
+        # Momentum expansion
+        if breadth > 70 and rsi > 60:
+            return "MOMENTUM-EXPANSION"
+
+        # Trending down
+        if breadth < 40 and momentum < 0:
+            return "TRENDING-DOWN"
+
+        # Recovery
+        if 45 < breadth < 55 and momentum > 0:
+            return "RECOVERY"
+
+        # Low volatility
+        if volatility < 12:
+            return "LOW-VOLATILITY"
+
+        # Default
+        return "RANGE"
+
+
+# =====================================================
+# Entry Point
+# =====================================================
+
+async def main():
+    """Main entry point for the market state service."""
+    service = MarketStateService()
+    try:
+        await service.start()
+    except KeyboardInterrupt:
+        await service.stop()
+    except Exception as e:
+        logger.error("Market State Service crashed", error=str(e))
+        await service.stop()
+        raise
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
