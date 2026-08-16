@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -20,20 +21,43 @@ class SourceFetchError(RuntimeError):
     pass
 
 
+def _origin(url: str) -> tuple[str, str, int]:
+    parsed = urllib.parse.urlsplit(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("URL must be absolute HTTP(S)")
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("URL credentials are not allowed")
+    default_port = 443 if parsed.scheme == "https" else 80
+    return parsed.scheme.lower(), parsed.hostname.lower(), parsed.port or default_port
+
+
+class _SameOriginRedirectHandler(urllib.request.HTTPRedirectHandler):
+    def __init__(self, allowed_origin: tuple[str, str, int]):
+        super().__init__()
+        self.allowed_origin = allowed_origin
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if _origin(newurl) != self.allowed_origin:
+            raise SourceFetchError("redirect escaped configured source origin")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 @dataclass(frozen=True)
 class HttpSourceConfig:
     source_id: str
     base_url: str
     timeout_seconds: float = 15.0
     user_agent: str = "ALPHA-v4-research/0.1"
+    max_body_bytes: int = 8 * 1024 * 1024
 
     def __post_init__(self) -> None:
         if not self.source_id.strip() or not self.base_url.strip():
             raise ValueError("source_id and base_url are required")
-        if not self.base_url.startswith(("http://", "https://")):
-            raise ValueError("base_url must be HTTP(S)")
+        _origin(self.base_url)
         if self.timeout_seconds <= 0:
             raise ValueError("timeout_seconds must be positive")
+        if self.max_body_bytes <= 0:
+            raise ValueError("max_body_bytes must be positive")
 
 
 @dataclass(frozen=True)
@@ -51,14 +75,23 @@ class FetchedDocument:
 class HttpFetcher:
     def __init__(self, config: HttpSourceConfig):
         self.config = config
+        self._allowed_origin = _origin(config.base_url)
+        self._opener = urllib.request.build_opener(
+            _SameOriginRedirectHandler(self._allowed_origin)
+        )
 
     def fetch(
         self, path_or_url: str, *, fetched_at: datetime | None = None
     ) -> FetchedDocument:
+        observed = fetched_at or datetime.now(timezone.utc)
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            raise ValueError("fetched_at must be timezone-aware")
+        observed = observed.astimezone(timezone.utc)
+
         if path_or_url.startswith(("http://", "https://")):
             url = path_or_url
-            if not url.startswith(self.config.base_url):
-                raise ValueError("absolute URL is outside configured source base_url")
+            if _origin(url) != self._allowed_origin:
+                raise ValueError("absolute URL is outside configured source origin")
         else:
             url = self.config.base_url.rstrip("/") + "/" + path_or_url.lstrip("/")
 
@@ -68,31 +101,37 @@ class HttpFetcher:
             method="GET",
         )
         try:
-            with urllib.request.urlopen(
-                request, timeout=self.config.timeout_seconds
-            ) as response:
-                body = response.read()
+            with self._opener.open(request, timeout=self.config.timeout_seconds) as response:
+                final_url = response.geturl()
+                if _origin(final_url) != self._allowed_origin:
+                    raise SourceFetchError("response escaped configured source origin")
+                body = response.read(self.config.max_body_bytes + 1)
+                if len(body) > self.config.max_body_bytes:
+                    raise SourceFetchError(
+                        f"response exceeded {self.config.max_body_bytes} byte limit"
+                    )
                 status = int(getattr(response, "status", 200))
                 content_type = response.headers.get("Content-Type")
+        except SourceFetchError:
+            raise
         except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as exc:
             raise SourceFetchError(
                 f"fetch failed for {self.config.source_id}: {exc}"
             ) from exc
 
-        observed = fetched_at or datetime.now(timezone.utc)
         body_hash = sha256(body).hexdigest()
         identity = "|".join(
             [
                 self.config.source_id,
-                url,
-                observed.astimezone(timezone.utc).isoformat(),
+                final_url,
+                observed.isoformat(),
                 body_hash,
             ]
         )
         return FetchedDocument(
             document_id=sha256(identity.encode("utf-8")).hexdigest(),
             source_id=self.config.source_id,
-            url=url,
+            url=final_url,
             fetched_at=observed,
             status_code=status,
             content_type=content_type,
