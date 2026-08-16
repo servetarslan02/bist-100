@@ -1,115 +1,51 @@
-# ALPHA BIST - Hızlı Başlangıç (Windows)
+# ALPHA — QUICKSTART / CURRENT RUNTIME STATUS
 
-## Ön Gereksinimler
+**STATUS:** MIGRATION / NOT YET CANONICAL
+**UPDATED_AT:** 2026-08-16
 
-1. **Docker Desktop** - https://www.docker.com/products/docker-desktop/
-   - Windows için indirin ve kurun
-   - Kurulumdan sonra bilgisayarınızı yeniden başlatın
-   - Docker Desktop'ı açın ve çalıştığını doğrulayın
+Bu dosyanın eski sürümü `start.bat` ile tüm sistemi başlatabildiğini ve otomatik taramanın çalışacağını söylüyordu. Mevcut repository incelemesinde `start.bat` bulunmadı ve birden fazla runtime/API neslinin aynı anda var olduğu görüldü. Bu nedenle eski quickstart talimatları güvenilir kabul edilmez.
 
-2. **Git** - https://git-scm.com/download/win
+## Şu Anki Kural
+Canonical runtime kurulana kadar:
 
-## Kurulum
+- `memory/MEMORY-INDEX.md` ile geçerli belgeleri belirle;
+- `memory/SYSTEM-CONSTITUTION.md` kurallarını uygula;
+- `memory/ROADMAP-v4.md` FAZ 0/1 migration planını takip et;
+- README veya eski roadmap'teki `start`, `scan`, `production-ready` iddialarını doğrulamadan kullanma;
+- hard-coded/fake market değerlerini canlı veri sayma;
+- mevcut backtest/ML sonuçlarını bağımsız reproducibility kanıtı olmadan Champion/OOS kanıtı sayma.
 
-### 1. Repoyu klonlayın
-```cmd
-git clone https://github.com/servetarslan02/bist-100.git
-cd bist-100
+## Hedef Quickstart
+FAZ 1 tamamlandığında bu dosya yalnız doğrulanmış tek bir bootstrap yolu içerecek. Hedef akış:
+
+```text
+1. prerequisites check
+2. secure .env / secret setup
+3. dependency/environment bootstrap
+4. storage/services health validation
+5. canonical migrations/schema checks
+6. canonical runtime start
+7. ingestion/source freshness check
+8. state/feature health check
+9. paper-mode health check
+10. explicit ready/degraded/no-trade status
 ```
 
-### 2. Başlatın
-```cmd
-start.bat
-```
+## Production/Paper Readiness İlkesi
+Bir HTTP endpoint'in açılması sistemin hazır olduğu anlamına gelmez. Ready state en az şu health gate'lerden oluşmalıdır:
 
-Bu script:
-- Docker'ı kontrol eder
-- `.env` dosyasını oluşturur
-- Tüm image'ları build eder
-- Veritabanlarını başlatır
-- Tüm servisleri başlatır
+- source/data freshness;
+- point-in-time integrity;
+- storage availability;
+- event/state pipeline;
+- feature contract health;
+- model artifact health;
+- risk engine;
+- portfolio persistence;
+- audit ledger;
+- no critical governance failure.
 
-### 3. Erişin
-- **Dashboard:** http://localhost:3000
-- **API:** http://localhost:8000
-- **Grafana:** http://localhost:3001
-- **MLflow:** http://localhost:5000
+Herhangi kritik gate başarısızsa status açıkça `DEGRADED`, `NO_TRADE` veya `HALT` olmalıdır.
 
-## Yönetim
-
-| Komut | Açıklama |
-|-------|----------|
-| `start.bat` | Tüm servisleri başlat |
-| `stop.bat` | Tüm servisleri durdur |
-| `status.bat` | Servis durumlarını göster |
-| `logs.bat` | Canlı logları göster |
-
-## Manuel Komutlar
-
-```cmd
-# Başlat
-docker-compose up -d
-
-# Durdur
-docker-compose down
-
-# Loglar
-docker-compose logs -f
-
-# Tek servis başlat
-docker-compose up -d api
-
-# Servis durumu
-docker-compose ps
-
-# Yeniden build
-docker-compose build --no-cache
-```
-
-## Sorun Giderme
-
-### Docker başlamıyor
-- Docker Desktop'ı açın
-- WSL2 kurulu olduğundan emin olun
-- Bilgisayarınızı yeniden başlatın
-
-### Port çakışması
-```cmd
-# Hangi portun kullanıldığını kontrol edin
-netstat -ano | findstr :8000
-netstat -ano | findstr :3000
-```
-
-### Bellek yetersiz
-- Docker Desktop → Settings → Resources → Memory → 8GB+
-- Gerekirse servis sayısını azaltın
-
-### Veritabanı bağlantısı yok
-```cmd
-# Veritabanı sağlık kontrolü
-docker-compose exec postgres pg_isready -U alpha
-docker-compose exec clickhouse clickhouse-client --query "SELECT 1"
-docker-compose exec redis redis-cli ping
-```
-
-## API Anahtarları (Opsiyonel)
-
-`.env` dosyasını düzenleyin:
-
-```env
-# TCMB EVDS (makro veri için)
-TCMB_EVDS_API_KEY=your_key_here
-
-# NewsAPI (haberler için)
-NEWS_API_KEY=your_key_here
-
-# Alpha Vantage (global veri için)
-ALPHA_VANTAGE_KEY=your_key_here
-```
-
-## İlk Çalıştırma
-
-1. `start.bat` çalıştırın
-2. http://localhost:3000 adresine gidin
-3. Dashboard'da Market Radar'ı kontrol edin
-4. İlk tarama otomatik başlayacak (birkaç dakika sürebilir)
+## Geçici Geliştirici Notu
+Mevcut Docker/Next.js/FastAPI dosyaları migration sırasında incelenebilir; ancak canonical bootstrap olarak ilan edilmeyecek. FAZ 1 sonunda gerçek komutlar test edilip bu dosyaya yazılacaktır.
