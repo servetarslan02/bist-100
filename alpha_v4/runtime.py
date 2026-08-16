@@ -12,6 +12,7 @@ from .acquisition import RawDocumentStore
 from .audit import AuditLedger
 from .contracts import CanonicalEvent
 from .features import FeatureStore
+from .jobs import JobCoordinator
 from .market_data import RawBarStore
 from .model_registry import ModelRegistry
 from .paper_ledger import PaperLedger
@@ -68,6 +69,7 @@ class AlphaRuntime:
         "relations",
         "models",
         "research",
+        "jobs",
         "audit",
         "paper_ledger",
     )
@@ -97,6 +99,7 @@ class AlphaRuntime:
         self.relations = RelationStore(config.database_path)
         self.models = ModelRegistry(config.database_path)
         self.research = ResearchQueue(config.database_path)
+        self.jobs = JobCoordinator(config.database_path)
         self.audit = AuditLedger(config.database_path)
         self.paper = PaperLedger(config.database_path)
 
@@ -173,19 +176,22 @@ class AlphaRuntime:
 
     def health(self) -> dict[str, object]:
         readiness = self.readiness()
-        database_ok = bool(readiness["checks"]["database"]["ok"])
-        audit_ok = bool(readiness["checks"]["audit_chain"]["ok"])
+        checks = readiness["checks"]
+        database_check = checks["database"]
+        audit_check = checks["audit_chain"]
+        source_check = checks["source_registry"]
+        database_ok = bool(database_check["ok"])
+        audit_ok = bool(audit_check["ok"])
         stores = {
             name: "ready" if database_ok else "unavailable" for name in self.STORE_NAMES
         }
         if not audit_ok:
             stores["audit"] = "corrupt"
 
-        source_check = readiness["checks"]["source_registry"]
         return {
             "mode": self.config.mode.value,
             "ready": readiness["ready"],
-            "checks": readiness["checks"],
+            "checks": checks,
             "stores": stores,
             "event_count": self.events.count() if database_ok else None,
             "registered_sources": source_check["registered_sources"],
