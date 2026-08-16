@@ -31,7 +31,7 @@ class RuntimeHealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
-    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler API
+    def do_GET(self) -> None:
         if self.path == "/health":
             self._write_json(200, self.server.runtime.health())
             return
