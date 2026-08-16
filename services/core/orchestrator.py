@@ -214,23 +214,41 @@ class SystemOrchestrator:
             # Portföy önerisi
             portfolio_value = 1_000_000  # 1M TL (varsayılan)
 
-            # Seçilmiş hisselerin volatilitesi
+            # Secilmis hisselerin volatilitesi
             selected = top_opportunities[:10] if top_opportunities else []
+            print(f"\n[ORCHESTRATOR] Position sizing: {len(selected)} opportunities selected")
+
             opp_with_vol = []
             for opp in selected:
                 ticker = opp["ticker"]
-                vol = all_features.get(ticker, {}).get("volatility_20d", 0.2)
+                features = all_features.get(ticker, {})
+                vol = features.get("volatility_20d", 0.2)
+
+                # NaN/Inf kontrolu
+                if np.isnan(vol) or np.isinf(vol) or vol <= 0:
+                    print(f"  [{ticker}] vol invalid ({vol}), using default 0.2")
+                    vol = 0.2
+
+                # Normalize: vol % olarak geliyorsa /100
+                vol_norm = vol / 100 if vol > 1 else vol
+
+                # expected_return: score'dan turet
+                exp_ret = opp.get("score", 0) * 0.01
+                if np.isnan(exp_ret) or np.isinf(exp_ret):
+                    exp_ret = 0.01
+
                 opp_with_vol.append({
                     **opp,
-                    "volatility": vol / 100 if vol > 1 else vol,  # Normalize
-                    "expected_return": opp.get("score", 0) * 0.01,
+                    "volatility": vol_norm,
+                    "expected_return": exp_ret,
                 })
+                print(f"  [{ticker}] vol={vol_norm:.4f}, exp_ret={exp_ret:.4f}, score={opp.get('score', 0)}")
 
             positions = position_sizer.calculate_position_sizes(
                 opportunities=opp_with_vol,
                 portfolio_value=portfolio_value,
                 current_volatility=0.15,
-                regime=self._current_regime,
+                regime=regime_str,
             )
 
             portfolio_recommendation = {

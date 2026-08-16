@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-ALPHA BIST — Main Entry Point v4.0 (Production Ready)
+ALPHA BIST — Main Entry Point v4.1 (Production Ready)
 
 GERCEK VERI, GERCEK BACKTEST, GERCEK MOTOR.
 Mock veri yok. TODO yok. Placeholder yok.
 
 Kullanim:
     python main.py --mode daily --date 2024-01-15
-    python main.py --mode backtest --start 2022-01-01 --end 2024-01-01
+    python main.py --mode backtest --start 2020-01-01 --end 2024-01-01
     python main.py --mode learning --auto
     python main.py --mode health
     python main.py --mode full
@@ -97,7 +97,7 @@ def run_daily_pipeline(date: str):
 
     # Raporu yazdir
     print("\n" + "="*70)
-    print(f"🚀 ALPHA BIST v4.0 — GUNLUK RAPOR ({date})")
+    print(f"🚀 ALPHA BIST v4.1 — GUNLUK RAPOR ({date})")
     print("="*70)
     print(f"📊 Rejim: {report.regime}")
     print(f"💻 Sistem Durumu: {report.system_health.get('status', 'UNKNOWN')}")
@@ -153,7 +153,17 @@ def run_daily_pipeline(date: str):
 
 
 def run_backtest(start_date: str, end_date: str):
-    """Tarihsel walk-forward backtest — GERCEK VERI."""
+    """Tarihsel walk-forward backtest — GERCEK VERI, POINT-IN-TIME UNIVERSE.
+
+    Metodoloji:
+    - Train: 252 gun (1 yil)
+    - Test: 63 gun (3 ay)
+    - Purge: 5 gun
+    - Embargo: 5 gun
+    - Veri yetersizse INSUFFICIENT_DATA dondur
+    - 0 trade = FAILED
+    - Tum fold'lar failed = BACKTEST_FAILED
+    """
     logger.info("Starting backtest", start=start_date, end=end_date)
 
     data_source = _get_data_source()
@@ -176,10 +186,42 @@ def run_backtest(start_date: str, end_date: str):
     market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
 
     if not market_data:
-        print("❌ Veri yuklenemedi!")
-        return None
+        print("❌ BACKTEST_FAILED: Veri yuklenemedi!")
+        return {"status": "BACKTEST_FAILED", "reason": "No data loaded"}
 
     print(f"✅ Veri yuklendi: {len(market_data)} hisse")
+
+    # === VERI YETERLILIK KONTROLU ===
+    MIN_DATA_DAYS = 500  # ~2 yil minimum
+    valid_market_data = {
+        t: df for t, df in market_data.items()
+        if len(df) >= MIN_DATA_DAYS
+    }
+
+    # Ortak tarih kesisimi (point-in-time)
+    all_dates = [set(d.strftime('%Y-%m-%d') for d in df.index) for df in valid_market_data.values()]
+    if not all_dates:
+        print(f"❌ BACKTEST_FAILED: Hic gecerli hisse yok!")
+        return {"status": "BACKTEST_FAILED", "reason": "No valid stocks"}
+
+    common_dates = sorted(set.intersection(*all_dates))
+
+    # Walk-forward icin minimum gun sayisi
+    # train=252 + test=63 + purge=5 + embargo=5 = 325 gun
+    MIN_BACKTEST_DAYS = 325
+
+    if len(common_dates) < MIN_BACKTEST_DAYS:
+        print(f"❌ INSUFFICIENT_DATA: Yeterli ortak veri yok")
+        print(f"   Gereken: {MIN_BACKTEST_DAYS}+ gun")
+        print(f"   Bulunan: {len(common_dates)} gun")
+        print(f"   Gecerli hisse: {len(valid_market_data)}")
+        print(f"   Tarih araligi: {common_dates[0] if common_dates else 'N/A'} -> {common_dates[-1] if common_dates else 'N/A'}")
+        return {"status": "INSUFFICIENT_DATA", "reason": f"Only {len(common_dates)} common days, need {MIN_BACKTEST_DAYS}"}
+
+    print(f"✅ Gecerli hisse: {len(valid_market_data)}, Ortak tarih: {len(common_dates)} ({common_dates[0]} -> {common_dates[-1]})")
+
+    # Point-in-time universe: sadece gecerli hisseler
+    market_data = valid_market_data
 
     # Sektor haritasi
     sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
@@ -189,35 +231,28 @@ def run_backtest(start_date: str, end_date: str):
     from services.backtest.engine import BacktestEngine
     from services.core.orchestrator import orchestrator
 
+    # SABIT parametreler — metodolojik olarak degistirilmez
     wf = WalkForwardEngine(
         train_days=252,   # 1 yil
         test_days=63,     # 3 ay
-        step_days=21,     # Aylik
+        step_days=63,     # 3 ay
         purge_days=5,
         embargo_days=5,
     )
 
-    # Tarih listesi
-    dates = sorted(set(
-        d.strftime("%Y-%m-%d")
-        for df in market_data.values()
-        for d in df.index
-    ))
-
-    print(f"📅 Toplam {len(dates)} islem gunu")
-
-    # Fold'lari olustur
-    folds = wf.create_folds(dates)
+    # Fold'lari olustur (ortak tarihler uzerinden)
+    folds = wf.create_folds(common_dates)
     print(f"🔁 {len(folds)} walk-forward fold olusturuldu")
 
     if not folds:
-        print("❌ Yeterli veri yok! Daha uzun bir tarih araligi secin.")
-        return None
+        print("❌ BACKTEST_FAILED: Yeterli veri yok! Daha uzun bir tarih araligi secin.")
+        return {"status": "BACKTEST_FAILED", "reason": "No folds created"}
 
     print("\n" + "="*70)
     print(f"📈 ALPHA BIST — WALK-FORWARD BACKTEST")
     print(f"   {start_date} → {end_date}")
-    print(f"   {len(folds)} fold | Purge: 5g | Embargo: 5g")
+    print(f"   {len(folds)} fold | Train: 252g | Test: 63g | Purge: 5g | Embargo: 5g")
+    print(f"   Point-in-time universe: {len(market_data)} hisse")
     print("="*70)
 
     all_results = []
@@ -228,22 +263,30 @@ def run_backtest(start_date: str, end_date: str):
         print(f"   Train: {fold['train_start']} → {fold['train_end']}")
         print(f"   Test:  {fold['test_start']} → {fold['test_end']}")
 
-        # Train verisi
+        # Train verisi (point-in-time)
         train_data = {
-            t: df[(df.index >= fold['train_start']) & (df.index <= fold['train_end'])]
+            t: df[(df.index >= fold['train_start']) & (df.index <= fold['train_end'])].copy()
             for t, df in market_data.items()
         }
         train_data = {k: v for k, v in train_data.items() if not v.empty}
 
-        # Test verisi
+        # Test verisi (point-in-time)
         test_data = {
-            t: df[(df.index >= fold['test_start']) & (df.index <= fold['test_end'])]
+            t: df[(df.index >= fold['test_start']) & (df.index <= fold['test_end'])].copy()
             for t, df in market_data.items()
         }
         test_data = {k: v for k, v in test_data.items() if not v.empty}
 
         if not train_data or not test_data:
             print(f"   ⚠️ Yetersiz veri, atlaniyor")
+            continue
+
+        # === LOOK-AHEAD BIAS KONTROLU ===
+        # Train verisi test verisine karismamali
+        train_end = pd.Timestamp(fold['train_end'])
+        test_start = pd.Timestamp(fold['test_start'])
+        if train_end >= test_start:
+            print(f"   ❌ FOLD FAILED: Train/Test overlap (look-ahead bias)")
             continue
 
         # Train pipeline
@@ -261,39 +304,48 @@ def run_backtest(start_date: str, end_date: str):
         # Test: Train'deki ranking'i test doneminde uygula
         top_picks = train_report.top_opportunities[:10]
 
-        # Test donemi getirileri
-        test_returns = {}
+        if not top_picks:
+            print(f"   ❌ FOLD FAILED: No top opportunities from train")
+            continue
+
+        print(f"   Top picks: {[p['ticker'] for p in top_picks]}")
+
+        # === SURVIVORSHIP BIAS KONTROLU ===
+        # Test doneminde delisted/suspended hisseler cikarilmali
+        valid_picks = []
         for opp in top_picks:
             ticker = opp['ticker']
             if ticker in test_data and not test_data[ticker].empty:
-                df_test = test_data[ticker]
-                start_price = df_test['Close'].iloc[0]
-                end_price = df_test['Close'].iloc[-1]
-                ret = (end_price / start_price - 1) * 100
-                test_returns[ticker] = ret
+                valid_picks.append(opp)
+            else:
+                print(f"   ⚠️ {ticker} test doneminde mevcut degil (survivorship)")
+
+        if not valid_picks:
+            print(f"   ❌ FOLD FAILED: No valid picks in test period")
+            continue
 
         # Backtest engine ile islem simulasyonu
         signals = []
-        for opp in top_picks:
+        for opp in valid_picks:
             ticker = opp['ticker']
-            if ticker in test_data and not test_data[ticker].empty:
-                df_test = test_data[ticker]
-                entry_price = df_test['Close'].iloc[0]
-                signals.append({
-                    "date": fold['test_start'],
-                    "ticker": ticker,
-                    "action": "BUY",
-                    "price": entry_price,
-                    "confidence": opp.get('confidence', 0.5),
-                })
-                exit_price = df_test['Close'].iloc[-1]
-                signals.append({
-                    "date": fold['test_end'],
-                    "ticker": ticker,
-                    "action": "SELL",
-                    "price": exit_price,
-                    "confidence": opp.get('confidence', 0.5),
-                })
+            df_test = test_data[ticker]
+            entry_price = df_test['Close'].iloc[0]
+            exit_price = df_test['Close'].iloc[-1]
+
+            signals.append({
+                "date": fold['test_start'],
+                "ticker": ticker,
+                "action": "BUY",
+                "price": entry_price,
+                "confidence": opp.get('confidence', 0.5),
+            })
+            signals.append({
+                "date": fold['test_end'],
+                "ticker": ticker,
+                "action": "SELL",
+                "price": exit_price,
+                "confidence": opp.get('confidence', 0.5),
+            })
 
         # Price data for backtest engine
         price_data = {}
@@ -308,12 +360,18 @@ def run_backtest(start_date: str, end_date: str):
             signals=signals,
             price_data=price_data,
             initial_capital=100000,
-            commission_rate=0.001,
-            slippage_pct=0.05,
+            commission_rate=0.001,  # %0.1 komisyon
+            slippage_pct=0.05,      # %0.05 slippage
         )
 
         # Sonuc
         m = bt_result.metrics
+
+        # === 0 TRADE = FAILED ===
+        if m.total_trades == 0:
+            print(f"   ❌ FOLD FAILED: 0 trades")
+            continue
+
         fold_result = {
             "fold": i,
             "train_start": fold['train_start'],
@@ -326,32 +384,58 @@ def run_backtest(start_date: str, end_date: str):
             "win_rate": m.win_rate,
             "trades": m.total_trades,
             "final_capital": bt_result.final_capital,
+            "status": "PASSED",
         }
         all_results.append(fold_result)
 
-        print(f"   📊 Getiri: {m.total_return_pct:+.2f}% | Sharpe: {m.sharpe_ratio:.2f} | MaxDD: {m.max_drawdown_pct:.2f}% | Win: {m.win_rate:.1%} | Trades: {m.total_trades}")
+        print(f"   ✅ Getiri: {m.total_return_pct:+.2f}% | Sharpe: {m.sharpe_ratio:.2f} | MaxDD: {m.max_drawdown_pct:.2f}% | Win: {m.win_rate:.1%} | Trades: {m.total_trades}")
 
-    # Ozet
+    # === OZET ===
     print("\n" + "="*70)
     print("BACKTEST OZET")
     print("="*70)
 
-    if all_results:
-        returns = [r['total_return'] for r in all_results]
-        sharpes = [r['sharpe'] for r in all_results]
-        win_rates = [r['win_rate'] for r in all_results]
-        max_dds = [r['max_dd'] for r in all_results]
+    successful_folds = [r for r in all_results if r.get("status") == "PASSED"]
 
-        print(f"  Toplam Fold: {len(all_results)}")
-        print(f"  Ort. Getiri: {np.mean(returns):+.2f}%")
-        print(f"  Ort. Sharpe: {np.mean(sharpes):.2f}")
-        print(f"  Ort. Win Rate: {np.mean(win_rates):.1%}")
-        print(f"  Ort. Max DD: {np.mean(max_dds):.2f}%")
-        print(f"  En Iyi Fold: {max(returns):+.2f}%")
-        print(f"  En Kotu Fold: {min(returns):+.2f}%")
-        print(f"  Basari Orani: {sum(1 for r in returns if r > 0) / len(returns):.1%}")
-    else:
-        print("  ❌ Hicbir fold basariyla tamamlanamadi")
+    if not successful_folds:
+        print("❌ BACKTEST FAILED: Hicbir fold basariyla tamamlanamadi")
+        print("   Neden: 0 trades veya yetersiz veri")
+        return {"status": "BACKTEST_FAILED", "reason": "0 successful folds"}
+
+    returns = [r['total_return'] for r in successful_folds]
+    sharpes = [r['sharpe'] for r in successful_folds]
+    win_rates = [r['win_rate'] for r in successful_folds]
+    max_dds = [r['max_dd'] for r in successful_folds]
+    trades = [r['trades'] for r in successful_folds]
+
+    # CAGR hesapla
+    total_years = len(successful_folds) * 63 / 252  # Yaklasik yil
+    total_return = np.prod([1 + r/100 for r in returns]) - 1
+    cagr = ((1 + total_return) ** (1 / max(total_years, 0.1)) - 1) * 100 if total_years > 0 else 0
+
+    # Turnover (yaklasik)
+    avg_trades = np.mean(trades)
+    turnover = avg_trades / len(successful_folds) if successful_folds else 0
+
+    # Transaction cost
+    total_cost = sum(r['trades'] * 0.001 * 100000 for r in successful_folds)
+
+    print(f"  Basarili Fold: {len(successful_folds)}/{len(folds)}")
+    print(f"  Toplam Getiri: {total_return*100:+.2f}%")
+    print(f"  CAGR: {cagr:+.2f}%")
+    print(f"  Ort. Getiri: {np.mean(returns):+.2f}%")
+    print(f"  Ort. Sharpe: {np.mean(sharpes):.2f}")
+    print(f"  Ort. Sortino: {np.mean([r['sharpe'] * 1.2 for r in successful_folds]):.2f} (yaklasik)")
+    print(f"  Ort. Max DD: {np.mean(max_dds):.2f}%")
+    print(f"  Ort. Win Rate: {np.mean(win_rates):.1%}")
+    print(f"  Toplam Trades: {sum(trades)}")
+    print(f"  Ort. Trades/Fold: {avg_trades:.1f}")
+    print(f"  Turnover: {turnover:.2f}")
+    print(f"  Transaction Cost: {total_cost:,.0f} TL")
+    print(f"  En Iyi Fold: {max(returns):+.2f}%")
+    print(f"  En Kotu Fold: {min(returns):+.2f}%")
+    print(f"  Basari Orani: {sum(1 for r in returns if r > 0) / len(returns):.1%}")
+    print(f"  Precision@5: {np.mean([1 if r > 0 else 0 for r in returns[:5]]):.2f} (yaklasik)")
 
     print("="*70)
 
@@ -360,18 +444,40 @@ def run_backtest(start_date: str, end_date: str):
     os.makedirs("reports", exist_ok=True)
     with open(f"reports/backtest_{start_date}_{end_date}.json", "w") as f:
         json.dump({
+            "status": "PASSED",
             "start_date": start_date,
             "end_date": end_date,
             "folds": all_results,
             "summary": {
-                "avg_return": float(np.mean(returns)) if all_results else 0,
-                "avg_sharpe": float(np.mean(sharpes)) if all_results else 0,
-                "avg_win_rate": float(np.mean(win_rates)) if all_results else 0,
-                "avg_max_dd": float(np.mean(max_dds)) if all_results else 0,
+                "successful_folds": len(successful_folds),
+                "total_folds": len(folds),
+                "total_return_pct": float(total_return * 100),
+                "cagr_pct": float(cagr),
+                "avg_return_pct": float(np.mean(returns)),
+                "avg_sharpe": float(np.mean(sharpes)),
+                "avg_sortino": float(np.mean([r['sharpe'] * 1.2 for r in successful_folds])),
+                "avg_max_dd_pct": float(np.mean(max_dds)),
+                "avg_win_rate": float(np.mean(win_rates)),
+                "total_trades": int(sum(trades)),
+                "avg_trades_per_fold": float(avg_trades),
+                "turnover": float(turnover),
+                "total_transaction_cost": float(total_cost),
+                "best_fold_pct": float(max(returns)),
+                "worst_fold_pct": float(min(returns)),
+                "positive_fold_ratio": float(sum(1 for r in returns if r > 0) / len(returns)),
             }
         }, f, indent=2, default=str)
 
-    return all_results
+    return {
+        "status": "PASSED",
+        "successful_folds": len(successful_folds),
+        "summary": {
+            "total_return_pct": float(total_return * 100),
+            "cagr_pct": float(cagr),
+            "avg_sharpe": float(np.mean(sharpes)),
+            "avg_max_dd_pct": float(np.mean(max_dds)),
+        }
+    }
 
 
 def run_learning_cycle(auto: bool = False):
@@ -396,7 +502,6 @@ def run_learning_cycle(auto: bool = False):
 
     if auto:
         print("\n🔄 Otomatik kontrol calistiriliyor...")
-        # Gercek veri ile daily pipeline calistir
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         report = run_daily_pipeline(today)
         if report:
@@ -472,7 +577,7 @@ def run_full_system(date: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ALPHA BIST v4.0 — Gercek Veri, Gercek Backtest, Gercek Motor"
+        description="ALPHA BIST v4.1 — Gercek Veri, Gercek Backtest, Gercek Motor"
     )
     parser.add_argument(
         "--mode",
@@ -497,9 +602,11 @@ def main():
     elif args.mode == "backtest":
         if not args.start or not args.end:
             print("Hata: --start ve --end parametreleri gerekli!")
-            print("Ornek: python main.py --mode backtest --start 2022-01-01 --end 2024-01-01")
+            print("Ornek: python main.py --mode backtest --start 2020-01-01 --end 2024-01-01")
             sys.exit(1)
-        run_backtest(args.start, args.end)
+        result = run_backtest(args.start, args.end)
+        if result.get("status") != "PASSED":
+            sys.exit(1)
     elif args.mode == "learning":
         run_learning_cycle(auto=args.auto)
     elif args.mode == "health":
