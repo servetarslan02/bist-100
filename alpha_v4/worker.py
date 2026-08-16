@@ -32,7 +32,12 @@ def run_snapshot_cycle(
     provider: SnapshotProvider | None = None,
 ) -> SnapshotCycleResult:
     """Run one idempotent acquisition cycle; never loops or creates hidden workers."""
-    if not source_id.strip() or not surface.strip() or not owner_id.strip() or not cycle_key.strip():
+    if (
+        not source_id.strip()
+        or not surface.strip()
+        or not owner_id.strip()
+        or not cycle_key.strip()
+    ):
         raise ValueError("source_id, surface, owner_id and cycle_key are required")
 
     observed_at = started_at or datetime.now(timezone.utc)
