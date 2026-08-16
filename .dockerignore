@@ -1,0 +1,5 @@
+*
+!alpha_v4/
+!alpha_v4/**
+!infrastructure/
+!infrastructure/Dockerfile.v4
