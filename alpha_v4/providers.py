@@ -40,7 +40,9 @@ class SnapshotProviderConfig:
             if not name.strip():
                 raise ValueError("surface names must not be empty")
             if path.startswith(("http://", "https://")):
-                raise ValueError("surface paths must be relative to the configured base URL")
+                raise ValueError(
+                    "surface paths must be relative to the configured base URL"
+                )
             if ".." in path.split("/"):
                 raise ValueError("surface paths must not contain parent traversal")
 
@@ -120,7 +122,9 @@ def official_snapshot_provider(
     try:
         surfaces = OFFICIAL_SURFACES[source_id]
     except KeyError as exc:
-        raise KeyError(f"no official snapshot surfaces configured for: {source_id}") from exc
+        raise KeyError(
+            f"no official snapshot surfaces configured for: {source_id}"
+        ) from exc
     seed = seed_by_id(source_id)
     return SnapshotProvider(
         SnapshotProviderConfig(http=seed.http, surfaces=surfaces),
