@@ -134,7 +134,7 @@ class RankingModel:
         # Eğitim verisi hazırla
         X, y, groups = self._prepare_training_data(features_map, returns, date_groups)
 
-        if len(X) < 100:
+        if len(X) < 50:
             logger.warning("Insufficient training data, using rule-based")
             self._is_trained = False
             return {"success": False, "error": "Insufficient data"}

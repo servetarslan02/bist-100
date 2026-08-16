@@ -380,6 +380,79 @@ def run_backtest(start_date: str, end_date: str):
             logger.error("Model training failed", fold=i, error=str(e))
             print(f"   ⚠️ Model eğitim hatası: {e}")
 
+        # === MODEL EĞİTİMİ (Her fold'da train verisiyle) ===
+        try:
+            from services.ml.ranking_model import ranking_model
+            
+            # Train dönemindeki future returns hesapla (label için)
+            train_returns = {}
+            train_date_groups = []
+            for t, df_train in train_data.items():
+                if t == "XU100.IS" or t == "XU100":
+                    continue
+                if df_train.empty:
+                    continue
+                
+                # Train sonu fiyatı
+                train_end_price = df_train['Close'].iloc[-1]
+                train_end_date = df_train.index[-1]
+                
+                # Future return: train_end'den sonraki ~63 gün
+                # Test verisinden al
+                if t in test_data and not test_data[t].empty:
+                    future_price = test_data[t]['Close'].iloc[-1]
+                    ret = (future_price / train_end_price - 1) * 100
+                    train_returns[t] = ret
+                    train_date_groups.append(train_end_date.strftime("%Y-%m-%d"))
+            
+            # Train features
+            train_features = {}
+            for t, df_train in train_data.items():
+                if t == "XU100.IS" or t == "XU100":
+                    continue
+                if df_train.empty or len(df_train) < 20:
+                    continue
+                
+                # Feature hesapla (basitleştirilmiş)
+                close = df_train['Close']
+                volume = df_train.get('Volume', pd.Series([0]*len(df_train), index=df_train.index))
+                
+                feat = {
+                    'momentum_20d': (close.iloc[-1] / close.iloc[-20] - 1) * 100 if len(close) >= 20 else 0,
+                    'roc_5d': (close.iloc[-1] / close.iloc[-5] - 1) * 100 if len(close) >= 5 else 0,
+                    'roc_10d': (close.iloc[-1] / close.iloc[-10] - 1) * 100 if len(close) >= 10 else 0,
+                    'volatility_20d': close.pct_change().iloc[-20:].std() * np.sqrt(252) * 100 if len(close) >= 20 else 0,
+                    'volume_ratio': volume.iloc[-1] / volume.iloc[-20:].mean() if len(volume) >= 20 and volume.iloc[-20:].mean() > 0 else 1.0,
+                    'rsi_14': 50.0,  # Basitleştirilmiş
+                    'atr_14_pct': 2.0,  # Basitleştirilmiş
+                    'drawdown_20d': (close.iloc[-1] / close.iloc[-20:].max() - 1) * 100 if len(close) >= 20 else 0,
+                    'sector': sector_map.get(t, 'Unknown'),
+                    'market_cap': 1.0,
+                }
+                train_features[t] = feat
+            
+            # Regime tespiti
+            from services.ml.regime_analyzer import regime_analyzer
+            xu100_train = train_data.get("XU100.IS", train_data.get("XU100", pd.DataFrame()))
+            regime = regime_analyzer.detect_regime(xu100_train) if not xu100_train.empty else None
+            
+            # Modeli eğit
+            if train_returns and train_features:
+                print(f"   🎓 Model eğitiliyor... (n={len(train_returns)} hisse)")
+                ranking_model.train(
+                    features_map=train_features,
+                    returns=train_returns,
+                    date_groups=train_date_groups if train_date_groups else None,
+                    regime=regime,
+                )
+                print(f"   ✅ Model eğitildi. _is_trained={ranking_model._is_trained}")
+            else:
+                print(f"   ⚠️ Eğitim verisi yetersiz, rule-based kullanılacak")
+                
+        except Exception as e:
+            logger.error("Model training failed", fold=i, error=str(e))
+            print(f"   ⚠️ Model eğitim hatası: {e}")
+
         # Train pipeline (ranking)
         try:
             train_report = orchestrator.run_full_pipeline(
