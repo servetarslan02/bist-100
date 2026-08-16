@@ -1,0 +1,17 @@
+{
+  "app": {
+    "env": "test",
+    "debug": false,
+    "port": 8001
+  },
+  "portfolio": {
+    "initial_capital": 50000
+  },
+  "risk": {
+    "max_drawdown_pct": 10.0,
+    "daily_loss_limit_pct": 3.0
+  },
+  "data": {
+    "cache_ttl_hours": 24
+  }
+}

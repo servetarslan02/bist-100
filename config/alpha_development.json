@@ -1,0 +1,16 @@
+{
+  "app": {
+    "env": "development",
+    "debug": true,
+    "port": 8000
+  },
+  "portfolio": {
+    "initial_capital": 100000
+  },
+  "risk": {
+    "max_drawdown_pct": 15.0
+  },
+  "data": {
+    "cache_ttl_hours": 1
+  }
+}

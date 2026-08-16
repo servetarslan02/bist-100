@@ -1,0 +1,19 @@
+{
+  "app": {
+    "env": "production",
+    "debug": false,
+    "port": 80
+  },
+  "portfolio": {
+    "initial_capital": 1000000,
+    "max_position_pct": 0.05
+  },
+  "risk": {
+    "max_drawdown_pct": 8.0,
+    "daily_loss_limit_pct": 2.0,
+    "max_position_pct": 5
+  },
+  "monitoring": {
+    "health_check_interval_s": 30
+  }
+}
