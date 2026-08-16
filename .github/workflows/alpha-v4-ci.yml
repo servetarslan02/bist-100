@@ -55,10 +55,27 @@ jobs:
         run: |
           set -euo pipefail
           DB_PATH="/tmp/alpha-v4-smoke-${{ matrix.python-version }}.sqlite3"
+          INIT_JSON="/tmp/alpha-v4-init-${{ matrix.python-version }}.json"
           HEALTH_JSON="/tmp/alpha-v4-health-${{ matrix.python-version }}.json"
-          rm -f "$DB_PATH" "$HEALTH_JSON"
+          rm -f "$DB_PATH" "$INIT_JSON" "$HEALTH_JSON"
 
-          python -m alpha_v4 init --mode test --db "$DB_PATH"
+          python -m alpha_v4 init --mode test --db "$DB_PATH" > "$INIT_JSON"
+          python - "$INIT_JSON" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              payload = json.load(handle)
+
+          assert payload["initialized"] is True
+          assert payload["mode"] == "test"
+          assert payload["audit_chain_valid"] is True
+          assert payload["real_money_execution"] is False
+          assert payload["stores"]
+          assert all(value == "ready" for value in payload["stores"].values())
+          print("init-ok", json.dumps(payload, sort_keys=True))
+          PY
+
           python -m alpha_v4 serve --mode test --db "$DB_PATH" --host 127.0.0.1 --port 8765 &
           SERVER_PID=$!
           trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
@@ -90,7 +107,7 @@ jobs:
           assert payload["real_money_execution"] is False
           assert payload["stores"]
           assert all(value == "ready" for value in payload["stores"].values())
-          print(json.dumps(payload, sort_keys=True))
+          print("health-ok", json.dumps(payload, sort_keys=True))
           PY
 
           kill "$SERVER_PID"
