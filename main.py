@@ -258,6 +258,10 @@ def run_backtest(start_date: str, end_date: str):
     all_results = []
     bt_engine = BacktestEngine()
 
+    # === CALIBRATOR: Fold'lar arasinda tasinarak calisir ===
+    # Test sonuclari sonraki fold'un calibration'ina girer
+    from services.risk.calibration import calibrator as fold_calibrator
+
     for i, fold in enumerate(folds, 1):
         print(f"\n📦 FOLD {i}/{len(folds)}")
         print(f"   Train: {fold['train_start']} → {fold['train_end']}")
@@ -282,12 +286,26 @@ def run_backtest(start_date: str, end_date: str):
             continue
 
         # === LOOK-AHEAD BIAS KONTROLU ===
-        # Train verisi test verisine karismamali
         train_end = pd.Timestamp(fold['train_end'])
         test_start = pd.Timestamp(fold['test_start'])
         if train_end >= test_start:
             print(f"   ❌ FOLD FAILED: Train/Test overlap (look-ahead bias)")
             continue
+
+        # === DATA LEAKAGE KONTROLU ===
+        # Train'deki bilgi (ornegin train sonu fiyat) test'e sizmamali
+        # Bu purge + embargo ile saglaniyor, ek kontrol:
+        for t, df_train in train_data.items():
+            if t in test_data:
+                last_train_date = df_train.index[-1]
+                first_test_date = test_data[t].index[0]
+                if last_train_date >= first_test_date:
+                    print(f"   ❌ FOLD FAILED: Data leakage detected for {t}")
+                    print(f"      Last train: {last_train_date}, First test: {first_test_date}")
+                    break
+        else:
+            # Hic break olmadi = data leakage yok
+            pass
 
         # Train pipeline
         try:
@@ -311,7 +329,6 @@ def run_backtest(start_date: str, end_date: str):
         print(f"   Top picks: {[p['ticker'] for p in top_picks]}")
 
         # === SURVIVORSHIP BIAS KONTROLU ===
-        # Test doneminde delisted/suspended hisseler cikarilmali
         valid_picks = []
         for opp in top_picks:
             ticker = opp['ticker']
@@ -389,6 +406,26 @@ def run_backtest(start_date: str, end_date: str):
         all_results.append(fold_result)
 
         print(f"   ✅ Getiri: {m.total_return_pct:+.2f}% | Sharpe: {m.sharpe_ratio:.2f} | MaxDD: {m.max_drawdown_pct:.2f}% | Win: {m.win_rate:.1%} | Trades: {m.total_trades}")
+
+        # === CALIBRATION: Test sonuclarini sonraki fold icin ekle ===
+        # AYNI fold'un test sonuclarini bu fold'da kullanma (data leakage)
+        # Sadece sonraki fold'larda kullanilacak
+        for opp in valid_picks:
+            ticker = opp['ticker']
+            df_test = test_data[ticker]
+            entry_price = df_test['Close'].iloc[0]
+            exit_price = df_test['Close'].iloc[-1]
+            return_pct = (exit_price / entry_price - 1) * 100
+            score = opp.get('score', 0)
+
+            fold_calibrator.add_trade(
+                score=score,
+                return_pct=return_pct,
+                ticker=ticker,
+                date=fold['test_end'],
+            )
+
+        print(f"   📊 Calibrator: {len(fold_calibrator._trade_history)} total trades")
 
     # === OZET ===
     print("\n" + "="*70)

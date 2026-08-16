@@ -209,10 +209,11 @@ class SystemOrchestrator:
         # === STAGE 5: RISK & POSITION SIZING ===
         try:
             from services.risk.position_sizing import position_sizer
+            from services.risk.calibration import calibrator
             from services.risk.covariance import covariance_estimator
 
-            # Portföy önerisi
-            portfolio_value = 1_000_000  # 1M TL (varsayılan)
+            # Portfoy onerisi
+            portfolio_value = 1_000_000  # 1M TL (varsayilan)
 
             # Secilmis hisselerin volatilitesi
             selected = top_opportunities[:10] if top_opportunities else []
@@ -249,6 +250,7 @@ class SystemOrchestrator:
                 portfolio_value=portfolio_value,
                 current_volatility=0.15,
                 regime=regime_str,
+                calibrator=calibrator,
             )
 
             portfolio_recommendation = {
