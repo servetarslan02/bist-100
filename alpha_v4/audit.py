@@ -89,14 +89,8 @@ class AuditLedger:
         payload_json: str,
         previous_hash: str,
     ) -> str:
-        material = "|".join(
-            [
-                entry_id,
-                event_type,
-                created_at.isoformat(),
-                payload_json,
-                previous_hash,
-            ]
+        material = (
+            f"{entry_id}|{event_type}|{created_at.isoformat()}|{payload_json}|{previous_hash}"
         )
         return sha256(material.encode("utf-8")).hexdigest()
 
