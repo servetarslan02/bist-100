@@ -97,7 +97,7 @@ class EventExtraction:
 
     @classmethod
     def from_mapping(cls, mapping: Mapping[str, Any]) -> EventExtraction:
-        top_level_keys = {str(key).lower() for key in mapping.keys()}
+        top_level_keys = {str(key).lower() for key in mapping}
         forbidden = FORBIDDEN_DECISION_KEYS & top_level_keys
         if forbidden:
             raise LLMProtocolError(
@@ -127,7 +127,7 @@ class EventExtraction:
         if not isinstance(raw_facts, Mapping):
             raise LLMProtocolError("facts must be an object")
         forbidden_fact_names = FORBIDDEN_DECISION_KEYS & {
-            str(name).lower() for name in raw_facts.keys()
+            str(name).lower() for name in raw_facts
         }
         if forbidden_fact_names:
             raise LLMProtocolError(
