@@ -42,7 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Bind port for the serve command.",
     )
     parser.add_argument("--source", help="Official source id for snapshot command.")
-    parser.add_argument("--surface", help="Allowlisted source surface for snapshot command.")
+    parser.add_argument(
+        "--surface", help="Allowlisted source surface for snapshot command."
+    )
     parser.add_argument(
         "--owner",
         default="alpha-v4-cli",
