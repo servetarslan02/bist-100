@@ -224,7 +224,7 @@ class RankingModel:
     ) -> RankingResult:
         """Hisseleri sırala — Ensemble (LightGBM + Rule-based)."""
 
-        # LightGBM skoru
+        # LambdaRank skoru (Champion — tek model)
         lgbm_scores = {}
         if self._is_trained and self._lgbm_model is not None:
             tickers = []
@@ -242,27 +242,15 @@ class RankingModel:
                 for ticker, pred in zip(tickers, predictions):
                     lgbm_scores[ticker] = float(pred)
 
-        # Rule-based skoru
-        rule_scores = {}
-        for ticker, features in features_map.items():
-            rule_scores[ticker] = self._rule_based_score(features, regime)
-
-        # Ensemble (ağırlıklı ortalama)
-        ensemble_scores = {}
+        # LambdaRank skorunu normalize et (düşük = iyi)
+        champion_scores = {}
         for ticker in features_map.keys():
-            lgbm = lgbm_scores.get(ticker, 0)
-            rule = rule_scores.get(ticker, 0)
-            # Normalize et
-            lgbm_norm = self._normalize_score(lgbm)
-            # Rule-based skorunu ters çevir: yüksek rule skoru = düşük norm = iyi
-            rule_norm = 100 - self._normalize_score(rule)
-            ensemble_scores[ticker] = (
-                self._ensemble_weights["lgbm"] * lgbm_norm +
-                self._ensemble_weights["rule_based"] * rule_norm
-            )
+            score = lgbm_scores.get(ticker, 50.0)  # Eğitilmemişse ortalama
+            # Normalize: düşük skor = iyi (LambdaRank semantiği)
+            champion_scores[ticker] = self._normalize_score(score)
 
         # Sırala (düşük skor = üst sıra, çünkü LambdaRank'te düşük label = iyi)
-        sorted_scores = sorted(ensemble_scores.items(), key=lambda x: x[1])
+        sorted_scores = sorted(champion_scores.items(), key=lambda x: x[1])
 
         scores = []
         for rank, (ticker, score) in enumerate(sorted_scores, 1):
