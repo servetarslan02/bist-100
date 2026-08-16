@@ -120,13 +120,8 @@ class HttpFetcher:
             ) from exc
 
         body_hash = sha256(body).hexdigest()
-        identity = "|".join(
-            [
-                self.config.source_id,
-                final_url,
-                observed.isoformat(),
-                body_hash,
-            ]
+        identity = (
+            f"{self.config.source_id}|{final_url}|{observed.isoformat()}|{body_hash}"
         )
         return FetchedDocument(
             document_id=sha256(identity.encode("utf-8")).hexdigest(),
