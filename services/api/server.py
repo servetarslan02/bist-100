@@ -626,6 +626,123 @@ async def admin_auth_status():
     return monitoring_auth.get_auth_status()
 
 
+# ===================== POLICY MANAGEMENT ENDPOINTS =====================
+
+@app.get("/admin/policy")
+async def admin_policy_get(request: Request):
+    """Mevcut alert policy."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    return {
+        "policy": alerting.get_policy_info(),
+        "active_silences": alerting.get_active_silences(),
+    }
+
+
+@app.post("/admin/policy")
+async def admin_policy_update(request: Request):
+    """Policy güncelle."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json()
+    result = alerting.update_policy(body, actor=f"api:{client_ip}")
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("errors", ["Update failed"]))
+    return result
+
+
+@app.post("/admin/policy/rollback")
+async def admin_policy_rollback(request: Request):
+    """Policy rollback."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    target = body.get("version", 0)
+    result = alerting.rollback_policy(target, actor=f"api:{client_ip}")
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "Rollback failed"))
+    return result
+
+
+@app.get("/admin/policy/history")
+async def admin_policy_history(request: Request):
+    """Policy versiyon geçmişi."""
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    return {"history": alerting.get_policy_history()}
+
+
+@app.get("/admin/policy/audit")
+async def admin_policy_audit(request: Request):
+    """Policy audit log."""
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    return {"audit_log": alerting.get_policy_audit_log()}
+
+
+@app.post("/admin/silence")
+async def admin_silence_add(request: Request):
+    """Alert susturma ekle."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json()
+    result = alerting.add_silence(
+        alert_type=body.get("alert_type"),
+        fingerprint=body.get("fingerprint"),
+        duration_s=body.get("duration_s", 3600),
+        reason=body.get("reason", ""),
+        created_by=f"api:{client_ip}",
+    )
+    return result
+
+
+@app.delete("/admin/silence")
+async def admin_silence_remove(request: Request):
+    """Alert susturma kaldır."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    removed = alerting.remove_silence(
+        fingerprint=body.get("fingerprint"),
+        alert_type=body.get("alert_type"),
+        actor=f"api:{client_ip}",
+    )
+    return {"removed": removed}
+
+
 # ===================== MAIN =====================
 if __name__ == "__main__":
     import uvicorn

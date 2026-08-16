@@ -267,29 +267,32 @@ async def test_silence_remove():
 
 
 async def test_silence_persistence():
-    """Susturma durumu dosyaya kaydedilebilmeli ve yüklenebilmeli."""
+    """Susturma durumu DB'ye kaydedilebilmeli ve yüklenebilmeli."""
+    import sqlite3
     issues = []
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        config_path = os.path.join(tmpdir, "policy.json")
-        silence_path = os.path.join(tmpdir, "silence_state.json")
+    db = sqlite3.connect(":memory:")
+    db.row_factory = sqlite3.Row
+    db.execute("""CREATE TABLE alert_silences (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alert_type TEXT, fingerprint TEXT,
+        start_time REAL NOT NULL, end_time REAL NOT NULL,
+        reason TEXT, created_by TEXT DEFAULT 'system',
+        created_at REAL, UNIQUE(fingerprint, alert_type))""")
+    db.commit()
 
-        with open(config_path, "w") as f:
-            json.dump({"version": 1}, f)
+    policy1 = AlertPolicy()
+    policy1.add_silence(alert_type="test", duration_s=3600, reason="maintenance", db=db)
 
-        policy1 = AlertPolicy(_config_path=config_path)
-        policy1.add_silence(alert_type="test", duration_s=3600, reason="maintenance")
-        policy1.save_silences(silence_path)
+    policy2 = AlertPolicy()
+    policy2.load_silences_from_db(db)
 
-        policy2 = AlertPolicy(_config_path=config_path)
-        policy2.load_silences(silence_path)
+    if not policy2.is_silenced("test", "any"):
+        issues.append("Silence DB'den yüklenemedi")
 
-        if not policy2.is_silenced("test", "any"):
-            issues.append("Silence yüklenemedi")
-
-        active = policy2.get_active_silences()
-        if len(active) == 0:
-            issues.append("Aktif silence yok")
+    active = policy2.get_active_silences()
+    if len(active) == 0:
+        issues.append("Aktif silence yok")
 
     return "Silence Persistence", len(issues) == 0, issues
 

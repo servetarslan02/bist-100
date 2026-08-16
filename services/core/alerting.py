@@ -589,17 +589,23 @@ class AlertingSystem:
     # =====================================================
 
     def add_silence(self, alert_type: str = None, fingerprint: str = None,
-                    duration_s: float = 3600, reason: str = "") -> Dict[str, Any]:
-        """Alert susturma ekle."""
+                    duration_s: float = 3600, reason: str = "",
+                    created_by: str = "system") -> Dict[str, Any]:
+        """Alert susturma ekle (DB persist ile)."""
         rule = self._policy.add_silence(
             alert_type=alert_type, fingerprint=fingerprint,
-            duration_s=duration_s, reason=reason,
+            duration_s=duration_s, reason=reason, created_by=created_by,
+            db=self._db,
         )
         return rule.to_dict()
 
-    def remove_silence(self, fingerprint: str = None, alert_type: str = None) -> int:
+    def remove_silence(self, fingerprint: str = None, alert_type: str = None,
+                       actor: str = "api") -> int:
         """Alert susturma kaldır."""
-        return self._policy.remove_silence(fingerprint=fingerprint, alert_type=alert_type)
+        return self._policy.remove_silence(
+            fingerprint=fingerprint, alert_type=alert_type,
+            actor=actor, db=self._db,
+        )
 
     def get_active_silences(self) -> List[Dict[str, Any]]:
         """Aktif susturmalar."""
@@ -610,8 +616,11 @@ class AlertingSystem:
         self._policy.save_silences()
 
     def load_silences(self):
-        """Silence durumunu yükle (restart recovery)."""
-        self._policy.load_silences()
+        """Silence durumunu yükle (DB + file restart recovery)."""
+        if self._db:
+            self._policy.load_silences_from_db(self._db)
+        else:
+            self._policy.load_silences()
 
     def get_policy_info(self) -> Dict[str, Any]:
         """Policy bilgisi."""
@@ -620,6 +629,22 @@ class AlertingSystem:
     def reload_policy(self) -> bool:
         """Policy'yi yeniden yükle."""
         return self._policy.reload_if_changed()
+
+    def update_policy(self, new_config: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
+        """Policy güncelle (API)."""
+        return self._policy.update(new_config, actor)
+
+    def rollback_policy(self, target_version: int = 0, actor: str = "api") -> Dict[str, Any]:
+        """Policy rollback."""
+        return self._policy.rollback(target_version, actor)
+
+    def get_policy_history(self) -> List[Dict[str, Any]]:
+        """Policy versiyon geçmişi."""
+        return self._policy.get_history()
+
+    def get_policy_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Policy audit log."""
+        return self._policy.get_audit_log(limit)
 
     def get_alert_summary(self) -> Dict[str, Any]:
         active = [a for a in self._alerts if a.is_active]
