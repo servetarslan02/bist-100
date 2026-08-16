@@ -12,13 +12,16 @@ Bu dosya `memory/` klasöründeki belgelerin hangi amaçla kullanılacağını v
 2. `MASTER-SPEC.md` — ürün/sistem vizyonu ve kapsam
 3. `TARGET-ARCHITECTURE.md` — hedef teknik mimari
 4. `EVENT-INTELLIGENCE-SPEC.md` — KAP/haber/web olay zekâsı
-5. `ROADMAP-v4.md` — mevcut migration/build planı
-6. `WORKING_RULES.md` — geliştirme disiplini ve completion kriterleri
-7. Versioned contracts/specs — ileride `contracts/` veya memory altına eklenecek
-8. Eski architecture/roadmap dosyaları — yalnız historical/reference
-9. Ham konuşma ve scan çıktıları — yalnız raw context/artifact
+5. `CURRENT-STATE.md` — mevcut repository hakkında doğrulanmış factual snapshot; hedef değil
+6. `ROADMAP-v4.md` — mevcut migration/build planı
+7. `WORKING_RULES.md` — geliştirme disiplini ve completion kriterleri
+8. Versioned contracts/specs — ileride `contracts/` veya memory altına eklenecek
+9. Eski architecture/roadmap dosyaları — yalnız historical/reference
+10. Ham konuşma ve scan çıktıları — yalnız raw context/artifact
 
-## 2. CANONICAL ACTIVE FILES
+**Önemli:** `CURRENT-STATE.md` hedef mimariyi değiştirmez. Yalnız bugün gerçekte neyin var/ne kadar güvenilir olduğunu kaydeder.
+
+## 2. CANONICAL / ACTIVE FILES
 
 ### `MASTER-SPEC.md`
 ALPHA'nın ne olduğunu tanımlar:
@@ -39,11 +42,17 @@ Hedef runtime/data/research/governance mimarisi. HOT/WARM/COLD yalnız compute p
 ### `EVENT-INTELLIGENCE-SPEC.md`
 Haber/KAP anlayışının ana spec'i. Sentiment-score yaklaşımının yerine event understanding, materiality, expectation/surprise, event threads, company memory, graph propagation ve reaction intelligence kullanılır.
 
+### `CURRENT-STATE.md`
+Mevcut kod tabanında doğrulanmış önemli gap ve riskleri kaydeder. Eski LLM belgelerindeki `production ready`, `champion`, `OOS passed` gibi iddiaların evidence olmadan gerçek kabul edilmesini engeller.
+
 ### `ROADMAP-v4.md`
 Eski LLM tarafından oluşturulmuş kod tabanından hedef ALPHA'ya migration planıdır. Fazlar ancak evidence ile COMPLETE olabilir.
 
 ### `WORKING_RULES.md`
 Her kod/değişiklik çalışmasında uygulanacak kurallar.
+
+### `QUICKSTART.md`
+Şu an migration-state belgesidir. Canonical runtime doğrulanana kadar eski başlatma iddiaları geçersizdir.
 
 ## 3. LEGACY / HISTORICAL FILES
 
@@ -72,12 +81,18 @@ Eski konuşmaların/brainstorming'in büyük ham dökümü. Source-of-truth değ
 ### `scan_results.json`
 Bir scan/runtime/research output artifact'ıdır. Architecture veya validation kanıtı değildir. Dataset/scan version, timestamp ve lineage olmadan model başarısı ispatı sayılmaz.
 
-## 5. QUICKSTART STATUS
-`QUICKSTART.md` yalnız doğrulanmış runtime başlatma yolu varsa ACTIVE olabilir. Mevcut repo migration sürecinde olduğundan eski start talimatları production-readiness kanıtı değildir.
+## 5. Hedef ile Gerçeği Ayırma Kuralı
+Üç ayrı kavram hiçbir zaman karıştırılamaz:
+
+- **TARGET:** ne inşa etmek istiyoruz? → MASTER/TARGET/EVENT specs
+- **CURRENT:** şu an kod gerçekten ne yapıyor? → CURRENT-STATE + yeni audit artifacts
+- **PLAN:** current'tan target'a nasıl gideceğiz? → ROADMAP-v4
+
+Bir özellik TARGET'ta yazıyor diye CURRENT'ta var sayılmaz.
 
 ## 6. Yeni Bir Belge Eklerken
 Her yeni memory belgesi şu metadata'yı açıkça söylemelidir:
-- STATUS: CANONICAL / ACTIVE / DRAFT / LEGACY / RAW-ARTIFACT
+- STATUS: CANONICAL / ACTIVE / DRAFT / FACTUAL-SNAPSHOT / LEGACY / RAW-ARTIFACT
 - OWNER/DOMAIN
 - VERSION
 - UPDATED_AT
@@ -93,8 +108,9 @@ Memory'de `DONE`, `COMPLETE`, `PRODUCTION READY`, `CHAMPION`, `LEAKAGE SAFE`, `O
 ## 8. Memory'nin Amacı
 `memory/` ALPHA'nın rastgele not klasörü değil; sistemin uzun dönem tasarım hafızasıdır.
 
-Burada üç şey ayrılır:
+Burada dört şey ayrılır:
 - **Truth/Policy:** canonical specs
+- **Current Reality:** factual snapshots/audits
 - **Plan:** active roadmap
 - **History:** legacy docs/raw conversations/artifacts
 
