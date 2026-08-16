@@ -143,8 +143,10 @@ class RankingModel:
         X_weighted = self._apply_regime_weights(X, regime)
 
         # LambdaRank eğitimi
-        # Getirileri rank'e çevir (yüksek getiri = düşük rank numarası)
-        y_rank = -y  # Negatif getiri (yüksek getiri = düşük rank = daha iyi)
+        # LightGBM LambdaRank int label bekler.
+        # rankdata(-y): yüksek future return = düşük ordinal rank = iyi label (0)
+        from scipy.stats import rankdata
+        y_rank = rankdata(-y, method='ordinal').astype(int) - 1  # 0 = en iyi
 
         # Group sizes
         group_sizes = []
@@ -165,11 +167,15 @@ class RankingModel:
         train_data = lgb.Dataset(X_weighted, label=y_rank, group=group_sizes,
                                  feature_name=self._feature_names)
 
+        # label_gain: her label için gain, label aralığıyla uyumlu
+        label_gain = list(range(len(y_rank) + 1))
+
         # LambdaRank parametreleri
         params = {
             "objective": "lambdarank",
             "metric": "ndcg",
             "ndcg_eval_at": [5, 10, 20],
+            "label_gain": label_gain,
             "learning_rate": 0.05,
             "num_leaves": 31,
             "min_data_in_leaf": 20,
