@@ -743,6 +743,101 @@ async def admin_silence_remove(request: Request):
     return {"removed": removed}
 
 
+@post_admin = lambda: None  # placeholder for syntax
+
+@app.post("/admin/policy/diff")
+async def admin_policy_diff(request: Request):
+    """Policy diff (uygulamadan)."""
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json()
+    diff = alerting.compute_policy_diff(body)
+    return {"diff": diff.to_dict()}
+
+
+@app.post("/admin/silence/batch")
+async def admin_silence_batch_add(request: Request):
+    """Toplu susturma ekle."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json()
+    rules = body.get("rules", [])
+    if not rules:
+        raise HTTPException(status_code=400, detail="rules array required")
+
+    results = alerting.batch_add_silences(rules, created_by=f"api:{client_ip}")
+    return {"results": results, "total": len(rules)}
+
+
+@app.delete("/admin/silence/batch")
+async def admin_silence_batch_remove(request: Request):
+    """Toplu susturma kaldır."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    filters = body.get("filters", [])
+    if not filters:
+        raise HTTPException(status_code=400, detail="filters array required")
+
+    result = alerting.batch_remove_silences(filters, actor=f"api:{client_ip}")
+    return result
+
+
+@app.post("/admin/policy/lock")
+async def admin_policy_lock(request: Request):
+    """Policy düzenleme kilidi al."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    body = await request.json() if request.headers.get("content-type") == "application/json" else {}
+    timeout = body.get("timeout_s", 30)
+    owner = f"api:{client_ip}"
+
+    acquired = alerting._policy.acquire_edit_lock(owner, timeout)
+    if not acquired:
+        lock_info = alerting._policy.get_lock_info()
+        raise HTTPException(status_code=409, detail={
+            "error": "Policy is locked by another user",
+            "lock_info": lock_info,
+        })
+    return {"success": True, "owner": owner, "timeout_s": timeout}
+
+
+@app.delete("/admin/policy/lock")
+async def admin_policy_unlock(request: Request):
+    """Policy düzenleme kilidi bırak."""
+    client_ip = request.client.host if request.client else "unknown"
+    token = extract_bearer_token(request.headers.get("authorization"))
+    api_key = extract_api_key(dict(request.headers))
+    if not (monitoring_auth.verify_admin_token(token or "") or
+            monitoring_auth.verify_admin_token(api_key or "")):
+        raise HTTPException(status_code=401, detail="Admin access required")
+
+    owner = f"api:{client_ip}"
+    released = alerting._policy.release_edit_lock(owner)
+    if not released:
+        raise HTTPException(status_code=409, detail="Lock not owned by you")
+    return {"success": True}
+
+
 # ===================== MAIN =====================
 if __name__ == "__main__":
     import uvicorn

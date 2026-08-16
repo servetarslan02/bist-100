@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from enum import Enum
 import structlog
 
-from .alert_policy import AlertPolicy, SilenceRule
+from .alert_policy import AlertPolicy, SilenceRule, VersionConflictError, PolicyDiff
 
 logger = structlog.get_logger()
 
@@ -630,9 +630,14 @@ class AlertingSystem:
         """Policy'yi yeniden yükle."""
         return self._policy.reload_if_changed()
 
-    def update_policy(self, new_config: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
-        """Policy güncelle (API)."""
-        return self._policy.update(new_config, actor)
+    def update_policy(self, new_config: Dict[str, Any], actor: str = "api",
+                      expected_version: int = 0) -> Dict[str, Any]:
+        """Policy güncelle (optimistic locking ile)."""
+        try:
+            return self._policy.update(new_config, actor, expected_version)
+        except VersionConflictError as e:
+            return {"success": False, "error": str(e), "conflict": True,
+                    "current_version": self._policy._version}
 
     def rollback_policy(self, target_version: int = 0, actor: str = "api") -> Dict[str, Any]:
         """Policy rollback."""
@@ -645,6 +650,24 @@ class AlertingSystem:
     def get_policy_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Policy audit log."""
         return self._policy.get_audit_log(limit)
+
+    def batch_add_silences(self, rules: List[Dict[str, Any]],
+                           created_by: str = "system") -> List[Dict[str, Any]]:
+        """Toplu susturma ekle (transaction)."""
+        return self._policy.batch_add_silences(rules, created_by, self._db)
+
+    def batch_remove_silences(self, filters: List[Dict[str, str]],
+                               actor: str = "api") -> Dict[str, int]:
+        """Toplu susturma kaldır (transaction)."""
+        return self._policy.batch_remove_silences(filters, actor, self._db)
+
+    def compute_policy_diff(self, new_config: Dict[str, Any]):
+        """Policy diff hesapla (uygulamadan)."""
+        return self._policy.compute_diff(new_config)
+
+    def set_policy_webhook(self, urls: List[str]):
+        """Policy değişiklik webhook URL'leri."""
+        self._policy.set_webhook_urls(urls)
 
     def get_alert_summary(self) -> Dict[str, Any]:
         active = [a for a in self._alerts if a.is_active]

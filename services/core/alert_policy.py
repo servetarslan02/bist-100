@@ -1,23 +1,22 @@
 """
-ALPHA BIST — Alert Policy Configuration v2.0
+ALPHA BIST — Alert Policy Configuration v3.0
 
-Merkezi policy yönetimi: API, versioning, rollback, audit, DB silence.
+Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 
 Özellikler:
-- API üzerinden policy CRUD
-- Policy versiyonlama + geçmiş
-- Rollback desteği
-- Audit log (kim, ne zaman, ne yaptı)
-- DB tabanlı silence yönetimi
-- Runtime config reload
-- Validation + safe fallback
+- Policy diff (eski/yeni/değişen alanlar)
+- Optimistic locking (çakışan güncellemeleri engelle)
+- Policy change webhook notification
+- Batch silence işlemleri (transaction)
+- Audit log (her değişiklik)
 """
 
 import json
 import os
 import time
+import copy
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
@@ -26,7 +25,6 @@ logger = structlog.get_logger()
 
 DEFAULT_POLICY_PATH = Path(__file__).parent.parent.parent / "config" / "alert_policy.json"
 
-# Safe fallback values
 FALLBACK_ESCALATION_TIMEOUT_S = {
     "health_change": 300, "invariant_failure": 60, "lock_deadlock": 120,
     "lock_timeout_spike": 300, "cash_negative": 30, "drawdown_breach": 180,
@@ -44,26 +42,62 @@ FALLBACK_SEVERITY_THRESHOLDS = {
 
 
 # =====================================================
-# AUDIT LOG
+# POLICY DIFF
 # =====================================================
+
+@dataclass
+class PolicyDiff:
+    """Policy değişiklik farkı."""
+    changed_fields: List[str] = field(default_factory=list)
+    added_keys: List[str] = field(default_factory=list)
+    removed_keys: List[str] = field(default_factory=list)
+    old_values: Dict[str, Any] = field(default_factory=dict)
+    new_values: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def has_changes(self) -> bool:
+        return bool(self.changed_fields or self.added_keys or self.removed_keys)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "has_changes": self.has_changes,
+            "changed_fields": self.changed_fields,
+            "added_keys": self.added_keys,
+            "removed_keys": self.removed_keys,
+            "old_values": self.old_values,
+            "new_values": self.new_values,
+        }
+
+    def summary(self) -> str:
+        parts = []
+        if self.changed_fields:
+            parts.append(f"changed: {', '.join(self.changed_fields)}")
+        if self.added_keys:
+            parts.append(f"added: {', '.join(self.added_keys)}")
+        if self.removed_keys:
+            parts.append(f"removed: {', '.join(self.removed_keys)}")
+        return "; ".join(parts) if parts else "no changes"
+
 
 @dataclass
 class PolicyAuditEntry:
     timestamp: float
-    action: str  # create, update, rollback, silence_add, silence_remove
+    action: str
     version: int
     actor: str
     details: Dict[str, Any]
+    diff: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
             "timestamp": self.timestamp,
             "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat(),
-            "action": self.action,
-            "version": self.version,
-            "actor": self.actor,
-            "details": self.details,
+            "action": self.action, "version": self.version,
+            "actor": self.actor, "details": self.details,
         }
+        if self.diff:
+            result["diff"] = self.diff
+        return result
 
 
 # =====================================================
@@ -72,7 +106,6 @@ class PolicyAuditEntry:
 
 @dataclass
 class SilenceRule:
-    """Alert susturma kuralı."""
     alert_type: Optional[str] = None
     fingerprint: Optional[str] = None
     start_time: float = 0.0
@@ -117,9 +150,13 @@ class SilenceRule:
 # ALERT POLICY
 # =====================================================
 
+class VersionConflictError(Exception):
+    """Optimistic locking conflict."""
+    pass
+
+
 @dataclass
 class AlertPolicy:
-    """Alert policy yapılandırması — API yönetilebilir."""
     escalation_timeouts: Dict[str, int] = field(default_factory=lambda: dict(FALLBACK_ESCALATION_TIMEOUT_S))
     notification_routing: Dict[str, List[str]] = field(default_factory=lambda: dict(FALLBACK_NOTIFICATION_ROUTING))
     severity_thresholds: Dict[str, float] = field(default_factory=lambda: dict(FALLBACK_SEVERITY_THRESHOLDS))
@@ -129,6 +166,9 @@ class AlertPolicy:
     _version: int = 0
     _history: List[Dict[str, Any]] = field(default_factory=list)
     _audit_log: List[PolicyAuditEntry] = field(default_factory=list)
+    _webhook_urls: List[str] = field(default_factory=list)
+    _lock_owner: Optional[str] = None
+    _lock_expires: float = 0.0
 
     # =====================================================
     # LOAD / RELOAD
@@ -139,16 +179,14 @@ class AlertPolicy:
         config_path = path or str(DEFAULT_POLICY_PATH)
         policy = cls(_config_path=config_path)
         if not os.path.exists(config_path):
-            logger.info("Alert policy file not found, using defaults", path=config_path)
             return policy
         try:
             with open(config_path) as f:
                 data = json.load(f)
             policy = cls._from_dict(data, config_path)
-            logger.info("Alert policy loaded", path=config_path, version=policy._version)
             return policy
         except Exception as e:
-            logger.error("Alert policy load failed, using fallback", path=config_path, error=str(e))
+            logger.error("Policy load failed, using fallback", error=str(e))
             return cls(_config_path=config_path)
 
     def reload_if_changed(self) -> bool:
@@ -163,37 +201,56 @@ class AlertPolicy:
             new_policy = AlertPolicy._from_dict(data, self._config_path)
             errors = new_policy.validate()
             if errors:
-                logger.error("Alert policy validation failed, keeping current", errors=errors)
+                logger.error("Policy validation failed", errors=errors)
                 return False
+            old_dict = self.to_dict()
             self._save_history()
             self.escalation_timeouts = new_policy.escalation_timeouts
             self.notification_routing = new_policy.notification_routing
             self.severity_thresholds = new_policy.severity_thresholds
             self._last_modified = mtime
             self._version += 1
-            self._add_audit("reload", {"source": "file"})
-            logger.info("Alert policy reloaded", version=self._version)
+            diff = self._compute_diff(old_dict, self.to_dict())
+            self._add_audit("reload", {"source": "file"}, diff)
+            self._notify_change("reload", diff)
             return True
         except Exception as e:
-            logger.error("Alert policy reload failed", error=str(e))
+            logger.error("Policy reload failed", error=str(e))
             return False
 
     # =====================================================
-    # API-BASED POLICY MANAGEMENT
+    # POLICY UPDATE (with optimistic locking)
     # =====================================================
 
-    def update(self, new_config: Dict[str, Any], actor: str = "api") -> Dict[str, Any]:
-        """Policy güncelle (API üzerinden)."""
+    def update(self, new_config: Dict[str, Any], actor: str = "api",
+               expected_version: int = 0) -> Dict[str, Any]:
+        """Policy güncelle (optimistic locking ile).
+
+        Args:
+            new_config: Yeni config
+            actor: Kim güncelledi
+            expected_version: Beklenen versiyon (0 = kontrol yok)
+        """
+        # Optimistic locking check
+        if expected_version > 0 and expected_version != self._version:
+            raise VersionConflictError(
+                f"Version conflict: expected {expected_version}, current {self._version}. "
+                f"Başka bir kullanıcı tarafından güncellenmiş olabilir."
+            )
+
         # Validate
         test_policy = AlertPolicy._from_dict(new_config, "")
         errors = test_policy.validate()
         if errors:
             return {"success": False, "errors": errors}
 
-        # Save history for rollback
+        # Compute diff
+        old_dict = copy.deepcopy(self.to_dict())
+
+        # Save history
         self._save_history()
 
-        # Apply
+        # Apply changes
         if "escalation_timeouts" in new_config:
             self.escalation_timeouts = new_config["escalation_timeouts"]
         if "notification_routing" in new_config:
@@ -202,23 +259,103 @@ class AlertPolicy:
             self.severity_thresholds = new_config["severity_thresholds"]
 
         self._version += 1
-        self._add_audit("update", {"actor": actor, "changes": list(new_config.keys())})
+        diff = self._compute_diff(old_dict, self.to_dict())
 
-        # Persist to file
+        # Audit
+        self._add_audit("update", {
+            "actor": actor, "changes": list(new_config.keys()),
+            "expected_version": expected_version,
+        }, diff)
+
+        # Persist
         self._save_to_file()
 
-        return {"success": True, "version": self._version}
+        # Webhook notification
+        self._notify_change("update", diff)
+
+        return {"success": True, "version": self._version, "diff": diff.to_dict()}
+
+    # =====================================================
+    # POLICY DIFF
+    # =====================================================
+
+    def compute_diff(self, new_config: Dict[str, Any]) -> PolicyDiff:
+        """İki config arasındaki farkı hesapla (uygulamadan)."""
+        old_dict = self.to_dict()
+        return self._compute_diff(old_dict, new_config)
+
+    @staticmethod
+    def _compute_diff(old: Dict[str, Any], new: Dict[str, Any]) -> PolicyDiff:
+        """Diff hesaplama."""
+        diff = PolicyDiff()
+
+        all_keys = set(list(old.keys()) + list(new.keys()))
+        for key in all_keys:
+            if key.startswith("_"):
+                continue
+            old_val = old.get(key)
+            new_val = new.get(key)
+
+            if key not in old:
+                diff.added_keys.append(key)
+                diff.new_values[key] = new_val
+            elif key not in new:
+                diff.removed_keys.append(key)
+                diff.old_values[key] = old_val
+            elif old_val != new_val:
+                diff.changed_fields.append(key)
+                diff.old_values[key] = old_val
+                diff.new_values[key] = new_val
+
+        return diff
+
+    # =====================================================
+    # OPTIMISTIC LOCKING
+    # =====================================================
+
+    def acquire_edit_lock(self, owner: str, timeout_s: float = 30.0) -> bool:
+        """Policy düzenleme kilidi al."""
+        now = time.time()
+        if self._lock_owner and self._lock_owner != owner and self._lock_expires > now:
+            return False  # Başkası kilitli
+        self._lock_owner = owner
+        self._lock_expires = now + timeout_s
+        self._add_audit("lock_acquired", {"owner": owner, "timeout_s": timeout_s})
+        return True
+
+    def release_edit_lock(self, owner: str) -> bool:
+        """Policy düzenleme kilidi bırak."""
+        if self._lock_owner != owner:
+            return False
+        self._lock_owner = None
+        self._lock_expires = 0.0
+        self._add_audit("lock_released", {"owner": owner})
+        return True
+
+    def is_locked(self) -> bool:
+        """Kilitli mi?"""
+        return self._lock_owner is not None and self._lock_expires > time.time()
+
+    def get_lock_info(self) -> Dict[str, Any]:
+        """Kilit bilgisi."""
+        return {
+            "locked": self.is_locked(),
+            "owner": self._lock_owner,
+            "expires_at": self._lock_expires,
+            "expires_iso": datetime.fromtimestamp(self._lock_expires, tz=timezone.utc).isoformat() if self._lock_expires else None,
+        }
+
+    # =====================================================
+    # ROLLBACK
+    # =====================================================
 
     def rollback(self, target_version: int = 0, actor: str = "api") -> Dict[str, Any]:
-        """Önceki versiyona geri dön."""
         if not self._history:
-            return {"success": False, "error": "No history available"}
+            return {"success": False, "error": "No history"}
 
         if target_version == 0:
-            # Bir önceki versiyona dön
             target = self._history[-1]
         else:
-            # Belirli versiyonu bul
             target = None
             for h in self._history:
                 if h.get("version") == target_version:
@@ -227,32 +364,74 @@ class AlertPolicy:
             if not target:
                 return {"success": False, "error": f"Version {target_version} not found"}
 
+        old_dict = copy.deepcopy(self.to_dict())
         self._save_history()
         self.escalation_timeouts = target.get("escalation_timeouts", dict(FALLBACK_ESCALATION_TIMEOUT_S))
         self.notification_routing = target.get("notification_routing", dict(FALLBACK_NOTIFICATION_ROUTING))
         self.severity_thresholds = target.get("severity_thresholds", dict(FALLBACK_SEVERITY_THRESHOLDS))
         self._version += 1
-        self._add_audit("rollback", {"actor": actor, "target_version": target_version})
+        diff = self._compute_diff(old_dict, self.to_dict())
+        self._add_audit("rollback", {"actor": actor, "target_version": target_version}, diff)
         self._save_to_file()
+        self._notify_change("rollback", diff)
 
-        return {"success": True, "version": self._version, "rolled_back_to": target.get("version", "?")}
-
-    def get_history(self) -> List[Dict[str, Any]]:
-        """Policy versiyon geçmişi."""
-        return self._history[-20:]
-
-    def get_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
-        """Audit log."""
-        return [e.to_dict() for e in self._audit_log[-limit:]]
+        return {"success": True, "version": self._version, "diff": diff.to_dict()}
 
     # =====================================================
-    # SILENCE MANAGEMENT (DB-backed)
+    # WEBHOOK NOTIFICATION
+    # =====================================================
+
+    def set_webhook_urls(self, urls: List[str]):
+        """Policy değişiklik webhook URL'leri."""
+        self._webhook_urls = urls
+
+    def _notify_change(self, action: str, diff: PolicyDiff):
+        """Policy değişikliği bildirimi."""
+        if not self._webhook_urls or not diff.has_changes:
+            return
+
+        payload = {
+            "event": "policy_change",
+            "action": action,
+            "version": self._version,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "diff": diff.to_dict(),
+        }
+
+        for url in self._webhook_urls:
+            try:
+                import aiohttp
+                import asyncio
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.ensure_future(self._send_webhook(url, payload))
+            except RuntimeError:
+                logger.info("No event loop for webhook notification")
+
+    async def _send_webhook(self, url: str, payload: Dict[str, Any]):
+        """Webhook gönder."""
+        try:
+            import aiohttp
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    url, json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status < 400:
+                        logger.info("Policy webhook sent", url=url, status=resp.status)
+                    else:
+                        logger.warning("Policy webhook failed", url=url, status=resp.status)
+        except Exception as e:
+            logger.warning("Policy webhook error", url=url, error=str(e))
+
+    # =====================================================
+    # SILENCE MANAGEMENT (DB-backed + batch)
     # =====================================================
 
     def add_silence(self, alert_type: str = None, fingerprint: str = None,
                     duration_s: float = 3600, reason: str = "",
                     created_by: str = "system", db=None) -> SilenceRule:
-        """Susturma ekle + DB persist + audit."""
         rule = SilenceRule(
             alert_type=alert_type, fingerprint=fingerprint,
             start_time=time.time(), end_time=time.time() + duration_s,
@@ -264,16 +443,86 @@ class AlertPolicy:
             "alert_type": alert_type, "fingerprint": fingerprint,
             "duration_s": duration_s, "reason": reason, "created_by": created_by,
         })
-
-        # DB persist
         if db:
             self._persist_silence_to_db(rule, db)
-
         return rule
+
+    def batch_add_silences(self, rules_config: List[Dict[str, Any]],
+                           created_by: str = "system", db=None) -> List[Dict[str, Any]]:
+        """Toplu susturma ekleme (transaction)."""
+        results = []
+        created_rules = []
+
+        for config in rules_config:
+            rule = SilenceRule(
+                alert_type=config.get("alert_type"),
+                fingerprint=config.get("fingerprint"),
+                start_time=time.time(),
+                end_time=time.time() + config.get("duration_s", 3600),
+                reason=config.get("reason", ""),
+                created_by=created_by,
+            )
+            created_rules.append(rule)
+            self.silence_rules.append(rule)
+            results.append({"success": True, "rule": rule.to_dict()})
+
+        # DB transaction
+        if db and created_rules:
+            try:
+                for rule in created_rules:
+                    self._persist_silence_to_db(rule, db)
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                # Rollback in-memory
+                for rule in created_rules:
+                    if rule in self.silence_rules:
+                        self.silence_rules.remove(rule)
+                results = [{"success": False, "error": str(e)} for _ in rules_config]
+
+        self._add_audit("batch_silence_add", {
+            "count": len(rules_config), "created_by": created_by,
+            "success_count": sum(1 for r in results if r.get("success")),
+        })
+        return results
+
+    def batch_remove_silences(self, filters: List[Dict[str, str]],
+                              actor: str = "api", db=None) -> Dict[str, int]:
+        """Toplu susturma kaldırma (transaction)."""
+        removed_count = 0
+        removed_rules = []
+
+        for f in filters:
+            fp = f.get("fingerprint")
+            at = f.get("alert_type")
+            to_remove = [
+                r for r in self.silence_rules
+                if (fp and r.fingerprint == fp) or (at and r.alert_type == at)
+            ]
+            for rule in to_remove:
+                self.silence_rules.remove(rule)
+                removed_rules.append(rule)
+                removed_count += 1
+
+        # DB transaction
+        if db and removed_rules:
+            try:
+                for rule in removed_rules:
+                    self._remove_silence_from_db(rule, db)
+                db.commit()
+            except Exception as e:
+                db.rollback()
+                # Restore in-memory
+                self.silence_rules.extend(removed_rules)
+                removed_count = 0
+
+        self._add_audit("batch_silence_remove", {
+            "filters": filters, "actor": actor, "removed_count": removed_count,
+        })
+        return {"removed": removed_count}
 
     def remove_silence(self, fingerprint: str = None, alert_type: str = None,
                        actor: str = "api", db=None) -> int:
-        """Susturma kaldır."""
         before = len(self.silence_rules)
         removed_rules = [r for r in self.silence_rules
                         if (fingerprint and r.fingerprint == fingerprint) or
@@ -286,8 +535,7 @@ class AlertPolicy:
         removed = before - len(self.silence_rules)
         if removed:
             self._add_audit("silence_remove", {
-                "fingerprint": fingerprint, "alert_type": alert_type,
-                "actor": actor, "removed_count": removed,
+                "fingerprint": fingerprint, "alert_type": alert_type, "actor": actor,
             })
             if db:
                 for rule in removed_rules:
@@ -303,11 +551,9 @@ class AlertPolicy:
         return [r.to_dict() for r in self.silence_rules if r.is_active]
 
     def load_silences_from_db(self, db):
-        """DB'den silence'ları yükle."""
         try:
             rows = db.execute(
-                "SELECT * FROM alert_silences WHERE end_time > ?",
-                (time.time(),)
+                "SELECT * FROM alert_silences WHERE end_time > ?", (time.time(),)
             ).fetchall()
             self.silence_rules = []
             for row in rows:
@@ -318,61 +564,52 @@ class AlertPolicy:
                     created_at=row["created_at"] or time.time(),
                 )
                 self.silence_rules.append(rule)
-            logger.info("Silences loaded from DB", count=len(self.silence_rules))
         except Exception as e:
             logger.warning("Silence DB load failed", error=str(e))
 
     def _persist_silence_to_db(self, rule: SilenceRule, db):
-        """Silence'ı DB'ye kaydet."""
         try:
             db.execute(
-                "INSERT INTO alert_silences "
+                "INSERT OR IGNORE INTO alert_silences "
                 "(alert_type, fingerprint, start_time, end_time, reason, created_by, created_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (rule.alert_type, rule.fingerprint, rule.start_time, rule.end_time,
                  rule.reason, rule.created_by, rule.created_at)
             )
-            db.commit()
         except Exception as e:
             logger.warning("Silence DB persist failed", error=str(e))
 
     def _remove_silence_from_db(self, rule: SilenceRule, db):
-        """Silence'ı DB'den sil."""
         try:
             if rule.fingerprint:
                 db.execute("DELETE FROM alert_silences WHERE fingerprint = ?", (rule.fingerprint,))
             elif rule.alert_type:
                 db.execute("DELETE FROM alert_silences WHERE alert_type = ?", (rule.alert_type,))
-            db.commit()
         except Exception as e:
             logger.warning("Silence DB remove failed", error=str(e))
 
     # =====================================================
-    # VALIDATION
+    # VALIDATION / QUERIES
     # =====================================================
 
     def validate(self) -> List[str]:
         errors = []
         for alert_type, timeout in self.escalation_timeouts.items():
             if not isinstance(timeout, (int, float)) or timeout < 0:
-                errors.append(f"Invalid escalation timeout for {alert_type}: {timeout}")
+                errors.append(f"Invalid timeout for {alert_type}: {timeout}")
             if timeout > 86400:
-                errors.append(f"Escalation timeout too long for {alert_type}: {timeout}s")
+                errors.append(f"Timeout too long for {alert_type}: {timeout}s")
         valid_channels = {"log", "webhook", "slack", "discord", "pagerduty", "email"}
         for severity, channels in self.notification_routing.items():
             if severity not in ("INFO", "WARNING", "CRITICAL"):
-                errors.append(f"Invalid severity in routing: {severity}")
+                errors.append(f"Invalid severity: {severity}")
             for ch in channels:
                 if ch not in valid_channels:
-                    errors.append(f"Invalid notification channel: {ch}")
+                    errors.append(f"Invalid channel: {ch}")
         return errors
 
-    # =====================================================
-    # QUERIES
-    # =====================================================
-
     def get_escalation_timeout(self, alert_type: str) -> Optional[int]:
-        return self.escalation_timeouts.get(str(alert_type) if not isinstance(alert_type, str) else alert_type)
+        return self.escalation_timeouts.get(alert_type)
 
     def get_notification_channels(self, severity: str) -> List[str]:
         return self.notification_routing.get(severity, ["log"])
@@ -380,14 +617,19 @@ class AlertPolicy:
     def get_threshold(self, key: str, default: float = 0.0) -> float:
         return self.severity_thresholds.get(key, default)
 
+    def get_history(self) -> List[Dict[str, Any]]:
+        return self._history[-20:]
+
+    def get_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+        return [e.to_dict() for e in self._audit_log[-limit:]]
+
     # =====================================================
     # INTERNAL
     # =====================================================
 
     def _save_history(self):
         self._history.append({
-            "version": self._version,
-            "timestamp": time.time(),
+            "version": self._version, "timestamp": time.time(),
             "escalation_timeouts": dict(self.escalation_timeouts),
             "notification_routing": dict(self.notification_routing),
             "severity_thresholds": dict(self.severity_thresholds),
@@ -395,11 +637,11 @@ class AlertPolicy:
         if len(self._history) > 50:
             self._history = self._history[-50:]
 
-    def _add_audit(self, action: str, details: Dict[str, Any]):
+    def _add_audit(self, action: str, details: Dict[str, Any], diff: PolicyDiff = None):
         entry = PolicyAuditEntry(
             timestamp=time.time(), action=action,
             version=self._version, actor=details.get("actor", "system"),
-            details=details,
+            details=details, diff=diff.to_dict() if diff else None,
         )
         self._audit_log.append(entry)
         if len(self._audit_log) > 500:
@@ -413,7 +655,7 @@ class AlertPolicy:
             with open(self._config_path, "w") as f:
                 json.dump(self.to_dict(), f, indent=2)
         except Exception as e:
-            logger.warning("Policy save to file failed", error=str(e))
+            logger.warning("Policy save failed", error=str(e))
 
     def _cleanup_expired_silences(self):
         self.silence_rules = [r for r in self.silence_rules if not r.is_expired]
@@ -447,4 +689,3 @@ def ensure_default_config(path: str = None):
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     with open(config_path, "w") as f:
         json.dump({"version": 1, **AlertPolicy().to_dict()}, f, indent=2)
-    logger.info("Default alert policy created", path=config_path)
