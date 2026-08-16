@@ -6,6 +6,7 @@ service can depend on without silently fabricating market state.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -37,8 +38,6 @@ class EvidenceRef:
         if not self.locator.strip():
             raise ValueError("locator must not be empty")
         if self.ingest_timestamp < self.source_timestamp:
-            # Ingest before publisher/source timestamp is normally impossible and must
-            # be explicitly resolved instead of silently accepted.
             raise ValueError("ingest_timestamp cannot be before source_timestamp")
 
 
@@ -85,6 +84,16 @@ class CanonicalEvent:
         if not self.evidence:
             raise ValueError("decision-relevant canonical events require evidence")
 
+        try:
+            canonical_payload = json.dumps(
+                self.payload,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+        except (TypeError, ValueError) as exc:
+            raise ValueError("canonical event payload must be JSON-serializable") from exc
+
         if not self.event_id:
             stable = "|".join(
                 [
@@ -93,7 +102,7 @@ class CanonicalEvent:
                     self.source_id,
                     self.source_timestamp.astimezone(timezone.utc).isoformat(),
                     ",".join(sorted(self.entities)),
-                    repr(sorted(self.payload.items(), key=lambda item: item[0])),
+                    canonical_payload,
                 ]
             )
             object.__setattr__(self, "event_id", sha256(stable.encode("utf-8")).hexdigest())
