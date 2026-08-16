@@ -35,9 +35,12 @@ def test_cli_status_bootstraps_all_v4_stores_in_fresh_database(tmp_path):
     payload = json.loads(result.stdout)
 
     assert payload["mode"] == "test"
+    assert payload["ready"] is True
     assert payload["event_count"] == 0
     assert payload["real_money_execution"] is False
     assert payload["audit_chain_valid"] is True
+    assert payload["checks"]["database"]["integrity"] == "ok"
+    assert payload["checks"]["source_registry"]["ok"] is True
     assert set(payload["stores"]) == {
         "raw_documents",
         "events",
@@ -48,6 +51,7 @@ def test_cli_status_bootstraps_all_v4_stores_in_fresh_database(tmp_path):
         "relations",
         "models",
         "research",
+        "jobs",
         "audit",
         "paper_ledger",
     }
@@ -136,6 +140,15 @@ def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_resta
         created_at=now,
         entry_id="audit-test-event",
     )
+    job = runtime.jobs.try_start(
+        job_name="restart-check",
+        owner_id="runtime-a",
+        idempotency_key="once",
+        started_at=now,
+        lease_for=timedelta(minutes=1),
+    )
+    assert job is not None
+    runtime.jobs.finish(job.run_id, status="SUCCEEDED", finished_at=now)
 
     restarted = AlphaRuntime(
         RuntimeConfig(mode=RuntimeMode.TEST, database_path=database)
@@ -143,3 +156,5 @@ def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_resta
     assert restarted.events.count() == 1
     assert restarted.audit.verify_chain().valid
     assert len(restarted.audit.entries()) == 1
+    assert restarted.jobs.get(job.run_id).status == "SUCCEEDED"
+    assert restarted.health()["ready"] is True
