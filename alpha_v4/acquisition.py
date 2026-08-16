@@ -101,7 +101,9 @@ class HttpFetcher:
             method="GET",
         )
         try:
-            with self._opener.open(request, timeout=self.config.timeout_seconds) as response:
+            with self._opener.open(
+                request, timeout=self.config.timeout_seconds
+            ) as response:
                 final_url = response.geturl()
                 if _origin(final_url) != self._allowed_origin:
                     raise SourceFetchError("response escaped configured source origin")
