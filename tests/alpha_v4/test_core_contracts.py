@@ -16,18 +16,18 @@ T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
 
 def _bar(**overrides):
-    base = dict(
-        ticker="TEST",
-        timestamp=T0,
-        open=100.0,
-        high=105.0,
-        low=99.0,
-        close=102.0,
-        volume=100_000.0,
-        source_id="provider-a",
-        observed_at=T0 + timedelta(minutes=1),
-        is_tradable=True,
-    )
+    base = {
+        "ticker": "TEST",
+        "timestamp": T0,
+        "open": 100.0,
+        "high": 105.0,
+        "low": 99.0,
+        "close": 102.0,
+        "volume": 100_000.0,
+        "source_id": "provider-a",
+        "observed_at": T0 + timedelta(minutes=1),
+        "is_tradable": True,
+    }
     base.update(overrides)
     return RawBar(**base)
 
@@ -40,16 +40,16 @@ def test_canonical_event_is_point_in_time_and_deterministic():
         locator="kap://disclosure/123",
         evidence_text="signed contract",
     )
-    kwargs = dict(
-        event_type="contract_award",
-        source_id="kap",
-        source_timestamp=T0,
-        ingest_timestamp=T0 + timedelta(minutes=2),
-        effective_timestamp=T0,
-        entities=("TEST",),
-        payload={"value": 1000, "currency": "TRY"},
-        evidence=(evidence,),
-    )
+    kwargs = {
+        "event_type": "contract_award",
+        "source_id": "kap",
+        "source_timestamp": T0,
+        "ingest_timestamp": T0 + timedelta(minutes=2),
+        "effective_timestamp": T0,
+        "entities": ("TEST",),
+        "payload": {"value": 1000, "currency": "TRY"},
+        "evidence": (evidence,),
+    }
     event_a = CanonicalEvent(**kwargs)
     event_b = CanonicalEvent(**kwargs)
 
