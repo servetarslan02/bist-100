@@ -16,17 +16,17 @@ T0 = datetime(2020, 1, 1, tzinfo=UTC)
 
 
 def test_dataset_manifest_id_is_reproducible_and_order_stable():
-    kwargs = dict(
-        universe_snapshot_id="universe-1",
-        feature_ids=("b@1", "a@1"),
-        label_ids=("y@1",),
-        start_time=T0,
-        end_time=T0 + timedelta(days=365),
-        code_commit="abc123",
-        source_manifest_hash="sourcehash",
-        mask_policy_version="1.0",
-        created_at=T0 + timedelta(days=400),
-    )
+    kwargs = {
+        "universe_snapshot_id": "universe-1",
+        "feature_ids": ("b@1", "a@1"),
+        "label_ids": ("y@1",),
+        "start_time": T0,
+        "end_time": T0 + timedelta(days=365),
+        "code_commit": "abc123",
+        "source_manifest_hash": "sourcehash",
+        "mask_policy_version": "1.0",
+        "created_at": T0 + timedelta(days=400),
+    }
     first = DatasetManifest(**kwargs)
     second = DatasetManifest(**{**kwargs, "feature_ids": ("a@1", "b@1")})
 
