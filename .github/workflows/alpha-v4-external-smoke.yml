@@ -7,8 +7,11 @@ on:
   push:
     branches: ["alpha-rebuild-v4"]
     paths:
+      - "alpha_v4/acquisition.py"
       - "alpha_v4/providers.py"
       - "alpha_v4/source_catalog.py"
+      - "alpha_v4/worker.py"
+      - "alpha_v4/__main__.py"
       - ".github/workflows/alpha-v4-external-smoke.yml"
 
 permissions:
@@ -38,50 +41,85 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Fetch, persist, hash and verify official source
+      - name: Run governed worker cycle against official source
         env:
           SOURCE_ID: ${{ matrix.source_id }}
           SURFACE: ${{ matrix.surface }}
+        shell: bash
         run: |
-          python - <<'PY'
+          set -euo pipefail
+          DB_PATH="/tmp/external-${SOURCE_ID}.sqlite3"
+          FIRST_JSON="/tmp/external-${SOURCE_ID}-first.json"
+          DUP_JSON="/tmp/external-${SOURCE_ID}-duplicate.json"
+          CYCLE_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${SOURCE_ID}-${SURFACE}"
+          rm -f "$DB_PATH" "$FIRST_JSON" "$DUP_JSON"
+
+          python -m alpha_v4 snapshot \
+            --mode test \
+            --db "$DB_PATH" \
+            --source "$SOURCE_ID" \
+            --surface "$SURFACE" \
+            --owner github-actions \
+            --cycle-key "$CYCLE_KEY" > "$FIRST_JSON"
+
+          python -m alpha_v4 snapshot \
+            --mode test \
+            --db "$DB_PATH" \
+            --source "$SOURCE_ID" \
+            --surface "$SURFACE" \
+            --owner github-actions-duplicate \
+            --cycle-key "$CYCLE_KEY" > "$DUP_JSON"
+
+          python - "$DB_PATH" "$FIRST_JSON" "$DUP_JSON" "$SOURCE_ID" <<'PY'
           import json
-          import os
-          import tempfile
+          import sys
           from pathlib import Path
 
-          from alpha_v4.providers import official_snapshot_provider
           from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode
 
-          source_id = os.environ["SOURCE_ID"]
-          surface = os.environ["SURFACE"]
-          with tempfile.TemporaryDirectory() as directory:
-              database = Path(directory) / "external-smoke.sqlite3"
-              runtime = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
-              provider = official_snapshot_provider(
-                  source_id,
-                  raw_store=runtime.raw_documents,
-                  source_history=runtime.source_registry,
+          database = Path(sys.argv[1])
+          first = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+          duplicate = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
+          source_id = sys.argv[4]
+
+          assert first["status"] == "SUCCEEDED"
+          assert first["run_id"]
+          assert first["document_id"]
+          assert first["body_sha256"]
+          assert first["byte_count"] > 100
+          assert duplicate["status"] == "SKIPPED"
+          assert duplicate["run_id"] is None
+
+          runtime = AlphaRuntime(
+              RuntimeConfig(mode=RuntimeMode.TEST, database_path=database)
+          )
+          document = runtime.raw_documents.get(first["document_id"])
+          assert document is not None
+          assert document.body_sha256 == first["body_sha256"]
+          assert len(document.body) == first["byte_count"]
+          assert runtime.jobs.get(first["run_id"]).status == "SUCCEEDED"
+          assert runtime.audit.verify_chain().valid
+          assert [entry.event_type for entry in runtime.audit.entries()] == [
+              "SOURCE_SNAPSHOT_COMPLETED"
+          ]
+          source = runtime.source_registry.get(source_id)
+          assert source.successful_observations == 1
+          assert source.failed_observations == 0
+          assert runtime.health()["ready"] is True
+
+          print(
+              json.dumps(
+                  {
+                      "source_id": source_id,
+                      "status_code": document.status_code,
+                      "bytes": len(document.body),
+                      "sha256": document.body_sha256,
+                      "url": document.url,
+                      "worker_run_id": first["run_id"],
+                      "duplicate_status": duplicate["status"],
+                      "audit_valid": True,
+                  },
+                  sort_keys=True,
               )
-              document = provider.snapshot(surface)
-              persisted = runtime.raw_documents.get(document.document_id)
-              assert persisted is not None
-              assert persisted.body == document.body
-              assert persisted.body_sha256 == document.body_sha256
-              assert document.status_code == 200
-              assert len(document.body) > 100
-              source = runtime.source_registry.get(source_id)
-              assert source.successful_observations == 1
-              print(
-                  json.dumps(
-                      {
-                          "source_id": source_id,
-                          "surface": surface,
-                          "status_code": document.status_code,
-                          "bytes": len(document.body),
-                          "sha256": document.body_sha256,
-                          "url": document.url,
-                      },
-                      sort_keys=True,
-                  )
-              )
+          )
           PY
