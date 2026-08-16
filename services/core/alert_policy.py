@@ -11,6 +11,7 @@ Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 - Audit log (her değişiklik)
 """
 
+import asyncio
 import json
 import os
 import time
@@ -39,6 +40,10 @@ FALLBACK_SEVERITY_THRESHOLDS = {
     "drawdown_warning_pct": 10.0, "drawdown_critical_pct": 15.0,
     "lock_timeout_spike_count": 3,
 }
+
+MAX_BATCH_SILENCE_SIZE = 100
+WEBHOOK_RETRY_COUNT = 3
+WEBHOOK_RETRY_DELAY_S = 1.0
 
 
 # =====================================================
@@ -309,15 +314,98 @@ class AlertPolicy:
 
         return diff
 
+    def three_way_diff(self, base_version: int, version_a: int, version_b: int) -> Dict[str, Any]:
+        """Üçlü karşılaştırma: base ile iki versiyon arasındaki farkları bul.
+
+        Returns:
+            {
+                "base_version": int,
+                "version_a": int,
+                "version_b": int,
+                "a_only": {field: value},    # Sadece A'da değişen
+                "b_only": {field: value},    # Sadece B'de değişen
+                "both_changed": {field: {"a": val, "b": val}},  # Her ikisinde değişen (conflict)
+                "identical": [field],         # Her ikisinde aynı değişen
+                "has_conflicts": bool,
+            }
+        """
+        base = self._get_history_version(base_version)
+        ver_a = self._get_history_version(version_a)
+        ver_b = self._get_history_version(version_b)
+
+        if not base or not ver_a or not ver_b:
+            return {"error": "One or more versions not found",
+                    "found": {"base": base is not None, "a": ver_a is not None, "b": ver_b is not None}}
+
+        diff_a = self._compute_diff(base, ver_a)
+        diff_b = self._compute_diff(base, ver_b)
+
+        # Metadata alanlarını hariç tut
+        skip_keys = {"version", "timestamp"}
+        a_changed = set(diff_a.changed_fields + diff_a.added_keys + diff_a.removed_keys) - skip_keys
+        b_changed = set(diff_b.changed_fields + diff_b.added_keys + diff_b.removed_keys) - skip_keys
+
+        a_only = {}
+        for f in a_changed - b_changed:
+            base_val = base.get(f)
+            a_val = ver_a.get(f)
+            a_only[f] = {"base": base_val, "a": a_val}
+
+        b_only = {}
+        for f in b_changed - a_changed:
+            base_val = base.get(f)
+            b_val = ver_b.get(f)
+            b_only[f] = {"base": base_val, "b": b_val}
+
+        both_changed = {}
+        identical = []
+        for f in a_changed & b_changed:
+            val_a = ver_a.get(f)
+            val_b = ver_b.get(f)
+            if val_a == val_b:
+                identical.append(f)
+            else:
+                both_changed[f] = {"base": base.get(f), "a": val_a, "b": val_b}
+
+        return {
+            "base_version": base_version,
+            "version_a": version_a,
+            "version_b": version_b,
+            "a_only": a_only,
+            "b_only": b_only,
+            "both_changed": both_changed,
+            "identical": identical,
+            "has_conflicts": len(both_changed) > 0,
+            "conflict_fields": list(both_changed.keys()),
+        }
+
+    def _get_history_version(self, version: int) -> Optional[Dict[str, Any]]:
+        """History'den belirli versiyonu getir."""
+        if version == self._version:
+            return self.to_dict()
+        for h in self._history:
+            if h.get("version") == version:
+                return h
+        return None
+
     # =====================================================
     # OPTIMISTIC LOCKING
     # =====================================================
 
     def acquire_edit_lock(self, owner: str, timeout_s: float = 30.0) -> bool:
-        """Policy düzenleme kilidi al."""
+        """Policy düzenleme kilidi al (auto-release expired locks)."""
         now = time.time()
-        if self._lock_owner and self._lock_owner != owner and self._lock_expires > now:
-            return False  # Başkası kilitli
+        if self._lock_owner and self._lock_owner != owner:
+            if self._lock_expires > now:
+                return False  # Başkası kilitli ve süresi dolmamış
+            # Süresi dolmuş kilit — otomatik temizle + audit
+            old_owner = self._lock_owner
+            self._lock_owner = None
+            self._lock_expires = 0.0
+            self._add_audit("lock_expired_recovery", {
+                "old_owner": old_owner, "new_owner": owner,
+                "expired_at": self._lock_expires,
+            })
         self._lock_owner = owner
         self._lock_expires = now + timeout_s
         self._add_audit("lock_acquired", {"owner": owner, "timeout_s": timeout_s})
@@ -400,30 +488,52 @@ class AlertPolicy:
 
         for url in self._webhook_urls:
             try:
-                import aiohttp
-                import asyncio
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
                     asyncio.ensure_future(self._send_webhook(url, payload))
+                else:
+                    # Event loop yoksa sync çalıştır
+                    loop.run_until_complete(self._send_webhook(url, payload))
             except RuntimeError:
-                logger.info("No event loop for webhook notification")
+                # Yeni event loop oluştur
+                try:
+                    loop = asyncio.new_event_loop()
+                    loop.run_until_complete(self._send_webhook(url, payload))
+                    loop.close()
+                except Exception:
+                    logger.warning("Webhook notification failed (no event loop)")
 
     async def _send_webhook(self, url: str, payload: Dict[str, Any]):
-        """Webhook gönder."""
-        try:
-            import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url, json=payload,
-                    headers={"Content-Type": "application/json"},
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status < 400:
-                        logger.info("Policy webhook sent", url=url, status=resp.status)
-                    else:
-                        logger.warning("Policy webhook failed", url=url, status=resp.status)
-        except Exception as e:
-            logger.warning("Policy webhook error", url=url, error=str(e))
+        """Webhook gönder (retry ile)."""
+        import aiohttp
+        last_error = None
+        for attempt in range(WEBHOOK_RETRY_COUNT):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        url, json=payload,
+                        headers={"Content-Type": "application/json"},
+                        timeout=aiohttp.ClientTimeout(total=10),
+                    ) as resp:
+                        if resp.status < 400:
+                            logger.info("Policy webhook sent", url=url, status=resp.status,
+                                       attempt=attempt + 1)
+                            return True
+                        else:
+                            last_error = f"HTTP {resp.status}"
+                            logger.warning("Policy webhook failed", url=url, status=resp.status,
+                                         attempt=attempt + 1)
+            except Exception as e:
+                last_error = str(e)
+                logger.warning("Policy webhook error", url=url, error=str(e),
+                             attempt=attempt + 1)
+
+            if attempt < WEBHOOK_RETRY_COUNT - 1:
+                await asyncio.sleep(WEBHOOK_RETRY_DELAY_S * (attempt + 1))
+
+        self._add_audit("webhook_failed", {"url": url, "error": last_error,
+                                           "attempts": WEBHOOK_RETRY_COUNT})
+        return False
 
     # =====================================================
     # SILENCE MANAGEMENT (DB-backed + batch)
@@ -449,7 +559,12 @@ class AlertPolicy:
 
     def batch_add_silences(self, rules_config: List[Dict[str, Any]],
                            created_by: str = "system", db=None) -> List[Dict[str, Any]]:
-        """Toplu susturma ekleme (transaction)."""
+        """Toplu susturma ekleme (transaction, batch limit ile)."""
+        # Batch size limit
+        if len(rules_config) > MAX_BATCH_SILENCE_SIZE:
+            return [{"success": False,
+                     "error": f"Batch size {len(rules_config)} exceeds limit {MAX_BATCH_SILENCE_SIZE}"}]
+
         results = []
         created_rules = []
 
