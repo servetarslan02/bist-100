@@ -36,9 +36,11 @@ jobs:
       - name: Run branch coverage
         run: coverage run --branch --source=alpha_v4 -m pytest -q tests/alpha_v4 --disable-warnings --maxfail=1
 
+      - name: Enforce measured coverage floor
+        run: coverage report --fail-under=85 -m
+
       - name: Report measured coverage
         run: |
-          coverage report -m
           coverage json -o coverage.json
           python - <<'PY'
           import json
