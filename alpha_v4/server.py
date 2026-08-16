@@ -19,7 +19,7 @@ class RuntimeHTTPServer(ThreadingHTTPServer):
 
 
 class RuntimeHealthHandler(BaseHTTPRequestHandler):
-    """Expose only operational health; no trading or broker endpoints exist here."""
+    """Expose operational health only; no trading or broker endpoints exist here."""
 
     server: RuntimeHTTPServer
 
@@ -32,8 +32,12 @@ class RuntimeHealthHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        if self.path == "/health":
-            self._write_json(200, self.server.runtime.health())
+        if self.path == "/health/live":
+            self._write_json(200, self.server.runtime.liveness())
+            return
+        if self.path in {"/health", "/health/ready"}:
+            payload = self.server.runtime.health()
+            self._write_json(200 if payload["ready"] else 503, payload)
             return
         self._write_json(404, {"error": "not_found"})
 
