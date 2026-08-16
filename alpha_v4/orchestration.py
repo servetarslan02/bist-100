@@ -56,7 +56,9 @@ class EvidenceEventIngestor:
         stored_event = self.runtime.events.get(event.event_id)
         if stored_event is not None:
             if stored_event != event:
-                raise IngestionConflictError(f"canonical event conflict: {event.event_id}")
+                raise IngestionConflictError(
+                    f"canonical event conflict: {event.event_id}"
+                )
             return EventIngestionOutcome(
                 raw_document_id=document.document_id,
                 event_id=event.event_id,
