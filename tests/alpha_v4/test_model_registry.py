@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import pytest
+
 from alpha_v4.artifacts import EvaluationArtifact, ModelArtifact, ModelLifecycle
 from alpha_v4.governance import GovernancePolicy
 from alpha_v4.model_registry import ModelRegistry
@@ -8,7 +10,7 @@ UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 
 
-def model():
+def model(*, lifecycle=ModelLifecycle.RESEARCH):
     return ModelArtifact(
         model_id="m1",
         model_type="baseline_ranker",
@@ -18,7 +20,7 @@ def model():
         hyperparameters={"direction": "higher"},
         random_seed=42,
         calibration_method=None,
-        lifecycle=ModelLifecycle.RESEARCH,
+        lifecycle=lifecycle,
         created_at=T0,
     )
 
@@ -42,6 +44,16 @@ def policy():
         required_metric_names=("rank_ic", "precision_at_k"),
         minimum_fold_count=3,
     )
+
+
+def test_registry_rejects_direct_non_research_entry_state(tmp_path):
+    registry = ModelRegistry(tmp_path / "models.sqlite3")
+
+    with pytest.raises(ValueError, match="enter the registry as RESEARCH"):
+        registry.register(model(lifecycle=ModelLifecycle.PAPER_ELIGIBLE))
+
+    with pytest.raises(KeyError):
+        registry.get("m1")
 
 
 def test_rejected_transition_is_recorded_but_does_not_change_lifecycle(tmp_path):
