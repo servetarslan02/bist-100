@@ -1,0 +1,224 @@
+{
+  "model_name": "LambdaRank_v3",
+  "model_version": "3.0.0",
+  "status": "CHAMPION",
+  "promotion_date": "2026-08-16 17:43:16",
+  "training": {
+    "period_start": "2020-01-02",
+    "period_end": "2023-12-29",
+    "total_days": 1002,
+    "train_window_days": 252,
+    "test_window_days": 21,
+    "purge_days": 5,
+    "folds": 35,
+    "features": 65,
+    "samples_per_fold_min": 76,
+    "samples_per_fold_max": 94
+  },
+  "oos_performance": {
+    "period": "2020-2023 (35 fold walk-forward)",
+    "gross_cagr_pct": 181.33,
+    "net_cagr_pct": 172.23,
+    "benchmark_cagr_pct": 55.56,
+    "net_alpha_pct": 116.67,
+    "sharpe": 2.75,
+    "sortino": null,
+    "max_drawdown_pct": -7.36,
+    "avg_turnover": 1.88,
+    "avg_transaction_cost_pct": 0.28,
+    "icir": 1.7,
+    "positive_ic_ratio": 0.943,
+    "avg_spread_pct": 10.95,
+    "win_rate_fold": 0.8
+  },
+  "quality_gate": {
+    "icir_check": {
+      "threshold": 0.5,
+      "actual": 1.7,
+      "pass": true
+    },
+    "positive_ic_check": {
+      "threshold": 0.7,
+      "actual": 0.943,
+      "pass": true
+    },
+    "spread_check": {
+      "threshold": 0,
+      "actual": 10.95,
+      "pass": true
+    },
+    "sharpe_check": {
+      "threshold": 1.0,
+      "actual": 2.75,
+      "pass": true
+    },
+    "max_dd_check": {
+      "threshold": -20.0,
+      "actual": -7.36,
+      "pass": true
+    },
+    "alpha_check": {
+      "threshold": 0,
+      "actual": 116.67,
+      "pass": true
+    },
+    "survivorship_check": {
+      "risk_level": "LOW",
+      "missing_tickers_per_fold": 0.0,
+      "pass": true
+    },
+    "leakage_check": {
+      "train_test_overlap": false,
+      "look_ahead": false,
+      "pass": true
+    }
+  },
+  "data": {
+    "universe": "BIST-100 constituents (historical)",
+    "total_tickers": 94,
+    "data_source": "Yahoo Finance",
+    "last_updated": "2023-12-29",
+    "hash": "011950d412becdb4"
+  },
+  "pending_validation": {
+    "2024_oos_test": {
+      "status": "PENDING",
+      "reason": "2024+ data not yet available in cache",
+      "required": true,
+      "note": "Champion will be re-evaluated when 2024+ data is added"
+    }
+  },
+  "champions": [
+    {
+      "model_name": "LambdaRank_v3",
+      "model_version": "3.0.0",
+      "status": "ACTIVE",
+      "promotion_date": "2026-08-16T17:47:19.534738",
+      "metrics": {
+        "model_name": "LambdaRank_v3",
+        "model_version": "3.0.0",
+        "gross_cagr_pct": 181.33,
+        "net_cagr_pct": 172.23,
+        "benchmark_cagr_pct": 55.56,
+        "net_alpha_pct": 116.67,
+        "sharpe": 2.75,
+        "sortino": null,
+        "max_drawdown_pct": -7.36,
+        "avg_turnover": 1.88,
+        "avg_transaction_cost_pct": 0.28,
+        "icir": 1.7,
+        "positive_ic_ratio": 0.943,
+        "avg_spread_pct": 10.95,
+        "win_rate_fold": 0.8,
+        "survivorship_risk": "LOW",
+        "missing_tickers_per_fold": 0.0,
+        "leakage_check_pass": true,
+        "train_period_start": "2020-01-02",
+        "train_period_end": "2023-12-29",
+        "oos_period": "2020-2023 (35 fold walk-forward)",
+        "folds": 35,
+        "features": 65
+      },
+      "quality_gate": {
+        "icir": {
+          "threshold": 0.5,
+          "actual": 1.7,
+          "pass": true
+        },
+        "positive_ic_ratio": {
+          "threshold": 0.7,
+          "actual": 0.943,
+          "pass": true
+        },
+        "spread": {
+          "threshold": 0.0,
+          "actual": 10.95,
+          "pass": true
+        },
+        "sharpe": {
+          "threshold": 1.0,
+          "actual": 2.75,
+          "pass": true
+        },
+        "max_drawdown": {
+          "threshold": -20.0,
+          "actual": -7.36,
+          "pass": true
+        },
+        "net_alpha": {
+          "threshold": 0.0,
+          "actual": 116.67,
+          "pass": true
+        },
+        "survivorship": {
+          "threshold": "MEDIUM",
+          "actual": "LOW",
+          "pass": true
+        },
+        "leakage": {
+          "threshold": true,
+          "actual": true,
+          "pass": true
+        }
+      }
+    }
+  ],
+  "pending_oos_tests": [
+    {
+      "id": "oos_2024_2026",
+      "name": "2024-2026 OOS Validation",
+      "status": "PENDING",
+      "reason": "2024+ data not yet available in cache",
+      "required": true,
+      "champion_model": "LambdaRank_v3",
+      "champion_version": "3.0.0",
+      "test_period": "2024-01-02 to present",
+      "minimum_fold": 12,
+      "criteria": {
+        "icir": 0.5,
+        "positive_ic_ratio": 0.7,
+        "spread": 0,
+        "sharpe": 1.0,
+        "max_drawdown": -20.0,
+        "net_alpha": 0
+      },
+      "note": "CRITICAL: Champion will be re-evaluated when 2024+ data is added. If Champion fails this OOS test, it will be demoted to RETIRED."
+    }
+  ],
+  "challenger_pipeline": {
+    "stages": [
+      {
+        "stage": 1,
+        "name": "TRAIN",
+        "description": "Model e\u011fitimi (train verisiyle)",
+        "gate": null
+      },
+      {
+        "stage": 2,
+        "name": "OOS_VALIDATION",
+        "description": "Walk-forward OOS test (min 35 fold)",
+        "gate": "QualityGate.evaluate()"
+      },
+      {
+        "stage": 3,
+        "name": "QUALITY_GATE",
+        "description": "T\u00fcm kriterlerden ge\u00e7me zorunlulu\u011fu",
+        "gate": "All criteria PASS"
+      },
+      {
+        "stage": 4,
+        "name": "SHADOW_TEST",
+        "description": "Champion ile paralel \u00e7al\u0131\u015ft\u0131rma (opsiyonel)",
+        "gate": "Shadow performance >= Champion"
+      },
+      {
+        "stage": 5,
+        "name": "PROMOTE",
+        "description": "Champion'a terfi",
+        "gate": "Registry.promote_challenger()"
+      }
+    ],
+    "current_stage": 5,
+    "next_challenger": null
+  }
+}
