@@ -8,10 +8,12 @@ There is no broker or real-money execution path in this module.
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
+from .artifacts import ModelLifecycle
 from .audit import AuditLedger
+from .model_registry import ModelRegistry
 from .paper_ledger import PaperLedger, PaperLedgerError
 from .risk import RiskAction, RiskDecision, RiskPolicy, RiskRequest, evaluate_risk
 
@@ -63,16 +65,29 @@ class PaperDecisionResult:
 
 
 class PaperEngine:
+    PAPER_ALLOWED_LIFECYCLES = frozenset(
+        {ModelLifecycle.PAPER_ELIGIBLE, ModelLifecycle.CHAMPION}
+    )
+
     def __init__(
         self,
         *,
         ledger: PaperLedger,
         audit: AuditLedger,
         risk_policy: RiskPolicy,
+        model_registry: ModelRegistry,
     ):
         self.ledger = ledger
         self.audit = audit
         self.risk_policy = risk_policy
+        self.model_registry = model_registry
+
+    def _model_status(self, model_id: str) -> tuple[ModelLifecycle | None, bool]:
+        try:
+            lifecycle = self.model_registry.current_lifecycle(model_id)
+        except KeyError:
+            return None, False
+        return lifecycle, lifecycle in self.PAPER_ALLOWED_LIFECYCLES
 
     def submit_buy(
         self,
@@ -81,6 +96,11 @@ class PaperEngine:
         event_time: datetime,
     ) -> PaperDecisionResult:
         """Evaluate and, only when allowed, record a simulated BUY fill."""
+        model_lifecycle, model_paper_eligible = self._model_status(request.model_id)
+        effective_model_integrity = (
+            request.risk_request.model_integrity_ok is True and model_paper_eligible
+        )
+
         self.audit.append(
             "DECISION_CREATED",
             {
@@ -89,6 +109,10 @@ class PaperEngine:
                 "instrument_id": request.instrument_id,
                 "ticker": request.ticker,
                 "model_id": request.model_id,
+                "model_lifecycle": (
+                    None if model_lifecycle is None else model_lifecycle.value
+                ),
+                "model_paper_eligible": model_paper_eligible,
                 "requested_notional": request.requested_notional,
                 "price": request.price,
                 "state_snapshot_ids": list(request.state_snapshot_ids),
@@ -98,7 +122,11 @@ class PaperEngine:
             created_at=event_time,
         )
 
-        risk = evaluate_risk(request.risk_request, self.risk_policy)
+        effective_risk_request = replace(
+            request.risk_request,
+            model_integrity_ok=effective_model_integrity,
+        )
+        risk = evaluate_risk(effective_risk_request, self.risk_policy)
         risk_decision_id = uuid.uuid4().hex
         self.audit.append(
             "RISK_DECISION",
