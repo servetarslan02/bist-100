@@ -32,7 +32,7 @@ def test_two_coordinators_cannot_run_same_job_concurrently(tmp_path):
     assert loser is None
 
 
-def test_expired_lease_can_be_recovered_by_another_worker(tmp_path):
+def test_expired_lease_can_be_recovered_and_old_run_is_finalized(tmp_path):
     database = tmp_path / "jobs.sqlite3"
     coordinator = JobCoordinator(database)
     first = coordinator.try_start(
@@ -42,17 +42,24 @@ def test_expired_lease_can_be_recovered_by_another_worker(tmp_path):
         started_at=T0,
         lease_for=timedelta(minutes=1),
     )
-    recovered = JobCoordinator(database).try_start(
+    assert first is not None
+
+    recovered_at = T0 + timedelta(minutes=2)
+    restarted = JobCoordinator(database)
+    recovered = restarted.try_start(
         job_name="market-refresh",
         owner_id="worker-b",
         idempotency_key="attempt-2",
-        started_at=T0 + timedelta(minutes=2),
+        started_at=recovered_at,
         lease_for=timedelta(minutes=1),
     )
 
-    assert first is not None
     assert recovered is not None
     assert recovered.owner_id == "worker-b"
+    expired = restarted.get(first.run_id)
+    assert expired.status == "EXPIRED"
+    assert expired.finished_at == recovered_at
+    assert restarted.get(recovered.run_id).status == "RUNNING"
 
 
 def test_idempotency_key_never_executes_twice_even_after_success(tmp_path):
