@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -57,6 +58,20 @@ class AlphaRuntime:
     storage engines may later split by measured workload without changing contracts.
     """
 
+    STORE_NAMES = (
+        "raw_documents",
+        "events",
+        "universe",
+        "market_data",
+        "states",
+        "features",
+        "relations",
+        "models",
+        "research",
+        "audit",
+        "paper_ledger",
+    )
+
     def __init__(
         self,
         config: RuntimeConfig,
@@ -94,24 +109,86 @@ class AlphaRuntime:
             raise DisabledSourceError(event.source_id)
         self.events.append(event)
 
+    def liveness(self) -> dict[str, object]:
+        """Report whether the runtime process itself is responsive."""
+        return {
+            "alive": True,
+            "mode": self.config.mode.value,
+            "real_money_execution": False,
+        }
+
+    def readiness(self) -> dict[str, object]:
+        """Fail closed when durable state or governance integrity is not usable."""
+        database_ok = False
+        database_integrity = "unavailable"
+        try:
+            with sqlite3.connect(self.config.database_path, timeout=2.0) as connection:
+                connection.execute("SELECT 1").fetchone()
+                row = connection.execute("PRAGMA quick_check(1)").fetchone()
+                database_integrity = "unknown" if row is None else str(row[0])
+                database_ok = database_integrity.lower() == "ok"
+        except sqlite3.Error as exc:
+            database_integrity = f"sqlite_error:{type(exc).__name__}"
+
+        try:
+            audit = self.audit.verify_chain()
+            audit_ok = audit.valid
+            audit_checked_entries = audit.checked_entries
+            audit_reason = audit.reason
+        except (sqlite3.Error, ValueError, TypeError) as exc:
+            audit_ok = False
+            audit_checked_entries = 0
+            audit_reason = f"audit_error:{type(exc).__name__}"
+
+        try:
+            registered_sources = len(self.source_registry.enabled_sources())
+            sources_ok = registered_sources > 0
+        except (sqlite3.Error, KeyError, TypeError) as exc:
+            registered_sources = 0
+            sources_ok = False
+            source_error = f"source_registry_error:{type(exc).__name__}"
+        else:
+            source_error = None
+
+        ready = database_ok and audit_ok and sources_ok
+        return {
+            "ready": ready,
+            "checks": {
+                "database": {
+                    "ok": database_ok,
+                    "integrity": database_integrity,
+                },
+                "audit_chain": {
+                    "ok": audit_ok,
+                    "checked_entries": audit_checked_entries,
+                    "reason": audit_reason,
+                },
+                "source_registry": {
+                    "ok": sources_ok,
+                    "registered_sources": registered_sources,
+                    "reason": source_error,
+                },
+            },
+        }
+
     def health(self) -> dict[str, object]:
+        readiness = self.readiness()
+        database_ok = bool(readiness["checks"]["database"]["ok"])
+        audit_ok = bool(readiness["checks"]["audit_chain"]["ok"])
+        stores = {
+            name: "ready" if database_ok else "unavailable" for name in self.STORE_NAMES
+        }
+        if not audit_ok:
+            stores["audit"] = "corrupt"
+
+        source_check = readiness["checks"]["source_registry"]
         return {
             "mode": self.config.mode.value,
-            "stores": {
-                "raw_documents": "ready",
-                "events": "ready",
-                "universe": "ready",
-                "market_data": "ready",
-                "states": "ready",
-                "features": "ready",
-                "relations": "ready",
-                "models": "ready",
-                "research": "ready",
-                "audit": "ready",
-                "paper_ledger": "ready",
-            },
-            "event_count": self.events.count(),
-            "registered_sources": len(self.source_registry.enabled_sources()),
-            "audit_chain_valid": self.audit.verify_chain().valid,
+            "ready": readiness["ready"],
+            "checks": readiness["checks"],
+            "stores": stores,
+            "event_count": self.events.count() if database_ok else None,
+            "registered_sources": source_check["registered_sources"],
+            "audit_chain_valid": audit_ok,
             "real_money_execution": False,
         }
