@@ -32,6 +32,7 @@ def test_cli_status_bootstraps_all_v4_stores_in_fresh_database(tmp_path):
     assert payload["mode"] == "test"
     assert payload["event_count"] == 0
     assert payload["real_money_execution"] is False
+    assert payload["audit_chain_valid"] is True
     assert set(payload["stores"]) == {
         "raw_documents",
         "events",
@@ -39,6 +40,10 @@ def test_cli_status_bootstraps_all_v4_stores_in_fresh_database(tmp_path):
         "market_data",
         "states",
         "features",
+        "relations",
+        "models",
+        "research",
+        "audit",
         "paper_ledger",
     }
     assert all(status == "ready" for status in payload["stores"].values())
@@ -118,7 +123,14 @@ def test_runtime_ingests_only_registered_enabled_source_and_recovers_after_resta
     runtime.ingest_event(event)
     assert runtime.events.count() == 1
     assert runtime.health()["registered_sources"] == 1
+    runtime.audit.append(
+        "TEST_EVENT",
+        {"event_id": event.event_id},
+        created_at=now,
+        entry_id="audit-test-event",
+    )
 
-    # Persistence is independent of the in-memory registry object.
     restarted = AlphaRuntime(RuntimeConfig(mode=RuntimeMode.TEST, database_path=database))
     assert restarted.events.count() == 1
+    assert restarted.audit.verify_chain().valid
+    assert len(restarted.audit.entries()) == 1
