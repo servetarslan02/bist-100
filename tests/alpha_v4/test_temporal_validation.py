@@ -52,26 +52,14 @@ def test_label_exactly_at_purge_cutoff_is_excluded_fail_closed():
         sample("test", 10, 12),
     ]
 
-    fold = build_temporal_fold(
-        samples,
-        fold_id="f1",
-        test_start=T0 + 10 * DAY,
-        test_end=T0 + 11 * DAY,
-        purge=2 * DAY,
-        embargo=DAY,
-    )
-
-    assert fold.train_ids == ()
-    # A fold with no train evidence is invalid rather than silently proceeding.
     with pytest.raises(ValueError, match="train and test"):
-        type(fold)(
-            fold_id=fold.fold_id,
-            train_ids=fold.train_ids,
-            test_ids=fold.test_ids,
-            purged_ids=fold.purged_ids,
-            embargoed_ids=fold.embargoed_ids,
-            test_start=fold.test_start,
-            test_end=fold.test_end,
+        build_temporal_fold(
+            samples,
+            fold_id="f1",
+            test_start=T0 + 10 * DAY,
+            test_end=T0 + 11 * DAY,
+            purge=2 * DAY,
+            embargo=DAY,
         )
 
 
