@@ -159,7 +159,7 @@ class OutcomeTracker:
                 entry = entry.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             return max(0, (now - entry).days)
-        except:
+        except Exception:
             return 0
 
     def get_pending_count(self) -> int:

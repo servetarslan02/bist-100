@@ -52,6 +52,12 @@ class MonitoringAuth:
                 "ALPHA_ADMIN_TOKEN", "alpha_admin_default_2026"
             )
 
+        # Default token uyarısı
+        if self._config.metrics_token == "alpha_metrics_default_2026":
+            logger.warning("⚠️ DEFAULT metrics token in use! Set ALPHA_METRICS_TOKEN environment variable.")
+        if self._config.admin_token == "alpha_admin_default_2026":
+            logger.warning("⚠️ DEFAULT admin token in use! Set ALPHA_ADMIN_TOKEN environment variable.")
+
     def verify_metrics_token(self, token: str) -> bool:
         """Metrics endpoint token doğrulama."""
         if not self._config.enabled:

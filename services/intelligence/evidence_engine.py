@@ -147,7 +147,7 @@ class EvidenceVerificationEngine:
                 # Çok eski timestamp şüpheli
                 if (now - ts).days > 30:
                     contradictions.append("Timestamp is more than 30 days old")
-            except:
+            except Exception:
                 timestamp_valid = False
 
         # 4. Cross-check

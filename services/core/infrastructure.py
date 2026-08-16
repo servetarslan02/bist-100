@@ -97,7 +97,7 @@ class CatalystEngine:
                         "importance": c.importance,
                         "expected_impact": c.expected_impact,
                     })
-            except:
+            except Exception:
                 pass
 
         return sorted(upcoming, key=lambda x: x["days_until"])

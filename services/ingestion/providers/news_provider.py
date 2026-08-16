@@ -184,7 +184,7 @@ class NewsProvider:
             feeds = config_manager.get("news.rss_feeds")
             if feeds:
                 return feeds
-        except:
+        except Exception:
             pass
 
         # Fallback: varsayılan feed'ler

@@ -80,7 +80,7 @@ class UniverseEnhancements:
                     return "DELISTED"
                 elif days_since > 5:
                     return "SUSPENDED"
-            except:
+            except Exception:
                 pass
 
         return "ACTIVE"

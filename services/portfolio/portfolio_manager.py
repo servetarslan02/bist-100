@@ -23,6 +23,13 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Memory safety limits
+MAX_TRADES = 10000
+MAX_CASH_LEDGER = 50000
+MAX_POSITION_HISTORY = 50000
+MAX_EQUITY_CURVE = 5000
+MAX_DAILY_PNL = 1000
+
 
 # ====================================================================
 # DATA CLASSES (v1.0 uyumlu + yeni扩展)
@@ -268,6 +275,12 @@ class CommissionModel:
 class PortfolioManager:
     """Kurumsal seviye portföy yöneticisi."""
 
+    @staticmethod
+    def _trim_list(lst: list, max_size: int):
+        """Liste boyutunu sınırla (eski kayıtları sil)."""
+        if len(lst) > max_size:
+            del lst[:len(lst) - max_size]
+
     def __init__(self, initial_capital: float = 100000.0):
         # v1.0 mevcut alanlar
         self._initial_capital = initial_capital
@@ -327,6 +340,7 @@ class PortfolioManager:
             reference_id=reference_id,
         )
         self._cash_ledger.append(entry)
+        self._trim_list(self._cash_ledger, MAX_CASH_LEDGER)
 
     def get_cash_ledger(self, limit: int = 100) -> List[Dict]:
         """Nakit hareket geçmişi."""
@@ -366,6 +380,7 @@ class PortfolioManager:
             reference_id=reference_id,
         )
         self._position_history.append(entry)
+        self._trim_list(self._position_history, MAX_POSITION_HISTORY)
 
     def get_position_history(self, ticker: str = "", limit: int = 100) -> List[Dict]:
         """Pozisyon değişiklik geçmişi."""
@@ -384,6 +399,7 @@ class PortfolioManager:
         )
 
         # v1.0 uyumlu equity curve
+        self._trim_list(self._equity_curve, MAX_EQUITY_CURVE)
         self._equity_curve.append({
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "equity": total_equity,
@@ -418,6 +434,7 @@ class PortfolioManager:
                 drawdown_from_hwm=dd_pct,
             )
             self._equity_snapshots.append(snapshot)
+            self._trim_list(self._equity_snapshots, MAX_EQUITY_CURVE)
             self._last_snapshot_date = today
 
             # Günlük sayaçları sıfırla
@@ -583,6 +600,7 @@ class PortfolioManager:
             realized_pnl=realized_pnl,
         )
         self._trades.append(trade)
+        self._trim_list(self._trades, MAX_TRADES)
 
         # Nakit güncelle
         net_revenue = revenue - commission
@@ -944,15 +962,35 @@ class PortfolioManager:
         total_equity = self._cash + market_value
         total_unrealized = sum(p.unrealized_pnl for p in self._positions.values())
 
+        # Bağımsız invariant doğrulama:
+        # 1. Cash negatif olamaz (margin trading yok)
+        # 2. Equity = cash + sum(qty * current_price) olmalı
+        # 3. Cost basis = sum(qty * entry_price + entry_commission)
+        # 4. Market value = sum(qty * current_price)
+        recomputed_mv = sum(p.quantity * p.current_price for p in self._positions.values())
+        recomputed_equity = self._cash + recomputed_mv
+        mv_diff = abs(market_value - recomputed_mv)
+        eq_diff = abs(total_equity - recomputed_equity)
+        cash_negative = self._cash < -0.01  # Margin yok, negatif cash hata
+        invariant_ok = mv_diff < 0.01 and eq_diff < 0.01 and not cash_negative
+
         return {
             "cash": round(self._cash, 2),
             "market_value": round(market_value, 2),
             "total_equity": round(total_equity, 2),
-            "invariant_check": abs(total_equity - (self._cash + market_value)) < 0.01,
+            "invariant_check": invariant_ok,
             "unrealized_pnl": round(total_unrealized, 2),
             "realized_pnl_total": round(self._realized_pnl_total, 2),
             "commission_total": round(self._commission_total, 2),
             "net_pnl": round(self._realized_pnl_total + total_unrealized - self._commission_total, 2),
+            "invariant_details": {
+                "cash": round(self._cash, 2),
+                "recomputed_mv": round(recomputed_mv, 2),
+                "recomputed_equity": round(recomputed_equity, 2),
+                "mv_diff": round(mv_diff, 4),
+                "eq_diff": round(eq_diff, 4),
+                "cash_negative": cash_negative,
+            },
             "return_on_equity_pct": round((total_equity / self._initial_capital - 1) * 100, 2),
             "high_water_mark": round(self._high_water_mark, 2),
             "drawdown_pct": round(self.get_drawdown() * 100, 4),
