@@ -67,6 +67,8 @@ class ModelRegistry:
             )
 
     def register(self, artifact: ModelArtifact) -> None:
+        if artifact.lifecycle is not ModelLifecycle.RESEARCH:
+            raise ValueError("new model artifacts must enter the registry as RESEARCH")
         try:
             hyperparameters_json = json.dumps(
                 artifact.hyperparameters,
