@@ -1,0 +1,771 @@
+BU TURDA YENİ ÖZELLİK EKLEME VE KODU GELİŞTİRMEYE ÇALIŞMA.
+
+Görevin mevcut ALPHA BIST sistemini CANLI VERİ ile uçtan uca test etmek ve sadece test sonucu üretmek değil, sistemin HER MODÜLÜNÜN TASARLANDIĞI MANTIKTA ÇALIŞIP ÇALIŞMADIĞINI doğrulamak.
+
+AMAÇ:
+Sistemin "çalışıyor" görünmesini değil, gerçekten doğru çalıştığını kanıtlamak.
+
+ÇOK ÖNEMLİ:
+Bir test PASS oldu diye modülün doğru çalıştığını varsayma.
+Her modül için:
+1. Girdi doğru mu?
+2. İşlem doğru mu?
+3. Çıktı doğru mu?
+4. Çıktı sonraki modüle doğru aktarılıyor mu?
+5. Finansal/istatistiksel anlamı doğru mu?
+6. Edge-case davranışı doğru mu?
+7. Hata durumunda fail-safe davranıyor mu?
+kontrol et.
+
+Kod değiştirmeden önce mevcut mimariyi ve SYSTEM VISION / ROADMAP / ARCHITECTURE belgelerini oku.
+
+==================================================
+1. CANLI VERİ TESTİ
+==================================================
+
+Mevcut gerçek veri kaynaklarını kullan.
+
+En az:
+- BIST hisse verileri
+- XU100
+- OHLCV
+- hacim
+- mümkün olan KAP/haber verisi
+- sektör bilgisi
+- mevcut fundamental veriler
+- mevcut cache/state
+
+kontrol edilecek.
+
+Her veri kaynağı için:
+
+- veri geliyor mu?
+- ticker doğru mu?
+- tarih doğru mu?
+- timezone doğru mu?
+- duplicate var mı?
+- missing data var mı?
+- stale data var mı?
+- OHLC mantıklı mı?
+- High >= Low mı?
+- Close High/Low aralığında mı?
+- Volume negatif mi?
+- geleceğe ait timestamp var mı?
+- veri kaynağı değişince sistem bunu fark ediyor mu?
+
+DATA QUALITY GATE gerçekten çalışıyor mu test et.
+
+Bozuk veri enjekte ederek de test et.
+
+Beklenen:
+BOZUK VERİ → WARNING/REJECT/NO_TRADE
+
+==================================================
+2. TIME / LOOK-AHEAD / DATA LEAKAGE
+==================================================
+
+Bu sistem için en kritik auditlerden biri.
+
+Her feature'ın hesaplandığı timestamp'i incele.
+
+Her signal üretildiği anda sistemin gelecekteki hiçbir bilgiyi kullanmadığını kanıtla.
+
+Özellikle:
+
+- future close
+- future return
+- future volume
+- future KAP
+- future fundamental
+- future normalization
+- future scaling
+- future calibration
+- future ranking
+- future model selection
+
+kontrol edilecek.
+
+Şu kuralı uygula:
+
+SIGNAL TIME = T
+
+kullanılan hiçbir veri T'den sonra olamaz.
+
+Bunu sadece kod inceleyerek değil, runtime audit ile de doğrula.
+
+Bir tane yapay future-data injection testi yap:
+
+Gelecek veriyi değiştir.
+
+Eğer T anındaki signal değişiyorsa:
+FAIL.
+
+==================================================
+3. MASK-FIRST / TRADABILITY
+==================================================
+
+Tradability mask gerçekten çalışıyor mu?
+
+Şunları test et:
+
+- missing price
+- stale price
+- zero volume
+- insufficient history
+- yeni halka arz
+- delisted ticker
+- invalid OHLC
+- extreme anomaly
+
+Bu hisseler:
+
+FEATURE → MODEL → SIGNAL → PORTFOLIO
+
+zincirine yanlışlıkla girebiliyor mu?
+
+Girmemeli.
+
+Beklenen:
+MASKED SECURITY → NO SIGNAL / NO TRADE
+
+==================================================
+4. FEATURE ENGINEERING AUDIT
+==================================================
+
+TÜM feature'ları tek tek kontrol et.
+
+Sadece exception vermemesine bakma.
+
+Her feature için:
+
+- matematiksel tanım doğru mu?
+- window doğru mu?
+- minimum sample doğru mu?
+- NaN handling doğru mu?
+- normalization doğru mu?
+- direction doğru mu?
+- feature'ın anlamı ile üretilen değer uyumlu mu?
+- future data kullanıyor mu?
+
+Özellikle:
+
+RSI
+MACD
+ATR
+ADX
+Bollinger
+ROC
+OBV
+MFI
+CMF
+VWAP
+momentum
+trend slope
+relative strength
+beta
+alpha
+sector-relative
+breadth
+fundamental
+KAP
+catalyst
+mean reversion
+seasonality
+
+kontrol edilecek.
+
+Sentetik küçük veri setleri oluşturup bilinen sonuçlarla karşılaştır.
+
+==================================================
+5. CROSS-SECTIONAL LOGIC
+==================================================
+
+Bir hisseyi sadece kendi geçmişine göre değil, evrene göre değerlendirdiğimizi doğrula.
+
+Test:
+
+Aynı tarih için:
+
+Ticker A
+Ticker B
+Ticker C
+
+oluştur.
+
+Rank, percentile, sector-relative ve market-relative değerlerin matematiksel olarak doğru olduğunu doğrula.
+
+Aynı veri farklı ticker sıralamasını bozuyorsa FAIL.
+
+==================================================
+6. REGIME DETECTOR
+==================================================
+
+Regime detector gerçekten piyasa rejimini tespit ediyor mu?
+
+BULL:
+- trend pozitif
+- breadth güçlü
+- volatility makul
+
+BEAR:
+- trend negatif
+- breadth zayıf
+
+SIDEWAYS:
+- trend düşük
+- range davranışı
+
+HIGH_VOL:
+- volatility belirgin yüksek
+
+Sentetik / kontrollü market state'leri oluştur ve detector'ın beklenen rejimi verdiğini test et.
+
+Ayrıca:
+Rejim değişince model/strategy davranışı gerçekten değişiyor mu?
+
+Sadece regime label üretmesi yeterli değil.
+
+==================================================
+7. KAP + LLM
+==================================================
+
+LLM extraction pipeline'ını test et.
+
+Bir KAP/haber örneği ver.
+
+Kontrol:
+
+RAW TEXT
+→ EVENT
+→ SENTIMENT
+→ IMPORTANCE
+→ NOVELTY
+→ TIME HORIZON
+→ COMPANY IMPACT
+→ SECTOR IMPACT
+→ FEATURE
+→ MODEL
+
+zinciri bozulmadan çalışıyor mu?
+
+LLM:
+- olmayan bilgiyi uyduruyor mu?
+- aynı haberi iki kere sayıyor mu?
+- eski haberi yeni sanıyor mu?
+- negatif/pozitif yönü ters yorumluyor mu?
+- event decay doğru mu?
+
+Aynı haber tekrar geldiğinde duplicate exposure oluşuyor mu?
+
+==================================================
+8. RANKING MODEL
+==================================================
+
+LambdaRank'in semantiğini doğrula.
+
+ÇOK ÖNEMLİ:
+
+Sistemde:
+HIGH QUALITY / HIGH EXPECTED RETURN
+=
+TOP RANK
+
+olmalı.
+
+Ama score yönünün hangi tarafta olduğunu açıkça tespit et.
+
+Şunları doğrula:
+
+FEATURE
+→ LABEL
+→ TRAIN
+→ PREDICTION
+→ NORMALIZATION
+→ SORT
+→ TOP-K
+
+zincirinde yön tersliği var mı?
+
+Sentetik veri oluştur:
+
+Açık şekilde:
+A > B > C
+
+olacak şekilde future return üret.
+
+Modelin:
+A'yı B'nin,
+B'yi C'nin
+üstüne koyduğunu doğrula.
+
+Eğer ters sıralarsa FAIL.
+
+==================================================
+9. WALK-FORWARD
+==================================================
+
+Her fold için:
+
+TRAIN
+PURGE
+EMBARGO
+TEST
+
+ayrımını doğrula.
+
+Kontrol:
+
+train_end < test_start
+
+ve hiçbir training feature/target'ın test dönemini görmediğini kanıtla.
+
+Fold'lar arasında state/calibration aktarımı varsa:
+
+SADECE izin verilen OOS bilgisi aktarılmalı.
+
+Gelecek fold'un bilgisi geçmiş fold'a sızmamalı.
+
+==================================================
+10. CALIBRATION
+==================================================
+
+Calibration:
+
+MODEL SCORE
+→ WIN PROBABILITY
+
+dönüşümünü doğrula.
+
+Calibration'ın:
+
+- training/OOS ayrımı
+- minimum sample
+- refit
+- cold start
+- historical trade usage
+
+mantığını kontrol et.
+
+Özellikle:
+
+Bir trade henüz gerçekleşmeden calibration onu kullanıyor mu?
+
+Kullanıyorsa FAIL.
+
+==================================================
+11. POSITION SIZING
+==================================================
+
+Kelly matematiğini yeniden hesapla.
+
+Örnek değerleri elle hesapla ve sistem sonucu ile karşılaştır.
+
+Kontrol:
+
+p
+q
+avg_win
+avg_loss
+b
+raw Kelly
+fractional Kelly
+volatility adjustment
+final weight
+
+tek tek doğrulanmalı.
+
+Şunlar kesinlikle olmamalı:
+
+- negative weight
+- NaN weight
+- infinite weight
+- > max position
+- risk limit aşımı
+- calibration yokken sahte Kelly
+
+Negative expectation:
+
+RAW KELLY <= 0
+→ NO TRADE
+
+olmalı.
+
+==================================================
+12. RISK ENGINE
+==================================================
+
+Risk Gate'i gerçek ve yapay senaryolarla test et.
+
+Test:
+
+- tek hisse max position
+- sektör concentration
+- portfolio volatility
+- max drawdown
+- daily loss
+- correlation
+- liquidity
+- turnover
+- kill switch
+
+Her birinde limit aşılınca:
+
+APPROVE edilmemeli.
+
+Özellikle:
+
+RISK FAILURE
+→ NO TRADE
+
+olmalı.
+
+Risk sistemini bypass eden hiçbir execution path olmamalı.
+
+==================================================
+13. PAPER EXECUTION
+==================================================
+
+Gerçek para/emir göndermek YASAK.
+
+Sadece simulation.
+
+Signal:
+
+→ Order
+→ execution price
+→ commission
+→ slippage
+→ spread
+→ fill
+→ position
+
+olarak ilerlemeli.
+
+Execution timing'i kontrol et.
+
+Signal kapanışta oluşuyorsa aynı kapanış fiyatından geleceği biliyormuş gibi işlem yapıp yapmadığını kontrol et.
+
+Impossible fill testleri yap.
+
+==================================================
+14. PORTFOLIO ACCOUNTING
+==================================================
+
+Muhasebeyi bağımsız olarak yeniden hesapla.
+
+Her işlem sonrası:
+
+cash
+positions
+market value
+realized P&L
+unrealized P&L
+equity
+
+kontrol et.
+
+Şu invariant her zaman doğru olmalı:
+
+EQUITY = CASH + MARKET VALUE OF POSITIONS
+
+Komisyon ve slippage muhasebesi doğru düşülmeli.
+
+Impossible money creation olmamalı.
+
+==================================================
+15. PERFORMANCE
+==================================================
+
+CAGR
+Sharpe
+Sortino
+MaxDD
+Calmar
+Win Rate
+Profit Factor
+Turnover
+Transaction Cost
+Alpha
+Beta
+IC
+ICIR
+
+hesaplarını bağımsız olarak doğrula.
+
+Küçük sentetik equity curve oluştur ve beklenen sonuçlarla karşılaştır.
+
+Özellikle:
+
+CAGR ≠ Total Return
+
+olduğunu doğrula.
+
+==================================================
+16. BENCHMARK
+==================================================
+
+XU100 benchmark:
+
+- doğru ticker
+- doğru tarih
+- doğru timezone
+- doğru return
+- compound return
+
+ile hesaplanıyor mu?
+
+Model ile benchmark aynı zaman aralığında karşılaştırılmalı.
+
+==================================================
+17. SURVIVORSHIP BIAS
+==================================================
+
+Bugünkü BIST 100 listesini geçmişe uygulamak yasak.
+
+Tarihsel evren kullanılmalı.
+
+Delisted / merged / newly listed securities için davranışı kontrol et.
+
+Geçmişte mevcut olmayan hisse geçmiş fold'a yanlışlıkla girmemeli.
+
+==================================================
+18. MODEL QUALITY GATE
+==================================================
+
+Quality Gate'i kasıtlı başarısız model ile test et.
+
+Kötü model:
+
+→ FAIL
+
+olmalı.
+
+FAIL model:
+
+→ Champion olamamalı.
+
+Challenger:
+
+→ Shadow
+
+→ Evaluate
+
+→ Promote / Reject
+
+sürecinden geçmeli.
+
+Aktif Champion'ın doğrudan üzerine yazılması yasak olmalı.
+
+==================================================
+19. SELF-LEARNING
+==================================================
+
+Self-learning mekanizmasını özellikle denetle.
+
+Sistem:
+
+- kendi OOS sonucunu kullanabilir
+- paper trading sonucunu kontrollü şekilde kullanabilir
+
+ama henüz gerçekleşmemiş sonucu öğrenemez.
+
+Ayrıca:
+
+MODEL PERFORMANCE ↓
+→ RETRAIN
+
+demeden önce:
+
+DRIFT
+REGIME
+DATA QUALITY
+EXECUTION
+COST
+SIGNAL QUALITY
+
+ayrıştırılmalı.
+
+Sistem kötü sonuç gördüğü her durumda körlemesine retrain olmamalı.
+
+==================================================
+20. FAILURE / CHAOS TEST
+==================================================
+
+Kasıtlı olarak şu hataları üret:
+
+- API unavailable
+- empty data
+- stale data
+- malformed OHLC
+- missing ticker
+- corrupted cache
+- model unavailable
+- calibration unavailable
+- invalid signal
+- NaN feature
+- extreme volatility
+- duplicate KAP
+- clock/timezone mismatch
+- database failure
+
+Beklenen davranış:
+
+SYSTEM CRASH + TRADE
+değil.
+
+FAIL-SAFE:
+NO TRADE
++ ALERT
++ AUDIT
+
+olmalı.
+
+==================================================
+21. END-TO-END LIVE PAPER TEST
+==================================================
+
+Son olarak gerçek piyasa verisiyle tam pipeline çalıştır:
+
+DATA
+→ QUALITY
+→ STATE
+→ FEATURES
+→ REGIME
+→ KAP/LLM
+→ CHAMPION
+→ RANKING
+→ CALIBRATION
+→ RISK
+→ POSITION SIZING
+→ PAPER EXECUTION
+→ PORTFOLIO
+→ PERFORMANCE
+→ AUDIT
+
+Her aşamanın input/output'unu kaydet.
+
+Bir işlem oluştuysa o işlemin tüm karar zincirini geriye doğru takip et.
+
+Örneğin:
+
+WHY THYAO?
+
+sorusuna sistem:
+
+DATA
+→ FEATURES
+→ REGIME
+→ MODEL SCORE
+→ RANK
+→ SIGNAL
+→ CALIBRATION
+→ RISK
+→ POSITION SIZE
+→ EXECUTION
+
+şeklinde eksiksiz cevap verebilmeli.
+
+==================================================
+22. TEST SONUCU FORMAT
+==================================================
+
+Bana sadece "test başarılı" deme.
+
+Şu formatta rapor ver:
+
+SYSTEM STATUS:
+PASS / CONDITIONAL PASS / FAIL
+
+MODULE AUDIT:
+
+Data ................ PASS/FAIL
+Data Quality ........ PASS/FAIL
+Tradability Mask .... PASS/FAIL
+Features ............ PASS/FAIL
+Cross Sectional .... PASS/FAIL
+Regime .............. PASS/FAIL
+KAP/LLM ............. PASS/FAIL
+Ranking ............. PASS/FAIL
+Walk Forward ........ PASS/FAIL
+Calibration ......... PASS/FAIL
+Position Sizing ..... PASS/FAIL
+Risk Gate ........... PASS/FAIL
+Execution ........... PASS/FAIL
+Portfolio ........... PASS/FAIL
+Performance ......... PASS/FAIL
+Benchmark ........... PASS/FAIL
+Survivorship ........ PASS/FAIL
+Quality Gate ........ PASS/FAIL
+Self Learning ....... PASS/FAIL
+Audit ................ PASS/FAIL
+Fail Safe ............ PASS/FAIL
+
+Her FAIL için:
+
+- ROOT CAUSE
+- EVIDENCE
+- SEVERITY: P0/P1/P2/P3
+- AFFECTED MODULE
+- RECOMMENDED FIX
+
+yaz.
+
+Ayrıca:
+
+CRITICAL BUGS
+LOGIC BUGS
+FINANCIAL MATH BUGS
+DATA BUGS
+LEAKAGE RISKS
+SECURITY/SAFETY BUGS
+PERFORMANCE ISSUES
+MISSING FEATURES
+
+olarak ayrı liste çıkar.
+
+==================================================
+23. EN ÖNEMLİ KURAL
+==================================================
+
+TEST SIRASINDA BULDUĞUN HATALARI "çalışıyor gibi görünüyor" diye geçme.
+
+Özellikle:
+
+- yanlış matematik
+- ters ranking
+- leakage
+- yanlış timestamp
+- yanlış position sizing
+- yanlış portfolio accounting
+- yanlış CAGR
+- yanlış benchmark
+- risk bypass
+- fail-open davranışı
+
+tespit edilirse TEST FAILED kabul et.
+
+Kod değiştirmek yerine önce problemi kesin olarak kanıtla.
+
+Her düzeltmeden sonra ilgili testi yeniden çalıştır.
+
+Tüm testler geçmeden:
+
+"PRODUCTION READY"
+veya
+"FULLY AUTONOMOUS"
+
+deme.
+
+Sonunda bana şu üç şeyi ayrıca söyle:
+
+1. Şu anda gerçekten doğru çalışan sistem parçaları
+2. Hâlâ güvenemeyeceğimiz parçalar
+3. Sistemi yıllarca paper trading'e bırakmadan önce kesinlikle çözülmesi gereken P0/P1 problemler
+
+AMAÇ:
+Sistemi övmek değil.
+Sistemin kendisini kandırıp kandırmadığını bulmak.
+
+Bu bir FEATURE DEVELOPMENT turu değil.
+
+BU BİR FULL SYSTEM FORENSIC AUDIT + LIVE DATA VALIDATION + LOGIC VERIFICATION TURUDUR.
