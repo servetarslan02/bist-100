@@ -1,6 +1,7 @@
 """ALPHA BIST - Social Media Data Provider"""
 
-import requests
+import structlog
+from ...core.async_http import get_client
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import structlog
@@ -11,11 +12,11 @@ logger = structlog.get_logger()
 class SocialProvider:
     """Fetches social media data for sentiment analysis."""
 
-    def __init__(self, x_api_key: Optional[str] = None):
+    async def __init__(self, x_api_key: Optional[str] = None):
         self.x_api_key = x_api_key
-        self.session = requests.Session()
+        self._client = get_client("social", timeout=15.0, max_retries=2)
 
-    def fetch_x_mentions(self, query: str = "$BIST OR $BIST100 OR borsa istanbul",
+    async def fetch_x_mentions(self, query: str = "$BIST OR $BIST100 OR borsa istanbul",
                          max_results: int = 50) -> List[Dict[str, Any]]:
         """Fetch mentions from X (Twitter) API v2."""
         if not self.x_api_key:
@@ -34,7 +35,7 @@ class SocialProvider:
         try:
             resp = self.session.get(url, headers=headers, params=params, timeout=30)
             resp.raise_for_status()
-            data = resp.json()
+            data = resp
 
             tweets = []
             for item in data.get("data", []):
@@ -70,14 +71,14 @@ class SocialProvider:
             logger.error("X API request failed", error=str(e))
             return []
 
-    def fetch_stocktwits(self, ticker: str) -> List[Dict[str, Any]]:
+    async def fetch_stocktwits(self, ticker: str) -> List[Dict[str, Any]]:
         """Fetch mentions from StockTwits API."""
         url = f"https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
 
         try:
-            resp = self.session.get(url, timeout=30)
+            resp = await self._client.get_json(url)
             resp.raise_for_status()
-            data = resp.json()
+            data = resp
 
             messages = []
             for item in data.get("messages", []):
@@ -100,7 +101,7 @@ class SocialProvider:
             logger.warning("StockTwits request failed", ticker=ticker, error=str(e))
             return []
 
-    def _basic_sentiment(self, text: str) -> float:
+    async def _basic_sentiment(self, text: str) -> float:
         """Basic Turkish/English sentiment analysis."""
         text = text.lower()
 

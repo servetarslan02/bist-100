@@ -1,6 +1,7 @@
 """ALPHA BIST - TCMB EVDS (Electronic Data Distribution System) Provider"""
 
-import requests
+import structlog
+from ...core.async_http import get_client
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
 import structlog
@@ -29,11 +30,11 @@ class TCMBProvider:
         "bist_100": "TP.TUFE1YI1",
     }
 
-    def __init__(self, api_key: Optional[str] = None):
+    async def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
-        self.session = requests.Session()
+        self._client = get_client("tcmb", timeout=30.0, max_retries=3)
 
-    def _make_request(self, series_code: str, start_date: str, end_date: str) -> Optional[List[Dict]]:
+    async def _make_request(self, series_code: str, start_date: str, end_date: str) -> Optional[List[Dict]]:
         """Make a request to TCMB EVDS API."""
         if not self.api_key:
             logger.warning("TCMB EVDS API key not configured")
@@ -42,9 +43,9 @@ class TCMBProvider:
         url = f"{TCMB_BASE_URL}/series={series_code}&startDate={start_date}&endDate={end_date}&type=json&key={self.api_key}"
 
         try:
-            resp = self.session.get(url, timeout=30)
+            resp = await self._client.get_json(url)
             resp.raise_for_status()
-            data = resp.json()
+            data = resp
 
             items = data.get("items", [])
             logger.info("TCMB data fetched", series=series_code, count=len(items))
@@ -54,25 +55,25 @@ class TCMBProvider:
             logger.error("TCMB EVDS request failed", series=series_code, error=str(e))
             return None
 
-    def fetch_usd_try(self, days: int = 30) -> Optional[List[Dict]]:
+    async def fetch_usd_try(self, days: int = 30) -> Optional[List[Dict]]:
         """Fetch USD/TRY exchange rate."""
         end_date = datetime.now().strftime("%d-%m-%Y")
         start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
         return self._make_request(self.SERIES["usd_try"], start_date, end_date)
 
-    def fetch_policy_rate(self, days: int = 365) -> Optional[List[Dict]]:
+    async def fetch_policy_rate(self, days: int = 365) -> Optional[List[Dict]]:
         """Fetch CBRT policy rate."""
         end_date = datetime.now().strftime("%d-%m-%Y")
         start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
         return self._make_request(self.SERIES["policy_rate"], start_date, end_date)
 
-    def fetch_inflation(self, days: int = 365) -> Optional[List[Dict]]:
+    async def fetch_inflation(self, days: int = 365) -> Optional[List[Dict]]:
         """Fetch CPI data."""
         end_date = datetime.now().strftime("%d-%m-%Y")
         start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
         return self._make_request(self.SERIES["cpi"], start_date, end_date)
 
-    def fetch_all_macro(self) -> Dict[str, Any]:
+    async def fetch_all_macro(self) -> Dict[str, Any]:
         """Fetch all key macro indicators."""
         result = {}
 

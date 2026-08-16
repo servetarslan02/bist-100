@@ -1,0 +1,60 @@
+{
+  "app": {
+    "env": "development",
+    "debug": true,
+    "host": "0.0.0.0",
+    "port": 8000
+  },
+  "portfolio": {
+    "initial_capital": 100000,
+    "max_position_pct": 0.10,
+    "max_sector_concentration": 0.30,
+    "max_drawdown_pct": 15.0,
+    "daily_loss_limit_pct": 5.0,
+    "commission": {
+      "broker_rate": 0.0003,
+      "exchange_rate": 0.000056,
+      "bsmv_rate": 0.05,
+      "min_commission": 1.0
+    }
+  },
+  "risk": {
+    "max_position_pct": 10,
+    "max_sector_pct": 30,
+    "max_drawdown_pct": 15,
+    "daily_loss_limit_pct": 5,
+    "target_volatility": 0.15,
+    "kelly_fraction": 0.5
+  },
+  "data": {
+    "cache_dir": "data/cache",
+    "cache_ttl_hours": 24,
+    "yfinance_interval": "1d",
+    "yfinance_period": "2y"
+  },
+  "features": {
+    "rsi_period": 14,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9,
+    "bb_period": 20,
+    "bb_std": 2.0,
+    "atr_period": 14,
+    "adx_period": 14,
+    "obv_enabled": true,
+    "mfi_period": 14,
+    "cmf_period": 20
+  },
+  "monitoring": {
+    "metrics_token_env": "ALPHA_METRICS_TOKEN",
+    "admin_token_env": "ALPHA_ADMIN_TOKEN",
+    "health_check_interval_s": 60,
+    "lock_timeout_s": 300,
+    "lock_heartbeat_s": 100
+  },
+  "bist": {
+    "universe_refresh_hours": 24,
+    "index_tickers": ["XU100", "XU030", "XU050"],
+    "default_sector": "OTHER"
+  }
+}

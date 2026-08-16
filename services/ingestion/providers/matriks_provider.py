@@ -7,7 +7,8 @@ Güvenilirlik: 8/10
 Kullanım: İkinci doğrulama kaynağı, cross-validation
 """
 
-import requests
+import structlog
+from ...core.async_http import get_client
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import structlog
@@ -20,20 +21,21 @@ class MatriksProvider:
 
     BASE_URL = "https://www.matriks.com"
 
-    def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({
+    async def __init__(self):
+        self._client = get_client("matriks", timeout=15.0, max_retries=3)
+        # Headers set in client config
+        pass  #
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
         })
 
-    def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Tek hisse fiyatı (15dk gecikmeli)."""
         try:
             url = f"{self.BASE_URL}/api/stock/{ticker}"
-            resp = self.session.get(url, timeout=10)
+            resp = await self._client.get_json(url)
 
-            if resp.status_code == 200:
-                data = resp.json()
+            if resp is not None:
+                data = resp
                 return {
                     "ticker": ticker,
                     "price": data.get("last", 0),
@@ -50,7 +52,7 @@ class MatriksProvider:
             logger.warning("Matriks fetch failed", ticker=ticker, error=str(e))
             return None
 
-    def fetch_batch(self, tickers: List[str]) -> Dict[str, Dict]:
+    async def fetch_batch(self, tickers: List[str]) -> Dict[str, Dict]:
         """Toplu fiyat çekme."""
         results = {}
         for ticker in tickers:

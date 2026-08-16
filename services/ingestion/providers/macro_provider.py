@@ -5,7 +5,8 @@ Kaynaklar: FRED, ECB, TCMB, Yahoo Finance
 Kullanım: Dünya piyasaları, makro veriler
 """
 
-import requests
+import structlog
+from ...core.async_http import get_client
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import structlog
@@ -40,10 +41,10 @@ class MacroProvider:
         "US_2Y_YIELD": "DGS2",
     }
 
-    def __init__(self):
-        self.session = requests.Session()
+    async def __init__(self):
+        self._client = get_client("macro", timeout=15.0, max_retries=3)
 
-    def fetch_yahoo_macro(self) -> Dict[str, Any]:
+    async def fetch_yahoo_macro(self) -> Dict[str, Any]:
         """Yahoo Finance makro verileri."""
         import yfinance as yf
 
@@ -63,7 +64,7 @@ class MacroProvider:
 
         return results
 
-    def fetch_fred_data(self, api_key: Optional[str] = None) -> Dict[str, Any]:
+    async def fetch_fred_data(self, api_key: Optional[str] = None) -> Dict[str, Any]:
         """FRED makro verileri."""
         if not api_key:
             logger.debug("FRED API key not configured")
@@ -81,8 +82,8 @@ class MacroProvider:
                     "limit": 5,
                 }
                 resp = self.session.get(url, params=params, timeout=10)
-                if resp.status_code == 200:
-                    data = resp.json()
+                if resp is not None:
+                    data = resp
                     observations = data.get("observations", [])
                     if observations:
                         latest = observations[0]
@@ -96,7 +97,7 @@ class MacroProvider:
 
         return results
 
-    def fetch_ecb_data(self) -> Dict[str, Any]:
+    async def fetch_ecb_data(self) -> Dict[str, Any]:
         """ECB makro verileri."""
         results = {}
 
@@ -105,8 +106,8 @@ class MacroProvider:
             url = "https://data-api.ecb.europa.eu/service/data/EXR/D.USD.EUR.SP00.A"
             params = {"lastNObservations": 1, "format": "jsondata"}
             resp = self.session.get(url, params=params, timeout=10)
-            if resp.status_code == 200:
-                data = resp.json()
+            if resp is not None:
+                data = resp
                 results["EURUSD"] = {
                     "value": data.get("dataSets", [{}])[0].get("series", {}).get("0:0:0:0:0", {}).get("observations", {}).get("0", [{}])[0],
                     "source": "ecb",
@@ -116,7 +117,7 @@ class MacroProvider:
 
         return results
 
-    def fetch_all(self) -> Dict[str, Any]:
+    async def fetch_all(self) -> Dict[str, Any]:
         """Tüm makro verileri çek."""
         results = {}
 

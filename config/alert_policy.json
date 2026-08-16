@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "escalation_timeouts": {
+    "health_change": 300,
+    "invariant_failure": 60,
+    "lock_deadlock": 120,
+    "lock_timeout_spike": 300,
+    "cash_negative": 30,
+    "drawdown_breach": 180
+  },
+  "notification_routing": {
+    "INFO": ["log"],
+    "WARNING": ["log", "webhook"],
+    "CRITICAL": ["log", "webhook", "slack", "discord", "pagerduty", "email"]
+  },
+  "severity_thresholds": {
+    "drawdown_warning_pct": 10.0,
+    "drawdown_critical_pct": 15.0,
+    "lock_timeout_spike_count": 3
+  }
+}
