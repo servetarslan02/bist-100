@@ -75,6 +75,28 @@ class PersistentSourceRegistry:
                 ),
             )
 
+    def register_if_missing(self, record: SourceRecord) -> bool:
+        """Register once; never overwrite measured/history-bearing source metadata silently."""
+        try:
+            existing = self.get(record.source_id)
+        except KeyError:
+            self.register(record)
+            return True
+
+        immutable_fields_match = (
+            existing.kind == record.kind
+            and existing.owner == record.owner
+            and existing.access_method == record.access_method
+            and existing.timezone_name == record.timezone_name
+            and existing.freshness_limit == record.freshness_limit
+            and existing.enabled == record.enabled
+        )
+        if not immutable_fields_match:
+            raise ValueError(
+                f"source seed conflicts with existing definition: {record.source_id}"
+            )
+        return False
+
     def record_observation(
         self,
         source_id: str,
@@ -86,7 +108,6 @@ class PersistentSourceRegistry:
         normalized = outcome.upper()
         if normalized not in {"SUCCESS", "FAILURE", "CONTRADICTION"}:
             raise ValueError("outcome must be SUCCESS, FAILURE or CONTRADICTION")
-        # Explicit existence check gives a clearer error than a DB-specific FK setting.
         self.get(source_id)
         with self._connect() as connection:
             connection.execute(
