@@ -5,8 +5,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 
 from alpha_v4.acquisition import HttpFetcher, HttpSourceConfig
+from alpha_v4.artifacts import EvaluationArtifact, ModelArtifact, ModelLifecycle
 from alpha_v4.contracts import RawBar
 from alpha_v4.features import compute_log_return_feature
+from alpha_v4.governance import GovernancePolicy
 from alpha_v4.llm_gateway import EventExtraction
 from alpha_v4.orchestration import EvidenceEventIngestor
 from alpha_v4.paper_engine import PaperDecisionRequest, PaperEngine
@@ -17,6 +19,7 @@ from alpha_v4.state import StateSnapshot
 UTC = timezone.utc
 T0 = datetime(2026, 8, 16, 9, 0, tzinfo=UTC)
 BODY = b"TEST company contract value 1000000 TRY was announced."
+MODEL_ID = "research-baseline"
 
 
 class _DisclosureHandler(BaseHTTPRequestHandler):
@@ -33,6 +36,55 @@ class _DisclosureHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         return
+
+
+def _promote_model_for_paper(runtime: AlphaRuntime) -> None:
+    runtime.models.register(
+        ModelArtifact(
+            model_id=MODEL_ID,
+            model_type="baseline_ranker",
+            horizon="1D",
+            dataset_manifest_id="e2e-dataset",
+            code_commit="e2e-research-commit",
+            hyperparameters={"feature": "log_return_1b"},
+            random_seed=17,
+            calibration_method=None,
+            lifecycle=ModelLifecycle.RESEARCH,
+            created_at=T0,
+        )
+    )
+    runtime.models.add_evaluation(
+        "e2e-evaluation",
+        EvaluationArtifact(
+            model_id=MODEL_ID,
+            dataset_manifest_id="e2e-dataset",
+            evaluator_code_commit="e2e-validator-commit",
+            fold_ids=("fold-1", "fold-2", "fold-3"),
+            metrics={"rank_ic": 0.04},
+            cost_assumptions={"commission_bps": 10.0},
+            independently_recomputed=True,
+            created_at=T0,
+        ),
+    )
+    governance = GovernancePolicy(
+        policy_version="e2e-governance",
+        required_metric_names=("rank_ic",),
+        minimum_fold_count=3,
+    )
+    for target in (
+        ModelLifecycle.VALIDATED,
+        ModelLifecycle.SHADOW,
+        ModelLifecycle.CHALLENGER,
+        ModelLifecycle.PAPER_ELIGIBLE,
+    ):
+        decision = runtime.models.request_transition(
+            MODEL_ID,
+            target,
+            requested_at=T0,
+            policy=governance,
+            evaluation_id="e2e-evaluation",
+        )
+        assert decision.approved
 
 
 def test_full_research_to_simulation_chain_survives_restart(tmp_path):
@@ -144,11 +196,15 @@ def test_full_research_to_simulation_chain_survives_restart(tmp_path):
     assert feature.status == "VALID"
     assert feature.value == pytest.approx(0.0295588022)
 
+    _promote_model_for_paper(runtime)
+    assert runtime.models.current_lifecycle(MODEL_ID) is ModelLifecycle.PAPER_ELIGIBLE
+
     account_id = "paper-research"
     runtime.paper.deposit(account_id, 100_000.0, event_time=decision_time)
     engine = PaperEngine(
         ledger=runtime.paper,
         audit=runtime.audit,
+        model_registry=runtime.models,
         risk_policy=RiskPolicy(
             policy_version="e2e-1",
             max_position_fraction=0.10,
@@ -163,7 +219,7 @@ def test_full_research_to_simulation_chain_survives_restart(tmp_path):
             account_id=account_id,
             instrument_id="instrument-test",
             ticker="TEST",
-            model_id="research-baseline",
+            model_id=MODEL_ID,
             price=103.0,
             requested_notional=5_000.0,
             commission_bps=10.0,
@@ -196,6 +252,7 @@ def test_full_research_to_simulation_chain_survives_restart(tmp_path):
     assert restarted.health()["ready"] is True
     assert restarted.events.count() == 1
     assert restarted.audit.verify_chain().valid
+    assert restarted.models.current_lifecycle(MODEL_ID) is ModelLifecycle.PAPER_ELIGIBLE
     assert restarted.states.as_of("CompanyState", "TEST", decision_time) == state
     restored_feature = restarted.features.as_of(
         "instrument-test", feature.feature_id, decision_time
