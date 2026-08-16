@@ -1,0 +1,209 @@
+name: ALPHA v4 Container Live Smoke
+
+on:
+  push:
+    branches: ["alpha-rebuild-v4"]
+    paths:
+      - "alpha_v4/**"
+      - "infrastructure/Dockerfile.v4"
+      - ".dockerignore"
+      - ".github/workflows/alpha-v4-container.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "alpha_v4/**"
+      - "infrastructure/Dockerfile.v4"
+      - ".dockerignore"
+      - ".github/workflows/alpha-v4-container.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  container-live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build minimal V4 image
+        run: docker build --pull -f infrastructure/Dockerfile.v4 -t alpha-v4:smoke .
+
+      - name: Verify image runs as non-root
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_USER="$(docker image inspect alpha-v4:smoke --format '{{.Config.User}}')"
+          test "$IMAGE_USER" = "10001:10001"
+
+      - name: Start hardened container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker volume create alpha-v4-smoke-data >/dev/null
+          docker run -d \
+            --name alpha-v4-smoke \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            -p 127.0.0.1:8765:8765 \
+            -v alpha-v4-smoke-data:/data \
+            alpha-v4:smoke >/dev/null
+
+      - name: Wait for real container readiness
+        shell: bash
+        run: |
+          set -euo pipefail
+          READY=0
+          for _ in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:8765/health/ready > /tmp/container-health.json; then
+              READY=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [[ "$READY" -ne 1 ]]; then
+            docker logs alpha-v4-smoke
+            exit 1
+          fi
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path('/tmp/container-health.json').read_text(encoding='utf-8'))
+          assert payload['ready'] is True
+          assert payload['mode'] == 'research'
+          assert payload['real_money_execution'] is False
+          assert payload['checks']['database']['integrity'] == 'ok'
+          assert payload['checks']['schema']['ok'] is True
+          assert payload['checks']['schema']['missing_tables'] == []
+          assert payload['checks']['audit_chain']['ok'] is True
+          assert payload['checks']['source_registry']['registered_sources'] == 3
+          print(json.dumps(payload, sort_keys=True))
+          PY
+
+      - name: Verify runtime sandbox restrictions
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker exec alpha-v4-smoke id -u)" = "10001"
+          test "$(docker exec alpha-v4-smoke id -g)" = "10001"
+          if docker exec alpha-v4-smoke sh -c 'touch /app/forbidden-write'; then
+            echo "read-only root filesystem was unexpectedly writable"
+            exit 1
+          fi
+          docker exec alpha-v4-smoke sh -c 'touch /data/writable-probe && rm /data/writable-probe'
+          SECURITY_OPT="$(docker inspect alpha-v4-smoke --format '{{json .HostConfig.SecurityOpt}}')"
+          echo "$SECURITY_OPT" | grep -q 'no-new-privileges'
+          CAP_DROP="$(docker inspect alpha-v4-smoke --format '{{json .HostConfig.CapDrop}}')"
+          echo "$CAP_DROP" | grep -q 'ALL'
+
+      - name: Persist audited state inside container
+        run: |
+          docker exec alpha-v4-smoke python - <<'PY'
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode
+
+          runtime = AlphaRuntime(
+              RuntimeConfig(
+                  mode=RuntimeMode.RESEARCH,
+                  database_path=Path('/data/alpha-v4.sqlite3'),
+              )
+          )
+          runtime.audit.append(
+              'CONTAINER_PERSISTENCE_PROBE',
+              {'container': 'alpha-v4-smoke', 'value': 1},
+              created_at=datetime.now(timezone.utc),
+              entry_id='container-persistence-probe',
+          )
+          verification = runtime.audit.verify_chain()
+          assert verification.valid
+          assert verification.checked_entries == 1
+          PY
+
+      - name: Destroy and recreate container with same persistent volume
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker rm -f alpha-v4-smoke >/dev/null
+          docker run -d \
+            --name alpha-v4-smoke \
+            --read-only \
+            --tmpfs /tmp:rw,noexec,nosuid,size=16m \
+            --cap-drop=ALL \
+            --security-opt=no-new-privileges \
+            -p 127.0.0.1:8765:8765 \
+            -v alpha-v4-smoke-data:/data \
+            alpha-v4:smoke >/dev/null
+
+          READY=0
+          for _ in {1..40}; do
+            if curl --fail --silent http://127.0.0.1:8765/health/ready > /tmp/container-health-restarted.json; then
+              READY=1
+              break
+            fi
+            sleep 0.25
+          done
+          if [[ "$READY" -ne 1 ]]; then
+            docker logs alpha-v4-smoke
+            exit 1
+          fi
+
+      - name: Verify restart recovery and fail-closed route surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker exec alpha-v4-smoke python - <<'PY'
+          from pathlib import Path
+
+          from alpha_v4.runtime import AlphaRuntime, RuntimeConfig, RuntimeMode
+
+          runtime = AlphaRuntime(
+              RuntimeConfig(
+                  mode=RuntimeMode.RESEARCH,
+                  database_path=Path('/data/alpha-v4.sqlite3'),
+              )
+          )
+          entries = runtime.audit.entries()
+          assert len(entries) == 1
+          assert entries[0].entry_id == 'container-persistence-probe'
+          assert entries[0].event_type == 'CONTAINER_PERSISTENCE_PROBE'
+          assert runtime.audit.verify_chain().valid
+          health = runtime.health()
+          assert health['ready'] is True
+          assert health['checks']['audit_chain']['checked_entries'] == 1
+          assert health['real_money_execution'] is False
+          PY
+
+          HTTP_CODE="$(curl --silent --output /tmp/trade-route.json --write-out '%{http_code}' http://127.0.0.1:8765/trade)"
+          test "$HTTP_CODE" = "404"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          assert json.loads(Path('/tmp/trade-route.json').read_text()) == {'error': 'not_found'}
+          PY
+
+          HEALTH_STATUS="$(docker inspect alpha-v4-smoke --format '{{.State.Health.Status}}')"
+          for _ in {1..20}; do
+            if [[ "$HEALTH_STATUS" = "healthy" ]]; then
+              break
+            fi
+            sleep 0.5
+            HEALTH_STATUS="$(docker inspect alpha-v4-smoke --format '{{.State.Health.Status}}')"
+          done
+          test "$HEALTH_STATUS" = "healthy"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs alpha-v4-smoke || true
+
+      - name: Cleanup
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f alpha-v4-smoke >/dev/null 2>&1 || true
+          docker volume rm alpha-v4-smoke-data >/dev/null 2>&1 || true
