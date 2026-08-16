@@ -35,11 +35,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install test dependency
-        run: python -m pip install --upgrade pip pytest
+      - name: Install quality and test dependencies
+        run: python -m pip install --upgrade pip pytest ruff
 
       - name: Compile clean core
         run: python -m compileall -q alpha_v4 tests/alpha_v4
+
+      - name: Static quality gate
+        run: ruff check alpha_v4 tests/alpha_v4
 
       - name: Run ALPHA v4 tests
         run: python -m pytest -q tests/alpha_v4 --disable-warnings --maxfail=1
