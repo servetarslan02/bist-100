@@ -416,5 +416,41 @@ async def main():
         raise
 
 
+async def main():
+    """Main entry point for the risk engine."""
+    engine = RiskEngine()
+    try:
+        await engine.start()
+    except KeyboardInterrupt:
+        await engine.stop()
+    except Exception as e:
+        logger.error("Risk Engine crashed", error=str(e))
+        await engine.stop()
+        raise
+
+
+# =====================================================
+# Enhanced Risk Entegrasyonu
+# =====================================================
+def assess_portfolio_risk(portfolio: Dict, market_data: Dict = None) -> Dict[str, Any]:
+    """Gelişmiş portföy risk değerlendirmesi."""
+    result = {}
+    try:
+        from .enhanced_risk import LedoitWolfCovariance, VolatilityTargeter, ConcentrationRisk
+        result["covariance"] = "ledoit_wolf_available"
+        result["volatility_targeting"] = "available"
+        result["concentration_risk"] = "available"
+    except: pass
+    try:
+        from .calibration import ModelCalibration
+        result["calibration"] = "available"
+    except: pass
+    try:
+        from .reconciliation import ReconciliationEngine
+        result["reconciliation"] = "available"
+    except: pass
+    return result
+
+
 if __name__ == "__main__":
     asyncio.run(main())

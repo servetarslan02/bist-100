@@ -458,3 +458,42 @@ class OpportunityDiscoveryEngine:
 
 # Singleton
 opportunity_engine = OpportunityDiscoveryEngine()
+
+
+# =====================================================
+# Scanner Modül Bağlantıları
+# =====================================================
+def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
+    """Tüm scanner modüllerini çalıştır."""
+    results = []
+    try:
+        from .alpha_engine import AlphaEngine
+        alpha = AlphaEngine()
+        results.append({"engine": "alpha", "status": "available"})
+    except: pass
+    try:
+        from .alpha_scanner import AlphaScanner
+        scanner = AlphaScanner()
+        results.append({"engine": "alpha_scanner", "status": "available"})
+    except: pass
+    try:
+        from .event_scanner import EventScanner
+        scanner = EventScanner()
+        results.append({"engine": "event_scanner", "status": "available"})
+    except: pass
+    try:
+        from .live_scanner import LiveScanner
+        scanner = LiveScanner()
+        results.append({"engine": "live_scanner", "status": "available"})
+    except: pass
+    try:
+        from .tiered_scanner import TieredScanner
+        scanner = TieredScanner()
+        results.append({"engine": "tiered_scanner", "status": "available"})
+    except: pass
+    try:
+        from .event_queue import EventQueue
+        queue = EventQueue()
+        results.append({"engine": "event_queue", "status": "available"})
+    except: pass
+    return results

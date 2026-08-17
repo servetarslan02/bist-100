@@ -482,3 +482,21 @@ class FeatureCalculator:
 
 # Singleton
 feature_calculator = FeatureCalculator()
+
+
+# =====================================================
+# Feature Module Bağlantıları — Tüm feature modüllerini birleştir
+# =====================================================
+def compute_extended_features(prices, highs=None, lows=None, closes=None, volumes=None) -> Dict[str, float]:
+    """Tüm feature modüllerini birleştir."""
+    features = {}
+    try:
+        from services.features.technical_features import technical_feature_engine
+        features.update(technical_feature_engine.compute_trend_features(prices))
+        features.update(technical_feature_engine.compute_momentum_features(prices, highs, lows))
+        features.update(technical_feature_engine.compute_volatility_features(prices, highs, lows, closes))
+        if volumes is not None:
+            features.update(technical_feature_engine.compute_volume_features(prices, volumes))
+    except Exception as e:
+        logger.warning("Technical features failed", error=str(e))
+    return features

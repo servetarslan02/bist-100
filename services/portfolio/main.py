@@ -783,3 +783,20 @@ class PortfolioService:
 
 # Singleton
 portfolio_service = PortfolioService()
+
+
+# =====================================================
+# Portfolio Enhancements Entegrasyonu
+# =====================================================
+def get_portfolio_enhancements() -> Dict[str, Any]:
+    """Portfolio enhancement servislerini getir."""
+    result = {}
+    try:
+        from .enhancements import TaxModel, DividendHandler, BenchmarkEngine, PerformanceAttribution, MultiCurrencyHandler
+        result["tax_model"] = TaxModel()
+        result["dividend_handler"] = DividendHandler()
+        result["benchmark_engine"] = BenchmarkEngine()
+        result["performance_attribution"] = PerformanceAttribution()
+        result["multi_currency"] = MultiCurrencyHandler()
+    except: pass
+    return result

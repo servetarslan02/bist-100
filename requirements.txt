@@ -23,6 +23,12 @@ redis>=5.0.0
 lightgbm>=4.1.0
 scikit-learn>=1.3.0
 polars>=0.20.0
+xgboost>=2.0.0
+scipy>=1.11.0
+
+# === ML DEEP (opsiyonel — LSTM, Transformer, RL) ===
+# torch>=2.0.0
+# stable-baselines3>=2.1.0
 
 # === MONITORING & LOGGING ===
 structlog>=23.2.0

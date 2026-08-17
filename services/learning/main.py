@@ -300,5 +300,47 @@ async def main():
         raise
 
 
+async def main():
+    """Main entry point for the learning service."""
+    service = LearningService()
+    try:
+        await service.start()
+    except KeyboardInterrupt:
+        await service.stop()
+    except Exception as e:
+        logger.error("Learning Service crashed", error=str(e))
+        await service.stop()
+        raise
+
+
+# =====================================================
+# Learning Modül Bağlantıları
+# =====================================================
+def get_learning_systems() -> Dict[str, Any]:
+    """Tüm learning servislerini getir."""
+    result = {}
+    try:
+        from .outcome_tracker import OutcomeTracker
+        result["outcome_tracker"] = OutcomeTracker()
+    except: pass
+    try:
+        from .attribution import AttributionEngine
+        result["attribution"] = AttributionEngine()
+    except: pass
+    try:
+        from .learning_loop import LearningLoop
+        result["learning_loop"] = LearningLoop()
+    except: pass
+    try:
+        from .continuous_learning import ContinuousLearning
+        result["continuous_learning"] = ContinuousLearning()
+    except: pass
+    try:
+        from .super_intelligence import SuperIntelligence
+        result["super_intelligence"] = SuperIntelligence()
+    except: pass
+    return result
+
+
 if __name__ == "__main__":
     asyncio.run(main())
