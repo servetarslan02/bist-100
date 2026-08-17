@@ -221,6 +221,13 @@ class WalkForwardBacktestRunner:
     # ML MODEL TRAINING
     # ------------------------------------------------------------------
 
+    # Minimum sample sayısı — bundan azsa ML kullanma, rule-based fallback'a geç
+    MIN_TRAINING_SAMPLES = 50
+    # Forward return penceresi (işlem günü)
+    FORWARD_DAYS = 5
+    # Feature hesaplaması için minimum bar sayısı
+    MIN_BARS_FOR_FEATURES = 60
+
     def _train_fold_model(
         self,
         pit_data: Dict[str, pd.DataFrame],
@@ -228,16 +235,23 @@ class WalkForwardBacktestRunner:
         train_end: str,
         benchmark_data=None,
     ):
-        """TRAIN window için LightGBM modeli eğit.
+        """TRAIN window için LightGBM modeli eğit — MULTI-SAMPLE.
 
-        PIT-safe:
-        - Sadece train_start..train_end arası veri kullanılır
-        - Feature'lar t anında hesaplanır, target t+5 getirisidir
-        - Feature ve target arasında veri sızıntısı yoktur
-        - Test verisi eğitimine kesinlikle girmez
+        Her uygun işlem günü için ayrı training sample oluşturulur:
+          - feature_date = T
+          - features  = sadece T'ye kadar bilinen veriler
+          - target    = T+5 günlük forward return
+
+        Güvenceler:
+          1. Son 5 gün target üretilemediği için KULLANILMAZ.
+          2. Feature hesaplamasında sadece T'ye kadar veri kullanılır.
+          3. Aynı (ticker, date) çifti iki kez eklenmez.
+          4. Purge/embargo: sadece train_start..train_end arası veri.
+          5. Minimum sample yetersizse None döner (caller rule-based fallback yapar).
+          6. Deterministik: seed=42, sıralı tarih grupları.
 
         Returns:
-            TrainedModel veya None (yeterli veri yoksa)
+            TrainedModel veya None
         """
         try:
             from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
@@ -245,79 +259,151 @@ class WalkForwardBacktestRunner:
         except ImportError:
             return None
 
-        # Purge gap kontrolü: train_end < purge_start (runner zaten sağlar)
-        # Burada sadece train_start..train_end arası veri kullanılır
-
-        # Train window verisini kes
-        train_data = {}
+        # 1) Train window verisini kes (pit_data zaten test_end'e kadar kesilmiş)
+        train_data: Dict[str, pd.DataFrame] = {}
+        ts_start = pd.Timestamp(train_start)
+        ts_end = pd.Timestamp(train_end)
         for ticker, df in pit_data.items():
-            mask = (df.index >= pd.Timestamp(train_start)) & (df.index <= pd.Timestamp(train_end))
-            df_train = df[mask]
-            if len(df_train) >= 60:
+            mask = (df.index >= ts_start) & (df.index <= ts_end)
+            df_train = df.loc[mask]
+            if len(df_train) >= self.MIN_BARS_FOR_FEATURES:
                 train_data[ticker] = df_train
 
         if len(train_data) < 5:
             return None
 
-        # Feature ve target hesapla (PIT-safe)
-        # Her ticker için train_end - 5 günündeki feature'ları kullan
-        # Target = train_end - 5'ten train_end'e kadar olan getiri
-        # Bu şekilde feature ve target arasında veri sızıntısı olmaz
+        # 2) Her ticker × her uygun gün için sample oluştur
         calc = FeatureCalculator()
-        features_map = {}
-        returns = {}
-        date_groups = {}
+        features_map: Dict[str, Dict] = {}   # key = "TICKER::YYYY-MM-DD"
+        returns: Dict[str, float] = {}
+        date_groups: Dict[str, str] = {}
+
+        # Feature names bir kez hesaplanacak (lazy)
+        _feature_names_cache: Optional[List[str]] = None
 
         for ticker, df in train_data.items():
             n = len(df)
-            if n < 65:  # En az 60 gün feature + 5 gün forward
-                continue
+            # İlk feature index: MIN_BARS_FOR_FEATURES - 1 (0-indexed, 60 bar gerekli)
+            first_feature_idx = self.MIN_BARS_FOR_FEATURES - 1
+            # Son feature index: n - FORWARD_DAYS - 1 (5 gün forward ayrılmalı)
+            last_feature_idx = n - self.FORWARD_DAYS - 1
 
-            # Feature tarihi: train_end - 5 (son 5 gün target için ayrılır)
-            feature_idx = n - 6  # train_end'den 6 gün önce
-            if feature_idx < 59:  # Feature hesaplama için en az 59 gün gerekli
-                continue
+            if last_feature_idx < first_feature_idx:
+                continue  # Bu ticker için yeterli gün yok
 
-            # Feature'ları hesapla (sadece feature_idx'e kadar veri kullan)
-            df_feature = df.iloc[:feature_idx + 1]
-            feats = calc.compute_all_features(df_feature, ticker=ticker)
-            if not feats:
-                continue
+            close_all = df['Close'].values
 
-            features_map[ticker] = feats
+            for idx in range(first_feature_idx, last_feature_idx + 1):
+                # Feature'ları sadece idx'e kadar (dahil) veri ile hesapla
+                df_slice = df.iloc[:idx + 1]
+                feats = calc.compute_all_features(df_slice, ticker=ticker)
+                if not feats:
+                    continue
 
-            # Forward return: feature_idx'den train_end'e kadar
-            close = df['Close'].values
-            forward_ret = (close[-1] / close[feature_idx] - 1) * 100
-            returns[ticker] = forward_ret
+                # Forward return: idx → idx + FORWARD_DAYS
+                c_t = close_all[idx]
+                c_t_fwd = close_all[idx + self.FORWARD_DAYS]
+                if c_t <= 0 or np.isnan(c_t) or np.isnan(c_t_fwd):
+                    continue
+                forward_ret = (c_t_fwd / c_t - 1.0) * 100.0
 
-            date_str = str(df.index[feature_idx].date()) if hasattr(df.index[feature_idx], 'date') else str(df.index[feature_idx])
-            date_groups[ticker] = date_str
+                # Benzersiz key: ticker + feature_date
+                feature_date = df.index[idx]
+                date_str = str(feature_date.date()) if hasattr(feature_date, 'date') else str(feature_date)
+                sample_key = f"{ticker}::{date_str}"
 
-        if len(features_map) < 10 or len(returns) < 10:
+                # Duplicate kontrolü
+                if sample_key in features_map:
+                    continue
+
+                features_map[sample_key] = feats
+                returns[sample_key] = forward_ret
+                date_groups[sample_key] = date_str
+
+        # 3) Minimum sample kontrolü
+        n_samples = len(features_map)
+        if n_samples < self.MIN_TRAINING_SAMPLES:
+            logger.warning("Insufficient training samples for ML, falling back to rule-based",
+                          samples=n_samples, min_required=self.MIN_TRAINING_SAMPLES)
             return None
 
-        # Feature names (canonical scoring ile uyumlu)
-        from ..core.canonical_scoring import canonical_scoring
-        feature_names = []
-        for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
-                         '_score_volume', '_score_fundamental', '_score_mean_reversion',
-                         '_score_risk']:
-            import inspect, re
-            src = inspect.getsource(getattr(canonical_scoring, dim_name))
-            features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
-            feature_names.extend(features_in_dim)
-        feature_names = list(dict.fromkeys(feature_names))  # Unique, order preserved
+        # 4) Feature names (canonical scoring ile uyumlu — lazy)
+        if _feature_names_cache is None:
+            try:
+                from ..core.canonical_scoring import canonical_scoring
+                import inspect, re
+                feature_names: List[str] = []
+                for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
+                                 '_score_volume', '_score_fundamental', '_score_mean_reversion',
+                                 '_score_risk']:
+                    src = inspect.getsource(getattr(canonical_scoring, dim_name))
+                    features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
+                    feature_names.extend(features_in_dim)
+                _feature_names_cache = list(dict.fromkeys(feature_names))  # Unique, order preserved
+            except Exception:
+                _feature_names_cache = []
+        feature_names = _feature_names_cache
 
-        # Eğit
-        trainer = LightGBMTrainer(MLModelConfig(num_boost_round=50, early_stopping_rounds=5))
-        model = trainer.train(features_map, returns, date_groups, feature_names=feature_names)
+        # 5) Deterministik sıralama (tarih ASC, sonra ticker)
+        #    LightGBM group yapısı için gerekli.
+        sorted_keys = sorted(features_map.keys(), key=lambda k: (date_groups[k], k))
+        features_map = {k: features_map[k] for k in sorted_keys}
+        returns = {k: returns[k] for k in sorted_keys}
+        date_groups = {k: date_groups[k] for k in sorted_keys}
+
+        # 5.5) Veri kalite kontrolü ve temizlik
+        try:
+            from ..ml.training_validator import training_validator
+
+            # Feature temizliği (inf → NaN, outlier clamp)
+            features_map, clean_stats = training_validator.clean_features(
+                features_map, feature_names
+            )
+            if clean_stats["inf_replaced"] > 0 or clean_stats["outliers_clamped"] > 0:
+                logger.info("Feature cleaning applied",
+                           inf_replaced=clean_stats["inf_replaced"],
+                           outliers_clamped=clean_stats["outliers_clamped"])
+
+            # Kalite raporu
+            quality_report = training_validator.validate_dataset(
+                features_map, returns, date_groups, feature_names
+            )
+            logger.info("Training data quality",
+                       quality_score=round(quality_report.quality_score, 2),
+                       valid_samples=quality_report.valid_samples,
+                       dropped=quality_report.dropped_samples,
+                       target_mean=round(quality_report.target_mean, 4),
+                       target_std=round(quality_report.target_std, 4),
+                       unique_tickers=quality_report.unique_tickers,
+                       unique_dates=quality_report.unique_dates)
+            if quality_report.warnings:
+                for w in quality_report.warnings[:3]:  # İlk 3 uyarıyı logla
+                    logger.warning("Data quality warning", warning=w)
+        except ImportError:
+            pass  # Validator yoksa eğitim devam etsin
+
+        # 6) Eğit (FAZ 4.3: purge gap + comprehensive metrics)
+        config = MLModelConfig(
+            num_boost_round=50,
+            early_stopping_rounds=5,
+            purge_gap_days=self.FORWARD_DAYS,  # Purge = forward horizon
+        )
+        trainer = LightGBMTrainer(config)
+        model = trainer.train(
+            features_map, returns, date_groups,
+            feature_names=feature_names, regime="UNKNOWN"
+        )
 
         if model:
-            logger.info("Fold ML model trained",
+            vm = getattr(model, '_validation_metrics', {})
+            logger.info("Fold ML model trained (multi-sample)",
                        train_range=f"{train_start}..{train_end}",
-                       samples=model.train_samples,
-                       val_score=model.validation_score)
+                       samples=n_samples,
+                       unique_dates=len(set(date_groups.values())),
+                       val_score=model.validation_score,
+                       confidence=getattr(model, '_confidence_score', 0),
+                       ic=round(vm.get('ic', 0), 4),
+                       dir_acc=round(vm.get('directional_accuracy', 0), 4))
 
         return model
 
