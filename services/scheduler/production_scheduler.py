@@ -12,6 +12,7 @@ import structlog
 
 from services.core.market_session import market_session, MarketPhase
 from services.core.worker import job_worker, JobType
+from services.core.config import settings
 
 logger = structlog.get_logger()
 
@@ -37,7 +38,15 @@ class ProductionScheduler:
     }
 
     def __init__(self, intervals: Optional[Dict[str, int]] = None):
-        self._intervals = {**self.DEFAULT_INTERVALS, **(intervals or {})}
+        # Config'den interval'ları oku, override ile birleştir
+        config_intervals = {
+            "feature_calculation": settings.interval_feature_calculation,
+            "live_inference": settings.interval_live_inference,
+            "health_check": settings.interval_health_check,
+            "market_data_update": settings.interval_market_data,
+            "ranking": settings.interval_ranking,
+        }
+        self._intervals = {**self.DEFAULT_INTERVALS, **config_intervals, **(intervals or {})}
         self._running = False
         self._handlers: Dict[str, Callable[..., Awaitable[Any]]] = {}
         self._last_run: Dict[str, float] = {}

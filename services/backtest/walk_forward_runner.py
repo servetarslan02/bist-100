@@ -449,6 +449,25 @@ class WalkForwardBacktestRunner:
                    primary=multi_model.primary_horizon,
                    total_samples=multi_model.total_train_samples)
 
+        # Model metadata'yı DB'ye kaydet (async, best-effort)
+        try:
+            from ..core.model_persistence import model_persistence
+            import asyncio
+            version = f"fold_{train_start}_{train_end}_h{'_'.join(str(h) for h in multi_model.available_horizons)}"
+            # DB yoksa bile crash etmez
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(model_persistence.save_model_metadata(
+                    model_name="alpha_bist_multi_horizon",
+                    version=version,
+                    model_obj=multi_model,
+                    artifact_path="in_memory",
+                    training_data_start=train_start,
+                    training_data_end=train_end,
+                ))
+        except Exception:
+            pass  # Best-effort, DB yoksa devam et
+
         return multi_model
 
     def _get_canonical_feature_names(self) -> List[str]:

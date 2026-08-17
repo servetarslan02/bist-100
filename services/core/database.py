@@ -77,9 +77,9 @@ async def get_pg_pool():
                 database=settings.postgres_db,
                 user=settings.postgres_user,
                 password=settings.postgres_password,
-                min_size=2,
-                max_size=10,
-                command_timeout=30,
+                min_size=settings.db_pool_min,
+                max_size=settings.db_pool_max,
+                command_timeout=settings.db_command_timeout,
             )
         _pg_pool = await _retry_async(_create, "PostgreSQL pool creation")
         _pg_healthy = True

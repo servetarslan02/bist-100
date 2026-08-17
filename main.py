@@ -785,13 +785,35 @@ def run_full_system(date: str):
     return report
 
 
+def run_live_scheduler():
+    """Live scheduler — production modu.
+
+    Market session-aware, DB-backed job scheduling.
+    SIGTERM/SIGINT ile graceful shutdown.
+    """
+    import asyncio
+    from services.scheduler.production_scheduler import production_scheduler
+    from services.core.database import init_databases, close_databases
+
+    async def _run():
+        logger.info("=== ALPHA BIST LIVE MODE ===")
+        await init_databases()
+        try:
+            await production_scheduler.start()
+        finally:
+            await close_databases()
+            logger.info("=== LIVE MODE SHUTDOWN ===")
+
+    asyncio.run(_run())
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="ALPHA BIST v4.1 — Gercek Veri, Gercek Backtest, Gercek Motor"
     )
     parser.add_argument(
         "--mode",
-        choices=["daily", "backtest", "paper", "learning", "health", "full"],
+        choices=["daily", "backtest", "paper", "learning", "health", "full", "live"],
         default="daily",
         help="Calistirma modu"
     )
@@ -831,6 +853,8 @@ def main():
         run_health_check()
     elif args.mode == "full":
         run_full_system(args.date)
+    elif args.mode == "live":
+        run_live_scheduler()
 
 
 if __name__ == "__main__":

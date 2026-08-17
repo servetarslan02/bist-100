@@ -74,13 +74,25 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = Field(default="http://localhost:5000", alias="MLFLOW_TRACKING_URI")
 
     # Broker
-    broker_type: str = Field(default="paper", alias="BROKER_TYPE")  # paper | live
+    broker_type: str = Field(default="paper", alias="BROKER_TYPE")
     broker_api_key: Optional[str] = Field(default=None, alias="BROKER_API_KEY")
     broker_api_secret: Optional[str] = Field(default=None, alias="BROKER_API_SECRET")
     broker_account_id: Optional[str] = Field(default=None, alias="BROKER_ACCOUNT_ID")
 
     # KAP
     kap_api_key: Optional[str] = Field(default=None, alias="KAP_API_KEY")
+
+    # DB Pool
+    db_pool_min: int = Field(default=2, alias="DB_POOL_MIN")
+    db_pool_max: int = Field(default=10, alias="DB_POOL_MAX")
+    db_command_timeout: int = Field(default=30, alias="DB_COMMAND_TIMEOUT")
+
+    # Scheduler intervals (saniye)
+    interval_feature_calculation: int = Field(default=300, alias="INTERVAL_FEATURE_CALCULATION")
+    interval_live_inference: int = Field(default=300, alias="INTERVAL_LIVE_INFERENCE")
+    interval_health_check: int = Field(default=60, alias="INTERVAL_HEALTH_CHECK")
+    interval_market_data: int = Field(default=120, alias="INTERVAL_MARKET_DATA")
+    interval_ranking: int = Field(default=600, alias="INTERVAL_RANKING")
 
     @property
     def is_production(self) -> bool:
