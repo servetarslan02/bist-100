@@ -452,7 +452,14 @@ def test_model_persistence_contract():
 
     # Metadata serialization test (DB yoksa None döner ama crash olmaz)
     import asyncio
-    result = asyncio.get_event_loop().run_until_complete(
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop = asyncio.new_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+
+    result = loop.run_until_complete(
         mp.save_model_metadata("test_model", "v1", MockModel(), "/tmp/test.pkl")
     )
     # DB yoksa None
