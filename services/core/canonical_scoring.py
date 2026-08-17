@@ -275,6 +275,7 @@ class CanonicalScoringPipeline:
         ml_confidence = 0.0
         if ml_model is not None:
             try:
+                # MultiHorizonModel veya TrainedModel — ikisi de predict(features) destekler
                 ml_pred = ml_model.predict(features)
                 # ML prediction'ı 0-100 aralığına normalize et
                 ml_score = max(0, min(100, 50 + ml_pred * 10))
@@ -639,6 +640,68 @@ class CanonicalScoringPipeline:
             return float(val)
         except (TypeError, ValueError):
             return 0.0
+
+
+# =====================================================
+# CANONICAL FEATURE REGISTRY (tek kaynak)
+# =====================================================
+
+# Bu liste canonical scoring pipeline'ın kullandığı TÜM feature'ları içerir.
+# Training ve inference aynı bu listeyi kullanır.
+# Regex veya source parsing GEREKTİRMEZ.
+#
+# Kural: Yeni feature eklendiğinde BURAYA da ekle.
+CANONICAL_FEATURE_REGISTRY: List[str] = [
+    # Motor 1: Relatif Güç
+    "rs_vs_bist_1d", "rs_vs_bist_5d", "rs_vs_bist_20d", "rs_vs_bist_60d",
+    "rs_vs_sector_5d", "rs_vs_peers_5d", "rs_trend", "rs_peer_rank",
+    # Motor 2: Momentum + Trend
+    "roc_5d", "roc_20d", "roc_60d", "momentum_20d",
+    "trend_slope_20d", "trend_r2_20d", "momentum_acceleration",
+    "momentum_accel_trend", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200",
+    "near_20d_high", "near_60d_high", "near_120d_high",
+    "breakout_failure", "drawdown_20d", "recovery_strength",
+    # Motor 3: Hacim + Mikroyapı
+    "volume_percentile", "volume_zscore", "volume_trend",
+    "volume_up_down_ratio", "tick_rule", "vwap_deviation",
+    "avg_volume_5d", "obv",
+    # Motor 4: Fundamental
+    "sector_norm_pe_ratio", "sector_norm_pb_ratio", "fcf_yield_pct",
+    "fcf_margin", "balance_sheet_quality", "profit_margin_pct",
+    "roe", "roa",
+    # Motor 5: KAP + Haber
+    "kap_sentiment_avg", "kap_sentiment_latest", "news_sentiment_weighted",
+    "sentiment_momentum", "kap_avg_importance",
+    # Motor 6: Katalizör
+    "catalyst_count", "catalyst_importance", "catalyst_days_nearest",
+    # Motor 7: Neden Düşüyor?
+    "falling_is_temporary", "fall_market_selloff", "fall_sector_selloff",
+    # Teknik (canonical scoring)
+    "rsi_14", "macd_hist", "bb_position", "adx",
+    "bb_zscore_20d", "mean_reversion_signal",
+    # Mevsimsellik
+    "seasonality_current_month_avg", "seasonality_current_month_win_rate",
+    "seasonality_current_quarter_avg",
+    # Katalizör detay
+    "catalyst_time_decay_score",
+    # Risk
+    "atr_pct", "volatility_20d", "realized_vol_20d",
+    "catch_falling_knife_risk",
+    # Cross-Sectional (canonical scoring)
+    "rank_return_5d", "rank_return_20d", "rank_volume_zscore", "rank_rsi_14",
+    "sector_rel_return_5d", "sector_zscore_momentum_20d",
+    "cs_zscore_roc_5d", "cs_zscore_roc_20d",
+    # Market Breadth
+    "market_breadth", "market_ad_ratio",
+]
+
+# Unique, order preserved
+CANONICAL_FEATURE_REGISTRY = list(dict.fromkeys(CANONICAL_FEATURE_REGISTRY))
+
+
+def get_canonical_features() -> List[str]:
+    """Canonical feature listesini döndür (tek kaynak)."""
+    return list(CANONICAL_FEATURE_REGISTRY)
 
 
 # Singleton

@@ -366,51 +366,98 @@ class WalkForwardBacktestRunner:
             logger.warning("CS normalization failed, using base features", error=str(e))
             all_feature_names = feature_names
 
-        # 7) Eğit (date-space purge gap)
-        config = MLModelConfig(
-            num_boost_round=50,
-            early_stopping_rounds=5,
-            purge_gap_days=self.FORWARD_DAYS,  # Date-space purge
-            target_horizon=self.FORWARD_DAYS,
-        )
-        trainer = LightGBMTrainer(config)
-        model = trainer.train(
-            features_map, returns, date_groups,
-            feature_names=all_feature_names, regime="UNKNOWN"
+        # 7) Multi-horizon eğitim (1d, 5d, 20d, 60d)
+        from ..ml.lightgbm_trainer import MultiHorizonModel, DEFAULT_TARGETS
+
+        multi_model = MultiHorizonModel(
+            primary_horizon=self.FORWARD_DAYS,
+            cs_features=cs_feature_names,
         )
 
-        if model:
-            # CS feature bilgisini model metadata'sına kaydet
-            model.cs_features = cs_feature_names
-            vm = model.validation_metrics
-            logger.info("Fold ML model trained (v4.4)",
-                       train_range=f"{train_start}..{train_end}",
-                       samples=n_samples,
-                       unique_dates=len(set(date_groups.values())),
-                       val_score=model.validation_score,
-                       confidence=model.confidence_score,
-                       ic=round(vm.get('ic', 0), 4),
-                       dir_acc=round(vm.get('directional_accuracy', 0), 4),
-                       cs_features=len(cs_feature_names))
+        for target_spec in DEFAULT_TARGETS:
+            horizon = target_spec.horizon
 
-        return model
+            # Horizon-aware purge: purge = max(default_purge, horizon)
+            effective_purge = max(self.FORWARD_DAYS, horizon)
+
+            # Bu horizon için yeterli tarih var mı?
+            unique_dates_sorted = sorted(set(date_groups.values()))
+            n_dates = len(unique_dates_sorted)
+            val_date_count = max(2, int(n_dates * 0.2))
+            train_date_end_idx = n_dates - val_date_count - effective_purge
+
+            if train_date_end_idx < 10:
+                logger.info("Skipping horizon (insufficient dates)",
+                           horizon=horizon, n_dates=n_dates, purge=effective_purge)
+                continue
+
+            # Bu horizon için target hesapla (sadece features_map'teki sample'lar için)
+            horizon_returns: Dict[str, float] = {}
+            for ticker, df in train_data.items():
+                close_all = df['Close'].values
+                n = len(df)
+                first_idx = self.MIN_BARS_FOR_FEATURES - 1
+                last_idx = n - horizon - 1
+                for idx in range(first_idx, last_idx + 1):
+                    c_t = close_all[idx]
+                    c_fwd = close_all[idx + horizon]
+                    if c_t <= 0 or not np.isfinite(c_t) or not np.isfinite(c_fwd):
+                        continue
+                    feature_date = df.index[idx]
+                    date_str = str(feature_date.date()) if hasattr(feature_date, 'date') else str(feature_date)
+                    sample_key = f"{ticker}::{date_str}"
+                    if sample_key in features_map and sample_key not in horizon_returns:
+                        horizon_returns[sample_key] = (c_fwd / c_t - 1.0) * 100.0
+
+            # Sadece bu horizon için target'ı olan sample'ları kullan
+            horizon_features = {k: v for k, v in features_map.items() if k in horizon_returns}
+            horizon_date_groups = {k: v for k, v in date_groups.items() if k in horizon_returns}
+
+            if len(horizon_features) < self.MIN_TRAINING_SAMPLES:
+                logger.info("Skipping horizon (insufficient samples)",
+                           horizon=horizon, samples=len(horizon_features))
+                continue
+
+            config = MLModelConfig(
+                num_boost_round=50,
+                early_stopping_rounds=5,
+                purge_gap_days=effective_purge,
+                target_horizon=horizon,
+            )
+            trainer = LightGBMTrainer(config)
+            h_model = trainer.train(
+                horizon_features, horizon_returns, horizon_date_groups,
+                feature_names=all_feature_names, regime="UNKNOWN"
+            )
+
+            if h_model is not None:
+                h_model.cs_features = cs_feature_names
+                multi_model.horizon_models[horizon] = h_model
+                vm = h_model.validation_metrics
+                logger.info("Horizon model trained",
+                           horizon=horizon,
+                           samples=h_model.train_samples,
+                           ic=round(vm.get('ic', 0), 4),
+                           confidence=h_model.confidence_score)
+
+        if not multi_model.horizon_models:
+            logger.warning("No horizon models trained, falling back to rule-based")
+            return None
+
+        logger.info("Multi-horizon training complete",
+                   horizons=multi_model.available_horizons,
+                   primary=multi_model.primary_horizon,
+                   total_samples=multi_model.total_train_samples)
+
+        return multi_model
 
     def _get_canonical_feature_names(self) -> List[str]:
-        """Canonical scoring'den feature isimlerini çıkar (lazy cache)."""
+        """Canonical feature registry'den feature isimlerini al (regex yok)."""
         if hasattr(self, '_feature_names_cache') and self._feature_names_cache:
             return self._feature_names_cache
-
         try:
-            from ..core.canonical_scoring import canonical_scoring
-            import inspect, re
-            feature_names: List[str] = []
-            for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
-                             '_score_volume', '_score_fundamental', '_score_mean_reversion',
-                             '_score_risk']:
-                src = inspect.getsource(getattr(canonical_scoring, dim_name))
-                features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
-                feature_names.extend(features_in_dim)
-            self._feature_names_cache = list(dict.fromkeys(feature_names))
+            from ..core.canonical_scoring import get_canonical_features
+            self._feature_names_cache = get_canonical_features()
         except Exception:
             self._feature_names_cache = []
         return self._feature_names_cache

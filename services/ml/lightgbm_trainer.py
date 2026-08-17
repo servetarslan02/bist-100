@@ -124,6 +124,88 @@ class TrainedModel:
             return pickle.load(f)
 
 
+@dataclass
+class MultiHorizonModel:
+    """Çoklu horizon model wrapper'ı.
+
+    Her horizon (1d, 5d, 20d, 60d) için ayrı TrainedModel tutar.
+    predict() varsayılan horizon'a (primary) delegasyon yapar.
+    horizon_models dict'i ile tüm horizon'lara erişilebilir.
+    """
+    horizon_models: Dict[int, TrainedModel] = field(default_factory=dict)
+    primary_horizon: int = 5
+    cs_features: List[str] = field(default_factory=list)
+
+    @property
+    def primary_model(self) -> Optional[TrainedModel]:
+        return self.horizon_models.get(self.primary_horizon)
+
+    def predict(self, features: Dict[str, Any]) -> float:
+        """Varsayılan horizon prediction."""
+        m = self.primary_model
+        if m is None:
+            return 0.0
+        try:
+            return m.predict(features)
+        except (ValueError, Exception):
+            return 0.0
+
+    def predict_horizon(self, features: Dict[str, Any], horizon: int) -> float:
+        """Belirli horizon prediction."""
+        m = self.horizon_models.get(horizon)
+        if m is None:
+            return 0.0
+        try:
+            return m.predict(features)
+        except (ValueError, Exception):
+            return 0.0
+
+    def get_all_predictions(self, features: Dict[str, Any]) -> Dict[int, float]:
+        """Tüm horizon'lar için prediction."""
+        return {h: m.predict(features) for h, m in self.horizon_models.items()}
+
+    @property
+    def available_horizons(self) -> List[int]:
+        return sorted(self.horizon_models.keys())
+
+    @property
+    def total_train_samples(self) -> int:
+        return sum(m.train_samples for m in self.horizon_models.values())
+
+    # Backward compatibility: TrainedModel interface
+    @property
+    def train_samples(self) -> int:
+        """Primary model'in train sample sayısı."""
+        m = self.primary_model
+        return m.train_samples if m else 0
+
+    @property
+    def train_date_range(self) -> Tuple[str, str]:
+        """Primary model'in train date range."""
+        m = self.primary_model
+        return m.train_date_range if m else ("", "")
+
+    @property
+    def validation_score(self) -> float:
+        m = self.primary_model
+        return m.validation_score if m else 0.0
+
+    @property
+    def validation_metrics(self) -> Dict[str, float]:
+        m = self.primary_model
+        return m.validation_metrics if m else {}
+
+    @property
+    def confidence_score(self) -> float:
+        m = self.primary_model
+        return m.confidence_score if m else 0.0
+
+    @property
+    def feature_names(self) -> List[str]:
+        m = self.primary_model
+        return m.feature_names if m else []
+
+
 # =====================================================
 # MULTI-HORIZON TARGET
 # =====================================================
