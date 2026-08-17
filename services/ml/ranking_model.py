@@ -357,27 +357,77 @@ class RankingModel:
         return float(val)
 
     def _rule_based_score(self, features: Dict, regime: str) -> float:
-        """Rejim-aware rule-based skor."""
+        """Rejim-aware rule-based skor.
+
+        Rejime göre strateji ağırlıkları:
+        - BULL: momentum ağırlıklı, trend takibi
+        - BEAR: defansif, kalite, mean reversion
+        - SIDEWAYS: değer, mean reversion
+        - HIGH_VOL: defansif, düşük volatilite tercihi
+        """
         _s = self._scalar  # shorthand
+
+        # === REJİM BAZLI STRATEJİ AĞIRLIKLARI ===
+        if regime == "BULL":
+            w_mom, w_roc, w_rs, w_vol, w_sector = 0.20, 0.12, 0.10, 0.08, 0.10
+            w_risk, w_dd, w_fund, w_quality = -0.02, -0.01, 0.03, 0.01
+            w_trend, w_rev = 0.05, 0.00
+        elif regime == "BEAR":
+            w_mom, w_roc, w_rs, w_vol, w_sector = 0.05, 0.05, 0.05, 0.08, 0.05
+            w_risk, w_dd, w_fund, w_quality = -0.05, -0.05, 0.05, 0.03
+            w_trend, w_rev = 0.02, 0.08
+        elif regime in ("HIGH_VOL", "HIGH_VOLATILITY"):
+            w_mom, w_roc, w_rs, w_vol, w_sector = 0.08, 0.06, 0.06, 0.05, 0.06
+            w_risk, w_dd, w_fund, w_quality = -0.06, -0.04, 0.04, 0.03
+            w_trend, w_rev = 0.03, 0.06
+        else:  # SIDEWAYS, UNKNOWN, vb.
+            w_mom, w_roc, w_rs, w_vol, w_sector = 0.12, 0.08, 0.08, 0.06, 0.08
+            w_risk, w_dd, w_fund, w_quality = -0.03, -0.02, 0.04, 0.02
+            w_trend, w_rev = 0.04, 0.04
+
         score = 50.0
 
-        # Momentum ağırlığı rejime göre değişir
-        mom_weight = 0.15 if regime == "BULL" else 0.08 if regime == "BEAR" else 0.12
-        score += _s(features.get("momentum_20d", 0)) * mom_weight
-        score += _s(features.get("roc_5d", 0)) * 0.10
-        score += _s(features.get("rs_vs_bist_5d", 0)) * 0.08
-        score += _s(features.get("volume_zscore", 0)) * 0.06
-        score += _s(features.get("sector_rel_return_5d", 0)) * 0.08
+        # === TEMEL SİNYALLER ===
+        score += _s(features.get("momentum_20d", 0)) * w_mom
+        score += _s(features.get("roc_5d", 0)) * w_roc
+        score += _s(features.get("rs_vs_bist_5d", 0)) * w_rs
+        score += _s(features.get("volume_zscore", 0)) * w_vol
+        score += _s(features.get("sector_rel_return_5d", 0)) * w_sector
 
-        # Risk cezası
-        score -= _s(features.get("atr_pct", 0)) * 0.03
-        score -= _s(features.get("drawdown_20d", 0)) * 0.02
+        # === RİSK CEZASI ===
+        score -= _s(features.get("atr_pct", 0)) * abs(w_risk)
+        score -= _s(features.get("drawdown_20d", 0)) * abs(w_dd)
 
-        # Fundamental
-        score += _s(features.get("fcf_yield_pct", 0)) * 0.05
-        score += _s(features.get("balance_sheet_quality", 0)) * 0.02
+        # === FUNDAMENTAL (Motor 4 bağlandığında otomatik çalışacak) ===
+        fcf = _s(features.get("fcf_yield_pct", 0))
+        bsq = _s(features.get("balance_sheet_quality", 0))
+        if fcf != 0:
+            score += fcf * w_fund
+        if bsq != 0:
+            score += bsq * w_quality * 0.01
 
-        # Sınırla
+        # === TREND KALİTESİ ===
+        trend_slope = _s(features.get("trend_slope_20d", 0))
+        trend_r2 = _s(features.get("trend_r2_20d", 0))
+        # Güçlü trend (yüksek R² + pozitif eğim) bonus
+        if trend_r2 > 0.5 and trend_slope > 0:
+            score += trend_slope * w_trend * trend_r2
+        elif trend_r2 > 0.5 and trend_slope < 0:
+            score += trend_slope * w_trend * trend_r2 * 0.5
+
+        # === MEAN REVERSION (BEAR/SIDEWAYS'de ağırlıklı) ===
+        rsi = _s(features.get("rsi_14", 50))
+        if rsi < 30:
+            score += (30 - rsi) * w_rev * 0.3  # Aşırı satım bonus
+        elif rsi > 70:
+            score -= (rsi - 70) * w_rev * 0.3  # Aşırı alım cezası
+
+        # === DÜŞÜŞ ANALİZİ (Motor 7) ===
+        falling_temp = _s(features.get("falling_is_temporary", 0.5))
+        if falling_temp > 0.7 and regime in ("BEAR", "HIGH_VOL", "HIGH_VOLATILITY"):
+            score += 3.0  # Geçici düşüş + kötü rejim = fırsat
+
+        # === Sınırla ===
         return max(0.0, min(100.0, float(score)))
 
     def _normalize_score(self, score: float) -> float:

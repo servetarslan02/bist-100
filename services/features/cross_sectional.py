@@ -27,6 +27,15 @@ class CrossSectionalEngine:
         "volume_zscore", "rsi_14", "momentum_20d", "roc_5d", "roc_20d",
         "realized_vol_20d", "bb_position", "atr_pct",
         "price_vs_sma20", "price_vs_sma50",
+        # Motor 2 (Momentum+Trend)
+        "trend_slope_20d", "trend_r2_20d", "momentum_acceleration",
+        "drawdown_20d", "recovery_strength",
+        # Motor 3 (Volume)
+        "volume_trend", "obv",
+        # Motor 7 (Neden Düşüyor)
+        "falling_is_temporary", "fall_severity",
+        # Motor 8 (Mean Reversion)
+        "bb_zscore_20d", "mean_reversion_strength",
     ]
 
     # Sektör relative feature'lar
@@ -34,6 +43,8 @@ class CrossSectionalEngine:
         "return_1d", "return_5d", "return_20d",
         "momentum_20d", "roc_5d", "roc_20d",
         "rsi_14", "volume_zscore",
+        # Motor 2
+        "trend_slope_20d", "drawdown_20d",
     ]
 
     def compute_all_cross_sectional(

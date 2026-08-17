@@ -1255,6 +1255,25 @@ class SevenMotorEngine:
             else:
                 cleaned[k] = v
 
+        # === FEATURE ALIASES ===
+        # Ranking modeli ve cross-sectional engine'in beklediği isimlerle
+        # motor çıktıları arasında eşleme. Var olan feature'ları ezme.
+        _ALIAS_MAP = {
+            # Motor 2: period-suffixed → unsuffixed (default period)
+            "breakout_failure_20d": "breakout_failure",
+            "recovery_strength_20d": "recovery_strength",
+            # Motor 7: period-suffixed → unsuffixed
+            "fall_market_selloff_5d": "fall_market_selloff",
+            "fall_sector_selloff_5d": "fall_sector_selloff",
+        }
+        for src, dst in _ALIAS_MAP.items():
+            if dst not in cleaned and src in cleaned:
+                cleaned[dst] = cleaned[src]
+
+        # Motor 3'ten volume_zscore_20d → volume_zscore (eğer calculator üretmemişse)
+        if "volume_zscore" not in cleaned and "volume_zscore_20d" in cleaned:
+            cleaned["volume_zscore"] = cleaned["volume_zscore_20d"]
+
         # Regime bilgisi ekle
         cleaned["regime"] = market_regime
 

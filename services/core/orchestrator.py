@@ -119,6 +119,24 @@ class SystemOrchestrator:
             from services.features.seven_motors import seven_motor_engine
 
             all_features = {}
+
+            # Benchmark (XU100) kapanış fiyatları — Motor 1 için
+            benchmark_close = None
+            if "XU100" in market_data and len(market_data["XU100"]) > 0:
+                benchmark_close = market_data["XU100"]["Close"].values
+
+            # Market getirileri — Motor 7 için
+            market_return_5d = 0.0
+            market_return_20d = 0.0
+            if "XU100" in market_data:
+                xu100 = market_data["XU100"]
+                if len(xu100) > 5:
+                    c = xu100["Close"].values
+                    if c[-6] > 0:
+                        market_return_5d = (c[-1] / c[-6] - 1) * 100
+                    if len(c) > 20 and c[-21] > 0:
+                        market_return_20d = (c[-1] / c[-21] - 1) * 100
+
             for ticker, df in market_data.items():
                 mask = masks.get(ticker)
 
@@ -127,10 +145,70 @@ class SystemOrchestrator:
                     df, mask=mask, ticker=ticker
                 )
 
-                # 7 motor feature'lari
-                motor_features = seven_motor_engine.compute_all(ticker, df, mask)
+                # Sektör kapanış verisi — Motor 1 için
+                sector_close = None
+                if ticker in sector_map and benchmark_close is not None:
+                    sector = sector_map[ticker]
+                    sector_peers = [
+                        t for t, s in sector_map.items()
+                        if s == sector and t != ticker and t in market_data
+                    ]
+                    if sector_peers:
+                        peer_closes_list = [
+                            market_data[t]["Close"].values
+                            for t in sector_peers[:10]
+                            if len(market_data[t]) > 0
+                        ]
+                        if peer_closes_list:
+                            min_len = min(len(c) for c in peer_closes_list)
+                            sector_close = np.mean(
+                                [c[-min_len:] for c in peer_closes_list], axis=0
+                            )
 
-                # Birlestir
+                # Peer kapanış verisi — Motor 1 için
+                peer_closes = None
+                if ticker in sector_map:
+                    sector = sector_map[ticker]
+                    sector_peers = [
+                        t for t, s in sector_map.items()
+                        if s == sector and t != ticker and t in market_data
+                    ]
+                    if sector_peers:
+                        peer_closes = {
+                            t: market_data[t]["Close"].values
+                            for t in sector_peers[:10]
+                            if len(market_data[t]) > 0
+                        }
+
+                # Sektör getirileri — Motor 7 için
+                sector_return_5d = 0.0
+                sector_return_20d = 0.0
+                if ticker in sector_map and sector_close is not None:
+                    if len(sector_close) > 5 and sector_close[-6] > 0:
+                        sector_return_5d = (sector_close[-1] / sector_close[-6] - 1) * 100
+                    if len(sector_close) > 20 and sector_close[-21] > 0:
+                        sector_return_20d = (sector_close[-1] / sector_close[-21] - 1) * 100
+
+                # Motor feature'ları — tüm veri akışlarıyla
+                motor_features = seven_motor_engine.compute_all(
+                    ticker, df, mask,
+                    benchmark_close=benchmark_close,
+                    sector_close=sector_close,
+                    peer_closes=peer_closes,
+                    fundamentals=None,        # Faz 2'de bağlanacak
+                    sector_medians=None,       # Faz 2'de bağlanacak
+                    kap_events=None,           # Faz 2'de bağlanacak
+                    news_events=None,          # Faz 2'de bağlanacak
+                    upcoming_events=None,      # Faz 2'de bağlanacak
+                    llm_analysis=None,         # Faz 2'de bağlanacak
+                    market_return_5d=market_return_5d,
+                    market_return_20d=market_return_20d,
+                    sector_return_5d=sector_return_5d,
+                    sector_return_20d=sector_return_20d,
+                    market_regime=str(self._current_regime),
+                )
+
+                # Birlestir (calculator + motors)
                 all_features[ticker] = {**tech_features, **motor_features}
 
             # Cross-sectional features
