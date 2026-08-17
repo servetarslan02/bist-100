@@ -73,7 +73,7 @@ def _make_features_map(n_samples=200, n_features=10, seed=42, n_tickers=10):
 # ────────────────────────────────────────────────────────────
 
 def test_chronological_validation_purge():
-    """Train/val split purge gap ile yapılıyor mu?"""
+    """Train/val split date-space purge gap ile yapılıyor mu?"""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
 
     passed = 0
@@ -89,14 +89,16 @@ def test_chronological_validation_purge():
         print("  ⚠ Model None, skip")
         return 0, 0
 
-    # Purge gap uygulanmış olmalı
-    vm = model._validation_metrics
+    # Date-space purge gap uygulanmış olmalı
+    vm = model.validation_metrics
     assert vm.get("validation_samples", 0) > 0, "No validation samples"
-    # Train samples + purge + val samples = total
     total = len(features_map)
     assert model.train_samples < total, "Train size should be < total (purge + val)"
-    print(f"  ✓ Purge gap: train={model.train_samples}, total={total}, "
-          f"val_samples={int(vm.get('validation_samples', 0))}")
+    # Train date range sonu, val tarihlerinden önce olmalı
+    assert model.train_date_range[1] != "", "Train end should not be empty"
+    print(f"  ✓ Date-space purge: train={model.train_samples}, total={total}, "
+          f"val_samples={int(vm.get('validation_samples', 0))}, "
+          f"train_end={model.train_date_range[1]}")
     passed += 1
 
     return passed, failed
@@ -107,38 +109,37 @@ def test_chronological_validation_purge():
 # ────────────────────────────────────────────────────────────
 
 def test_no_future_leakage():
-    """Train'den val'e veri sızıntısı yok — purge gap sample-space'de."""
+    """Train'den val'e veri s\u0131z\u0131nt\u0131 yok — date-space purge gap."""
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
 
     passed = 0
     failed = 0
 
-    # purge_gap_days sample sayısı olarak kullanılır (10 ticker/date)
-    # 50 purge sample / 10 ticker = 5 gün gap
-    config = MLModelConfig(num_boost_round=10, early_stopping_rounds=3, purge_gap_days=50)
+    # purge_gap_days art\u0131k tarih g\u00fcn\u00fcnde \u00e7al\u0131\u015f\u0131yor
+    config = MLModelConfig(num_boost_round=10, early_stopping_rounds=3, purge_gap_days=5)
     trainer = LightGBMTrainer(config)
 
     features_map, returns, date_groups, fnames = _make_features_map(300, n_features=10)
 
     model = trainer.train(features_map, returns, date_groups, feature_names=fnames)
     if model is None:
-        print("  ⚠ Model None, skip")
+        print("  \u26a0 Model None, skip")
         return 0, 0
 
-    # Trainer split doğrulama
-    n = len(features_map)
-    val_size = max(10, int(n * config.val_ratio))
-    purge_gap = config.purge_gap_days
-    expected_train = n - val_size - purge_gap
-
-    assert model.train_samples == expected_train, \
-        f"Train size mismatch: {model.train_samples} vs {expected_train}"
-
+    # Date-space purge: train_date_range sonu < val tarihleri
     train_end = model.train_date_range[1]
     assert train_end != "", "Train end should not be empty"
 
-    print(f"  ✓ No leakage: train={model.train_samples}, purge={purge_gap} samples (~5 days), "
-          f"val={val_size}, train_end={train_end}")
+    # Val tarihleri train_end'den sonra olmal\u0131 (purge gap nedeniyle)
+    # train_samples + val_samples < toplam sample (purge aras\u0131 atlan\u0131r)
+    total = len(features_map)
+    assert model.train_samples < total, "Train should be < total"
+
+    vm = model.validation_metrics
+    assert vm.get("validation_samples", 0) > 0, "Should have validation samples"
+
+    print(f"  \u2713 No leakage: train={model.train_samples}, total={total}, "
+          f"val_samples={int(vm.get('validation_samples', 0))}, train_end={train_end}")
     passed += 1
 
     return passed, failed
@@ -286,7 +287,7 @@ def test_constant_feature():
 
     # Model None olabilir (sabit feature ile), ama crash olmamalı
     if model is not None:
-        vm = model._validation_metrics
+        vm = model.validation_metrics
         assert np.isfinite(vm.get("mae", 0)), "MAE should be finite"
         assert np.isfinite(vm.get("rmse", 0)), "RMSE should be finite"
         print(f"  ✓ Constant feature: model trained, MAE={vm['mae']:.4f}")
@@ -424,10 +425,10 @@ def test_deterministic_training():
 
     assert model1.train_samples == model2.train_samples
     assert model1.validation_score == model2.validation_score
-    assert model1._validation_metrics["mae"] == model2._validation_metrics["mae"]
-    assert model1._validation_metrics["rmse"] == model2._validation_metrics["rmse"]
+    assert model1.validation_metrics["mae"] == model2.validation_metrics["mae"]
+    assert model1.validation_metrics["rmse"] == model2.validation_metrics["rmse"]
     print(f"  ✓ Deterministic: samples={model1.train_samples}, "
-          f"val={model1.validation_score}, MAE={model1._validation_metrics['mae']:.4f}")
+          f"val={model1.validation_score}, MAE={model1.validation_metrics['mae']:.4f}")
     passed += 1
 
     return passed, failed

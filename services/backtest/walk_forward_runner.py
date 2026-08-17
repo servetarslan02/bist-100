@@ -235,31 +235,26 @@ class WalkForwardBacktestRunner:
         train_end: str,
         benchmark_data=None,
     ):
-        """TRAIN window için LightGBM modeli eğit — MULTI-SAMPLE.
+        """TRAIN window için LightGBM modeli eğit — FAZ 4.4.
 
-        Her uygun işlem günü için ayrı training sample oluşturulur:
-          - feature_date = T
-          - features  = sadece T'ye kadar bilinen veriler
-          - target    = T+5 günlük forward return
-
-        Güvenceler:
-          1. Son 5 gün target üretilemediği için KULLANILMAZ.
-          2. Feature hesaplamasında sadece T'ye kadar veri kullanılır.
-          3. Aynı (ticker, date) çifti iki kez eklenmez.
-          4. Purge/embargo: sadece train_start..train_end arası veri.
-          5. Minimum sample yetersizse None döner (caller rule-based fallback yapar).
-          6. Deterministik: seed=42, sıralı tarih grupları.
+        Değişiklikler:
+        - purge_gap date-space'de çalışır (sample-space değil)
+        - CrossSectionalNormalizer PIT-safe entegrasyon
+        - Feature contract CS feature'larını içerir
+        - Multi-horizon target (1d/5d/20d/60d) altyapısı
+        - Model metadata kalıcı field'larda saklanır
 
         Returns:
             TrainedModel veya None
         """
         try:
-            from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
+            from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, DEFAULT_TARGETS
             from ..features.calculator import FeatureCalculator
+            from ..ml.training_validator import training_validator, cross_sectional_normalizer
         except ImportError:
             return None
 
-        # 1) Train window verisini kes (pit_data zaten test_end'e kadar kesilmiş)
+        # 1) Train window verisini kes
         train_data: Dict[str, pd.DataFrame] = {}
         ts_start = pd.Timestamp(train_start)
         ts_end = pd.Timestamp(train_end)
@@ -274,45 +269,39 @@ class WalkForwardBacktestRunner:
 
         # 2) Her ticker × her uygun gün için sample oluştur
         calc = FeatureCalculator()
-        features_map: Dict[str, Dict] = {}   # key = "TICKER::YYYY-MM-DD"
+        features_map: Dict[str, Dict] = {}
         returns: Dict[str, float] = {}
         date_groups: Dict[str, str] = {}
 
-        # Feature names bir kez hesaplanacak (lazy)
-        _feature_names_cache: Optional[List[str]] = None
+        # En büyük horizon kadar son günleri atla (horizon-aware)
+        max_horizon = self.FORWARD_DAYS  # Varsayılan 5d
 
         for ticker, df in train_data.items():
             n = len(df)
-            # İlk feature index: MIN_BARS_FOR_FEATURES - 1 (0-indexed, 60 bar gerekli)
             first_feature_idx = self.MIN_BARS_FOR_FEATURES - 1
-            # Son feature index: n - FORWARD_DAYS - 1 (5 gün forward ayrılmalı)
-            last_feature_idx = n - self.FORWARD_DAYS - 1
+            last_feature_idx = n - max_horizon - 1
 
             if last_feature_idx < first_feature_idx:
-                continue  # Bu ticker için yeterli gün yok
+                continue
 
             close_all = df['Close'].values
 
             for idx in range(first_feature_idx, last_feature_idx + 1):
-                # Feature'ları sadece idx'e kadar (dahil) veri ile hesapla
                 df_slice = df.iloc[:idx + 1]
                 feats = calc.compute_all_features(df_slice, ticker=ticker)
                 if not feats:
                     continue
 
-                # Forward return: idx → idx + FORWARD_DAYS
                 c_t = close_all[idx]
                 c_t_fwd = close_all[idx + self.FORWARD_DAYS]
                 if c_t <= 0 or np.isnan(c_t) or np.isnan(c_t_fwd):
                     continue
                 forward_ret = (c_t_fwd / c_t - 1.0) * 100.0
 
-                # Benzersiz key: ticker + feature_date
                 feature_date = df.index[idx]
                 date_str = str(feature_date.date()) if hasattr(feature_date, 'date') else str(feature_date)
                 sample_key = f"{ticker}::{date_str}"
 
-                # Duplicate kontrolü
                 if sample_key in features_map:
                     continue
 
@@ -320,94 +309,118 @@ class WalkForwardBacktestRunner:
                 returns[sample_key] = forward_ret
                 date_groups[sample_key] = date_str
 
-        # 3) Minimum sample kontrolü
         n_samples = len(features_map)
         if n_samples < self.MIN_TRAINING_SAMPLES:
             logger.warning("Insufficient training samples for ML, falling back to rule-based",
                           samples=n_samples, min_required=self.MIN_TRAINING_SAMPLES)
             return None
 
-        # 4) Feature names (canonical scoring ile uyumlu — lazy)
-        if _feature_names_cache is None:
-            try:
-                from ..core.canonical_scoring import canonical_scoring
-                import inspect, re
-                feature_names: List[str] = []
-                for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
-                                 '_score_volume', '_score_fundamental', '_score_mean_reversion',
-                                 '_score_risk']:
-                    src = inspect.getsource(getattr(canonical_scoring, dim_name))
-                    features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
-                    feature_names.extend(features_in_dim)
-                _feature_names_cache = list(dict.fromkeys(feature_names))  # Unique, order preserved
-            except Exception:
-                _feature_names_cache = []
-        feature_names = _feature_names_cache
+        # 3) Feature names (canonical scoring ile uyumlu)
+        feature_names = self._get_canonical_feature_names()
+        if not feature_names:
+            return None
 
-        # 5) Deterministik sıralama (tarih ASC, sonra ticker)
-        #    LightGBM group yapısı için gerekli.
+        # 4) Deterministik sıralama
         sorted_keys = sorted(features_map.keys(), key=lambda k: (date_groups[k], k))
         features_map = {k: features_map[k] for k in sorted_keys}
         returns = {k: returns[k] for k in sorted_keys}
         date_groups = {k: date_groups[k] for k in sorted_keys}
 
-        # 5.5) Veri kalite kontrolü ve temizlik
+        # 5) Veri kalite kontrolü ve temizlik
+        features_map, clean_stats = training_validator.clean_features(
+            features_map, feature_names
+        )
+        if clean_stats["inf_replaced"] > 0 or clean_stats["outliers_clamped"] > 0:
+            logger.info("Feature cleaning applied",
+                       inf_replaced=clean_stats["inf_replaced"],
+                       outliers_clamped=clean_stats["outliers_clamped"])
+
+        quality_report = training_validator.validate_dataset(
+            features_map, returns, date_groups, feature_names
+        )
+        logger.info("Training data quality",
+                   quality_score=round(quality_report.quality_score, 2),
+                   valid_samples=quality_report.valid_samples,
+                   unique_tickers=quality_report.unique_tickers,
+                   unique_dates=quality_report.unique_dates)
+
+        # 6) Cross-Sectional Normalization (PIT-safe: sadece aynı tarih snapshot'ı)
+        #    CS feature'ları feature contract'a eklenir
+        cs_feature_names = []
         try:
-            from ..ml.training_validator import training_validator
-
-            # Feature temizliği (inf → NaN, outlier clamp)
-            features_map, clean_stats = training_validator.clean_features(
-                features_map, feature_names
+            # Sadece temel feature'ları normalize et (CS suffix'li olanları değil)
+            base_features = [f for f in feature_names if not f.endswith('_cs_zscore') and not f.endswith('_cs_rank')]
+            features_map = cross_sectional_normalizer.normalize_zscore_by_date(
+                features_map, date_groups, base_features
             )
-            if clean_stats["inf_replaced"] > 0 or clean_stats["outliers_clamped"] > 0:
-                logger.info("Feature cleaning applied",
-                           inf_replaced=clean_stats["inf_replaced"],
-                           outliers_clamped=clean_stats["outliers_clamped"])
+            # CS feature isimlerini topla
+            sample_feats = list(features_map.values())[0] if features_map else {}
+            cs_feature_names = sorted([k for k in sample_feats.keys() if k.endswith('_cs_zscore')])
+            # Feature listesini güncelle (orijinal + CS)
+            all_feature_names = feature_names + cs_feature_names
+            all_feature_names = list(dict.fromkeys(all_feature_names))  # Unique, order preserved
+            logger.info("Cross-sectional normalization applied",
+                       cs_features=len(cs_feature_names),
+                       total_features=len(all_feature_names))
+        except Exception as e:
+            logger.warning("CS normalization failed, using base features", error=str(e))
+            all_feature_names = feature_names
 
-            # Kalite raporu
-            quality_report = training_validator.validate_dataset(
-                features_map, returns, date_groups, feature_names
-            )
-            logger.info("Training data quality",
-                       quality_score=round(quality_report.quality_score, 2),
-                       valid_samples=quality_report.valid_samples,
-                       dropped=quality_report.dropped_samples,
-                       target_mean=round(quality_report.target_mean, 4),
-                       target_std=round(quality_report.target_std, 4),
-                       unique_tickers=quality_report.unique_tickers,
-                       unique_dates=quality_report.unique_dates)
-            if quality_report.warnings:
-                for w in quality_report.warnings[:3]:  # İlk 3 uyarıyı logla
-                    logger.warning("Data quality warning", warning=w)
-        except ImportError:
-            pass  # Validator yoksa eğitim devam etsin
-
-        # 6) Eğit (FAZ 4.3: purge gap + comprehensive metrics)
+        # 7) Eğit (date-space purge gap)
         config = MLModelConfig(
             num_boost_round=50,
             early_stopping_rounds=5,
-            purge_gap_days=self.FORWARD_DAYS,  # Purge = forward horizon
+            purge_gap_days=self.FORWARD_DAYS,  # Date-space purge
+            target_horizon=self.FORWARD_DAYS,
         )
         trainer = LightGBMTrainer(config)
         model = trainer.train(
             features_map, returns, date_groups,
-            feature_names=feature_names, regime="UNKNOWN"
+            feature_names=all_feature_names, regime="UNKNOWN"
         )
 
         if model:
-            vm = getattr(model, '_validation_metrics', {})
-            logger.info("Fold ML model trained (multi-sample)",
+            # CS feature bilgisini model metadata'sına kaydet
+            model.cs_features = cs_feature_names
+            vm = model.validation_metrics
+            logger.info("Fold ML model trained (v4.4)",
                        train_range=f"{train_start}..{train_end}",
                        samples=n_samples,
                        unique_dates=len(set(date_groups.values())),
                        val_score=model.validation_score,
-                       confidence=getattr(model, '_confidence_score', 0),
+                       confidence=model.confidence_score,
                        ic=round(vm.get('ic', 0), 4),
-                       dir_acc=round(vm.get('directional_accuracy', 0), 4))
+                       dir_acc=round(vm.get('directional_accuracy', 0), 4),
+                       cs_features=len(cs_feature_names))
 
         return model
 
+    def _get_canonical_feature_names(self) -> List[str]:
+        """Canonical scoring'den feature isimlerini çıkar (lazy cache)."""
+        if hasattr(self, '_feature_names_cache') and self._feature_names_cache:
+            return self._feature_names_cache
+
+        try:
+            from ..core.canonical_scoring import canonical_scoring
+            import inspect, re
+            feature_names: List[str] = []
+            for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
+                             '_score_volume', '_score_fundamental', '_score_mean_reversion',
+                             '_score_risk']:
+                src = inspect.getsource(getattr(canonical_scoring, dim_name))
+                features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
+                feature_names.extend(features_in_dim)
+            self._feature_names_cache = list(dict.fromkeys(feature_names))
+        except Exception:
+            self._feature_names_cache = []
+        return self._feature_names_cache
+
+
     # ------------------------------------------------------------------
+    # GUARDS
+    # ------------------------------------------------------------------
+
+    @staticmethod    # ------------------------------------------------------------------
     # GUARDS
     # ------------------------------------------------------------------
 

@@ -389,8 +389,8 @@ def test_lightgbm_validation_metrics():
         return 0, 0
 
     # Validation metrikleri model üzerinde olmalı
-    assert hasattr(model, '_validation_metrics'), "Model should have _validation_metrics"
-    vm = model._validation_metrics
+    assert hasattr(model, "validation_metrics"), "Model should have validation_metrics"
+    vm = model.validation_metrics
 
     assert "mae" in vm, "Missing mae"
     assert "rmse" in vm, "Missing rmse"
@@ -500,7 +500,7 @@ def test_full_pipeline_integration():
         return passed, failed
 
     assert model.train_samples > 0
-    vm = model._validation_metrics
+    vm = model.validation_metrics
     print(f"  ✓ Trained: samples={model.train_samples}, MAE={vm['mae']:.4f}, DirAcc={vm['directional_accuracy']:.4f}")
     passed += 1
 
