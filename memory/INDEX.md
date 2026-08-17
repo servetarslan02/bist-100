@@ -40,10 +40,10 @@ memory/
     └── ROADMAP-v4.md             ← Aktif yol haritası
 ```
 
-## 📐 sistem ve calisma mantiklari/ — Sistem Tanımı
+## 📐 system/ — Sistem Tanımı ve Çalışma Mantıkları
 
 ```
-sistem ve calisma mantiklari/
+memory/system/
 ├── Sistem tanımı          ← Sistem tanımı (5631 satır)
 ├── Çalışma şekli          ← Çalışma şekli (865 satır)
 ├── Hatalar                ← Hata raporu (1237 satır)
