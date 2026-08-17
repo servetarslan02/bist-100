@@ -18,6 +18,7 @@ ALTER TABLE model_versions ADD COLUMN IF NOT EXISTS feature_importance JSONB DEF
 CREATE TABLE IF NOT EXISTS system_jobs (
     id SERIAL PRIMARY KEY,
     job_type VARCHAR(50) NOT NULL,
+    idempotency_key VARCHAR(64) NOT NULL,
     status VARCHAR(20) DEFAULT 'PENDING',
     priority INTEGER DEFAULT 0,
     payload JSONB DEFAULT '{}',
@@ -69,6 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status) WHERE status IN (
 CREATE INDEX IF NOT EXISTS idx_fills_order ON fills(order_id);
 CREATE INDEX IF NOT EXISTS idx_system_jobs_status ON system_jobs(status) WHERE status IN ('PENDING', 'RUNNING');
 CREATE INDEX IF NOT EXISTS idx_system_jobs_type ON system_jobs(job_type, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_system_jobs_idempotency ON system_jobs(idempotency_key) WHERE status IN ('PENDING', 'RUNNING');
 CREATE INDEX IF NOT EXISTS idx_market_data_snapshots_date ON market_data_snapshots(instrument_id, snapshot_date DESC);
 CREATE INDEX IF NOT EXISTS idx_feature_snapshots_date ON feature_snapshots(instrument_id, feature_date DESC);
 CREATE INDEX IF NOT EXISTS idx_model_versions_status ON model_versions(status) WHERE status = 'CHAMPION';
@@ -79,6 +81,7 @@ DROP INDEX IF EXISTS idx_audit_logs_created;
 DROP INDEX IF EXISTS idx_model_versions_status;
 DROP INDEX IF EXISTS idx_feature_snapshots_date;
 DROP INDEX IF EXISTS idx_market_data_snapshots_date;
+DROP INDEX IF EXISTS idx_system_jobs_idempotency;
 DROP INDEX IF EXISTS idx_system_jobs_type;
 DROP INDEX IF EXISTS idx_system_jobs_status;
 DROP INDEX IF EXISTS idx_fills_order;

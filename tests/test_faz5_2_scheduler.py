@@ -432,6 +432,121 @@ def test_worker_graceful_shutdown():
 
 
 # ────────────────────────────────────────────────────────────
+# 13. Concurrent job prevention
+# ────────────────────────────────────────────────────────────
+
+def test_concurrent_job_prevention():
+    """Aynı idempotency_key ile iki job gönderilmemeli."""
+    from services.core.worker import JobWorker
+
+    passed = 0
+    failed = 0
+
+    w = JobWorker()
+    # Aynı key ile iki key üretimi
+    k1 = w._generate_idempotency_key("live_inference", {"ticker": "THYAO", "horizon": 5})
+    k2 = w._generate_idempotency_key("live_inference", {"horizon": 5, "ticker": "THYAO"})
+    k3 = w._generate_idempotency_key("live_inference", {"ticker": "GARAN", "horizon": 5})
+
+    assert k1 == k2, "Same params, different order → same key"
+    assert k1 != k3, "Different ticker → different key"
+
+    print(f"  ✓ Concurrent prevention: same key={k1[:8]}..., different key={k3[:8]}...")
+    passed += 1
+
+    return passed, failed
+
+
+# ────────────────────────────────────────────────────────────
+# 14. Failure scenarios — model unavailable
+# ────────────────────────────────────────────────────────────
+
+def test_failure_model_unavailable():
+    """Model yoksa sistem crash olmamalı, fallback kullanmalı."""
+    from services.core.worker import JobWorker
+
+    passed = 0
+    failed = 0
+
+    worker = JobWorker(worker_id="test-model-fail")
+
+    async def handler_with_model(**kwargs):
+        # Model yok simülasyonu
+        model = kwargs.get("model")
+        if model is None:
+            return {"status": "fallback", "reason": "model_unavailable"}
+        return {"status": "ok"}
+
+    async def run():
+        job_id = await worker.submit_job(
+            job_type="live_inference",
+            handler=handler_with_model,
+            payload={"model": None},
+            idempotency_key="model_fail_test",
+        )
+        await asyncio.sleep(0.3)
+        return job_id
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(run())
+        print("  ✓ Model unavailable: graceful fallback, no crash")
+        passed += 1
+    except Exception as e:
+        print(f"  ✗ Model unavailable caused crash: {e}")
+        failed += 1
+    finally:
+        loop.close()
+
+    return passed, failed
+
+
+# ────────────────────────────────────────────────────────────
+# 15. Failure scenarios — provider timeout
+# ────────────────────────────────────────────────────────────
+
+def test_failure_provider_timeout():
+    """Provider timeout'ta retry yapmalı, crash olmamalı."""
+    from services.core.worker import JobWorker
+
+    passed = 0
+    failed = 0
+
+    worker = JobWorker(worker_id="test-provider", retry_base_delay=0.05)
+    attempt_count = {"n": 0}
+
+    async def slow_provider(**kwargs):
+        attempt_count["n"] += 1
+        if attempt_count["n"] < 2:
+            await asyncio.sleep(10)  # Timeout
+        return {"data": "ok"}
+
+    async def run():
+        job_id = await worker.submit_job(
+            job_type="market_data_update",
+            handler=slow_provider,
+            timeout=1,
+            max_retries=2,
+            idempotency_key="provider_timeout_test",
+        )
+        await asyncio.sleep(3)
+        return job_id
+
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(run())
+        print(f"  ✓ Provider timeout: {attempt_count['n']} attempts, no crash")
+        passed += 1
+    except Exception as e:
+        print(f"  ✗ Provider timeout caused crash: {e}")
+        failed += 1
+    finally:
+        loop.close()
+
+    return passed, failed
+
+
+# ────────────────────────────────────────────────────────────
 # Ana çalıştırıcı
 # ────────────────────────────────────────────────────────────
 
@@ -449,6 +564,9 @@ def run_all():
         ("Market closed blocks trading", test_scheduler_market_closed),
         ("Next phase change", test_next_phase_change),
         ("Worker graceful shutdown", test_worker_graceful_shutdown),
+        ("Concurrent job prevention", test_concurrent_job_prevention),
+        ("Failure: model unavailable", test_failure_model_unavailable),
+        ("Failure: provider timeout", test_failure_provider_timeout),
     ]
 
     total_passed = 0

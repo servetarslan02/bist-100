@@ -5,6 +5,7 @@ Uses: MarketSessionManager + JobWorker + system_jobs DB table.
 """
 
 import asyncio
+import signal
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable, Awaitable
 import structlog
@@ -21,18 +22,18 @@ class ProductionScheduler:
     Market session aware: trading job'ları sadece piyasa açıkken çalışır.
     DB-backed job tracking: system_jobs tablosu.
     Config-driven intervals.
+    SIGTERM/SIGINT handler.
     """
 
-    # Varsayılan job interval'ları (saniye)
     DEFAULT_INTERVALS = {
-        "feature_calculation": 300,    # 5 dakika
-        "live_inference": 300,         # 5 dakika
-        "health_check": 60,            # 1 dakika
-        "market_data_update": 120,     # 2 dakika
-        "ranking": 600,                # 10 dakika
-        "signal_generation": 600,      # 10 dakika
-        "persistence": 900,            # 15 dakika
-        "daily_report": 86400,         # 1 gün
+        "feature_calculation": 300,
+        "live_inference": 300,
+        "health_check": 60,
+        "market_data_update": 120,
+        "ranking": 600,
+        "signal_generation": 600,
+        "persistence": 900,
+        "daily_report": 86400,
     }
 
     def __init__(self, intervals: Optional[Dict[str, int]] = None):
@@ -40,21 +41,34 @@ class ProductionScheduler:
         self._running = False
         self._handlers: Dict[str, Callable[..., Awaitable[Any]]] = {}
         self._last_run: Dict[str, float] = {}
+        self._shutdown_event = asyncio.Event()
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
         """Job handler kaydet."""
         self._handlers[job_type] = handler
         logger.info("Handler registered", job_type=job_type)
 
+    def update_interval(self, job_type: str, interval_seconds: int):
+        """Job interval'ını runtime'da güncelle."""
+        self._intervals[job_type] = interval_seconds
+        logger.info("Interval updated", job_type=job_type, interval=interval_seconds)
+
     async def start(self):
-        """Scheduler'ı başlat."""
+        """Scheduler'ı başlat. SIGTERM/SIGINT handler dahil."""
         self._running = True
+
+        # Signal handler bağla
+        loop = asyncio.get_event_loop()
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            try:
+                loop.add_signal_handler(sig, self._signal_handler, sig)
+            except NotImplementedError:
+                pass  # Windows
+
         logger.info("Production scheduler starting", phase=market_session.current_phase().value)
 
-        # Startup sequence
         await self._startup_sequence()
 
-        # Main loop
         while self._running:
             try:
                 await self._tick()
@@ -69,13 +83,20 @@ class ProductionScheduler:
     async def stop(self):
         """Scheduler'ı durdur."""
         self._running = False
+        self._shutdown_event.set()
         await job_worker.shutdown(timeout=30)
         logger.info("Scheduler stop requested")
 
+    def _signal_handler(self, sig):
+        """SIGTERM/SIGINT callback."""
+        logger.info(f"Received signal {sig}, initiating shutdown")
+        self._running = False
+        self._shutdown_event.set()
+
     async def _startup_sequence(self):
         """Startup'ta çalışacak kontroller."""
-        from .config import settings
-        from .database import check_db_health
+        from services.core.config import settings
+        from services.core.database import check_db_health
 
         logger.info("=== STARTUP SEQUENCE ===")
 
@@ -100,7 +121,6 @@ class ProductionScheduler:
         phase = market_session.current_phase()
 
         if phase == MarketPhase.CLOSED:
-            # Piyasa kapalı — sadece health check
             await self._maybe_run("health_check", trading_only=False)
             sleep_time = min(market_session.seconds_until_next_phase(), 300)
             await asyncio.sleep(max(sleep_time, 30))
@@ -113,7 +133,6 @@ class ProductionScheduler:
             return
 
         if phase == MarketPhase.ACTIVE:
-            # Aktif trading — tüm job'lar çalışabilir
             for job_type in ["market_data_update", "feature_calculation",
                              "live_inference", "ranking", "signal_generation",
                              "health_check"]:
@@ -145,13 +164,11 @@ class ProductionScheduler:
         if handler is None:
             return
 
-        # Trading-only job'lar sadece piyasa açıkken
         if trading_only and not market_session.should_run_trading_job():
             return
 
         self._last_run[job_type] = now
 
-        # Job'ı worker'a gönder
         try:
             job_id = await job_worker.submit_job(
                 job_type=job_type,
@@ -164,6 +181,8 @@ class ProductionScheduler:
         except Exception as e:
             logger.error("Failed to schedule job", job_type=job_type, error=str(e))
 
+
+import time  # noqa: E402 — time.time() için
 
 # Singleton
 production_scheduler = ProductionScheduler()
