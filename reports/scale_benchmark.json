@@ -1,0 +1,85 @@
+{
+  "date": "2026-08-17T10:58:53.373497",
+  "days": 252,
+  "lookback": 60,
+  "scales": {
+    "100": {
+      "panel": {
+        "wall_seconds": 0.63,
+        "total_scans": 19347,
+        "scans_per_second": 30664.7,
+        "trades": 514,
+        "feature_seconds": 0.11,
+        "panel_seconds": 0.07,
+        "scalar_fallbacks": 17,
+        "peak_rss_mb": 86.9,
+        "peak_run_delta_mb": 4.7,
+        "rss_delta_mb": 4.9,
+        "cpu_percent": 88.8,
+        "total_return_pct": 11.52
+      },
+      "legacy": {
+        "wall_seconds": 43.25,
+        "total_scans": 19347,
+        "scans_per_second": 447.4,
+        "trades": 514,
+        "feature_seconds": 39.14,
+        "panel_seconds": 0.0,
+        "scalar_fallbacks": 0,
+        "peak_rss_mb": 87.3,
+        "peak_run_delta_mb": 0.4,
+        "rss_delta_mb": 0.4,
+        "cpu_percent": 99.8,
+        "total_return_pct": 11.52
+      },
+      "equivalence_verified": true,
+      "speedup": 68.7
+    },
+    "500": {
+      "panel": {
+        "wall_seconds": 2.47,
+        "total_scans": 95747,
+        "scans_per_second": 38763.8,
+        "trades": 514,
+        "feature_seconds": 0.58,
+        "panel_seconds": 0.37,
+        "scalar_fallbacks": 79,
+        "peak_rss_mb": 100.6,
+        "peak_run_delta_mb": 10.5,
+        "rss_delta_mb": 11.0,
+        "cpu_percent": 100.4,
+        "total_return_pct": 11.52
+      },
+      "legacy_extrapolated": {
+        "wall_seconds": 214.0,
+        "total_scans": 95747,
+        "scans_per_second": 447.3,
+        "note": "100 hisse ölçümünden ekstrapolasyon (2.24 ms/scan); gerçek çalıştırma yapılmadı"
+      },
+      "speedup": 86.6
+    },
+    "1000": {
+      "panel": {
+        "wall_seconds": 5.13,
+        "total_scans": 191247,
+        "scans_per_second": 37266.8,
+        "trades": 514,
+        "feature_seconds": 1.24,
+        "panel_seconds": 0.74,
+        "scalar_fallbacks": 163,
+        "peak_rss_mb": 117.4,
+        "peak_run_delta_mb": 16.8,
+        "rss_delta_mb": 17.6,
+        "cpu_percent": 100.0,
+        "total_return_pct": 11.52
+      },
+      "legacy_extrapolated": {
+        "wall_seconds": 427.5,
+        "total_scans": 191247,
+        "scans_per_second": 447.3,
+        "note": "100 hisse ölçümünden ekstrapolasyon (2.24 ms/scan); gerçek çalıştırma yapılmadı"
+      },
+      "speedup": 83.3
+    }
+  }
+}
