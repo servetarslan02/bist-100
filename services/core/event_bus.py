@@ -254,24 +254,46 @@ async def _publish_with_idempotency(event: CanonicalEvent):
 async def _check_and_mark_published(event_id: str) -> bool:
     """Idempotency check — aynı event_id tekrar publish edilmesin.
     Returns True if this is a new event, False if duplicate.
+    Öncelik: Redis > PostgreSQL > fail-open
     """
+    # 1. Redis dene
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.redis_url, decode_responses=True)
         key = f"event_published:{event_id}"
-        result = await r.set(key, "1", ex=3600, nx=True)  # 1 saat TTL
+        result = await r.set(key, "1", ex=3600, nx=True)
         await r.close()
-        return result is not None  # None = already exists = duplicate
+        if result is not None:
+            return True
+        return False
     except Exception:
-        return True  # Redis yoksa publish et (fail-open for publishing)
+        pass
+
+    # 2. PostgreSQL dene
+    try:
+        from services.core.database_dev import dev_db
+        existing = await dev_db.pg_fetchrow(
+            "SELECT event_id FROM event_ledger WHERE event_id = ?", event_id
+        )
+        if existing:
+            return False
+        await dev_db.pg_execute(
+            "INSERT OR IGNORE INTO event_ledger (event_id, published_at) VALUES (?, CURRENT_TIMESTAMP)",
+            event_id
+        )
+        return True
+    except Exception:
+        pass
+
+    # 3. Fail-open
+    return True
 
 
 async def _publish_to_stream(event: CanonicalEvent):
-    """Redis Streams'a event yaz (durable ledger).
-
-    Subscriber kapalıyken event kaybolmamalı.
-    Consumer'lar XREADGROUP ile okuyabilir.
+    """Durable event ledger'a yaz.
+    Öncelik: Redis Stream > PostgreSQL > Log
     """
+    # 1. Redis Stream dene
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.redis_url, decode_responses=True)
@@ -281,10 +303,22 @@ async def _publish_to_stream(event: CanonicalEvent):
             "event_type": event.event_type,
             "data": event.to_json(),
             "timestamp": event.timestamp.isoformat(),
-        }, maxlen=10000)  # Son 10K event tut
+        }, maxlen=10000)
         await r.close()
+        return
+    except Exception:
+        pass
+
+    # 2. PostgreSQL dene
+    try:
+        from services.core.database_dev import dev_db
+        await dev_db.pg_execute(
+            "INSERT OR IGNORE INTO event_ledger (event_id, event_type, payload, published_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            event.event_id, event.event_type, event.to_json()
+        )
+        return
     except Exception as e:
-        logger.debug("Stream publish failed", error=str(e))
+        logger.debug("PG event ledger write failed", error=str(e))
 
 
 def flush_producer():
@@ -347,8 +381,8 @@ class EventConsumer:
                 else:
                     handler(event)
                 self._processed_ids.add(event.event_id)
-                if len(self._processed_ids) > 10000:
-                    self._processed_ids = set(list(self._processed_ids)[-5000:])
+                if len(self._processed_ids) > 50000:
+                    self._processed_ids = set(list(self._processed_ids)[-25000:])
             except Exception as e:
                 logger.error("Handler error", event_type=event.event_type, error=str(e))
 

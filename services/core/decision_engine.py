@@ -261,7 +261,7 @@ class DecisionEngine:
         elif bearish_signals >= 3:
             return "SHORT"
 
-        return "LONG" if inp.ml_score > 50 else "SHORT"
+        return "HOLD"
 
     def _determine_action(self, inp: DecisionInput, direction: str) -> str:
         """Action belirle."""

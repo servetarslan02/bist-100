@@ -21,12 +21,8 @@ class MatriksProvider:
 
     BASE_URL = "https://www.matriks.com"
 
-    async def __init__(self):
+    def __init__(self):
         self._client = get_client("matriks", timeout=15.0, max_retries=3)
-        # Headers set in client config
-        pass  #
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-        })
 
     async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Tek hisse fiyatı (15dk gecikmeli)."""

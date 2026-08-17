@@ -30,7 +30,7 @@ class TCMBProvider:
         "bist_100": "TP.TUFE1YI1",
     }
 
-    async def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key
         self._client = get_client("tcmb", timeout=30.0, max_retries=3)
 

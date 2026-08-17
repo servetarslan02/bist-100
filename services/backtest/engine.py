@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 import structlog
+from services.portfolio.portfolio_manager import CommissionModel
 
 logger = structlog.get_logger()
 
@@ -82,7 +83,7 @@ class BacktestEngine:
         signals: List[Dict[str, Any]],
         price_data: Dict[str, List[Dict[str, Any]]],
         initial_capital: float = 100000,
-        commission_rate: float = 0.001,
+        commission_rate: Optional[float] = None,
         slippage_pct: float = 0.05,
     ) -> BacktestResult:
         """Backtest çalıştır.
@@ -91,6 +92,11 @@ class BacktestEngine:
             signals: [{"date": "2024-01-15", "ticker": "THYAO", "action": "BUY", "price": 300, "confidence": 0.8}, ...]
             price_data: {"THYAO": [{"date": "2024-01-15", "close": 300, "volume": 1000000}, ...], ...}
         """
+        if commission_rate is not None:
+            _cm = CommissionModel(broker_rate=commission_rate/2, exchange_rate=commission_rate/2)
+        else:
+            _cm = CommissionModel()
+
         capital = initial_capital
         positions: Dict[str, Dict] = {}  # ticker -> {qty, avg_cost, entry_date}
         trades: List[BacktestTrade] = []
@@ -121,7 +127,7 @@ class BacktestEngine:
 
                 if shares > 0 and capital >= shares * fill_price:
                     cost = shares * fill_price
-                    commission = cost * commission_rate
+                    commission = _cm.calculate(cost)
                     capital -= (cost + commission)
 
                     positions[ticker] = {
@@ -134,7 +140,7 @@ class BacktestEngine:
             elif action == "SELL" and ticker in positions:
                 pos = positions[ticker]
                 revenue = pos["qty"] * fill_price
-                commission = revenue * commission_rate
+                commission = _cm.calculate(revenue)
                 capital += (revenue - commission)
 
                 pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission

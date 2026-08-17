@@ -239,7 +239,7 @@ class BacktestEngineV4:
 
         if self._dq is None:
             try:
-                from ..core.data_quality_v2 import DataQualityV2
+                from ..core.data_quality import DataQualityChecker as DataQualityV2
                 self._dq = DataQualityV2()
             except ImportError:
                 self._dq = _FallbackQuality()

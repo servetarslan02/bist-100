@@ -35,6 +35,18 @@ class WorldState:
     min_value: float = 0.0
     max_value: float = 1.0
 
+    # Factor bazlı nötr seviyeler
+    neutral_levels: Dict[str, float] = field(default_factory=lambda: {
+        "global_risk_appetite": 0.5, "usd_strength": 0.5, "us_rate_pressure": 0.5,
+        "commodity_pressure": 0.5, "oil_pressure": 0.5, "turkey_macro_risk": 0.6,
+        "geopolitical_risk": 0.45, "em_risk_appetite": 0.5, "inflation_pressure": 0.55,
+    })
+    decay_rates: Dict[str, float] = field(default_factory=lambda: {
+        "global_risk_appetite": 0.95, "usd_strength": 0.90, "us_rate_pressure": 0.92,
+        "commodity_pressure": 0.88, "oil_pressure": 0.88, "turkey_macro_risk": 0.97,
+        "geopolitical_risk": 0.93, "em_risk_appetite": 0.95, "inflation_pressure": 0.96,
+    })
+
     def to_vector(self) -> np.ndarray:
         """State'i numpy vektörüne çevir."""
         return np.array([
@@ -80,20 +92,20 @@ class WorldState:
         }
 
     def apply_decay(self, hours_elapsed: float):
-        """Zaman geçtikçe etki azalır — mean reversion."""
-        decay = self.decay_rate ** hours_elapsed
-        # Tüm faktörleri 0.5'e (nötr) doğru çek
-        self.global_risk_appetite = 0.5 + (self.global_risk_appetite - 0.5) * decay
-        self.usd_strength = 0.5 + (self.usd_strength - 0.5) * decay
-        self.us_rate_pressure = 0.5 + (self.us_rate_pressure - 0.5) * decay
-        self.commodity_pressure = 0.5 + (self.commodity_pressure - 0.5) * decay
-        self.oil_pressure = 0.5 + (self.oil_pressure - 0.5) * decay
-        self.turkey_macro_risk = 0.5 + (self.turkey_macro_risk - 0.5) * decay
-        self.geopolitical_risk = 0.5 + (self.geopolitical_risk - 0.5) * decay
-        self.em_risk_appetite = 0.5 + (self.em_risk_appetite - 0.5) * decay
-        self.inflation_pressure = 0.5 + (self.inflation_pressure - 0.5) * decay
-        # VIX 20'ye (normal) döner
-        self.vix_level = 20 + (self.vix_level - 20) * decay
+        """Zaman geçtikçe etki azalır — factor bazlı decay."""
+        factors = [
+            "global_risk_appetite", "usd_strength", "us_rate_pressure",
+            "commodity_pressure", "oil_pressure", "turkey_macro_risk",
+            "geopolitical_risk", "em_risk_appetite", "inflation_pressure",
+        ]
+        for factor in factors:
+            neutral = self.neutral_levels.get(factor, 0.5)
+            factor_decay = self.decay_rates.get(factor, self.decay_rate)
+            decay = factor_decay ** hours_elapsed
+            current = getattr(self, factor)
+            setattr(self, factor, neutral + (current - neutral) * decay)
+        vix_decay = self.decay_rate ** hours_elapsed
+        self.vix_level = 20 + (self.vix_level - 20) * vix_decay
 
 
 class WorldStateManager:

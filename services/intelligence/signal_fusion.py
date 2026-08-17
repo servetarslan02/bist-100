@@ -76,6 +76,16 @@ class SignalFusionEngine:
         "ai": 0.15,
     }
 
+    REGIME_WEIGHT_OVERRIDES = {
+        "TRENDING-UP": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
+        "TRENDING-DOWN": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
+        "HIGH-VOLATILITY": {"macro": 0.20, "valuation": 0.20, "momentum": 0.10},
+        "RISK-ON": {"momentum": 0.25, "sentiment": 0.15},
+        "RISK-OFF": {"macro": 0.20, "valuation": 0.20, "fundamental": 0.20},
+        "PANIC": {"macro": 0.25, "valuation": 0.15},
+        "RECOVERY": {"fundamental": 0.25, "valuation": 0.20, "sentiment": 0.15},
+    }
+
     def fuse_signals(
         self,
         ticker: str,
@@ -109,8 +119,10 @@ class SignalFusionEngine:
 
         result.opportunity_score = signals.get("opportunity", {}).get("score", 50)
 
-        # Ağırlıklı skor
+        # Ağırlıklı skor — rejime göre ayarla
         weights = dict(self.DEFAULT_WEIGHTS)
+        if market_regime in self.REGIME_WEIGHT_OVERRIDES:
+            weights.update(self.REGIME_WEIGHT_OVERRIDES[market_regime])
         weighted_score = 0.0
         total_weight = 0.0
 

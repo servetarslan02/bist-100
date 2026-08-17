@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
 
-from ..core.data_quality_v2 import DataQualityV2, QualityReport
+from ..core.data_quality import DataQualityChecker as DataQualityV2, QualityReport
 from ..features.calculator import FeatureCalculator
 from ..core.tradability_mask import TradabilityMask
 

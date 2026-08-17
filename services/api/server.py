@@ -765,8 +765,6 @@ async def admin_silence_remove(request: Request):
     return {"removed": removed}
 
 
-@post_admin = lambda: None  # placeholder for syntax
-
 @app.post("/admin/policy/diff")
 async def admin_policy_diff(request: Request):
     """Policy diff (uygulamadan)."""

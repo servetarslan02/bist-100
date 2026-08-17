@@ -467,8 +467,8 @@ class PortfolioService:
             db_cash = float(pf_row["cash_balance"]) if pf_row else self._pm._cash
             if db_cash < quantity * price + commission:
                 return {"success": False, "error": "Yetersiz nakit (DB)"}
-        except Exception:
-            pass  # DB okunamazsa in-memory ile devam et
+        except Exception as e:
+            logger.warning("DB cash read failed — using in-memory", error=str(e), ticker=ticker)
 
         result = self._pm.open_position(
             ticker=ticker, direction="LONG", quantity=quantity,

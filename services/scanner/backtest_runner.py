@@ -23,7 +23,7 @@ import structlog
 
 from ..features.calculator import FeatureCalculator
 from ..core.tradability_mask import TradabilityMask
-from ..core.data_quality_v2 import DataQualityV2
+from ..core.data_quality import DataQualityChecker as DataQualityV2
 
 logger = structlog.get_logger()
 

@@ -12,7 +12,7 @@ logger = structlog.get_logger()
 class SocialProvider:
     """Fetches social media data for sentiment analysis."""
 
-    async def __init__(self, x_api_key: Optional[str] = None):
+    def __init__(self, x_api_key: Optional[str] = None):
         self.x_api_key = x_api_key
         self._client = get_client("social", timeout=15.0, max_retries=2)
 

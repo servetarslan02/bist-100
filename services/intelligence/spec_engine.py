@@ -91,6 +91,19 @@ class SPECEngine:
         historical_sim = self._compute_historical_similarity(historical_analogues)
         penalty, penalty_details = self._compute_penalties(asset_state, market_state)
 
+        # Config eşiklerini uygula
+        if anomaly < self.config.anomaly_threshold:
+            anomaly *= 0.5
+        if evidence_consensus < self.config.evidence_min_ratio:
+            evidence_consensus *= 0.7
+        if regime_compat < self.config.regime_compatibility_min:
+            regime_compat *= 0.6
+        if expected_value < self.config.expected_value_min:
+            expected_value *= 0.5
+        if risk_asymmetry < self.config.risk_asymmetry_min:
+            risk_asymmetry *= 0.7
+        penalty = min(penalty, self.config.penalty_max)
+
         raw_score = (
             self.config.w_anomaly * anomaly
             + self.config.w_evidence * evidence_consensus

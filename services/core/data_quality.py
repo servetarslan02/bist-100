@@ -170,5 +170,62 @@ class DataQualityEngine:
                     reasons[reason] = reasons.get(reason, 0) + 1
         return reasons
 
-# Singleton
+# =====================================================
+# DataFrame Kalite Kontrolleri (v2'den birleştirildi)
+# =====================================================
+
+@dataclass
+class QualityIssue:
+    check: str
+    severity: str
+    message: str
+    details: Dict[str, Any] = None
+    affected_rows: int = 0
+    def __post_init__(self):
+        if self.details is None: self.details = {}
+    def to_dict(self):
+        return {"check": self.check, "severity": self.severity, "message": self.message,
+                "details": self.details, "affected_rows": self.affected_rows}
+
+@dataclass
+class QualityReport:
+    ticker: str
+    total_rows: int
+    issues: List[QualityIssue]
+    quality_score: float
+    passed: bool
+    def to_dict(self):
+        return {"ticker": self.ticker, "total_rows": self.total_rows,
+                "issues": [i.to_dict() for i in self.issues], "quality_score": self.quality_score,
+                "passed": self.passed}
+
+class DataQualityChecker:
+    """DataFrame bazlı veri kalitesi kontrolü (duplicate, stale, gap, vb.)."""
+    def full_quality_check(self, df, ticker="UNKNOWN"):
+        import pandas as pd
+        issues = []
+        total_rows = len(df)
+        if total_rows == 0:
+            return QualityReport(ticker, 0, [], 0, False)
+        for col in ["close", "open", "high", "low", "volume"]:
+            if col in df.columns:
+                missing = df[col].isna().sum()
+                if missing > 0:
+                    issues.append(QualityIssue(f"missing_{col}", "CRITICAL" if col == "close" else "WARNING",
+                                               f"{col}: {missing} eksik", affected_rows=int(missing)))
+        for col in ["close", "open", "high", "low"]:
+            if col in df.columns:
+                invalid = (df[col] <= 0).sum()
+                if invalid > 0:
+                    issues.append(QualityIssue(f"invalid_{col}", "CRITICAL", f"{col}: {invalid} geçersiz", affected_rows=int(invalid)))
+        if "high" in df.columns and "low" in df.columns:
+            inv = (df["high"] < df["low"]).sum()
+            if inv > 0:
+                issues.append(QualityIssue("high_low_inv", "CRITICAL", f"High<Low: {inv}", affected_rows=int(inv)))
+        critical = sum(1 for i in issues if i.severity == "CRITICAL")
+        score = max(0, 100 - critical * 20 - sum(1 for i in issues if i.severity == "WARNING") * 5)
+        return QualityReport(ticker, total_rows, issues, score, critical == 0)
+
+# Singleton'lar
 data_quality = DataQualityEngine()
+data_quality_checker = DataQualityChecker()

@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Data Quality v2.0
+ALPHA BIST — Data Quality v2.0 [DEPRECATED → data_quality.py'ye birleştirildi]
 
 Gelişmiş veri kalitesi kontrolleri.
 

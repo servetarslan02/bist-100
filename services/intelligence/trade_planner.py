@@ -201,7 +201,15 @@ class TradePlanner:
 
         bb_lower = features.get("bb_lower", price * 0.95)
         sma_20 = features.get("sma_20", price)
-        atr = features.get("atr_14", price * 0.02)
+        atr_raw = features.get("atr_14")
+        atr_pct_raw = features.get("atr_pct")
+        if atr_raw is not None and atr_raw > 0:
+            atr = atr_raw
+        elif atr_pct_raw is not None and atr_pct_raw > 0:
+            atr = price * atr_pct_raw / 100.0
+        else:
+            bb_width = features.get("bb_upper", price * 1.05) - bb_lower
+            atr = min(bb_width * 0.5, price * 0.02) if bb_width > 0 else price * 0.015
 
         # Bollinger alt bandına yakın → limit emir
         if price < bb_lower * 1.02:
@@ -220,7 +228,14 @@ class TradePlanner:
     ) -> Tuple[float, float, float]:
         """Hedef fiyatlar belirle."""
 
-        atr = features.get("atr_14", price * 0.02)
+        atr_raw = features.get("atr_14")
+        atr_pct_raw = features.get("atr_pct")
+        if atr_raw is not None and atr_raw > 0:
+            atr = atr_raw
+        elif atr_pct_raw is not None and atr_pct_raw > 0:
+            atr = price * atr_pct_raw / 100.0
+        else:
+            atr = price * 0.015
         bb_upper = features.get("bb_upper", price * 1.05)
         sma_20 = features.get("sma_20", price)
         mom20 = features.get("momentum_20d", 0)
@@ -251,7 +266,14 @@ class TradePlanner:
     ) -> Tuple[float, str]:
         """Stop loss belirle."""
 
-        atr = features.get("atr_14", price * 0.02)
+        atr_raw = features.get("atr_14")
+        atr_pct_raw = features.get("atr_pct")
+        if atr_raw is not None and atr_raw > 0:
+            atr = atr_raw
+        elif atr_pct_raw is not None and atr_pct_raw > 0:
+            atr = price * atr_pct_raw / 100.0
+        else:
+            atr = price * 0.015
         bb_lower = features.get("bb_lower", price * 0.95)
         support = features.get("near_20d_low", 0)
 

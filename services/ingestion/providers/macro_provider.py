@@ -41,7 +41,7 @@ class MacroProvider:
         "US_2Y_YIELD": "DGS2",
     }
 
-    async def __init__(self):
+    def __init__(self):
         self._client = get_client("macro", timeout=15.0, max_retries=3)
 
     async def fetch_yahoo_macro(self) -> Dict[str, Any]:
