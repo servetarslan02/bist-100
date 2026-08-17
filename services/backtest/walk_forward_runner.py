@@ -148,12 +148,26 @@ class WalkForwardBacktestRunner:
             fold_run_id = f"{run_id}_fold{fold_id:03d}"
             test_start = fold["test_start"]
             test_end = fold["test_end"]
+            train_start = fold["train_start"]
+            train_end = fold["train_end"]
 
             # ====== POINT-IN-TIME KESİT (gelecek veri fiziksel olarak yok) ======
             pit_data = self._truncate(market_data, test_end)
 
+            # ====== ML MODEL EĞİTİMİ (TRAIN window ile) ======
+            fold_config = self._config
+            if self._config.use_canonical_scoring:
+                ml_model = self._train_fold_model(
+                    pit_data, train_start, train_end, benchmark_data
+                )
+                if ml_model is not None:
+                    # Config'in kopyasını oluştur (model sadece bu fold için)
+                    import copy
+                    fold_config = copy.deepcopy(self._config)
+                    fold_config.ml_model = ml_model
+
             # ====== ENGINE RUN (trade penceresi = test aralığı) ======
-            engine = BacktestEngineV4(self._config, use_panel_features=self._use_panel)
+            engine = BacktestEngineV4(fold_config, use_panel_features=self._use_panel)
             r = engine.run(
                 pit_data,
                 universe_at_date=universe_at_date,
@@ -202,6 +216,88 @@ class WalkForwardBacktestRunner:
                        leakage_ok=leakage_ok)
 
         return self._aggregate(run_id, fold_results)
+
+    # ------------------------------------------------------------------
+    # ML MODEL TRAINING
+    # ------------------------------------------------------------------
+
+    def _train_fold_model(
+        self,
+        pit_data: Dict[str, pd.DataFrame],
+        train_start: str,
+        train_end: str,
+        benchmark_data=None,
+    ):
+        """TRAIN window için LightGBM modeli eğit.
+
+        Sadece train_start..train_end arası veri kullanılır.
+        Test verisi eğitimine kesinlikle girmez.
+
+        Returns:
+            TrainedModel veya None (yeterli veri yoksa)
+        """
+        try:
+            from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
+            from ..features.calculator import FeatureCalculator
+        except ImportError:
+            return None
+
+        # Train window verisini kes
+        train_data = {}
+        for ticker, df in pit_data.items():
+            mask = (df.index >= pd.Timestamp(train_start)) & (df.index <= pd.Timestamp(train_end))
+            df_train = df[mask]
+            if len(df_train) >= 60:
+                train_data[ticker] = df_train
+
+        if len(train_data) < 5:
+            return None
+
+        # Feature'ları hesapla
+        calc = FeatureCalculator()
+        features_map = {}
+        returns = {}
+        date_groups = {}
+
+        for ticker, df in train_data.items():
+            # Son gün feature'ları
+            feats = calc.compute_all_features(df, ticker=ticker)
+            if feats:
+                features_map[ticker] = feats
+                # Forward return (5 gün)
+                if len(df) > 5:
+                    close = df['Close'].values
+                    ret = (close[-1] / close[-6] - 1) * 100 if len(close) > 6 else 0
+                    returns[ticker] = ret
+                    date_str = str(df.index[-1].date()) if hasattr(df.index[-1], 'date') else str(df.index[-1])
+                    date_groups[ticker] = date_str
+
+        if len(features_map) < 10 or len(returns) < 10:
+            return None
+
+        # Feature names (canonical scoring ile uyumlu)
+        from ..core.canonical_scoring import canonical_scoring
+        feature_names = []
+        for dim_name in ['_score_technical', '_score_momentum', '_score_relative_strength',
+                         '_score_volume', '_score_fundamental', '_score_mean_reversion',
+                         '_score_risk']:
+            import inspect, re
+            src = inspect.getsource(getattr(canonical_scoring, dim_name))
+            features_in_dim = re.findall(r'f\.get\("([^"]+)"', src)
+            feature_names.extend(features_in_dim)
+        feature_names = list(dict.fromkeys(feature_names))  # Unique, order preserved
+
+        # Eğit
+        trainer = LightGBMTrainer(MLModelConfig(num_boost_round=50, early_stopping_rounds=5))
+        model = trainer.train(features_map, returns, date_groups, feature_names=feature_names)
+
+        if model:
+            logger.info("Fold ML model trained",
+                       train_range=f"{train_start}..{train_end}",
+                       samples=model.train_samples,
+                       val_score=model.validation_score)
+
+        return model
 
     # ------------------------------------------------------------------
     # GUARDS

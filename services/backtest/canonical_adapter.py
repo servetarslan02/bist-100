@@ -45,6 +45,7 @@ class BacktestCanonicalAdapter:
         self,
         features: Dict[str, Any],
         regime: str = "UNKNOWN",
+        ml_model=None,
     ) -> float:
         """Feature'lardan canonical opportunity score üret.
 
@@ -53,6 +54,7 @@ class BacktestCanonicalAdapter:
         Args:
             features: Calculator output (teknik feature'lar)
             regime: Piyasa rejimi
+            ml_model: TrainedModel instance (None → rule-based only)
 
         Returns:
             Opportunity score (0-100)
@@ -64,6 +66,7 @@ class BacktestCanonicalAdapter:
             ticker="BACKTEST",
             features=features,
             regime=regime,
+            ml_model=ml_model,
         )
 
         return cs.opportunity_score
@@ -73,6 +76,7 @@ class BacktestCanonicalAdapter:
         features: Dict[str, Any],
         regime: str = "UNKNOWN",
         price: float = 0,
+        ml_model=None,
     ):
         """Feature'lardan canonical score + decision üret.
 
@@ -85,6 +89,7 @@ class BacktestCanonicalAdapter:
             ticker="BACKTEST",
             features=features,
             regime=regime,
+            ml_model=ml_model,
         )
 
         decision = self._decision_engine.decide_from_canonical(cs, price=price)

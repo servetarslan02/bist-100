@@ -49,6 +49,7 @@ class BacktestConfig:
     use_canonical_scoring: bool = False  # True → CanonicalScoringPipeline kullan
     regime: str = "UNKNOWN"  # Canonical scoring için rejim
     historical_repository: Any = None  # HistoricalDataRepository instance
+    ml_model: Any = None  # TrainedModel instance (LightGBM)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -1016,12 +1017,14 @@ class BacktestEngineV4:
 
         PIT KORUMASI: Sadece calculator feature'ları kullanılır.
         Motor5/6/9 gibi anlık veri gerektiren motorlar çalıştırılmaz.
+        ML model varsa kullanılır, yoksa rule-based fallback.
         """
         try:
             from .canonical_adapter import backtest_canonical_adapter
             return backtest_canonical_adapter.compute_score(
                 features=features,
                 regime=self._config.regime,
+                ml_model=self._config.ml_model,
             )
         except Exception as e:
             logger.warning("Canonical scoring failed, falling back to legacy", error=str(e))

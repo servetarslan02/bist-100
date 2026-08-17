@@ -109,6 +109,11 @@ class CanonicalScore:
     feature_count: int = 0
     nonzero_dimensions: int = 0
 
+    # ML model bilgisi
+    ml_score: Optional[float] = None    # ML prediction (0-100)
+    ml_confidence: float = 0.0          # ML güven skoru (0-1)
+    rule_score: float = 0.0             # Rule-based skor (ML blend öncesi)
+
 
 # =====================================================
 # CANONICAL SCORING PIPELINE
@@ -240,10 +245,15 @@ class CanonicalScoringPipeline:
         ticker: str,
         features: Dict[str, Any],
         regime: str = "UNKNOWN",
+        ml_model=None,
     ) -> CanonicalScore:
         """Tek canonical skor üret.
 
-        Mevcut rule-based score ile aynı sonucu vermeli (backward compatible).
+        Args:
+            ticker: Hisse kodu
+            features: Feature dict
+            regime: Piyasa rejimi
+            ml_model: TrainedModel instance (None → rule-based only)
         """
         vector = self.compute_score_vector(ticker, features, regime)
         weights = self.REGIME_WEIGHTS.get(regime, self.REGIME_WEIGHTS["UNKNOWN"])
@@ -258,7 +268,25 @@ class CanonicalScoringPipeline:
             weights.get(dim, 0)
             for dim in opportunity_dims
         )
-        opportunity_score = weighted_sum / total_weight if total_weight > 0 else 50.0
+        rule_score = weighted_sum / total_weight if total_weight > 0 else 50.0
+
+        # ML prediction (varsa)
+        ml_score = None
+        ml_confidence = 0.0
+        if ml_model is not None:
+            try:
+                ml_pred = ml_model.predict(features)
+                # ML prediction'ı 0-100 aralığına normalize et
+                ml_score = max(0, min(100, 50 + ml_pred * 10))
+                ml_confidence = min(1.0, abs(ml_pred) / 2.0)
+            except Exception:
+                pass  # ML prediction başarısızsa rule-based kullan
+
+        # Ensemble: ML varsa %70 ML + %30 rule-based
+        if ml_score is not None:
+            opportunity_score = 0.7 * ml_score + 0.3 * rule_score
+        else:
+            opportunity_score = rule_score
 
         # Risk skoru (0-100, yüksek = güvenli)
         risk_score = vector.risk
@@ -287,6 +315,9 @@ class CanonicalScoringPipeline:
             regime=regime,
             feature_count=len(features),
             nonzero_dimensions=vector.get_nonzero_count(),
+            ml_score=round(ml_score, 2) if ml_score is not None else None,
+            ml_confidence=round(ml_confidence, 4),
+            rule_score=round(rule_score, 2),
         )
 
     # =====================================================
