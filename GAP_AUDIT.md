@@ -1,7 +1,8 @@
 # ALPHA BIST — Production Readiness GAP Audit
-# Tarih: 2026-08-18
-# Kapsam: Repository tamamı (89,912 satır Python, 263 dosya, 78 test dosyası)
-# FAZ 4.1–4.9: KAPALI (185/185 passed, tekrar açılmayacak)
+**Tarih:** 2026-08-18
+**Kapsam:** Repository tamamı (89,912 satır Python, 263 dosya, 78 test dosyası)
+**Kaynak:** MIMARI_GAP_ANALIZ.md + ROADMAP-v4.md + mevcut kod doğrulaması
+**FAZ 4.1–4.9:** KAPALI (185/185 passed, tekrar açılmayacak)
 
 ---
 
@@ -9,19 +10,45 @@
 
 | Sınıf | Sayı |
 |-------|------|
-| A — Production Blocker | 4 |
-| B — Production öncesi zorunlu | 11 |
-| C — Production sonrası yapılabilir | 14 |
+| A — Production Blocker | 5 |
+| B — Production öncesi zorunlu | 8 |
+| C — Production sonrası yapılabilir | 10 |
 | D — Nice-to-have | 7 |
-| **Toplam bulgu** | **36** |
+| **Toplam doğrulanmış bulgu** | **30** |
 
-**Production Readiness: %42 — HAZIR DEĞİL**
+**Production Readiness: %35 — HAZIR DEĞİL**
 
 ---
 
-## A — PRODUCTION BLOCKER (4)
+## A — PRODUCTION BLOCKER (5)
 
-### A-1. Broker/Order Abstraction Yok
+### A-1. Production Config/Secrets Yönetimi
+
+| Alan | Configuration |
+|------|-------------|
+| Dosya | `.env.example`, `config/alpha_config.json`, `services/core/config.py` |
+| Mevcut durum | `.env.example`'da `POSTGRES_PASSWORD=alpha_…026` hardcoded. `SECRET_KEY=change…ng`. Config validation yok. Dev/prod ayrımı yok. |
+| Eksik | Secret management (Vault/env), config validation, production/dev separation, credential rotation |
+| Etki | **CRITICAL** — Güvenlik açığı, credential leak |
+| Neden | Production'da hardcoded şifreler tehlikeli |
+| Bağımlılık | — |
+| Çözüm | .env ile config separation, secret validation, production defaults, gitignore |
+| Kabul kriteri | `git grep "alpha_secure_2026"` → 0 sonuç, .env gitignore'da |
+
+### A-2. Database Entegrasyonu Çalışmıyor
+
+| Alan | Database |
+|------|----------|
+| Dosya | `database/init/001_schema.sql`, `services/core/migrations/`, `docker-compose.yml`, `services/core/database.py` |
+| Mevcut durum | Schema SQL'leri var (4 migration), docker-compose var, `database.py`'de asyncpg pool code var. Ama production'da aktif değil, feature/signal/prediction DB'ye yazılmıyor. |
+| Eksik | DB connection pool production'da aktif, feature storage, prediction storage, signal storage, model metadata storage, retention, backup/recovery |
+| Etki | **CRITICAL** — Veri kalıcı değil, restart'ta her şey kaybolur |
+| Neden | Historical analysis, backtest, model training için veri lazım |
+| Bağımlılık | Docker |
+| Çözüm | DB repository layer + feature/signal/prediction persistence |
+| Kabul kriteri | Feature → DB → query → model pipeline çalışmalı |
+
+### A-3. Broker/Order Abstraction Yok
 
 | Alan | Execution |
 |------|-----------|
@@ -34,7 +61,7 @@
 | Çözüm | Broker abstraction interface + en az 1 concrete implementation (paper/live) |
 | Kabul kriteri | Paper order → broker API → fill → portfolio update zinciri çalışmalı |
 
-### A-2. Live Scheduler / Worker Altyapısı Yok
+### A-4. Live Scheduler/Worker Altyapısı Yok
 
 | Alan | Scheduling |
 |------|-----------|
@@ -47,165 +74,115 @@
 | Çözüm | Worker altyapısı + market session scheduler |
 | Kabul kriteri | Market açıkken otomatik tarama + model yeniden eğitim döngüsü çalışmalı |
 
-### A-3. Database Entegrasyonu Çalışmıyor
+### A-5. 17 Intelligence Modülü Bağlı Değil
 
-| Alan | Database |
-|------|----------|
-| Dosya | `database/init/001_schema.sql`, `services/core/migrations/`, `docker-compose.yml` |
-| Mevcut durum | Schema SQL'leri var, docker-compose var, ama Python kodunda asyncpg/aiosqlite import'ları sadece `services/api/main.py`'de health check'te. Feature storage, prediction storage, signal persistence DB'ye yazılmıyor. |
-| Eksik | DB connection pool, ORM/repository layer, feature storage, prediction storage, signal storage, model metadata storage, retention policy, backup/recovery |
-| Etki | **CRITICAL** — Veri kalıcı değil, restart'ta her şey kaybolur |
-| Neden | Historical analysis, backtest, model training için veri lazım |
-| Bağımlılık | PostgreSQL + ClickHouse docker ayağa kalkmalı |
-| Çözüm | DB repository layer + feature/signal/prediction persistence |
-| Kabul kriteri | Feature → DB → query → model pipeline çalışmalı |
-
-### A-4. Production Config/Secrets Yönetimi Yok
-
-| Alan | Configuration |
+| Alan | Intelligence |
 |------|-------------|
-| Dosya | `.env.example`, `config/alpha_config.json`, `services/core/config.py` |
-| Mevcut durum | `.env.example`'da `POSTGRES_PASSWORD=alpha_secure_2026` hardcoded. `SECRET_KEY=change_this_to_a_random_string`. Config validation yok. Dev/prod ayrımı yok. |
-| Eksik | Secret management (Vault/env), config validation, production/dev separation, credential rotation, exposed credential scanning |
-| Etki | **CRITICAL** — Güvenlik açığı, credential leak |
-| Neden | Production'da hardcoded şifreler tehlikeli |
-| Bağımlılık | — |
-| Çözüm | .env ile config separation, secret validation, production defaults |
-| Kabul kriteri | `git grep "alpha_secure_2026"` → 0 sonuç, .env gitignore'da |
+| Dosya | `services/intelligence/*.py` (17 modül) |
+| Mevcut durum | signal_fusion, trade_planner, forecasting, probability, monte_carlo, spec_engine, evidence_engine, factor_engine, knowledge_graph, impact_engine, kap_extractor, analysis_engines, macro_sensitivity, research_memory, scenario, valuation, world_state — hiçbiri orchestrator'a bağlı değil |
+| Eksik | Orchestrator pipeline entegrasyonu, veri besleme, output tüketimi |
+| Etki | **CRITICAL** — Prediction layer, decision quality, intelligence features üretilemez |
+| Neden | Sistem sadece teknik feature'lardan skor üretiyor, intelligence katmanı tamamen pasif |
+| Bağımlılık | Motor besleme (A-2 sonrası) |
+| Çözüm | Orchestrator'da intelligence modül entegrasyonu (öncelik: signal_fusion, trade_planner, forecasting) |
+| Kabul kriteri | Intelligence modülleri orchestrator'dan çağrılıyor ve output üretiyor |
 
 ---
 
-## B — PRODUCTION ÖNCESİ ZORUNLU (11)
+## B — PRODUCTION ÖNCESİ ZORUNLU (8)
 
-### B-1. KAP Veri Pipeline Entegrasyonu
+### B-1. Motor 1/4/5/6/9 Veri Beslemesi
 
-| Dosya | `services/ingestion/providers/kap_provider.py`, `services/intelligence/kap_extractor.py` |
+| Dosya | `services/core/orchestrator.py`, `services/features/seven_motors.py` |
 |-------|---|
-| Mevcut | KAP provider class'ları var ama canlı KAP çekimi test edilmemiş, retry/timeout yok |
-| Eksik | Canlı KAP API entegrasyonu, retry, duplicate detection, timestamp/PIT, failure fallback |
-| Etki | HIGH |
-| Çözüm | KAP provider'ı production-ready yap, integration test yaz |
+| Mevcut | Orchestrator'da `benchmark_close`, `market_return`, `sector_close`, `peer_closes` besleniyor. Ama `fundamentals`, `kap_events`, `news_events`, `upcoming_events`, `llm_analysis` hâlâ None. Motor 1 (RS) çalışıyor, Motor 4/5/6/9 veri alamıyor. |
+| Etki | HIGH — 5 motor feature üretmiyor |
+| Çözüm | Fundamental, KAP, news, catalyst veri akışını orchestrator'a bağla |
 
-### B-2. News Pipeline Entegrasyonu
+### B-2. Prediction Layer (Direction/Return/Confidence)
 
-| Dosya | `services/ingestion/providers/news_provider.py`, `services/intelligence/news_pipeline.py` |
+| Dosya | `services/intelligence/forecasting.py`, `services/intelligence/probability.py` |
 |-------|---|
-| Mevcut | feedparser + aiohttp yüklü, provider class var. Ama canlı çekim test edilmemiş, embedding pipeline eksik |
-| Eksik | Canlı haber çekimi, duplicate detection, embedding/feature pipeline, failure fallback |
-| Etki | HIGH |
-| Çözüm | News provider integration test + embedding pipeline |
+| Mevcut | Sistem sadece "skor" üretiyor. Yön tahmini, beklenen getiri, zaman ufku, confidence, risk/reward, kalite sınıfı yok. `forecasting.py`'de `HORIZONS = [1, 5, 20, 60, 120]` tanımlı ama hiç kullanılmıyor. |
+| Etki | HIGH — Trading kalitesi düşük |
+| Bağımlılık | FAZ 4 ML pipeline (mevcut) |
+| Çözüm | Direction model (classification), return model (regresyon + CI), calibration (Platt scaling) |
 
-### B-3. Model Registry / Versioning
+### B-3. Signal-to-Decision Pipeline Kopuk
+
+| Dosya | `services/intelligence/signal_fusion.py`, `services/intelligence/trade_planner.py` |
+|-------|---|
+| Mevcut | Mevcut: features → ranking → top_20 → rapor. Hedef: features → ranking → direction → expected_return → confidence → risk/reward → trade_plan. signal_fusion ve trade_planner var ama bağlı değil. |
+| Etki | HIGH |
+| Bağımlılık | Prediction layer (B-2) |
+| Çözüm | Orchestrator'da signal fusion + trade planner entegrasyonu |
+
+### B-4. Model Registry / Versioning
 
 | Dosya | `services/ml/lightgbm_trainer.py` |
 |-------|---|
-| Mevcut | `TrainedModel.save()/load()` var ama versioning, registry, promotion/rollback yok |
-| Eksik | Model version tracking, champion/challenger promotion, rollback, metadata storage |
+| Mevcut | `TrainedModel.save()/load()` var (pickle), `MultiHorizonModel` var ama versioning, champion/challenger promotion, rollback, DB persistence yok. |
 | Etki | HIGH |
-| Çözüm | Model registry class + DB persistence |
+| Çözüm | Model registry class + DB persistence + promotion/rollback |
 
-### B-4. Live Feature Calculation Pipeline
+### B-5. Calibrasyon Eğitilmemiş
 
-| Dosya | `services/features/calculator.py`, `services/backtest/engine_v4.py` |
+| Dosya | `services/risk/calibration.py`, `services/risk/position_sizing.py` |
 |-------|---|
-| Mevcut | FeatureCalculator var, backtest'te kullanılıyor. Ama canlı inference scheduling, stale feature detection, missing data handling yok |
-| Eksik | Live feature scheduler, stale detection, missing data fallback, feature freshness check |
-| Etki | HIGH |
-| Çözüm | Live feature pipeline + freshness monitoring |
+| Mevcut | `calibrator._fitted = False`. Position sizing cold-start policy'de. Kelly devre dışı. |
+| Etki | HIGH — Score-based weight çalışıyor ama optimal değil |
+| Çözüm | Calibrator'ı historical trade data ile eğit, Kelly'yi aktif et |
 
-### B-5. Signal Deduplication / Expiry
+### B-6. KAP/News Canlı Pipeline
 
-| Dosya | `services/core/decision_engine.py` |
+| Dosya | `services/ingestion/providers/kap_provider.py`, `services/ingestion/providers/news_provider.py` |
 |-------|---|
-| Mevcut | Decision engine var ama signal deduplication, expiry, ranking universe filtering yok |
-| Eksik | Signal cache, duplicate prevention, TTL/expiry, universe filtering |
+| Mevcut | `fetch_disclosures()`, `fetch_newsapi()` method'ları var ama canlı test edilmemiş, orchestrator'a bağlı değil, embedding pipeline yok, retry/timeout yok. |
 | Etki | HIGH |
-| Çözüm | Signal cache with TTL + deduplication |
+| Çözüm | Canlı KAP/news çekimi + orchestrator entegrasyonu + embedding pipeline |
 
-### B-6. Position Sizing → Risk Gate Bağlantısı
-
-| Dosya | `services/risk/position_sizing.py`, `services/risk/enhanced_risk.py` |
-|-------|---|
-| Mevcut | PositionSizer class var (Kelly), risk module var ama live pipeline'a bağlı değil |
-| Eksik | Risk gate'in live scoring pipeline ile entegrasyonu, sector exposure, concentration limits |
-| Etki | HIGH |
-| Çözüm | Risk gate middleware + live pipeline integration |
-
-### B-7. Circuit Breaker / Kill Switch
-
-| Dosya | `services/core/circuit_breaker.py`, `services/paper_trading/paper_risk_gate.py` |
-|-------|---|
-| Mevcut | CircuitBreaker class var, paper trading'de kill switch var. Ama live execution'da kullanılmıyor |
-| Eksik | Live execution'da circuit breaker, emergency stop, model confidence ile risk bağlantısı |
-| Etki | HIGH |
-| Çözüm | Live risk gate + circuit breaker integration |
-
-### B-8. Structured Logging + Monitoring
-
-| Dosya | `services/core/monitoring.py`, `services/core/observability.py` |
-|-------|---|
-| Mevcut | structlog kullanılıyor, Prometheus metrics var. Ama live'da metric collection, alert routing, audit trail eksik |
-| Eksik | Live metric collection, alert routing (Slack/email), audit trail, latency tracking |
-| Etki | HIGH |
-| Çözüm | Monitoring pipeline + alert integration |
-
-### B-9. API Authentication/Authorization
-
-| Dosya | `services/api/server.py` |
-|-------|---|
-| Mevcut | Monitoring endpoint'lerinde Bearer token var. Ama genel API auth yok |
-| Eksik | API-wide auth, rate limiting, CORS, input validation |
-| Etki | HIGH |
-| Çözüm | API middleware (auth + rate limit + validation) |
-
-### B-10. Corporate Actions Handling
+### B-7. Corporate Actions (Split/Dividend)
 
 | Dosya | — |
 |-------|---|
-| Mevcut | **YOK.** Split, dividend, ticker change, delist handling yok |
-| Eksik | Corporate action detection, price adjustment, universe update, survivorship bias correction |
-| Etki | HIGH |
+| Mevcut | **YOK.** Split, dividend, ticker change, delist handling yok. |
+| Etki | HIGH — Fiyat verisi bozulur, backtest sonuçları yanıltır |
 | Çözüm | Corporate action handler + price adjustment pipeline |
 
-### B-11. Deployment / Docker Production Config
+### B-8. Risk Gate + Circuit Breaker Live
 
-| Dosya | `docker-compose.yml`, `infrastructure/Dockerfile.api` |
+| Dosya | `services/risk/enhanced_risk.py`, `services/core/circuit_breaker.py`, `services/paper_trading/paper_risk_gate.py` |
 |-------|---|
-| Mevcut | docker-compose var ama production resource limits, health checks, restart policy, startup ordering eksik |
-| Eksik | Production docker-compose, resource limits, health checks, startup ordering, deployment/rollback |
-| Etki | HIGH |
-| Çözüm | Production docker-compose + deployment script |
+| Mevcut | Risk modülleri ve CircuitBreaker class var ama live execution'da aktif değil. Paper trading'de kill switch var. |
+| Etki | HIGH — Live'da risk kontrolü yok |
+| Çözüm | Risk gate middleware + circuit breaker live pipeline entegrasyonu |
 
 ---
 
-## C — PRODUCTION SONRASI YAPILABİLİR (14)
+## C — PRODUCTION SONRASI YAPILABİLİR (10)
 
-| ID | Alan | Açıklama | Etki |
-|----|------|----------|------|
-| C-1 | WebSocket streaming | Canlı fiyat stream'i (WebSocket) | MEDIUM |
-| C-2 | Grafana dashboard | Monitoring dashboard (grafana provision var ama aktif değil) | MEDIUM |
-| C-3 | Backtest performance | Büyük dataset'te backtest yavaşlaması | MEDIUM |
-| C-4 | Feature caching | Feature hesaplama cache (per-ticker, per-date) | MEDIUM |
-| C-5 | Database migrations runner | Migration runner var ama CLI integration yok | LOW |
-| C-6 | Redpanda/Kafka event bus | Event bus kodu var ama production'da aktif değil | MEDIUM |
-| C-7 | LLM integration | Ollama config var ama KAP extraction LLM pipeline eksik | MEDIUM |
-| C-8 | Multi-instance deployment | Birden fazla instance çalıştırma | LOW |
-| C-9 | Historical data backfill | Eski veriyi DB'ye doldurma scripti | MEDIUM |
-| C-10 | Operational runbook | Operasyonel prosedür dokümantasyonu | LOW |
-| C-11 | Performance profiling | CPU/RAM/latency profiling | LOW |
-| C-12 | Load testing | Eşzamanlı ticker işleme testi | MEDIUM |
-| C-13 | Disaster recovery | DB backup/restore prosedürü | MEDIUM |
-| C-14 | API versioning | API v1/v2 ayrımı | LOW |
+| # | Alan | Açıklama | Etki |
+|---|------|----------|------|
+| C-1 | API auth/rate limiting | Monitoring endpoint'lerinde Bearer token var ama genel API auth yok | MEDIUM |
+| C-2 | Monitoring/alert routing | structlog + Prometheus var ama live metric collection, alert routing eksik | MEDIUM |
+| C-3 | Docker production config | docker-compose var ama production resource limits, health checks eksik | MEDIUM |
+| C-4 | Regime sistemi tutarsızlığı | `regime_detector.py` (aktif) ve `regime.py` (pasif) farklı rejim tipleri üretiyor | LOW |
+| C-5 | WebSocket streaming | API'de WebSocket endpoint var ama canlı fiyat stream'i yok | MEDIUM |
+| C-6 | Historical data backfill | Eski veriyi DB'ye doldurma scripti yok | MEDIUM |
+| C-7 | Feature caching | Feature hesaplama cache (per-ticker, per-date) yok | MEDIUM |
+| C-8 | Grafana dashboard | Grafana provision var ama aktif değil | LOW |
+| C-9 | Disaster recovery | DB backup/restore prosedürü yok | MEDIUM |
+| C-10 | Operational runbook | Operasyonel prosedür dokümantasyonu yok | LOW |
 
 ---
 
 ## D — NICE-TO-HAVE (7)
 
-| ID | Alan | Açıklama |
-|----|------|----------|
-| D-1 | FinRL/FinGPT entegrasyonu | ROADMAP'te vaat edilmiş (FAZ 29) |
+| # | Alan | Açıklama |
+|---|------|----------|
+| D-1 | FinRL/FinGPT entegrasyonu | ROADMAP FAZ 29 |
 | D-2 | Alternative data | Satellite, social media, web scraping |
-| D-3 | Options/VIOP | ROADMAP'te vaat edilmiş (FAZ 32) |
+| D-3 | Options/VIOP | ROADMAP FAZ 32 |
 | D-4 | Global market expansion | Sadece BIST değil, global |
 | D-5 | Autonomous research brain | ROADMAP FAZ 13 |
 | D-6 | Governed autonomous coding | ROADMAP FAZ 14 |
@@ -213,17 +190,36 @@
 
 ---
 
-## ROADMAP vs KOD GAP ANALİZİ
+## FAZ 4 İLE KAPATILANLAR (Tekrar iş olarak yazılmaz)
+
+| Madde | FAZ 4.x |
+|-------|---------|
+| Multi-sample training dataset | 4.1 |
+| Training dataset kalite kontrolü | 4.2 |
+| Production-grade ML validation | 4.3 |
+| Date-space purge gap | 4.4 |
+| Multi-horizon target (1d/5d/20d/60d) | 4.4-4.5 |
+| Feature registry/contract (76 feature) | 4.5 |
+| CS normalization live parity | 4.6 |
+| Adapter parity-safe | 4.7 |
+| Tüm scoring path'leri parity-safe | 4.8-4.9 |
+| Scalar feature guard | 4.8 |
+| Future-data mutation protection | 4.1-4.9 |
+| Deterministic training/replay | 4.1-4.9 |
+
+---
+
+## ROADMAP vs KOD GAP
 
 | Roadmap FAZ | Durum | Açıklama |
 |-------------|-------|----------|
-| FAZ 0 (Truth Audit) | ✅ Yapıldı | — |
+| FAZ 0 (Truth Audit) | ✅ Tamamlandı | — |
 | FAZ 1 (Canonical Runtime) | ⚠️ Kısmen | Entry point var ama single runtime yok |
 | FAZ 2 (Universe/Entity) | ⚠️ Kısmen | `bist_universe.py` var ama PIT universe snapshot yok |
 | FAZ 3 (Raw Data + PIT) | ⚠️ Kısmen | yfinance var ama PIT store, mask-first partial |
-| FAZ 4 (Event Intelligence) | ✅ FAZ 4.1–4.9 kapatıldı | — |
+| FAZ 4 (ML Pipeline) | ✅ FAZ 4.1–4.9 kapatıldı | — |
 | FAZ 5 (World State) | ⚠️ Kısmen | `WorldStateManager` var ama live besleme yok |
-| FAZ 6 (Feature Platform) | ⚠️ Kısmen | FeatureCalculator var ama 9 family eksik |
+| FAZ 6 (Feature Platform) | ⚠️ Kısmen | FeatureCalculator var ama 9 family eksik (Motor 1/4/5/6/9) |
 | FAZ 7 (Label/Dataset) | ❌ Yok | Label generator, dataset manifest yok |
 | FAZ 8 (Model Zoo) | ⚠️ Kısmen | LightGBM var ama model zoo, benchmark yok |
 | FAZ 9 (Governance) | ⚠️ Kısmen | Paper trading'de champion/challenger var ama live'da yok |
@@ -234,31 +230,37 @@
 
 ---
 
+## BAĞIMLILIK SIRASI
+
+```
+Sprint 1: A-1 (config/secrets) + A-2 (DB) + C-3 (docker production)
+    ↓
+Sprint 2: A-4 (scheduler) + B-1 (motor besleme) + C-2 (monitoring)
+    ↓
+Sprint 3: A-3 (broker) + B-8 (risk gate live) + B-7 (corporate actions)
+    ↓
+Sprint 4: A-5 (intelligence bağlama) + B-2 (prediction layer) + B-6 (KAP/news)
+    ↓
+Sprint 5: B-3 (signal-to-decision) + B-4 (model registry) + B-5 (calibration)
+    ↓
+Sprint 6: C-1 (API auth) + C-4 (regime) + integration tests
+    ↓
+Sonrası: C serisi + D serisi
+```
+
+---
+
 ## SONUÇ
 
 | Metric | Değer |
 |--------|-------|
-| Production Blocker | 4 |
-| Production öncesi zorunlu | 11 |
-| Production sonrası | 14 |
-| Nice-to-have | 7 |
-| **Production Readiness** | **%42** |
+| Toplam doğrulanmış bulgu | 30 |
+| FAZ 4 ile kapatılan | 12 (tekrar açılmayacak) |
+| Hâlâ gerçek eksik | 18 |
+| Production Blocker (A) | 5 |
+| Production öncesi (B) | 8 |
+| Sonraya bırakılabilir (C+D) | 17 |
+| **Production Readiness** | **%35** |
 | **Karar** | **HAZIR DEĞİL** |
-
-### Production'a Çıkışı Engelleyen 4 Blocker
-
-1. **Broker/Order abstraction** — Gerçek emir gönderilemez
-2. **Live scheduler/worker** — Sistem kendi kendine çalışmaz
-3. **Database entegrasyonu** — Veri kalıcı değil
-4. **Production config/secrets** — Güvenlik açığı
-
-### Önerilen Uygulama Sırası
-
-1. **Sprint 1 (1 hafta):** A-4 (secrets) + A-3 (DB) + B-11 (docker production)
-2. **Sprint 2 (2 hafta):** A-2 (scheduler) + B-4 (live feature pipeline) + B-8 (monitoring)
-3. **Sprint 3 (2 hafta):** A-1 (broker abstraction) + B-6 (risk gate) + B-7 (circuit breaker)
-4. **Sprint 4 (1 hafta):** B-1 (KAP) + B-2 (news) + B-3 (model registry) + B-5 (signal dedup)
-5. **Sprint 5 (1 hafta):** B-9 (API auth) + B-10 (corporate actions) + integration tests
-6. **Sonrası:** C serisi + D serisi
-
-**Tahmini production-ready süre: 7-8 sprint (8-10 hafta)**
+| **Tahmini production-ready süre** | **6 sprint (8-10 hafta)** |
+| **İlk uygulanması gereken** | **Config/Secrets + DB + Docker (Sprint 1)** |
