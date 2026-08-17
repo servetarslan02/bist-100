@@ -230,8 +230,11 @@ class WalkForwardBacktestRunner:
     ):
         """TRAIN window için LightGBM modeli eğit.
 
-        Sadece train_start..train_end arası veri kullanılır.
-        Test verisi eğitimine kesinlikle girmez.
+        PIT-safe:
+        - Sadece train_start..train_end arası veri kullanılır
+        - Feature'lar t anında hesaplanır, target t+5 getirisidir
+        - Feature ve target arasında veri sızıntısı yoktur
+        - Test verisi eğitimine kesinlikle girmez
 
         Returns:
             TrainedModel veya None (yeterli veri yoksa)
@@ -241,6 +244,9 @@ class WalkForwardBacktestRunner:
             from ..features.calculator import FeatureCalculator
         except ImportError:
             return None
+
+        # Purge gap kontrolü: train_end < purge_start (runner zaten sağlar)
+        # Burada sadece train_start..train_end arası veri kullanılır
 
         # Train window verisini kes
         train_data = {}
@@ -253,24 +259,40 @@ class WalkForwardBacktestRunner:
         if len(train_data) < 5:
             return None
 
-        # Feature'ları hesapla
+        # Feature ve target hesapla (PIT-safe)
+        # Her ticker için train_end - 5 günündeki feature'ları kullan
+        # Target = train_end - 5'ten train_end'e kadar olan getiri
+        # Bu şekilde feature ve target arasında veri sızıntısı olmaz
         calc = FeatureCalculator()
         features_map = {}
         returns = {}
         date_groups = {}
 
         for ticker, df in train_data.items():
-            # Son gün feature'ları
-            feats = calc.compute_all_features(df, ticker=ticker)
-            if feats:
-                features_map[ticker] = feats
-                # Forward return (5 gün)
-                if len(df) > 5:
-                    close = df['Close'].values
-                    ret = (close[-1] / close[-6] - 1) * 100 if len(close) > 6 else 0
-                    returns[ticker] = ret
-                    date_str = str(df.index[-1].date()) if hasattr(df.index[-1], 'date') else str(df.index[-1])
-                    date_groups[ticker] = date_str
+            n = len(df)
+            if n < 65:  # En az 60 gün feature + 5 gün forward
+                continue
+
+            # Feature tarihi: train_end - 5 (son 5 gün target için ayrılır)
+            feature_idx = n - 6  # train_end'den 6 gün önce
+            if feature_idx < 59:  # Feature hesaplama için en az 59 gün gerekli
+                continue
+
+            # Feature'ları hesapla (sadece feature_idx'e kadar veri kullan)
+            df_feature = df.iloc[:feature_idx + 1]
+            feats = calc.compute_all_features(df_feature, ticker=ticker)
+            if not feats:
+                continue
+
+            features_map[ticker] = feats
+
+            # Forward return: feature_idx'den train_end'e kadar
+            close = df['Close'].values
+            forward_ret = (close[-1] / close[feature_idx] - 1) * 100
+            returns[ticker] = forward_ret
+
+            date_str = str(df.index[feature_idx].date()) if hasattr(df.index[feature_idx], 'date') else str(df.index[feature_idx])
+            date_groups[ticker] = date_str
 
         if len(features_map) < 10 or len(returns) < 10:
             return None
