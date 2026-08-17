@@ -7,40 +7,55 @@
 
 ## 1. İşlem Saatleri
 
-| Seans | Saat | Açıklama |
-|-------|------|----------|
-| Emir Toplama | 09:40-09:55 | Sadece emir girilir, işlem yok |
-| Seans 1 | 09:55-12:30 | Tek fiyat yöntemi |
-| Ara | 12:30-14:00 | İşlem yok |
-| Seans 2 | 14:00-17:40 | Sürekli müzayede |
-| Kapanış | 17:40-18:00 | Kapanış fiyatları |
-| After-hours | 18:00+ | Piyasa kapalı |
+**Kaynak:** Borsa İstanbul resmi, Garanti BBVA, ÜNLÜ Menkul
+**Not:** 2015 BISTECH geçişinden sonra tek seans sistemi uygulanmaktadır.
 
-**Önemli:** Scanner, scheduler, API bu saatlere göre çalışmalı.
+| Aşama | Saat | Açıklama |
+|-------|------|----------|
+| Açılış Seansı Emir Toplama | 09:40-09:55 | Sadece emir girilir, işlem yok |
+| Fiyat Belirleme ve İşlem | 09:55-10:00 | Açılış fiyatı belirlenir |
+| Sürekli İşlem | 10:00-18:00 | Ana işlem seansı (tek seans, ara yok) |
+| Kapanış Seansı | 18:00-18:10 | Kapanış fiyatları belirlenir |
+
+**Önemli:**
+- 2015 öncesi iki seans (10:00-12:30 + 14:00-17:40) vardı
+- 2015 BISTECH geçişinden sonra tek seans (10:00-18:00)
+- Öğle arası yok
+- Scanner, scheduler, API bu saatlere göre çalışmalı
 
 ---
 
 ## 2. Fiyat Limitleri
 
-| Hisse Türü | Limit | Açıklama |
-|------------|-------|----------|
-| Normal | ±%10 | Önceki kapanışa göre |
-| Volatil | ±%5 veya ±%20 | SPK belirler |
-| İlk seansta | Limit yok | Açılış fiyatına kadar |
-| Devre kesici | ±%5 (gün içi), ±%10 (açılış) | Otomatik durdurma |
+**Kaynak:** Borsa İstanbul resmi, İş Yatırım, AA (2020)
+
+| Pazar | Fiyat Marjı | Devre Kesici | Açığa Satış Yukarı Adım |
+|-------|------------|--------------|------------------------|
+| Yıldız Pazar | ±%20 | %10 | VAR |
+| Ana Pazar | ±%15 | %7.5 | VAR |
+| Alt Pazar | ±%10 | %5 | YOK |
+| Tüm gruplar (kriz) | ±%10 | %5 | — |
+
+**Devre Kesici:**
+- Sadece aşağı yönlü tetiklenir
+- Tetikleme sonrası 15 dakika emir toplama
+- Açılış seansında devre kesici yok
 
 **Önemli:** price_limits.py, risk_gate.py bu kuralları uygulamalı.
 
 ---
 
-## 3. Açığa satış
+## 3. Açığa Satış
 
-- Sadece **BIST-30** hisseleri açığa satılabilir
-- **Uptick rule:** Son işlem fiyatından yüksek fiyatla açığa satış
+**Kaynak:** Borsa İstanbul resmi, Para Dergi (2025), Ata Yatırım
+
+- **BIST-50** hisseleri açığa satılabilir (BIST-30 değil!)
+- **Yukarı adım kuralı:** Açığa satış fiyatı son işlem fiyatından yüksek olmalı (BIST-50)
 - **Brüt takaslı** hisselerde açığa satış yasak
 - **SPK geçici yasak** kontrolü gerekli
+- Alt Pazar'da açığa satış yok
 
-**Önemli:** short_selling.py bu kuralları uygulamalı.
+**Önemli:** short_selling.py, risk_gate.py bu kuralları uygulamalı.
 
 ---
 
@@ -60,11 +75,14 @@
 
 | Bileşen | Oran | Açıklama |
 |---------|------|----------|
-| Broker | %0.03 (değişken) | Aracı kurum |
-| BIST | %0.0056 | Borsa payı |
-| MKK | %0.00109 | Saklama payı |
-| BSMV | %5 (komisyon üzerinden) | Vergi |
+| Broker | %0.03-0.2 (değişken) | Aracı kuruma göre değişir, hacme bağlı |
+| BIST | %0.0056 | Borsa payı (Borsa İstanbul tarifesi) |
+| MKK | %0.00109 | Saklama payı (Kayıt sayısı üzerinden) |
+| BSMV | %5 (komisyon üzerinden) | Banka ve Sigorta Muameleleri Vergisi |
 | Minimum | ₺1 | Alt sınır |
+
+**Kaynak:** Borsa İstanbul ücretlendirme tablosu, Ata Yatırım, TEB Yatırım
+**Not:** Broker oranları aracı kuruma ve işlem hacmine göre büyük farklılık gösterir.
 
 **Önemli:** fee_calculator.py, portfolio_manager.py, backtest/engine.py bu oranları kullanmalı.
 
@@ -72,12 +90,14 @@
 
 ## 6. Temettü
 
+**Kaynak:** EY Türkiye (2025), Verginet.net
+
 - KAP üzerinden açıklanır
 - Temettü tarihi öncesi hisse fiyatı düşer (ex-date)
-- Stopaj: %10 (gerçek kişiler)
-- Temettü verimi = Hisse fiyatı / Yıllık temettü
+- **Stopaj: %15** (gerçek kişiler, 2025 itibariyle — daha önce %10'du)
+- Temettü verimi = Yıllık temettü / Hisse fiyatı
 
-**Önemli:** portfolio/enhancements.py, features/fundamental.py bu kuralları uygulamalı.
+**Önemli:** portfolio/enhancements.py, features/fundamental.py bu oranı kullanmalı.
 
 ---
 
