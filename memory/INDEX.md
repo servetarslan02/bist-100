@@ -40,6 +40,33 @@ memory/
     └── ROADMAP-v4.md             ← Aktif yol haritası
 ```
 
+## 📦 modules/ — Modül Dokümantasyonu (207 dosya)
+
+```
+memory/modules/
+├── core/              ← 53 modül (temel altyapı)
+├── ingestion/         ← 7 modül (veri toplama)
+├── features/          ← 18 modül (özellik hesaplama)
+├── intelligence/      ← 23 modül (analiz ve tahmin)
+├── risk/              ← 7 modül (risk yönetimi)
+├── portfolio/         ← 4 modül (portföy yönetimi)
+├── learning/          ← 8 modül (öğrenme sistemi)
+├── ml/                ← 17 modül (makine öğrenmesi)
+├── backtest/          ← 9 modül (geriye dönük test)
+├── agents/            ← 2 modül (AI agent)
+├── scanner/           ← 9 modül (tarama motoru)
+├── scheduler/         ← 4 modül (zamanlayıcı)
+├── simulation/        ← 3 modül (simülasyon)
+├── api/               ← 4 modül (arayüz)
+├── market_state/      ← 2 modül (piyasa durumu)
+├── alternative/       ← 6 modül (alternatif veri)
+├── macro/             ← 8 modül (makro ekonomi)
+├── factors/           ← 8 modül (faktör investing)
+├── event_study/       ← 8 modül (olay analizi)
+└── viop/              ← 7 modül (vadeli işlem)
+```
+Her modül için ayrı .md dosyası: sınıf, fonksiyon, bağlantı bilgileri.
+
 ## 📐 system/ — Sistem Tanımı ve Çalışma Mantıkları
 
 ```
