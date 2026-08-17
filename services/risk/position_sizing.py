@@ -104,10 +104,11 @@ class PositionSizer:
             if calibrator:
                 win_prob = calibrator.calibrate(score)
             else:
-                # Fallback: confidence'ı win_prob olarak kullanma!
-                # Score semantigi: dusuk score = iyi
-                # Empirical mapping: score ~0 -> p~0.9, score ~5 -> p~0.7, score ~10 -> p~0.5
-                win_prob = 1.0 / (1.0 + np.exp(0.5 * score - 2.5))
+                # Fallback: score semantiği yüksek=iyi (0-100 skala,
+                # ranking_model.py ile ve aşağıdaki cold-start bloğuyla
+                # tutarlı). score=50 (nötr) -> p~0.5; score=70 -> p~0.85;
+                # score=30 -> p~0.15.
+                win_prob = 1.0 / (1.0 + np.exp(-0.08 * (score - 50)))
                 win_prob = float(np.clip(win_prob, 0.05, 0.95))
 
             print(f"    win_probability={win_prob:.4f} (calibrated from score={score:.4f})")

@@ -103,7 +103,7 @@ class RiskGate:
 
         # 6. Position concentration
         pos = current_positions.get(ticker, {})
-        existing_qty = pos.get("qty", 0) if side == "BUY" else 0
+        existing_qty = pos.get("qty", 0)
         new_qty = existing_qty + quantity if side == "BUY" else existing_qty - quantity
         position_value = new_qty * price
         position_pct = (position_value / portfolio_value * 100) if portfolio_value > 0 else 100
@@ -127,8 +127,11 @@ class RiskGate:
         if self._daily_pnl < 0 and daily_loss_pct > self.daily_loss_limit_pct:
             checks_failed += 1
             reasons.append(f"Daily loss {daily_loss_pct:.1f}% > {self.daily_loss_limit_pct}%")
+        else:
+            checks_passed += 1
 
         # 9. BIST Kuralları entegrasyonu
+        _checks_failed_before_bist = checks_failed
         try:
             from services.core.short_selling import short_selling_monitor
             from services.core.halt_monitor import halt_monitor
@@ -162,7 +165,11 @@ class RiskGate:
         except Exception:
             pass  # BIST kuralları modülleri yoksa skip
         else:
-            checks_passed += 1
+            # Yalnızca bu blok içinde hiçbir alt-kontrol başarısız olmadıysa
+            # "geçti" say (önceki hali, içeride bir kural reddetse bile
+            # istisna fırlatılmadığı için her zaman checks_passed'i artırıyordu)
+            if checks_failed == _checks_failed_before_bist:
+                checks_passed += 1
 
         allowed = checks_failed == 0
         reason = "; ".join(reasons) if reasons else "All checks passed"

@@ -413,9 +413,12 @@ class DecisionEngine:
             action = "SELL"
 
         # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
+        # (Hem BUY hem SELL için uygulanır; önceden yalnızca BUY kontrol
+        # ediliyordu ve yüksek riskli SHORT sinyalleri bu korumayı hiç
+        # görmüyordu.)
         if score.risk_score < 30:
-            if action == "BUY":
-                action = "HOLD"  # Çok riskli — alma
+            if action in ("BUY", "SELL"):
+                action = "HOLD"  # Çok riskli — pozisyon açma
                 direction = "NEUTRAL"
 
         # Conviction

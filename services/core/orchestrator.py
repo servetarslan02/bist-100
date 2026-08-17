@@ -9,11 +9,20 @@ INGESTION → FEATURES → INTELLIGENCE → DECISION → RISK → PORTFOLIO → 
 """
 
 import asyncio
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import structlog
 
 logger = structlog.get_logger()
+
+
+@dataclass
+class PipelineReport:
+    """run_full_pipeline() çıktısı — çoklu-hisse batch çalıştırma raporu."""
+    date: str
+    results: Dict[str, Any] = field(default_factory=dict)
+    system_health: Dict[str, Any] = field(default_factory=dict)
 
 
 class MasterOrchestrator:
@@ -224,7 +233,19 @@ class MasterOrchestrator:
         try:
             calc = self._services.get("feature_calculator")
             if calc:
-                features = calc.compute_all_features(market_data)
+                # compute_all_features bir OHLCV DataFrame bekler; market_data
+                # burada ayrı numpy dizileri içeren bir sözlük olduğundan
+                # önce uygun şekle dönüştürülür (önceki halde bu adım eksikti
+                # ve çağrı her zaman sessizce başarısız oluyordu).
+                import pandas as _pd
+                ohlcv_df = _pd.DataFrame({
+                    "Open": market_data.get("opens", prices),
+                    "High": market_data.get("highs", prices),
+                    "Low": market_data.get("lows", prices),
+                    "Close": market_data.get("closes", prices),
+                    "Volume": market_data.get("volumes", [1.0] * len(prices)),
+                })
+                features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))
         result["features"] = features
@@ -411,6 +432,82 @@ class MasterOrchestrator:
 
         return result
 
+    def run_full_pipeline(
+        self,
+        date: str,
+        market_data: Dict[str, Any],
+        sector_map: Optional[Dict[str, str]] = None,
+    ) -> "PipelineReport":
+        """Birden fazla hisse için tam pipeline'ı bir tarih için çalıştırır.
+
+        Args:
+            date: İşlem tarihi (ISO string)
+            market_data: {ticker: OHLCV DataFrame}
+            sector_map: {ticker: sektör adı} (opsiyonel)
+
+        Not: Bu metod senkrondur; servisler henüz initialize edilmediyse
+        (`await initialize()` çağrılmadıysa) otomatik olarak, mevcut bir
+        event loop'a bağımlı olmadan senkron şekilde initialize eder.
+        """
+        if not self._initialized:
+            try:
+                asyncio.run(self.initialize())
+            except RuntimeError:
+                # Zaten çalışan bir event loop içindeysek (nadir, sync
+                # context'te olmamalı) — yine de en azından boş servis
+                # sözlüğüyle devam et, initialize() daha sonra çağrılabilir.
+                logger.warning("initialize() senkron çağrılamadı (aktif event loop mevcut)")
+
+        sector_map = sector_map or {}
+        per_ticker_results: Dict[str, Any] = {}
+        errors: List[str] = []
+
+        for ticker, df in market_data.items():
+            try:
+                calc = self._services.get("feature_calculator")
+                features = calc.compute_all_features(df, ticker=ticker) if calc else {}
+                per_ticker_results[ticker] = {
+                    "ticker": ticker,
+                    "sector": sector_map.get(ticker, "UNKNOWN"),
+                    "features": features,
+                    "feature_count": len(features),
+                    "error": None,
+                }
+                if not features:
+                    errors.append(f"{ticker}: feature hesaplanamadı (boş sonuç)")
+            except Exception as e:
+                per_ticker_results[ticker] = {
+                    "ticker": ticker, "sector": sector_map.get(ticker, "UNKNOWN"),
+                    "features": {}, "feature_count": 0, "error": str(e),
+                }
+                errors.append(f"{ticker}: {e}")
+
+        total = len(market_data)
+        failed = sum(1 for r in per_ticker_results.values() if r["error"] is not None)
+        # Sağlık durumu gerçek başarısızlık oranına dayanır — uydurulmuş
+        # bir "her zaman HEALTHY" değeri değildir.
+        if total == 0:
+            status = "CRITICAL"
+        elif failed == total:
+            status = "CRITICAL"
+        elif failed > 0:
+            status = "DEGRADED"
+        else:
+            status = "HEALTHY"
+
+        system_health = {
+            "status": status,
+            "total_tickers": total,
+            "failed_tickers": failed,
+            "errors": errors,
+        }
+
+        return PipelineReport(
+            date=date,
+            results=per_ticker_results,
+            system_health=system_health,
+        )
+
     def get_status(self) -> Dict[str, Any]:
         """Sistem durumu."""
         return {
@@ -422,3 +519,7 @@ class MasterOrchestrator:
 
 # Singleton
 master_orchestrator = MasterOrchestrator()
+
+# Geriye dönük/alternatif isimlendirme uyumluluğu — testlerde ve bazı
+# çağıranlarda "SystemOrchestrator" adı kullanılıyor; gerçek sınıf budur.
+SystemOrchestrator = MasterOrchestrator

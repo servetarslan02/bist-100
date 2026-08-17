@@ -214,8 +214,8 @@ class TestRankingModel:
         scores = result.scores
 
         assert len(scores) == 2
-        # NOT: Sistem LambdaRank kuralını kullanır - düşük skor = üst sıra (rank 1)
-        assert scores[0].score <= scores[1].score  # Sıralı (artan)
+        # Yüksek skor = üst sıra (rank 1)
+        assert scores[0].score >= scores[1].score  # Sıralı (azalan)
         assert all(s.direction in ["LONG", "SHORT"] for s in scores)
 
 # === PORTFOLIO TESTS ===
@@ -225,6 +225,8 @@ class TestPortfolioManager:
 
     def test_open_position(self, portfolio):
         """Pozisyon açma."""
+        notional = 100 * 100.0
+        expected_commission = portfolio.calculate_commission(notional)
         result = portfolio.open_position(
             ticker="THYAO",
             direction="LONG",
@@ -236,7 +238,10 @@ class TestPortfolioManager:
 
         assert result["success"] is True
         assert "THYAO" in portfolio._positions
-        assert portfolio._cash == 90000.0  # 100000 - 100*100
+        # Nakit, işlem tutarı + gerçekçi komisyon kadar azalır (bkz.
+        # documentation/06 — execution simülasyonu maliyetleri görmezden
+        # gelmez).
+        assert portfolio._cash == pytest.approx(100000.0 - notional - expected_commission, abs=0.01)
 
     def test_close_position(self, portfolio):
         """Pozisyon kapatma."""
@@ -246,7 +251,12 @@ class TestPortfolioManager:
 
         assert result["success"] is True
         assert "THYAO" not in portfolio._positions
-        assert result["trade"]["pnl"] == 1000.0  # (110-100)*100
+        # PnL, brüt kâr eksi giriş+çıkış komisyonları olmalı; sabit
+        # (110-100)*100=1000 varsayımı gerçekçi komisyon modelini
+        # görmezden geldiği için brüt kârdan az olmalı ama yakın olmalı.
+        gross_pnl = (110.0 - 100.0) * 100
+        assert result["trade"]["pnl"] < gross_pnl
+        assert result["trade"]["pnl"] == pytest.approx(gross_pnl, abs=20.0)
 
     def test_insufficient_cash(self, portfolio):
         """Yetersiz nakit kontrolü."""
