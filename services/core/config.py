@@ -73,6 +73,15 @@ class Settings(BaseSettings):
     # MLflow
     mlflow_tracking_uri: str = Field(default="http://localhost:5000", alias="MLFLOW_TRACKING_URI")
 
+    # Broker
+    broker_type: str = Field(default="paper", alias="BROKER_TYPE")  # paper | live
+    broker_api_key: Optional[str] = Field(default=None, alias="BROKER_API_KEY")
+    broker_api_secret: Optional[str] = Field(default=None, alias="BROKER_API_SECRET")
+    broker_account_id: Optional[str] = Field(default=None, alias="BROKER_ACCOUNT_ID")
+
+    # KAP
+    kap_api_key: Optional[str] = Field(default=None, alias="KAP_API_KEY")
+
     @property
     def is_production(self) -> bool:
         """Production ortaminda mi?"""
