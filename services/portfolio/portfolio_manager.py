@@ -233,22 +233,30 @@ class PositionHistoryEntry:
 # ====================================================================
 
 class CommissionModel:
-    """BIST komisyon modeli."""
+    """BIST komisyon modeli — fee_calculator entegre."""
 
     def __init__(
         self,
-        broker_rate: float = 0.0003,      # %0.03 broker
-        exchange_rate: float = 0.000056,   # %0.0056 BIST
-        bsmv_rate: float = 0.05,           # BSMV (komisyon üzerinden %5)
+        broker_rate: float = 0.0003,
+        exchange_rate: float = 0.000056,
+        bsmv_rate: float = 0.05,
         min_commission: float = 1.0,
     ):
         self.broker_rate = broker_rate
         self.exchange_rate = exchange_rate
         self.bsmv_rate = bsmv_rate
         self.min_commission = min_commission
+        # fee_calculator entegrasyonu
+        try:
+            from services.core.fee_calculator import FeeCalculator
+            self._fee_calc = FeeCalculator(broker_rate=broker_rate)
+        except ImportError:
+            self._fee_calc = None
 
     def calculate(self, amount: float) -> float:
         """Toplam komisyon hesapla."""
+        if self._fee_calc:
+            return self._fee_calc.calculate(amount).total
         base = amount * (self.broker_rate + self.exchange_rate)
         bsmv = base * self.bsmv_rate
         total = base + bsmv

@@ -268,3 +268,21 @@ class FactorEngine:
 
 # Singleton
 factor_engine = FactorEngine()
+
+
+# =====================================================
+# B30 Factor Investing entegrasyonu
+# =====================================================
+def compute_financial_scores(financials: Dict[str, Any]) -> Dict[str, Any]:
+    """Piotroski F-Score, Beneish M-Score, Altman Z-Score hesapla."""
+    result = {}
+    try:
+        from services.factors.piotroski import calculate_f_score
+        from services.factors.beneish import calculate_m_score
+        from services.factors.altman import calculate_z_score
+        result["f_score"] = calculate_f_score(financials)
+        result["m_score"] = calculate_m_score(financials)
+        result["z_score"] = calculate_z_score(financials)
+    except ImportError:
+        pass
+    return result

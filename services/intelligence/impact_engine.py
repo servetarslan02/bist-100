@@ -273,3 +273,19 @@ class ImpactEngine:
 
 # Singleton
 impact_engine = ImpactEngine()
+
+
+# =====================================================
+# B31 Event Study entegrasyonu
+# =====================================================
+def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, market_returns: list) -> Dict[str, Any]:
+    """Event study ile olay etkisi analizi."""
+    try:
+        from services.event_study.kap_event import analyze_kap_event
+        from services.event_study.impact import calculate_event_impact
+        result = analyze_kap_event(ticker, event_type, stock_returns, market_returns)
+        impact = calculate_event_impact(result.get("car", 0), result.get("p_value", 1))
+        result["impact"] = impact
+        return result
+    except ImportError:
+        return {"ticker": ticker, "event_type": event_type, "error": "event_study not available"}

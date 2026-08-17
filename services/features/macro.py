@@ -253,3 +253,29 @@ class MacroFeatureEngine:
 
 # Singleton
 macro_feature_engine = MacroFeatureEngine()
+
+
+# =====================================================
+# B28 Macro entegrasyonu — servis modülleri
+# =====================================================
+def compute_all_macro_features(tcmb_data=None, inflation_data=None, fx_data=None,
+                                cds_data=None, credit_data=None, ca_data=None) -> Dict[str, float]:
+    """Tüm makro feature'ları birleştir (B28 modülleri)."""
+    features = {}
+    try:
+        from services.macro.tcmb import compute_tcmb_features
+        from services.macro.inflation import compute_inflation_features
+        from services.macro.fx import compute_fx_features
+        from services.macro.cds import compute_cds_features
+        from services.macro.credit import compute_credit_features
+        from services.macro.current_account import compute_ca_features
+
+        if tcmb_data: features.update({f"tcmb_{k}": v for k, v in compute_tcmb_features(tcmb_data).items()})
+        if inflation_data: features.update({f"inf_{k}": v for k, v in compute_inflation_features(inflation_data).items()})
+        if fx_data: features.update({f"fx_{k}": v for k, v in compute_fx_features(fx_data).items()})
+        if cds_data: features.update({f"cds_{k}": v for k, v in compute_cds_features(cds_data).items()})
+        if credit_data: features.update({f"credit_{k}": v for k, v in compute_credit_features(credit_data).items()})
+        if ca_data: features.update({f"ca_{k}": v for k, v in compute_ca_features(ca_data).items()})
+    except ImportError:
+        pass
+    return features
