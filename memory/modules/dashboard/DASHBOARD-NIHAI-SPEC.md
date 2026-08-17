@@ -121,6 +121,7 @@ ALADDIN DASHBOARD
 | **Alternative Data** | Alternatif veri kaynakları |
 | **Scheduler** | Job durumu, çalıştırma geçmişi |
 | **Audit Log** | Denetim kayıtları |
+| **Research & Documentation** | BIST kuralları, nihai spec'ler, tech stack, bağımlılık sırası, test beklentileri |
 
 ### 3.3 Eksik Component'lar
 
@@ -335,11 +336,58 @@ DASHBOARD SAYFALARI
 │   ├── Job durumu
 │   └── Retry logları
 │
-└── Audit Log ← YENİ
-    ├── Denetim kayıtları
-    ├── Karar zinciri
-    ├── Kim, ne zaman, ne yaptı
-    └── Filtreleme
+├── Audit Log ← YENİ
+│   ├── Denetim kayıtları
+│   ├── Karar zinciri
+│   ├── Kim, ne zaman, ne yaptı
+│   └── Filtreleme
+│
+├── Research & Documentation ← YENİ
+│   ├── BIST Kuralları
+│   │   ├── İşlem saatleri
+│   │   ├── Fiyat limitleri (pazara göre)
+│   │   ├── Açığa satış kuralları
+│   │   ├── Komisyon yapısı
+│   │   ├── Temettü stopajı
+│   │   ├── SPK regülasyonları
+│   │   └── VIOP kuralları
+│   │
+│   ├── Modül Nihai Spec'leri
+│   │   ├── 22 katman detaylı doküman
+│   │   ├── Kod analizi
+│   │   ├── Sektör araştırması
+│   │   ├── Eksikler listesi
+│   │   └── Uygulama planı
+│   │
+│   ├── Tech Stack Karşılaştırması
+│   │   ├── Mevcut teknolojiler
+│   │   ├── Nihai seçimler
+│   │   ├── Eksik teknolojiler
+│   │   ├── Performans karşılaştırması
+│   │   └── Bağımlılık ağacı
+│   │
+│   ├── Bağımlılık Sırası
+│   │   ├── 15 seviye bağımlılık ağacı
+│   │   ├── Hangi modül önce düzeltilmeli
+│   │   └── Düzeltme sırası
+│   │
+│   ├── Test Beklentileri
+│   │   ├── Her modül için test gereksinimleri
+│   │   ├── Test çalıştırma komutları
+│   │   └── Geçme/kalma kriterleri
+│   │
+│   └── Sistem Tanımı
+│       ├── 32 bölüm detaylı doküman
+│       ├── Hata raporu
+│       ├── Çalışma şekli
+│       └── Uygulama planları
+│
+└── Dashboard Settings
+    ├── Tema seçimi (dark/light)
+    ├── Widget özelleştirme
+    ├── Bildirim ayarları
+    ├── Dil seçimi (TR/EN)
+    └── Export (PDF/CSV)
 ```
 
 ### 4.2 Component Mimarisi (Nihai)
