@@ -176,6 +176,32 @@ class SystemOrchestrator:
             from services.features.data_adapter import data_adapter
             data_adapter.reset_duplicates()  # Her run için temiz başlangıç
 
+            # FAZ 5.3: Sector medians için fundamental veriyi önce topla
+            all_fundamentals: Dict[str, Dict[str, float]] = {}
+            for t in market_data:
+                if t in sector_map:
+                    try:
+                        fund_features = data_adapter.fetch_fundamentals(t, as_of_date=date)
+                        fund_available = any(dp.status.value == "FRESH" for dp in fund_features.values())
+                        if fund_available:
+                            all_fundamentals[t] = {k: dp.to_value() for k, dp in fund_features.items()}
+                    except Exception:
+                        pass
+
+            # Sector medians hesapla
+            sector_medians_map: Dict[str, Dict[str, float]] = {}
+            for t in market_data:
+                if t in sector_map:
+                    sector = sector_map[t]
+                    peers = [p for p, s in sector_map.items() if s == sector and p in all_fundamentals and p != t]
+                    if peers:
+                        medians = {}
+                        for key in ["pe_ratio", "pb_ratio", "ev_ebitda", "ev_sales", "profit_margin", "roe"]:
+                            vals = [all_fundamentals[p].get(key) for p in peers if all_fundamentals[p].get(key) is not None]
+                            if vals:
+                                medians[key] = float(np.median(vals))
+                        sector_medians_map[t] = medians
+
             all_features = {}
 
             # Benchmark (XU100) kapanış fiyatları — Motor 1 için
@@ -271,7 +297,7 @@ class SystemOrchestrator:
                     sector_close=sector_close,
                     peer_closes=peer_closes,
                     fundamentals=fundamentals,
-                    sector_medians=None,
+                    sector_medians=sector_medians_map.get(ticker),
                     kap_events=kap_events or None,
                     news_events=news_events or None,
                     upcoming_events=upcoming_events or None,
