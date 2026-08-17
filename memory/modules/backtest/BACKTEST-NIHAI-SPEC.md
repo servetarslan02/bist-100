@@ -1,7 +1,69 @@
-# Backtest Nihai Sistem Dokümanı — Araştırma Bazlı
+# Backtest Nihai Sistem Dokümanı — Kod Analizi + Araştırma Bazlı
 
 **Tarih:** 2026-08-18
-**Kaynaklar:** arXiv Momentum-Gated Framework (2026), For Traders Bias Guide (2026), ML4T GitHub, QuantConnect/Zipline/Backtrader karşılaştırması, Aladdin mimarisi
+**Kaynaklar:** arXiv Momentum-Gated Framework (2026), For Traders Bias Guide (2026), MDPI Regime-Aware LightGBM (2026), QuantConnect/Zipline/Backtrader, Aladdin mimarisi
+
+---
+
+## 0. Mevcut Durum (Kod Analizi)
+
+### Modüller (8 dosya, 3,961 satır)
+
+| Modül | Satır | Class | Fonksiyon | Durum |
+|-------|-------|-------|-----------|-------|
+| `engine_v4.py` | 1,225 | 9 | 31 | ✅ En kapsamlı — canonical scoring, fast mode, feature cache |
+| `walk_forward_runner.py` | 649 | 3 | 11 | ✅ Walk-forward backtest runner |
+| `portfolio_sim.py` | 565 | 6 | 25 | ✅ Portföy simülasyonu (Trade, Position, EquitySnapshot, BISTCommission) |
+| `walk_forward.py` | 436 | 3 | 7 | ✅ Walk-forward analysis (folds, metrics, deflated sharpe) |
+| `enhanced_walk_forward.py` | 369 | 3 | 12 | ✅ Purge/embargo walk-forward (precision@K, IC, hit rate) |
+| `engine.py` | 302 | 4 | 4 | ✅ Basit backtest engine |
+| `persistence.py` | 250 | 1 | 10 | ✅ SQLite tabanlı sonuç saklama |
+| `canonical_adapter.py` | 165 | 1 | 6 | ✅ Canonical scoring adapter |
+
+### Test Dosyaları (7)
+
+```
+tests/test_backtest_data_parity.py
+tests/test_backtest_performance.py
+tests/test_backtest_v4.py
+tests/test_backtest_v5_upgrade.py
+tests/test_canonical_backtest.py
+tests/test_faz4_backtest.py
+tests/test_walkforward_canonical.py
+```
+
+### Kritik Fonksiyonlar
+
+| Fonksiyon | Modül | Ne Yapıyor | Durum |
+|-----------|-------|------------|-------|
+| `BacktestEngineV4.run()` | engine_v4 | Ana backtest çalıştır (legacy + fast mode) | ✅ İyi |
+| `BacktestEngineV4._run_fast()` | engine_v4 | Hızlı backtest (vectorized) | ✅ İyi |
+| `BacktestEngineV4._compute_score()` | engine_v4 | Canonical scoring | ✅ İyi |
+| `BacktestEngineV4._get_features()` | engine_v4 | Feature cache ile feature hesaplama | ✅ İyi |
+| `PurgeEmbargoWalkForward.split()` | enhanced_wf | Purge/embargo ile fold bölme | ✅ İyi |
+| `PurgeEmbargoWalkForward.run()` | enhanced_wf | Walk-forward çalıştır | ✅ İyi |
+| `PortfolioSimulatorV3.execute_buy()` | portfolio_sim | Alım simülasyonu | ✅ İyi |
+| `PortfolioSimulatorV3.execute_sell()` | portfolio_sim | Satış simülasyonu | ✅ İyi |
+| `PortfolioSimulatorV3.check_invariants()` | portfolio_sim | Muhasebe invariant kontrolü | ✅ İyi |
+| `BacktestPersistence.save_run()` | persistence | Sonuç kaydetme | ✅ İyi |
+| `BacktestPersistence.save_trades()` | persistence | Trade kaydetme | ✅ İyi |
+
+### Eksikler (Kod Analizi)
+
+| Eksik | Açıklama | Öncelik |
+|-------|----------|--------|
+| **Look-ahead bias detection** | Kodda timestamp validation yok | 🔴 Kritik |
+| **Survivorship bias handling** | Delisted şirketleri dahil etme yok | 🔴 Kritik |
+| **Point-in-time validation** | Feature hesaplamanın zaman doğruluğu yok | 🔴 Kritik |
+| **Transaction cost model** | Sadece komisyon (BISTCommissionModel) — spread/slippage yok | 🟡 Önemli |
+| **Spread model** | Bid/ask spread kullanılmıyor | 🟡 Önemli |
+| **Slippage model** | Sabit %0.05 — volatilite bazlı değil | 🟡 Önemli |
+| **Market impact** | Büyük emirler için impact modeli yok | 🟡 Önemli |
+| **Multi-asset backtest** | Sadece tek hisse | 🟡 Önemli |
+| **Event replay** | Belirli günü yeniden çalıştırma | 🟡 Önemli |
+| **Deterministic recovery** | Restart sonrası aynı sonuç garantisi yok | 🟡 Önemli |
+| **API endpoint** | Backtest API endpoint'i yok | 🟡 Önemli |
+| **Backtest-scanner parity** | Backtest ve canlı tarama aynı kodu kullanmıyor | 🟡 Önemli |
 
 ---
 
