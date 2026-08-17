@@ -118,6 +118,7 @@ class SystemOrchestrator:
             from services.features.cross_sectional import cross_sectional_engine
             from services.features.seven_motors import seven_motor_engine
             from services.features.data_adapter import data_adapter
+            data_adapter.reset_duplicates()  # Her run için temiz başlangıç
 
             all_features = {}
 

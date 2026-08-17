@@ -27,17 +27,32 @@ class DecisionInput:
     """Karar motoru girdisi (ATR eklendi)."""
     ticker: str
     price: float
-    features: Dict[str, Any]
-    signals: Dict[str, Any]
-    regime: str
-    ml_score: float
-    ml_confidence: float
-    news_sentiment: float
-    sector: str
-    market_cap: float
-    # YENİ: ATR bilgisi
+    features: Dict[str, Any] = field(default_factory=dict)
+    signals: Dict[str, Any] = field(default_factory=dict)
+    regime: str = "UNKNOWN"
+    ml_score: float = 50.0
+    ml_confidence: float = 0.5
+    news_sentiment: float = 0.0
+    sector: str = ""
+    market_cap: float = 0.0
+    # ATR bilgisi
     atr: float = 0.0
     atr_pct: float = 0.0
+    # Geriye uyumlu ek alanlar (test_phase10_13)
+    ml_return_5d: float = 0.0
+    ml_return_20d: float = 0.0
+    spec_score: float = 0.0
+    world_alignment: float = 0.0
+    sim_expected_return: float = 0.0
+    sim_var_95: float = 0.0
+    sim_prob_positive: float = 0.0
+    ai_direction: str = "NEUTRAL"
+    ai_confidence: float = 0.0
+    max_position_pct: float = 10.0
+    current_position_pct: float = 0.0
+    portfolio_drawdown: float = 0.0
+    avg_volume: float = 0.0
+    spread_pct: float = 0.0
 
 @dataclass
 class Decision:
@@ -54,6 +69,7 @@ class Decision:
     position_size: float = 0.0
     time_horizon: str = "1-5D"
     expected_return: float = 0.0
+    conviction: str = "LOW"  # Geriye uyumlu
 
 class DecisionEngine:
     """Karar motoru."""
@@ -95,6 +111,14 @@ class DecisionEngine:
         # 7. Nedenler
         reasons = self._generate_reasons(inp, score)
 
+        # Conviction belirle
+        if score >= 80 and inp.ml_confidence >= 0.8:
+            conviction = "HIGH"
+        elif score >= 60 and inp.ml_confidence >= 0.65:
+            conviction = "MEDIUM"
+        else:
+            conviction = "LOW"
+
         return Decision(
             ticker=inp.ticker,
             action=action,
@@ -106,12 +130,16 @@ class DecisionEngine:
             target_price=target_price,
             stop_price=stop_price,
             expected_return=self._calculate_expected_return(inp, direction),
+            conviction=conviction,
         )
 
     def _calculate_composite_score(self, inp: DecisionInput) -> float:
         """Composite skor hesapla."""
+        # ML skor: ml_score veya spec_score'dan yüksek olanı kullan
+        ml_component = max(inp.ml_score, inp.spec_score * 0.9) if inp.spec_score > 0 else inp.ml_score
+
         components = {
-            "ml_score": inp.ml_score * 0.30,
+            "ml_score": ml_component * 0.30,
             "technical": self._technical_score(inp) * 0.25,
             "fundamental": self._fundamental_score(inp) * 0.15,
             "sentiment": self._sentiment_score(inp) * 0.10,
@@ -120,6 +148,13 @@ class DecisionEngine:
         }
 
         total = sum(components.values())
+
+        # ML return sinyalleri (geriye uyumlu)
+        if inp.ml_return_5d > 3:
+            total += 5
+        if inp.ml_return_20d > 8:
+            total += 5
+
         return min(100, max(0, total))
 
     def _technical_score(self, inp: DecisionInput) -> float:

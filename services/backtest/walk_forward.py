@@ -138,9 +138,15 @@ class WalkForwardEngine:
 
     def run_walk_forward(
         self,
-        predictions: List[Dict[str, Any]],  # {date, ticker, score, predicted_return}
-        actual_returns: Dict[str, Dict[str, float]],  # {date: {ticker: return}}
+        predictions: Optional[List[Dict[str, Any]]] = None,  # {date, ticker, score, predicted_return}
+        actual_returns: Optional[Dict[str, Dict[str, float]]] = None,  # {date: {ticker: return}}
         dates: Optional[List[str]] = None,
+        # Geriye uyumlu alternatif parametreler (test_phase11_12)
+        signals: Optional[List[Dict[str, Any]]] = None,
+        price_data: Optional[Dict] = None,
+        train_days: Optional[int] = None,
+        test_days: Optional[int] = None,
+        step_days: Optional[int] = None,
     ) -> WalkForwardResult:
         """Walk-forward validation çalıştır.
 
@@ -148,7 +154,41 @@ class WalkForwardEngine:
             predictions: Model tahminleri (tarih sıralı)
             actual_returns: Gerçekleşen getiriler {date: {ticker: return}}
             dates: Tarih listesi (None ise predictions'dan çıkar)
+            signals: Geriye uyumlu — sinyal listesi (predictions'a dönüştürülür)
+            price_data: Geriye uyumlu — fiyat verisi (actual_returns'a dönüştürülür)
+            train_days/test_days/step_days: Config override
         """
+        # Config override
+        if train_days is not None:
+            self.train_days = train_days
+        if test_days is not None:
+            self.test_days = test_days
+        if step_days is not None:
+            self.step_days = step_days
+
+        # signals → predictions dönüştürme (geriye uyumlu)
+        if predictions is None and signals is not None:
+            predictions = []
+            actual_returns = actual_returns or {}
+            for s in signals:
+                d = s.get("date", "")
+                ticker = s.get("ticker", "TEST")
+                pnl_pct = s.get("pnl_pct", 0)
+                predictions.append({
+                    "date": d,
+                    "ticker": ticker,
+                    "score": s.get("score", 50),
+                    "predicted_return": pnl_pct,
+                })
+                if d not in actual_returns:
+                    actual_returns[d] = {}
+                actual_returns[d][ticker] = pnl_pct / 100 if pnl_pct else 0
+
+        if predictions is None:
+            predictions = []
+        if actual_returns is None:
+            actual_returns = {}
+
         if dates is None:
             dates = sorted(set(p.get("date", "") for p in predictions if p.get("date")))
 

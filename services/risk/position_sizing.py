@@ -258,5 +258,78 @@ class PositionSizer:
         return True
 
 
-# Singleton
-position_sizer = PositionSizer()
+@dataclass
+class _CalcResult:
+    """Geriye uyumlu calculate() sonuç tipi."""
+    shares: int = 0
+    position_value: float = 0.0
+    position_pct: float = 0.0
+    risk_pct: float = 0.0
+    method: str = "INVALID"
+
+
+class _PositionSizerCompat(PositionSizer):
+    """Geriye uyumlu calculate() metodu ekler."""
+
+    def calculate(
+        self,
+        ticker: str,
+        entry_price: float,
+        stop_price: float,
+        portfolio_value: float = 100000,
+        max_position_pct: float = 10.0,
+        max_risk_per_trade_pct: float = 2.0,
+        confidence: float = 0.5,
+        volatility: float = 0.2,
+        correlation_to_portfolio: float = 0.0,
+    ) -> _CalcResult:
+        """Tek pozisyon boyutu — risk bütçesi yöntemi.
+
+        Geriye uyumlu API: test_phase11_12 tarafından çağrılır.
+        """
+        # Geçersiz giriş
+        if entry_price <= 0 or stop_price <= 0:
+            return _CalcResult(method="INVALID")
+
+        stop_distance = abs(entry_price - stop_price)
+        if stop_distance <= 0:
+            return _CalcResult(method="INVALID")
+
+        stop_pct = stop_distance / entry_price
+
+        # Risk bütçesi
+        risk_budget = portfolio_value * (max_risk_per_trade_pct / 100)
+        shares_by_risk = int(risk_budget / stop_distance)
+
+        # Max position limit
+        max_notional = portfolio_value * (max_position_pct / 100)
+        shares_by_max = int(max_notional / entry_price)
+
+        # Korelasyon ayarlaması (yüksek korelasyon → daha az pay)
+        corr_factor = max(0.3, 1.0 - correlation_to_portfolio * 0.5)
+
+        # Confidence ayarlaması
+        conf_factor = max(0.5, min(1.0, confidence))
+
+        # Minimum hisse
+        shares = max(0, min(shares_by_risk, shares_by_max))
+        shares = int(shares * corr_factor * conf_factor)
+
+        if shares <= 0:
+            return _CalcResult(method="RISK_BUDGET")
+
+        position_value = shares * entry_price
+        position_pct = (position_value / portfolio_value) * 100 if portfolio_value > 0 else 0
+        risk_pct = (shares * stop_distance / portfolio_value) * 100 if portfolio_value > 0 else 0
+
+        return _CalcResult(
+            shares=shares,
+            position_value=round(position_value, 2),
+            position_pct=round(position_pct, 2),
+            risk_pct=round(risk_pct, 2),
+            method="RISK_BUDGET",
+        )
+
+
+# Singleton (geriye uyumlu)
+position_sizer = _PositionSizerCompat()

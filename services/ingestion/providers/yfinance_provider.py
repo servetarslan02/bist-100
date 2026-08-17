@@ -11,18 +11,63 @@ from ..bist_universe import bist_universe
 logger = structlog.get_logger()
 
 
+def get_yfinance_ticker(ticker: str) -> str:
+    """BIST ticker'ını Yahoo Finance formatına çevir.
+
+    THYAO → THYAO.IS
+    XU100 → XU100.IS (endeks)
+    """
+    if ticker.endswith(".IS"):
+        return ticker
+    return f"{ticker}.IS"
+
+
 class YFinanceProvider:
     """Fetches BIST market data from yfinance (15min delayed, free)."""
 
+    _FETCH_TIMEOUT = 15  # saniye
+
     def __init__(self):
         self._cache: Dict[str, Any] = {}
+
+    @staticmethod
+    def _expand_period(period: str) -> str:
+        """Hafta sonu/tatil günlerini telafi etmek için period'u genişlet.
+
+        60d → 90d, 30d → 45d, 1y → 1y (zaten yeterli)
+        """
+        import re
+        m = re.match(r"^(\d+)(d|mo|y)$", period)
+        if not m:
+            return period
+        val, unit = int(m.group(1)), m.group(2)
+        if unit == "d":
+            # ~1.5x genişlet (hafta sonları + tatiller)
+            return f"{int(val * 1.5)}d"
+        if unit == "mo":
+            return f"{int(val * 1.5)}mo"
+        return period  # 1y+ zaten yeterli
+
+    @staticmethod
+    def _run_with_timeout(fn, *args, timeout: int = 15, **kwargs):
+        """Blocking fonksiyonu timeout ile çalıştır."""
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(fn, *args, **kwargs)
+            try:
+                return future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                logger.warning("yfinance call timed out", timeout=timeout)
+                return None
 
     def fetch_current_price(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Fetch current price data for a single ticker."""
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
-            info = t.info
+            info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+            if info is None:
+                return None
 
             if not info or "regularMarketPrice" not in info:
                 return None
@@ -58,7 +103,15 @@ class YFinanceProvider:
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
-            df = t.history(period=period, interval=interval)
+            # Hafta sonu/tatil günleri için period'u genişlet
+            # (60d ≈ 42 trading günü, feature_calculator en az 60 bar ister)
+            expanded_period = self._expand_period(period)
+            df = self._run_with_timeout(
+                lambda: t.history(period=expanded_period, interval=interval),
+                timeout=self._FETCH_TIMEOUT,
+            )
+            if df is None or (hasattr(df, 'empty') and df.empty):
+                return None
 
             if df.empty:
                 return None
@@ -66,21 +119,18 @@ class YFinanceProvider:
             df = df.reset_index()
             df["Ticker"] = ticker
 
-            # Convert to Polars
-            pl_df = pl.from_pandas(df)
-
-            # Rename columns
-            pl_df = pl_df.rename({
+            # Capitalize columns for feature_calculator compatibility
+            df = df.rename(columns={
                 "Date": "timestamp",
-                "Open": "open",
-                "High": "high",
-                "Low": "low",
-                "Close": "close",
-                "Volume": "volume",
-                "Ticker": "ticker",
+                "Open": "Open",
+                "High": "High",
+                "Low": "Low",
+                "Close": "Close",
+                "Volume": "Volume",
+                "Ticker": "Ticker",
             })
 
-            return pl_df.select(["ticker", "timestamp", "open", "high", "low", "close", "volume"])
+            return df[["Ticker", "timestamp", "Open", "High", "Low", "Close", "Volume"]]
 
         except Exception as e:
             logger.warning("Failed to fetch OHLCV", ticker=ticker, error=str(e))
@@ -161,7 +211,9 @@ class YFinanceProvider:
         yf_symbol = f"{index_symbol}.IS"
         try:
             t = yf.Ticker(yf_symbol)
-            info = t.info
+            info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+            if info is None:
+                return None
 
             return {
                 "symbol": index_symbol,
@@ -194,7 +246,10 @@ class YFinanceProvider:
         for yf_symbol, name in macro_tickers.items():
             try:
                 t = yf.Ticker(yf_symbol)
-                info = t.info
+                info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+                if info is None:
+                    results[name] = {"price": 0, "change_pct": 0}
+                    continue
                 results[name] = {
                     "price": info.get("regularMarketPrice", 0),
                     "change_pct": info.get("regularMarketChangePercent", 0),

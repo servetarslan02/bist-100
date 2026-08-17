@@ -302,7 +302,7 @@ def get_sector(ticker: str) -> str:
     return bist_universe.get_ticker_sector(ticker)
 
 # Singleton (auto-discovery aktif)
-bist_universe = BISTUniverse(use_auto_discovery=True)
+bist_universe = BISTUniverse(use_auto_discovery=False)
 
 # Backward compatibility exports
 BIST_STOCKS = bist_universe.BIST_100_TICKERS

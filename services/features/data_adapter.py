@@ -14,8 +14,9 @@ Provider bağımlılıkları (yfinance, aiohttp) kurulu değilse
 graceful degradation — MISSING status döner, pipeline durmaz.
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any, Set
+from datetime import datetime, timezone, timedelta
+import hashlib
 import structlog
 
 from .feature_contract import (
@@ -24,6 +25,10 @@ from .feature_contract import (
 )
 
 logger = structlog.get_logger()
+
+# Fundamental veri freshness eşikleri
+FUNDAMENTAL_STALE_DAYS = 90   # 90 günden eski → STALE
+FUNDAMENTAL_MAX_AGE_DAYS = 365  # 1 yıldan eski → MISSING
 
 
 class DataAdapter:
@@ -34,6 +39,9 @@ class DataAdapter:
         self._kap_provider = None
         self._news_provider = None
         self._providers_loaded = False
+        self._seen_event_ids: Set[str] = set()  # Duplicate kontrolü
+        self._kap_provider_instance = None
+        self._news_provider_instance = None
 
     def _load_providers(self):
         """Provider'ları lazy-load et (bağımlılık yoksa graceful skip)."""
@@ -64,6 +72,44 @@ class DataAdapter:
             logger.info("News provider loaded")
         except ImportError:
             logger.warning("News provider unavailable")
+
+    def reset_duplicates(self):
+        """Duplicate tracking sıfırla (pipeline run başlangıcında çağrılır)."""
+        self._seen_event_ids.clear()
+
+    # ==================================================
+    # ASYNC BRIDGE
+    # ==================================================
+
+    def _run_async(self, coro, timeout: float = 10.0):
+        """Async coroutine'u sync olarak çalıştır.
+
+        Thread-based timeout: ağ çağrısı asla sonsuz bloklanmaz.
+        Daemon thread kullanılır — ana process çıkışında otomatik temizlenir.
+        """
+        import asyncio
+        import threading
+
+        result = [None]
+        error = [None]
+
+        def _run():
+            try:
+                result[0] = asyncio.run(coro)
+            except Exception as e:
+                error[0] = e
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout)
+
+        if thread.is_alive():
+            logger.warning("Async call timed out", timeout=timeout)
+            return None
+        if error[0]:
+            logger.warning("Async call failed", error=str(error[0]))
+            return None
+        return result[0]
 
     # ==================================================
     # FUNDAMENTAL (Motor 4)
@@ -103,9 +149,15 @@ class DataAdapter:
                 if fetch_day > as_of_date:
                     return self._empty_fundamental(ticker, "future_data_blocked")
 
+            # Freshness kontrolü
+            ts = fetch_date or datetime.now(timezone.utc).isoformat()
+            freshness_status = self._check_fundamental_freshness(ts, as_of_date)
+
+            if freshness_status == FeatureStatus.MISSING:
+                return self._empty_fundamental(ticker, "stale_data")
+
             # Motor 4'ün beklediği formata çevir
             result = {}
-            ts = fetch_date or datetime.now(timezone.utc).isoformat()
 
             field_map = {
                 "pe_ratio": "pe_ratio",
@@ -131,7 +183,11 @@ class DataAdapter:
                 val = raw.get(src_key)
                 if val is not None:
                     try:
-                        result[dst_key] = make_fresh(float(val), source, ts)
+                        float_val = float(val)
+                        if freshness_status == FeatureStatus.STALE:
+                            result[dst_key] = make_stale(float_val, source, ts)
+                        else:
+                            result[dst_key] = make_fresh(float_val, source, ts)
                     except (TypeError, ValueError):
                         result[dst_key] = make_unknown(source)
                 else:
@@ -143,6 +199,39 @@ class DataAdapter:
             logger.warning("Fundamental fetch error", ticker=ticker, error=str(e))
             return self._empty_fundamental(ticker, "fetch_error")
 
+    def _check_fundamental_freshness(
+        self, fetch_ts: str, as_of_date: Optional[str],
+    ) -> FeatureStatus:
+        """Fundamental veri freshness kontrolü.
+
+        Returns:
+            FRESH: veri güncel
+            STALE: veri var ama eski (kullanılabilir ama düşük güven)
+            MISSING: veri çok eski veya tarihlendirilemez
+        """
+        if not fetch_ts:
+            return FeatureStatus.MISSING
+
+        try:
+            fetch_day = fetch_ts[:10]
+            ref_date = as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            d_fetch = datetime.strptime(fetch_day, "%Y-%m-%d")
+            d_ref = datetime.strptime(ref_date, "%Y-%m-%d")
+            age_days = (d_ref - d_fetch).days
+
+            if age_days < 0:
+                # Gelecek tarihli veri (zaten PIT bloklar ama ekstra güvenlik)
+                return FeatureStatus.MISSING
+            elif age_days <= FUNDAMENTAL_STALE_DAYS:
+                return FeatureStatus.FRESH
+            elif age_days <= FUNDAMENTAL_MAX_AGE_DAYS:
+                return FeatureStatus.STALE
+            else:
+                return FeatureStatus.MISSING
+        except (ValueError, TypeError):
+            return FeatureStatus.MISSING
+
     def _empty_fundamental(self, ticker: str, reason: str) -> Dict[str, FeatureDataPoint]:
         """Boş fundamental veri — tüm feature'lar MISSING/UNKNOWN."""
         keys = [
@@ -151,8 +240,13 @@ class DataAdapter:
             "revenue_growth", "earnings_growth", "debt_to_equity", "current_ratio",
             "free_cash_flow", "revenue", "market_cap", "total_assets",
         ]
-        status = make_missing if reason == "provider_unavailable" else make_unknown
-        return {k: status("fundamental") for k in keys}
+        if reason == "provider_unavailable":
+            status_fn = make_missing
+        elif reason == "stale_data":
+            status_fn = make_unknown
+        else:
+            status_fn = make_unknown
+        return {k: status_fn("fundamental") for k in keys}
 
     # ==================================================
     # KAP + HABER (Motor 5)
@@ -181,51 +275,54 @@ class DataAdapter:
             return []
 
         try:
-            import asyncio
-            provider = self._kap_provider()
+            if self._kap_provider_instance is None:
+                self._kap_provider_instance = self._kap_provider()
+            provider = self._kap_provider_instance
 
-            # Async → sync bridge
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    # Event loop zaten çalışıyorsa yeni thread'de çalıştır
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(
-                            asyncio.run,
-                            provider.fetch_disclosures(ticker=ticker, limit=limit)
-                        )
-                        raw_events = future.result(timeout=30)
-                else:
-                    raw_events = loop.run_until_complete(
-                        provider.fetch_disclosures(ticker=ticker, limit=limit)
-                    )
-            except RuntimeError:
-                raw_events = asyncio.run(
-                    provider.fetch_disclosures(ticker=ticker, limit=limit)
-                )
+            raw_events = self._run_async(
+                provider.fetch_disclosures(ticker=ticker, limit=limit)
+            )
 
             if not raw_events:
                 return []
 
-            # Motor 5 formatına çevir + PIT filtreleme
+            # Motor 5 formatına çevir + PIT filtreleme + duplicate kontrolü
             events = []
             for item in raw_events:
+                # Zorunlu alan kontrolü
+                kap_ticker = item.get("ticker", "").strip().upper()
                 pub_date = item.get("publish_date", "")[:10]
+                title = item.get("title", "").strip()
+
+                if not pub_date or not title:
+                    continue  # Zorunlu alan eksik
+
+                # Ticker doğrulama: KAP API'den gelen stockTicker
+                if kap_ticker and kap_ticker != ticker.upper():
+                    continue  # Farklı şirket
 
                 # Point-in-time: as_of_date'den sonra yayınlananları atla
                 if as_of_date and pub_date > as_of_date:
                     continue
 
+                # Duplicate kontrolü (event ID veya title hash)
+                event_id = item.get("id", "") or hashlib.md5(
+                    f"{pub_date}:{title}".encode()
+                ).hexdigest()[:16]
+                if event_id in self._seen_event_ids:
+                    continue
+                self._seen_event_ids.add(event_id)
+
                 events.append({
-                    "category": self._classify_kap_category(item.get("title", "")),
+                    "category": self._classify_kap_category(title),
                     "date": pub_date,
-                    "sentiment": self._estimate_sentiment(item.get("title", ""), item.get("summary", "")),
-                    "importance": self._estimate_importance(item.get("category", ""), item.get("title", "")),
+                    "sentiment": self._estimate_sentiment(title, item.get("summary", "")),
+                    "importance": self._estimate_importance(item.get("category", ""), title),
                     "surprise": 0.0,
                     "source": "kap",
-                    "title": item.get("title", ""),
+                    "title": title,
                     "publish_date": pub_date,
+                    "ticker": kap_ticker or ticker,
                 })
 
             return events
@@ -256,48 +353,50 @@ class DataAdapter:
             return []
 
         try:
-            import asyncio
-            provider = self._news_provider()
+            if self._news_provider_instance is None:
+                self._news_provider_instance = self._news_provider()
+            provider = self._news_provider_instance
 
-            try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(
-                            asyncio.run,
-                            provider.fetch_financial_news_rss()
-                        )
-                        raw_news = future.result(timeout=30)
-                else:
-                    raw_news = loop.run_until_complete(
-                        provider.fetch_financial_news_rss()
-                    )
-            except RuntimeError:
-                raw_news = asyncio.run(
-                    provider.fetch_financial_news_rss()
-                )
+            raw_news = self._run_async(
+                provider.fetch_financial_news_rss()
+            )
 
             if not raw_news:
                 return []
 
-            # Ticker ile eşleştir + PIT filtreleme
+            # Ticker ile eşleştir + PIT filtreleme + duplicate kontrolü
             events = []
             for item in raw_news:
+                title = item.get("title", "").strip()
+                if not title:
+                    continue  # Zorunlu alan eksik
+
                 if not provider.match_news_to_ticker(item, ticker):
                     continue
 
                 pub_date = item.get("published", "")[:10]
+                if not pub_date:
+                    continue  # Tarih yoksa kullanılamaz
+
                 if as_of_date and pub_date > as_of_date:
                     continue
+
+                # Duplicate kontrolü (title hash)
+                event_id = hashlib.md5(
+                    f"{pub_date}:{title}".encode()
+                ).hexdigest()[:16]
+                if event_id in self._seen_event_ids:
+                    continue
+                self._seen_event_ids.add(event_id)
 
                 events.append({
                     "date": pub_date,
                     "sentiment": item.get("sentiment", 0.0),
                     "importance": item.get("importance", 0.5),
                     "source": item.get("source", "news"),
-                    "title": item.get("title", ""),
+                    "title": title,
                     "published": pub_date,
+                    "ticker": ticker,
                 })
 
             return events[:limit]

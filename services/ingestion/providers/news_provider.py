@@ -224,36 +224,33 @@ class NewsProvider:
         return all_news
 
     def match_news_to_ticker(self, news: Dict, ticker: str) -> bool:
-        """Haberi hisseyle eşleştir."""
-        text = f"{news.get('title', '')} {news.get('summary', '')}".lower()
+        """Haberi hisseyle eşleştir.
 
-        # Ticker kodu
-        if ticker.lower() in text:
+        Öncelik sırası:
+        1. BIST ticker kodu (kelime sınırı ile — yanlış pozitif önleme)
+        2. KAP şirket kimliği (news dict içinde kap_ticker varsa)
+        3. Şirket adı (COMPANY_NAME_MAP — fallback)
+        """
+        import re
+        text = f"{news.get('title', '')} {news.get('summary', '')}"
+        text_lower = text.lower()
+        ticker_lower = ticker.lower()
+
+        # 1. KAP ticker doğrudan eşleşme (en güvenilir)
+        news_ticker = news.get("ticker", "").strip().upper()
+        if news_ticker and news_ticker == ticker.upper():
             return True
 
-        # Şirket adı
-        company_name = self.COMPANY_NAME_MAP.get(ticker.lower(), "")
-        if company_name and company_name.lower() in text:
+        # 2. BIST ticker kodu — kelime sınırı ile eşleşme
+        #    "as" → "aselsan" ile eşleşmemeli, ama "AS" kelime olarak eşleşmeli
+        ticker_pattern = re.compile(r'\b' + re.escape(ticker_lower) + r'\b', re.IGNORECASE)
+        if ticker_pattern.search(text):
             return True
 
-        # Sektör eşleştirmesi
-        sector_keywords = {
-            "bankacılık": ["garan", "isctr", "akbnk", "ykbnk", "halkb", "vakbn"],
-            "havacılık": ["thyao", "pgsus", "clebi"],
-            "otomotiv": ["froto", "toaso", "karsn", "otkar"],
-            "perakende": ["bimas", "mgros", "sokm"],
-            "enerji": ["enjsa", "akenr", "aydem", "zoren", "aksen"],
-            "cimento": ["cimsa", "nuhcm", "golts", "bucim", "konya", "btcim", "oyakc"],
-            "savunma": ["asels"],
-            "telekom": ["tcell", "ttkom"],
-            "gıda": ["ulker", "bizim", "ccola", "eggub", "ersu", "kervt", "yylgd"],
-            "tekstil": ["mavi", "desa", "derim", "mndtr"],
-        }
-
-        for sector, tickers in sector_keywords.items():
-            if ticker.lower() in [t.lower() for t in tickers]:
-                if sector in text:
-                    return True
+        # 3. Şirket adı (fallback)
+        company_name = self.COMPANY_NAME_MAP.get(ticker_lower, "")
+        if company_name and company_name.lower() in text_lower:
+            return True
 
         return False
 
