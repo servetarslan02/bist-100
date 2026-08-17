@@ -1,63 +1,68 @@
 # ALPHA BIST — Memory Index
 
-Bu dizin sistemin tüm dokümantasyon, araştırma ve raporlarını içerir.
+**Son güncelleme:** 2026-08-18
 
-## 📐 architecture/ — Mimari Belgeler
-| Dosya | Açıklama |
-|-------|----------|
-| `ALPHA-ARCHITECTURE.md` | Ana mimari doküman |
-| `ALPHA-ARCHITECTURE-v1.1.md` | Mimari v1.1 güncelleme |
-| `TARGET-ARCHITECTURE.md` | Hedef mimari |
-| `SYSTEM-CONSTITUTION.md` | Sistem anayasası |
-| `MASTER-SPEC.md` | Ana spesifikasyon |
+## 📁 Dizin Yapısı
 
-## 🗺️ roadmaps/ — Yol Haritaları
-| Dosya | Açıklama |
-|-------|----------|
-| `ROADMAP.md` | Ana yol haritası (32 faz) |
-| `ROADMAP-v2.md` | Yol haritası v2 |
-| `ROADMAP-v3.md` | Yol haritası v3 |
-| `ROADMAP-v4.md` | Yol haritası v4 (aktif) |
+```
+memory/
+├── VISION.md              ← Nihai hayal ve sistem vizyonu
+├── INDEX.md               ← Bu dosya
+│
+├── specs/                 ← Teknik spesifikasyonlar
+│   ├── SYSTEM-CONSTITUTION.md    ← Sistem anayasası (en üst otorite)
+│   ├── MASTER-SPEC.md            ← Ana spesifikasyon
+│   ├── TARGET-ARCHITECTURE.md    ← Hedef mimari
+│   ├── ALPHA-ARCHITECTURE-v1.1.md ← Mimari v1.1
+│   ├── EVENT-INTELLIGENCE-SPEC.md ← KAP/haber olay zekâsı
+│   ├── QUICKSTART.md             ← Hızlı başlangıç
+│   └── WORKING_RULES.md          ← Geliştirme disiplini
+│
+├── plans/                 ← Uygulama planları
+│   ├── BOLUM23-32-PLAN.md        ← Bölüm 23-32 planı (✅ tamamlandı)
+│   └── SYSTEM-WIRING-PLAN.md     ← Sistem bağlantı planı (✅ tamamlandı)
+│
+├── reports/               ← Analiz ve durum raporları
+│   ├── ANALIZ_RAPORU.md
+│   ├── CURRENT-STATE.md
+│   ├── DOGULAMA_RAPORU.md
+│   ├── DUZELTME_RAPORU.md
+│   ├── GAP_AUDIT.md
+│   └── MIMARI_GAP_ANALIZ.md
+│
+├── research/              ← Araştırma notları
+│   ├── Hisse-bulma-mantığı
+│   ├── Sistemler-mantığı
+│   ├── bist100.md
+│   └── İnceleme-test
+│
+└── roadmaps/              ← Yol haritaları
+    └── ROADMAP-v4.md             ← Aktif yol haritası
+```
 
-## 📊 reports/ — Raporlar ve Analizler
-| Dosya | Açıklama |
-|-------|----------|
-| `ANALIZ_RAPORU.md` | Sistem analiz raporu |
-| `DOGULAMA_RAPORU.md` | Doğulama raporu |
-| `DUZELTME_RAPORU.md` | Düzeltme raporu |
-| `GAP_AUDIT.md` | Production readiness gap audit |
-| `MIMARI_GAP_ANALIZ.md` | Mimari gap analizi |
-| `CURRENT-STATE.md` | Mevcut durum raporu |
+## 📐 sistem ve calisma mantiklari/ — Sistem Tanımı
 
-## 🔬 research/ — Araştırma Notları
-| Dosya | Açıklama |
-|-------|----------|
-| `Hisse-bulma-mantığı` | Hisse bulma stratejisi araştırması |
-| `Sistemler-mantığı` | Sistem bölümlemesi ve çalışma akışı |
-| `İnceleme-test` | Test inceleme notları |
-| `bist100.md` | BIST-100 hisse verileri |
+```
+sistem ve calisma mantiklari/
+├── Sistem tanımı          ← Sistem tanımı (5631 satır)
+├── Çalışma şekli          ← Çalışma şekli (865 satır)
+├── Hatalar                ← Hata raporu (1237 satır)
+├── bolumler/              ← 32 bölüm detaylı doküman
+│   ├── bolum-01 ... bolum-32
+└── planlar/               ← Uygulama planları
+    ├── IMPLEMENTATION-PLAN-v4.md
+    ├── IMPLEMENTATION-PLAN-v4-BOLUM9-16.md
+    ├── IMPLEMENTATION-PLAN-v4-BOLUM17-22.md
+    ├── IMPLEMENTATION-PLAN-v4-BOLUM23-32.md
+    └── ARCHITECTURE-MAP-v1.md
+```
 
-## 📋 specs/ — Spesifikasyonlar
-| Dosya | Açıklama |
-|-------|----------|
-| `EVENT-INTELLIGENCE-SPEC.md` | Event intelligence spesifikasyonu |
-| `MASTER-SPEC.md` | Ana spesifikasyon |
-| `SYSTEM-CONSTITUTION.md` | Sistem anayasası |
-| `TARGET-ARCHITECTURE.md` | Hedef mimari |
-| `WORKING_RULES.md` | Çalışma kuralları |
-| `QUICKSTART.md` | Hızlı başlangıç |
+## 🏷️ Otorite Sırası
 
-## ⚙️ system/ — Sistem Tanımı ve Çalışma Mantıkları
-| Dosya | Açıklama |
-|-------|----------|
-| `bolumler/` | 32 bölüm detaylı sistem tanımı |
-| `planlar/` | Implementasyon planları |
-| `Hatalar` | Hata kayıtları |
-| `Sistem tanımı` | Sistem tanımı |
-| `Çalışma şekli` | Çalışma şekli |
-
-## 📝 memory/*.md — Günlük ve Çalışma Notları
-| Dosya | Açıklama |
-|-------|----------|
-| `MEMORY-INDEX.md` | Eski index (bu dosya ile değiştirildi) |
-| `scan_results.json` | Tarama sonuçları |
+Çelişki olduğunda:
+1. `SYSTEM-CONSTITUTION.md` — governance kuralları
+2. `MASTER-SPEC.md` — sistem vizyonu
+3. `TARGET-ARCHITECTURE.md` — hedef mimari
+4. `sistem ve calisma mantiklari/Sistem tanımı` — detaylı tanım
+5. `ROADMAP-v4.md` — uygulama planı
+6. `VISION.md` — nihai hayal
