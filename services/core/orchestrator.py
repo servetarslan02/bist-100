@@ -455,6 +455,28 @@ class SystemOrchestrator:
             logger.error("Canonical scoring failed", error=str(e))
             errors.append(f"CanonicalScoring: {str(e)}")
 
+        # === STAGE 4C: INTELLIGENCE PIPELINE + PREDICTION LAYER ===
+        intelligence_outputs = {}
+        predictions = {}
+        try:
+            from services.intelligence.pipeline import intelligence_pipeline
+            from services.intelligence.prediction_layer import compute_multi_horizon_predictions
+
+            for ticker, features in all_features.items():
+                # Intelligence pipeline (signal fusion, forecasting, trade plan, vb.)
+                intel = intelligence_pipeline.run(
+                    ticker=ticker, features=features, regime=regime_str_decision
+                )
+                intelligence_outputs[ticker] = intel
+
+            logger.info("Intelligence pipeline completed",
+                       tickers=len(intelligence_outputs),
+                       modules_used=list(set(m for o in intelligence_outputs.values() for m in o.modules_used)))
+
+        except Exception as e:
+            logger.warning("Intelligence pipeline failed", error=str(e))
+            errors.append(f"Intelligence: {str(e)}")
+
         # === STAGE 5: RISK & POSITION SIZING ===
         try:
             from services.risk.position_sizing import position_sizer
