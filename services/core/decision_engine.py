@@ -367,5 +367,105 @@ class DecisionEngine:
 
         return round(expected, 2)
 
+    def decide_from_canonical(self, score, price: float = 0):
+        """CanonicalScore'tan karar üret.
+
+        Bu, tek canonical karar noktasıdır.
+        Ranking, scoring, risk burada birleşir.
+
+        Args:
+            score: CanonicalScore instance
+            price: Güncel fiyat (stop/target hesaplama için)
+        """
+        from services.core.canonical_scoring import CanonicalScore
+
+        if not isinstance(score, CanonicalScore):
+            raise TypeError(f"Expected CanonicalScore, got {type(score)}")
+
+        # Eşik kontrolü
+        if score.confidence < self._min_confidence:
+            return Decision(
+                ticker=score.ticker,
+                action="NO_ACTION",
+                direction="NEUTRAL",
+                confidence=score.confidence,
+                score=score.opportunity_score,
+                reasons=[f"Confidence çok düşük: {score.confidence:.2f} < {self._min_confidence}"],
+            )
+
+        if score.opportunity_score < self._min_score:
+            return Decision(
+                ticker=score.ticker,
+                action="NO_ACTION",
+                direction="NEUTRAL",
+                confidence=score.confidence,
+                score=score.opportunity_score,
+                reasons=[f"Skor eşik altında: {score.opportunity_score:.1f} < {self._min_score}"],
+            )
+
+        # Yön ve action
+        direction = score.direction
+        if direction == "NEUTRAL":
+            action = "HOLD"
+        elif direction == "LONG":
+            action = "BUY"
+        else:
+            action = "SELL"
+
+        # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
+        if score.risk_score < 30:
+            if action == "BUY":
+                action = "HOLD"  # Çok riskli — alma
+                direction = "NEUTRAL"
+
+        # Conviction
+        if score.opportunity_score >= 80 and score.confidence >= 0.8:
+            conviction = "HIGH"
+        elif score.opportunity_score >= 65 and score.confidence >= 0.65:
+            conviction = "MEDIUM"
+        else:
+            conviction = "LOW"
+
+        # Nedenler
+        reasons = []
+        v = score.vector
+        if v.momentum > 65:
+            reasons.append(f"Momentum güçlü: {v.momentum:.0f}")
+        if v.relative_strength > 65:
+            reasons.append(f"Relatif güç yüksek: {v.relative_strength:.0f}")
+        if v.fundamental > 65:
+            reasons.append(f"Fundamental pozitif: {v.fundamental:.0f}")
+        if v.news_sentiment > 65:
+            reasons.append(f"Sentiment olumlu: {v.news_sentiment:.0f}")
+        if v.catalyst > 65:
+            reasons.append(f"Katalizör var: {v.catalyst:.0f}")
+        if v.mean_reversion > 65:
+            reasons.append(f"Mean reversion fırsatı: {v.mean_reversion:.0f}")
+        if not reasons:
+            reasons.append("Genel skor eşiği aşıldı")
+
+        # Riskler
+        risks = []
+        if v.risk < 40:
+            risks.append(f"Yüksek risk: {v.risk:.0f}")
+        if v.data_quality < 60:
+            risks.append(f"Düşük veri kalitesi: {v.data_quality:.0f}")
+        if v.momentum < 35:
+            risks.append(f"Momentum zayıf: {v.momentum:.0f}")
+        if not risks:
+            risks.append("Belirgin risk tespit edilmedi")
+
+        return Decision(
+            ticker=score.ticker,
+            action=action,
+            direction=direction,
+            confidence=score.confidence,
+            score=score.opportunity_score,
+            reasons=reasons,
+            risks=risks,
+            conviction=conviction,
+        )
+
+
 # Singleton
 decision_engine = DecisionEngine()

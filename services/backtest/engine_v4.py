@@ -46,6 +46,9 @@ class BacktestConfig:
     max_positions: int = 20
     slippage_rate: float = 0.001
     min_quality_score: float = 70.0
+    use_canonical_scoring: bool = False  # True → CanonicalScoringPipeline kullan
+    regime: str = "UNKNOWN"  # Canonical scoring için rejim
+    historical_repository: Any = None  # HistoricalDataRepository instance
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -56,6 +59,8 @@ class BacktestConfig:
             "max_positions": self.max_positions,
             "slippage_rate": self.slippage_rate,
             "min_quality_score": self.min_quality_score,
+            "use_canonical_scoring": self.use_canonical_scoring,
+            "regime": self.regime,
         }
 
 
@@ -329,10 +334,13 @@ class BacktestEngineV4:
 
         # Benchmark prices (XU100)
         benchmark_prices = {}
+        benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
                 benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
+            if 'Close' in benchmark_data.columns:
+                benchmark_close_arr = benchmark_data['Close'].values.astype(float)
 
         # Pre-compute quality cache
         for ticker, df in market_data.items():
@@ -365,6 +373,31 @@ class BacktestEngineV4:
             # Benchmark price
             bench_price = benchmark_prices.get(date_str)
 
+            # === CANONICAL: GÜNLÜK FEATURE TOPLAMA (tüm tickers) ===
+            day_features: Dict[str, Dict[str, Any]] = {}
+            if cfg.use_canonical_scoring:
+                # Historical adapter (repository varsa)
+                hist_adapter = None
+                if cfg.historical_repository is not None:
+                    from ..data.historical_adapter import HistoricalDataAdapter
+                    hist_adapter = HistoricalDataAdapter(cfg.historical_repository)
+
+                for t, tdf in market_data.items():
+                    tdf_until = tdf[tdf.index <= current_date]
+                    if len(tdf_until) >= effective_lookback:
+                        feats = self._get_features(t, date_str, tdf_until, effective_lookback, cfg)
+                        if feats:
+                            day_features[t] = feats
+                # Cross-sectional enrichment (PIT-safe: sadece current_date verisi)
+                if len(day_features) >= 5:
+                    for t in list(day_features.keys()):
+                        day_features[t] = self._enrich_features_for_canonical(
+                            t, day_features[t], date_str,
+                            day_features, market_data, current_date,
+                            benchmark_close=benchmark_close_arr,
+                            historical_adapter=hist_adapter,
+                        )
+
             # SELL sinyalleri (pozisyondaki hisseler)
             for ticker in list(sim._positions.keys()):
                 if ticker not in market_data:
@@ -373,12 +406,15 @@ class BacktestEngineV4:
                 if next_date not in df.index:
                     continue
 
-                # Score hesapla
-                df_until = df[df.index <= current_date]
-                if len(df_until) < effective_lookback:
-                    continue
+                # Score hesapla (canonical modda enriched features)
+                if cfg.use_canonical_scoring and ticker in day_features:
+                    features = day_features[ticker]
+                else:
+                    df_until = df[df.index <= current_date]
+                    if len(df_until) < effective_lookback:
+                        continue
+                    features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
 
-                features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
                 if not features:
                     continue
 
@@ -391,38 +427,51 @@ class BacktestEngineV4:
 
             # BUY sinyalleri
             buy_candidates = []
-            for ticker, df in market_data.items():
-                # Survivorship bias
-                if universe_at_date and ticker not in universe_at_date:
-                    survivorship_violations += 1
-                    continue
 
-                # Zaten pozisyondaysa skip
-                if sim.has_position(ticker):
-                    continue
+            if cfg.use_canonical_scoring:
+                # Canonical modda: day_features zaten SELL öncesi toplandı ve enrich edildi
+                # Sadece pozisyonda olmayanları filtrele
+                for ticker, features in day_features.items():
+                    if sim.has_position(ticker):
+                        continue
+                    quality_info = self._quality_cache.get(ticker)
+                    if quality_info and not quality_info[0]:
+                        continue
+                    if quality_info and quality_info[1] < cfg.min_quality_score:
+                        continue
+                    total_scans += 1
+                    score = self._compute_score(features)
+                    if score >= cfg.signal_threshold + 10:
+                        buy_candidates.append((ticker, score))
+            else:
+                # Legacy modda: burada topla
+                day_features = {}
+                for ticker, df in market_data.items():
+                    if universe_at_date and ticker not in universe_at_date:
+                        survivorship_violations += 1
+                        continue
+                    if sim.has_position(ticker):
+                        continue
+                    quality_info = self._quality_cache.get(ticker)
+                    if quality_info and not quality_info[0]:
+                        data_quality_issues += 1
+                        continue
+                    if quality_info and quality_info[1] < cfg.min_quality_score:
+                        data_quality_issues += 1
+                        continue
+                    df_until = df[df.index <= current_date]
+                    if len(df_until) < effective_lookback:
+                        continue
+                    features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
+                    if not features:
+                        continue
+                    day_features[ticker] = features
 
-                # Quality cache
-                quality_info = self._quality_cache.get(ticker)
-                if quality_info and not quality_info[0]:
-                    data_quality_issues += 1
-                    continue
-                if quality_info and quality_info[1] < cfg.min_quality_score:
-                    data_quality_issues += 1
-                    continue
-
-                # Veri penceresi
-                df_until = df[df.index <= current_date]
-                if len(df_until) < effective_lookback:
-                    continue
-
-                features = self._get_features(ticker, date_str, df_until, effective_lookback, cfg)
-                if not features:
-                    continue
-
-                total_scans += 1
-                score = self._compute_score(features)
-                if score >= cfg.signal_threshold + 10:
-                    buy_candidates.append((ticker, score))
+                for ticker, features in day_features.items():
+                    total_scans += 1
+                    score = self._compute_score(features)
+                    if score >= cfg.signal_threshold + 10:
+                        buy_candidates.append((ticker, score))
 
             # En iyi adayları sırala ve al
             buy_candidates.sort(key=lambda x: x[1], reverse=True)
@@ -567,10 +616,13 @@ class BacktestEngineV4:
 
         # Benchmark prices (legacy ile aynı)
         benchmark_prices = {}
+        benchmark_close_arr = None  # Motor1 relative strength için
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
                 benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
+            if 'Close' in benchmark_data.columns:
+                benchmark_close_arr = benchmark_data['Close'].values.astype(float)
 
         # Pre-compute quality cache (legacy ile aynı)
         for ticker, df in market_data.items():
@@ -936,7 +988,17 @@ class BacktestEngineV4:
             return None
 
     def _compute_score(self, features: Dict[str, Any]) -> float:
-        """Feature'lardan skor hesapla (v2.0 ile aynı mantık)."""
+        """Feature'lardan skor hesapla.
+
+        use_canonical_scoring=True ise CanonicalScoringPipeline kullanır.
+        Aksi halde v2.0 ile aynı legacy mantık.
+        """
+        if self._config.use_canonical_scoring:
+            return self._compute_score_canonical(features)
+        return self._compute_score_legacy(features)
+
+    def _compute_score_legacy(self, features: Dict[str, Any]) -> float:
+        """Legacy skor (v2.0 ile aynı mantık)."""
         _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
         score = 50.0
         rsi = _s(features.get("rsi_14", 50))
@@ -948,6 +1010,137 @@ class BacktestEngineV4:
         score += _s(features.get("roc_5d", 0)) * 2
         score += _s(features.get("volume_zscore", 0)) * 5
         return max(0, min(100, score))
+
+    def _compute_score_canonical(self, features: Dict[str, Any]) -> float:
+        """Canonical scoring pipeline ile skor.
+
+        PIT KORUMASI: Sadece calculator feature'ları kullanılır.
+        Motor5/6/9 gibi anlık veri gerektiren motorlar çalıştırılmaz.
+        """
+        try:
+            from .canonical_adapter import backtest_canonical_adapter
+            return backtest_canonical_adapter.compute_score(
+                features=features,
+                regime=self._config.regime,
+            )
+        except Exception as e:
+            logger.warning("Canonical scoring failed, falling back to legacy", error=str(e))
+            return self._compute_score_legacy(features)
+
+    def _enrich_features_for_canonical(
+        self,
+        ticker: str,
+        features: Dict[str, Any],
+        date_str: str,
+        all_day_features: Dict[str, Dict[str, Any]],
+        market_data: Dict[str, pd.DataFrame],
+        current_date,
+        benchmark_close: Optional[np.ndarray] = None,
+        historical_adapter=None,
+    ) -> Dict[str, Any]:
+        """Calculator feature'larını canonical scoring için zenginleştir.
+
+        PIT-safe: Sadece current_date'e kadar bilinen veriler kullanılır.
+
+        Eklenen:
+        - Historical fundamental features (Motor4)
+        - Historical KAP/News sentiment (Motor5)
+        - Historical catalyst features (Motor6)
+        - Motor1 relative strength features (benchmark varsa)
+        - Cross-sectional rank features (return_*, rank_*, market_breadth)
+        - Seasonality features (Motor9)
+        - Canonical aliases (return_5d → roc_5d mapping)
+        """
+        enriched = dict(features)
+
+        # === HISTORICAL FUNDAMENTAL (Motor4 — PIT-safe) ===
+        if historical_adapter is not None:
+            try:
+                fund_features = historical_adapter.get_fundamental_features(ticker, date_str)
+                if fund_features:
+                    enriched.update(fund_features)
+            except Exception:
+                pass
+
+        # === HISTORICAL KAP + NEWS SENTIMENT (Motor5 — PIT-safe) ===
+        if historical_adapter is not None:
+            try:
+                kap_events = historical_adapter.get_kap_events(ticker, date_str)
+                news_events = historical_adapter.get_news_events(ticker, date_str)
+                sentiment_features = historical_adapter.compute_sentiment(kap_events, news_events)
+                if sentiment_features:
+                    enriched.update(sentiment_features)
+            except Exception:
+                pass
+
+        # === HISTORICAL CATALYST (Motor6 — PIT-safe) ===
+        if historical_adapter is not None:
+            try:
+                catalyst_events = historical_adapter.get_catalyst_events(ticker, date_str)
+                catalyst_features = historical_adapter.compute_catalyst_features(catalyst_events)
+                if catalyst_features:
+                    enriched.update(catalyst_features)
+            except Exception:
+                pass
+
+        # === MOTOR 1: RELATIVE STRENGTH (PIT-safe) ===
+        if benchmark_close is not None and len(benchmark_close) > 20:
+            try:
+                from services.features.seven_motors import RelativeStrengthMotor
+                df = market_data.get(ticker)
+                if df is not None:
+                    mask_arr = df.index <= current_date
+                    stock_close = df['Close'].values[mask_arr]
+                    bench_slice = benchmark_close[:len(stock_close)]
+                    if len(stock_close) > 20 and len(bench_slice) == len(stock_close):
+                        rs_motor = RelativeStrengthMotor()
+                        rs_feats = rs_motor.compute(
+                            ticker, stock_close, bench_slice
+                        )
+                        enriched.update(rs_feats)
+            except Exception:
+                pass
+
+        # === CROSS-SECTIONAL FEATURES (PIT-safe) ===
+        if len(all_day_features) >= 5:
+            from services.features.cross_sectional import cross_sectional_engine
+            rank_feats = cross_sectional_engine.compute_rank_features(
+                ticker, features, all_day_features
+            )
+            enriched.update(rank_feats)
+            breadth = cross_sectional_engine.compute_market_breadth_features(
+                all_day_features
+            )
+            enriched.update(breadth)
+
+        # === SEASONALITY (PIT-safe) ===
+        try:
+            dates_list = []
+            df = market_data.get(ticker)
+            if df is not None:
+                mask_arr = df.index <= current_date
+                dates_list = [str(d.date()) if hasattr(d, 'date') else str(d)
+                             for d in df.index[mask_arr]]
+            if len(dates_list) >= 252:
+                close_arr = df['Close'].values[mask_arr] if df is not None else None
+                if close_arr is not None and len(close_arr) >= 252:
+                    from services.features.seven_motors import SeasonalityMotor
+                    season_motor = SeasonalityMotor()
+                    season_feats = season_motor.compute(
+                        ticker, close_arr, dates_list
+                    )
+                    enriched.update(season_feats)
+        except Exception:
+            pass
+
+        # === CANONICAL ALIASES ===
+        for period in [1, 5, 20, 60]:
+            roc_key = f'roc_{period}d'
+            ret_key = f'return_{period}d'
+            if roc_key in enriched and ret_key not in enriched:
+                enriched[ret_key] = enriched[roc_key]
+
+        return enriched
 
     def _generate_run_id(self, market_data: Dict[str, pd.DataFrame]) -> str:
         """Deterministic run ID üret."""

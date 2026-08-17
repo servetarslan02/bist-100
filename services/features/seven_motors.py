@@ -396,6 +396,10 @@ class VolumeMicrostructureMotor:
             if vol_prev > 0:
                 features["volume_trend"] = round((vol_recent / vol_prev - 1) * 100, 4)
 
+        # Average volume (ranking model bekler)
+        if len(valid_vol) >= 5:
+            features["avg_volume_5d"] = round(float(np.mean(valid_vol[-5:])), 0)
+
         # Money Flow Index (MFI) approximation
         if n >= 14:
             pos_flow = 0
@@ -1259,19 +1263,44 @@ class SevenMotorEngine:
         # === FEATURE ALIASES ===
         # Ranking modeli ve cross-sectional engine'in beklediği isimlerle
         # motor çıktıları arasında eşleme. Var olan feature'ları ezme.
-        _ALIAS_MAP = {
-            # Motor 2: period-suffixed → unsuffixed (default period)
-            "breakout_failure_20d": "breakout_failure",
-            "recovery_strength_20d": "recovery_strength",
-            # Motor 7: period-suffixed → unsuffixed
-            "fall_market_selloff_5d": "fall_market_selloff",
-            "fall_sector_selloff_5d": "fall_sector_selloff",
-        }
-        for src, dst in _ALIAS_MAP.items():
-            if dst not in cleaned and src in cleaned:
-                cleaned[dst] = cleaned[src]
+        # === FEATURE CONTRACT ALIASES ===
+        # Ranking model ve cross-sectional engine'in beklediği canonical isimler.
+        # Kural: dst zaten varsa EZMEZ (canonical source korunur).
+        _ALIAS_MAP = [
+            # (source_name, canonical_name, source_motor)
+            # Motor 1
+            ("rs_peer_rank_5d",            "rs_peer_rank",            "motor1"),
+            # Motor 2
+            ("breakout_failure_20d",       "breakout_failure",        "motor2"),
+            ("recovery_strength_20d",      "recovery_strength",       "motor2"),
+            # Motor 3
+            ("volume_percentile_20d",      "volume_percentile",       "motor3"),
+            ("volume_up_down_ratio_20d",   "volume_up_down_ratio",    "motor3"),
+            ("tick_rule_20d",              "tick_rule",               "motor3"),
+            ("vwap_deviation_20d",         "vwap_deviation",          "motor3"),
+            # Motor 4
+            ("raw_roe",                    "roe",                     "motor4"),
+            ("raw_roa",                    "roa",                     "motor4"),
+            ("raw_profit_margin",          "profit_margin_pct",       "motor4"),
+            # Motor 7
+            ("fall_market_selloff_5d",     "fall_market_selloff",     "motor7"),
+            ("fall_sector_selloff_5d",     "fall_sector_selloff",     "motor7"),
+        ]
 
-        # Motor 3'ten volume_zscore_20d → volume_zscore (eğer calculator üretmemişse)
+        for src, dst, motor in _ALIAS_MAP:
+            if src in cleaned:
+                if dst not in cleaned:
+                    cleaned[dst] = cleaned[src]
+                # else: canonical source zaten var, ezme
+
+        # return_* → roc_* mapping (cross-sectional RANK_TARGETS için)
+        for period in [1, 5, 20, 60]:
+            roc_key = f"roc_{period}d"
+            ret_key = f"return_{period}d"
+            if roc_key in cleaned and ret_key not in cleaned:
+                cleaned[ret_key] = cleaned[roc_key]
+
+        # volume_zscore: calculator canonical, motor3 fallback
         if "volume_zscore" not in cleaned and "volume_zscore_20d" in cleaned:
             cleaned["volume_zscore"] = cleaned["volume_zscore_20d"]
 

@@ -65,6 +65,62 @@ class SystemOrchestrator:
 
         logger.info("SystemOrchestrator v3.0 initialized")
 
+    # Calculator'ın canonical olduğu feature'lar.
+    # Motorlar bu feature'ları üretse bile calculator'ın değeri korunur.
+    _CALCULATOR_CANONICAL = frozenset([
+        "rsi_14", "rsi_5",
+        "momentum_20d",
+        "volume_zscore",
+        "bb_position", "bb_upper", "bb_lower", "bb_width",
+        "sma_20", "sma_50", "ema_12", "ema_26",
+        "macd", "macd_signal", "macd_hist",
+        "stoch_k", "stoch_d",
+        "atr_14", "atr_pct",
+        "adx",
+        "obv",
+        "volatility_20d", "volatility_60d", "realized_vol_20d",
+        "price_vs_sma20", "price_vs_sma50",
+        "roc_5d", "roc_20d", "roc_60d", "roc_120d",
+    ])
+
+    def _merge_features(
+        self,
+        calc_features: Dict[str, Any],
+        motor_features: Dict[str, Any],
+        ticker: str,
+    ) -> Dict[str, Any]:
+        """Calculator + motor feature'larını collision-aware birleştir.
+
+        Precedence:
+        1. Calculator canonical feature'ları her zaman korunur
+        2. Motor feature'ları calculator'da yoksa eklenir
+        3. Collision loglanır ama overwrite yapılmaz
+        """
+        merged = dict(calc_features)
+        collisions = []
+
+        for key, motor_val in motor_features.items():
+            if key.startswith("_"):
+                continue  # Meta feature'ları atla
+            if key in merged:
+                if key in self._CALCULATOR_CANONICAL:
+                    collisions.append(key)
+                    continue  # Calculator canonical — ezme
+                # Motor'un kendi feature'ı — motor'un değeri geçerli
+                # (Örn: Motor2'nin trend_slope_20d'i calculator'dan daha kapsamlı)
+                merged[key] = motor_val
+            else:
+                merged[key] = motor_val
+
+        if collisions:
+            logger.debug(
+                "Feature collision (calculator canonical preserved)",
+                ticker=ticker,
+                collisions=collisions[:5],
+            )
+
+        return merged
+
     def run_full_pipeline(
         self,
         date: str,
@@ -227,8 +283,10 @@ class SystemOrchestrator:
                     market_regime=str(self._current_regime),
                 )
 
-                # Birlestir (calculator + motors)
-                all_features[ticker] = {**tech_features, **motor_features}
+                # Birlestir (calculator + motors) — collision-aware
+                all_features[ticker] = self._merge_features(
+                    tech_features, motor_features, ticker
+                )
 
             # Cross-sectional features
             cs_features = cross_sectional_engine.compute_all_cross_sectional(
@@ -302,6 +360,55 @@ class SystemOrchestrator:
             errors.append(f"Ranking: {str(e)}")
             top_opportunities = []
             ranking_result = None
+
+        # === STAGE 4B: CANONICAL SCORING + DECISION ===
+        canonical_scores = {}
+        decisions = {}
+        try:
+            from services.core.canonical_scoring import canonical_scoring
+            from services.core.decision_engine import decision_engine
+
+            regime_str_decision = self._current_regime.regime if hasattr(self._current_regime, 'regime') else str(self._current_regime)
+
+            for ticker, features in all_features.items():
+                # Canonical skor üret
+                cs = canonical_scoring.compute_canonical_score(
+                    ticker=ticker,
+                    features=features,
+                    regime=regime_str_decision,
+                )
+                canonical_scores[ticker] = cs
+
+                # Decision Engine'dan karar al
+                price = features.get("close", features.get("price", 0))
+                if price and isinstance(price, (int, float)) and price > 0:
+                    dec = decision_engine.decide_from_canonical(cs, price=price)
+                else:
+                    dec = decision_engine.decide_from_canonical(cs)
+                decisions[ticker] = dec
+
+            # Top opportunities'ları canonical skorlarla güncelle
+            for opp in top_opportunities:
+                ticker = opp["ticker"]
+                if ticker in canonical_scores:
+                    cs = canonical_scores[ticker]
+                    opp["canonical_score"] = cs.opportunity_score
+                    opp["risk_score"] = cs.risk_score
+                    opp["confidence"] = cs.confidence
+                    opp["direction"] = cs.direction
+                    opp["decision"] = decisions[ticker].action if ticker in decisions else "NO_ACTION"
+                    opp["conviction"] = decisions[ticker].conviction if ticker in decisions else "LOW"
+                    opp["score_vector"] = cs.vector.to_dict()
+
+            buy_count = sum(1 for d in decisions.values() if d.action == "BUY")
+            sell_count = sum(1 for d in decisions.values() if d.action == "SELL")
+            logger.info("Canonical scoring completed",
+                       tickers=len(canonical_scores),
+                       buy=buy_count, sell=sell_count)
+
+        except Exception as e:
+            logger.error("Canonical scoring failed", error=str(e))
+            errors.append(f"CanonicalScoring: {str(e)}")
 
         # === STAGE 5: RISK & POSITION SIZING ===
         try:
