@@ -1,7 +1,135 @@
-# API Nihai Sistem Dokümanı — Araştırma Bazlı
+# API Nihai Sistem Dokümanı — Kod Analizi + Araştırma Bazlı
 
 **Tarih:** 2026-08-18
 **Kaynaklar:** Aladdin (BlackRock) mimarisi, Low-Latency HFT System Design (Liu, 2026), ScienceDirect Modular Trading System (2026), QuantConnect platform tasarımı, CQRS/Event Sourcing patterns
+
+---
+
+## 0. Mevcut Durum (Kod Analizi)
+
+### Modüller (3 dosya, 1,829 satır)
+
+| Modül | Satır | Class | Fonksiyon | Durum |
+|-------|-------|-------|-----------|-------|
+| `server.py` | 871 | 1 | 42 | ✅ Dashboard + API (port 8000) |
+| `main.py` | 716 | 1 | 21 | ✅ Backend API (port 8001) |
+| `websocket.py` | 242 | 2 | 3 | ✅ WebSocket server |
+
+### Mevcut Endpoint'ler (41 adet)
+
+**main.py (16 endpoint):**
+| Method | Endpoint | Servis |
+|--------|----------|--------|
+| GET | `/api/health` | infrastructure |
+| GET | `/api/status` | orchestrator |
+| GET | `/api/market/state` | market_state, features |
+| GET | `/api/market/instruments` | bist_universe |
+| GET | `/api/market/instrument/{ticker}/ohlcv` | yfinance |
+| GET | `/api/market/instrument/{ticker}/full` | orchestrator |
+| GET | `/api/market/instrument/{ticker}` | intelligence |
+| GET | `/api/signals` | signal_fusion |
+| GET | `/api/portfolio` | portfolio |
+| GET | `/api/world/state` | world_state |
+| GET | `/api/features/{ticker}` | calculator |
+| GET | `/api/events` | event_bus |
+| GET | `/api/models` | ranking_model |
+| GET | `/api/alerts` | alerting |
+| WS | `/ws/{channel}` | websocket |
+| GET | `/api/stream/events` | event_bus |
+
+**server.py (25 endpoint):**
+| Method | Endpoint | Servis |
+|--------|----------|--------|
+| GET | `/` | Dashboard HTML |
+| GET | `/health` | infrastructure |
+| GET | `/api/market` | market_state |
+| GET | `/api/opportunities` | opportunity_engine |
+| GET | `/api/portfolio` | portfolio |
+| GET | `/api/decisions` | decision_engine |
+| GET | `/api/learning` | learning |
+| GET | `/api/learning/predictions` | outcome_tracker |
+| GET | `/api/signals` | signal_fusion |
+| GET | `/api/features/{ticker}` | calculator |
+| GET | `/api/regime` | regime |
+| GET | `/api/risk` | risk |
+| GET | `/api/notifications` | alerting |
+| GET | `/api/audit` | audit_log |
+| GET | `/api/stats` | observability |
+| GET | `/api/tickers` | bist_universe |
+| GET | `/health/detailed` | infrastructure |
+| GET | `/metrics` | production_metrics |
+| GET | `/admin/lock-metrics` | db_lock |
+| GET | `/admin/portfolio` | portfolio |
+| GET | `/admin/alerts` | alerting |
+| GET | `/admin/auth-status` | monitoring_security |
+| GET/POST | `/admin/policy` | policy |
+| POST | `/admin/policy/rollback` | policy |
+| GET | `/admin/policy/history` | policy |
+| GET | `/admin/policy/audit` | policy |
+| POST | `/admin/silence` | alerting |
+| DELETE | `/admin/silence` | alerting |
+| POST | `/admin/policy/diff` | policy |
+
+### WebSocket Kanalları (7)
+
+| Kanal | İçerik |
+|-------|--------|
+| `/ws` | Genel WebSocket |
+| `/ws/market` | Piyasa verisi |
+| `/ws/portfolio` | Portföy güncellemeleri |
+| `/ws/risk` | Risk alert'leri |
+| `/ws/signals` | Sinyal akışı |
+| `/ws/decisions` | Karar akışı |
+| `/ws/system` | Sistem durumu |
+
+### Servis Bağlantıları
+
+**main.py kullandığı servisler:**
+- core: config, database, event_bus, logging
+- ingestion: bist_universe
+- features: calculator
+- intelligence: spec_engine
+
+**server.py kullandığı servisler:**
+- core: database_dev, logging, audit_log, observability, infrastructure, monitoring, monitoring_security, alerting, config
+- ingestion: bist_universe
+- features: store
+- intelligence: regime, signal_fusion
+- scanner: opportunity_engine
+- ml: ranking_model
+- core: decision_engine
+- risk: position_sizing
+- simulation: execution_simulator
+- portfolio: portfolio_manager
+- learning: integrated_learning, outcome_tracker
+
+### Eksik Entegrasyonlar (Kod Analizi)
+
+| Servis | Neden Kullanılmalı | Durum |
+|--------|-------------------|-------|
+| intelligence/monte_carlo.py | `/api/scenarios` endpoint'inde | ❌ |
+| intelligence/scenario.py | `/api/scenarios` endpoint'inde | ❌ |
+| intelligence/probability.py | `/api/instrument/{ticker}/forecast` endpoint'inde | ❌ |
+| intelligence/prediction_layer.py | `/api/predictions` endpoint'inde | ❌ |
+| intelligence/kap_llm_extractor.py | `/api/events` endpoint'inde | ❌ |
+| intelligence/pipeline.py | `/api/intelligence` endpoint'inde | ❌ |
+| risk/enhanced_risk.py | `/api/risk/portfolio` endpoint'inde | ❌ |
+| risk/calibration.py | `/api/models/calibration` endpoint'inde | ❌ |
+| learning/attribution.py | `/api/learning/attribution` endpoint'inde | ❌ |
+| learning/continuous_learning.py | `/api/learning/status` endpoint'inde | ❌ |
+| ml/model_comparator.py | `/api/models/compare` endpoint'inde | ❌ |
+| ml/ensemble.py | `/api/models/ensemble` endpoint'inde | ❌ |
+| backtest/engine.py | `/api/backtests` endpoint'inde | ❌ |
+| agents/agent_system.py | `/api/agents` endpoint'inde | ❌ |
+| scanner/alpha_engine.py | `/api/scanner/alpha` endpoint'inde | ❌ |
+| simulation/execution_simulator.py | `/api/orders` endpoint'inde | ❌ |
+| alternative/* | `/api/alternative` endpoint'inde | ❌ |
+| macro/* | `/api/macro` endpoint'inde | ❌ |
+| factors/* | `/api/factors` endpoint'inde | ❌ |
+| event_study/* | `/api/event-study` endpoint'inde | ❌ |
+| viop/* | `/api/viop` endpoint'inde | ❌ |
+| features/technical_features.py | `/api/features/{ticker}` endpoint'inde | ❌ |
+| features/feature_selector.py | `/api/features/select` endpoint'inde | ❌ |
 
 ---
 
