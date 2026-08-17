@@ -387,14 +387,18 @@ class SystemOrchestrator:
             top_opportunities = []
             ranking_result = None
 
-        # === STAGE 4B: CANONICAL SCORING + DECISION ===
+        # === STAGE 4B: CANONICAL SCORING + DECISION + RISK GATE ===
         canonical_scores = {}
         decisions = {}
+        risk_decisions = {}
         try:
             from services.core.canonical_scoring import canonical_scoring
             from services.core.decision_engine import decision_engine
+            from services.core.risk_gate import risk_gate
+            from services.core.market_session import market_session
 
             regime_str_decision = self._current_regime.regime if hasattr(self._current_regime, 'regime') else str(self._current_regime)
+            is_market_open = market_session.is_trading_hours()
 
             for ticker, features in all_features.items():
                 # Canonical skor üret
@@ -412,6 +416,21 @@ class SystemOrchestrator:
                 else:
                     dec = decision_engine.decide_from_canonical(cs)
                 decisions[ticker] = dec
+
+                # Risk gate kontrolü (BUY kararları için)
+                if dec.action == "BUY":
+                    rd = risk_gate.check_order(
+                        ticker=ticker, side="BUY", quantity=10, price=float(price or 0),
+                        portfolio_value=1_000_000, current_positions={},
+                        model_confidence=cs.confidence,
+                        market_open=is_market_open,
+                        data_valid=cs.vector.data_quality > 50,
+                    )
+                    risk_decisions[ticker] = rd
+                    if not rd.allowed:
+                        dec.action = "NO_ACTION"
+                        dec.reasons.append(f"Risk gate: {rd.reason}")
+                        decisions[ticker] = dec
 
             # Top opportunities'ları canonical skorlarla güncelle
             for opp in top_opportunities:

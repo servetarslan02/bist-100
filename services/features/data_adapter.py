@@ -43,6 +43,17 @@ class DataAdapter:
         self._kap_provider_instance = None
         self._news_provider_instance = None
 
+        # Circuit breaker'lar (FAZ 5.4)
+        try:
+            from services.core.circuit_breaker import CircuitBreaker
+            self._cb_fundamental = CircuitBreaker(name="fundamental", failure_threshold=5, recovery_timeout_seconds=120)
+            self._cb_kap = CircuitBreaker(name="kap", failure_threshold=3, recovery_timeout_seconds=60)
+            self._cb_news = CircuitBreaker(name="news", failure_threshold=5, recovery_timeout_seconds=60)
+        except ImportError:
+            self._cb_fundamental = None
+            self._cb_kap = None
+            self._cb_news = None
+
     def _load_providers(self):
         """Provider'ları lazy-load et (bağımlılık yoksa graceful skip)."""
         if self._providers_loaded:
@@ -139,6 +150,10 @@ class DataAdapter:
         if self._fundamental_provider is None:
             return self._empty_fundamental(ticker, "provider_unavailable")
 
+        # Circuit breaker kontrolü
+        if self._cb_fundamental and not self._cb_fundamental.can_execute():
+            return self._empty_fundamental(ticker, "circuit_breaker_open")
+
         try:
             raw = self._fundamental_provider.fetch_fundamentals(ticker)
             if raw is None:
@@ -211,9 +226,13 @@ class DataAdapter:
                 else:
                     result[dst_key] = make_unknown(source)
 
+            if self._cb_fundamental:
+                self._cb_fundamental.record_success()
             return result
 
         except Exception as e:
+            if self._cb_fundamental:
+                self._cb_fundamental.record_failure()
             logger.warning("Fundamental fetch error", ticker=ticker, error=str(e))
             return self._empty_fundamental(ticker, "fetch_error")
 
@@ -299,6 +318,11 @@ class DataAdapter:
             logger.debug("KAP provider unavailable", ticker=ticker)
             return []
 
+        # Circuit breaker kontrolü
+        if self._cb_kap and not self._cb_kap.can_execute():
+            logger.debug("KAP circuit breaker open", ticker=ticker)
+            return []
+
         try:
             if self._kap_provider_instance is None:
                 self._kap_provider_instance = self._kap_provider()
@@ -375,6 +399,11 @@ class DataAdapter:
 
         if self._news_provider is None:
             logger.debug("News provider unavailable", ticker=ticker)
+            return []
+
+        # Circuit breaker kontrolü
+        if self._cb_news and not self._cb_news.can_execute():
+            logger.debug("News circuit breaker open", ticker=ticker)
             return []
 
         try:
