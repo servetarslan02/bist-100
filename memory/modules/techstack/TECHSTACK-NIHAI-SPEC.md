@@ -1,7 +1,40 @@
 # Tech Stack Nihai Sistem Dokümanı — Kod Analizi + Araştırma Bazlı
 
 **Tarih:** 2026-08-18
-**Kaynaklar:** awesome-quant GitHub, arXiv Comparative ML (2025), ACM Hybrid ML (2025), Dash0 Prometheus Guide (2026), Reddit dataengineering
+**Kaynaklar:** awesome-quant GitHub, arXiv Comparative ML (2025), ACM Hybrid ML (2025), Dash0 Prometheus Guide (2026), Reddit dataengineering, Nature Stacked Ensemble (2026), MDPI ML Survey (2025), QuestDB Benchmark (2025), Moesif API Frameworks (2026)
+
+---
+
+## 0. Nihai Teknoloji Seçimleri (Araştırma Bazlı)
+
+### Doğrulanan Seçimler ✅
+
+| Teknoloji | Neden En İyi | Kaynak |
+|-----------|-------------|--------|
+| **FastAPI** | Async, performant, OpenAPI docs, en popüler Python API framework | Moesif (2026), Reddit |
+| **PostgreSQL** | ACID transactions, JSON support, en güvenilir relational DB | Reddit (2025) |
+| **ClickHouse** | Time-series analytics'te en hızlı, columnar storage | QuestDB Benchmark (2025) |
+| **Redis** | Cache + event bus, sub-ms latency | Standart |
+| **LightGBM** | En hızlı gradient boosting, financial prediction'da en iyi | arXiv (2025), MDPI (2025) |
+| **XGBoost** | En esnek, regularization güçlü | arXiv (2025) |
+| **scikit-learn** | Preprocessing, metrics, calibration'da standart | Standart |
+| **structlog** | Structured logging'de en iyi Python kütüphanesi | Standart |
+| **Next.js** | React SSR, API routes, en popüler frontend framework | Standart |
+| **Docker** | Containerization'da endüstri standardı | Standart |
+
+### Eklenmesi Gereken (Araştırma Bazlı)
+
+| Teknoloji | Neden En İyi | Kaynak |
+|-----------|-------------|--------|
+| **CatBoost** | Kategorik feature'da en iyi (BIST sektör, pazar) | arXiv (2025), MDPI (2025) |
+| **Optuna** | Bayesian optimization'da en iyi hyperparameter tuning | Standart |
+| **SHAP** | Model explainability'de endüstri standardı | ResearchGate (2026) |
+| **MLflow** | Model tracking'de en popüler | Standart |
+| **Grafana** | Monitoring dashboard'da endüstri standardı | Dash0 (2026) |
+| **python-jose** | JWT token'da en popüler Python kütüphanesi | Standart |
+| **Qwen3** | Türkçe finansal analizde en iyi local LLM | LinkedIn (2026) |
+| **Recharts** | React grafik kütüphanesinde en popüler | Standart |
+| **AG Grid** | Data table'da en güçlü (sortable, filterable, virtual scroll) | Standart |
 
 ---
 
@@ -86,6 +119,9 @@
 |-----------|----------|------|-------|
 | Ollama | — | Local LLM server | ✅ |
 | gemma4:12b-q4_0 | — | Default model | ✅ |
+| **Qwen3** | — | Türkçe finansal analiz (nihai) | ❌ Eklenmeli |
+
+**Kaynak:** LinkedIn (2026) — Qwen3 Türkçe'de en iyi, finansal analizde güçlü.
 
 ---
 
