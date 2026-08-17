@@ -23,6 +23,7 @@ from .feature_contract import (
     FeatureDataPoint, FeatureStatus,
     make_fresh, make_missing, make_unknown, make_stale,
 )
+from services.core.production_metrics import production_metrics, Metrics
 
 logger = structlog.get_logger()
 
@@ -234,6 +235,7 @@ class DataAdapter:
             if self._cb_fundamental:
                 self._cb_fundamental.record_failure()
             logger.warning("Fundamental fetch error", ticker=ticker, error=str(e))
+            production_metrics.inc(Metrics.DATA_FETCH_ERRORS)
             return self._empty_fundamental(ticker, "fetch_error")
 
     def _check_fundamental_freshness(
@@ -378,6 +380,7 @@ class DataAdapter:
 
         except Exception as e:
             logger.warning("KAP fetch error", ticker=ticker, error=str(e))
+            production_metrics.inc(Metrics.DATA_FETCH_ERRORS)
             return []
 
     def fetch_news_events(
@@ -463,6 +466,7 @@ class DataAdapter:
 
         except Exception as e:
             logger.warning("News fetch error", ticker=ticker, error=str(e))
+            production_metrics.inc(Metrics.DATA_FETCH_ERRORS)
             return []
 
     # ==================================================

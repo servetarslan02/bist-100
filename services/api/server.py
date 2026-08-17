@@ -106,6 +106,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API Key middleware (FAZ 5)
+_PUBLIC_PATHS = {"/", "/docs", "/redoc", "/openapi.json", "/api/health"}
+
+@app.middleware("http")
+async def api_key_middleware(request: Request, call_next):
+    """API key kontrolü — public path'ler hariç."""
+    path = request.url.path
+    if path in _PUBLIC_PATHS or path.startswith("/ws"):
+        return await call_next(request)
+
+    # Production'da API key zorunlu
+    from services.core.config import settings
+    if settings.is_production:
+        api_key = request.headers.get("X-API-Key", "")
+        if not api_key:
+            return JSONResponse(
+                status_code=401,
+                content={"error": "API key required", "header": "X-API-Key"}
+            )
+
+    return await call_next(request)
+
 # ===================== WEBSOCKET MANAGER =====================
 class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""

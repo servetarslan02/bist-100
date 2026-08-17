@@ -22,6 +22,8 @@ from datetime import datetime, timezone, timedelta
 from collections import deque, defaultdict
 import structlog
 
+from services.core.production_metrics import production_metrics, Metrics
+
 logger = structlog.get_logger()
 
 
@@ -343,6 +345,28 @@ class SystemOrchestrator:
                     )
                     all_features[ticker].update(sector_feats)
 
+            # FAZ 5: Cross-sectional z-score normalization (PIT-safe)
+            try:
+                from services.ml.training_validator import CrossSectionalNormalizer
+                cs_normalizer = CrossSectionalNormalizer()
+                # Base feature'ları normalize et
+                cs_base_features = [f for f in list(list(all_features.values())[0].keys())
+                                    if not f.endswith('_cs_zscore') and not f.endswith('_cs_rank')]
+                cs_date_groups = {f"{t}::{date}": date for t in all_features}
+                cs_features_map = {f"{t}::{date}": all_features[t] for t in all_features}
+                cs_normalized = cs_normalizer.normalize_zscore_by_date(
+                    cs_features_map, cs_date_groups, cs_base_features[:20]  # İlk 20 feature
+                )
+                # CS feature'ları her hisseye ekle
+                for t in all_features:
+                    key = f"{t}::{date}"
+                    if key in cs_normalized:
+                        for fname, val in cs_normalized[key].items():
+                            if fname.endswith('_cs_zscore'):
+                                all_features[t][fname] = val
+            except Exception:
+                pass  # CS normalization opsiyonel
+
         except Exception as e:
             logger.error("Feature engineering failed", error=str(e))
             errors.append(f"Features: {str(e)}")
@@ -450,10 +474,12 @@ class SystemOrchestrator:
             logger.info("Canonical scoring completed",
                        tickers=len(canonical_scores),
                        buy=buy_count, sell=sell_count)
+            production_metrics.inc(Metrics.SIGNAL_GENERATED, len(canonical_scores))
 
         except Exception as e:
             logger.error("Canonical scoring failed", error=str(e))
             errors.append(f"CanonicalScoring: {str(e)}")
+            production_metrics.inc(Metrics.DATA_FETCH_ERRORS)
 
         # === STAGE 4C: INTELLIGENCE PIPELINE + PREDICTION LAYER ===
         intelligence_outputs = {}
@@ -472,10 +498,12 @@ class SystemOrchestrator:
             logger.info("Intelligence pipeline completed",
                        tickers=len(intelligence_outputs),
                        modules_used=list(set(m for o in intelligence_outputs.values() for m in o.modules_used)))
+            production_metrics.inc(Metrics.MODEL_INFERENCE_TOTAL, len(intelligence_outputs))
 
         except Exception as e:
             logger.warning("Intelligence pipeline failed", error=str(e))
             errors.append(f"Intelligence: {str(e)}")
+            production_metrics.inc(Metrics.DATA_FETCH_ERRORS)
 
         # === STAGE 5: RISK & POSITION SIZING ===
         try:

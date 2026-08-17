@@ -13,6 +13,7 @@ import structlog
 from services.core.market_session import market_session, MarketPhase
 from services.core.worker import job_worker, JobType
 from services.core.config import settings
+from services.core.production_metrics import production_metrics, Metrics
 
 logger = structlog.get_logger()
 
@@ -187,6 +188,7 @@ class ProductionScheduler:
             )
             if job_id:
                 logger.info("Job scheduled", job_type=job_type, job_id=job_id)
+                production_metrics.inc(Metrics.WORKER_JOB_TOTAL)
         except Exception as e:
             logger.error("Failed to schedule job", job_type=job_type, error=str(e))
 

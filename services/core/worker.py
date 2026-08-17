@@ -18,6 +18,8 @@ from typing import Optional, Dict, Any, Callable, Awaitable
 from enum import Enum
 import structlog
 
+from services.core.production_metrics import production_metrics, Metrics
+
 logger = structlog.get_logger()
 
 
@@ -187,6 +189,7 @@ class JobWorker:
                 # Success
                 await self._complete_job(job_id, result)
                 logger.info("Job completed", job_id=job_id, attempt=attempt + 1)
+                production_metrics.inc(Metrics.WORKER_JOB_TOTAL)
                 return
 
             except asyncio.TimeoutError:
@@ -212,6 +215,7 @@ class JobWorker:
         # Tüm retry'lar başarısız
         await self._fail_job(job_id, last_error)
         logger.error("Job failed permanently", job_id=job_id, retries=max_retries)
+        production_metrics.inc(Metrics.WORKER_JOB_FAILED)
 
     def _generate_idempotency_key(self, job_type: str, payload: Optional[Dict]) -> str:
         """Idempotency key üret."""
@@ -220,14 +224,19 @@ class JobWorker:
 
     async def _check_idempotency(self, idempotency_key: str) -> Optional[int]:
         """DB'de aynı idempotency_key ile completed/running job var mı?"""
+        if not self._db_available():
+            return None
         try:
             from .database import pg_fetchval
-            return await pg_fetchval(
-                """SELECT id FROM system_jobs
-                   WHERE idempotency_key = $1
-                   AND status IN ('RUNNING', 'COMPLETED')
-                   ORDER BY created_at DESC LIMIT 1""",
-                idempotency_key
+            return await asyncio.wait_for(
+                pg_fetchval(
+                    """SELECT id FROM system_jobs
+                       WHERE idempotency_key = $1
+                       AND status IN ('RUNNING', 'COMPLETED')
+                       ORDER BY created_at DESC LIMIT 1""",
+                    idempotency_key
+                ),
+                timeout=3.0
             )
         except Exception:
             return None
@@ -235,22 +244,42 @@ class JobWorker:
     async def _create_job(self, job_type: str, payload: Dict, priority: int,
                           max_retries: int, idempotency_key: str) -> Optional[int]:
         """DB'ye job kaydet."""
+        if not self._db_available():
+            return None
         try:
             from .database import pg_fetchval
-            return await pg_fetchval(
-                """INSERT INTO system_jobs
-                   (job_type, status, priority, payload, max_retries, idempotency_key)
-                   VALUES ($1, 'PENDING', $2, $3, $4, $5)
-                   RETURNING id""",
-                job_type, priority, json.dumps(payload), max_retries, idempotency_key
+            return await asyncio.wait_for(
+                pg_fetchval(
+                    """INSERT INTO system_jobs
+                       (job_type, status, priority, payload, max_retries, idempotency_key)
+                       VALUES ($1, 'PENDING', $2, $3, $4, $5)
+                       RETURNING id""",
+                    job_type, priority, json.dumps(payload), max_retries, idempotency_key
+                ),
+                timeout=3.0
             )
         except Exception as e:
-            logger.error("Failed to create job in DB", error=str(e))
+            logger.warning("Failed to create job in DB (DB unavailable)", error=str(e)[:100])
             return None
+
+    @staticmethod
+    def _db_available() -> bool:
+        """DB hızlı erişim kontrolü (retry yok)."""
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            result = s.connect_ex(('127.0.0.1', 5432))
+            s.close()
+            return result == 0
+        except Exception:
+            return False
 
     async def _update_job_status(self, job_id: int, status: JobStatus,
                                  retry_count: Optional[int] = None):
         """Job durumunu güncelle."""
+        if not self._db_available():
+            return
         try:
             from .database import pg_execute
             if retry_count is not None:
@@ -270,6 +299,8 @@ class JobWorker:
 
     async def _complete_job(self, job_id: int, result: Any):
         """Job başarıyla tamamlandı."""
+        if not self._db_available():
+            return
         try:
             from .database import pg_execute
             result_json = json.dumps(result, default=str) if result else '{}'
@@ -283,6 +314,8 @@ class JobWorker:
 
     async def _fail_job(self, job_id: int, error_message: str):
         """Job başarısız oldu."""
+        if not self._db_available():
+            return
         try:
             from .database import pg_execute
             await pg_execute(
