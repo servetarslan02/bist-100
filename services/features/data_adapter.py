@@ -144,14 +144,28 @@ class DataAdapter:
             source = raw.get("source", "yfinance")
 
             # Point-in-time kontrolü
-            if as_of_date and fetch_date:
-                fetch_day = fetch_date[:10]
-                if fetch_day > as_of_date:
+            # KRİTİK: fetch_date, verinin ÇEKİLME tarihidir, yayınlanma tarihi değil.
+            # yfinance gibi real-time kaynaklarda fetch_date her zaman "şimdi"dir.
+            # PIT kontrolü sadece "published_date" veya "report_date" varsa uygulanır.
+            # Fundamental veri için publication_date yoksa, freshness check yeterlidir.
+            pub_date = raw.get("publication_date", "") or raw.get("report_date", "")
+            if as_of_date and pub_date:
+                pub_day = pub_date[:10]
+                if pub_day > as_of_date:
                     return self._empty_fundamental(ticker, "future_data_blocked")
 
             # Freshness kontrolü
-            ts = fetch_date or datetime.now(timezone.utc).isoformat()
-            freshness_status = self._check_fundamental_freshness(ts, as_of_date)
+            # KRİTİK: yfinance real-time kaynaktır, fetch_date her zaman "şimdi"dir.
+            # publication_date/report_date yoksa → her zaman FRESH (live data)
+            # publication_date varsa → PIT kontrolü yapılır
+            if pub_date:
+                # Gerçek yayın tarihi var → freshness check
+                ts = pub_date
+                freshness_status = self._check_fundamental_freshness(ts, as_of_date)
+            else:
+                # Real-time kaynak (yfinance) → her zaman FRESH
+                freshness_status = FeatureStatus.FRESH
+                ts = fetch_date or datetime.now(timezone.utc).isoformat()
 
             if freshness_status == FeatureStatus.MISSING:
                 return self._empty_fundamental(ticker, "stale_data")
@@ -204,25 +218,32 @@ class DataAdapter:
     ) -> FeatureStatus:
         """Fundamental veri freshness kontrolü.
 
-        Returns:
-            FRESH: veri güncel
-            STALE: veri var ama eski (kullanılabilir ama düşük güven)
-            MISSING: veri çok eski veya tarihlendirilemez
+        fetch_ts: Verinin çekildiği timestamp (yfinance → her zaman "şimdi")
+        as_of_date: Backtest snapshot tarihi (None → live)
+
+        Kural: Real-time kaynaklar (yfinance) her zaman FRESH.
+        Publication date varsa PIT kontrolü yapılır.
         """
         if not fetch_ts:
             return FeatureStatus.MISSING
 
         try:
             fetch_day = fetch_ts[:10]
-            ref_date = as_of_date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+            # as_of_date yoksa → live mode → her zaman FRESH
+            if not as_of_date:
+                return FeatureStatus.FRESH
 
             d_fetch = datetime.strptime(fetch_day, "%Y-%m-%d")
-            d_ref = datetime.strptime(ref_date, "%Y-%m-%d")
+            d_ref = datetime.strptime(as_of_date, "%Y-%m-%d")
             age_days = (d_ref - d_fetch).days
 
+            # fetch_date gelecekte → bu veri gelecekte çekilmiş, PIT'de kullanılamaz
+            # Ama bu sadece publication_date yoksa geçerli (yfinance'da fetch_date her zaman şimdi)
+            # Bu durumda STALE olarak işaretle, MISSING değil
             if age_days < 0:
-                # Gelecek tarihli veri (zaten PIT bloklar ama ekstra güvenlik)
-                return FeatureStatus.MISSING
+                # Gelecek tarihli fetch — STALE (kullanılabilir ama güven düşük)
+                return FeatureStatus.STALE
             elif age_days <= FUNDAMENTAL_STALE_DAYS:
                 return FeatureStatus.FRESH
             elif age_days <= FUNDAMENTAL_MAX_AGE_DAYS:

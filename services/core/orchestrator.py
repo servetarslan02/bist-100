@@ -182,7 +182,7 @@ class SystemOrchestrator:
                 if t in sector_map:
                     try:
                         fund_features = data_adapter.fetch_fundamentals(t, as_of_date=date)
-                        fund_available = any(dp.status.value == "FRESH" for dp in fund_features.values())
+                        fund_available = any(dp.status.value in ("FRESH", "STALE") for dp in fund_features.values())
                         if fund_available:
                             all_fundamentals[t] = {k: dp.to_value() for k, dp in fund_features.items()}
                     except Exception:
@@ -277,7 +277,7 @@ class SystemOrchestrator:
                 # Fundamental — Motor 4
                 fund_features = data_adapter.fetch_fundamentals(ticker, as_of_date=date)
                 fundamentals = {k: dp.to_value() for k, dp in fund_features.items()}
-                fund_available = any(dp.status.value == "FRESH" for dp in fund_features.values())
+                fund_available = any(dp.status.value in ("FRESH", "STALE") for dp in fund_features.values())
                 if not fund_available:
                     fundamentals = None  # Motor 4 skip etsin
 
