@@ -14,7 +14,7 @@ Bu modül:
 - Decision Engine'e yapılandırılmış girdi sağlar
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import numpy as np
@@ -700,6 +700,41 @@ CANONICAL_FEATURE_REGISTRY = list(dict.fromkeys(CANONICAL_FEATURE_REGISTRY))
 def get_canonical_features() -> List[str]:
     """Canonical feature listesini döndür (tek kaynak)."""
     return list(CANONICAL_FEATURE_REGISTRY)
+
+
+def validate_model_feature_contract(
+    model,
+    registry: Optional[List[str]] = None,
+) -> Tuple[bool, List[str]]:
+    """Model'in feature_names'inin registry ile tutarlılığını kontrol et.
+
+    Registry'de olmayan feature'lar warning üretir.
+    Model'in cs_features'inin de tutarlılığı kontrol edilir.
+
+    Returns:
+        (is_consistent, warnings)
+    """
+    if registry is None:
+        registry = CANONICAL_FEATURE_REGISTRY
+
+    warnings = []
+    model_features = getattr(model, 'feature_names', [])
+    model_cs = getattr(model, 'cs_features', [])
+
+    # Model feature_names'de registry'de olmayanlar
+    registry_set = set(registry)
+    for fname in model_features:
+        base = fname.replace('_cs_zscore', '').replace('_cs_rank', '')
+        if base not in registry_set and not fname.endswith(('_cs_zscore', '_cs_rank')):
+            warnings.append(f"Model feature '{fname}' not in canonical registry")
+
+    # CS feature'ların base feature'ları registry'de olmalı
+    for fname in model_cs:
+        base = fname.replace('_cs_zscore', '').replace('_cs_rank', '')
+        if base not in registry_set:
+            warnings.append(f"CS base feature '{base}' not in canonical registry")
+
+    return len(warnings) == 0, warnings
 
 
 # Singleton

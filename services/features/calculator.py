@@ -157,7 +157,42 @@ class FeatureCalculator:
         features["_mask_valid_pct"] = round(np.sum(mask) / len(mask) * 100, 1)
         features["_mask_invalid_count"] = int(len(mask) - np.sum(mask))
 
+        # FAZ 4.8: Scalar guard — dict/nested feature'ları filtrele
+        features = self._enforce_scalar_features(features, ticker)
+
         return features
+
+    @staticmethod
+    def _enforce_scalar_features(features: Dict[str, Any], ticker: str = "") -> Dict[str, Any]:
+        """Dict/nested feature'ları güvenli şekilde filtrele.
+
+        Sadece scalar (int/float) ve finite olan feature'lar korunur.
+        Dict, list, array, inf, NaN olan feature'lar atılır.
+        """
+        result = {}
+        dropped = []
+        for k, v in features.items():
+            if v is None:
+                continue
+            if isinstance(v, (int, float, np.floating, np.integer)):
+                fv = float(v)
+                if np.isfinite(fv):
+                    result[k] = fv
+                else:
+                    dropped.append(k)
+            elif isinstance(v, np.ndarray) and v.size == 1:
+                fv = float(v.flat[0])
+                if np.isfinite(fv):
+                    result[k] = fv
+                else:
+                    dropped.append(k)
+            else:
+                dropped.append(k)
+
+        if dropped:
+            logger.debug(f"[{ticker}] Dropped non-scalar features: {dropped}")
+
+        return result
 
     # === MASK-AWARE HELPER METHODS ===
 

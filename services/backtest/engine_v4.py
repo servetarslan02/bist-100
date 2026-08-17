@@ -691,8 +691,9 @@ class BacktestEngineV4:
                 if not features:
                     continue
 
+                # day_features_fast henüz BUY'da toplanmadı, SELL için tek başına scoring
                 total_scans += 1
-                score = self._compute_score(features)
+                score = self._compute_score(features, ticker=ticker, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
                     price = float(open_arr[loc])
                     sim.execute_sell(ticker, price, date_str)
@@ -701,6 +702,7 @@ class BacktestEngineV4:
             # BUY sinyalleri
             buy_candidates = []
             day_scores: Dict[str, Tuple[float, int]] = {}
+            day_features_fast: Dict[str, Dict[str, Any]] = {}
             for ticker, df in market_data.items():
                 # Survivorship bias
                 if universe_at_date and ticker not in universe_at_date:
@@ -735,8 +737,9 @@ class BacktestEngineV4:
                 if not features:
                     continue
 
+                day_features_fast[ticker] = features
                 total_scans += 1
-                score = self._compute_score(features)
+                score = self._compute_score(features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str)
                 day_scores[ticker] = (score, pos)
                 if score >= cfg.signal_threshold + 10:
                     buy_candidates.append((ticker, score))
@@ -815,7 +818,7 @@ class BacktestEngineV4:
         if not use_scalar:
             # Borderline kontrolü — karar sınırlarına yakınsa scalar doğrula
             rsi = feats["rsi_14"]
-            score = self._compute_score(feats)
+            score = self._compute_score(feats, ticker=ticker, date_str=date_str)
             if (
                 abs(rsi - 60.0) <= self._BORDERLINE_RSI_EPS
                 or abs(rsi - 40.0) <= self._BORDERLINE_RSI_EPS
@@ -875,7 +878,7 @@ class BacktestEngineV4:
             df_until = market_data[ticker].iloc[: pos + 1]
             feats = self._get_features(ticker, date_str, df_until, lookback, cfg)
             if feats:
-                rescored[ticker] = self._compute_score(feats)
+                rescored[ticker] = self._compute_score(feats, ticker=ticker, date_str=date_str)
         merged = [(t, rescored.get(t, s)) for t, s in buy_candidates]
         merged.sort(key=lambda x: x[1], reverse=True)
         return merged
