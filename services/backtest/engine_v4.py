@@ -670,6 +670,22 @@ class BacktestEngineV4:
 
             bench_price = benchmark_prices.get(date_str)
 
+            # FAZ 4.9: Tum gunun feature'larini topla (CS normalization icin)
+            day_features_fast: Dict[str, Dict[str, Any]] = {}
+            for _t, _df in market_data.items():
+                _info = tinfo.get(_t)
+                if _info is None:
+                    continue
+                _idx_arr = _info[0]
+                _pos = _idx_arr.searchsorted(current_date, side="right") - 1
+                if _pos < effective_lookback - 1:
+                    continue
+                _feats = self._features_fast(
+                    _t, date_str, _pos, panels, market_data, effective_lookback, cfg
+                )
+                if _feats:
+                    day_features_fast[_t] = _feats
+
             # SELL sinyalleri (pozisyondaki hisseler)
             for ticker in list(sim._positions.keys()):
                 info = tinfo.get(ticker)
@@ -691,9 +707,8 @@ class BacktestEngineV4:
                 if not features:
                     continue
 
-                # day_features_fast henüz BUY'da toplanmadı, SELL için tek başına scoring
                 total_scans += 1
-                score = self._compute_score(features, ticker=ticker, date_str=date_str)
+                score = self._compute_score(features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
                     price = float(open_arr[loc])
                     sim.execute_sell(ticker, price, date_str)
@@ -702,7 +717,6 @@ class BacktestEngineV4:
             # BUY sinyalleri
             buy_candidates = []
             day_scores: Dict[str, Tuple[float, int]] = {}
-            day_features_fast: Dict[str, Dict[str, Any]] = {}
             for ticker, df in market_data.items():
                 # Survivorship bias
                 if universe_at_date and ticker not in universe_at_date:
@@ -737,7 +751,6 @@ class BacktestEngineV4:
                 if not features:
                     continue
 
-                day_features_fast[ticker] = features
                 total_scans += 1
                 score = self._compute_score(features, ticker=ticker, all_day_features=day_features_fast, date_str=date_str)
                 day_scores[ticker] = (score, pos)
@@ -760,6 +773,7 @@ class BacktestEngineV4:
                     buy_candidates = self._rescore_tie_members_scalar(
                         buy_candidates, tie_members, day_scores, date_str,
                         market_data, effective_lookback, cfg,
+                        all_day_features=day_features_fast,
                     )
 
             for ticker, score in buy_candidates:
@@ -869,6 +883,7 @@ class BacktestEngineV4:
         market_data: Dict[str, pd.DataFrame],
         lookback: int,
         cfg: BacktestConfig,
+        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
     ) -> List[Tuple[str, float]]:
         """Tie kümesi üyelerinin skorlarını scalar (legacy) yoldan hesapla."""
         rescored: Dict[str, float] = {}
@@ -878,7 +893,7 @@ class BacktestEngineV4:
             df_until = market_data[ticker].iloc[: pos + 1]
             feats = self._get_features(ticker, date_str, df_until, lookback, cfg)
             if feats:
-                rescored[ticker] = self._compute_score(feats, ticker=ticker, date_str=date_str)
+                rescored[ticker] = self._compute_score(feats, ticker=ticker, all_day_features=all_day_features, date_str=date_str)
         merged = [(t, rescored.get(t, s)) for t, s in buy_candidates]
         merged.sort(key=lambda x: x[1], reverse=True)
         return merged
