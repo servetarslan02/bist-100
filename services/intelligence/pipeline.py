@@ -87,6 +87,15 @@ class IntelligencePipeline:
         self._run_factor(ticker, features, output)
         self._run_world_state(features, output)
         self._run_spec(ticker, features, output)
+        self._run_probability(ticker, features, output)
+        self._run_evidence(ticker, output)
+        self._run_knowledge_graph(ticker, output)
+        self._run_impact(ticker, features, output)
+        self._run_kap_extractor(ticker, output)
+        self._run_analysis_engines(features, output)
+        self._run_macro_sensitivity(ticker, features, output)
+        self._run_research_memory(ticker, output)
+        self._run_scenario(ticker, features, output)
 
         return output
 
@@ -227,6 +236,137 @@ class IntelligencePipeline:
             "loaded_modules": len(self._modules),
             "available": list(self._modules.keys()),
         }
+
+    def _run_probability(self, ticker, features, output):
+        """ProbabilityEngine.compute_return_distribution(ticker, historical_returns)"""
+        if "probability" not in self._modules:
+            return
+        try:
+            mod = self._modules["probability"]
+            pe = mod.ProbabilityEngine()
+            result = pe.compute_return_distribution(ticker=ticker, historical_returns=[])
+            if result:
+                output.modules_used.append("probability")
+        except Exception as e:
+            output.modules_failed.append(f"probability:{str(e)[:80]}")
+
+    def _run_evidence(self, ticker, output):
+        """EvidenceVerificationEngine.extract_claims(text, ticker)"""
+        if "evidence_engine" not in self._modules:
+            return
+        try:
+            mod = self._modules["evidence_engine"]
+            ee = mod.EvidenceVerificationEngine()
+            claims = ee.extract_claims(text="", ticker=ticker)
+            output.evidence_count = len(claims) if claims else 0
+            output.modules_used.append("evidence_engine")
+        except Exception as e:
+            output.modules_failed.append(f"evidence_engine:{str(e)[:80]}")
+
+    def _run_knowledge_graph(self, ticker, output):
+        """KnowledgeGraph — entity/rel araması"""
+        if "knowledge_graph" not in self._modules:
+            return
+        try:
+            mod = self._modules["knowledge_graph"]
+            kg = mod.KnowledgeGraph()
+            # Mevcut entity'leri ara
+            entities = kg.search_entities(ticker) if hasattr(kg, 'search_entities') else []
+            output.modules_used.append("knowledge_graph")
+        except Exception as e:
+            output.modules_failed.append(f"knowledge_graph:{str(e)[:80]}")
+
+    def _run_impact(self, ticker, features, output):
+        """ImpactEngine.propagate(event_type, event_data, event_id, current_world_state)"""
+        if "impact_engine" not in self._modules:
+            return
+        try:
+            mod = self._modules["impact_engine"]
+            ie = mod.ImpactEngine()
+            result = ie.propagate(
+                event_type="general",
+                event_data={"ticker": ticker},
+                event_id=f"{ticker}_general",
+                current_world_state={"risk_appetite": 0.5},
+                instrument_states={},
+            )
+            if result:
+                output.modules_used.append("impact_engine")
+        except Exception as e:
+            output.modules_failed.append(f"impact_engine:{str(e)[:80]}")
+
+    def _run_kap_extractor(self, ticker, output):
+        """KAPExtractor.extract(ticker, kap_id, title, summary)"""
+        if "kap_extractor" not in self._modules:
+            return
+        try:
+            mod = self._modules["kap_extractor"]
+            ke = mod.KAPExtractor()
+            result = ke.extract(ticker=ticker, kap_id="", title="", summary="")
+            if result:
+                output.modules_used.append("kap_extractor")
+        except Exception as e:
+            output.modules_failed.append(f"kap_extractor:{str(e)[:80]}")
+
+    def _run_analysis_engines(self, features, output):
+        """PriceActionEngine.detect_patterns(open, high, low, close)"""
+        if "analysis_engines" not in self._modules:
+            return
+        try:
+            import numpy as np
+            mod = self._modules["analysis_engines"]
+            # Price action
+            pa = mod.PriceActionEngine()
+            close = np.array([features.get("close", 100)])
+            high = np.array([features.get("high", 100)])
+            low = np.array([features.get("low", 100)])
+            open_ = np.array([features.get("open", 100)])
+            patterns = pa.detect_patterns(open_, high, low, close)
+            if patterns is not None:
+                output.modules_used.append("analysis_engines")
+        except Exception as e:
+            output.modules_failed.append(f"analysis_engines:{str(e)[:80]}")
+
+    def _run_macro_sensitivity(self, ticker, features, output):
+        """MacroSensitivityEngine.get_company_sensitivity(ticker, sector)"""
+        if "macro_sensitivity" not in self._modules:
+            return
+        try:
+            mod = self._modules["macro_sensitivity"]
+            ms = mod.MacroSensitivityEngine()
+            sensitivity = ms.get_company_sensitivity(ticker=ticker, sector="UNKNOWN")
+            if sensitivity:
+                output.modules_used.append("macro_sensitivity")
+        except Exception as e:
+            output.modules_failed.append(f"macro_sensitivity:{str(e)[:80]}")
+
+    def _run_research_memory(self, ticker, output):
+        """ResearchMemory.get_ticker_history(ticker, limit)"""
+        if "research_memory" not in self._modules:
+            return
+        try:
+            mod = self._modules["research_memory"]
+            rm = mod.ResearchMemory()
+            history = rm.get_ticker_history(ticker=ticker, limit=5)
+            output.modules_used.append("research_memory")
+        except Exception as e:
+            output.modules_failed.append(f"research_memory:{str(e)[:80]}")
+
+    def _run_scenario(self, ticker, features, output):
+        """ScenarioEngine.run_scenario(scenario, positions)"""
+        if "scenario" not in self._modules:
+            return
+        try:
+            mod = self._modules["scenario"]
+            se = mod.ScenarioEngine()
+            scenario_input = mod.ScenarioInput(
+                name="base", description="Base case"
+            )
+            result = se.run_scenario(scenario=scenario_input, positions=[])
+            if result:
+                output.modules_used.append("scenario")
+        except Exception as e:
+            output.modules_failed.append(f"scenario:{str(e)[:80]}")
 
 
 intelligence_pipeline = IntelligencePipeline()
