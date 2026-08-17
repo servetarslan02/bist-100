@@ -275,8 +275,30 @@ class CanonicalScoringPipeline:
         ml_confidence = 0.0
         if ml_model is not None:
             try:
-                # MultiHorizonModel veya TrainedModel — ikisi de predict(features) destekler
-                ml_pred = ml_model.predict(features)
+                # Feature parity: model'in bekledigi feature'lari dogrula
+                # ve CS normalization uygula
+                model_features = getattr(ml_model, 'feature_names', [])
+                model_cs = getattr(ml_model, 'cs_features', [])
+                model_impute = getattr(ml_model, 'impute_values', None)
+
+                if model_features:
+                    # Feature contract dogrulama
+                    from services.ml.training_validator import prepare_features_for_inference
+                    # Eger all_date_features verilmisse CS normalization uygulanir
+                    # Bu bilgi caller tarafindan features dict'ine eklenmis olmali
+                    # (_all_date_features key'i ile)
+                    all_date = features.get('_all_date_features', {ticker: features})
+                    date_str = features.get('_date_str', '')
+                    clean_features = {k: v for k, v in features.items()
+                                      if not k.startswith('_')}
+                    normalized = prepare_features_for_inference(
+                        ticker, clean_features, all_date,
+                        model_features, model_cs, model_impute, date_str
+                    )
+                    ml_pred = ml_model.predict(normalized)
+                else:
+                    ml_pred = ml_model.predict(features)
+
                 # ML prediction'ı 0-100 aralığına normalize et
                 ml_score = max(0, min(100, 50 + ml_pred * 10))
                 ml_confidence = min(1.0, abs(ml_pred) / 2.0)

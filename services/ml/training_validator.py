@@ -731,3 +731,79 @@ class CrossSectionalNormalizer:
 
 # Singleton
 cross_sectional_normalizer = CrossSectionalNormalizer()
+
+
+# =====================================================
+# LIVE INFERENCE FEATURE PARITY
+# =====================================================
+
+def prepare_features_for_inference(
+    ticker: str,
+    raw_features: Dict[str, Any],
+    all_date_features: Dict[str, Dict[str, Any]],
+    feature_names: List[str],
+    cs_features: List[str],
+    impute_values: Optional[Dict[str, float]] = None,
+    date_str: str = "",
+) -> Dict[str, Any]:
+    """Live inference icin feature'lari hazırla — training ile PARITY.
+
+    Training pipeline ile aynı matematigi kullanir:
+    1. Raw features'i al
+    2. CrossSectionalNormalizer ile CS z-score ekle (PIT-safe, sadece ayni tarih)
+    3. Feature contract dogrula (eksik feature varsa impute)
+    4. Model'in bekledigi feature_names + cs_features sirasinda dondur
+
+    Args:
+        ticker: Hisse kodu
+        raw_features: Bu hissenin ham feature'lari
+        all_date_features: Ayni tarihteki TUM hisselerin feature'lari {ticker: features}
+        feature_names: Model'in bekledigi temel feature'lar
+        cs_features: Model'in bekledigi CS-normalized feature'lar (suffix: _cs_zscore)
+        impute_values: Eksik feature'lar icin impute degerleri (None → 0.0)
+        date_str: Tarih string'i (logging icin)
+
+    Returns:
+        Normalized feature dict (model.predict() icin hazir)
+    """
+    # 1. CS normalization (PIT-safe: sadece ayni tarih snapshot'i)
+    #    all_date_features'daki ticker'lar o an piyasada olan hisseler
+    date_features_map = {}
+    date_groups_map = {}
+    for t, feats in all_date_features.items():
+        key = f"{t}::{date_str}"
+        date_features_map[key] = feats
+        date_groups_map[key] = date_str
+
+    # CS normalization uygula (sadece temel feature'lar uzerinden)
+    base_features = [f for f in feature_names if not f.endswith('_cs_zscore') and not f.endswith('_cs_rank')]
+    if len(all_date_features) >= 2:
+        normalized_map = cross_sectional_normalizer.normalize_zscore_by_date(
+            date_features_map, date_groups_map, base_features
+        )
+        ticker_key = f"{ticker}::{date_str}"
+        normalized_features = normalized_map.get(ticker_key, raw_features)
+    else:
+        # Tek hisse varsa CS normalization uygulanamaz
+        normalized_features = dict(raw_features)
+
+    # 2. Feature contract dogrulama ve imputation
+    result = {}
+    all_expected = feature_names + cs_features
+
+    for fname in all_expected:
+        val = normalized_features.get(fname)
+        if val is None:
+            # Impute degeri varsa kullan, yoksa 0.0
+            if impute_values and fname in impute_values:
+                result[fname] = impute_values[fname]
+            else:
+                result[fname] = 0.0
+        else:
+            try:
+                v = float(val)
+                result[fname] = v if np.isfinite(v) else 0.0
+            except (TypeError, ValueError):
+                result[fname] = 0.0
+
+    return result
