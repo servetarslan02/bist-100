@@ -1,11 +1,11 @@
 """
 ALPHA BIST — Price Limits
 
-BIST fiyat limitleri:
-- Normal hisseler: ±%10
-- Volatil hisseler: ±%5 veya ±%20
-- İlk seansta limit yok
-- Devre kesici: ±%5 (gün içi), ±%10 (açılış)
+BIST fiyat limitleri (pazara göre):
+- Yıldız Pazar: ±%20
+- Ana Pazar: ±%15
+- Alt Pazar: ±%10
+- Devre kesici: sadece aşağı yönlü tetiklenir
 """
 
 from typing import Dict, Any, Optional
@@ -42,9 +42,12 @@ class PriceLimitResult:
 class PriceLimitMonitor:
     """BIST fiyat limitleri kontrolü."""
 
-    # Varsayılan limitler
-    DEFAULT_LIMIT = 10.0    # %10
-    VOLATILE_LIMIT = 5.0    # %5
+    # Varsayılan limitler (pazara göre)
+    DEFAULT_LIMIT = 15.0    # %15 (Ana Pazar varsayılan)
+    YILDIZ_LIMIT = 20.0     # %20 (Yıldız Pazar)
+    ANA_LIMIT = 15.0        # %15 (Ana Pazar)
+    ALT_LIMIT = 10.0        # %10 (Alt Pazar)
+    VOLATILE_LIMIT = 5.0    # %5 (devre kesici sonrası)
     WIDE_LIMIT = 20.0       # %20
 
     def __init__(self):

@@ -22,7 +22,7 @@ class TaxModel:
     """Vergi modeli — BIST Türkiye."""
 
     # Stopaj oranları (2026 tahmini)
-    STOCK_DIVIDEND_TAX = 0.10      # %10 temettü stopajı
+    STOCK_DIVIDEND_TAX = 0.15      # %15 temettü stopajı (2025 itibariyle)
     STOCK_CAPITAL_GAINS_TAX = 0.0  # Hisse sermaye kazancı (şu an 0)
     BSMV_RATE = 0.05               # BSMV (komisyon üzerinden)
     KKDF_RATE = 0.0                # KKDF (şu an 0)

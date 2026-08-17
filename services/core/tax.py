@@ -7,7 +7,7 @@ logger = structlog.get_logger()
 # BIST vergi oranları
 TAX_RATES = {
     "stock": {"short_term": 0.15, "long_term": 0.10},  # Kısa/uzun vadeli
-    "dividend": 0.10,  # Temettü stopajı
+    "dividend": 0.15,  # Temettü stopajı (%15, 2025 itibariyle)
     "bond": 0.10,      # Tahvil
 }
 

@@ -2,7 +2,7 @@
 ALPHA BIST — Short Selling Monitor
 
 BIST açığa satış kuralları:
-- Sadece BIST-30 hisseleri açığa satılabilir
+- Sadece BIST-50 hisseleri açığa satılabilir
 - Uptick rule: son işlem fiyatından yüksek fiyatla açığa satış
 - Brüt takaslı hisselerde açığa satış yasak
 - SPK geçici yasak kontrolü
@@ -35,11 +35,11 @@ class ShortSellingMonitor:
         self._spk_banned_tickers: set = set()
 
     def _get_bist30(self) -> List[str]:
-        """BIST-30 hisselerini getir."""
+        """BIST-50 hisselerini getir."""
         if self._bist30_cache is None:
             try:
                 from services.ingestion.bist_universe import bist_universe
-                self._bist30_cache = bist_universe.BIST_30_TICKERS
+                self._bist30_cache = bist_universe.BIST_50_TICKERS if hasattr(bist_universe, 'BIST_50_TICKERS') else bist_universe.BIST_30_TICKERS
             except ImportError:
                 self._bist30_cache = []
         return self._bist30_cache
@@ -67,12 +67,12 @@ class ShortSellingMonitor:
         """
         details = {"ticker": ticker}
 
-        # 1. BIST-30 kontrolü
-        bist30 = self._get_bist30()
-        if ticker not in bist30:
+        # 1. BIST-50 kontrolü (BIST-30 değil)
+        bist50 = self._get_bist30()
+        if ticker not in bist50:
             return ShortSellingDecision(
                 allowed=False,
-                reason=f"{ticker} BIST-30'da değil — açığa satış sadece BIST-30",
+                reason=f"{ticker} BIST-50'de değil — açığa satış sadece BIST-50",
                 details=details,
             )
 

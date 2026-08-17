@@ -16,11 +16,11 @@ logger = structlog.get_logger()
 
 
 class MarketSession(str, Enum):
-    """BIST işlem seansları."""
-    PRE_MARKET = "PRE_MARKET"      # 09:45 - 10:00
-    MORNING = "MORNING"             # 10:00 - 13:00
-    BREAK = "BREAK"                 # 13:00 - 14:00
-    AFTERNOON = "AFTERNOON"         # 14:00 - 18:00
+    """BIST işlem seansları (2015 BISTECH sonrası tek seans)."""
+    PRE_MARKET = "PRE_MARKET"      # 09:40 - 10:00 (Açılış seansı emir toplama)
+    OPENING = "OPENING"             # 09:55 - 10:00 (Fiyat belirleme)
+    CONTINUOUS = "CONTINUOUS"       # 10:00 - 18:00 (Sürekli işlem — tek seans)
+    CLOSING = "CLOSING"             # 18:00 - 18:10 (Kapanış seansı)
     CLOSED = "CLOSED"
 
 
@@ -59,12 +59,13 @@ TURKEY_HOLIDAYS_2026 = [
 class MarketCalendar:
     """BIST işlem takvimi."""
 
-    # BIST normal işlem saatleri
+    # BIST normal işlem saatleri (2015 BISTECH sonrası tek seans)
     MARKET_OPEN = time(10, 0)
     MARKET_CLOSE = time(18, 0)
-    PRE_MARKET_START = time(9, 45)
-    LUNCH_BREAK_START = time(13, 0)
-    LUNCH_BREAK_END = time(14, 0)
+    PRE_MARKET_START = time(9, 40)
+    OPENING_END = time(10, 0)
+    CLOSING_START = time(18, 0)
+    CLOSING_END = time(18, 10)
 
     def __init__(self, holidays: Optional[List[date]] = None):
         self._holidays = set(holidays or TURKEY_HOLIDAYS_2026)
@@ -100,10 +101,6 @@ class MarketCalendar:
         if current_time < self.MARKET_OPEN or current_time >= self.MARKET_CLOSE:
             return False
 
-        # Öğle arası
-        if self.LUNCH_BREAK_START <= current_time < self.LUNCH_BREAK_END:
-            return False
-
         # Devre kesici
         if self._is_halt(dt):
             return False
@@ -111,7 +108,7 @@ class MarketCalendar:
         return True
 
     def get_session(self, dt: Optional[datetime] = None) -> MarketSession:
-        """Mevcut işlem seansını döndür."""
+        """Mevcut işlem seansını döndür (tek seans sistemi)."""
         if dt is None:
             dt = datetime.now()
 
@@ -122,14 +119,12 @@ class MarketCalendar:
 
         if t < self.PRE_MARKET_START:
             return MarketSession.CLOSED
-        elif t < self.MARKET_OPEN:
+        elif t < self.OPENING_END:
             return MarketSession.PRE_MARKET
-        elif t < self.LUNCH_BREAK_START:
-            return MarketSession.MORNING
-        elif t < self.LUNCH_BREAK_END:
-            return MarketSession.BREAK
-        elif t < self.MARKET_CLOSE:
-            return MarketSession.AFTERNOON
+        elif t < self.CLOSING_START:
+            return MarketSession.CONTINUOUS
+        elif t < self.CLOSING_END:
+            return MarketSession.CLOSING
         else:
             return MarketSession.CLOSED
 
