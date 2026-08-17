@@ -131,7 +131,11 @@ class FeatureCalculator:
         valid_volume = volume[~np.isnan(volume)]
         if len(valid_close_vol) >= 20 and len(valid_volume) >= 20:
             vp = self._volume_profile(valid_close_vol, valid_volume)
-            features["volume_profile"] = vp
+            # FAZ 4.7: Dict yerine scalar feature'lar (feature contract uyumluluğu)
+            features["vp_poc"] = vp.get("poc", 0.0)
+            features["vp_value_area_high"] = vp.get("value_area_high", 0.0)
+            features["vp_value_area_low"] = vp.get("value_area_low", 0.0)
+            features["vp_bins"] = float(vp.get("bins", 0))
             features["poc_price"] = vp.get("poc", valid_close_vol[-1])
             features["value_area_high"] = vp.get("value_area_high", valid_close_vol[-1])
             features["value_area_low"] = vp.get("value_area_low", valid_close_vol[-1])

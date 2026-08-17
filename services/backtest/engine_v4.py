@@ -420,7 +420,7 @@ class BacktestEngineV4:
                     continue
 
                 total_scans += 1
-                score = self._compute_score(features)
+                score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
                     price = float(df.loc[next_date, 'Open'])
                     sim.execute_sell(ticker, price, date_str)
@@ -441,7 +441,7 @@ class BacktestEngineV4:
                     if quality_info and quality_info[1] < cfg.min_quality_score:
                         continue
                     total_scans += 1
-                    score = self._compute_score(features)
+                    score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                     if score >= cfg.signal_threshold + 10:
                         buy_candidates.append((ticker, score))
             else:
@@ -470,7 +470,7 @@ class BacktestEngineV4:
 
                 for ticker, features in day_features.items():
                     total_scans += 1
-                    score = self._compute_score(features)
+                    score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                     if score >= cfg.signal_threshold + 10:
                         buy_candidates.append((ticker, score))
 
@@ -988,14 +988,17 @@ class BacktestEngineV4:
             self._last_feature_seconds += _time.perf_counter() - _t0
             return None
 
-    def _compute_score(self, features: Dict[str, Any]) -> float:
+    def _compute_score(self, features: Dict[str, Any],
+                       ticker: str = "",
+                       all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+                       date_str: str = "") -> float:
         """Feature'lardan skor hesapla.
 
         use_canonical_scoring=True ise CanonicalScoringPipeline kullanır.
         Aksi halde v2.0 ile aynı legacy mantık.
         """
         if self._config.use_canonical_scoring:
-            return self._compute_score_canonical(features)
+            return self._compute_score_canonical(features, ticker, all_day_features, date_str)
         return self._compute_score_legacy(features)
 
     def _compute_score_legacy(self, features: Dict[str, Any]) -> float:
@@ -1012,12 +1015,14 @@ class BacktestEngineV4:
         score += _s(features.get("volume_zscore", 0)) * 5
         return max(0, min(100, score))
 
-    def _compute_score_canonical(self, features: Dict[str, Any]) -> float:
+    def _compute_score_canonical(self, features: Dict[str, Any],
+                                ticker: str = "",
+                                all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+                                date_str: str = "") -> float:
         """Canonical scoring pipeline ile skor.
 
-        PIT KORUMASI: Sadece calculator feature'ları kullanılır.
-        Motor5/6/9 gibi anlık veri gerektiren motorlar çalıştırılmaz.
-        ML model varsa kullanılır, yoksa rule-based fallback.
+        FAZ 4.7: prepare_features_for_inference() ile parity-safe.
+        all_day_features ve date_str adapter'a geçirilerek CS normalization uygulanır.
         """
         try:
             from .canonical_adapter import backtest_canonical_adapter
@@ -1025,6 +1030,9 @@ class BacktestEngineV4:
                 features=features,
                 regime=self._config.regime,
                 ml_model=self._config.ml_model,
+                ticker=ticker or "BACKTEST",
+                all_day_features=all_day_features,
+                date_str=date_str,
             )
         except Exception as e:
             logger.warning("Canonical scoring failed, falling back to legacy", error=str(e))

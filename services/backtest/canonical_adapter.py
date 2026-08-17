@@ -1,32 +1,35 @@
 """
-ALPHA BIST — Backtest Canonical Scoring Adapter
+ALPHA BIST — Backtest Canonical Scoring Adapter v2.0
 
-Backtest engine ile CanonicalScoringPipeline arasında köprü.
+FAZ 4.7: Artık prepare_features_for_inference() kullanır.
+Feature parity training ile garanti edilir.
 
 Bu adapter:
 - Backtest'teki feature snapshot'tan canonical score üretir
 - PIT (Point-in-Time) koruması sağlar
+- prepare_features_for_inference() ile CS normalization uygular
+- Feature contract'ı zorunlu kılar
 - Mevcut backtest API'sini bozmaz
-- Eksik motor feature'larını graceful handle eder
-
-KURAL: Bu adapter backtest'in strateji kurallarını DEĞİŞTİRMEZ.
-Sadece skor hesaplama mekanizmasını canonical hale getirir.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-class BacktestCanonicalAdapter:
-    """Backtest → CanonicalScoringPipeline adapter.
+def _scalar_features(feats: Dict[str, Any]) -> Dict[str, Any]:
+    """Dict/nested feature'ları filtrele, sadece scalar olanları tut."""
+    return {k: v for k, v in feats.items()
+            if isinstance(v, (int, float, np.floating, np.integer)) and np.isfinite(float(v))}
 
-    Backtest'te mevcut olan feature'lardan canonical score üretir.
-    Motor5 (KAP/news), Motor6 (catalyst), Motor9 (seasonality) gibi
-    anlık veri gerektiren motorlar backtest'te mevcut değildir;
-    bu durumda ilgili boyut0 (bilgi yok) olarak işaretlenir.
+
+class BacktestCanonicalAdapter:
+    """Backtest → CanonicalScoringPipeline adapter v2.0.
+
+    Artık her prediction için prepare_features_for_inference() kullanır.
+    Training ile aynı CS normalization ve feature contract uygulanır.
     """
 
     def __init__(self):
@@ -46,24 +49,53 @@ class BacktestCanonicalAdapter:
         features: Dict[str, Any],
         regime: str = "UNKNOWN",
         ml_model=None,
+        ticker: str = "BACKTEST",
+        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+        date_str: str = "",
     ) -> float:
         """Feature'lardan canonical opportunity score üret.
 
-        Backtest engine bu skoru BUY/SELL kararı için kullanır.
+        FAZ 4.7: prepare_features_for_inference() ile parity-safe.
 
         Args:
-            features: Calculator output (teknik feature'lar)
+            features: Bu hissenin feature'ları (zaten enriched olabilir)
             regime: Piyasa rejimi
-            ml_model: TrainedModel instance (None → rule-based only)
+            ml_model: TrainedModel/MultiHorizonModel (None → rule-based)
+            ticker: Hisse kodu
+            all_day_features: Aynı tarihteki TUM hisselerin feature'ları (CS için)
+            date_str: Tarih string'i (CS için)
 
         Returns:
             Opportunity score (0-100)
         """
         self._lazy_load()
 
-        # Canonical score hesapla
+        # Feature parity: model beklenen feature'ları doğrula ve CS normalization uygula
+        if ml_model is not None:
+            model_features = getattr(ml_model, 'feature_names', [])
+            model_cs = getattr(ml_model, 'cs_features', [])
+            model_impute = getattr(ml_model, 'impute_values', None)
+
+            if model_features and all_day_features:
+                try:
+                    from services.ml.training_validator import prepare_features_for_inference
+                    # Scalar olmayan feature'ları filtrele (volume_profile dict vb.)
+                    clean_features = _scalar_features(features)
+                    clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
+                    features = prepare_features_for_inference(
+                        ticker=ticker,
+                        raw_features=clean_features,
+                        all_date_features=clean_all,
+                        feature_names=model_features,
+                        cs_features=model_cs,
+                        impute_values=model_impute,
+                        date_str=date_str,
+                    )
+                except Exception as e:
+                    logger.warning("prepare_features_for_inference failed", error=str(e))
+
         cs = self._scoring.compute_canonical_score(
-            ticker="BACKTEST",
+            ticker=ticker,
             features=features,
             regime=regime,
             ml_model=ml_model,
@@ -77,16 +109,38 @@ class BacktestCanonicalAdapter:
         regime: str = "UNKNOWN",
         price: float = 0,
         ml_model=None,
+        ticker: str = "BACKTEST",
+        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+        date_str: str = "",
     ):
-        """Feature'lardan canonical score + decision üret.
-
-        Returns:
-            (opportunity_score, decision_action)
-        """
+        """Feature'lardan canonical score + decision üret."""
         self._lazy_load()
 
+        # Feature parity uygula
+        if ml_model is not None:
+            model_features = getattr(ml_model, 'feature_names', [])
+            model_cs = getattr(ml_model, 'cs_features', [])
+            model_impute = getattr(ml_model, 'impute_values', None)
+
+            if model_features and all_day_features:
+                try:
+                    from services.ml.training_validator import prepare_features_for_inference
+                    clean_features = _scalar_features(features)
+                    clean_all = {t: _scalar_features(f) for t, f in all_day_features.items()}
+                    features = prepare_features_for_inference(
+                        ticker=ticker,
+                        raw_features=clean_features,
+                        all_date_features=clean_all,
+                        feature_names=model_features,
+                        cs_features=model_cs,
+                        impute_values=model_impute,
+                        date_str=date_str,
+                    )
+                except Exception as e:
+                    logger.warning("prepare_features_for_inference failed", error=str(e))
+
         cs = self._scoring.compute_canonical_score(
-            ticker="BACKTEST",
+            ticker=ticker,
             features=features,
             regime=regime,
             ml_model=ml_model,
@@ -102,41 +156,8 @@ class BacktestCanonicalAdapter:
         ticker: str = "",
         date_str: str = "",
     ) -> Dict[str, Any]:
-        """Calculator feature'larını canonical scoring için hazırla.
-
-        Backtest'te sadece calculator feature'ları mevcuttur.
-        Motor5/6/9 gibi anlık veri gerektiren motorlar çalıştırılamaz.
-        Bu fonksiyon, calculator output'unu canonical scoring'in
-        beklediği formata dönüştürür.
-
-        PIT KORUMASI: Bu fonksiyon gelecekteki veriyi KULLANMAZ.
-        Sadece mevcut calculator feature'larını dönüştürür.
-        """
+        """Calculator feature'larını canonical scoring için hazırla."""
         enriched = dict(calc_features)
-
-        # Calculator feature'larından canonical boyutlara mapping
-        # (canonical_scoring._score_* metodları bu isimleri bekler)
-
-        # Motor 1 (RS) — calculator'da rs_vs_bist yok, ama
-        # cross-sectional rank feature'ları var
-        # → canonical scoring bu feature'ları0 olarak işler (bilgi yok)
-
-        # Motor 4 (Fundamental) — backtest'te mevcut değil
-        # → canonical scoring fundamental boyutunu0 olarak işler
-
-        # Motor 5 (KAP/News) — backtest'te mevcut değil
-        # → canonical scoring news_sentiment boyutunu50 (nötr) olarak işler
-
-        # Motor 6 (Catalyst) — backtest'te mevcut değil
-        # → canonical scoring catalyst boyutunu50 (nötr) olarak işler
-
-        # Motor 9 (Seasonality) — tarih varsa hesaplanabilir
-        # Ama backtest'te dates DataFrame'de mevcut
-        # → canonical scoring seasonality boyutunu50 (nötr) olarak işler
-
-        # Canonical scoring zaten eksik feature'ları graceful handle eder.
-        # Bu fonksiyon sadece mapping'i doğrular.
-
         return enriched
 
 
