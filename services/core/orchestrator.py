@@ -147,7 +147,7 @@ class SystemOrchestrator:
 
                 # Sektör kapanış verisi — Motor 1 için
                 sector_close = None
-                if ticker in sector_map and benchmark_close is not None:
+                if ticker in sector_map:
                     sector = sector_map[ticker]
                     sector_peers = [
                         t for t, s in sector_map.items()

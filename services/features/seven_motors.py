@@ -1227,7 +1227,8 @@ class SevenMotorEngine:
         vol_zscore = all_features.get("volume_zscore_20d", 0)
         news_sent = all_features.get("news_sentiment_weighted", 0)
         kap_sent = all_features.get("kap_sentiment_avg", 0)
-        rsi = all_features.get("rsi_14d", 50)
+        # rsi_14: calculator'dan (Motor 8 henüz çalışmadı, rsi_14d mevcut değil)
+        rsi = all_features.get("rsi_14", 50)
         atr = all_features.get("atr_pct", 0)
 
         m7 = self.motor7.compute(

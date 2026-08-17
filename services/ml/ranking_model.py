@@ -242,19 +242,24 @@ class RankingModel:
             rule_scores[ticker] = self._rule_based_score(features, regime)
 
         # Ensemble (ağırlıklı ortalama)
+        # LightGBM eğitilmemişse tamamen rule-based kullan
+        has_lgbm = self._is_trained and self._lgbm_model is not None and lgbm_scores
         ensemble_scores = {}
         normalized_scores = {}
         for ticker in features_map.keys():
-            lgbm = lgbm_scores.get(ticker, 0)
             rule = rule_scores.get(ticker, 0)
-            # Normalize et
-            lgbm_norm = self._normalize_score(lgbm)
             rule_norm = self._normalize_score(rule)
-            normalized_scores[ticker] = (lgbm_norm, rule_norm)
-            ensemble_scores[ticker] = (
-                self._ensemble_weights["lgbm"] * lgbm_norm +
-                self._ensemble_weights["rule_based"] * rule_norm
-            )
+            if has_lgbm:
+                lgbm = lgbm_scores.get(ticker, 0)
+                lgbm_norm = self._normalize_score(lgbm)
+                normalized_scores[ticker] = (lgbm_norm, rule_norm)
+                ensemble_scores[ticker] = (
+                    self._ensemble_weights["lgbm"] * lgbm_norm +
+                    self._ensemble_weights["rule_based"] * rule_norm
+                )
+            else:
+                normalized_scores[ticker] = (0, rule_norm)
+                ensemble_scores[ticker] = rule_norm
 
         # Sırala (yüksek skor = üst sıra — label: future return, yüksek = iyi)
         sorted_scores = sorted(ensemble_scores.items(), key=lambda x: x[1], reverse=True)
