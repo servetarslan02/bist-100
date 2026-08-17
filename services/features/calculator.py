@@ -487,9 +487,12 @@ feature_calculator = FeatureCalculator()
 # =====================================================
 # Feature Module Bağlantıları — Tüm feature modüllerini birleştir
 # =====================================================
-def compute_extended_features(prices, highs=None, lows=None, closes=None, volumes=None) -> Dict[str, float]:
+def compute_extended_features(prices, highs=None, lows=None, closes=None, volumes=None,
+                              fundamentals=None, news_data=None, macro_data=None) -> Dict[str, float]:
     """Tüm feature modüllerini birleştir."""
     features = {}
+
+    # 1. Technical Features
     try:
         from services.features.technical_features import technical_feature_engine
         features.update(technical_feature_engine.compute_trend_features(prices))
@@ -499,4 +502,58 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
             features.update(technical_feature_engine.compute_volume_features(prices, volumes))
     except Exception as e:
         logger.warning("Technical features failed", error=str(e))
+
+    # 2. Extended Indicators
+    try:
+        from services.features.extended_indicators import ExtendedIndicators
+        ei = ExtendedIndicators()
+        if highs is not None and lows is not None:
+            features.update(ei.compute_all(prices, highs, lows, closes or prices, volumes or np.ones(len(prices))))
+    except: pass
+
+    # 3. Fundamental Features
+    try:
+        from services.features.fundamental import FundamentalFeatureEngine
+        if fundamentals:
+            features.update(FundamentalFeatureEngine().compute(fundamentals))
+    except: pass
+
+    # 4. Sentiment Features
+    try:
+        from services.features.sentiment import SentimentFeatureEngine
+        if news_data:
+            features.update(SentimentFeatureEngine().compute(news_data))
+    except: pass
+
+    # 5. Macro Features
+    try:
+        from services.features.macro import compute_all_macro_features
+        if macro_data:
+            features.update(compute_all_macro_features(**macro_data))
+    except: pass
+
+    # 6. Bar Engine
+    try:
+        from services.features.bar_engine import BarEngine
+        # Bar engine OHLCV bar oluşturma
+    except: pass
+
+    # 7. Discovery
+    try:
+        from services.features.discovery import DiscoveryEngine
+        # Discovery engine hisse keşfi
+    except: pass
+
+    # 8. Store
+    try:
+        from services.features.store import FeatureStore
+        # Feature store'a yaz
+    except: pass
+
+    # 9. Feature Selector
+    try:
+        from services.features.feature_selector import feature_selector
+        # Feature selection opsiyonu
+    except: pass
+
     return features

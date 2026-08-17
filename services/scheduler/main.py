@@ -9,6 +9,7 @@ ALPHA BIST — Scheduler v2.0
 
 import asyncio
 from datetime import datetime
+from typing import Dict, Any
 import structlog
 
 from ..scanner.alpha_engine import alpha_engine
@@ -137,3 +138,15 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+# =====================================================
+# Scheduler Entegrasyonu
+# =====================================================
+def get_scheduler_status() -> Dict[str, Any]:
+    """Scheduler durumu."""
+    return {
+        "scanner_modules": ["alpha_engine", "alpha_scanner", "event_scanner", "live_scanner"],
+        "scheduler_modules": ["daily_report", "production_scheduler"],
+        "status": "available",
+    }

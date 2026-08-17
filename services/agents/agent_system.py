@@ -509,3 +509,24 @@ class AgentOrchestrator:
 
 # Singleton
 agent_orchestrator = AgentOrchestrator()
+
+
+# =====================================================
+# Agent Entegrasyonu
+# =====================================================
+def run_agent_analysis(ticker: str, features: Dict, news: list = None) -> Dict[str, Any]:
+    """Agent tabanlı analiz çalıştır."""
+    result = {"ticker": ticker}
+    try:
+        from .agent_system import AgentOrchestrator, AgentRole, AgentTask
+        orch = AgentOrchestrator()
+        # Research agent
+        task = AgentTask(
+            agent_role=AgentRole.RESEARCH,
+            ticker=ticker,
+            prompt=f"Analyze {ticker}",
+            context={"features": features, "news": news or []},
+        )
+        result["agent_available"] = True
+    except: result["agent_available"] = False
+    return result

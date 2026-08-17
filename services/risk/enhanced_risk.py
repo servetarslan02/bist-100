@@ -17,7 +17,7 @@ Kaynak: Du (2026) — Ledoit-Wolf; Oxford — volatility targeting
 
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass
 import structlog
 
@@ -293,3 +293,26 @@ volatility_targeter = VolatilityTargeter()
 position_sizer = PositionSizer()
 rebalance_engine = RebalanceEngine()
 concentration_risk = ConcentrationRisk()
+
+
+# =====================================================
+# VIOP Hedging Entegrasyonu (B32)
+# =====================================================
+def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> Dict[str, Any]:
+    """Portföy hedge önerisi."""
+    try:
+        from services.viop.hedging import hedge_portfolio
+        return hedge_portfolio(portfolio_value, beta, futures_price)
+    except: return {"error": "VIOP hedging not available"}
+
+
+def check_options_strategy(spot_price: float, strike: float, premium: float,
+                           strategy_type: str = "covered_call") -> Dict[str, Any]:
+    """Opsiyon stratejisi kontrolü."""
+    try:
+        from services.viop.strategies import create_covered_call, create_protective_put
+        if strategy_type == "covered_call":
+            return create_covered_call(spot_price, strike, premium, 100)
+        elif strategy_type == "protective_put":
+            return create_protective_put(spot_price, strike, premium, 100)
+    except: return {"error": "VIOP strategies not available"}

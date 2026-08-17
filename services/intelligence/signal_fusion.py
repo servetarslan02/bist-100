@@ -73,7 +73,8 @@ class SignalFusionEngine:
         "sentiment": 0.10,
         "macro": 0.10,
         "valuation": 0.15,
-        "ai": 0.15,
+        "ai": 0.10,
+        "spec": 0.05,  # SPEC engine entegrasyonu
     }
 
     REGIME_WEIGHT_OVERRIDES = {
