@@ -281,7 +281,26 @@ class PortfolioSimulator:
 
     def get_summary(self) -> Dict[str, Any]:
         if not self._daily_snapshots:
-            return {}
+            # Trade-based metrics only
+            sell_trades = [t for t in self._trades if t.direction == "SELL"]
+            winning = sum(1 for t in sell_trades if t.pnl > 0)
+            win_rate = winning / len(sell_trades) * 100 if sell_trades else 0
+            gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
+            gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
+            profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
+            total_commission = sum(t.commission for t in self._trades)
+            total_slippage = sum(t.slippage for t in self._trades)
+            return {
+                "initial_capital": self._initial_capital,
+                "final_equity": self._cash,
+                "total_return_pct": 0, "sharpe_ratio": 0, "sortino_ratio": 0,
+                "max_drawdown_pct": 0, "total_trades": len(self._trades),
+                "win_rate_pct": round(win_rate, 1),
+                "profit_factor": round(profit_factor, 2),
+                "total_commission": round(total_commission, 2),
+                "total_slippage": round(total_slippage, 2),
+                "open_positions": len(self._positions),
+            }
 
         final = self._daily_snapshots[-1].equity
         total_return = (final / self._initial_capital - 1) * 100
@@ -290,8 +309,9 @@ class PortfolioSimulator:
         returns = np.array([s.daily_return for s in self._daily_snapshots])
         if len(returns) > 1:
             sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if np.std(returns) > 0 else 0
-            downside = returns[returns < 0]
-            sortino = np.mean(returns) / np.std(downside) * np.sqrt(252) if len(downside) > 0 and np.std(downside) > 0 else 0
+            downside_returns = np.minimum(returns, 0)
+            downside_std = np.sqrt(np.mean(downside_returns ** 2))
+            sortino = np.mean(returns) / downside_std * np.sqrt(252) if downside_std > 0 else 0
         else:
             sharpe = sortino = 0
 

@@ -212,8 +212,9 @@ class BacktestEngine:
             returns = np.diff(equity_curve) / equity_curve[:-1]
             sharpe = (np.mean(returns) / np.std(returns) * np.sqrt(252)) if np.std(returns) > 0 else 0
 
-            downside_returns = returns[returns < 0]
-            sortino = (np.mean(returns) / np.std(downside_returns) * np.sqrt(252)) if len(downside_returns) > 0 and np.std(downside_returns) > 0 else 0
+            downside_returns = np.minimum(returns, 0)
+            downside_std = np.sqrt(np.mean(downside_returns ** 2))
+            sortino = (np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0
         else:
             sharpe = 0
             sortino = 0
@@ -223,7 +224,7 @@ class BacktestEngine:
 
         return BacktestMetrics(
             total_return_pct=round(total_return, 2),
-            cagr_pct=round(total_return, 2),  # Basitleştirilmiş
+            cagr_pct=round(((final / initial_capital) ** (1 / max(len(equity_curve) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0,
             sharpe_ratio=round(sharpe, 2),
             sortino_ratio=round(sortino, 2),
             calmar_ratio=round(total_return / max_dd, 2) if max_dd > 0 else 0,
