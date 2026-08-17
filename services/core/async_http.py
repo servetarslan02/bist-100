@@ -35,7 +35,7 @@ class AsyncHTTPClient:
         headers: Optional[Dict[str, str]] = None,
     ):
         self._timeout = aiohttp.ClientTimeout(total=timeout, connect=min(5.0, timeout / 3))
-        self._max_retries = min(max_retries, 1)  # Tek deneme — ağ sorunlarında hızlı fallback
+        self._max_retries = max_retries
         self._retry_delay_s = retry_delay_s
         self._headers = headers or {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",

@@ -85,7 +85,7 @@ class DataAdapter:
         """Async coroutine'u sync olarak çalıştır.
 
         Thread-based timeout: ağ çağrısı asla sonsuz bloklanmaz.
-        Daemon thread kullanılır — ana process çıkışında otomatik temizlenir.
+        Her çağrıda yeni event loop oluşturulur — aiohttp session lifecycle sorunu çözülür.
         """
         import asyncio
         import threading
@@ -94,10 +94,14 @@ class DataAdapter:
         error = [None]
 
         def _run():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
             try:
-                result[0] = asyncio.run(coro)
+                result[0] = loop.run_until_complete(coro)
             except Exception as e:
                 error[0] = e
+            finally:
+                loop.close()
 
         thread = threading.Thread(target=_run, daemon=True)
         thread.start()
@@ -390,16 +394,22 @@ class DataAdapter:
             for item in raw_news:
                 title = item.get("title", "").strip()
                 if not title:
-                    continue  # Zorunlu alan eksik
-
-                if not provider.match_news_to_ticker(item, ticker):
                     continue
 
-                pub_date = item.get("published", "")[:10]
+                # Tarih parse (RFC 2822: "Thu, 06 Aug 2026 09:03:00 +0000")
+                raw_date = item.get("published", "")
+                pub_date = self._parse_news_date(raw_date)
                 if not pub_date:
-                    continue  # Tarih yoksa kullanılamaz
+                    continue
 
                 if as_of_date and pub_date > as_of_date:
+                    continue
+
+                # Ticker eşleşme kontrolü
+                # Genel finansal haberler (ticker boş) → tüm hisseler için geçerli
+                # Şirket özel haberleri → sadece eşleşen hisse için
+                news_ticker = item.get("ticker", "").strip()
+                if news_ticker and not provider.match_news_to_ticker(item, ticker):
                     continue
 
                 # Duplicate kontrolü (title hash)
@@ -473,6 +483,47 @@ class DataAdapter:
     # ==================================================
     # HELPERS
     # ==================================================
+
+    @staticmethod
+    def _parse_news_date(raw_date: str) -> str:
+        """Haber tarihini YYYY-MM-DD formatına çevir.
+
+        Desteklenen formatlar:
+        - RFC 2822: "Thu, 06 Aug 2026 09:03:00 +0000"
+        - ISO: "2026-08-06T09:03:00Z"
+        - Basit: "2026-08-06"
+        """
+        if not raw_date:
+            return ""
+
+        # Zaten YYYY-MM-DD formatında
+        if len(raw_date) >= 10 and raw_date[4] == "-" and raw_date[7] == "-":
+            return raw_date[:10]
+
+        # RFC 2822 parse
+        try:
+            from email.utils import parsedate_to_datetime
+            dt = parsedate_to_datetime(raw_date)
+            return dt.strftime("%Y-%m-%d")
+        except Exception:
+            pass
+
+        # Manuel parse ("06 Aug 2026" formatı)
+        try:
+            parts = raw_date.split()
+            if len(parts) >= 3:
+                day = parts[1] if len(parts[1]) == 2 else parts[1]
+                month_map = {"Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
+                             "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
+                             "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12"}
+                month = month_map.get(parts[2][:3], "")
+                year = parts[3] if len(parts) > 3 else ""
+                if year and month and day:
+                    return f"{year}-{month}-{day.zfill(2)}"
+        except Exception:
+            pass
+
+        return ""
 
     @staticmethod
     def _classify_kap_category(title: str) -> str:
