@@ -117,6 +117,7 @@ class SystemOrchestrator:
             from services.features.calculator import feature_calculator
             from services.features.cross_sectional import cross_sectional_engine
             from services.features.seven_motors import seven_motor_engine
+            from services.features.data_adapter import data_adapter
 
             all_features = {}
 
@@ -189,18 +190,35 @@ class SystemOrchestrator:
                     if len(sector_close) > 20 and sector_close[-21] > 0:
                         sector_return_20d = (sector_close[-1] / sector_close[-21] - 1) * 100
 
+                # === VERİ KAYNAKLARI (data adapter) ===
+                # Fundamental — Motor 4
+                fund_features = data_adapter.fetch_fundamentals(ticker, as_of_date=date)
+                fundamentals = {k: dp.to_value() for k, dp in fund_features.items()}
+                fund_available = any(dp.status.value == "FRESH" for dp in fund_features.values())
+                if not fund_available:
+                    fundamentals = None  # Motor 4 skip etsin
+
+                # KAP + Haber — Motor 5
+                kap_events = data_adapter.fetch_kap_events(ticker, as_of_date=date)
+                news_events = data_adapter.fetch_news_events(ticker, as_of_date=date)
+
+                # Katalizör — Motor 6
+                upcoming_events = data_adapter.derive_catalysts(
+                    kap_events, news_events, as_of_date=date
+                )
+
                 # Motor feature'ları — tüm veri akışlarıyla
                 motor_features = seven_motor_engine.compute_all(
                     ticker, df, mask,
                     benchmark_close=benchmark_close,
                     sector_close=sector_close,
                     peer_closes=peer_closes,
-                    fundamentals=None,        # Faz 2'de bağlanacak
-                    sector_medians=None,       # Faz 2'de bağlanacak
-                    kap_events=None,           # Faz 2'de bağlanacak
-                    news_events=None,          # Faz 2'de bağlanacak
-                    upcoming_events=None,      # Faz 2'de bağlanacak
-                    llm_analysis=None,         # Faz 2'de bağlanacak
+                    fundamentals=fundamentals,
+                    sector_medians=None,
+                    kap_events=kap_events or None,
+                    news_events=news_events or None,
+                    upcoming_events=upcoming_events or None,
+                    llm_analysis=None,
                     market_return_5d=market_return_5d,
                     market_return_20d=market_return_20d,
                     sector_return_5d=sector_return_5d,
