@@ -136,10 +136,38 @@ class FundamentalProvider:
             return None
 
     def _fetch_from_kap(self, ticker: str) -> Optional[Dict[str, Any]]:
-        """KAP'tan finansal veri çek."""
+        """KAP'tan finansal veri çek (async → sync wrapper)."""
         try:
             from .kap_provider import kap_provider
-            return kap_provider.fetch_company_financials(ticker)
+            import asyncio
+            import threading
+
+            result = [None]
+            error = [None]
+
+            def _run():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    result[0] = loop.run_until_complete(
+                        kap_provider.fetch_financial_data(ticker)
+                    )
+                except Exception as e:
+                    error[0] = e
+                finally:
+                    loop.close()
+
+            thread = threading.Thread(target=_run, daemon=True)
+            thread.start()
+            thread.join(timeout=15.0)
+
+            if thread.is_alive():
+                logger.debug("KAP financial data timeout", ticker=ticker)
+                return None
+            if error[0]:
+                logger.debug("KAP fundamental fetch failed", ticker=ticker, error=str(error[0]))
+                return None
+            return result[0]
         except Exception as e:
             logger.debug("KAP fundamental fetch failed", ticker=ticker, error=str(e))
             return None
