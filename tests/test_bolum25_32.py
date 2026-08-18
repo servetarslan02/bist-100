@@ -166,9 +166,11 @@ class TestEventStudy:
         from services.event_study.expected_return import calculate_expected_return
         sr = np.random.randn(100) * 0.02
         mr = np.random.randn(100) * 0.015
-        alpha, beta = calculate_expected_return(sr, mr)
-        assert isinstance(alpha, float)
-        assert isinstance(beta, float)
+        result = calculate_expected_return(sr, mr, model="market")
+        assert "alpha" in result
+        assert "beta_market" in result
+        assert isinstance(result["alpha"], float)
+        assert isinstance(result["beta_market"], float)
 
     def test_abnormal_return(self):
         from services.event_study.abnormal_return import calculate_abnormal_return

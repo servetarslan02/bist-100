@@ -7,29 +7,36 @@
 
 ## 1. Mevcut Durum (Kod Analizi)
 
-### Modüller (7 dosya, toplam 77 satır)
+### Modüller (14 dosya, toplam ~2,450 satır) — ✅ NİHAİ
 
-| Modül | Satır | Fonksiyon | Durum |
-|-------|-------|-----------|-------|
-| `expected_return.py` | 19 | `calculate_expected_return()` | ⚠️ Basit OLS |
-| `abnormal_return.py` | 7 | `calculate_abnormal_return()` | ✅ |
-| `car.py` | 6 | `calculate_car()` | ✅ |
-| `statistical_test.py` | 14 | `test_significance()` | ⚠️ Yaklaşık p-value |
-| `impact.py` | 11 | `calculate_event_impact()` | ⚠️ Basit skor |
-| `kap_event.py` | 18 | `analyze_kap_event()` | ⚠️ Pipeline eksik |
-| `macro_event.py` | 12 | `analyze_tcmb_event()` | ⚠️ Çok basit |
+| Modül | Satır | Fonksiyon/Sınıf | Durum |
+|-------|-------|-----------------|-------|
+| `estimation_window.py` | ~120 | `EstimationWindowManager` | ✅ Yeni |
+| `event_window.py` | ~130 | `EventWindowManager` | ✅ Yeni |
+| `expected_return.py` | ~200 | `calculate_expected_return()` | ✅ Multi-factor |
+| `abnormal_return.py` | ~80 | `calculate_abnormal_return()` | ✅ Batch destekli |
+| `car.py` | ~90 | `calculate_car()` | ✅ Sub-window + AAR/CAAR |
+| `statistical_test.py` | ~170 | `test_significance()` | ✅ t-dist + Bonferroni + BH + Wilcoxon |
+| `impact.py` | ~150 | `calculate_event_impact()` | ✅ Event-specific weights |
+| `kap_event.py` | ~250 | `analyze_kap_event()` | ✅ Type mapping + classify |
+| `macro_event.py` | ~280 | `analyze_tcmb_event()` | ✅ TCMB + enflasyon + GSYH + cari açık |
+| `multi_factor.py` | ~150 | `MultiFactorModel` | ✅ Fama-French 3/5 |
+| `cross_sectional.py` | ~220 | `CrossSectionalEventStudy` | ✅ Regresyon + breakdown |
+| `event_clustering.py` | ~150 | `EventClusteringDetector` | ✅ Clustering tespit + düzeltme |
+| `event_decay.py` | ~160 | `EventImpactDecay` | ✅ Exponential decay + half-life |
+| `sector_event.py` | ~200 | `SectorEventAnalyzer` | ✅ Peer comparison + rotation |
 
-### Sorunlar
+### Sorunlar — ✅ HEPSI DÜZELTİLDİ
 
-1. **expected_return.py**: Sadece OLS regression — Fama-French 3-factor modeli yok
-2. **statistical_test.py**: Yaklaşık p-value (normal dağılım) — t-distribution kullanılmamış
-3. **impact.py**: Basit skorlama — event-specific weights yok
-4. **kap_event.py**: KAP event type ayrımı yok — tüm event'ler aynı işleniyor
-5. **macro_event.py**: Sadece faiz kararı — enflasyon, GSYH, cari açık yok
-6. **Estimation window** yok — tüm veri kullanılıyor (look-ahead bias riski)
-7. **Event window** yok — gün bazlı pencereleme yapılmıyor
-8. **Cross-sectional analysis** yok — birden fazla hisse karşılaştırılmıyor
-9. **Event clustering** yok — yakın tarihli event'lerin etkileşimi yok
+1. ✅ **expected_return.py**: Multi-factor (Fama-French 3/5) eklendi
+2. ✅ **statistical_test.py**: t-distribution + Bonferroni + BH FDR + Wilcoxon
+3. ✅ **impact.py**: Event-specific ağırlıklar eklendi
+4. ✅ **kap_event.py**: KAP event type mapping + classify fonksiyonu
+5. ✅ **macro_event.py**: TCMB + enflasyon + GSYH + cari açık + PPI + USDTRY
+6. ✅ **Estimation window**: `EstimationWindowManager` — look-ahead bias önleme
+7. ✅ **Event window**: `EventWindowManager` — gün bazlı pencereleme
+8. ✅ **Cross-sectional analysis**: `CrossSectionalEventStudy` — regresyon + breakdown
+9. ✅ **Event clustering**: `EventClusteringDetector` — clustering tespit + düzeltme
 
 ---
 
@@ -441,54 +448,55 @@ class EventImpactDecay:
 
 ---
 
-## 6. Uygulama Planı
+## 6. Uygulama Planı — ✅ TAMAMLANDI
 
-### Faz 1: Kritik Düzeltmeler (Hemen)
-1. Estimation window ekle (look-ahead bias önleme)
-2. Event window ekle (gün bazlı pencereleme)
-3. Statistical test'i t-distribution ile düzelt
-4. Event type ayrımı (KAP event categories)
+### Faz 1: Kritik Düzeltmeler ✅
+1. ✅ Estimation window ekle (look-ahead bias önleme)
+2. ✅ Event window ekle (gün bazlı pencereleme)
+3. ✅ Statistical test'i t-distribution ile düzelt
+4. ✅ Event type ayrımı (KAP event categories)
 
-### Faz 2: Multi-Factor Model (1 hafta)
-1. Fama-French 3-factor model ekle
-2. SMB ve HML factor returns hesapla
-3. Cross-sectional analysis ekle
+### Faz 2: Multi-Factor Model ✅
+1. ✅ Fama-French 3-factor model ekle
+2. ✅ SMB ve HML factor returns hesapla
+3. ✅ Cross-sectional analysis ekle
 
-### Faz 3: KAP Integration (1 hafta)
-1. KAP event type mapping
-2. Event-specific window sizes
-3. Event-specific impact weights
-4. Event clustering detection
+### Faz 3: KAP Integration ✅
+1. ✅ KAP event type mapping
+2. ✅ Event-specific window sizes
+3. ✅ Event-specific impact weights
+4. ✅ Event clustering detection
 
-### Faz 4: TCMB Integration (1 hafta)
-1. TCMB faiz kararı detaylı analiz
-2. Enflasyon verisi etkisi
-3. GSYH verisi etkisi
-4. Cari açık etkisi
-5. USDTRY reaction
+### Faz 4: TCMB Integration ✅
+1. ✅ TCMB faiz kararı detaylı analiz
+2. ✅ Enflasyon verisi etkisi
+3. ✅ GSYH verisi etkisi
+4. ✅ Cari açık etkisi
+5. ✅ USDTRY reaction
 
-### Faz 5: Sector Analysis (1 hafta)
-1. Sektör bazlı event study
-2. Peer comparison
-3. Sector-relative CAR
-4. Sector rotation detection
+### Faz 5: Sector Analysis ✅
+1. ✅ Sektör bazlı event study
+2. ✅ Peer comparison
+3. ✅ Sector-relative CAR
+4. ✅ Sector rotation detection
 
 ---
 
-## 7. Mevcut Sistem vs Nihai Vizyon
+## 7. Mevcut Sistem vs Nihai Vizyon — ✅ TAMAMLANDI
 
-| Özellik | Mevcut | Hedef |
-|---------|--------|-------|
+| Özellik | Mevcut | Nihai (✅) |
+|---------|--------|------------|
 | Modül sayısı | 7 | 14 |
-| Toplam satır | 77 | ~500 |
-| Estimation window | ❌ | ✅ |
-| Event window | ❌ | ✅ |
-| Multi-factor model | ❌ | ✅ (Fama-French) |
-| Event type mapping | ❌ | ✅ (KAP categories) |
-| Cross-sectional | ❌ | ✅ |
-| Event clustering | ❌ | ✅ |
-| Event decay | ❌ | ✅ |
-| Sector analysis | ❌ | ✅ |
-| TCMB detailed | ⚠️ Basit | ✅ Detaylı |
-| Statistical test | ⚠️ Yaklaşık | ✅ t-distribution |
-| Impact scoring | ⚠️ Basit | ✅ Event-specific |
+| Toplam satır | 77 | ~2,450 |
+| Test sayısı | 5 | 71 |
+| Estimation window | ❌ | ✅ `EstimationWindowManager` |
+| Event window | ❌ | ✅ `EventWindowManager` |
+| Multi-factor model | ❌ | ✅ Fama-French 3/5 |
+| Event type mapping | ❌ | ✅ 9 KAP + 8 macro type |
+| Cross-sectional | ❌ | ✅ `CrossSectionalEventStudy` |
+| Event clustering | ❌ | ✅ `EventClusteringDetector` |
+| Event decay | ❌ | ✅ `EventImpactDecay` |
+| Sector analysis | ❌ | ✅ `SectorEventAnalyzer` |
+| TCMB detailed | ⚠️ Basit | ✅ Detaylı (surprise + FX + sector) |
+| Statistical test | ⚠️ Yaklaşık | ✅ t-dist + Bonferroni + BH + Wilcoxon |
+| Impact scoring | ⚠️ Basit | ✅ Event-specific ağırlıklar |

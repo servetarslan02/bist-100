@@ -283,8 +283,16 @@ def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, mark
     try:
         from services.event_study.kap_event import analyze_kap_event
         from services.event_study.impact import calculate_event_impact
-        result = analyze_kap_event(ticker, event_type, stock_returns, market_returns)
-        impact = calculate_event_impact(result.get("car", 0), result.get("p_value", 1))
+        from datetime import datetime
+        result = analyze_kap_event(
+            ticker=ticker,
+            event_description=event_type,
+            event_date=datetime.now(),
+            stock_returns=np.array(stock_returns),
+            market_returns=np.array(market_returns),
+        )
+        p_value = result.get("significance", {}).get("p_value", 1.0)
+        impact = calculate_event_impact(result.get("car", 0), p_value)
         result["impact"] = impact
         return result
     except ImportError:
