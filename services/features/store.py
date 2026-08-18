@@ -398,9 +398,18 @@ class FeatureStore:
                 # PIT kontrolü
                 if as_of and not meta.is_pit_valid(as_of):
                     continue
-                # TTL kontrolü
-                if not include_expired and meta.is_expired():
-                    continue
+                # TTL kontrolü (PIT-aware: get() ile tutarlı)
+                if not include_expired:
+                    if as_of:
+                        if meta.ttl_seconds is not None:
+                            computed = datetime.fromisoformat(meta.computed_at)
+                            expiry = computed + timedelta(seconds=meta.ttl_seconds)
+                            as_of_dt = datetime.fromisoformat(as_of)
+                            if as_of_dt >= expiry:
+                                continue
+                    else:
+                        if meta.is_expired():
+                            continue
                 result[name] = meta.value
 
         return result
@@ -641,6 +650,8 @@ class FeatureStore:
             self._store.pop(ticker, None)
             self._snapshots.pop(ticker, None)
             self._baselines.pop(ticker, None)
+            # Bu ticker'ın lineage kayıtlarını da temizle
+            self._lineage = [r for r in self._lineage if r.ticker != ticker]
         else:
             self._store.clear()
             self._snapshots.clear()
