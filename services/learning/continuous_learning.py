@@ -20,6 +20,8 @@ from datetime import datetime, timezone, timedelta
 from collections import deque, defaultdict
 import structlog
 
+from services.learning.config.learning_config import learning_settings
+
 logger = structlog.get_logger()
 
 
@@ -51,15 +53,16 @@ class ContinuousLearningPipeline:
 
     def __init__(
         self,
-        retrain_interval_days: int = 7,
-        drift_check_interval: int = 1,
-        performance_window: int = 21,
-        min_samples_for_retrain: int = 500,
+        retrain_interval_days: Optional[int] = None,
+        drift_check_interval: Optional[int] = None,
+        performance_window: Optional[int] = None,
+        min_samples_for_retrain: Optional[int] = None,
     ):
-        self.retrain_interval_days = retrain_interval_days
-        self.drift_check_interval = drift_check_interval
-        self.performance_window = performance_window
-        self.min_samples_for_retrain = min_samples_for_retrain
+        cfg = learning_settings
+        self.retrain_interval_days = retrain_interval_days or cfg.retrain.max_interval_days
+        self.drift_check_interval = drift_check_interval or cfg.drift.check_interval_days
+        self.performance_window = performance_window or cfg.retrain.performance_window
+        self.min_samples_for_retrain = min_samples_for_retrain or cfg.retrain.min_samples
 
         # Öğrenme döngüsü geçmişi
         self._cycles: deque = deque(maxlen=100)
@@ -223,19 +226,21 @@ class ContinuousLearningPipeline:
         daily_metrics: Dict[str, float],
     ) -> bool:
         """Yeniden eğitim gerekli mi?"""
+        cfg = learning_settings.retrain
 
         # Zorunlu interval
         if self._last_retrain_date:
             days_since = (datetime.strptime(date, "%Y-%m-%d") - self._last_retrain_date).days
-            if days_since < self.retrain_interval_days:
+            if days_since < cfg.min_interval_days:
                 return False
 
         # Performans düşüşü
         recent_sharpes = [m["sharpe"] for m in list(self._daily_performance)[-self.performance_window:]]
         if recent_sharpes:
             avg_sharpe = np.mean(recent_sharpes)
-            if avg_sharpe < 0.3:  # Sharpe < 0.3 ise retrain
-                logger.warning("Retrain triggered: low Sharpe", avg_sharpe=round(avg_sharpe, 4))
+            if avg_sharpe < cfg.sharpe_threshold:
+                logger.warning("Retrain triggered: low Sharpe", avg_sharpe=round(avg_sharpe, 4),
+                             threshold=cfg.sharpe_threshold)
                 return True
 
         # Drift tespiti
@@ -245,15 +250,17 @@ class ContinuousLearningPipeline:
 
         # Win rate düşüşü
         recent_win_rates = [m["win_rate"] for m in list(self._daily_performance)[-self.performance_window:]]
-        if recent_win_rates and np.mean(recent_win_rates) < 0.45:
-            logger.warning("Retrain triggered: low win rate")
+        if recent_win_rates and np.mean(recent_win_rates) < cfg.winrate_threshold:
+            logger.warning("Retrain triggered: low win rate",
+                         avg=round(np.mean(recent_win_rates), 4),
+                         threshold=cfg.winrate_threshold)
             return True
 
         # Zorunlu interval doldu
         if self._last_retrain_date:
             days_since = (datetime.strptime(date, "%Y-%m-%d") - self._last_retrain_date).days
-            if days_since >= self.retrain_interval_days * 2:  # 2x interval
-                logger.warning("Retrain triggered: max interval exceeded")
+            if days_since >= cfg.max_interval_days:
+                logger.warning("Retrain triggered: max interval exceeded", days=days_since)
                 return True
 
         return False

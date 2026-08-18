@@ -11,6 +11,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
 
+from services.learning.config.learning_config import learning_settings
+
 logger = structlog.get_logger()
 
 
@@ -120,13 +122,14 @@ class LearningLoop:
 
     def _check_model_decay(self):
         """Model bozulması kontrolü."""
+        cfg = learning_settings.retrain
         if len(self._accuracy_window) < 50:
             return
 
-        # Son 50 tahminde doğruluk %50'nin altına düştüyse
-        if self._state.recent_accuracy < 0.50:
+        # Son 50 tahminde doğruluk eşik altına düştüyse
+        if self._state.recent_accuracy < cfg.winrate_threshold:
             self._state.retrain_needed = True
-            self._state.retrain_reason = f"Recent accuracy dropped to {self._state.recent_accuracy:.2%}"
+            self._state.retrain_reason = f"Recent accuracy dropped to {self._state.recent_accuracy:.2%} (threshold: {cfg.winrate_threshold:.2%})"
 
         # Accuracy trendi negatifse
         if self._state.accuracy_trend < -0.1:

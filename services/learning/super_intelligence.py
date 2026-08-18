@@ -17,6 +17,7 @@ KURAL: Sistem insan müdahalesi olmadan 7/24 çalışmalı.
 """
 
 import json
+import time
 import numpy as np
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field, asdict
@@ -25,6 +26,8 @@ from collections import deque, defaultdict
 import structlog
 import hashlib
 import threading
+
+from services.learning.config.learning_config import learning_settings
 
 logger = structlog.get_logger()
 
@@ -76,17 +79,18 @@ class SuperIntelligenceEngine:
 
     def __init__(
         self,
-        retrain_threshold_sharpe: float = 0.3,
-        retrain_threshold_ic: float = 0.02,
-        drift_threshold: float = 0.1,
-        max_models_history: int = 10,
-        ab_test_window_days: int = 21,
+        retrain_threshold_sharpe: Optional[float] = None,
+        retrain_threshold_ic: Optional[float] = None,
+        drift_threshold: Optional[float] = None,
+        max_models_history: Optional[int] = None,
+        ab_test_window_days: Optional[int] = None,
     ):
-        self.retrain_threshold_sharpe = retrain_threshold_sharpe
-        self.retrain_threshold_ic = retrain_threshold_ic
-        self.drift_threshold = drift_threshold
-        self.max_models_history = max_models_history
-        self.ab_test_window_days = ab_test_window_days
+        cfg = learning_settings
+        self.retrain_threshold_sharpe = retrain_threshold_sharpe or cfg.retrain.sharpe_threshold
+        self.retrain_threshold_ic = retrain_threshold_ic or cfg.retrain.ic_threshold
+        self.drift_threshold = drift_threshold or cfg.drift.psi_alert
+        self.max_models_history = max_models_history or cfg.model_registry.max_versions
+        self.ab_test_window_days = ab_test_window_days or cfg.shadow.duration_days
 
         # Model versiyonlama
         self._model_versions: List[ModelVersion] = []
@@ -178,8 +182,18 @@ class SuperIntelligenceEngine:
     def execute_healing(self, healing_record: Dict) -> bool:
         """Healing aksiyonunu çalıştır."""
         action = healing_record.get("action")
+        max_attempts = learning_settings.health.max_healing_attempts
+        attempt = healing_record.get("attempt", 0)
+
+        if attempt >= max_attempts:
+            healing_record["status"] = "FAILED"
+            healing_record["failure_reason"] = f"Max attempts ({max_attempts}) exceeded"
+            logger.error("Healing max attempts exceeded", action=action)
+            return False
 
         try:
+            healing_record["attempt"] = attempt + 1
+
             if action == "retrain_model":
                 self._trigger_retrain()
             elif action == "refresh_data":
@@ -198,7 +212,7 @@ class SuperIntelligenceEngine:
         except Exception as e:
             healing_record["status"] = "FAILED"
             healing_record["failure_reason"] = str(e)
-            logger.error("Healing failed", action=action, error=str(e))
+            logger.error("Healing failed", action=action, error=str(e), attempt=attempt + 1)
             return False
 
     # === AUTO-RETRAIN ===
@@ -512,21 +526,25 @@ class SuperIntelligenceEngine:
             results["recent_metrics"] = recent_metrics
 
         # 3. Retrain kontrolü
-        if recent_metrics:
-            needs_retrain = self.check_retrain_needed(recent_metrics)
-            results["retrain_needed"] = needs_retrain
+        recent_metrics = results.get("recent_metrics", {})
+        needs_retrain = self.check_retrain_needed(recent_metrics) if recent_metrics else False
+        results["retrain_needed"] = needs_retrain
 
-            if needs_retrain:
-                retrain_result = self.auto_retrain(
-                    training_data={"features": features_map, "regime": regime},
-                    validation_data={},
-                )
-                results["retrain_result"] = retrain_result
+        if needs_retrain:
+            retrain_result = self.auto_retrain(
+                training_data={"features": features_map, "regime": regime},
+                validation_data={},
+            )
+            results["retrain_result"] = retrain_result
 
         # 4. A/B test değerlendirme
-        if self._ab_test_active:
-            # A/B test sonuçlarını topla ve değerlendir
-            pass  # Gerçek veri gelince değerlendir
+        if self._ab_test_active and actual_returns:
+            try:
+                ab_result = self._evaluate_active_ab_test(actual_returns)
+                if ab_result:
+                    results["ab_test"] = ab_result
+            except Exception as e:
+                logger.warning("A/B test evaluation failed", error=str(e))
 
         # 5. Health check
         health = self.get_health_status()
@@ -597,24 +615,74 @@ class SuperIntelligenceEngine:
         return f"v_{timestamp}_{random_hash}"
 
     def _trigger_retrain(self):
-        """Yeniden eğitim tetikle."""
+        """Yeniden eğitim tetikle — continuous_learning üzerinden."""
         logger.info("Retrain triggered by self-healing")
+        try:
+            from services.learning.continuous_learning import continuous_learning
+            continuous_learning._drift_detected = True
+            self._health_status.retrain_needed = True
+        except Exception as e:
+            logger.error("Retrain trigger failed", error=str(e))
 
     def _trigger_data_refresh(self):
-        """Veri yenileme tetikle."""
+        """Veri yenileme tetikle — event bus üzerinden."""
         logger.info("Data refresh triggered by self-healing")
+        try:
+            from services.core.event_bus import publish_event, EventType
+            publish_event(
+                EventType.DATA_REFRESH_REQUESTED,
+                source="super_intelligence",
+                payload={"reason": "self_healing", "timestamp": datetime.now(timezone.utc).isoformat()},
+            )
+        except Exception as e:
+            logger.error("Data refresh trigger failed", error=str(e))
 
     def _restart_module(self, module: str):
-        """Modül yeniden başlat."""
+        """Modül yeniden başlat — health status güncelle."""
         logger.info("Module restart triggered", module=module)
+        self.update_module_status(module, "RESTARTING")
+        try:
+            from services.learning.health_monitor import learning_health_monitor
+            learning_health_monitor.request_restart(module)
+        except ImportError:
+            logger.warning("Health monitor not available for restart", module=module)
 
     def _retry_with_backoff(self, healing_record: Dict):
         """Backoff ile tekrar dene."""
-        logger.info("Retry with backoff triggered")
+        attempt = healing_record.get("attempt", 0)
+        backoff = learning_settings.health.healing_backoff_seconds
+        wait_time = backoff * (2 ** attempt)
+        logger.info("Retry with backoff", attempt=attempt, wait_seconds=wait_time)
+        time.sleep(min(wait_time, 300))
 
     def _activate_fallback(self):
-        """Fallback modunu aktive et."""
-        logger.warning("Fallback mode activated")
+        """Fallback modunu aktive et — rule-based sisteme geç."""
+        logger.warning("Fallback mode activated — switching to rule-based")
+        self._health_status.overall_status = "DEGRADED"
+        self._health_status.last_error = "Fallback mode active"
+
+    def _evaluate_active_ab_test(self, actual_returns: Dict[str, float]) -> Optional[Dict]:
+        """Aktif A/B test'i değerlendir."""
+        if not self._ab_test_active:
+            return None
+
+        champion_returns = []
+        challenger_returns = []
+
+        for pred in list(self._prediction_history)[-100:]:
+            ticker = pred.get("ticker", "")
+            if ticker in actual_returns:
+                model_version = pred.get("model_version", "")
+                if model_version == self._ab_test_champion:
+                    champion_returns.append(actual_returns[ticker])
+                elif model_version == self._ab_test_challenger:
+                    challenger_returns.append(actual_returns[ticker])
+
+        if len(champion_returns) >= 10 and len(challenger_returns) >= 10:
+            result = self.evaluate_ab_test(champion_returns, challenger_returns)
+            return asdict(result)
+
+        return None
 
 
 # Singleton
