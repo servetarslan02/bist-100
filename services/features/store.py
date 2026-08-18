@@ -75,7 +75,7 @@ class FeatureMeta:
             return False
         computed = datetime.fromisoformat(self.computed_at)
         expiry = computed + timedelta(seconds=self.ttl_seconds)
-        return datetime.now(timezone.utc) > expiry
+        return datetime.now(timezone.utc) >= expiry
 
     def is_pit_valid(self, as_of: str) -> bool:
         """Point-in-time: as_of anında bu feature kullanılabilir mi?"""
@@ -223,8 +223,12 @@ class FeatureStore:
         # Her feature için FeatureMeta oluştur
         meta_dict: Dict[str, FeatureMeta] = {}
         for name, value in features.items():
-            if isinstance(value, float) and (value != value):  # NaN
-                continue
+            # NaN ve Inf filtrele
+            if isinstance(value, (int, float)):
+                if value != value:  # NaN
+                    continue
+                if value == float('inf') or value == float('-inf'):
+                    continue
 
             parents = (parent_features or {}).get(name, [])
             checksum = hashlib.sha256(
@@ -241,7 +245,7 @@ class FeatureStore:
                 computed_at=now,
                 available_at=pit_time,
                 confidence=confidence,
-                ttl_seconds=ttl_seconds or self._default_ttl,
+                ttl_seconds=ttl_seconds if ttl_seconds is not None else self._default_ttl,
                 parent_features=parents,
                 checksum=checksum,
             )
@@ -346,7 +350,7 @@ class FeatureStore:
                     computed = datetime.fromisoformat(meta.computed_at)
                     expiry = computed + timedelta(seconds=meta.ttl_seconds)
                     as_of_dt = datetime.fromisoformat(as_of)
-                    if as_of_dt > expiry:
+                    if as_of_dt >= expiry:
                         logger.debug("Feature expired at as_of", ticker=ticker, feature=feature_name)
                         continue
             else:

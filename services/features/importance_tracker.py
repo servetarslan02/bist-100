@@ -507,6 +507,9 @@ class FeatureImportanceTracker:
 
         0 = mükemmel eşitlik (tüm feature'lar eşit önemli)
         1 = mükemmel eşitsizlik (tek bir feature dominant)
+
+        Gini = (2 * Σ(i * x_i)) / (n * Σ(x_i)) - (n+1)/n
+        (x_i sıralı, i 1-den başlar)
         """
         if not features:
             return 0.0
@@ -516,13 +519,9 @@ class FeatureImportanceTracker:
         if n == 0 or sum(values) == 0:
             return 0.0
 
-        # Gini = 1 - 2 * Σ((n+1-i)/n * x_i) / Σ(x_i)
         total = sum(values)
-        gini_sum = 0.0
-        for i, v in enumerate(values):
-            gini_sum += (n + 1 - (i + 1)) * v
-
-        gini = 1 - 2 * gini_sum / (n * total)
+        weighted_sum = sum((i + 1) * v for i, v in enumerate(values))
+        gini = 2 * weighted_sum / (n * total) - (n + 1) / n
         return max(0.0, min(1.0, gini))
 
     # =====================================================
