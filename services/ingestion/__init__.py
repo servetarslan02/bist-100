@@ -22,8 +22,13 @@ from .incremental import IncrementalFetcher, incremental_fetcher
 # Metrics
 from .ingestion_metrics import IngestionMetrics, ingestion_metrics
 
-# Orchestrator integration
-from .orchestrator_integration import IngestionOrchestrator, IngestionResult, PipelineReport, ingestion_orchestrator
+# Orchestrator integration — lazy import (providers need yfinance etc.)
+# from .orchestrator_integration import IngestionOrchestrator, IngestionResult, PipelineReport, ingestion_orchestrator
+
+def get_orchestrator():
+    """Lazy import — sadece gerektiğinde yüklenir."""
+    from .orchestrator_integration import IngestionOrchestrator, ingestion_orchestrator
+    return ingestion_orchestrator
 
 __all__ = [
     # Circuit Breaker
@@ -60,9 +65,6 @@ __all__ = [
     # Metrics
     "IngestionMetrics",
     "ingestion_metrics",
-    # Orchestrator
-    "IngestionOrchestrator",
-    "IngestionResult",
-    "PipelineReport",
-    "ingestion_orchestrator",
+    # Orchestrator (lazy)
+    "get_orchestrator",
 ]
