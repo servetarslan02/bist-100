@@ -566,33 +566,33 @@ class BISTSpecificFactors:
 
 ---
 
-## 5. Uygulama Planı
+## 5. Uygulama Planı — ✅ TAMAMLANDI
 
-### Faz 1: Kritik Düzeltmeler (Hemen)
-1. Piotroski F-Score — ağırlıklar ekle
-2. Beneish M-Score — gerçek veri entegrasyonu
-3. Altman Z-Score — Türkiye düzeltmesi
-4. Fama-French — gerçek factor return hesapla
+### Faz 1: Kritik Düzeltmeler ✅
+1. ✅ Piotroski F-Score — ağırlıklar, sub-scores eklendi
+2. ✅ Beneish M-Score — gerçek veri entegrasyonu + raw index desteği
+3. ✅ Altman Z-Score — Türkiye düzeltmesi (enflasyon, kur, sektör)
+4. ✅ Fama-French — 8 faktör, cross-sectional z-score
 
-### Faz 2: BIST Faktörleri (1 hafta)
-1. BIST anomaly'leri detaylandır
-2. Türkiye'ye özgü faktörler ekle
-3. KAP sentiment faktörü
-4. FX/inflasyon/faiz hassasiyeti
+### Faz 2: BIST Faktörleri ✅
+1. ✅ BIST anomaly'leri 8'e çıkarıldı
+2. ✅ Türkiye'ye özgü faktörler (FX, enflasyon, faiz, KAP, yabancı)
+3. ✅ KAP sentiment faktörü
+4. ✅ FX/inflasyon/faiz hassasiyeti
 
-### Faz 3: Factor Combination (1 hafta)
-1. Multi-factor ranking — risk-adjusted
-2. Rejime göre faktör ağırlıkları
-3. Factor correlation analizi
-4. Factor rotation stratejisi
+### Faz 3: Factor Combination ✅
+1. ✅ Multi-factor ranking — risk-adjusted, sector-neutral
+2. ✅ Rejime göre faktör ağırlıkları (BULL, BEAR, SIDEWAYS, HIGH_VOL)
+3. ✅ Factor correlation analizi (VIF, diversifikasyon skoru)
+4. ✅ Factor rotation stratejisi (regime detection, rotation signal)
 
-### Faz 4: Factor Performance (1 hafta)
-1. Faktör performans takibi
-2. Factor exposure analizi
-3. Time-series factor returns
-4. Benchmark karşılaştırma
+### Faz 4: Factor Performance ✅
+1. ✅ Faktör performans takibi (15+ metrik)
+2. ✅ Factor exposure analizi (alpha, beta, IR, Treynor)
+3. ✅ Time-series factor returns (trend, momentum, mevsimsellik)
+4. ✅ Benchmark karşılaştırma
 
-### Faz 5: ML Integration (1 hafta)
+### Faz 5: ML Integration ❌ (gelecek faz)
 1. Factor-based ML features
 2. Factor importance (SHAP)
 3. Dynamic factor weighting
@@ -600,20 +600,22 @@ class BISTSpecificFactors:
 
 ---
 
-## 6. Mevcut Sistem vs Nihai Vizyon
+## 6. Mevcut Sistem vs Nihai Vizyon — ✅ Faz 1-4 TAMAMLANDI
 
-| Özellik | Mevcut | Hedef |
-|---------|--------|-------|
-| Modül sayısı | 7 | 14 |
+| Özellik | Mevcut | Nihai (✅) |
+|---------|--------|------------|
+| Modül sayısı | 7 | 10 |
 | Toplam satır | 135 | ~600 |
-| Piotroski F-Score | ⚠️ Basit | ✅ Ağırlıklı |
-| Beneish M-Score | ⚠️ Default values | ✅ Gerçek veri |
+| Test sayısı | 6 | 43 |
+| Piotroski F-Score | ⚠️ Basit | ✅ Ağırlıklı + sub-scores |
+| Beneish M-Score | ⚠️ Default values | ✅ Gerçek veri + raw index |
 | Altman Z-Score | ⚠️ Orijinal | ✅ Türkiye düzeltmeli |
-| Fama-French | ⚠️ Skor only | ✅ Factor returns |
-| BIST anomalileri | ⚠️ 4 anomaly | ✅ 8+ anomaly |
-| Multi-factor ranking | ⚠️ Basit | ✅ Risk-adjusted |
-| Factor performance | ⚠️ 3 metrik | ✅ 10+ metrik |
-| Factor correlation | ❌ | ✅ |
-| Factor rotation | ❌ | ✅ |
-| Rejime göre ağırlık | ❌ | ✅ |
-| Türkiye'ye özgü faktörler | ❌ | ✅ |
+| Fama-French | ⚠️ 5 faktör | ✅ 8 faktör + batch + weights |
+| BIST anomalileri | ⚠️ 4 anomaly | ✅ 8 anomaly + scoring |
+| Multi-factor ranking | ⚠️ Basit | ✅ Risk-adjusted + sector-neutral |
+| Factor performance | ⚠️ 3 metrik | ✅ 15+ metrik |
+| Factor correlation | ❌ | ✅ VIF + diversifikasyon |
+| Factor rotation | ❌ | ✅ Regime detection + signal |
+| Rejime göre ağırlık | ❌ | ✅ BULL/BEAR/SIDEWAYS/HIGH_VOL |
+| Time-series analysis | ❌ | ✅ Trend + momentum + mevsimsellik |
+| Türkiye'ye özgü faktörler | ❌ | ✅ FX + enflasyon + faiz + KAP |

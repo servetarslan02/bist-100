@@ -127,19 +127,22 @@ class TestMacro:
 class TestFactors:
     def test_piotroski(self):
         from services.factors.piotroski import calculate_f_score
-        s = calculate_f_score({"net_income": 100, "operating_cf": 150, "roa_current": 0.1, "roa_prev": 0.08})
-        assert 0 <= s <= 9
+        r = calculate_f_score({"net_income": 100, "operating_cf": 150, "roa": 0.1})
+        assert "f_score" in r
+        assert 0 <= r["f_score"] <= 9
 
     def test_beneish(self):
         from services.factors.beneish import calculate_m_score
-        m = calculate_m_score({"dsri": 1.0, "gmi": 1.0, "aqi": 1.0, "sgi": 1.0})
-        assert isinstance(m, float)
+        r = calculate_m_score({"dsri": 1.0, "gmi": 1.0, "aqi": 1.0, "sgi": 1.0})
+        assert "m_score" in r
+        assert isinstance(r["m_score"], float)
 
     def test_altman(self):
         from services.factors.altman import calculate_z_score
-        z = calculate_z_score({"working_capital": 100, "total_assets": 1000, "retained_earnings": 200,
+        r = calculate_z_score({"working_capital": 100, "total_assets": 1000, "retained_earnings": 200,
                                "ebit": 150, "market_cap": 500, "total_debt": 300, "revenue": 800})
-        assert z > 0
+        assert "z_score" in r
+        assert r["z_score"] > 0
 
     def test_fama_french(self):
         from services.factors.fama_french import calculate_factor_scores
@@ -157,8 +160,8 @@ class TestFactors:
     def test_performance(self):
         from services.factors.performance import track_factor_performance
         r = track_factor_performance([0.01, 0.02, -0.01], [0.005, 0.01, -0.005])
-        assert "alpha" in r
-        assert "sharpe" in r
+        assert "annual_return" in r
+        assert "sharpe_ratio" in r
 
 
 class TestEventStudy:

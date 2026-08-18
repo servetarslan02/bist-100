@@ -280,9 +280,15 @@ def compute_financial_scores(financials: Dict[str, Any]) -> Dict[str, Any]:
         from services.factors.piotroski import calculate_f_score
         from services.factors.beneish import calculate_m_score
         from services.factors.altman import calculate_z_score
-        result["f_score"] = calculate_f_score(financials)
-        result["m_score"] = calculate_m_score(financials)
-        result["z_score"] = calculate_z_score(financials)
+        f_result = calculate_f_score(financials)
+        m_result = calculate_m_score(financials)
+        z_result = calculate_z_score(financials)
+        result["f_score"] = f_result["f_score"]
+        result["f_score_detail"] = f_result
+        result["m_score"] = m_result["m_score"]
+        result["m_score_detail"] = m_result
+        result["z_score"] = z_result["z_score"]
+        result["z_score_detail"] = z_result
     except ImportError:
         pass
     return result
