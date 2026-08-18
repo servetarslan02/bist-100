@@ -50,20 +50,20 @@ tests/test_walkforward_canonical.py
 
 ### Eksikler (Kod Analizi)
 
-| Eksik | Açıklama | Öncelik |
-|-------|----------|--------|
-| **Look-ahead bias detection** | Kodda timestamp validation yok | 🔴 Kritik |
-| **Survivorship bias handling** | Delisted şirketleri dahil etme yok | 🔴 Kritik |
-| **Point-in-time validation** | Feature hesaplamanın zaman doğruluğu yok | 🔴 Kritik |
-| **Transaction cost model** | Sadece komisyon (BISTCommissionModel) — spread/slippage yok | 🟡 Önemli |
-| **Spread model** | Bid/ask spread kullanılmıyor | 🟡 Önemli |
-| **Slippage model** | Sabit %0.05 — volatilite bazlı değil | 🟡 Önemli |
-| **Market impact** | Büyük emirler için impact modeli yok | 🟡 Önemli |
-| **Multi-asset backtest** | Sadece tek hisse | 🟡 Önemli |
-| **Event replay** | Belirli günü yeniden çalıştırma | 🟡 Önemli |
-| **Deterministic recovery** | Restart sonrası aynı sonuç garantisi yok | 🟡 Önemli |
-| **API endpoint** | Backtest API endpoint'i yok | 🟡 Önemli |
-| **Backtest-scanner parity** | Backtest ve canlı tarama aynı kodu kullanmıyor | 🟡 Önemli |
+| Eksik | Açıklama | Öncelik | Durum |
+|-------|----------|--------|-------|
+| **Look-ahead bias detection** | Kodda timestamp validation yok | 🔴 Kritik | ✅ `bias_detector.py` |
+| **Survivorship bias handling** | Delisted şirketleri dahil etme yok | 🔴 Kritik | ✅ `survivorship.py` |
+| **Point-in-time validation** | Feature hesaplamanın zaman doğruluğu yok | 🔴 Kritik | ✅ `pit_validator.py` |
+| **Transaction cost model** | Sadece komisyon (BISTCommissionModel) — spread/slippage yok | 🟡 Önemli | ✅ `transaction_costs.py` |
+| **Spread model** | Bid/ask spread kullanılmıyor | 🟡 Önemli | ✅ `transaction_costs.py` |
+| **Slippage model** | Sabit %0.05 — volatilite bazlı değil | 🟡 Önemli | ✅ `transaction_costs.py` |
+| **Market impact** | Büyük emirler için impact modeli yok | 🟡 Önemli | ✅ `transaction_costs.py` |
+| **Multi-asset backtest** | Sadece tek hisse | 🟡 Önemli | ✅ `multi_asset_engine.py` |
+| **Event replay** | Belirli günü yeniden çalıştırma | 🟡 Önemli | ✅ `event_replay.py` |
+| **Deterministic recovery** | Restart sonrası aynı sonuç garantisi yok | 🟡 Önemli | ✅ `deterministic.py` |
+| **API endpoint** | Backtest API endpoint'i yok | 🟡 Önemli | ⏳ Mevcut `/api/v1/backtest` |
+| **Backtest-scanner parity** | Backtest ve canlı tarama aynı kodu kullanmıyor | 🟡 Önemli | ✅ `scanner_parity.py` |
 
 ---
 
