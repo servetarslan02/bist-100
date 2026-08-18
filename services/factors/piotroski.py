@@ -63,7 +63,8 @@ def calculate_f_score(
     details["roa_increasing"] = {"current": roa_curr, "previous": roa_prev, "passed": passed, "weight": w["roa_increasing"]}
 
     # 4. Cash flow > Net income (Kazanç kalitesi — düşük tahakkuk)
-    passed = ocf > ni
+    # Orijinal Piotroski: CFO > NI. Negatif değerlerde anlamsız → sadece pozitif NI'da uygula
+    passed = ocf > ni and ni > 0
     score += passed * w["cf_gt_ni"]
     details["cf_gt_ni"] = {"cf": ocf, "ni": ni, "passed": passed, "weight": w["cf_gt_ni"]}
 
@@ -84,7 +85,7 @@ def calculate_f_score(
     # 7. No dilution (Seyreltme yok)
     shares_curr = financials.get("shares_outstanding", financials.get("shares_current", 0))
     shares_prev = prev.get("shares_outstanding", financials.get("shares_prev", 0))
-    passed = shares_curr <= shares_prev
+    passed = shares_curr <= shares_prev and shares_curr > 0
     score += passed * w["no_dilution"]
     details["no_dilution"] = {"current": shares_curr, "previous": shares_prev, "passed": passed, "weight": w["no_dilution"]}
 
