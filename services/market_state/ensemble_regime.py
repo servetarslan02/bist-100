@@ -131,10 +131,14 @@ class EnsembleRegimeDetector:
         results = {}
         method_details = {}
 
-        # 1. Skor bazlı (her zaman çalışır)
+        # 1. Skor bazlı (her zaman çalışır) — bu sonuç aynı zamanda
+        # rejime-duyarlı ağırlıklandırma için "preliminary regime" olarak
+        # kullanılır (bkz. get_regime_adapted_weights).
+        preliminary_regime: Optional[str] = None
         if self._score_engine:
             try:
                 score_result = self._score_engine.detect_regime(features)
+                preliminary_regime = score_result.regime.value
                 results["score"] = {
                     "regime": score_result.regime.value,
                     "confidence": score_result.confidence,
@@ -147,6 +151,19 @@ class EnsembleRegimeDetector:
             except Exception as e:
                 logger.warning("Score-based regime detection failed", error=str(e))
 
+        # Rejime göre ağırlık adaptasyonu — preliminary_regime bulunduysa
+        # sabit varsayılan ağırlıklar yerine bu rejime uygun ağırlıklar
+        # kullanılır (önceden bu metod hiç çağrılmıyordu, ağırlıklar her
+        # zaman sabit kalıyordu).
+        adapted_weights = (
+            self.get_regime_adapted_weights(preliminary_regime)
+            if preliminary_regime else
+            {"score": self._score_weight, "hmm": self._hmm_weight, "gmm": self._gmm_weight}
+        )
+        if "score" in results:
+            results["score"]["weight"] = adapted_weights["score"]
+            method_details["score"]["weight"] = adapted_weights["score"]
+
         # 2. HMM (yeterli veri varsa)
         if self._hmm_detector and returns is not None and len(returns) >= self._rolling_window:
             try:
@@ -156,7 +173,7 @@ class EnsembleRegimeDetector:
                 results["hmm"] = {
                     "regime": hmm_result.regime,
                     "confidence": hmm_result.confidence,
-                    "weight": self._hmm_weight,
+                    "weight": adapted_weights["hmm"],
                 }
                 method_details["hmm"] = {
                     "regime": hmm_result.regime,
@@ -173,7 +190,7 @@ class EnsembleRegimeDetector:
                 results["gmm"] = {
                     "regime": gmm_result["regime"],
                     "confidence": gmm_result["confidence"],
-                    "weight": self._gmm_weight,
+                    "weight": adapted_weights["gmm"],
                 }
                 method_details["gmm"] = gmm_result
             except Exception as e:
