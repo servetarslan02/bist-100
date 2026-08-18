@@ -30,9 +30,16 @@ from .google_trends import GoogleTrendsAdapter, google_trends_adapter
 from .bkm_adapter import BKMAdapter, bkm_adapter
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
 from .eksi_sozluk import EksiSozlukAdapter, eksi_sozluk_adapter
+from .investing_adapter import InvestingAdapter, investing_adapter
 
 # === LLM Sentiment ===
 from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
+
+# === Reconciliation ===
+from .reconciliation import CrossSourceReconciler, ReconciliationReport, reconciler
+
+# === Feature Store ===
+from .feature_store import FeatureStore, FeatureManifest, feature_store
 
 # === Feature Engine ===
 from .feature_engine import AlternativeFeatureEngine, alt_feature_engine
@@ -54,8 +61,13 @@ __all__ = [
     "BKMAdapter", "bkm_adapter",
     "KariyerNetAdapter", "kariyer_net_adapter",
     "EksiSozlukAdapter", "eksi_sozluk_adapter",
+    "InvestingAdapter", "investing_adapter",
     # LLM
     "LLMSentimentAnalyzer", "llm_sentiment",
+    # Reconciliation
+    "CrossSourceReconciler", "ReconciliationReport", "reconciler",
+    # Feature Store
+    "FeatureStore", "FeatureManifest", "feature_store",
     # Feature Engine
     "AlternativeFeatureEngine", "alt_feature_engine",
     # Legacy

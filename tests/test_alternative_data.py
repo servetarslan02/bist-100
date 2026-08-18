@@ -20,7 +20,10 @@ from services.alternative import (
     BKMAdapter, bkm_adapter,
     KariyerNetAdapter, kariyer_net_adapter,
     EksiSozlukAdapter, eksi_sozluk_adapter,
+    InvestingAdapter, investing_adapter,
     LLMSentimentAnalyzer, llm_sentiment,
+    CrossSourceReconciler, ReconciliationReport, reconciler,
+    FeatureStore, FeatureManifest, feature_store,
     AlternativeFeatureEngine, alt_feature_engine,
     compute_social_features, compute_job_features,
     compute_cc_features, compute_satellite_features,
@@ -464,6 +467,111 @@ class TestFaz4_FeatureEngine:
 # FAZ 5: ENTEGRASYON
 # =====================================================
 
+class TestFaz5_InvestingAdapter:
+    """Investing.com adapter test'leri."""
+
+    def test_source_name(self):
+        assert investing_adapter.source_name == "investing"
+
+    def test_compute_features_empty(self):
+        features = investing_adapter.compute_features({}, "THYAO")
+        assert features == {}
+
+    def test_compute_features_valid(self):
+        data = {
+            "comments": [
+                {"text": "yükseliş devam edecek, al"},
+                {"text": "düşüş riski var, sat"},
+                {"text": "güçlü performans"},
+            ],
+        }
+        features = investing_adapter.compute_features(data, "THYAO")
+        assert "investing_sentiment" in features
+        assert "investing_volume" in features
+        assert features["investing_volume"] == 3
+
+    def test_basic_sentiment(self):
+        assert investing_adapter._basic_sentiment("yükseliş güçlü al") > 0
+        assert investing_adapter._basic_sentiment("düşüş riski sat") < 0
+
+
+class TestFaz5_Reconciliation:
+    """Cross-source reconciliation test'leri."""
+
+    def test_reconcile_no_data(self):
+        r = reconciler.reconcile("THYAO", {})
+        assert r.consensus_direction == "NEUTRAL"
+        assert r.source_count == 0
+
+    def test_reconcile_consistent(self):
+        features = {
+            "google_trends_zscore": 1.5,
+            "eksi_sentiment": 0.6,
+            "investing_sentiment": 0.7,
+        }
+        r = reconciler.reconcile("THYAO", features)
+        assert r.consensus_direction == "LONG"
+        assert r.source_count == 3
+        assert r.reliability_score > 0
+
+    def test_reconcile_discrepant(self):
+        features = {
+            "google_trends_zscore": 0.8,
+            "eksi_sentiment": -0.7,
+        }
+        r = reconciler.reconcile("THYAO", features)
+        assert len(r.discrepancies) > 0 or len(r.warnings) > 0
+
+    def test_reconcile_to_dict(self):
+        r = reconciler.reconcile("THYAO", {"eksi_sentiment": 0.5})
+        d = r.to_dict()
+        assert "ticker" in d
+        assert "consensus_direction" in d
+
+
+class TestFaz5_FeatureStore:
+    """Feature store test'leri."""
+
+    def test_put_and_get(self):
+        store = FeatureStore()
+        store.put("THYAO", "2026-01-01", {"sentiment": 0.5, "volume": 100})
+        features = store.get("THYAO", "2026-01-01")
+        assert features["sentiment"] == 0.5
+
+    def test_get_latest(self):
+        store = FeatureStore()
+        store.put("THYAO", "2026-01-01", {"sentiment": 0.3})
+        store.put("THYAO", "2026-01-15", {"sentiment": 0.7})
+        features = store.get_latest("THYAO", "2026-01-20")
+        assert features["sentiment"] == 0.7
+
+    def test_get_latest_before_any_date(self):
+        store = FeatureStore()
+        store.put("THYAO", "2026-01-01", {"sentiment": 0.5})
+        features = store.get_latest("THYAO", "2025-12-01")
+        assert features == {}
+
+    def test_register_feature(self):
+        store = FeatureStore()
+        store.register_feature(FeatureManifest(
+            feature_name="test_feature",
+            version="v1",
+            source="test",
+            description="Test feature",
+            dtype="float",
+            range_min=-1,
+            range_max=1,
+        ))
+        assert "test_feature" in store.list_features()
+
+    def test_stats(self):
+        store = FeatureStore()
+        store.put("THYAO", "2026-01-01", {"a": 1, "b": 2})
+        stats = store.get_stats()
+        assert stats["total_features"] == 2
+        assert stats["total_dates"] == 1
+
+
 class TestFaz5_Integration:
     """Entegrasyon test'leri."""
 
@@ -474,7 +582,9 @@ class TestFaz5_Integration:
             DataQualityValidator, AdapterRegistry,
             google_trends_adapter, bkm_adapter,
             kariyer_net_adapter, eksi_sozluk_adapter,
+            investing_adapter,
             llm_sentiment, alt_feature_engine,
+            reconciler, feature_store,
             compute_social_features, compute_job_features,
             compute_cc_features, compute_satellite_features,
             compute_web_features,

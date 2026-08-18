@@ -18,6 +18,7 @@ Kaynaklar:
 import asyncio
 import time
 from typing import Dict, Any, Optional, List
+from datetime import datetime, timezone
 import structlog
 
 from .base import adapter_registry, BaseAdapter
@@ -25,7 +26,10 @@ from .google_trends import google_trends_adapter
 from .bkm_adapter import bkm_adapter
 from .kariyer_net import kariyer_net_adapter
 from .eksi_sozluk import eksi_sozluk_adapter
+from .investing_adapter import investing_adapter
 from .llm_sentiment import llm_sentiment
+from .reconciliation import reconciler
+from .feature_store import feature_store
 
 logger = structlog.get_logger()
 
@@ -53,6 +57,7 @@ class AlternativeFeatureEngine:
         adapter_registry.register(bkm_adapter)
         adapter_registry.register(kariyer_net_adapter)
         adapter_registry.register(eksi_sozluk_adapter)
+        adapter_registry.register(investing_adapter)
 
         self._initialized = True
         logger.info(
@@ -106,9 +111,18 @@ class AlternativeFeatureEngine:
             llm_features = await self._compute_llm_features(ticker, extra_data)
             all_features.update(llm_features)
 
-        # 4. Cross-source composite features
+        # 4. Cross-source reconciliation
+        reconciliation = reconciler.reconcile(ticker, all_features)
+        all_features["alt_reliability_score"] = reconciliation.reliability_score
+        all_features["alt_consensus_score"] = reconciliation.consensus_score
+        all_features["alt_source_count"] = float(reconciliation.source_count)
+
+        # 5. Cross-source composite features
         composite = self._compute_composite_features(all_features)
         all_features.update(composite)
+
+        # 6. Feature store'a yaz
+        feature_store.put(ticker, datetime.now(timezone.utc).strftime("%Y-%m-%d"), all_features)
 
         duration = (time.monotonic() - start) * 1000
 
@@ -230,6 +244,11 @@ class AlternativeFeatureEngine:
             # LLM Sentiment
             "llm_kap_sentiment", "llm_kap_confidence", "llm_kap_impact",
             "llm_news_sentiment", "llm_news_sentiment_std", "llm_news_count",
+            # Investing.com
+            "investing_sentiment", "investing_volume", "investing_positive_ratio",
+            "investing_negative_ratio", "investing_sentiment_std", "investing_technical_rating",
+            # Reconciliation
+            "alt_reliability_score", "alt_consensus_score", "alt_source_count",
             # Composite
             "alt_sentiment_avg", "alt_sentiment_consensus",
             "alt_growth_avg", "alt_growth_consensus", "alt_data_coverage",
