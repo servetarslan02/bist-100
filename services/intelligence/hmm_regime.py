@@ -117,7 +117,7 @@ class HMMRegimeDetector:
             # HMM eğit
             self._model = GaussianHMM(
                 n_components=self.n_regimes,
-                covariance_type="full",
+                covariance_type="diag",  # "full" yerine "diag" — daha robust
                 n_iter=100,
                 random_state=42,
                 tol=1e-4,

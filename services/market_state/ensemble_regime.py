@@ -150,6 +150,8 @@ class EnsembleRegimeDetector:
         # 2. HMM (yeterli veri varsa)
         if self._hmm_detector and returns is not None and len(returns) >= self._rolling_window:
             try:
+                # Fit + predict
+                self._hmm_detector.fit(returns, volatility)
                 hmm_result = self._hmm_detector.predict_regime(returns, volatility)
                 results["hmm"] = {
                     "regime": hmm_result.regime,

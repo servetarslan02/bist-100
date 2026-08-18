@@ -324,9 +324,14 @@ class MarketStateService:
             )
             risk_appetite_state = risk_appetite_detail.get("state", "NEUTRAL")
 
-            # 6. Multi-Timeframe (daily only for now)
+            # 6. Multi-Timeframe (daily + weekly)
+            weekly_instruments = self._compute_weekly_aggregate(states)
             daily_data = {"instruments": states, "features": features}
-            multi_tf = self._multi_tf.compute_all_timeframes({"daily": daily_data})
+            weekly_data = {"instruments": weekly_instruments, "features": features}
+            multi_tf = self._multi_tf.compute_all_timeframes({
+                "daily": daily_data,
+                "weekly": weekly_data,
+            })
 
             # 7. Format output
             market_state = self._formatter.format(
@@ -416,6 +421,26 @@ class MarketStateService:
             "vix_level": self._world_state.get("vix_level", 20),
             "global_momentum": self._world_state.get("global_risk_appetite", 0.5) * 10,
         }
+
+    def _compute_weekly_aggregate(self, daily_states: List[Dict]) -> List[Dict]:
+        """Günlük verilerden haftalık aggregate üret.
+
+        Her hisse için haftalık ortalama change_pct ve momentum hesaplar.
+        Basitleştirilmiş: mevcut daily veriyi haftalık gibi kullanır.
+        Gerçek implementasyonda haftalık bar verisi gerekli.
+        """
+        # Şimdilik daily veriyi haftalık olarak kullan
+        # Gerçek implementasyonda: haftalık OHLCV aggregation
+        return [
+            {
+                "ticker": s.get("ticker", ""),
+                "change_pct": s.get("change_pct", 0),
+                "momentum": s.get("momentum", 0),
+                "volatility": s.get("volatility", 0),
+                "volume": s.get("volume", 0),
+            }
+            for s in daily_states
+        ]
 
     async def _publish_events(
         self,
