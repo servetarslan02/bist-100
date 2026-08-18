@@ -1,7 +1,8 @@
 """
-ALPHA BIST — Ingestion Service
+ALPHA BIST — Ingestion Service v2.0
 
 Data ingestion pipeline: veri çekme, doğrulama, düzeltme, publish.
+Tüm resilience katmanları ile korumalı.
 """
 
 # Core resilience
@@ -17,6 +18,12 @@ from .reconciliation import SourceReconciler, ReconciliationResult, source_recon
 from .point_in_time import PointInTimeValidator, pit_validator
 from .deduplication import EventDeduplicator, event_deduplicator
 from .incremental import IncrementalFetcher, incremental_fetcher
+
+# Metrics
+from .ingestion_metrics import IngestionMetrics, ingestion_metrics
+
+# Orchestrator integration
+from .orchestrator_integration import IngestionOrchestrator, IngestionResult, PipelineReport, ingestion_orchestrator
 
 __all__ = [
     # Circuit Breaker
@@ -50,4 +57,12 @@ __all__ = [
     # Incremental
     "IncrementalFetcher",
     "incremental_fetcher",
+    # Metrics
+    "IngestionMetrics",
+    "ingestion_metrics",
+    # Orchestrator
+    "IngestionOrchestrator",
+    "IngestionResult",
+    "PipelineReport",
+    "ingestion_orchestrator",
 ]
