@@ -29,6 +29,8 @@ from .schemas import (
     AgentOutputSchema, Direction, RiskLevel,
     SynthesisResultSchema, DebateArgumentSchema,
     RiskAssessmentSchema, validate_agent_output,
+    TechnicalOutputSchema, FundamentalOutputSchema,
+    NewsOutputSchema, MacroOutputSchema,
 )
 from .prompts import PromptFactory, PROMPT_VERSION
 
@@ -155,17 +157,19 @@ class AIOutputValidator:
 
         # 2. Schema validation (Pydantic)
         schema_map = {
-            "technical": "TechnicalOutputSchema",
-            "fundamental": "FundamentalOutputSchema",
-            "news": "NewsOutputSchema",
-            "macro": "MacroOutputSchema",
-            "debate": "DebateArgumentSchema",
-            "risk": "RiskAssessmentSchema",
-            "synthesis": "SynthesisResultSchema",
+            "technical": TechnicalOutputSchema,
+            "fundamental": FundamentalOutputSchema,
+            "news": NewsOutputSchema,
+            "macro": MacroOutputSchema,
+            "debate": DebateArgumentSchema,
+            "risk": RiskAssessmentSchema,
+            "synthesis": SynthesisResultSchema,
         }
 
         if expected_schema and expected_schema in schema_map:
-            is_valid, validated, schema_errors = validate_agent_output(parsed)
+            is_valid, validated, schema_errors = validate_agent_output(
+                parsed, schema_class=schema_map[expected_schema]
+            )
             if not is_valid:
                 errors.extend(schema_errors)
             else:
@@ -316,8 +320,22 @@ class BaseAgent:
                     task.context.get("features", {}), task.ticker
                 )
 
-            # Validate
-            validation = AIOutputValidator.validate(json.dumps(output))
+            # Validate — rol -> şema eşlemesi ile (önceden expected_schema
+            # hiç geçirilmediği için Pydantic doğrulama katmanı hiçbir
+            # zaman gerçekten devreye girmiyordu).
+            _role_schema_map = {
+                AgentRole.TECHNICAL: "technical",
+                AgentRole.FUNDAMENTAL: "fundamental",
+                AgentRole.NEWS: "news",
+                AgentRole.MACRO: "macro",
+                AgentRole.BULL: "debate",
+                AgentRole.BEAR: "debate",
+                AgentRole.RISK: "risk",
+                AgentRole.SYNTHESIS: "synthesis",
+            }
+            validation = AIOutputValidator.validate(
+                json.dumps(output), expected_schema=_role_schema_map.get(self.role)
+            )
             if not validation["valid"]:
                 logger.warning(
                     "AI output validation failed, using fallback",

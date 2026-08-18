@@ -227,7 +227,7 @@ class DebateEngine:
             task_id=f"bull-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BULL,
             ticker=ticker,
-            prompt=bull_prompt_vars["user_prompt"],
+            prompt=f"[Tur {round_num + 1}] {ticker} için BULL argümanı",
             context={**context, "prompt_vars": bull_prompt_vars},
             template_name=f"bull_tur{round_num + 1}",
         )
@@ -244,7 +244,7 @@ class DebateEngine:
             task_id=f"bear-{ticker}-r{round_num}-{int(time.time())}",
             agent_role=AgentRole.BEAR,
             ticker=ticker,
-            prompt=bear_prompt_vars["user_prompt"],
+            prompt=f"[Tur {round_num + 1}] {ticker} için BEAR argümanı",
             context={**context, "prompt_vars": bear_prompt_vars},
             template_name=f"bear_tur{round_num + 1}",
         )
@@ -255,11 +255,11 @@ class DebateEngine:
 
         return DebateRound(
             round_num=round_num,
-            bull_direction=bull_result.output.get("direction", "NEUTRAL"),
+            bull_direction=bull_result.output.get("position") or bull_result.output.get("direction", "NEUTRAL"),
             bull_confidence=bull_result.confidence,
             bull_reasoning=bull_result.reasoning,
             bull_evidence=bull_result.evidence,
-            bear_direction=bear_result.output.get("direction", "NEUTRAL"),
+            bear_direction=bear_result.output.get("position") or bear_result.output.get("direction", "NEUTRAL"),
             bear_confidence=bear_result.confidence,
             bear_reasoning=bear_result.reasoning,
             bear_evidence=bear_result.evidence,
