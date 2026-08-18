@@ -93,7 +93,11 @@ class AuditRecord:
     def compute_hash(self, prev_hash: str = "") -> str:
         """Hash hesapla (audit trail zinciri)."""
         content = f"{self.event_id}:{self.timestamp.isoformat()}:{self.event_type}:{json.dumps(self.data, sort_keys=True)}"
-        self.hash_chain = hashlib.sha256(f"{prev_hash}:{content}".encode()).hexdigest()[:16]
+        return hashlib.sha256(f"{prev_hash}:{content}".encode()).hexdigest()[:16]
+
+    def seal(self, prev_hash: str = "") -> str:
+        """Hash hesapla ve kaydet (immutable seal)."""
+        self.hash_chain = self.compute_hash(prev_hash)
         return self.hash_chain
 
 
@@ -413,7 +417,7 @@ class EnhancedReplayEngine:
             event_type=event_type,
             data=data,
         )
-        self._current_hash = record.compute_hash(self._current_hash)
+        self._current_hash = record.seal(self._current_hash)
         self._audit_trail.append(record)
 
     def get_audit_trail(self) -> List[Dict[str, Any]]:

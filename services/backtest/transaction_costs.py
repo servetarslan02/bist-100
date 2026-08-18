@@ -317,6 +317,16 @@ class TransactionCostEngine:
         Returns:
             Maliyet bileşenleri ve toplam
         """
+        # Savunma: negatif veya sifir fiyat/adet
+        if price <= 0 or quantity <= 0:
+            return {
+                "ticker": ticker, "side": side, "price": 0, "quantity": 0,
+                "notional": 0, "liquidity_tier": "tier_4",
+                "costs": {k: 0 for k in ["commission", "bsmv", "spread", "slippage", "market_impact", "stopaj"]},
+                "cost_pcts": {k: 0 for k in ["commission_pct", "spread_pct", "slippage_pct", "impact_pct"]},
+                "total_cost": 0, "total_cost_pct": 0, "execution_price": 0,
+            }
+
         notional = price * quantity
 
         # 1. Komisyon

@@ -297,7 +297,8 @@ class MultiAssetBacktestEngine:
                             slippage = cost["costs"]["slippage"]
                             exec_price = cost["execution_price"]
                         else:
-                            commission = sell_price * pos["quantity"] * 0.001
+                            # Basit komisyon: sadece broker ücreti (realistic modelden düşük olmalı)
+                            commission = sell_price * pos["quantity"] * 0.0003
                             slippage = 0
                             exec_price = sell_price
 
@@ -373,7 +374,8 @@ class MultiAssetBacktestEngine:
                         slippage = cost["costs"]["slippage"]
                         exec_price = cost["execution_price"]
                     else:
-                        commission = buy_price * quantity * 0.001
+                        # Basit komisyon: sadece broker ücreti
+                        commission = buy_price * quantity * 0.0003
                         slippage = 0
                         exec_price = buy_price
 
