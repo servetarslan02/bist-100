@@ -1,7 +1,7 @@
-"""ALPHA BIST — XGBoost Model (Nihai).
+"""ALPHA BIST — CatBoost Model (Nihai).
 
-XGBoost entegrasyonu — multi-horizon, SHAP feature importance,
-walk-forward desteği, early stopping.
+CatBoost entegrasyonu — kategorik feature handling, early stopping,
+adjusted loss desteği.
 """
 import os
 import pickle
@@ -15,32 +15,29 @@ logger = structlog.get_logger()
 
 
 @dataclass
-class XGBoostConfig:
-    """XGBoost model konfigürasyonu."""
-    max_depth: int = 6
+class CatBoostConfig:
+    """CatBoost model konfigürasyonu."""
+    iterations: int = 500
+    depth: int = 6
     learning_rate: float = 0.1
-    n_estimators: int = 200
-    objective: str = "binary:logistic"
-    eval_metric: str = "auc"
-    subsample: float = 0.8
-    colsample_bytree: float = 0.8
-    reg_alpha: float = 0.1
-    reg_lambda: float = 1.0
-    min_child_weight: int = 5
-    early_stopping_rounds: int = 20
-    verbose: int = 0  # XGBoost verbosity parametresi
-    random_state: int = 42
+    l2_leaf_reg: float = 3.0
+    loss_function: str = "Logloss"
+    eval_metric: str = "AUC"
+    verbose: int = 0
+    early_stopping_rounds: int = 50
+    random_seed: int = 42
+    cat_features: List[int] = field(default_factory=list)
 
 
-class XGBoostModel:
-    """XGBoost model — multi-horizon, SHAP destekli."""
+class CatBoostModel:
+    """CatBoost model — kategorik feature handling."""
 
-    def __init__(self, config: Optional[XGBoostConfig] = None):
-        self._config = config or XGBoostConfig()
+    def __init__(self, config: Optional[CatBoostConfig] = None):
+        self._config = config or CatBoostConfig()
         self._model = None
+        self._is_classifier = self._config.loss_function in ["Logloss", "CrossEntropy"]
         self._feature_names = None
         self._training_metrics = {}
-        self._shap_values = None
 
     def train(
         self,
@@ -49,8 +46,9 @@ class XGBoostModel:
         X_val: Optional[np.ndarray] = None,
         y_val: Optional[np.ndarray] = None,
         feature_names: Optional[List[str]] = None,
+        cat_features: Optional[List[int]] = None,
     ) -> Dict[str, Any]:
-        """XGBoost model eğit.
+        """CatBoost model eğit.
 
         Args:
             X_train: Eğitim verisi
@@ -58,57 +56,51 @@ class XGBoostModel:
             X_val: Validation verisi
             y_val: Validation label
             feature_names: Feature isimleri
+            cat_features: Kategorik feature indeksleri
 
         Returns:
             Training metrics
         """
         try:
-            import xgboost as xgb
+            from catboost import CatBoostClassifier, CatBoostRegressor
         except ImportError:
-            logger.warning("xgboost not installed — pip install xgboost")
-            return {"error": "xgboost not installed"}
+            logger.warning("catboost not installed — pip install catboost")
+            return {"error": "catboost not installed"}
 
         self._feature_names = feature_names
+        cat_idx = cat_features or self._config.cat_features
 
-        # Classifier veya Regressor
-        is_classifier = "logistic" in self._config.objective or "hinge" in self._config.objective
-
-        if is_classifier:
-            model = xgb.XGBClassifier(
-                max_depth=self._config.max_depth,
+        # Model seçimi
+        if self._is_classifier:
+            model = CatBoostClassifier(
+                iterations=self._config.iterations,
+                depth=self._config.depth,
                 learning_rate=self._config.learning_rate,
-                n_estimators=self._config.n_estimators,
-                objective=self._config.objective,
+                l2_leaf_reg=self._config.l2_leaf_reg,
+                loss_function=self._config.loss_function,
                 eval_metric=self._config.eval_metric,
-                subsample=self._config.subsample,
-                colsample_bytree=self._config.colsample_bytree,
-                reg_alpha=self._config.reg_alpha,
-                reg_lambda=self._config.reg_lambda,
-                min_child_weight=self._config.min_child_weight,
                 verbose=self._config.verbose,
-                random_state=self._config.random_state,
+                random_seed=self._config.random_seed,
             )
         else:
-            model = xgb.XGBRegressor(
-                max_depth=self._config.max_depth,
+            model = CatBoostRegressor(
+                iterations=self._config.iterations,
+                depth=self._config.depth,
                 learning_rate=self._config.learning_rate,
-                n_estimators=self._config.n_estimators,
-                objective=self._config.objective,
-                subsample=self._config.subsample,
-                colsample_bytree=self._config.colsample_bytree,
-                reg_alpha=self._config.reg_alpha,
-                reg_lambda=self._config.reg_lambda,
-                min_child_weight=self._config.min_child_weight,
+                l2_leaf_reg=self._config.l2_leaf_reg,
+                loss_function="RMSE",
+                eval_metric="RMSE",
                 verbose=self._config.verbose,
-                random_state=self._config.random_state,
+                random_seed=self._config.random_seed,
             )
 
         # Eğitim
-        eval_set = [(X_val, y_val)] if X_val is not None else None
+        eval_set = (X_val, y_val) if X_val is not None else None
         model.fit(
             X_train, y_train,
             eval_set=eval_set,
-            verbose=self._config.verbose,
+            cat_features=cat_idx if cat_idx else None,
+            early_stopping_rounds=self._config.early_stopping_rounds if eval_set else None,
         )
 
         self._model = model
@@ -117,33 +109,33 @@ class XGBoostModel:
         self._training_metrics = {
             "n_train": len(X_train),
             "n_val": len(X_val) if X_val is not None else 0,
-            "best_iteration": model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators,
+            "best_iteration": model.best_iteration_ if hasattr(model, "best_iteration_") else self._config.iterations,
             "feature_count": X_train.shape[1],
         }
 
-        if X_val is not None:
+        if eval_set is not None:
             val_pred = self.predict(X_val)
-            from sklearn.metrics import roc_auc_score
+            from sklearn.metrics import roc_auc_score, accuracy_score
             try:
                 self._training_metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
+                self._training_metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
             except Exception:
                 pass
 
-        logger.info("xgboost_trained", **self._training_metrics)
+        logger.info("catboost_trained", **self._training_metrics)
         return self._training_metrics
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """Tahmin yap."""
         if self._model is None:
             return np.zeros(len(X))
-        try:
-            if hasattr(self._model, "predict_proba"):
-                return self._model.predict_proba(X)[:, 1]
-            return self._model.predict(X)
-        except Exception:
-            return np.zeros(len(X))
 
-    def feature_importance(self, importance_type: str = "weight") -> Optional[Dict[str, float]]:
+        if self._is_classifier:
+            return self._model.predict_proba(X)[:, 1]
+        else:
+            return self._model.predict(X)
+
+    def feature_importance(self, importance_type: str = "FeatureImportance") -> Optional[Dict[str, float]]:
         """Feature importance döndür."""
         if self._model is None:
             return None
@@ -154,23 +146,6 @@ class XGBoostModel:
                 return dict(zip(self._feature_names, importance.tolist()))
             return {f"f{i}": float(v) for i, v in enumerate(importance)}
         except Exception:
-            return None
-
-    def shap_values(self, X: np.ndarray) -> Optional[np.ndarray]:
-        """SHAP values hesapla."""
-        if self._model is None:
-            return None
-
-        try:
-            import shap
-            explainer = shap.TreeExplainer(self._model)
-            self._shap_values = explainer.shap_values(X)
-            return self._shap_values
-        except ImportError:
-            logger.warning("shap not installed")
-            return None
-        except Exception as e:
-            logger.warning("shap_calculation_failed", error=str(e))
             return None
 
     def save(self, path: str) -> bool:
@@ -189,7 +164,7 @@ class XGBoostModel:
                 }, f)
             return True
         except Exception as e:
-            logger.error("xgboost_save_failed", error=str(e))
+            logger.error("catboost_save_failed", error=str(e))
             return False
 
     def load(self, path: str) -> bool:
@@ -203,7 +178,7 @@ class XGBoostModel:
             self._feature_names = data.get("feature_names")
             return True
         except Exception as e:
-            logger.error("xgboost_load_failed", error=str(e))
+            logger.error("catboost_load_failed", error=str(e))
             return False
 
     @property
