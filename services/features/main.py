@@ -18,6 +18,7 @@ from ..core.event_bus import (
 )
 from ..core.logging import setup_logging
 from .calculator import feature_calculator
+from .pipeline import feature_pipeline, PipelineConfig
 
 logger = structlog.get_logger()
 
@@ -29,6 +30,8 @@ class FeatureEngineService:
         self._running = False
         self._consumer: EventConsumer = None
         self._price_cache: Dict[str, List[Dict]] = {}  # ticker -> recent prices
+        # Pipeline — drift detection, BIST features, store entegrasyonu
+        self._pipeline = feature_pipeline
 
     async def start(self):
         """Start the feature engine service."""
@@ -139,11 +142,42 @@ class FeatureEngineService:
             features["computed_at"] = datetime.now(timezone.utc).isoformat()
             features["data_points"] = len(df)
 
+            # === PIPELINE ENTEGRASYONU ===
+            # Feature store'a kaydet, drift detection çalıştır
+            try:
+                import asyncio as _asyncio
+                try:
+                    loop = _asyncio.get_running_loop()
+                    # Zaten bir loop içinde — background task olarak çalıştır
+                    loop.create_task(self._run_pipeline_async(ticker, features, df))
+                except RuntimeError:
+                    # Loop yok — yeni oluştur
+                    _asyncio.run(self._run_pipeline_async(ticker, features, df))
+            except Exception as e:
+                logger.debug("Pipeline integration skipped", error=str(e))
+
             return features
 
         except Exception as e:
             logger.warning("Feature computation failed", ticker=ticker, error=str(e))
             return {}
+
+    async def _run_pipeline_async(self, ticker: str, features: Dict[str, float], df):
+        """Pipeline'ı async olarak çalıştır (store, drift detection)."""
+        try:
+            result = await self._pipeline.run(
+                ticker=ticker,
+                features=features,
+                ohlcv_df=df,
+            )
+            if result.drift_report and result.drift_report.get("drifted_features", 0) > 0:
+                logger.warning(
+                    "Feature drift detected via pipeline",
+                    ticker=ticker,
+                    drifted=result.drift_report.get("drifted_features"),
+                )
+        except Exception as e:
+            logger.debug("Pipeline run failed", ticker=ticker, error=str(e))
 
     def _store_features_ch(self, instrument_id: int, ticker: str, features: Dict[str, float]):
         """Store features in ClickHouse."""

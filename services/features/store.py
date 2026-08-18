@@ -420,6 +420,65 @@ class FeatureStore:
         return None
 
     # =====================================================
+    # RANGE — Tarih aralığı sorgusu
+    # =====================================================
+
+    def get_range(
+        self,
+        ticker: str,
+        start_date: str,
+        end_date: str,
+        version: str = "v1",
+        feature_name: Optional[str] = None,
+    ) -> List[Dict[str, Any]]:
+        """Tarih aralığındaki feature'ları getir.
+
+        Backtest'te belirli bir dönem için feature geçmişi oluşturur.
+        Spec gereksinimi: get_range(ticker, start_date, end_date, version)
+
+        Args:
+            ticker: Hisse kodu
+            start_date: Başlangıç tarihi (ISO-8601)
+            end_date: Bitiş tarihi (ISO-8601)
+            version: Feature version
+            feature_name: Spesifik feature (None=tümü)
+
+        Returns:
+            [{"date": ..., "features": {name: value}}]
+        """
+        snapshots = self._snapshots.get(ticker, [])
+        results = []
+
+        for snap in snapshots:
+            # Tarih aralığı kontrolü
+            if snap.timestamp < start_date or snap.timestamp > end_date:
+                continue
+            # Version kontrolü
+            if version != "latest" and snap.version != version:
+                continue
+
+            if feature_name:
+                # Tek feature
+                meta = snap.features.get(feature_name)
+                if meta:
+                    results.append({
+                        "date": snap.timestamp,
+                        "feature": feature_name,
+                        "value": meta.value,
+                        "version": snap.version,
+                    })
+            else:
+                # Tüm feature'lar
+                results.append({
+                    "date": snap.timestamp,
+                    "features": snap.to_raw_dict(),
+                    "version": snap.version,
+                    "snapshot_hash": snap.snapshot_hash,
+                })
+
+        return sorted(results, key=lambda x: x["date"])
+
+    # =====================================================
     # SNAPSHOT — Zaman noktasına geri dönme
     # =====================================================
 

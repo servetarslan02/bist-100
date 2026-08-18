@@ -223,6 +223,58 @@ def test_feature_store_stats():
     print("✅ test_feature_store_stats PASSED")
 
 
+def test_feature_store_get_range():
+    """Tarih aralığı sorgusu testi."""
+    from services.features.store import FeatureStore, FeatureSource
+
+    store = FeatureStore()
+
+    # Farklı tarihlerde snapshot'lar oluştur
+    t1 = (datetime.now(timezone.utc) - timedelta(days=3)).isoformat()
+    t2 = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    t3 = (datetime.now(timezone.utc) - timedelta(days=1)).isoformat()
+
+    store.set("THYAO", {"rsi_14": 55.0}, version="v1",
+              source=FeatureSource.CALCULATOR, computed_at=t1, available_at=t1)
+    store.set("THYAO", {"rsi_14": 60.0}, version="v1",
+              source=FeatureSource.CALCULATOR, computed_at=t2, available_at=t2)
+    store.set("THYAO", {"rsi_14": 65.0}, version="v1",
+              source=FeatureSource.CALCULATOR, computed_at=t3, available_at=t3)
+
+    # Tarih aralığı sorgusu
+    results = store.get_range(
+        ticker="THYAO",
+        start_date=t1,
+        end_date=t3,
+        version="v1",
+    )
+    assert len(results) == 3
+    assert results[0]["features"]["rsi_14"] == 55.0
+    assert results[-1]["features"]["rsi_14"] == 65.0
+
+    # Dar aralık
+    results_narrow = store.get_range(
+        ticker="THYAO",
+        start_date=t2,
+        end_date=t3,
+        version="v1",
+    )
+    assert len(results_narrow) == 2
+
+    # Spesifik feature
+    results_feature = store.get_range(
+        ticker="THYAO",
+        start_date=t1,
+        end_date=t3,
+        version="v1",
+        feature_name="rsi_14",
+    )
+    assert len(results_feature) == 3
+    assert all(r["feature"] == "rsi_14" for r in results_feature)
+
+    print("✅ test_feature_store_get_range PASSED")
+
+
 # =====================================================
 # 2. DRIFT DETECTOR TESTS
 # =====================================================
@@ -788,6 +840,7 @@ def run_all_tests():
         test_feature_store_snapshot,
         test_feature_store_baseline,
         test_feature_store_stats,
+        test_feature_store_get_range,
         # Drift Detector
         test_drift_detector_ks,
         test_drift_detector_psi,
