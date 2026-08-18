@@ -174,9 +174,14 @@ class DeadLetterQueue:
             Başarıyla retry edilen sayısı
         """
         retried = 0
+        # Include entries that are ready OR have no handler (immediate exhaustion)
         ready_entries = [
             e for e in self._entries.values()
-            if e.is_ready_for_retry
+            if e.is_ready_for_retry or (
+                e.status == DLQStatus.PENDING and
+                e.retry_count < e.max_retries and
+                e.event_type not in self._retry_handlers
+            )
         ][:batch_size]
 
         for entry in ready_entries:
