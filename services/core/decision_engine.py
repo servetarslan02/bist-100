@@ -42,6 +42,11 @@ class DecisionInput:
     agent_direction: str = "NEUTRAL"
     agent_confidence: float = 0.0
     agent_score: float = 50.0
+    # Macro sistemi
+    macro_regime: str = "UNKNOWN"
+    macro_stance: float = 0.0  # -1.0 (negatif) ile +1.0 (pozitif)
+    macro_confidence: float = 0.0
+    macro_impact: float = 0.0  # Sektör bazlı makro etki
     # Geriye uyumlu ek alanlar (test_phase10_13)
     ml_return_5d: float = 0.0
     ml_return_20d: float = 0.0
@@ -146,13 +151,14 @@ class DecisionEngine:
         agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
 
         components = {
-            "ml_score": ml_component * 0.25,
-            "agent": agent_component * 0.15,
-            "technical": self._technical_score(inp) * 0.20,
-            "fundamental": self._fundamental_score(inp) * 0.15,
-            "sentiment": self._sentiment_score(inp) * 0.10,
-            "regime": self._regime_score(inp) * 0.10,
-            "risk": self._risk_score(inp) * 0.05,
+            "ml_score": ml_component * 0.22,
+            "agent": agent_component * 0.13,
+            "technical": self._technical_score(inp) * 0.18,
+            "fundamental": self._fundamental_score(inp) * 0.13,
+            "sentiment": self._sentiment_score(inp) * 0.08,
+            "regime": self._regime_score(inp) * 0.08,
+            "macro": self._macro_score(inp) * 0.10,
+            "risk": self._risk_score(inp) * 0.08,
         }
 
         total = sum(components.values())
@@ -239,6 +245,35 @@ class DecisionEngine:
         # Volume (yüksek hacim = likidite = iyi)
         volume = f.get("volume_zscore", 0)
         score += volume * 0.5
+
+        return min(100, max(0, score))
+
+    def _macro_score(self, inp: DecisionInput) -> float:
+        """Macro skor — makro rejim ve etki."""
+        score = 50.0
+
+        # Macro stance (pozitif = yukarı, negatif = aşağı)
+        if inp.macro_stance != 0:
+            score += inp.macro_stance * 20  # -20 ile +20 arası
+
+        # Macro confidence (yüksek güven = daha güçlü sinyal)
+        if inp.macro_confidence > 0.5:
+            score += inp.macro_stance * 10  # Güvenli sinyalleri güçlendir
+
+        # Macro impact (sektör bazlı etki)
+        if inp.macro_impact != 0:
+            score += inp.macro_impact * 100  # Etki skora yansıt
+
+        # Macro regime bonusları
+        regime_bonuses = {
+            "EXPANSION": 5,
+            "RISK_ON": 5,
+            "CONTRACTION": -5,
+            "STAGFLATION": -10,
+            "RISK_OFF": -8,
+            "REFLATION": 0,
+        }
+        score += regime_bonuses.get(inp.macro_regime, 0)
 
         return min(100, max(0, score))
 

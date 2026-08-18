@@ -118,6 +118,31 @@ class ContinuousLearningPipeline:
             results["drift_check"] = drift_result
             self._drift_detected = drift_result.get("drift_detected", False)
 
+        # 2.5 Macro regime + surprise kontrolü
+        try:
+            from services.macro import macro_regime_detector, macro_surprise_model
+            from services.features.macro import macro_feature_engine
+
+            # Macro features
+            all_macro_features = {}
+            for ticker, feats in features_map.items():
+                all_macro_features.update(feats)
+
+            if all_macro_features:
+                macro_regime = macro_regime_detector.detect_regime(all_macro_features)
+                results["macro_regime"] = {
+                    "regime": macro_regime.regime,
+                    "confidence": macro_regime.confidence,
+                    "description": macro_regime.description,
+                }
+
+                # Macro regime değişikliği retrain tetikleyebilir
+                if macro_regime.regime in ("STAGFLATION", "RISK_OFF"):
+                    logger.warning("Macro regime unfavorable", regime=macro_regime.regime)
+                    results["macro_alert"] = True
+        except Exception as e:
+            logger.debug("Macro check failed", error=str(e))
+
         # 3. Retrain kararı
         should_retrain = self._should_retrain(date, daily_metrics)
         results["should_retrain"] = should_retrain

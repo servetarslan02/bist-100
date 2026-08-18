@@ -36,6 +36,7 @@ class RiskGate:
         min_confidence: float = 0.3,
         max_drawdown_pct: float = 20.0,
         daily_loss_limit_pct: float = 5.0,
+        macro_stress_threshold_pct: float = -15.0,
     ):
         self.max_position_pct = max_position_pct
         self.max_portfolio_exposure_pct = max_portfolio_exposure_pct
@@ -43,7 +44,9 @@ class RiskGate:
         self.min_confidence = min_confidence
         self.max_drawdown_pct = max_drawdown_pct
         self.daily_loss_limit_pct = daily_loss_limit_pct
+        self.macro_stress_threshold_pct = macro_stress_threshold_pct
         self._daily_pnl = 0.0
+        self._macro_stress_result = None
 
     def check_order(
         self,
@@ -171,10 +174,37 @@ class RiskGate:
             if checks_failed == _checks_failed_before_bist:
                 checks_passed += 1
 
+        # 10. Macro stress test kontrolü
+        if self._macro_stress_result:
+            worst_impact = self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0)
+            if worst_impact < self.macro_stress_threshold_pct:
+                checks_failed += 1
+                reasons.append(f"Macro stress test: %{abs(worst_impact):.1f} kayıp riski (eşik: %{abs(self.macro_stress_threshold_pct):.0f})")
+            else:
+                checks_passed += 1
+            details["macro_stress_worst"] = worst_impact
+
         allowed = checks_failed == 0
         reason = "; ".join(reasons) if reasons else "All checks passed"
 
         return RiskDecision(allowed, reason, checks_passed, checks_failed, details)
+
+    def set_macro_stress_result(self, stress_result: Dict[str, Any]):
+        """Macro stres testi sonucunu risk gate'e besle."""
+        self._macro_stress_result = stress_result
+
+    def check_macro_stress(
+        self,
+        portfolio: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Macro stres testi çalıştır ve sonucu kaydet."""
+        try:
+            from services.macro.stress_test import macro_stress_test
+            report = macro_stress_test.get_report(portfolio)
+            self._macro_stress_result = report
+            return report
+        except Exception as e:
+            return {"error": str(e)}
 
     def update_daily_pnl(self, pnl: float):
         self._daily_pnl = pnl

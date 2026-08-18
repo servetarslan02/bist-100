@@ -11,7 +11,7 @@ FAZ 3.3: Macro Sensitivity
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -105,10 +105,14 @@ SECTOR_MACRO_SENSITIVITY = {
 
 
 class MacroSensitivityEngine:
-    """Şirket bazlı makro hassasiyet hesaplama."""
+    """Şirket bazlı makro hassasiyet hesaplama — dinamik güncelleme destekli."""
 
     def __init__(self):
         self._company_sensitivity: Dict[str, Dict[str, float]] = {}
+        self._dynamic_sensitivity: Dict[str, Dict[str, float]] = {}  # sector → dynamic values
+        self._sector_returns: Dict[str, List[float]] = {}  # sector → returns history
+        self._macro_values: Dict[str, List[float]] = {}  # macro_var → values history
+        self._window = 60  # Rolling window
 
     def get_sector_sensitivity(self, sector: str) -> Dict[str, float]:
         """Sektör bazlı makro hassasiyet."""
@@ -202,6 +206,76 @@ class MacroSensitivityEngine:
             return {"error": f"Unknown scenario: {scenario}"}
 
         return self.compute_macro_impact(ticker, sector, macro_shocks)
+
+
+    def update_dynamic(
+        self,
+        sector_returns: Dict[str, float],
+        macro_values: Dict[str, float],
+    ):
+        """Dinamik hassasiyet güncelleme — günlük çağrılır.
+
+        Args:
+            sector_returns: {sector: daily_return}
+            macro_values: {macro_var: value}
+        """
+        for sector, ret in sector_returns.items():
+            if sector not in self._sector_returns:
+                self._sector_returns[sector] = []
+            self._sector_returns[sector].append(ret)
+            self._sector_returns[sector] = self._sector_returns[sector][-self._window:]
+
+        for var, val in macro_values.items():
+            if var not in self._macro_values:
+                self._macro_values[var] = []
+            self._macro_values[var].append(val)
+            self._macro_values[var] = self._macro_values[var][-self._window:]
+
+        # Rolling korelasyon ile hassasiyet güncelle
+        self._compute_dynamic_sensitivities()
+
+    def _compute_dynamic_sensitivities(self):
+        """Rolling korelasyon ile dinamik hassasiyet hesapla."""
+        import numpy as np
+
+        for sector, returns in self._sector_returns.items():
+            if len(returns) < 20:
+                continue
+
+            dynamic = {}
+            for macro_var, values in self._macro_values.items():
+                if len(values) < 20:
+                    continue
+
+                # Son N gözlemi kullan
+                n = min(len(returns), len(values), self._window)
+                arr_ret = np.array(returns[-n:])
+                arr_val = np.array(values[-n:])
+
+                # NaN temizle
+                mask = np.isfinite(arr_ret) & np.isfinite(arr_val)
+                if mask.sum() < 10:
+                    continue
+
+                corr = np.corrcoef(arr_ret[mask], arr_val[mask])[0, 1]
+                if not np.isnan(corr):
+                    dynamic[macro_var] = round(float(corr), 4)
+
+            if dynamic:
+                self._dynamic_sensitivity[sector] = dynamic
+
+    def get_dynamic_sensitivity(self, sector: str) -> Dict[str, float]:
+        """Dinamik hassasiyet getir."""
+        return self._dynamic_sensitivity.get(sector, {})
+
+    def get_report(self) -> Dict[str, Any]:
+        """Hassasiyet raporu."""
+        return {
+            "static_sectors": len(SECTOR_MACRO_SENSITIVITY),
+            "dynamic_sectors": len(self._dynamic_sensitivity),
+            "company_overrides": len(self._company_sensitivity),
+            "dynamic_data": self._dynamic_sensitivity,
+        }
 
 
 # Singleton

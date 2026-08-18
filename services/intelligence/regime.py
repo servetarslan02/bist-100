@@ -123,6 +123,29 @@ class RegimeEngine:
             except Exception:
                 hmm_result = None
 
+        # Macro regime entegrasyonu
+        try:
+            from services.macro.regime_detector import macro_regime_detector
+            macro_regime = macro_regime_detector.detect_regime(features)
+            if macro_regime.confidence > 0.3:
+                # Macro regime skorlarını mevcut skorlarla birleştir
+                macro_weight = 0.15  # Macro %15 ağırlık
+                macro_mapping = {
+                    "EXPANSION": [Regime.BULL, Regime.MOMENTUM_EXPANSION],
+                    "CONTRACTION": [Regime.BEAR, Regime.MOMENTUM_CONTRACTION],
+                    "STAGFLATION": [Regime.BEAR, Regime.HIGH_VOLATILITY],
+                    "REFLATION": [Regime.RECOVERY, Regime.RISK_ON],
+                    "RISK_ON": [Regime.RISK_ON, Regime.BULL],
+                    "RISK_OFF": [Regime.RISK_OFF, Regime.BEAR],
+                }
+                for macro_name, target_regimes in macro_mapping.items():
+                    macro_score = macro_regime.all_scores.get(macro_name, 0)
+                    for target in target_regimes:
+                        if target in scores:
+                            scores[target] = scores[target] * (1 - macro_weight) + macro_score * macro_weight * 100
+        except Exception:
+            pass
+
         # En yüksek skorlu rejimi seç
         best_regime = max(scores, key=scores.get)
         best_score = scores[best_regime]
