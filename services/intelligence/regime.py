@@ -62,10 +62,18 @@ class RegimeEngine:
         "global_momentum": 0.05,      # Global piyasa momentum
     }
 
-    def __init__(self):
+    def __init__(self, use_hmm: bool = True):
         self._current_regime: Optional[RegimeState] = None
         self._regime_history: List[RegimeState] = []
         self._transition_counts: Dict[str, Dict[str, int]] = {}
+        self._use_hmm = use_hmm
+        self._hmm_detector = None
+        if use_hmm:
+            try:
+                from .hmm_regime import HMMRegimeDetector
+                self._hmm_detector = HMMRegimeDetector(n_regimes=4, rolling_window=63)
+            except Exception:
+                self._hmm_detector = None
 
     def detect_regime(self, features: Dict[str, float]) -> RegimeState:
         """Feature'lardan rejim tespit et.
@@ -96,6 +104,24 @@ class RegimeEngine:
         scores[Regime.RECOVERY] = self._score_recovery(features)
         scores[Regime.MOMENTUM_EXPANSION] = self._score_momentum_expansion(features)
         scores[Regime.MOMENTUM_CONTRACTION] = self._score_momentum_contraction(features)
+
+        # HMM entegrasyonu — hybrid skor
+        hmm_result = None
+        if self._hmm_detector:
+            try:
+                # Features'tan return ve volatility üret
+                returns = np.array([features.get("momentum_avg", 0) / 100] * 63)
+                vol = np.array([features.get("volatility_avg", 20) / 100] * 63)
+                hmm_result = self._hmm_detector.predict_regime(returns, vol)
+
+                # HMM skorlarını rule-based skorlarla birleştir (ağırlıklı)
+                hmm_weight = 0.3  # HMM %30, rule-based %70
+                for regime_key in scores:
+                    regime_name = regime_key.value
+                    hmm_prob = hmm_result.probabilities.get(regime_name, 0.0)
+                    scores[regime_key] = scores[regime_key] * (1 - hmm_weight) + hmm_prob * hmm_weight * 100
+            except Exception:
+                hmm_result = None
 
         # En yüksek skorlu rejimi seç
         best_regime = max(scores, key=scores.get)

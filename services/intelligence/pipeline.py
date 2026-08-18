@@ -1,9 +1,13 @@
-"""ALPHA BIST — Intelligence Pipeline Integration v2.0
+"""ALPHA BIST — Intelligence Pipeline Integration v2.1
 
 17 intelligence modülünü orchestrator'a bağlayan pipeline.
 Her modül için doğru method isimleri ve parametreleri kullanılır.
+
+v2.1: Async support + phase metrics
 """
 
+import time
+import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 import structlog
@@ -35,6 +39,8 @@ class IntelligenceOutput:
     modules_used: List[str] = field(default_factory=list)
     modules_failed: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    phase_durations_ms: Dict[str, float] = field(default_factory=dict)
+    total_elapsed_ms: float = 0.0
 
 
 class IntelligencePipeline:
@@ -77,27 +83,75 @@ class IntelligencePipeline:
         market_data: Optional[Any] = None,
         regime: str = "UNKNOWN",
     ) -> IntelligenceOutput:
-        """Tüm intelligence modüllerini çalıştır."""
+        """Tüm intelligence modüllerini çalıştır (sync, phase metrics ile)."""
+        total_start = time.time()
         output = IntelligenceOutput(ticker=ticker, timestamp="")
 
-        self._run_signal_fusion(ticker, features, regime, output)
-        self._run_forecasting(ticker, features, output)
-        self._run_trade_planner(ticker, features, output)
-        self._run_monte_carlo(ticker, features, output)
-        self._run_factor(ticker, features, output)
+        # Phase 1: Context
+        p1_start = time.time()
         self._run_world_state(features, output)
-        self._run_spec(ticker, features, output)
-        self._run_probability(ticker, features, output)
+        self._run_macro_sensitivity(ticker, features, output)
+        self._run_factor(ticker, features, output)
+        output.phase_durations_ms["context"] = round((time.time() - p1_start) * 1000, 2)
+
+        # Phase 2: Analysis
+        p2_start = time.time()
+        self._run_analysis_engines(features, output)
         self._run_evidence(ticker, output)
-        self._run_knowledge_graph(ticker, output)
         self._run_impact(ticker, features, output)
         self._run_kap_extractor(ticker, output)
-        self._run_analysis_engines(features, output)
-        self._run_macro_sensitivity(ticker, features, output)
-        self._run_research_memory(ticker, output)
-        self._run_scenario(ticker, features, output)
+        output.phase_durations_ms["analysis"] = round((time.time() - p2_start) * 1000, 2)
 
+        # Phase 3: Forecast
+        p3_start = time.time()
+        self._run_forecasting(ticker, features, output)
+        self._run_monte_carlo(ticker, features, output)
+        self._run_probability(ticker, features, output)
+        self._run_scenario(ticker, features, output)
+        output.phase_durations_ms["forecast"] = round((time.time() - p3_start) * 1000, 2)
+
+        # Phase 4: Fusion
+        p4_start = time.time()
+        self._run_signal_fusion(ticker, features, regime, output)
+        self._run_spec(ticker, features, output)
+        self._run_trade_planner(ticker, features, output)
+        output.phase_durations_ms["fusion"] = round((time.time() - p4_start) * 1000, 2)
+
+        # Phase 5: Knowledge
+        p5_start = time.time()
+        self._run_knowledge_graph(ticker, output)
+        self._run_research_memory(ticker, output)
+        output.phase_durations_ms["knowledge"] = round((time.time() - p5_start) * 1000, 2)
+
+        output.total_elapsed_ms = round((time.time() - total_start) * 1000, 2)
         return output
+
+    async def run_async(
+        self,
+        ticker: str,
+        features: Dict[str, Any],
+        market_data: Optional[Any] = None,
+        regime: str = "UNKNOWN",
+    ) -> IntelligenceOutput:
+        """Async pipeline — paralel phase'ler ile."""
+        try:
+            from .parallel_pipeline import parallel_pipeline
+            result = await parallel_pipeline.run(ticker, features, market_data, regime)
+
+            # ParallelPipelineResult → IntelligenceOutput
+            output = IntelligenceOutput(ticker=ticker, timestamp="")
+            for phase_name, phase_result in result.phases.items():
+                output.phase_durations_ms[phase_name] = phase_result.elapsed_ms
+                output.modules_used.extend(phase_result.modules.keys())
+                output.modules_failed.extend(
+                    [f"{k}:{v}" for k, v in phase_result.errors.items()]
+                )
+            output.total_elapsed_ms = result.total_elapsed_ms
+            return output
+
+        except ImportError:
+            # Parallel pipeline yoksa sync çalıştır
+            return self.run(ticker, features, market_data, regime)
 
     def _run_signal_fusion(self, ticker, features, regime, output):
         """SignalFusionEngine.fuse_signals(ticker, signals)"""
