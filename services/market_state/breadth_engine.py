@@ -58,6 +58,9 @@ class BreadthResult:
     # Sektörel breadth (opsiyonel)
     sector_breadth: Dict[str, float] = field(default_factory=dict)
 
+    # Döviz izolasyonu
+    fx_adjustment: float = 0.0  # Breadth'e uygulanan döviz düzeltmesi
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -77,6 +80,7 @@ class BreadthResult:
             "breadth_state": self.breadth_state,
             "alert_level": self.alert_level,
             "sector_breadth": self.sector_breadth,
+            "fx_adjustment": self.fx_adjustment,
         }
 
 
@@ -115,6 +119,7 @@ class MarketBreadthEngine:
         new_highs: int = 0,
         new_lows: int = 0,
         sector_map: Optional[Dict[str, str]] = None,
+        fx_momentum: float = 0.0,
     ) -> BreadthResult:
         """Tüm breadth göstergelerini hesapla.
 
@@ -125,6 +130,7 @@ class MarketBreadthEngine:
             new_highs: 52-week high yapan hisse sayısı
             new_lows: 52-week low yapan hisse sayısı
             sector_map: {ticker: sector_name} eşleştirmesi
+            fx_momentum: Döviz momentum (USD/TRY) — breadth'den izole etmek için
 
         Returns:
             BreadthResult
@@ -180,7 +186,20 @@ class MarketBreadthEngine:
             pct_advancing, mcclellan_osc, trin, ad_ratio, breadth_thrust
         )
 
-        # 11. Sektörel breadth
+        # 11. Döviz izolasyonu — BIST-specific
+        #     USD/TRY yükseldiğinde hisseler düşer ama bu gerçek bearishlik değil.
+        #     Breadth'i döviz etkisine göre ayarla.
+        fx_adjustment = 0.0
+        if fx_momentum > 2.0:  # Döviz sert yükseliyor
+            # Breadth'i %5-15 yukarı çek (döviz kaynaklı düşüşü filtrele)
+            fx_adjustment = min(fx_momentum * 2.0, 15.0)
+            pct_advancing = min(100.0, pct_advancing + fx_adjustment)
+        elif fx_momentum < -2.0:  # Döviz sert düşüyor
+            # Breadth'i %5-15 aşağı çek (döviz kaynaklı yükselişi filtrele)
+            fx_adjustment = max(fx_momentum * 2.0, -15.0)
+            pct_advancing = max(0.0, pct_advancing + fx_adjustment)
+
+        # 12. Sektörel breadth
         sector_breadth = {}
         if sector_map:
             sector_breadth = self._compute_sector_breadth(valid_states, sector_map)
@@ -203,6 +222,7 @@ class MarketBreadthEngine:
             breadth_state=breadth_state,
             alert_level=alert_level,
             sector_breadth=sector_breadth,
+            fx_adjustment=round(fx_adjustment, 2),
         )
 
         logger.info(

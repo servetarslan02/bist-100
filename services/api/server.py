@@ -411,6 +411,129 @@ async def get_risk():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+
+# =====================================================
+# Market State Engine v2.0 Endpoints
+# =====================================================
+
+@app.get("/api/market/state")
+async def get_market_state_v2():
+    """Market State Engine v2.0 — tam market state."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            return json.loads(raw)
+    except Exception:
+        pass
+    return {"error": "Market state not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/market/breadth")
+async def get_market_breadth():
+    """Market breadth detayları."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            state = json.loads(raw)
+            return {
+                "breadth": state.get("breadth", {}),
+                "timestamp": state.get("timestamp"),
+            }
+    except Exception:
+        pass
+    return {"error": "Breadth data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/market/regime")
+async def get_market_regime_v2():
+    """Ensemble regime detayları."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            state = json.loads(raw)
+            return {
+                "regime": state.get("regime"),
+                "confidence": state.get("regime_confidence"),
+                "consensus": state.get("regime_consensus"),
+                "stability": state.get("regime_stability"),
+                "duration_days": state.get("regime_duration_days"),
+                "confidence_trend": state.get("confidence_trend"),
+                "ensemble_methods": state.get("ensemble_methods", {}),
+                "hmm_probabilities": state.get("hmm_probabilities", {}),
+                "timestamp": state.get("timestamp"),
+            }
+    except Exception:
+        pass
+    return {"error": "Regime data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/market/transition")
+async def get_market_transition():
+    """Regime transition istatistikleri."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            state = json.loads(raw)
+            return {
+                "total_transitions": state.get("total_transitions", 0),
+                "transition_matrix": state.get("transition_matrix", {}),
+                "stability": state.get("regime_stability"),
+                "current_regime": state.get("regime"),
+                "current_duration_days": state.get("regime_duration_days"),
+                "timestamp": state.get("timestamp"),
+            }
+    except Exception:
+        pass
+    return {"error": "Transition data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/market/multi-tf")
+async def get_market_multi_tf():
+    """Multi-timeframe state."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            state = json.loads(raw)
+            return {
+                "daily_state": state.get("daily_state", {}),
+                "weekly_state": state.get("weekly_state", {}),
+                "alignment": state.get("multi_tf_alignment"),
+                "divergences": state.get("multi_tf_divergences", []),
+                "timestamp": state.get("timestamp"),
+            }
+    except Exception:
+        pass
+    return {"error": "Multi-TF data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+
+@app.get("/api/market/risk-appetite")
+async def get_market_risk_appetite():
+    """Risk appetite detayları."""
+    try:
+        from services.core.database import redis_get
+        import json
+        raw = await redis_get("market_state")
+        if raw:
+            state = json.loads(raw)
+            return {
+                "risk_appetite": state.get("risk_appetite"),
+                "risk_appetite_state": state.get("risk_appetite_state"),
+                "timestamp": state.get("timestamp"),
+            }
+    except Exception:
+        pass
+    return {"error": "Risk appetite not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+
 @app.get("/api/notifications")
 async def get_notifications(
     limit: int = Query(20, ge=1, le=100),

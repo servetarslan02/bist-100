@@ -378,6 +378,23 @@ class MarketStateService:
                 stability=round(transition_stats.stability_score, 3),
             )
 
+            # Prometheus metrics
+            try:
+                from services.core.observability import prometheus_metrics
+                prometheus_metrics.set_gauge("market_state_regime", 1, {"regime": ensemble.regime})
+                prometheus_metrics.set_gauge("market_state_regime_confidence", ensemble.confidence)
+                prometheus_metrics.set_gauge("market_state_breadth_pct", breadth.pct_advancing)
+                prometheus_metrics.set_gauge("market_state_mcclellan", breadth.mcclellan_osc)
+                prometheus_metrics.set_gauge("market_state_trin", breadth.trin)
+                prometheus_metrics.set_gauge("market_state_risk_appetite", risk_appetite)
+                prometheus_metrics.set_gauge("market_state_stability", transition_stats.stability_score)
+                prometheus_metrics.set_gauge("market_state_anomaly_count", components.anomaly_count)
+                prometheus_metrics.set_gauge("market_state_momentum", components.avg_momentum)
+                prometheus_metrics.set_gauge("market_state_volatility", components.avg_volatility)
+                prometheus_metrics.set_gauge("market_state_rsi", components.avg_rsi)
+            except Exception:
+                pass
+
         except Exception as e:
             logger.error("Market state computation error", error=str(e), exc_info=True)
 

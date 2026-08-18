@@ -352,3 +352,51 @@ class EnsembleRegimeDetector:
             self._score_weight /= total
             self._hmm_weight /= total
             self._gmm_weight /= total
+
+    def get_regime_adapted_weights(self, preliminary_regime: str) -> Dict[str, float]:
+        """Rejime göre ağırlık adaptasyonu.
+
+        Crisis/High-Vol rejimlerde HMM ağırlığı artar (matematiksel model daha güvenilir).
+        Bull/Sideways rejimlerde skor ağırlığı artar (yorumlanabilirlik daha önemli).
+
+        Args:
+            preliminary_regime: İlk tespit edilen rejim
+
+        Returns:
+            Adapted weights {score, hmm, gmm}
+        """
+        # Varsayılan ağırlıklar
+        weights = {
+            "score": self._score_weight,
+            "hmm": self._hmm_weight,
+            "gmm": self._gmm_weight,
+        }
+
+        # Crisis/High-Vol: HMM ağırlığı artsın
+        crisis_regimes = {"CRISIS", "HIGH_VOLATILITY", "RISK_OFF", "BEAR"}
+        if preliminary_regime in crisis_regimes:
+            weights = {
+                "score": 0.35,
+                "hmm": 0.45,  # HMM daha güvenilir
+                "gmm": 0.20,
+            }
+
+        # Bull/Sideways: Skor ağırlığı artsın
+        calm_regimes = {"BULL", "SIDEWAYS", "LOW_VOLATILITY", "RISK_ON"}
+        if preliminary_regime in calm_regimes:
+            weights = {
+                "score": 0.60,  # Yorumlanabilirlik daha önemli
+                "hmm": 0.25,
+                "gmm": 0.15,
+            }
+
+        # Momentum: GMM ağırlığı artsın
+        momentum_regimes = {"MOMENTUM_EXPANSION", "MOMENTUM_CONTRACTION"}
+        if preliminary_regime in momentum_regimes:
+            weights = {
+                "score": 0.45,
+                "hmm": 0.30,
+                "gmm": 0.25,  # GMM momentum değişimi yakalar
+            }
+
+        return weights

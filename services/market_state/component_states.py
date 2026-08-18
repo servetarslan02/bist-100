@@ -77,6 +77,8 @@ class ComponentStateEngine:
         vix_level: float = None,
         news_sentiment: float = None,
         social_sentiment: float = None,
+        put_call_ratio: float = None,
+        market_depth: float = None,
         macro_data: Dict = None,
         world_state: Dict = None,
     ) -> ComponentStates:
@@ -113,13 +115,17 @@ class ComponentStateEngine:
         volatility_state = self._compute_volatility_state(volatilities, avg_volatility, vix_level)
         volume_state = self._compute_volume_state(volume_zscores, avg_volume_zscore)
         rsi_state = self._compute_rsi_state(rsis, avg_rsi)
-        liquidity_state = self._compute_liquidity_state(spreads, avg_spread, volume_zscores)
-        sentiment_state = self._compute_sentiment_state(news_sentiment, social_sentiment)
+        liquidity_state = self._compute_liquidity_state(spreads, avg_spread, volume_zscores, market_depth)
+        sentiment_state = self._compute_sentiment_state(
+            news_sentiment, social_sentiment, put_call_ratio, vix_level
+        )
         macro_state = self._compute_macro_state(world_state)
         anomaly_count, anomaly_severity = self._compute_anomaly_state(anomaly_scores)
 
-        # Sentiment score (composite)
-        sentiment_score = self._compute_sentiment_score(news_sentiment, social_sentiment)
+        # Sentiment score (composite — fear/greed)
+        sentiment_score = self._compute_fear_greed_score(
+            news_sentiment, social_sentiment, put_call_ratio, vix_level
+        )
 
         # Macro score
         macro_score = self._compute_macro_score(world_state)
@@ -247,15 +253,23 @@ class ComponentStateEngine:
         spreads: List[float],
         avg_spread: float,
         volume_zscores: List[float],
+        market_depth: float = None,
     ) -> str:
         """Liquidity state belirle.
 
-        TIGHT: Likidite sıkışık (yüksek spread, düşük hacim)
+        TIGHT: Likidite sıkışık (yüksek spread, düşük hacim, düşük derinlik)
         NORMAL: Normal
-        LOOSE: Likidite bol (düşük spread, yüksek hacim)
+        LOOSE: Likidite bol (düşük spread, yüksek hacim, yüksek derinlik)
         """
         # Spread analizi
         avg_vol_zscore = float(np.mean(volume_zscores)) if volume_zscores else 0.0
+
+        # Market depth varsa dahil et
+        depth_score = 0.0
+        if market_depth is not None:
+            # depth 0-1 arası normalize edilmiş
+            # 0 = derinlik yok, 1 = tam derinlik
+            depth_score = market_depth
 
         # Yüksek spread + düşük hacim = TIGHT
         if avg_spread > 0.03 and avg_vol_zscore < -0.5:
@@ -264,6 +278,13 @@ class ComponentStateEngine:
         # Düşük spread + yüksek hacim = LOOSE
         if avg_spread < 0.01 and avg_vol_zscore > 0.5:
             return "LOOSE"
+
+        # Market depth'e göre
+        if market_depth is not None:
+            if depth_score < 0.3:
+                return "TIGHT"
+            elif depth_score > 0.7:
+                return "LOOSE"
 
         # Sadece spread'e göre
         if avg_spread > 0.05:
@@ -277,15 +298,21 @@ class ComponentStateEngine:
         self,
         news_sentiment: float = None,
         social_sentiment: float = None,
+        put_call_ratio: float = None,
+        vix_level: float = None,
     ) -> str:
         """Sentiment state belirle.
 
-        NEGATIVE: Piyasa korkusu
+        Fear/Greed composite = news + social + put_call + VIX
+
+        NEGATIVE: Piyasa korkusu (fear)
         NEUTRAL: Normal
-        POSITIVE: Piyasa iyimser
+        POSITIVE: Piyasa iyimser (greed)
         EUPHORIA: Aşırı iyimserlik (dikkat)
         """
-        score = self._compute_sentiment_score(news_sentiment, social_sentiment)
+        score = self._compute_fear_greed_score(
+            news_sentiment, social_sentiment, put_call_ratio, vix_level
+        )
 
         if score < -0.3:
             return "NEGATIVE"
@@ -311,6 +338,56 @@ class ComponentStateEngine:
         if social_sentiment is not None:
             scores.append(social_sentiment)
             weights.append(0.4)
+
+        if not scores:
+            return 0.0
+
+        total_weight = sum(weights)
+        return sum(s * w for s, w in zip(scores, weights)) / total_weight
+
+    def _compute_fear_greed_score(
+        self,
+        news_sentiment: float = None,
+        social_sentiment: float = None,
+        put_call_ratio: float = None,
+        vix_level: float = None,
+    ) -> float:
+        """Fear/Greed composite skoru [-1, 1].
+
+        -1 = extreme fear
+         0 = neutral
+        +1 = extreme greed
+
+        Bileşenler:
+        - News sentiment (ağırlık: 0.35)
+        - Social sentiment (ağırlık: 0.25)
+        - Put/Call ratio (ağırlık: 0.20) — yüksek = fear, düşük = greed
+        - VIX level (ağırlık: 0.20) — yüksek = fear, düşük = greed
+        """
+        scores = []
+        weights = []
+
+        if news_sentiment is not None:
+            scores.append(news_sentiment)
+            weights.append(0.35)
+
+        if social_sentiment is not None:
+            scores.append(social_sentiment)
+            weights.append(0.25)
+
+        if put_call_ratio is not None:
+            # Put/Call > 1.0 = fear, < 0.7 = greed
+            # Normalize: [-1, 1]
+            pcr_score = np.clip(1.0 - put_call_ratio, -1, 1)
+            scores.append(pcr_score)
+            weights.append(0.20)
+
+        if vix_level is not None:
+            # VIX > 30 = fear, < 15 = greed
+            # Normalize: [0, 50] → [-1, 1]
+            vix_score = np.clip(1.0 - (vix_level - 15) / 25.0, -1, 1)
+            scores.append(vix_score)
+            weights.append(0.20)
 
         if not scores:
             return 0.0
