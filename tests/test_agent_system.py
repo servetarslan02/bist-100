@@ -1,0 +1,657 @@
+"""
+ALPHA BIST — Agent System Test Suite v1.0
+
+Tüm fazlar için kapsamlı test'ler.
+FAZ 0-7 test'leri dahil.
+
+Kullanım:
+    python -m pytest tests/test_agent_system.py -v
+"""
+
+import asyncio
+import json
+import pytest
+import time
+from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime, timezone
+
+# Test edilecek modüller
+from services.agents import (
+    AgentRole, AgentTask, AgentResult,
+    AgentToolRegistry, AIOutputValidator, AIFallback,
+    BaseAgent, AgentOrchestrator,
+    BaseLLMClient, OllamaLLMClient, LLMClientFactory, LLMConfig, LLMResponse,
+    parse_llm_json, validate_agent_output,
+    PromptFactory, PROMPT_VERSION,
+    ParallelAgentRunner, ParallelRunResult, AgentPipelineBuilder,
+    ConflictDetector, ConflictReport,
+    DebateEngine, DebateResult,
+    AgentMemory, WorkingMemory, EpisodicMemory, SemanticMemory,
+    MemoryConsolidator, MemoryEntry,
+    AgentCommunicationBus, AgentMessage, ConflictResolver, Resolution,
+    SynthesisEngine, SynthesisResult,
+    AgentSelfEvaluator, MultiAgentEvaluator,
+    RiskAssessor, RiskAssessment,
+    AgentPipelineOrchestrator,
+)
+from services.agents.agent_pipeline import PipelineResult
+
+
+# =====================================================
+# HELPERS
+# =====================================================
+
+def create_mock_features():
+    """Mock feature'lar oluştur."""
+    return {
+        "roc_5d": 2.5,
+        "roc_20d": 5.0,
+        "rsi_14": 55.0,
+        "volume_zscore": 1.2,
+        "trend_slope_20d": 0.05,
+        "atr_pct": 2.5,
+        "momentum_20d": 3.0,
+        "regime": "RISK_ON",
+    }
+
+
+def create_mock_agent_result(
+    role: AgentRole = AgentRole.TECHNICAL,
+    direction: str = "LONG",
+    confidence: float = 0.7,
+    success: bool = True,
+) -> AgentResult:
+    """Mock agent sonucu oluştur."""
+    return AgentResult(
+        task_id=f"test-{role.value}",
+        agent_role=role,
+        ticker="THYAO",
+        success=success,
+        output={
+            "direction": direction,
+            "confidence": confidence,
+            "score": 65.0,
+            "reasoning": f"{role.value} analysis",
+            "reasons": ["reason1", "reason2"],
+            "risks": ["risk1"],
+        },
+        confidence=confidence,
+        evidence=["reason1", "reason2"],
+        reasoning=f"{role.value} analysis",
+        model_version="test",
+        prompt_version=PROMPT_VERSION,
+        input_hash="test123",
+        duration_ms=100.0,
+    )
+
+
+def run_async(coro):
+    """Async fonksiyonu çalıştır."""
+    return asyncio.get_event_loop().run_until_complete(coro)
+
+
+# =====================================================
+# FAZ 0: TEMEL ALTYAPI
+# =====================================================
+
+class TestFaz0_LLMClient:
+    """Faz 0: LLM Client Abstraction test'leri."""
+
+    def test_llm_config_defaults(self):
+        config = LLMConfig()
+        assert config.provider == "ollama"
+        assert config.temperature == 0.3
+        assert config.max_retries == 3
+
+    def test_llm_factory_ollama(self):
+        config = LLMConfig(provider="ollama")
+        client = LLMClientFactory.create(config)
+        assert isinstance(client, OllamaLLMClient)
+
+    def test_llm_factory_unknown_provider(self):
+        config = LLMConfig(provider="unknown")
+        with pytest.raises(ValueError, match="Unknown LLM provider"):
+            LLMClientFactory.create(config)
+
+    def test_parse_llm_json_valid(self):
+        content = '{"direction": "LONG", "confidence": 0.7}'
+        result = parse_llm_json(content)
+        assert result is not None
+        assert result["direction"] == "LONG"
+
+    def test_parse_llm_json_code_block(self):
+        content = '```json\n{"direction": "SHORT", "confidence": 0.6}\n```'
+        result = parse_llm_json(content)
+        assert result is not None
+        assert result["direction"] == "SHORT"
+
+    def test_parse_llm_json_text_fallback(self):
+        content = "Hisse LONG görünüyor, confidence 0.75"
+        result = parse_llm_json(content)
+        assert result is not None
+        assert result["direction"] == "LONG"
+
+    def test_parse_llm_json_empty(self):
+        result = parse_llm_json("")
+        assert result is None
+
+    def test_parse_llm_json_none(self):
+        result = parse_llm_json(None)
+        assert result is None
+
+
+class TestFaz0_Schemas:
+    """Faz 0: JSON Schema test'leri."""
+
+    def test_agent_output_schema_valid(self):
+        from services.agents.schemas import AgentOutputSchema
+        data = {"direction": "LONG", "confidence": 0.7, "score": 65}
+        schema = AgentOutputSchema(**data)
+        assert schema.direction == "LONG"
+        assert schema.confidence == 0.7
+
+    def test_agent_output_schema_normalize_confidence(self):
+        from services.agents.schemas import AgentOutputSchema
+        data = {"confidence": 75}  # 0-100 arası
+        schema = AgentOutputSchema(**data)
+        assert schema.confidence == 0.75
+
+    def test_validate_agent_output_valid(self):
+        data = {"direction": "LONG", "confidence": 0.7}
+        is_valid, parsed, errors = validate_agent_output(data)
+        assert is_valid
+        assert len(errors) == 0
+
+
+class TestFaz0_Prompts:
+    """Faz 0: Prompt Template test'leri."""
+
+    def test_list_templates(self):
+        templates = PromptFactory.list_templates()
+        assert "technical" in templates
+        assert "fundamental" in templates
+        assert "news" in templates
+        assert "macro" in templates
+        assert "risk" in templates
+        assert "synthesis" in templates
+
+    def test_get_technical_prompt(self):
+        context = {"features": create_mock_features()}
+        system, user = PromptFactory.get_prompts("technical", "THYAO", context)
+        assert "THYAO" in system
+        assert "JSON" in system
+        assert "THYAO" in user
+
+    def test_unknown_template_raises(self):
+        with pytest.raises(ValueError, match="Unknown template"):
+            PromptFactory.get_prompts("nonexistent", "THYAO", {})
+
+
+class TestFaz0_AgentSystem:
+    """Faz 0: Agent System refactor test'leri."""
+
+    def test_agent_roles(self):
+        assert AgentRole.TECHNICAL.value == "TECHNICAL"
+        assert AgentRole.BULL.value == "BULL"
+        assert AgentRole.BEAR.value == "BEAR"
+
+    def test_agent_task_creation(self):
+        task = AgentTask(
+            task_id="test-1",
+            agent_role=AgentRole.TECHNICAL,
+            ticker="THYAO",
+            prompt="Analyze",
+            context={"features": {}},
+        )
+        assert task.ticker == "THYAO"
+        assert task.template_name is None
+
+    def test_tool_registry(self):
+        assert AgentToolRegistry.can_access(AgentRole.TECHNICAL, "read_market_data")
+        assert not AgentToolRegistry.can_access(AgentRole.TECHNICAL, "read_portfolio")
+        assert AgentToolRegistry.can_access(AgentRole.RISK, "reject_decision")
+
+    def test_fallback_analysis(self):
+        features = create_mock_features()
+        result = AIFallback.rule_based_analysis(features, "THYAO")
+        assert "direction" in result
+        assert "confidence" in result
+        assert result["source"] == "rule_based_fallback"
+
+    def test_output_validator_valid(self):
+        output = json.dumps({"direction": "LONG", "confidence": 0.7})
+        result = AIOutputValidator.validate(output)
+        assert result["valid"]
+
+    def test_output_validator_invalid_direction(self):
+        output = json.dumps({"direction": "INVALID", "confidence": 0.7})
+        result = AIOutputValidator.validate(output)
+        assert not result["valid"] or "Invalid direction" in str(result["errors"])
+
+
+# =====================================================
+# FAZ 1: PARALEL ÇALIŞMA
+# =====================================================
+
+class TestFaz1_ParallelRunner:
+    """Faz 1: Parallel Agent Runner test'leri."""
+
+    def test_parallel_run_result_properties(self):
+        result = ParallelRunResult(
+            results={},
+            total_duration_ms=100,
+            success_count=3,
+            failure_count=1,
+            timeout_count=0,
+        )
+        assert result.success_rate == 0.75
+        assert not result.all_failed
+        assert result.partial_success
+
+    def test_parallel_run_result_all_failed(self):
+        result = ParallelRunResult(
+            results={},
+            total_duration_ms=100,
+            success_count=0,
+            failure_count=4,
+            timeout_count=0,
+        )
+        assert result.all_failed
+        assert result.success_rate == 0
+
+    @pytest.mark.asyncio
+    async def test_parallel_runner_basic(self):
+        runner = ParallelAgentRunner(max_concurrent=2, timeout_seconds=5)
+
+        # Mock agent'lar
+        agents = {
+            AgentRole.TECHNICAL: BaseAgent(AgentRole.TECHNICAL),
+            AgentRole.FUNDAMENTAL: BaseAgent(AgentRole.FUNDAMENTAL),
+        }
+
+        tasks = {
+            AgentRole.TECHNICAL: AgentTask(
+                task_id="t1", agent_role=AgentRole.TECHNICAL,
+                ticker="THYAO", prompt="test", context={"features": {}},
+            ),
+            AgentRole.FUNDAMENTAL: AgentTask(
+                task_id="t2", agent_role=AgentRole.FUNDAMENTAL,
+                ticker="THYAO", prompt="test", context={"features": {}},
+            ),
+        }
+
+        result = await runner.run_agents(agents, tasks)
+        assert isinstance(result, ParallelRunResult)
+        assert result.success_count + result.failure_count == 2
+
+
+# =====================================================
+# FAZ 2: CONFLICT + DEBATE
+# =====================================================
+
+class TestFaz2_ConflictDetector:
+    """Faz 2: Conflict Detection test'leri."""
+
+    def test_no_conflict_unanimous_long(self):
+        detector = ConflictDetector()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "LONG"),
+            AgentRole.NEWS: create_mock_agent_result(AgentRole.NEWS, "LONG"),
+        }
+        report = detector.detect(results)
+        assert not report.has_conflict
+        assert report.is_unanimous
+        assert not report.requires_debate
+
+    def test_conflict_long_vs_short(self):
+        detector = ConflictDetector()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "SHORT"),
+            AgentRole.NEWS: create_mock_agent_result(AgentRole.NEWS, "LONG"),
+        }
+        report = detector.detect(results)
+        assert report.has_conflict
+        assert not report.is_unanimous
+        assert report.long_count == 2
+        assert report.short_count == 1
+
+    def test_excludes_synthesis_and_risk(self):
+        detector = ConflictDetector()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+            AgentRole.SYNTHESIS: create_mock_agent_result(AgentRole.SYNTHESIS, "SHORT"),
+            AgentRole.RISK: create_mock_agent_result(AgentRole.RISK, "NEUTRAL"),
+        }
+        report = detector.detect(results)
+        assert not report.has_conflict  # SYNTHESIS ve RISK hariç
+
+
+class TestFaz2_DebateEngine:
+    """Faz 2: Debate Engine test'leri."""
+
+    def test_debate_result_to_dict(self):
+        result = DebateResult(
+            consensus="LONG",
+            consensus_confidence=0.6,
+            rounds=[],
+            agreement=True,
+            total_rounds=1,
+        )
+        d = result.to_dict()
+        assert d["consensus"] == "LONG"
+        assert d["agreement"]
+
+
+# =====================================================
+# FAZ 3: MEMORY
+# =====================================================
+
+class TestFaz3_WorkingMemory:
+    """Faz 3: Working Memory test'leri."""
+
+    def test_add_and_get_recent(self):
+        wm = WorkingMemory(max_items=5)
+        for i in range(10):
+            wm.add(MemoryEntry(
+                task_id=f"t{i}",
+                agent_role="TECHNICAL",
+                ticker="THYAO",
+                direction="LONG",
+                confidence=0.7,
+                reasoning="test",
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ))
+        assert len(wm.items) == 5  # max_items
+        recent = wm.get_recent(limit=3)
+        assert len(recent) == 3
+
+    def test_get_last_direction(self):
+        wm = WorkingMemory()
+        wm.add(MemoryEntry(
+            task_id="t1", agent_role="TECHNICAL", ticker="THYAO",
+            direction="SHORT", confidence=0.6, reasoning="", timestamp="",
+        ))
+        wm.add(MemoryEntry(
+            task_id="t2", agent_role="TECHNICAL", ticker="THYAO",
+            direction="LONG", confidence=0.8, reasoning="", timestamp="",
+        ))
+        assert wm.get_last_direction("THYAO") == "LONG"
+
+
+class TestFaz3_EpisodicMemory:
+    """Faz 3: Episodic Memory test'leri."""
+
+    def test_record_outcome(self):
+        em = EpisodicMemory()
+        em.add(MemoryEntry(
+            task_id="t1", agent_role="TECHNICAL", ticker="THYAO",
+            direction="LONG", confidence=0.7, reasoning="", timestamp="",
+        ))
+        em.record_outcome("t1", 5.0, "RISK_ON")
+
+        assert len(em.outcomes) == 1
+        assert em.outcomes["t1"]["correct"]  # LONG + positive return
+
+    def test_accuracy(self):
+        em = EpisodicMemory()
+        for i in range(10):
+            task_id = f"t{i}"
+            em.add(MemoryEntry(
+                task_id=task_id, agent_role="TECHNICAL", ticker="THYAO",
+                direction="LONG", confidence=0.7, reasoning="", timestamp="",
+            ))
+            em.record_outcome(task_id, 5.0 if i < 7 else -3.0, "RISK_ON")
+
+        assert em.get_accuracy() == 0.7  # 7/10 correct
+
+
+class TestFaz3_AgentMemory:
+    """Faz 3: Agent Memory (3 katmanlı) test'leri."""
+
+    def test_record_task(self):
+        mem = AgentMemory("TECHNICAL")
+        mem.record_task("t1", "THYAO", "LONG", 0.7, "test reasoning")
+        assert len(mem.working.items) == 1
+
+    def test_get_context(self):
+        mem = AgentMemory("TECHNICAL")
+        mem.record_task("t1", "THYAO", "LONG", 0.7, "test")
+        context = mem.get_context_for_task("THYAO")
+        assert "recent_tasks" in context
+        assert "accuracy" in context
+
+    def test_performance_summary(self):
+        mem = AgentMemory("TECHNICAL")
+        summary = mem.get_performance_summary()
+        assert summary["agent_role"] == "TECHNICAL"
+        assert summary["overall_accuracy"] == 0
+
+
+class TestFaz3_MemoryConsolidator:
+    """Faz 3: Memory Consolidator test'leri."""
+
+    @pytest.mark.asyncio
+    async def test_consolidate_first_run(self):
+        consolidator = MemoryConsolidator(consolidation_interval_hours=24)
+        mem = AgentMemory("TECHNICAL")
+        result = await consolidator.consolidate(mem)
+        # İlk çalıştırmada consolidation yapılır
+        assert result["consolidated"] is True
+
+    @pytest.mark.asyncio
+    async def test_consolidate_too_soon(self):
+        consolidator = MemoryConsolidator(consolidation_interval_hours=24)
+        mem = AgentMemory("TECHNICAL")
+        # İlk çalıştırma
+        await consolidator.consolidate(mem)
+        # İkinci çalıştırma — too_soon
+        result = await consolidator.consolidate(mem)
+        assert not result["consolidated"]
+        assert result["reason"] == "too_soon"
+
+
+# =====================================================
+# FAZ 4: COMMUNICATION + SYNTHESIS
+# =====================================================
+
+class TestFaz4_CommunicationBus:
+    """Faz 4: Communication Bus test'leri."""
+
+    def test_send_and_receive(self):
+        bus = AgentCommunicationBus()
+        msg = AgentMessage(
+            sender=AgentRole.TECHNICAL,
+            receiver=AgentRole.FUNDAMENTAL,
+            task_id="t1",
+            message_type="CONTEXT",
+            payload={"data": "test"},
+        )
+        bus.send(msg)
+        messages = bus.receive(AgentRole.FUNDAMENTAL)
+        assert len(messages) == 1
+        assert messages[0].payload["data"] == "test"
+
+    def test_broadcast(self):
+        bus = AgentCommunicationBus()
+        bus.broadcast(AgentRole.TECHNICAL, "ALERT", {"warning": True})
+        # Tüm roller TECHNICAL hariç mesaj almalı
+        for role in AgentRole:
+            if role != AgentRole.TECHNICAL:
+                messages = bus.peek(role)
+                assert len(messages) >= 1
+
+
+class TestFaz4_ConflictResolver:
+    """Faz 4: Conflict Resolver test'leri."""
+
+    def test_majority_vote(self):
+        resolver = ConflictResolver()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG", 0.7),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "LONG", 0.6),
+            AgentRole.NEWS: create_mock_agent_result(AgentRole.NEWS, "SHORT", 0.5),
+        }
+        resolution = resolver.resolve(results)
+        assert resolution.direction == "LONG"
+        assert resolution.method == "majority_vote"
+
+    def test_risk_veto(self):
+        resolver = ConflictResolver()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+        }
+        resolution = resolver.resolve(results, risk_approved=False)
+        assert resolution.direction == "NO_TRADE"
+        assert resolution.method == "risk_veto"
+
+    def test_debate_consensus(self):
+        resolver = ConflictResolver()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+        }
+        resolution = resolver.resolve(results, debate_consensus="SHORT")
+        assert resolution.direction == "SHORT"
+        assert resolution.method == "debate_consensus"
+
+
+class TestFaz4_SynthesisEngine:
+    """Faz 4: Synthesis Engine test'leri."""
+
+    @pytest.mark.asyncio
+    async def test_synthesize_basic(self):
+        engine = SynthesisEngine()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG", 0.7),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "LONG", 0.6),
+        }
+        resolution = Resolution(
+            direction="LONG", confidence=0.65,
+            method="majority_vote", conflict=False,
+        )
+        result = await engine.synthesize(
+            ticker="THYAO",
+            agent_results=results,
+            resolution=resolution,
+        )
+        assert result.ticker == "THYAO"
+        assert result.final_direction == "LONG"
+        assert result.final_confidence > 0
+
+
+# =====================================================
+# FAZ 5: SELF-EVALUATION
+# =====================================================
+
+class TestFaz5_SelfEvaluator:
+    """Faz 5: Self-Evaluator test'leri."""
+
+    def test_evaluate_empty_memory(self):
+        evaluator = AgentSelfEvaluator()
+        mem = AgentMemory("TECHNICAL")
+        report = evaluator.evaluate(mem)
+        assert report.recommendation == "RETRAIN"  # 0 accuracy = RETRAIN
+        assert report.accuracy == 0
+
+    def test_evaluate_with_outcomes(self):
+        evaluator = AgentSelfEvaluator()
+        mem = AgentMemory("TECHNICAL")
+
+        # 50 görev ekle (min_samples)
+        for i in range(50):
+            task_id = f"t{i}"
+            mem.record_task(task_id, "THYAO", "LONG", 0.7, "test")
+            mem.record_outcome(task_id, 5.0 if i < 35 else -3.0, "RISK_ON")
+
+        report = evaluator.evaluate(mem)
+        assert report.accuracy == 0.7  # 35/50
+        assert report.total_outcomes == 50
+
+
+# =====================================================
+# FAZ 6: RISK + PIPELINE
+# =====================================================
+
+class TestFaz6_RiskAssessor:
+    """Faz 6: Risk Assessor test'leri."""
+
+    @pytest.mark.asyncio
+    async def test_assess_low_risk(self):
+        assessor = RiskAssessor()
+        features = create_mock_features()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "LONG"),
+        }
+        assessment = await assessor.assess("THYAO", results, features)
+        assert assessment.approved
+        assert assessment.risk_level in ["LOW", "MEDIUM"]
+
+    @pytest.mark.asyncio
+    async def test_assess_high_volatility(self):
+        assessor = RiskAssessor()
+        features = {**create_mock_features(), "atr_pct": 8.0}
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG"),
+        }
+        assessment = await assessor.assess("THYAO", results, features)
+        assert assessment.risk_score > 20
+        assert "volatilite" in str(assessment.risk_factors).lower() or \
+               assessment.risk_level in ["MEDIUM", "HIGH", "CRITICAL"]
+
+
+# =====================================================
+# FAZ 7: ENTEGRASYON
+# =====================================================
+
+class TestFaz7_Integration:
+    """Faz 7: Entegrasyon test'leri."""
+
+    def test_all_modules_importable(self):
+        """Tüm modüllerin import edilebilir olduğunu doğrula."""
+        from services.agents import (
+            AgentRole, AgentTask, AgentResult,
+            ParallelAgentRunner, ConflictDetector, DebateEngine,
+            AgentMemory, SynthesisEngine, RiskAssessor,
+            AgentPipelineOrchestrator, AgentCommunicationBus,
+            AgentSelfEvaluator, MultiAgentEvaluator,
+        )
+        assert True  # Import başarılı
+
+    def test_pipeline_result_structure(self):
+        """PipelineResult yapısını doğrula."""
+        import dataclasses
+        assert dataclasses.is_dataclass(PipelineResult)
+        field_names = [f.name for f in dataclasses.fields(PipelineResult)]
+        assert 'ticker' in field_names
+        assert 'synthesis' in field_names
+
+    def test_memory_persistence_path(self):
+        """Memory persistence path'in doğru oluştuğunu doğrula."""
+        mem = AgentMemory("TECHNICAL", persistence_path="/tmp/test_memory.json")
+        assert mem._persistence_path == "/tmp/test_memory.json"
+
+    def test_debate_confidence_damping(self):
+        """Debate confidence damping'in doğru uygulandığını doğrula."""
+        engine = DebateEngine(confidence_damping=0.9)
+        assert engine.confidence_damping == 0.9
+        assert engine.max_rounds == 3
+
+    def test_full_pipeline_structure(self):
+        """Full pipeline yapısını doğrula."""
+        pipeline = AgentPipelineOrchestrator()
+        assert pipeline.runner is not None
+        assert pipeline.conflict_detector is not None
+        assert pipeline.debate_engine is not None
+        assert pipeline.risk_assessor is not None
+        assert pipeline.synthesis_engine is not None
+        assert pipeline.conflict_resolver is not None
+
+
+# =====================================================
+# MAIN
+# =====================================================
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--tb=short"])
