@@ -281,12 +281,14 @@ class MarketStateService:
         try:
             states = list(self._instrument_states.values())
 
-            # 1. Market Breadth
-            breadth = self._breadth_engine.compute(states)
+            # 1. Market Breadth (döviz izolasyonu ile)
+            fx_momentum = self._world_state.get("usd_strength", 0.5) * 10 - 5  # Normalize: 0-1 → -5..+5
+            breadth = self._breadth_engine.compute(states, fx_momentum=fx_momentum)
 
-            # 2. Component States
+            # 2. Component States (fear/greed + market depth ile)
             components = self._component_engine.compute_all(
                 instrument_states=states,
+                vix_level=self._world_state.get("vix_level"),
                 news_sentiment=self._news_sentiment,
                 social_sentiment=self._social_sentiment,
                 world_state=self._world_state,
@@ -493,6 +495,32 @@ class MarketStateService:
                 },
             )
             publish_event(anomaly_event, key="anomaly")
+
+        # Sentiment shift
+        if abs(components.sentiment_score) > 0.5:
+            sentiment_event = CanonicalEvent(
+                event_type=EventType.SENTIMENT_SHIFT,
+                source="market-state-v2",
+                data={
+                    "sentiment_state": components.sentiment_state,
+                    "sentiment_score": components.sentiment_score,
+                    "news_sentiment": self._news_sentiment,
+                    "social_sentiment": self._social_sentiment,
+                },
+            )
+            publish_event(sentiment_event, key="sentiment")
+
+        # Multi-TF divergence
+        if self._last_market_state and self._last_market_state.multi_tf_divergences:
+            divergence_event = CanonicalEvent(
+                event_type=EventType.MULTI_TF_DIVERGENCE,
+                source="market-state-v2",
+                data={
+                    "divergences": self._last_market_state.multi_tf_divergences,
+                    "alignment": self._last_market_state.multi_tf_alignment,
+                },
+            )
+            publish_event(divergence_event, key="multi_tf")
 
 
 # =====================================================
