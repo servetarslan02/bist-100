@@ -80,9 +80,3 @@ python3 tests/test_faz2_motors.py # 7 Motor
 python3 tests/test_faz3_ranking.py # Ranking Model
 # ... (22 test dosyası, 424+ test)
 ```
-
-## Dokümantasyon
-
-- `memory/ROADMAP-v3.md` — Güncel yol haritası
-- `memory/WORKING_RULES.md` — Çalışma kuralları
-- `sistem ve calisma mantiklari/` — Sistem tanımı ve mimari
