@@ -59,6 +59,17 @@ class BreakingPointResult:
 class MacroStressTest:
     """Makro stres testi motoru."""
 
+    # Önceden tanımlı senaryolar (config'den de okunabilir)
+    PREDEFINED_SCENARIOS = {
+        "USDTRY_10_PCT": {"usdtry_change": 0.10},
+        "TCMB_RATE_HIKE_500BP": {"interest_rate_change": 0.05},
+        "VIX_SPIKE_50_PCT": {"vix_change": 0.50},
+        "OIL_SHOCK_20_PCT": {"oil_change": 0.20},
+        "GLOBAL_RISK_OFF": {"global_change": -0.10, "usdtry_change": 0.05},
+        "INFLATION_HIGH": {"inflation_change": 0.05},
+        "BIST_CRASH_10_PCT": {"bist_change": -0.10},
+    }
+
     # Sektör hassasiyet matrisi
     SECTOR_SENSITIVITY = {
         "BANK": {"usdtry": -0.3, "interest_rate": 0.9, "oil": -0.1, "inflation": -0.7, "global": 0.5, "vix": -0.4, "bist": 0.7},
