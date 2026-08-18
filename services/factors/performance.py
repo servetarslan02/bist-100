@@ -40,7 +40,7 @@ def track_factor_performance(
     annual_return = float((1 + total_return) ** (252 / max(n, 1)) - 1)
     volatility = float(np.std(f, ddof=1) * np.sqrt(252))
     daily_rf = risk_free_rate / 252
-    sharpe = (annual_return - risk_free_rate) / max(volatility, 0.001) if volatility > 0 else 0.0
+    sharpe = (annual_return - risk_free_rate) / max(volatility, 0.001) if volatility > 1e-10 else 0.0
 
     # Risk metrikleri
     cumulative = np.cumprod(1 + f)
@@ -66,7 +66,7 @@ def track_factor_performance(
     # Skewness ve kurtosis
     try:
         from scipy.stats import skew, kurtosis
-        if volatility > 0:
+        if volatility > 1e-10:
             skewness = float(skew(f))
             kurt = float(kurtosis(f))
         else:

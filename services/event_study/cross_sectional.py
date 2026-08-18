@@ -40,7 +40,7 @@ class CrossSectionalEventStudy:
         if n >= 2:
             std_car = float(np.std(cars, ddof=1))
             std_error = std_car / np.sqrt(n)
-            t_stat = mean_car / std_error if std_error > 0 else 0.0
+            t_stat = mean_car / std_error if std_error > 1e-10 else 0.0
             df = n - 1
             p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=df))
         else:
@@ -212,7 +212,7 @@ class CrossSectionalEventStudy:
             n = len(cars_arr)
             mean = float(np.mean(cars_arr))
             std = float(np.std(cars_arr, ddof=1)) if n > 1 else 0.0
-            t = mean / (std / np.sqrt(n)) if std > 0 and n > 0 else 0.0
+            t = mean / (std / np.sqrt(n)) if std > 1e-10 and n > 0 else 0.0
             p = 2 * (1 - stats.t.cdf(abs(t), df=max(n - 1, 1)))
 
             breakdown[key] = {

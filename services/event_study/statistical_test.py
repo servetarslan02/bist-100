@@ -52,7 +52,7 @@ def test_significance(
     car_std = ar_std * np.sqrt(n)
 
     # t-statistic
-    t_stat = car / car_std if car_std > 0 else 0.0
+    t_stat = car / car_std if car_std > 1e-10 else 0.0
 
     # p-value — t-distribution (n - n_params derece serbestlik)
     df = n - n_params
