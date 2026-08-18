@@ -1,0 +1,243 @@
+"""
+ALPHA BIST — Macro Historical Data Store v1.0
+
+Tarihsel makro veri deposu — point-in-time:
+- Tarihsel veri kaydetme/okuma
+- Point-in-time erişim (look-ahead bias yok)
+- Backfill desteği
+- JSON-based storage
+
+KURAL: Backtest'te sadece o tarihte bilinen veriyi kullan.
+"""
+
+import json
+import os
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, field
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+import structlog
+
+logger = structlog.get_logger()
+
+
+@dataclass
+class MacroDataPoint:
+    """Tek veri noktası."""
+    date: str
+    indicator: str
+    value: float
+    source: str
+    timestamp: str
+
+
+class MacroHistoricalStore:
+    """Tarihsel makro veri deposu."""
+
+    def __init__(self, storage_path: str = "data/macro_historical.json"):
+        self._storage_path = storage_path
+        self._data: Dict[str, Dict[str, List[Dict]]] = {}  # indicator → {date → [values]}
+        self._load()
+
+    def save(
+        self,
+        date: str,
+        indicator: str,
+        value: float,
+        source: str = "unknown",
+    ):
+        """Makro veri kaydet.
+
+        Args:
+            date: Tarih (YYYY-MM-DD)
+            indicator: Gösterge adı (USDTRY, CPI, POLICY_RATE, vb.)
+            value: Değer
+            source: Veri kaynağı
+        """
+        if indicator not in self._data:
+            self._data[indicator] = {}
+
+        if date not in self._data[indicator]:
+            self._data[indicator][date] = []
+
+        entry = {
+            "value": value,
+            "source": source,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+        self._data[indicator][date].append(entry)
+        self._save()
+
+        logger.debug("Macro data saved", indicator=indicator, date=date, value=value)
+
+    def get(
+        self,
+        date: str,
+        indicator: str,
+    ) -> Optional[float]:
+        """Belirli tarihteki veriyi getir (point-in-time).
+
+        Args:
+            date: Tarih (YYYY-MM-DD)
+            indicator: Gösterge adı
+
+        Returns:
+            Değer veya None
+        """
+        indicator_data = self._data.get(indicator, {})
+        date_data = indicator_data.get(date)
+
+        if date_data:
+            # Son kaydedilen değeri döndür
+            return date_data[-1]["value"]
+
+        return None
+
+    def get_latest_before(
+        self,
+        date: str,
+        indicator: str,
+    ) -> Optional[Dict[str, Any]]:
+        """Belirli tarihten önceki en son veriyi getir (PIT)."""
+        indicator_data = self._data.get(indicator, {})
+
+        # Tarihten önceki tüm tarihleri bul
+        earlier_dates = [d for d in indicator_data.keys() if d <= date]
+
+        if not earlier_dates:
+            return None
+
+        latest_date = max(earlier_dates)
+        latest_entry = indicator_data[latest_date][-1]
+
+        return {
+            "date": latest_date,
+            "indicator": indicator,
+            "value": latest_entry["value"],
+            "source": latest_entry["source"],
+        }
+
+    def get_range(
+        self,
+        indicator: str,
+        start_date: str,
+        end_date: str,
+    ) -> List[Dict[str, Any]]:
+        """Tarih aralığındaki veriyi getir."""
+        indicator_data = self._data.get(indicator, {})
+
+        result = []
+        for date, entries in sorted(indicator_data.items()):
+            if start_date <= date <= end_date:
+                latest = entries[-1]
+                result.append({
+                    "date": date,
+                    "indicator": indicator,
+                    "value": latest["value"],
+                    "source": latest["source"],
+                })
+
+        return result
+
+    def get_latest(self, indicator: str) -> Optional[Dict[str, Any]]:
+        """Son veriyi getir."""
+        indicator_data = self._data.get(indicator, {})
+
+        if not indicator_data:
+            return None
+
+        latest_date = max(indicator_data.keys())
+        latest_entry = indicator_data[latest_date][-1]
+
+        return {
+            "date": latest_date,
+            "indicator": indicator,
+            "value": latest_entry["value"],
+            "source": latest_entry["source"],
+        }
+
+    def backfill(
+        self,
+        indicator: str,
+        data: List[Dict[str, Any]],
+    ):
+        """Toplu veri yükleme (backfill).
+
+        Args:
+            indicator: Gösterge adı
+            data: [{"date": "YYYY-MM-DD", "value": float, "source": str}]
+        """
+        count = 0
+        for entry in data:
+            self.save(
+                date=entry["date"],
+                indicator=indicator,
+                value=entry["value"],
+                source=entry.get("source", "backfill"),
+            )
+            count += 1
+
+        logger.info("Backfill completed", indicator=indicator, count=count)
+
+    def get_available_indicators(self) -> List[str]:
+        """Mevcut göstergeleri listele."""
+        return list(self._data.keys())
+
+    def get_date_range(self, indicator: str) -> Optional[Dict[str, str]]:
+        """Göstergenin tarih aralığını döndür."""
+        indicator_data = self._data.get(indicator, {})
+
+        if not indicator_data:
+            return None
+
+        dates = sorted(indicator_data.keys())
+        return {
+            "indicator": indicator,
+            "start_date": dates[0],
+            "end_date": dates[-1],
+            "total_points": len(dates),
+        }
+
+    def get_report(self) -> Dict[str, Any]:
+        """Rapor."""
+        indicators = self.get_available_indicators()
+        total_points = sum(
+            sum(len(entries) for entries in ind_data.values())
+            for ind_data in self._data.values()
+        )
+
+        return {
+            "indicators": len(indicators),
+            "total_data_points": total_points,
+            "indicator_list": indicators,
+            "storage_path": self._storage_path,
+        }
+
+    # ===================== PERSISTENCE =====================
+
+    def _load(self):
+        """Veriyi dosyadan yükle."""
+        if os.path.exists(self._storage_path):
+            try:
+                with open(self._storage_path, "r") as f:
+                    self._data = json.load(f)
+                logger.info("Historical store loaded",
+                           indicators=len(self._data),
+                           path=self._storage_path)
+            except Exception as e:
+                logger.error("Failed to load historical store", error=str(e))
+                self._data = {}
+
+    def _save(self):
+        """Veriyi dosyaya kaydet."""
+        try:
+            os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)
+            with open(self._storage_path, "w") as f:
+                json.dump(self._data, f, indent=2)
+        except Exception as e:
+            logger.error("Failed to save historical store", error=str(e))
+
+
+# Singleton
+macro_historical_store = MacroHistoricalStore()
