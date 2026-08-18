@@ -26,6 +26,7 @@ class PipelineReport:
     agent_results: Dict[str, Any] = field(default_factory=dict)
     top_opportunities: List[Dict] = field(default_factory=list)
     regime: str = "UNKNOWN"
+    macro_analysis: Dict[str, Any] = field(default_factory=dict)
     portfolio_recommendation: Dict[str, Any] = field(default_factory=dict)
     learning_status: Dict[str, Any] = field(default_factory=dict)
     alerts: List[str] = field(default_factory=list)
@@ -565,10 +566,53 @@ class MasterOrchestrator:
         per_ticker_results: Dict[str, Any] = {}
         errors: List[str] = []
 
+        # === MACRO PIPELINE (YENİ) ===
+        macro_analysis = {}
+        try:
+            from services.macro import (
+                macro_surprise_model, macro_regime_detector,
+                macro_impact_analyzer, macro_stress_test,
+                macro_correlation_tracker, macro_factor_decomposition,
+            )
+            from services.features.macro import macro_feature_engine
+
+            # Macro data (market_data'dan çıkar veya servislerden al)
+            macro_data = {}
+            for _ticker, _df in market_data.items():
+                if hasattr(_df, 'columns') and 'Close' in _df.columns:
+                    # Basit macro data çıkarma
+                    pass
+
+            # Macro regime detection
+            macro_features = macro_feature_engine.compute_all_macro_features(macro_data)
+            if macro_features:
+                macro_regime = macro_regime_detector.detect_regime(macro_features)
+                macro_analysis = {
+                    "regime": macro_regime.regime,
+                    "regime_confidence": macro_regime.confidence,
+                    "regime_description": macro_regime.description,
+                    "macro_features": macro_features,
+                }
+        except Exception as e:
+            logger.warning("Macro pipeline failed", error=str(e))
+
         for ticker, df in market_data.items():
             try:
                 calc = self._services.get("feature_calculator")
                 features = calc.compute_all_features(df, ticker=ticker) if calc else {}
+
+                # Macro features ekle
+                if macro_analysis.get("macro_features"):
+                    features.update(macro_analysis["macro_features"])
+
+                # Macro impact (sektör bazlı)
+                if macro_analysis.get("regime"):
+                    sector = sector_map.get(ticker, "OTHER")
+                    try:
+                        impact = macro_impact_analyzer.compute_cumulative_impact(ticker, sector)
+                        features["macro_cumulative_impact"] = impact.get("cumulative_impact", 0)
+                    except Exception:
+                        pass
 
                 # Agent pipeline (varsa)
                 agent_info = {}
@@ -668,6 +712,8 @@ class MasterOrchestrator:
             system_health=system_health,
             agent_results=agent_results_all,
             top_opportunities=top_opportunities[:20],
+            macro_analysis=macro_analysis,
+            regime=macro_analysis.get("regime", "UNKNOWN"),
         )
 
     def get_status(self) -> Dict[str, Any]:
