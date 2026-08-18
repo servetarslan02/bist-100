@@ -275,20 +275,11 @@ class DebateEngine:
     ) -> Dict[str, str]:
         """Bull prompt değişkenlerini oluştur."""
         if round_num == 0:
-            return {"user_prompt": f"{ticker} hissesi için YÜKSELİŞ argümanlarını sun."}
+            return {}  # Template kendi prompt'unu oluşturur
         elif round_num == 1 and bear_arg:
-            return {
-                "user_prompt": f"Bear analistin argümanı:\n{bear_arg.bear_reasoning}\n\n"
-                              f"Bu argümanları çürüterek YÜKSELİŞ tezini savun.",
-                "bear_argument": bear_arg.bear_reasoning,
-            }
+            return {"bear_argument": bear_arg.bear_reasoning}
         else:
-            summary = self._summarize_history(history)
-            return {
-                "user_prompt": f"Tartışma özeti:\n{summary}\n\n"
-                              f"Son pozisyonunu açıkla.",
-                "debate_summary": summary,
-            }
+            return {"debate_summary": self._summarize_history(history)}
 
     def _create_bear_prompt_vars(
         self,
@@ -300,24 +291,11 @@ class DebateEngine:
     ) -> Dict[str, str]:
         """Bear prompt değişkenlerini oluştur."""
         if round_num == 0:
-            return {
-                "user_prompt": f"Bull analistin argümanı:\n{bull_result.reasoning}\n\n"
-                              f"Bu argümanları çürüterek DÜŞÜŞ tezini savun.",
-                "bull_argument": bull_result.reasoning,
-            }
+            return {"bull_argument": bull_result.reasoning}
         elif round_num == 1:
-            return {
-                "user_prompt": f"Bull analistin son argümanı:\n{bull_result.reasoning}\n\n"
-                              f"DÜŞÜŞ argümanlarını güçlendir.",
-                "bull_argument": bull_result.reasoning,
-            }
+            return {"bull_argument": bull_result.reasoning}
         else:
-            summary = self._summarize_history(history)
-            return {
-                "user_prompt": f"Tartışma özeti:\n{summary}\n\n"
-                              f"Son pozisyonunu açıkla.",
-                "debate_summary": summary,
-            }
+            return {"debate_summary": self._summarize_history(history)}
 
     def _summarize_history(self, history: List[DebateRound]) -> str:
         """Tartışma geçmişini özetle."""

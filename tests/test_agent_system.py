@@ -404,7 +404,8 @@ class TestFaz3_EpisodicMemory:
             ))
             em.record_outcome(task_id, 5.0 if i < 7 else -3.0, "RISK_ON")
 
-        assert em.get_accuracy() == 0.7  # 7/10 correct
+        # 10 episodic (conf 0.7 > 0.6), 7 correct, 3 wrong
+        assert em.get_accuracy() == 0.7  # 7/10
 
 
 class TestFaz3_AgentMemory:

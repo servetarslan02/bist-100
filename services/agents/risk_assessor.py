@@ -146,10 +146,11 @@ class RiskAssessor:
         # Risk seviyesi belirle
         risk_score = min(100, risk_score)
         risk_level = "LOW"
-        for level, threshold in sorted(self.RISK_THRESHOLDS.items(), key=lambda x: x[1], reverse=True):
-            if risk_score >= threshold:
+        for level, threshold in sorted(self.RISK_THRESHOLDS.items(), key=lambda x: x[1]):
+            if risk_score < threshold:
                 risk_level = level
                 break
+            risk_level = level
 
         # Veto kontrolü
         approved = True
