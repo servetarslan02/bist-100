@@ -48,6 +48,14 @@ class EventType(str, Enum):
     # Portfolio
     DECISION_CREATED = "decision.created"
     ORDER_PLACED = "order.placed"
+
+    # Agent System
+    AGENT_ANALYSIS_COMPLETED = "agent.analysis.completed"
+    AGENT_DEBATE_COMPLETED = "agent.debate.completed"
+    AGENT_CONFLICT_DETECTED = "agent.conflict.detected"
+    AGENT_RISK_VETO = "agent.risk.veto"
+    AGENT_EVALUATION_COMPLETED = "agent.evaluation.completed"
+    AGENT_DRIFT_DETECTED = "agent.drift.detected"
     ORDER_FILLED = "order.filled"
 
     # Learning

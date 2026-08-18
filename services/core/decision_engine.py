@@ -38,6 +38,10 @@ class DecisionInput:
     # ATR bilgisi
     atr: float = 0.0
     atr_pct: float = 0.0
+    # Agent sistemi
+    agent_direction: str = "NEUTRAL"
+    agent_confidence: float = 0.0
+    agent_score: float = 50.0
     # Geriye uyumlu ek alanlar (test_phase10_13)
     ml_return_5d: float = 0.0
     ml_return_20d: float = 0.0
@@ -138,13 +142,17 @@ class DecisionEngine:
         # ML skor: ml_score veya spec_score'dan yüksek olanı kullan
         ml_component = max(inp.ml_score, inp.spec_score * 0.9) if inp.spec_score > 0 else inp.ml_score
 
+        # Agent skor: agent_confidence > 0.5 ise ağırlık ver
+        agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
+
         components = {
-            "ml_score": ml_component * 0.30,
-            "technical": self._technical_score(inp) * 0.25,
+            "ml_score": ml_component * 0.25,
+            "agent": agent_component * 0.15,
+            "technical": self._technical_score(inp) * 0.20,
             "fundamental": self._fundamental_score(inp) * 0.15,
             "sentiment": self._sentiment_score(inp) * 0.10,
             "regime": self._regime_score(inp) * 0.10,
-            "risk": self._risk_score(inp) * 0.10,
+            "risk": self._risk_score(inp) * 0.05,
         }
 
         total = sum(components.values())

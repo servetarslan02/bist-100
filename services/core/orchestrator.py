@@ -23,6 +23,12 @@ class PipelineReport:
     date: str
     results: Dict[str, Any] = field(default_factory=dict)
     system_health: Dict[str, Any] = field(default_factory=dict)
+    agent_results: Dict[str, Any] = field(default_factory=dict)
+    top_opportunities: List[Dict] = field(default_factory=list)
+    regime: str = "UNKNOWN"
+    portfolio_recommendation: Dict[str, Any] = field(default_factory=dict)
+    learning_status: Dict[str, Any] = field(default_factory=dict)
+    alerts: List[str] = field(default_factory=list)
 
 
 class MasterOrchestrator:
@@ -207,6 +213,18 @@ class MasterOrchestrator:
             self._services["event_impact"] = analyze_event_impact
         except: pass
 
+        # === AGENT SYSTEM (Nihai Mimari) ===
+        try:
+            from services.agents.agent_pipeline import AgentPipelineOrchestrator
+            self._services["agent_pipeline"] = AgentPipelineOrchestrator(
+                enable_debate=True,
+                enable_memory=True,
+                enable_self_eval=True,
+            )
+            logger.info("Agent pipeline loaded")
+        except Exception as e:
+            logger.warning("Agent pipeline not available", error=str(e))
+
         self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
 
@@ -334,7 +352,85 @@ class MasterOrchestrator:
         except: pass
         result["factors"] = factors
 
-        # ━━━ 10. SIGNAL FUSION ━━━
+        # ━━━ 9.5. AGENT PIPELINE (Nihai Mimari) ━━━
+        agent_result = {}
+        try:
+            agent_pipe = self._services.get("agent_pipeline")
+            if agent_pipe:
+                import asyncio as _asyncio
+                try:
+                    loop = _asyncio.get_running_loop()
+                    # Zaten bir loop içinde — nested çalıştır
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as pool:
+                        future = pool.submit(
+                            _asyncio.run,
+                            agent_pipe.run(
+                                ticker=ticker,
+                                features=features,
+                                sector=sector_map.get(ticker, "UNKNOWN"),
+                                regime=regime,
+                                price=float(prices[-1]) if len(prices) > 0 else 0,
+                            )
+                        )
+                        agent_pipeline_result = future.result(timeout=180)
+                except RuntimeError:
+                    # Loop yok
+                    agent_pipeline_result = _asyncio.run(
+                        agent_pipe.run(
+                            ticker=ticker,
+                            features=features,
+                            sector=sector_map.get(ticker, "UNKNOWN"),
+                            regime=regime,
+                            price=float(prices[-1]) if len(prices) > 0 else 0,
+                        )
+                    )
+
+                agent_result = {
+                    "direction": agent_pipeline_result.direction,
+                    "confidence": agent_pipeline_result.confidence,
+                    "score": agent_pipeline_result.synthesis.weighted_score,
+                    "consensus": agent_pipeline_result.synthesis.consensus_reached,
+                    "debate_occurred": agent_pipeline_result.synthesis.debate_occurred,
+                    "risk_approved": agent_pipeline_result.synthesis.risk_approved,
+                    "reasoning": agent_pipeline_result.synthesis.reasoning[:300],
+                    "reasons": agent_pipeline_result.synthesis.reasons[:5],
+                    "risks": agent_pipeline_result.synthesis.risks[:5],
+                    "duration_ms": agent_pipeline_result.total_duration_ms,
+                }
+                logger.info("Agent pipeline completed",
+                           ticker=ticker,
+                           direction=agent_result["direction"],
+                           confidence=agent_result["confidence"])
+        except Exception as e:
+            logger.warning("Agent pipeline failed", ticker=ticker, error=str(e))
+        result["agent"] = agent_result
+
+        # Agent event publish
+        if agent_result and agent_result.get("direction"):
+            try:
+                eb = self._services.get("event_bus")
+                if eb:
+                    from services.core.event_schema import CanonicalEvent, EventType
+                    event = CanonicalEvent(
+                        event_type=EventType.AGENT_ANALYSIS_COMPLETED,
+                        payload={
+                            "ticker": ticker,
+                            "direction": agent_result.get("direction"),
+                            "confidence": agent_result.get("confidence"),
+                            "score": agent_result.get("score"),
+                            "consensus": agent_result.get("consensus"),
+                            "debate_occurred": agent_result.get("debate_occurred"),
+                        },
+                    )
+                    import asyncio as _asyncio
+                    try:
+                        _asyncio.get_event_loop().create_task(eb.publish("agent.analysis", event))
+                    except RuntimeError:
+                        pass
+            except: pass
+
+        # ━━━ 10. SIGNAL FUSION (Agent sonuçları dahil) ━━━
         fused_signal = {}
         try:
             sf = self._services.get("signal_fusion")
@@ -345,7 +441,10 @@ class MasterOrchestrator:
                     "momentum": {"direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT", "score": min(max(features.get("roc_20d", 0) + 50, 0), 100)},
                     "macro": {"direction": "NEUTRAL", "score": 50},
                     "valuation": {"direction": "NEUTRAL", "score": 50},
-                    "ai": {"direction": "NEUTRAL", "score": 50},
+                    "ai": {
+                        "direction": agent_result.get("direction", "NEUTRAL"),
+                        "score": agent_result.get("score", 50),
+                    },
                 }
                 fused = sf.fuse_signals(ticker, signals, regime)
                 fused_signal = fused.__dict__ if hasattr(fused, "__dict__") else {}
@@ -366,6 +465,10 @@ class MasterOrchestrator:
                     ml_confidence=fused_signal.get("fused_confidence", 0.5),
                     atr=features.get("atr_14", 0),
                     atr_pct=features.get("atr_pct", 0),
+                    # Agent sistemi
+                    agent_direction=agent_result.get("direction", "NEUTRAL"),
+                    agent_confidence=agent_result.get("confidence", 0.0),
+                    agent_score=agent_result.get("score", 50.0),
                 )
                 d = de.decide(inp)
                 decision = d.__dict__ if hasattr(d, "__dict__") else {}
@@ -466,11 +569,48 @@ class MasterOrchestrator:
             try:
                 calc = self._services.get("feature_calculator")
                 features = calc.compute_all_features(df, ticker=ticker) if calc else {}
+
+                # Agent pipeline (varsa)
+                agent_info = {}
+                try:
+                    agent_pipe = self._services.get("agent_pipeline")
+                    if agent_pipe and features:
+                        import asyncio as _asyncio
+                        try:
+                            loop = _asyncio.get_running_loop()
+                            import concurrent.futures
+                            with concurrent.futures.ThreadPoolExecutor() as pool:
+                                future = pool.submit(
+                                    _asyncio.run,
+                                    agent_pipe.run(
+                                        ticker=ticker,
+                                        features=features,
+                                        sector=sector_map.get(ticker, "UNKNOWN"),
+                                    )
+                                )
+                                agent_res = future.result(timeout=180)
+                        except RuntimeError:
+                            agent_res = _asyncio.run(
+                                agent_pipe.run(
+                                    ticker=ticker,
+                                    features=features,
+                                    sector=sector_map.get(ticker, "UNKNOWN"),
+                                )
+                            )
+                        agent_info = {
+                            "direction": agent_res.direction,
+                            "confidence": agent_res.confidence,
+                            "score": agent_res.synthesis.weighted_score,
+                        }
+                except Exception as e:
+                    agent_info = {"error": str(e)}
+
                 per_ticker_results[ticker] = {
                     "ticker": ticker,
                     "sector": sector_map.get(ticker, "UNKNOWN"),
                     "features": features,
                     "feature_count": len(features),
+                    "agent": agent_info,
                     "error": None,
                 }
                 if not features:
@@ -502,10 +642,32 @@ class MasterOrchestrator:
             "errors": errors,
         }
 
+        # Agent sonuçlarından top_opportunities oluştur
+        top_opportunities = []
+        agent_results_all = {}
+        for ticker, data in per_ticker_results.items():
+            agent = data.get("agent", {})
+            if agent and agent.get("direction") in ["LONG", "SHORT"]:
+                top_opportunities.append({
+                    "ticker": ticker,
+                    "direction": agent.get("direction", "NEUTRAL"),
+                    "score": agent.get("score", 50),
+                    "confidence": agent.get("confidence", 0),
+                    "sector": data.get("sector", "UNKNOWN"),
+                })
+                agent_results_all[ticker] = agent
+
+        # Score'a göre sırala
+        top_opportunities.sort(key=lambda x: x["score"], reverse=True)
+        for i, opp in enumerate(top_opportunities[:20], 1):
+            opp["rank"] = i
+
         return PipelineReport(
             date=date,
             results=per_ticker_results,
             system_health=system_health,
+            agent_results=agent_results_all,
+            top_opportunities=top_opportunities[:20],
         )
 
     def get_status(self) -> Dict[str, Any]:
