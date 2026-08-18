@@ -174,6 +174,8 @@ TOPICS = [
     "risk.changed", "risk.alert", "kill_switch.triggered",
     "decision.created", "order.placed", "order.filled",
     "prediction.created", "outcome.created",
+    "breadth.alert", "liquidity.alert", "regime.transition",
+    "anomaly.cluster", "sentiment.shift", "multi_tf.divergence",
     "bar.1m", "bar.5m", "bar.15m", "bar.1h", "bar.1d",
 ]
 

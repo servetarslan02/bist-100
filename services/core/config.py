@@ -94,6 +94,47 @@ class Settings(BaseSettings):
     interval_market_data: int = Field(default=120, alias="INTERVAL_MARKET_DATA")
     interval_ranking: int = Field(default=600, alias="INTERVAL_RANKING")
 
+    # =====================================================
+    # Market State Settings
+    # =====================================================
+
+    # Breadth Engine
+    breadth_mcclellan_ema_short: int = Field(default=19, alias="BREADTH_MCCLELLAN_EMA_SHORT")
+    breadth_mcclellan_ema_long: int = Field(default=39, alias="BREADTH_MCCLELLAN_EMA_LONG")
+    breadth_thrust_threshold: float = Field(default=0.615, alias="BREADTH_THRUST_THRESHOLD")
+    breadth_liquidity_volume_min: float = Field(default=10000, alias="BREADTH_LIQUIDITY_VOLUME_MIN")
+
+    # Regime Detection
+    regime_hmm_weight: float = Field(default=0.30, alias="REGIME_HMM_WEIGHT")
+    regime_score_weight: float = Field(default=0.50, alias="REGIME_SCORE_WEIGHT")
+    regime_gmm_weight: float = Field(default=0.20, alias="REGIME_GMM_WEIGHT")
+    regime_rolling_window: int = Field(default=63, alias="REGIME_ROLLING_WINDOW")
+    regime_confidence_min: float = Field(default=0.30, alias="REGIME_CONFIDENCE_MIN")
+    regime_transition_stability_window: int = Field(default=20, alias="REGIME_TRANSITION_STABILITY_WINDOW")
+
+    # Risk Appetite Weights
+    risk_appetite_breadth_weight: float = Field(default=0.30, alias="RISK_APPETITE_BREADTH_WEIGHT")
+    risk_appetite_momentum_weight: float = Field(default=0.20, alias="RISK_APPETITE_MOMENTUM_WEIGHT")
+    risk_appetite_volatility_weight: float = Field(default=0.20, alias="RISK_APPETITE_VOLATILITY_WEIGHT")
+    risk_appetite_rsi_weight: float = Field(default=0.10, alias="RISK_APPETITE_RSI_WEIGHT")
+    risk_appetite_sentiment_weight: float = Field(default=0.10, alias="RISK_APPETITE_SENTIMENT_WEIGHT")
+    risk_appetite_macro_weight: float = Field(default=0.10, alias="RISK_APPETITE_MACRO_WEIGHT")
+
+    # Multi-Timeframe
+    multi_tf_intraday_interval: str = Field(default="15min", alias="MULTI_TF_INTRADAY_INTERVAL")
+    multi_tf_daily_interval: str = Field(default="1d", alias="MULTI_TF_DAILY_INTERVAL")
+    multi_tf_weekly_interval: str = Field(default="1w", alias="MULTI_TF_WEEKLY_INTERVAL")
+    multi_tf_monthly_interval: str = Field(default="1M", alias="MULTI_TF_MONTHLY_INTERVAL")
+
+    # Liquidity State
+    liquidity_spread_threshold: float = Field(default=0.02, alias="LIQUIDITY_SPREAD_THRESHOLD")
+    liquidity_volume_participation_min: float = Field(default=0.005, alias="LIQUIDITY_VOLUME_PARTICIPATION_MIN")
+
+    # Sentiment State
+    sentiment_news_weight: float = Field(default=0.50, alias="SENTIMENT_NEWS_WEIGHT")
+    sentiment_social_weight: float = Field(default=0.30, alias="SENTIMENT_SOCIAL_WEIGHT")
+    sentiment_options_weight: float = Field(default=0.20, alias="SENTIMENT_OPTIONS_WEIGHT")
+
     @property
     def is_production(self) -> bool:
         """Production ortaminda mi?"""

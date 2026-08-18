@@ -62,6 +62,14 @@ class EventType(str, Enum):
     PREDICTION_CREATED = "prediction.created"
     OUTCOME_CREATED = "outcome.created"
 
+    # Market State Engine v2.0
+    BREADTH_ALERT = "breadth.alert"
+    LIQUIDITY_ALERT = "liquidity.alert"
+    REGIME_TRANSITION = "regime.transition"
+    ANOMALY_CLUSTER = "anomaly.cluster"
+    SENTIMENT_SHIFT = "sentiment.shift"
+    MULTI_TF_DIVERGENCE = "multi_tf.divergence"
+
 
 class EventMetadata(BaseModel):
     provider: str = ""
