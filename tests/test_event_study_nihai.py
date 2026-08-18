@@ -346,19 +346,37 @@ class TestKAPEvent:
 
     def test_analyze_kap_event(self):
         from services.event_study.kap_event import analyze_kap_event
-        sr = np.random.randn(20) * 0.02
-        mr = np.random.randn(20) * 0.015
+        est_sr = np.random.randn(100) * 0.02
+        est_mr = np.random.randn(100) * 0.015
+        evt_sr = np.random.randn(11) * 0.02
+        evt_mr = np.random.randn(11) * 0.015
         r = analyze_kap_event(
             ticker="THYAO",
             event_description="Finansal sonuçlar açıklandı",
+            event_date=datetime(2025, 6, 15),
+            estimation_stock_returns=est_sr,
+            estimation_market_returns=est_mr,
+            event_stock_returns=evt_sr,
+            event_market_returns=evt_mr,
+        )
+        assert r["ticker"] == "THYAO"
+        assert "car" in r
+        assert "significance" in r
+        assert "impact" in r
+
+    def test_analyze_kap_event_simple(self):
+        from services.event_study.kap_event import analyze_kap_event_simple
+        sr = np.random.randn(50) * 0.02
+        mr = np.random.randn(50) * 0.015
+        r = analyze_kap_event_simple(
+            ticker="THYAO",
+            event_description="Finansal sonuçlar",
             event_date=datetime(2025, 6, 15),
             stock_returns=sr,
             market_returns=mr,
         )
         assert r["ticker"] == "THYAO"
         assert "car" in r
-        assert "significance" in r
-        assert "impact" in r
 
 
 # ─── Macro Event Tests ───
@@ -678,14 +696,18 @@ class TestIntegration:
 
         events = []
         for i in range(5):
-            sr = np.random.randn(20) * 0.02
-            mr = np.random.randn(20) * 0.015
+            est_sr = np.random.randn(100) * 0.02
+            est_mr = np.random.randn(100) * 0.015
+            evt_sr = np.random.randn(11) * 0.02
+            evt_mr = np.random.randn(11) * 0.015
             r = analyze_kap_event(
                 ticker=f"STOCK{i}",
                 event_description="Finansal sonuçlar",
                 event_date=datetime(2025, 6, 15),
-                stock_returns=sr,
-                market_returns=mr,
+                estimation_stock_returns=est_sr,
+                estimation_market_returns=est_mr,
+                event_stock_returns=evt_sr,
+                event_market_returns=evt_mr,
             )
             events.append(r)
 

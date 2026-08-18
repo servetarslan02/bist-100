@@ -281,10 +281,10 @@ impact_engine = ImpactEngine()
 def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, market_returns: list) -> Dict[str, Any]:
     """Event study ile olay etkisi analizi."""
     try:
-        from services.event_study.kap_event import analyze_kap_event
+        from services.event_study.kap_event import analyze_kap_event_simple
         from services.event_study.impact import calculate_event_impact
         from datetime import datetime
-        result = analyze_kap_event(
+        result = analyze_kap_event_simple(
             ticker=ticker,
             event_description=event_type,
             event_date=datetime.now(),

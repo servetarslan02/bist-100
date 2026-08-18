@@ -37,11 +37,19 @@ class CrossSectionalEventStudy:
 
         # Genel istatistikler
         mean_car = float(np.mean(cars))
-        std_car = float(np.std(cars, ddof=1))
-        std_error = std_car / np.sqrt(n) if n > 0 else 0.0
-        t_stat = mean_car / std_error if std_error > 0 else 0.0
-        df = n - 1
-        p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=max(df, 1)))
+        if n >= 2:
+            std_car = float(np.std(cars, ddof=1))
+            std_error = std_car / np.sqrt(n)
+            t_stat = mean_car / std_error if std_error > 0 else 0.0
+            df = n - 1
+            p_value = 2 * (1 - stats.t.cdf(abs(t_stat), df=df))
+        else:
+            # n=1: t-test yapılamaz
+            std_car = 0.0
+            std_error = 0.0
+            t_stat = 0.0
+            df = 0
+            p_value = 1.0
 
         result = {
             "average_car": round(mean_car, 4),

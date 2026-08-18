@@ -121,7 +121,8 @@ def analyze_tcmb_event(
         impact_level = "LOW"
 
     # BIST-100 CAR
-    n = len(market_returns)
+    mr = np.array(market_returns, dtype=float)
+    n = len(mr)
     if n < 3:
         return {
             "surprise": round(surprise, 4),
@@ -131,7 +132,7 @@ def analyze_tcmb_event(
         }
 
     # Market AR (market model: beta=1, alpha=0 → BIST-100 kendi getirisi)
-    bist_ar = market_returns[:n]
+    bist_ar = mr[:n]
     bist_car = calculate_car(bist_ar)
 
     # İstatistiksel test
@@ -140,8 +141,9 @@ def analyze_tcmb_event(
     # USDTRY reaksiyonu
     fx_reaction = None
     if usdtry_returns is not None and len(usdtry_returns) > 0:
-        fx_car = calculate_car(usdtry_returns[:n])
-        fx_significance = test_significance(fx_car, usdtry_returns[:n])
+        fx_ar = np.array(usdtry_returns, dtype=float)[:n]
+        fx_car = calculate_car(fx_ar)
+        fx_significance = test_significance(fx_car, fx_ar)
         fx_reaction = {
             "usdtry_car": round(fx_car, 4),
             "significant": fx_significance["significant"],
@@ -152,7 +154,7 @@ def analyze_tcmb_event(
     sector_breakdown = {}
     if sector_returns:
         for sector, rets in sector_returns.items():
-            s_ar = rets[:n]
+            s_ar = np.array(rets, dtype=float)[:n]
             s_car = calculate_car(s_ar)
             s_sig = test_significance(s_car, s_ar)
             sector_breakdown[sector] = {
@@ -236,14 +238,15 @@ def analyze_macro_event(
         expected_bist = "NEUTRAL"
 
     # BIST CAR
-    n = len(market_returns)
-    bist_car = calculate_car(market_returns[:n]) if n > 0 else 0.0
-    significance = test_significance(bist_car, market_returns[:n]) if n > 2 else {"significant": False}
+    mr = np.array(market_returns, dtype=float)
+    n = len(mr)
+    bist_car = calculate_car(mr[:n]) if n > 0 else 0.0
+    significance = test_significance(bist_car, mr[:n]) if n > 2 else {"significant": False}
 
     # USDTRY
     fx_car = 0.0
     if usdtry_returns is not None and len(usdtry_returns) > 0:
-        fx_car = calculate_car(usdtry_returns[:n])
+        fx_car = calculate_car(np.array(usdtry_returns, dtype=float)[:n])
 
     # Impact level
     abs_surprise_pct = abs(surprise_pct)

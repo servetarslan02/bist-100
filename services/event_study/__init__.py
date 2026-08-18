@@ -44,7 +44,7 @@ from .statistical_test import (
     wilcoxon_test,
 )
 from .impact import calculate_event_impact, calculate_impact_batch
-from .kap_event import classify_kap_event, analyze_kap_event, analyze_kap_events_batch
+from .kap_event import classify_kap_event, analyze_kap_event, analyze_kap_event_simple, analyze_kap_events_batch
 from .macro_event import (
     analyze_tcmb_event,
     analyze_macro_event,
@@ -88,6 +88,7 @@ __all__ = [
     "calculate_impact_batch",
     "classify_kap_event",
     "analyze_kap_event",
+    "analyze_kap_event_simple",
     "analyze_kap_events_batch",
     "analyze_tcmb_event",
     "analyze_macro_event",

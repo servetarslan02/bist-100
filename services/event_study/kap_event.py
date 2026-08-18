@@ -2,6 +2,7 @@
 
 KAP açıklamaları için detaylı event study.
 Event type mapping, event-specific window sizes, clustering detection.
+MacKinlay (1997) — estimation window ayrı, event window ayrı.
 """
 import numpy as np
 from typing import Dict, List, Any, Optional
@@ -126,21 +127,28 @@ def analyze_kap_event(
     ticker: str,
     event_description: str,
     event_date: datetime,
-    stock_returns: np.ndarray,
-    market_returns: np.ndarray,
+    estimation_stock_returns: np.ndarray,
+    estimation_market_returns: np.ndarray,
+    event_stock_returns: np.ndarray,
+    event_market_returns: np.ndarray,
     dates: Optional[np.ndarray] = None,
     volume_data: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
-    """KAP açıklaması için detaylı event study.
+    """KAP açıklaması için detaylı event study (MacKinlay 1997 uyumlu).
+
+    Estimation window ve event window AYRI veri ile çalışır.
+    Look-ahead bias önlenir.
 
     Args:
         ticker: Hisse kodu
         event_description: KAP açıklama metni
         event_date: Event tarihi
-        stock_returns: Hisse getirileri (event window)
-        market_returns: BIST-100 getirileri (event window)
-        dates: Tarih dizisi (opsiyonel)
-        volume_data: Hacim verisi (opsiyonel)
+        estimation_stock_returns: Estimation window hisse getirileri
+        estimation_market_returns: Estimation window BIST-100 getirileri
+        event_stock_returns: Event window hisse getirileri
+        event_market_returns: Event window BIST-100 getirileri
+        dates: Event window tarih dizisi (opsiyonel)
+        volume_data: Event window hacim verisi (opsiyonel)
 
     Returns:
         Dict with event_type, car, impact, significance, classification
@@ -155,51 +163,44 @@ def analyze_kap_event(
     classification = classify_kap_event(event_description)
     event_type = classification["event_type"]
 
+    # Tip dönüşümü
+    est_sr = np.array(estimation_stock_returns, dtype=float)
+    est_mr = np.array(estimation_market_returns, dtype=float)
+    evt_sr = np.array(event_stock_returns, dtype=float)
+    evt_mr = np.array(event_market_returns, dtype=float)
+
     # Veri kontrolü
-    n = min(len(stock_returns), len(market_returns))
-    if n < 5:
-        logger.warning("insufficient_data_for_kap_event", ticker=ticker, n=n)
-        return {
-            "ticker": ticker,
-            "event_type": event_type,
-            "event_date": event_date.isoformat() if isinstance(event_date, datetime) else str(event_date),
-            "error": "Yetersiz veri",
-            "car": 0.0,
-            "significant": False,
-        }
+    if len(est_sr) < 10 or len(est_mr) < 10:
+        logger.warning("insufficient_estimation_data", ticker=ticker, n_est=len(est_sr))
+        return _error_result(ticker, event_type, event_date, "Estimation verisi yetersiz")
 
-    sr = stock_returns[:n]
-    mr = market_returns[:n]
+    if len(evt_sr) < 3 or len(evt_mr) < 3:
+        logger.warning("insufficient_event_data", ticker=ticker, n_evt=len(evt_sr))
+        return _error_result(ticker, event_type, event_date, "Event verisi yetersiz")
 
-    # Expected return modeli
-    params = calculate_expected_return(sr, mr, model="market")
+    # 1. Estimation window → model parametreleri
+    params = calculate_expected_return(est_sr, est_mr, model="market")
 
-    # Abnormal return
-    ar = calculate_abnormal_return(sr, mr, params["alpha"], params["beta_market"])
+    # 2. Event window → abnormal return
+    n_evt = min(len(evt_sr), len(evt_mr))
+    ar = calculate_abnormal_return(evt_sr[:n_evt], evt_mr[:n_evt], params["alpha"], params["beta_market"])
 
-    # CAR
+    # 3. CAR
     car = calculate_car(ar)
 
-    # Alt pencereler için CAR
+    # 4. Alt pencereler için CAR
     sub_cars = {}
     if dates is not None:
-        day_offsets = np.array([(d - event_date).days for d in dates[:n]])
+        day_offsets = np.array([(d - event_date).days for d in dates[:n_evt]])
         sub_cars = calculate_car_sub_windows(ar, day_offsets)
 
-    # İstatistiksel test
-    n_params = 2  # market model
-    significance = test_significance(car, ar, n_params=n_params)
+    # 5. İstatistiksel test
+    significance = test_significance(car, ar, n_params=2)
 
-    # Hacim analizi
-    volume_change = 0.0
-    if volume_data is not None and len(volume_data) > 1:
-        vol = volume_data[:n]
-        if len(vol) > 5:
-            recent_vol = np.mean(vol[-3:])
-            base_vol = np.mean(vol[:-3])
-            volume_change = (recent_vol - base_vol) / base_vol if base_vol > 0 else 0.0
+    # 6. Hacim analizi
+    volume_change = _calculate_volume_change(volume_data, n_evt)
 
-    # Etki skoru
+    # 7. Etki skoru
     impact = calculate_event_impact(
         car=car,
         p_value=significance["p_value"],
@@ -237,16 +238,79 @@ def analyze_kap_event(
     return result
 
 
+def analyze_kap_event_simple(
+    ticker: str,
+    event_description: str,
+    event_date: datetime,
+    stock_returns: np.ndarray,
+    market_returns: np.ndarray,
+    estimation_ratio: float = 0.7,
+    dates: Optional[np.ndarray] = None,
+    volume_data: Optional[np.ndarray] = None,
+) -> Dict[str, Any]:
+    """Basitleştirilmiş KAP event study — tek veri setini estimation/event olarak böler.
+
+    Veriyi estimation_ratio oranında estimation ve event window olarak ayırır.
+    Tam veri olmadığında pratik çözüm.
+
+    Args:
+        ticker: Hisse kodu
+        event_description: KAP açıklama metni
+        event_date: Event tarihi
+        stock_returns: Tüm getiri serisi (estimation + event)
+        market_returns: Tüm piyasa getiri serisi
+        estimation_ratio: Estimation window oranı (default: %70)
+        dates: Tarih dizisi
+        volume_data: Hacim verisi
+
+    Returns:
+        Dict with event_type, car, impact, significance
+    """
+    sr = np.array(stock_returns, dtype=float)
+    mr = np.array(market_returns, dtype=float)
+    n = min(len(sr), len(mr))
+
+    if n < 10:
+        classification = classify_kap_event(event_description)
+        return _error_result(ticker, classification["event_type"], event_date, "Yetersiz veri")
+
+    # Veriyi estimation ve event olarak böl
+    split_idx = int(n * estimation_ratio)
+    if split_idx < 5:
+        split_idx = 5
+    if n - split_idx < 3:
+        split_idx = n - 3
+
+    est_sr = sr[:split_idx]
+    est_mr = mr[:split_idx]
+    evt_sr = sr[split_idx:]
+    evt_mr = mr[split_idx:]
+
+    return analyze_kap_event(
+        ticker=ticker,
+        event_description=event_description,
+        event_date=event_date,
+        estimation_stock_returns=est_sr,
+        estimation_market_returns=est_mr,
+        event_stock_returns=evt_sr,
+        event_market_returns=evt_mr,
+        dates=dates[split_idx:] if dates is not None else None,
+        volume_data=volume_data[split_idx:] if volume_data is not None else None,
+    )
+
+
 def analyze_kap_events_batch(
     events: List[Dict[str, Any]],
-    market_returns: np.ndarray,
+    estimation_market_returns: np.ndarray,
+    event_market_returns: np.ndarray,
     dates: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """Birden fazla KAP event'i için toplu analiz.
 
     Args:
-        events: [{ticker, description, date, stock_returns, volume_data}]
-        market_returns: BIST-100 getirileri
+        events: [{ticker, description, date, estimation_stock_returns, event_stock_returns}]
+        estimation_market_returns: Estimation window BIST-100 getirileri
+        event_market_returns: Event window BIST-100 getirileri
         dates: Tarih dizisi
 
     Returns:
@@ -260,8 +324,10 @@ def analyze_kap_events_batch(
             ticker=event["ticker"],
             event_description=event.get("description", ""),
             event_date=event["date"],
-            stock_returns=event["stock_returns"],
-            market_returns=market_returns,
+            estimation_stock_returns=event["estimation_stock_returns"],
+            estimation_market_returns=estimation_market_returns,
+            event_stock_returns=event["event_stock_returns"],
+            event_market_returns=event_market_returns,
             dates=dates,
             volume_data=event.get("volume_data"),
         )
@@ -278,10 +344,33 @@ def analyze_kap_events_batch(
             "n_events": len(results),
             "n_significant": sum(1 for r in results if r.get("significance", {}).get("significant", False)),
             "mean_car": round(float(np.mean([r["car"] for r in results])), 4) if results else 0,
-            "event_type_distribution": {
-                r["event_type"]: sum(1 for x in results if x["event_type"] == r["event_type"])
-                for set_r in [set(r["event_type"] for r in results)]
-                for r in results
-            },
         },
+    }
+
+
+def _calculate_volume_change(volume_data: Optional[np.ndarray], n: int) -> float:
+    """Hacim değişimi hesapla."""
+    if volume_data is None or len(volume_data) < 2:
+        return 0.0
+    vol = np.array(volume_data, dtype=float)[:n]
+    if len(vol) > 5:
+        recent_vol = np.mean(vol[-3:])
+        base_vol = np.mean(vol[:-3])
+        return (recent_vol - base_vol) / base_vol if base_vol > 0 else 0.0
+    return 0.0
+
+
+def _error_result(
+    ticker: str, event_type: str, event_date: Any, error_msg: str
+) -> Dict[str, Any]:
+    """Hata sonuç şablonu."""
+    return {
+        "ticker": ticker,
+        "event_type": event_type,
+        "event_date": event_date.isoformat() if isinstance(event_date, datetime) else str(event_date),
+        "error": error_msg,
+        "car": 0.0,
+        "significant": False,
+        "significance": {"t_statistic": 0.0, "p_value": 1.0, "significant": False},
+        "impact": {"impact_score": 0.0, "direction": "NEUTRAL", "significant": False, "impact_level": "LOW"},
     }

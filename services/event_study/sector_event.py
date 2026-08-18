@@ -64,9 +64,8 @@ class SectorEventAnalyzer:
             sector_ar = calculate_abnormal_return(sector_returns, market_returns, alpha, beta)
             sector_car = calculate_car(sector_ar)
 
-        # BIST-100 AR
-        bist_ar = calculate_abnormal_return(market_returns, market_returns, 0.0, 1.0)
-        bist_car = calculate_car(bist_ar)
+        # BIST-100 CAR = kümülatif getiri (market kendi benchmark'ı → AR=0, raw return kullan)
+        bist_car = float(np.sum(market_returns))
 
         # Relative performance
         relative_car = stock_car - bist_car
