@@ -484,7 +484,52 @@ def assess_portfolio_risk(portfolio: Dict, market_data: Dict = None) -> Dict[str
         from .monitoring import RiskMonitor
         result["monitoring"] = "available"
     except: pass
+    # VIOP Risk Integration
+    try:
+        from ..viop.enhanced_options import viop_risk
+        result["viop_risk"] = "available"
+    except: pass
     return result
+
+
+def assess_viop_risk(
+    viop_positions: List[Dict[str, Any]],
+    portfolio_value: float,
+) -> Dict[str, Any]:
+    """VIOP pozisyonları için risk değerlendirmesi.
+
+    Args:
+        viop_positions: VIOP pozisyon listesi
+            [{"ticker", "type", "side", "quantity", "entry_price",
+              "current_price", "delta", "gamma", "vega", "contract_multiplier"}]
+        portfolio_value: Toplam portföy değeri
+
+    Returns:
+        Risk metrikleri + risk flags
+    """
+    try:
+        from ..viop.enhanced_options import viop_risk
+
+        risk_result = viop_risk.calculate_portfolio_viop_risk(
+            viop_positions, portfolio_value
+        )
+
+        margin_result = viop_risk.calculate_margin_requirement(viop_positions)
+
+        margin_adequate = portfolio_value >= margin_result["total_margin"]
+
+        return {
+            **risk_result,
+            "margin": margin_result,
+            "margin_adequate": margin_adequate,
+            "margin_surplus": round(portfolio_value - margin_result["total_margin"], 2),
+            "margin_utilization_pct": round(
+                margin_result["total_margin"] / portfolio_value * 100, 2
+            ) if portfolio_value > 0 else 0,
+        }
+    except Exception as e:
+        logger.error(f"VIOP risk assessment failed: {e}")
+        return {"error": str(e), "viop_risk": "unavailable"}
 
 
 if __name__ == "__main__":
