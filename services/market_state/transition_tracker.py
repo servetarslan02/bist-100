@@ -309,6 +309,90 @@ class RegimeTransitionTracker:
         except Exception:
             return 0.0
 
+    def check_alerts(self) -> List[Dict[str, Any]]:
+        """Alert kontrolü — rejim değişimi, kararlılık, beklenmedik geçiş.
+
+        Returns:
+            Alert listesi [{type, severity, message, ...}]
+        """
+        alerts = []
+
+        # 1. Son rejim değişimi alert'i
+        if self._transitions:
+            last = self._transitions[-1]
+            # Son 1 saat içinde geçiş var mı?
+            now = datetime.now(timezone.utc)
+            hours_since = (now - last.timestamp).total_seconds() / 3600
+
+            if hours_since < 1:
+                severity = "WARNING" if last.to_regime in ("CRISIS", "BEAR", "RISK_OFF") else "INFO"
+                alerts.append({
+                    "type": "REGIME_TRANSITION",
+                    "severity": severity,
+                    "message": f"Rejim değişimi: {last.from_regime} → {last.to_regime} (süre: {last.duration_days:.1f} gün)",
+                    "from_regime": last.from_regime,
+                    "to_regime": last.to_regime,
+                    "duration_days": round(last.duration_days, 1),
+                    "timestamp": last.timestamp.isoformat(),
+                })
+
+        # 2. Kararlılık uyarısı
+        stability = self._compute_stability()
+        if stability < 0.3:
+            alerts.append({
+                "type": "LOW_STABILITY",
+                "severity": "WARNING",
+                "message": f"Piyasa çok kararsız — stability skoru: {stability:.2f}",
+                "stability_score": round(stability, 4),
+            })
+        elif stability < 0.5:
+            alerts.append({
+                "type": "LOW_STABILITY",
+                "severity": "INFO",
+                "message": f"Piyasa kararsız — stability skoru: {stability:.2f}",
+                "stability_score": round(stability, 4),
+            })
+
+        # 3. Beklenmedik geçiş (CRISIS → BULL gibi)
+        if self._transitions:
+            last = self._transitions[-1]
+            unexpected_pairs = {
+                ("CRISIS", "BULL"), ("CRISIS", "RISK_ON"),
+                ("BEAR", "BULL"), ("RISK_OFF", "RISK_ON"),
+                ("MOMENTUM_CONTRACTION", "MOMENTUM_EXPANSION"),
+            }
+            pair = (last.from_regime, last.to_regime)
+            if pair in unexpected_pairs:
+                alerts.append({
+                    "type": "UNEXPECTED_TRANSITION",
+                    "severity": "WARNING",
+                    "message": f"Beklenmedik geçiş: {last.from_regime} → {last.to_regime} — doğrulama gerekli",
+                    "from_regime": last.from_regime,
+                    "to_regime": last.to_regime,
+                })
+
+        # 4. Confidence trend uyarısı
+        trend = self._compute_confidence_trend()
+        if trend == "DECREASING":
+            alerts.append({
+                "type": "CONFIDENCE_DECLINING",
+                "severity": "INFO",
+                "message": "Rejim confidence'ı düşüyor — kararlılık azalıyor",
+            })
+
+        # 5. Uzun süren rejim uyarısı (30+ gün aynı rejim)
+        current_duration = self.get_current_regime_duration()
+        if current_duration > 30:
+            alerts.append({
+                "type": "LONG_REGIME",
+                "severity": "INFO",
+                "message": f"{self._current_regime} rejimi {current_duration:.0f} gündür devam ediyor — değişim yaklaşıyor olabilir",
+                "regime": self._current_regime,
+                "duration_days": round(current_duration, 1),
+            })
+
+        return alerts
+
     def reset(self):
         """Tüm state sıfırla (backtest için)."""
         self._history = []

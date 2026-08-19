@@ -44,8 +44,10 @@ from .component_states import ComponentStateEngine, ComponentStates
 from .ensemble_regime import EnsembleRegimeDetector, EnsembleResult
 from .transition_tracker import RegimeTransitionTracker
 from .risk_appetite import RiskAppetiteEngine
-from .multi_timeframe import MultiTimeframeEngine
+from .multi_timeframe import MultiTimeframeEngine, MultiTimeframeResult
 from .output_formatter import MarketStateFormatter, MarketStateOutput
+from .monitoring import market_state_monitor
+from .api import register_market_state_routes
 
 logger = structlog.get_logger()
 
@@ -158,6 +160,47 @@ class MarketStateService:
             self._consumer.stop()
         await close_databases()
         logger.info("Market State Engine v2.0 stopped")
+
+    # API getter methods
+    def get_current_state(self) -> Optional[MarketStateOutput]:
+        """Mevcut market state döndür (API için)."""
+        return self._last_market_state
+
+    def get_breadth(self) -> Optional[BreadthResult]:
+        """Son breadth sonucu döndür (API için)."""
+        states = list(self._instrument_states.values())
+        if not states:
+            return None
+        return self._breadth_engine.compute(states)
+
+    def get_ensemble_regime(self) -> Optional[EnsembleResult]:
+        """Son ensemble regime sonucu döndür (API için)."""
+        if not self._instrument_states:
+            return None
+        states = list(self._instrument_states.values())
+        features = self._build_feature_dict(
+            self._breadth_engine.compute(states),
+            self._component_engine.compute_all(states),
+        )
+        returns = np.array(self._returns_history) if self._returns_history else None
+        volatility = np.array(self._volatility_history) if self._volatility_history else None
+        return self._ensemble_detector.detect(features, returns, volatility)
+
+    def get_transition_tracker(self) -> Optional[RegimeTransitionTracker]:
+        """Transition tracker'ı döndür (API için)."""
+        return self._transition_tracker
+
+    def get_multi_timeframe(self) -> Optional[MultiTimeframeResult]:
+        """Son multi-timeframe sonucu döndür (API için)."""
+        if not self._instrument_states:
+            return None
+        states = list(self._instrument_states.values())
+        features = self._build_feature_dict(
+            self._breadth_engine.compute(states),
+            self._component_engine.compute_all(states),
+        )
+        daily_data = {"instruments": states, "features": features}
+        return self._multi_tf.compute_all_timeframes({"daily": daily_data})
 
     async def _load_instruments(self):
         """Load instrument mapping — BIST universe."""
@@ -375,6 +418,30 @@ class MarketStateService:
 
             # 10. Publish events
             await self._publish_events(ensemble, breadth, components, transition_stats)
+
+            # 10.5 Transition alerts
+            transition_alerts = self._transition_tracker.check_alerts()
+            for alert in transition_alerts:
+                logger.warning("transition_alert", **alert)
+
+            # 11. Monitoring update
+            try:
+                market_state_monitor.update(
+                    regime=ensemble.regime,
+                    confidence=ensemble.confidence,
+                    consensus=ensemble.consensus,
+                    stability=transition_stats.stability_score,
+                    transition_count=transition_stats.total_transitions,
+                    breadth_pct=breadth.pct_advancing,
+                    mcclellan=breadth.mcclellan_osc,
+                    trin=breadth.trin,
+                    thrust=breadth.breadth_thrust,
+                    risk_appetite=risk_appetite,
+                    alert_count=len(transition_alerts),
+                    critical_alerts=sum(1 for a in transition_alerts if a.get("severity") == "WARNING"),
+                )
+            except Exception:
+                pass
 
             logger.info(
                 "Market state computed",

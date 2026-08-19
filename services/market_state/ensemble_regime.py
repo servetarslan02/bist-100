@@ -372,6 +372,87 @@ class EnsembleRegimeDetector:
             self._hmm_weight /= total
             self._gmm_weight /= total
 
+    def optimize_weights_from_history(
+        self,
+        regime_history: List[Dict[str, Any]],
+        lookback: int = 100,
+    ) -> Dict[str, float]:
+        """Geçmiş rejim tahminlerinden ağırlık optimizasyonu.
+
+        Backtest sonucu hangi yöntem daha doğruysa onun ağırlığını artırır.
+
+        Args:
+            regime_history: [{actual_regime, score_regime, hmm_regime, gmm_regime, timestamp}]
+            lookback: Son N gözlem
+
+        Returns:
+            Optimized weights {score, hmm, gmm}
+        """
+        if len(regime_history) < 10:
+            return {"score": self._score_weight, "hmm": self._hmm_weight, "gmm": self._gmm_weight}
+
+        recent = regime_history[-lookback:]
+
+        # Her yöntemin doğruluğunu hesapla
+        score_correct = 0
+        hmm_correct = 0
+        gmm_correct = 0
+        score_total = 0
+        hmm_total = 0
+        gmm_total = 0
+
+        for entry in recent:
+            actual = entry.get("actual_regime", "")
+            if not actual:
+                continue
+
+            if entry.get("score_regime"):
+                score_total += 1
+                if entry["score_regime"] == actual:
+                    score_correct += 1
+
+            if entry.get("hmm_regime"):
+                hmm_total += 1
+                if entry["hmm_regime"] == actual:
+                    hmm_correct += 1
+
+            if entry.get("gmm_regime"):
+                gmm_total += 1
+                if entry["gmm_regime"] == actual:
+                    gmm_correct += 1
+
+        # Accuracy
+        score_acc = score_correct / max(score_total, 1)
+        hmm_acc = hmm_correct / max(hmm_total, 1)
+        gmm_acc = gmm_correct / max(gmm_total, 1)
+
+        total_acc = score_acc + hmm_acc + gmm_acc
+        if total_acc < 1e-8:
+            return {"score": self._score_weight, "hmm": self._hmm_weight, "gmm": self._gmm_weight}
+
+        # Normalize to weights
+        optimized = {
+            "score": round(score_acc / total_acc, 4),
+            "hmm": round(hmm_acc / total_acc, 4),
+            "gmm": round(gmm_acc / total_acc, 4),
+        }
+
+        logger.info("ensemble_weights_optimized",
+                     score_acc=round(score_acc, 3),
+                     hmm_acc=round(hmm_acc, 3),
+                     gmm_acc=round(gmm_acc, 3),
+                     optimized_weights=optimized)
+
+        return optimized
+
+    def get_weights(self) -> Dict[str, float]:
+        """Mevcut ağırlıkları döndür."""
+        return {
+            "score": self._score_weight,
+            "hmm": self._hmm_weight,
+            "gmm": self._gmm_weight,
+        }
+
     def get_regime_adapted_weights(self, preliminary_regime: str) -> Dict[str, float]:
         """Rejime göre ağırlık adaptasyonu.
 
