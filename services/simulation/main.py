@@ -188,25 +188,58 @@ class SimulationEngine:
         return result
 
     async def _run_scenario_analysis(self, params: Dict) -> Dict[str, Any]:
-        """Run scenario analysis."""
+        """Run scenario analysis — beta ve sektör bazlı.
+
+        Her pozisyon için:
+        - Beta ayarlaması (market beta × market change)
+        - Sektör bazlı etki
+        - USD hassasiyeti
+        """
         ticker = params.get("ticker")
         portfolio_id = params.get("portfolio_id")
 
-        # Define scenarios
+        # Senaryolar: piyasa etkisi + sektör rotasyonu + makro
         scenarios = [
-            {"name": "Bull", "market_change": 5, "probability": 0.25},
-            {"name": "Base", "market_change": 0, "probability": 0.50},
-            {"name": "Bear", "market_change": -5, "probability": 0.20},
-            {"name": "Crash", "market_change": -15, "probability": 0.05},
+            {
+                "name": "Bull",
+                "market_change": 5,
+                "probability": 0.25,
+                "sector_rotation": {"TECHNOLOGY": 1.2, "BANKING": 0.9, "INDUSTRY": 1.0},
+                "usd_change": -0.05,
+            },
+            {
+                "name": "Base",
+                "market_change": 0,
+                "probability": 0.50,
+                "sector_rotation": {},
+                "usd_change": 0,
+            },
+            {
+                "name": "Bear",
+                "market_change": -5,
+                "probability": 0.20,
+                "sector_rotation": {"TECHNOLOGY": 0.8, "BANKING": 1.1, "INDUSTRY": 0.95},
+                "usd_change": 0.08,
+            },
+            {
+                "name": "Crash",
+                "market_change": -15,
+                "probability": 0.05,
+                "sector_rotation": {"TECHNOLOGY": 0.7, "BANKING": 1.3, "INDUSTRY": 0.85},
+                "usd_change": 0.20,
+            },
         ]
 
         results = []
         for scenario in scenarios:
-            # Get portfolio positions
             positions = await pg_fetch("""
-                SELECT p.quantity, p.avg_cost, i.symbol
+                SELECT p.quantity, p.avg_cost, i.symbol,
+                       COALESCE(c.beta, 1.0) as beta,
+                       COALESCE(s.code, 'OTHER') as sector
                 FROM positions p
                 JOIN instruments i ON p.instrument_id = i.id
+                LEFT JOIN companies c ON i.company_id = c.id
+                LEFT JOIN sectors s ON c.sector_id = s.id
                 WHERE p.portfolio_id = $1 AND p.status = 'OPEN'
             """, portfolio_id)
 
@@ -214,13 +247,37 @@ class SimulationEngine:
             position_details = []
 
             for pos in positions:
-                # Estimate position impact (simplified beta = 1)
-                impact = float(pos["quantity"]) * float(pos["avg_cost"]) * scenario["market_change"] / 100
+                qty = float(pos["quantity"])
+                cost = float(pos["avg_cost"])
+                beta = float(pos.get("beta", 1.0) or 1.0)
+                sector = pos.get("sector", "OTHER") or "OTHER"
+                position_value = qty * cost
+
+                # Beta bazlı market etkisi
+                market_effect = scenario["market_change"] * beta
+
+                # Sektör rotasyon etkisi
+                sector_mult = scenario["sector_rotation"].get(sector, 1.0)
+                sector_effect = scenario["market_change"] * (sector_mult - 1)
+
+                # USD etkisi (şirket bazlı)
+                usd_sensitivity = 0.5  # Default
+                usd_effect = scenario["usd_change"] * usd_sensitivity * 100
+
+                # Toplam etki
+                total_effect = market_effect + sector_effect + usd_effect
+                impact = position_value * total_effect / 100
                 portfolio_impact += impact
 
                 position_details.append({
                     "ticker": pos["symbol"],
-                    "quantity": pos["quantity"],
+                    "quantity": qty,
+                    "beta": beta,
+                    "sector": sector,
+                    "market_effect_pct": round(market_effect, 2),
+                    "sector_effect_pct": round(sector_effect, 2),
+                    "usd_effect_pct": round(usd_effect, 2),
+                    "total_effect_pct": round(total_effect, 2),
                     "impact": round(impact, 2),
                 })
 
@@ -235,6 +292,11 @@ class SimulationEngine:
         return {
             "ticker": ticker,
             "scenarios": results,
+            "expected_impact": round(
+                sum(r["portfolio_impact"] * r["probability"] for r in results), 2
+            ),
+            "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
+            "best_case": max(r["portfolio_impact"] for r in results) if results else 0,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

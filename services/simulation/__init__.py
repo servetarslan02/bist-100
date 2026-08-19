@@ -21,6 +21,10 @@ from .enhanced_stress_test import (
     EnhancedStressTestEngine, enhanced_stress_test,
     StressScenario, StressResult,
 )
+from .order_book import (
+    OrderBookSimulator, order_book_sim,
+    OrderBookLevel, OrderBookSnapshot,
+)
 
 __all__ = [
     # Enhanced Execution
@@ -34,4 +38,7 @@ __all__ = [
     # Stress Test
     "EnhancedStressTestEngine", "enhanced_stress_test",
     "StressScenario", "StressResult",
+    # Order Book
+    "OrderBookSimulator", "order_book_sim",
+    "OrderBookLevel", "OrderBookSnapshot",
 ]

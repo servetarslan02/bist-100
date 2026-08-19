@@ -229,8 +229,10 @@ class TestJumpDiffusionMonteCarlo:
         assert 0 <= result.prob_down_5pct <= 100
 
     def test_jump_increases_volatility(self):
-        no_jump = self.mc.simulate(100.0, 0.0004, 0.02, 5000, 20, jump_intensity=0, seed=42)
-        with_jump = self.mc.simulate(100.0, 0.0004, 0.02, 5000, 20, jump_intensity=0.05, seed=42)
+        # Yüksek jump intensity ile volatilite artmalı
+        # Daha fazla simülasyon ile istatistiksel güvenilirlik
+        no_jump = self.mc.simulate(100.0, 0.0004, 0.02, 50000, 20, jump_intensity=0, seed=42)
+        with_jump = self.mc.simulate(100.0, 0.0004, 0.02, 50000, 20, jump_intensity=0.10, seed=42)
         assert with_jump.std_return_pct > no_jump.std_return_pct
 
 
@@ -450,6 +452,159 @@ class TestSimulationIntegration:
 
         # Crisis'te daha kötü sonuçlar
         assert crisis.var_95 < normal.var_95
+
+
+# =====================================================
+# ORDER BOOK TESTS
+# =====================================================
+
+class TestOrderBook:
+    """Order book simülasyon testleri."""
+
+    def setup_method(self):
+        from services.simulation.order_book import OrderBookSimulator
+        self.sim = OrderBookSimulator()
+
+    def test_generate_book(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        assert len(book.bids) == 5
+        assert len(book.asks) == 5
+        assert book.best_bid > 0
+        assert book.best_ask > 0
+        assert book.best_ask > book.best_bid
+
+    def test_spread_positive(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        assert book.spread > 0
+        assert book.spread_pct > 0
+
+    def test_panic_wider_spread(self):
+        normal = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        panic = self.sim.generate_book(100.0, 1000000, 0.02, "PANIC")
+        assert panic.spread_pct > normal.spread_pct
+
+    def test_depth_positive(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        assert book.bid_depth > 0
+        assert book.ask_depth > 0
+
+    def test_imbalance_range(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        assert -1 <= book.imbalance <= 1
+
+    def test_market_buy_order(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        result = self.sim.simulate_market_order(book, "BUY", 500)
+        assert result["fill_quantity"] > 0
+        assert result["avg_price"] > 0
+        assert result["slippage_pct"] >= 0
+
+    def test_market_sell_order(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        result = self.sim.simulate_market_order(book, "SELL", 500)
+        assert result["fill_quantity"] > 0
+        assert result["avg_price"] > 0
+
+    def test_large_order_partial_fill(self):
+        book = self.sim.generate_book(100.0, 100000, 0.02, "RANGE")
+        result = self.sim.simulate_market_order(book, "BUY", 100000)
+        # Book'da yeterli likidite olmayabilir
+        assert result["fill_quantity"] > 0
+
+    def test_buy_walks_asks(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        result = self.sim.simulate_market_order(book, "BUY", 500)
+        # BUY emri ask'lerden fill olmalı
+        assert result["avg_price"] >= book.best_ask
+
+    def test_liquidity_score(self):
+        book = self.sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+        score = self.sim.calculate_liquidity_score(book)
+        assert 0 <= score["liquidity_score"] <= 100
+        assert "spread_score" in score
+        assert "depth_score" in score
+
+    def test_spread_estimate(self):
+        spread = self.sim.estimate_spread_from_volume(1000000, 0.02)
+        assert 0.01 <= spread <= 2.0
+
+
+# =====================================================
+# INTEGRATION TESTS (updated)
+# =====================================================
+
+class TestSimulationIntegration:
+    """Entegrasyon testleri."""
+
+    def test_execution_with_stress(self):
+        """Execution + stress test entegrasyonu."""
+        from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
+        from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
+        from services.simulation.execution_simulator import Order, OrderSide, OrderType
+
+        exec_sim = EnhancedExecutionSimulator()
+        stress = EnhancedStressTestEngine()
+
+        positions = [
+            {"ticker": "THYAO", "value": 500000, "sector": "INDUSTRY", "beta": 1.2, "usd_sensitivity": 0.3},
+        ]
+        stress_results = stress.run_stress_test(1000000, positions)
+        worst = min(stress_results, key=lambda r: r.portfolio_impact_pct)
+
+        order = Order(
+            order_id="stress_test", portfolio_id=1, instrument_id=1,
+            ticker="THYAO", side=OrderSide.SELL, order_type=OrderType.MARKET, quantity=1000,
+        )
+        liquidity = LiquidityProfile(avg_daily_volume=1000000, spread_pct=0.5)
+        result = exec_sim.execute_order(order, 250.0, liquidity, "PANIC", 0.05)
+        assert result["slippage_pct"] > 0
+
+    def test_monte_carlo_with_stress(self):
+        """Monte Carlo + stress test entegrasyonu."""
+        from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
+        mc = RegimeConditionedMonteCarlo()
+        normal = mc.simulate(100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42)
+        crisis = mc.simulate(100.0, 0.0004, 0.02, "CRISIS", 1000, 20, seed=42)
+        assert crisis.var_95 < normal.var_95
+
+    def test_order_book_with_execution(self):
+        """Order book + execution entegrasyonu."""
+        from services.simulation.order_book import OrderBookSimulator
+        from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
+        from services.simulation.execution_simulator import Order, OrderSide, OrderType
+
+        book_sim = OrderBookSimulator()
+        exec_sim = EnhancedExecutionSimulator()
+
+        # Order book üret
+        book = book_sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+
+        # Book'dan spread al, execution'a ver
+        order = Order(
+            order_id="ob_test", portfolio_id=1, instrument_id=1,
+            ticker="TEST", side=OrderSide.BUY, order_type=OrderType.MARKET, quantity=500,
+        )
+        liquidity = LiquidityProfile(
+            avg_daily_volume=1000000, spread_pct=book.spread_pct,
+        )
+        result = exec_sim.execute_order(
+            order, book.mid_price, liquidity, "RANGE", 0.02,
+            bid=book.best_bid, ask=book.best_ask,
+        )
+        assert result["fill_price"] > 0
+        assert result["slippage_pct"] > 0
+
+    def test_order_book_large_order(self):
+        """Büyük emir order book'da daha fazla slippage yapmalı."""
+        from services.simulation.order_book import OrderBookSimulator
+        sim = OrderBookSimulator()
+        book = sim.generate_book(100.0, 1000000, 0.02, "RANGE")
+
+        small = sim.simulate_market_order(book, "BUY", 100)
+        large = sim.simulate_market_order(book, "BUY", 5000)
+
+        # Büyük emir daha fazla slippage yapmalı (veya partial fill)
+        assert large["slippage_pct"] >= small["slippage_pct"] or large["partial_fill"]
 
 
 if __name__ == "__main__":

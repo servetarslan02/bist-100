@@ -105,22 +105,20 @@ class JumpDiffusionMonteCarlo:
         drift = daily_return - jump_intensity * jump_mean
 
         for t in range(1, horizon + 1):
-            # Brownian motion
+            # Brownian motion: z ~ N(0,1)
             z = np.random.standard_normal(num_sims)
-            dW = z * np.sqrt(dt)
 
             # Jump process (Poisson)
             n_jumps = np.random.poisson(jump_intensity * dt, num_sims)
-
-            # Jump sizes (toplam jump etkisi)
             max_jumps = max(n_jumps.max(), 1)
             jump_sizes_all = np.random.normal(jump_mean, jump_std, (num_sims, max_jumps))
             jump_effect = np.sum(jump_sizes_all, axis=1) * (n_jumps > 0).astype(float)
 
-            # Fiyat güncelleme
-            paths[:, t] = paths[:, t - 1] * np.exp(
-                drift * dt + daily_vol * dW + jump_effect
-            )
+            # Fiyat güncelleme: GBM + jump
+            # daily_vol zaten günlük std (yıllık değil), √dt ile çarpılmaz
+            # log-return: drift*dt + σ*z + J*dN
+            log_return = drift * dt + daily_vol * z + jump_effect
+            paths[:, t] = paths[:, t - 1] * np.exp(log_return)
 
         # İstatistikler
         return self._compute_stats(paths, current_price, horizon, num_sims, "Jump-Diffusion")
