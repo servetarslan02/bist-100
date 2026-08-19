@@ -182,6 +182,45 @@ class RiskEngine:
             check = await self._check_drawdown(portfolio_id)
             checks.append(check)
 
+            # 5. Drawdown response system check
+            try:
+                from .drawdown_response import drawdown_system
+                portfolio = await _db_fetchrow("""
+                    SELECT current_capital FROM portfolios WHERE id = $1
+                """, portfolio_id)
+                if portfolio:
+                    dd_state = drawdown_system.update_equity(float(portfolio["current_capital"]))
+                    if not drawdown_system.is_trading_allowed():
+                        checks.append({
+                            "name": "drawdown_response",
+                            "passed": False,
+                            "severity": "BLOCK",
+                            "details": f"Drawdown response: {dd_state.description} (DD: {dd_state.current_drawdown_pct:.1f}%)",
+                        })
+            except Exception as e:
+                logger.debug("Drawdown response check skipped", error=str(e))
+
+            # 6. Dynamic limits check (volatilite bazlı)
+            try:
+                from .dynamic_limits import dynamic_limits
+                dynamic = dynamic_limits.get_limits(regime="SIDEWAYS")
+                # Dinamik pozisyon limiti kontrolü
+                portfolio = await _db_fetchrow("""
+                    SELECT current_capital FROM portfolios WHERE id = $1
+                """, portfolio_id)
+                if portfolio:
+                    portfolio_value = float(portfolio["current_capital"])
+                    position_pct = (amount / portfolio_value * 100) if portfolio_value > 0 else 0
+                    if position_pct > dynamic.max_position_pct:
+                        checks.append({
+                            "name": "dynamic_position_limit",
+                            "passed": False,
+                            "severity": "BLOCK",
+                            "details": f"Dynamic limit: {position_pct:.1f}% > {dynamic.max_position_pct:.1f}%",
+                        })
+            except Exception as e:
+                logger.debug("Dynamic limits check skipped", error=str(e))
+
             # Determine overall result
             all_passed = all(c["passed"] for c in checks)
             blocking_checks = [c for c in checks if not c["passed"] and c["severity"] == "BLOCK"]
@@ -377,7 +416,7 @@ class RiskEngine:
         limit = self._risk_limits.get("max_drawdown_pct", 15.0)
 
         portfolio = await _db_fetchrow("""
-            SELECT initial_capital, current_capital FROM portfolios WHERE id = $1
+            SELECT initial_capital, current_capital, peak_equity FROM portfolios WHERE id = $1
         """, portfolio_id)
 
         if not portfolio:
@@ -387,7 +426,11 @@ class RiskEngine:
 
         initial = float(portfolio["initial_capital"])
         current = float(portfolio["current_capital"])
-        drawdown = ((initial - current) / initial * 100) if initial > 0 else 0
+        # Peak equity: DB'de varsa kullan, yoksa max(initial, current) olarak tahmin et
+        peak = float(portfolio.get("peak_equity") or max(initial, current))
+
+        # Drawdown = peak equity → current equity (initial capital DEĞİL)
+        drawdown = ((peak - current) / peak * 100) if peak > 0 else 0
 
         passed = drawdown <= limit
 
@@ -395,7 +438,7 @@ class RiskEngine:
             "name": "drawdown",
             "passed": passed,
             "severity": "BLOCK" if not passed else "INFO",
-            "details": f"Drawdown: {drawdown:.1f}% (limit: {limit}%)",
+            "details": f"Drawdown: {drawdown:.1f}% (peak: {peak:,.0f}, current: {current:,.0f}, limit: {limit}%)",
         }
 
 
@@ -416,79 +459,150 @@ async def main():
         raise
 
 
-async def main():
-    """Main entry point for the risk engine."""
-    engine = RiskEngine()
-    try:
-        await engine.start()
-    except KeyboardInterrupt:
-        await engine.stop()
-    except Exception as e:
-        logger.error("Risk Engine crashed", error=str(e))
-        await engine.stop()
-        raise
-
-
 # =====================================================
 # Enhanced Risk Entegrasyonu
 # =====================================================
-def assess_portfolio_risk(portfolio: Dict, market_data: Dict = None) -> Dict[str, Any]:
-    """Gelişmiş portföy risk değerlendirmesi."""
-    result = {}
+def assess_portfolio_risk(
+    portfolio: Dict,
+    market_data: Dict = None,
+    returns_history: np.ndarray = None,
+    regime: str = "SIDEWAYS",
+) -> Dict[str, Any]:
+    """Gelişmiş portföy risk değerlendirmesi.
+
+    Tüm risk modüllerini çalıştırır ve kapsamlı risk raporu üretir.
+
+    Args:
+        portfolio: Portföy bilgisi {"positions", "total_value", "weights"}
+        market_data: Piyasa verisi (opsiyonel)
+        returns_history: Geçmiş getiri dizisi (opsiyonel)
+        regime: Mevcut piyasa rejimi
+
+    Returns:
+        Kapsamlı risk raporu
+    """
+    result = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "portfolio_value": portfolio.get("total_value", 0),
+        "regime": regime,
+    }
+
+    # 1. VaR/CVaR (getiri geçmişi varsa)
+    if returns_history is not None and len(returns_history) > 20:
+        try:
+            from .var_cvar import var_calculator
+            portfolio_value = portfolio.get("total_value", 100000)
+            var_report = var_calculator.calculate_full_var_report(
+                returns=returns_history,
+                portfolio_value=portfolio_value,
+            )
+            result["var_cvar"] = {
+                "consensus_var_95": var_report["consensus"]["var_95"],
+                "parametric_var_95": var_report["parametric"]["var_95"],
+                "historical_var_95": var_report["historical"]["var_95"],
+                "monte_carlo_var_95": var_report["monte_carlo"]["var_95"],
+                "cvar_95": var_report["historical"]["cvar_95"],
+                "method_agreement": var_report["consensus"]["method_agreement"],
+            }
+        except Exception as e:
+            result["var_cvar"] = {"error": str(e)}
+
+    # 2. Dynamic Limits
     try:
-        from .enhanced_risk import LedoitWolfCovariance, VolatilityTargeter, ConcentrationRisk
-        result["covariance"] = "ledoit_wolf_available"
-        result["volatility_targeting"] = "available"
-        result["concentration_risk"] = "available"
-    except: pass
+        from .dynamic_limits import dynamic_limits
+        volatility = float(np.std(returns_history or [0]) * np.sqrt(252)) if returns_history is not None else 0.20
+        current_dd = portfolio.get("current_drawdown_pct", 0)
+        limits = dynamic_limits.get_limits(
+            annualized_volatility=volatility,
+            regime=regime,
+            current_drawdown_pct=current_dd,
+        )
+        result["dynamic_limits"] = {
+            "max_position_pct": limits.max_position_pct,
+            "max_sector_pct": limits.max_sector_pct,
+            "max_exposure_pct": limits.max_exposure_pct,
+            "kelly_fraction": limits.kelly_fraction,
+            "min_confidence": limits.min_confidence,
+        }
+    except Exception as e:
+        result["dynamic_limits"] = {"error": str(e)}
+
+    # 3. Concentration Risk
     try:
-        from .calibration import ScoreCalibrator
-        result["calibration"] = "available"
-    except: pass
+        from .enhanced_risk import concentration_risk
+        weights = portfolio.get("weights", {})
+        if weights:
+            hhi = concentration_risk.compute_hhi(weights)
+            max_ticker, max_weight = concentration_risk.compute_max_concentration(weights)
+            result["concentration"] = {
+                "hhi": round(hhi, 4),
+                "max_position": max_ticker,
+                "max_weight": round(max_weight, 4),
+            }
+    except Exception as e:
+        result["concentration"] = {"error": str(e)}
+
+    # 4. Drawdown Response
     try:
-        from .reconciliation import ReconciliationEngine
-        result["reconciliation"] = "available"
-    except: pass
-    # VaR/CVaR
+        from .drawdown_response import drawdown_system
+        current_equity = portfolio.get("total_value", 0)
+        if current_equity > 0:
+            dd_state = drawdown_system.update_equity(current_equity)
+            result["drawdown"] = {
+                "current_pct": dd_state.current_drawdown_pct,
+                "max_pct": dd_state.max_drawdown_pct,
+                "action": dd_state.action.value,
+                "severity": dd_state.severity.value,
+                "position_scale": dd_state.position_scale,
+            }
+    except Exception as e:
+        result["drawdown"] = {"error": str(e)}
+
+    # 5. Stress Test (getiri geçmişi varsa)
+    if returns_history is not None and len(returns_history) > 20:
+        try:
+            from .stress_test import stress_test_engine
+            stress_report = stress_test_engine.run_all_scenarios(portfolio)
+            result["stress_test"] = {
+                "risk_score": stress_report.risk_score,
+                "worst_scenario": stress_report.worst_scenario.scenario_name if stress_report.worst_scenario else "N/A",
+                "worst_impact_pct": stress_report.worst_scenario.total_impact_pct if stress_report.worst_scenario else 0,
+                "recommendations": stress_report.recommendations,
+            }
+        except Exception as e:
+            result["stress_test"] = {"error": str(e)}
+
+    # 6. Tail Hedge
     try:
-        from .var_cvar import VaRCalculator
-        result["var_cvar"] = "available"
-    except: pass
-    # Dynamic Limits
+        from .tail_hedge import tail_hedger
+        portfolio_value = portfolio.get("total_value", 100000)
+        hedge = tail_hedger.analyze(
+            portfolio_value=portfolio_value,
+            regime=regime,
+        )
+        result["tail_hedge"] = {
+            "strategy": hedge.strategy,
+            "hedge_ratio": hedge.hedge_ratio,
+            "estimated_cost_pct": hedge.estimated_cost_pct,
+            "protection_level": hedge.protection_level,
+        }
+    except Exception as e:
+        result["tail_hedge"] = {"error": str(e)}
+
+    # 7. Monitoring Alert Check
     try:
-        from .dynamic_limits import DynamicRiskLimits
-        result["dynamic_limits"] = "available"
-    except: pass
-    # Stress Test
-    try:
-        from .stress_test import StressTestEngine
-        result["stress_test"] = "available"
-    except: pass
-    # Drawdown Response
-    try:
-        from .drawdown_response import DrawdownResponseSystem
-        result["drawdown_response"] = "available"
-    except: pass
-    # Tail Hedge
-    try:
-        from .tail_hedge import TailRiskHedger
-        result["tail_hedge"] = "available"
-    except: pass
-    # Risk Parity
-    try:
-        from .risk_parity import RiskParityOptimizer
-        result["risk_parity"] = "available"
-    except: pass
-    # Monitoring
-    try:
-        from .monitoring import RiskMonitor
-        result["monitoring"] = "available"
-    except: pass
-    # VIOP Risk Integration
-    try:
-        from ..viop.enhanced_options import viop_risk
-        result["viop_risk"] = "available"
-    except: pass
+        from .monitoring import risk_monitor, RiskMetricsSnapshot
+        # Basit risk skoru hesapla
+        risk_score = 50.0
+        if "var_cvar" in result and "error" not in result.get("var_cvar", {}):
+            var_pct = result["var_cvar"].get("consensus_var_95", 0) / max(portfolio.get("total_value", 1), 1) * 100
+            risk_score += min(30, var_pct * 6)
+        if "drawdown" in result and "error" not in result.get("drawdown", {}):
+            risk_score += min(20, result["drawdown"].get("current_pct", 0) * 2)
+        result["risk_score"] = round(min(100, risk_score), 1)
+    except Exception as e:
+        result["risk_score"] = 50.0
+
     return result
 
 

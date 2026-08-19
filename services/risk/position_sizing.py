@@ -131,8 +131,9 @@ class PositionSizer:
 
             if has_history:
                 # === FRACTIONAL KELLY (historical data varsa) ===
-                kelly = self._fractional_kelly(win_prob, ticker_avg_win, ticker_avg_loss)
-                logger.info("debug_output", message=f"    kelly={kelly:.4f} (fractional={self.kelly_fraction})")
+                # Regime-conditioned: fraction rejime göre değişir
+                kelly = self._fractional_kelly(win_prob, ticker_avg_win, ticker_avg_loss, regime=regime)
+                logger.info("debug_output", message=f"    kelly={kelly:.4f} (regime={regime})")
 
                 if kelly <= 0:
                     logger.info("debug_output", message=f"    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
@@ -209,12 +210,30 @@ class PositionSizer:
 
         return positions
 
-    def _fractional_kelly(self, win_prob: float, avg_win: float, avg_loss: float) -> float:
+    # Rejime göre Kelly fraction (SSRN Regime-Conditioned Kelly 2026)
+    REGIME_KELLY_FRACTIONS = {
+        "BULL": 0.6,              # Agresif
+        "BEAR": 0.3,              # Muhafazakar
+        "SIDEWAYS": 0.4,          # Orta
+        "HIGH_VOLATILITY": 0.25,  # Çok muhafazakar
+        "LOW_VOLATILITY": 0.5,    # Normal
+        "RISK_ON": 0.55,          # Biraz agresif
+        "RISK_OFF": 0.3,          # Muhafazakar
+        "CRISIS": 0.15,           # Çok muhafazakar
+        "RECOVERY": 0.45,         # Orta-agresif
+        "MOMENTUM_EXPANSION": 0.55,
+        "MOMENTUM_CONTRACTION": 0.25,
+        "PANIC": 0.15,
+    }
+
+    def _fractional_kelly(self, win_prob: float, avg_win: float, avg_loss: float,
+                          regime: str = "SIDEWAYS") -> float:
         """Fractional Kelly: f* = (p*b - q) / b * fraction.
 
-        Loglar: p, q, b, raw_kelly, fractional_kelly
+        Regime-conditioned: fraction rejime göre değişir.
+        SSRN Regime-Conditioned Kelly (2026) araştırmasına dayalı.
         """
-        logger.info("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}")
+        logger.info("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}")
 
         if avg_loss <= 0:
             logger.info("debug_output", message=f"      -> avg_loss<=0, kelly=0")
@@ -237,8 +256,11 @@ class PositionSizer:
             return 0.0
 
         kelly = max(0, min(1, raw_kelly))
-        fractional = kelly * self.kelly_fraction
-        logger.info("debug_output", message=f"      [KELLY] clamped={kelly:.4f}, fractional={fractional:.4f}")
+
+        # Regime-conditioned fraction (SSRN 2026)
+        regime_fraction = self.REGIME_KELLY_FRACTIONS.get(regime, self.kelly_fraction)
+        fractional = kelly * regime_fraction
+        logger.info("debug_output", message=f"      [KELLY] clamped={kelly:.4f}, regime_fraction={regime_fraction}, fractional={fractional:.4f}")
 
         return fractional
 

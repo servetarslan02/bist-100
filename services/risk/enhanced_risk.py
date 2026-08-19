@@ -299,6 +299,90 @@ rebalance_engine = RebalanceEngine()
 concentration_risk = ConcentrationRisk()
 
 
+def compute_full_risk_metrics(
+    returns: np.ndarray,
+    weights: Dict[str, float],
+    cov_matrix: np.ndarray = None,
+    sector_map: Dict[str, str] = None,
+    portfolio_value: float = 100000.0,
+) -> RiskMetrics:
+    """Kapsamlı risk metrikleri hesapla.
+
+    VaR/CVaR + concentration + volatility + correlation birlikte.
+
+    Args:
+        returns: Portföy getiri dizisi
+        weights: Pozisyon ağırlıkları
+        cov_matrix: Kovaryans matrisi (opsiyonel)
+        sector_map: Sektör eşleme (opsiyonel)
+        portfolio_value: Portföy değeri
+
+    Returns:
+        RiskMetrics
+    """
+    from .var_cvar import var_calculator
+
+    weights_array = np.array(list(weights.values()))
+    tickers = list(weights.keys())
+
+    # VaR/CVaR
+    var_95 = var_calculator.calculate_historical_var(returns, 0.95, portfolio_value)
+    cvar_95 = var_calculator.calculate_historical_cvar(returns, 0.95, portfolio_value)
+    var_99 = var_calculator.calculate_historical_var(returns, 0.99, portfolio_value)
+    cvar_99 = var_calculator.calculate_historical_cvar(returns, 0.99, portfolio_value)
+
+    # Portfolio volatility
+    port_vol = float(np.std(returns, ddof=1) * np.sqrt(252))
+
+    # Concentration
+    hhi = concentration_risk.compute_hhi(weights)
+    max_ticker, max_weight = concentration_risk.compute_max_concentration(weights)
+
+    # Sector concentration
+    sector_conc = {}
+    if sector_map:
+        sector_conc = concentration_risk.compute_sector_concentration(weights, sector_map)
+
+    # Correlation risk
+    corr_risk = 0.0
+    if cov_matrix is not None and len(weights) > 1:
+        corr_matrix = cov_matrix / np.outer(np.sqrt(np.diag(cov_matrix)), np.sqrt(np.diag(cov_matrix)))
+        upper_tri = corr_matrix[np.triu_indices_from(corr_matrix, k=1)]
+        corr_risk = float(np.mean(np.abs(upper_tri)))
+
+    # Component VaR
+    component_var = None
+    if cov_matrix is not None and len(weights) > 1:
+        try:
+            cv = var_calculator.calculate_component_var(
+                weights_array, cov_matrix, 0.95, portfolio_value, tickers
+            )
+            component_var = {cvr.ticker: cvr.component_var_95 for cvr in cv}
+        except Exception:
+            pass
+
+    # Risk score (0-100)
+    risk_score = 50.0
+    risk_score += min(20, (var_95 / portfolio_value * 100) * 4)  # VaR etkisi
+    risk_score += min(15, hhi * 100)  # Konsantrasyon etkisi
+    risk_score += min(15, port_vol * 50)  # Volatilite etkisi
+    risk_score = min(100, risk_score)
+
+    return RiskMetrics(
+        portfolio_volatility=port_vol,
+        concentration_hhi=hhi,
+        max_position_weight=max_weight,
+        sector_concentration=sector_conc,
+        correlation_risk=corr_risk,
+        var_95=var_95,
+        cvar_95=cvar_95,
+        var_99=var_99,
+        cvar_99=cvar_99,
+        component_var=component_var,
+        risk_score=round(risk_score, 1),
+    )
+
+
 # =====================================================
 # VIOP Hedging Entegrasyonu (B32)
 # =====================================================

@@ -8,7 +8,7 @@ KURAL: Score != win_probability. Calibration gerekli.
 """
 
 import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import structlog
 
@@ -31,6 +31,8 @@ class ScoreCalibrator:
         self.params = CalibrationParams()
         self._trade_history: List[Dict] = []  # Historical OOS trades
         self._fitted = False
+        self._brier_scores: List[float] = []  # Brier score geçmişi
+        self._calibration_curve: Dict[str, List] = {"predicted": [], "actual": []}
 
     def fit_from_trades(self, trades: List[Dict]):
         """Historical OOS trades'ten calibration fit et.
@@ -116,6 +118,105 @@ class ScoreCalibrator:
         avg_loss = float(abs(losses.mean())) if len(losses) > 0 else 0.05
 
         return avg_win, avg_loss
+
+    def compute_brier_score(self, trades: List[Dict] = None) -> float:
+        """Brier score hesapla — kalibrasyon kalitesi ölçümü.
+
+        Brier = (1/N) * Σ(predicted - actual)²
+        0 = mükemmel, 1 = kötü
+
+        Args:
+            trades: Trade listesi. None ise kendi geçmişini kullan.
+
+        Returns:
+            Brier score (0-1)
+        """
+        if trades is None:
+            trades = self._trade_history
+
+        if len(trades) < 10:
+            return -1.0  # Yetersiz veri
+
+        scores = np.array([t["score"] for t in trades])
+        outcomes = np.array([1.0 if t["return_pct"] > 0 else 0.0 for t in trades])
+
+        # Tahmin olasılıkları
+        predicted = np.array([self.calibrate(s) for s in scores])
+
+        # Brier score
+        brier = float(np.mean((predicted - outcomes) ** 2))
+
+        self._brier_scores.append(brier)
+
+        logger.info("Brier score computed",
+                   brier=round(brier, 4),
+                   n_trades=len(trades))
+
+        return brier
+
+    def get_calibration_curve(self, n_bins: int = 10) -> Dict[str, List]:
+        """Kalibrasyon eğrisi — tahmin vs gerçek.
+
+        Args:
+            n_bins: Bin sayısı
+
+        Returns:
+            {"predicted": [...], "actual": [...], "bin_centers": [...]}
+        """
+        if len(self._trade_history) < 20:
+            return {"predicted": [], "actual": [], "bin_centers": []}
+
+        scores = np.array([t["score"] for t in self._trade_history])
+        outcomes = np.array([1.0 if t["return_pct"] > 0 else 0.0 for t in self._trade_history])
+        predicted = np.array([self.calibrate(s) for s in scores])
+
+        # Bin'le
+        bin_edges = np.linspace(0, 1, n_bins + 1)
+        bin_centers = []
+        actual_rates = []
+        predicted_rates = []
+
+        for i in range(n_bins):
+            mask = (predicted >= bin_edges[i]) & (predicted < bin_edges[i + 1])
+            if mask.sum() > 0:
+                bin_centers.append(round((bin_edges[i] + bin_edges[i + 1]) / 2, 2))
+                actual_rates.append(round(float(outcomes[mask].mean()), 3))
+                predicted_rates.append(round(float(predicted[mask].mean()), 3))
+
+        self._calibration_curve = {
+            "predicted": predicted_rates,
+            "actual": actual_rates,
+            "bin_centers": bin_centers,
+        }
+
+        return self._calibration_curve
+
+    def get_brier_history(self) -> List[float]:
+        """Brier score geçmişini döndür."""
+        return self._brier_scores.copy()
+
+    def get_calibration_quality(self) -> Dict[str, Any]:
+        """Kalibrasyon kalitesi özeti."""
+        brier = self.compute_brier_score() if len(self._trade_history) >= 10 else -1
+
+        quality = "UNKNOWN"
+        if brier >= 0:
+            if brier < 0.1:
+                quality = "EXCELLENT"
+            elif brier < 0.2:
+                quality = "GOOD"
+            elif brier < 0.3:
+                quality = "FAIR"
+            else:
+                quality = "POOR"
+
+        return {
+            "brier_score": round(brier, 4) if brier >= 0 else None,
+            "quality": quality,
+            "n_trades": len(self._trade_history),
+            "fitted": self._fitted,
+            "brier_history_count": len(self._brier_scores),
+        }
 
 
 # Singleton
