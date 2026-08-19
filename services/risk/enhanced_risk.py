@@ -44,6 +44,10 @@ class RiskMetrics:
     correlation_risk: float
     var_95: float
     cvar_95: float
+    var_99: float = 0.0
+    cvar_99: float = 0.0
+    component_var: Optional[Dict[str, float]] = None
+    risk_score: float = 0.0  # 0-100
 
 
 class LedoitWolfCovariance:

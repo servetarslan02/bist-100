@@ -442,12 +442,47 @@ def assess_portfolio_risk(portfolio: Dict, market_data: Dict = None) -> Dict[str
         result["concentration_risk"] = "available"
     except: pass
     try:
-        from .calibration import ModelCalibration
+        from .calibration import ScoreCalibrator
         result["calibration"] = "available"
     except: pass
     try:
         from .reconciliation import ReconciliationEngine
         result["reconciliation"] = "available"
+    except: pass
+    # VaR/CVaR
+    try:
+        from .var_cvar import VaRCalculator
+        result["var_cvar"] = "available"
+    except: pass
+    # Dynamic Limits
+    try:
+        from .dynamic_limits import DynamicRiskLimits
+        result["dynamic_limits"] = "available"
+    except: pass
+    # Stress Test
+    try:
+        from .stress_test import StressTestEngine
+        result["stress_test"] = "available"
+    except: pass
+    # Drawdown Response
+    try:
+        from .drawdown_response import DrawdownResponseSystem
+        result["drawdown_response"] = "available"
+    except: pass
+    # Tail Hedge
+    try:
+        from .tail_hedge import TailRiskHedger
+        result["tail_hedge"] = "available"
+    except: pass
+    # Risk Parity
+    try:
+        from .risk_parity import RiskParityOptimizer
+        result["risk_parity"] = "available"
+    except: pass
+    # Monitoring
+    try:
+        from .monitoring import RiskMonitor
+        result["monitoring"] = "available"
     except: pass
     return result
 
