@@ -869,7 +869,11 @@ class PortfolioManager:
         }
 
     def get_risk_metrics(self) -> Dict[str, Any]:
-        """Risk metrikleri (v1.0 uyumlu)."""
+        """Risk metrikleri — VaR/CVaR + rolling correlation + concentration.
+
+        Risk modülünden VaR/CVaR hesaplar.
+        Rolling correlation: equity curve'den hesaplanır.
+        """
         portfolio = self.get_portfolio()
         positions = portfolio.get("positions", [])
         total_value = portfolio.get("total_value", 1)
@@ -881,12 +885,17 @@ class PortfolioManager:
                 "sector_concentration": 0,
                 "portfolio_correlation": 0,
                 "max_drawdown": 0,
+                "var_95": 0,
+                "cvar_95": 0,
+                "hhi": 0,
             }
 
+        # Position concentration
         max_position_pct = max(
             (p.get("market_value", 0) / total_value * 100) for p in positions
         ) if total_value else 0
 
+        # Sector concentration
         sector_values = defaultdict(float)
         for p in positions:
             sector = p.get("sector", "Unknown")
@@ -896,6 +905,42 @@ class PortfolioManager:
             (v / total_value * 100) for v in sector_values.values()
         ) if total_value else 0
 
+        # HHI (Herfindahl-Hirschman Index)
+        weights = {p["ticker"]: p.get("market_value", 0) / total_value for p in positions if total_value > 0}
+        hhi = sum(w ** 2 for w in weights.values())
+
+        # Rolling correlation (equity curve'den)
+        rolling_corr = 0.0
+        if len(self._equity_snapshots) > 20:
+            equities = [s.total_equity for s in self._equity_snapshots]
+            returns = [(equities[i] / equities[i - 1] - 1) for i in range(1, len(equities))]
+            if len(returns) > 20:
+                # 20 günlük rolling window ile korelasyon
+                window = min(20, len(returns) // 2)
+                recent = returns[-window:]
+                prev = returns[-2 * window:-window]
+                if len(recent) == len(prev) and len(recent) > 2:
+                    rolling_corr = float(np.corrcoef(recent, prev)[0, 1])
+
+        # VaR/CVaR (equity curve'den)
+        var_95 = 0.0
+        cvar_95 = 0.0
+        if len(self._equity_snapshots) > 20:
+            equities = [s.total_equity for s in self._equity_snapshots]
+            returns = np.array([(equities[i] / equities[i - 1] - 1) for i in range(1, len(equities))])
+            try:
+                from ..risk.var_cvar import var_calculator
+                var_95 = var_calculator.calculate_historical_var(returns, 0.95, total_value)
+                cvar_95 = var_calculator.calculate_historical_cvar(returns, 0.95, total_value)
+            except Exception:
+                # Fallback: basit percentile
+                sorted_returns = np.sort(returns)
+                idx = int(0.05 * len(sorted_returns))
+                var_95 = abs(float(sorted_returns[idx])) * total_value
+                tail = sorted_returns[:idx + 1]
+                cvar_95 = abs(float(np.mean(tail))) * total_value if len(tail) > 0 else var_95
+
+        # Risk level
         if max_position_pct > 15 or max_sector_pct > 40:
             risk_level = "YÜKSEK"
         elif max_position_pct > 10 or max_sector_pct > 30:
@@ -909,8 +954,13 @@ class PortfolioManager:
             "risk_level": risk_level,
             "max_position_pct": round(max_position_pct, 2),
             "sector_concentration": round(max_sector_pct, 2),
-            "portfolio_correlation": 0.62,
+            "portfolio_correlation": round(rolling_corr, 4),
             "max_drawdown": round(max_dd, 2),
+            "var_95": round(var_95, 2),
+            "cvar_95": round(cvar_95, 2),
+            "hhi": round(hhi, 4),
+            "n_positions": len(positions),
+            "concentration_risk": "HIGH" if hhi > 0.25 else "MEDIUM" if hhi > 0.15 else "LOW",
         }
 
     def get_position(self, ticker: str) -> Optional[Dict]:
@@ -1003,6 +1053,127 @@ class PortfolioManager:
             "high_water_mark": round(self._high_water_mark, 2),
             "drawdown_pct": round(self.get_drawdown() * 100, 4),
         }
+
+
+    # ===================== REBALANCING v2.0 =====================
+
+    def check_rebalance(
+        self,
+        target_weights: Dict[str, float],
+        threshold_pct: float = 5.0,
+    ) -> Dict[str, Any]:
+        """Rebalance gerekli mi? Drift analizi.
+
+        Args:
+            target_weights: ticker → hedef ağırlık (0-1)
+            threshold_pct: Sapma eşiği (%) — bu kadar sapma toleransı
+
+        Returns:
+            Rebalance durumu + drift analizi
+        """
+        portfolio = self.get_portfolio()
+        total_value = portfolio["total_value"]
+        positions = portfolio["positions"]
+
+        if total_value <= 0 or not positions:
+            return {"needs_rebalance": False, "drifts": {}, "max_drift": 0}
+
+        # Mevcut ağırlıkları hesapla
+        current_weights = {}
+        for p in positions:
+            ticker = p["ticker"]
+            current_weights[ticker] = p["market_value"] / total_value
+
+        # Drift hesapla
+        drifts = {}
+        all_tickers = set(list(current_weights.keys()) + list(target_weights.keys()))
+
+        for ticker in all_tickers:
+            current = current_weights.get(ticker, 0)
+            target = target_weights.get(ticker, 0)
+            drift = abs(current - target)
+            drifts[ticker] = {
+                "current": round(current, 4),
+                "target": round(target, 4),
+                "drift": round(drift, 4),
+                "drift_pct": round(drift * 100, 2),
+                "exceeds_threshold": drift > threshold_pct / 100,
+            }
+
+        max_drift = max(d["drift"] for d in drifts.values()) if drifts else 0
+        needs_rebalance = max_drift > threshold_pct / 100
+
+        return {
+            "needs_rebalance": needs_rebalance,
+            "threshold_pct": threshold_pct,
+            "max_drift_pct": round(max_drift * 100, 2),
+            "drifts": drifts,
+        }
+
+    def compute_rebalance_orders(
+        self,
+        target_weights: Dict[str, float],
+        threshold_pct: float = 5.0,
+        turnover_limit: float = 0.3,
+    ) -> List[Dict[str, Any]]:
+        """Rebalance emirleri oluştur.
+
+        Args:
+            target_weights: ticker → hedef ağırlık
+            threshold_pct: Sapma eşiği (%)
+            turnover_limit: Maksimum turnover (0-1)
+
+        Returns:
+            Rebalance emirleri listesi
+        """
+        portfolio = self.get_portfolio()
+        total_value = portfolio["total_value"]
+        positions = portfolio["positions"]
+
+        if total_value <= 0:
+            return []
+
+        current_weights = {}
+        for p in positions:
+            ticker = p["ticker"]
+            current_weights[ticker] = p["market_value"] / total_value
+
+        orders = []
+        all_tickers = set(list(current_weights.keys()) + list(target_weights.keys()))
+
+        for ticker in all_tickers:
+            current = current_weights.get(ticker, 0)
+            target = target_weights.get(ticker, 0)
+            diff = target - current
+
+            if abs(diff) < threshold_pct / 100:
+                continue
+
+            order_value = diff * total_value
+            action = "BUY" if diff > 0 else "SELL"
+
+            orders.append({
+                "ticker": ticker,
+                "action": action,
+                "value": round(abs(order_value), 2),
+                "weight_change_pct": round(diff * 100, 2),
+                "current_weight": round(current, 4),
+                "target_weight": round(target, 4),
+            })
+
+        # Turnover limit kontrolü
+        total_turnover = sum(abs(o["weight_change_pct"]) for o in orders) / 100
+        if total_turnover > turnover_limit and total_turnover > 0:
+            scale = turnover_limit / total_turnover
+            for order in orders:
+                order["value"] = round(order["value"] * scale, 2)
+                order["weight_change_pct"] = round(order["weight_change_pct"] * scale, 2)
+                order["scaled"] = True
+
+        # BUY'leri skor'a göre sırala (en yüksek skorlu önce)
+        orders.sort(key=lambda o: o["value"], reverse=True)
+
+        return orders
 
 
 # Singleton
