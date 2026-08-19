@@ -32,6 +32,7 @@ from .correlation_tracker import MacroCorrelationTracker, macro_correlation_trac
 from .calendar_engine import MacroCalendarEngine, macro_calendar_engine
 from .historical_store import MacroHistoricalStore, macro_historical_store
 from .factor_decomposition import MacroFactorDecomposition, macro_factor_decomposition
+from .sensitivity_engine import DynamicSensitivityEngine, SensitivityResult, CompanySensitivity, macro_sensitivity_engine
 
 __all__ = [
     # Config
@@ -45,4 +46,5 @@ __all__ = [
     "MacroCalendarEngine", "macro_calendar_engine",
     "MacroHistoricalStore", "macro_historical_store",
     "MacroFactorDecomposition", "macro_factor_decomposition",
+    "DynamicSensitivityEngine", "SensitivityResult", "CompanySensitivity", "macro_sensitivity_engine",
 ]
