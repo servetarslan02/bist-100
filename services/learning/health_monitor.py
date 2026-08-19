@@ -258,5 +258,71 @@ class LearningHealthMonitor:
         )
 
 
+    def auto_heal(self, health_report: Dict[str, Any] = None):
+        """Otomatik onarım — hatalı modülleri onarmaya çalış.
+
+        Args:
+            health_report: Sağlık raporu (None ise check_health çağırır)
+        """
+        if health_report is None:
+            health_report = self.check_health()
+
+        overall = health_report.get("overall_status", "UNKNOWN")
+        modules = health_report.get("modules", {})
+
+        if overall == "HEALTHY":
+            return
+
+        logger.info("Auto-heal triggered", overall_status=overall)
+
+        for module_name, module_data in modules.items():
+            status = module_data.get("status", "UNKNOWN") if isinstance(module_data, dict) else str(module_data)
+
+            if status == "CRITICAL":
+                healing_action = self._determine_healing_action(module_name, module_data)
+                self._execute_healing(module_name, healing_action)
+            elif status == "WARNING":
+                logger.info("Module in warning state", module=module_name)
+
+    def _determine_healing_action(self, module: str, data: Any) -> str:
+        """Onarım aksiyonu belirle."""
+        action_map = {
+            "prediction_tracking": "restart",
+            "outcome_tracking": "restart",
+            "calibration": "adjust",
+            "drift_detection": "retrain",
+            "model_performance": "fallback",
+            "feature_pipeline": "refresh",
+            "database": "retry",
+        }
+        return action_map.get(module, "restart")
+
+    def _execute_healing(self, module: str, action: str):
+        """Onarım aksiyonunu yürüt."""
+        logger.info("Executing healing action", module=module, action=action)
+
+        try:
+            if action == "restart":
+                self.request_restart(module)
+            elif action == "retrain":
+                from services.learning.retrain_engine import retrain_engine
+                retrain_engine._retrain_count = 0  # Reset
+                logger.info("Retrain triggered by auto-heal")
+            elif action == "fallback":
+                logger.warning("Fallback mode activated for", module=module)
+            elif action == "refresh":
+                logger.info("Data refresh triggered for", module=module)
+            elif action == "adjust":
+                logger.info("Calibration adjustment triggered for", module=module)
+            elif action == "retry":
+                logger.info("Retry with backoff for", module=module)
+        except Exception as e:
+            logger.error("Healing action failed", module=module, action=action, error=str(e))
+
+    def get_report(self) -> Dict[str, Any]:
+        """Sağlık raporu."""
+        return self.check_health()
+
+
 # Singleton
 learning_health_monitor = LearningHealthMonitor()

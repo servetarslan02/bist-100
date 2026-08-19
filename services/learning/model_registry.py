@@ -183,5 +183,39 @@ class ModelRegistry:
                 logger.debug("Cleaned up old version", version=r.version)
 
 
+    def cleanup_old_versions(self, keep_last: int = 20):
+        """Eski versiyonları temizle.
+
+        Champion ve son N versiyonu tut, diğerlerini sil.
+
+        Args:
+            keep_last: Son kaç versiyonu tut
+        """
+        cfg = learning_settings.registry
+        keep = keep_last or cfg.max_versions
+
+        # Champion'ı asla silme
+        champion = self.get_champion()
+
+        # Tarihe göre sırala
+        sorted_records = sorted(self._records, key=lambda r: r.created_at, reverse=True)
+
+        # Korunacaklar: champion + son N
+        keep_set = set()
+        if champion:
+            keep_set.add(champion.version)
+
+        for r in sorted_records[:keep]:
+            keep_set.add(r.version)
+
+        # Silinecekler
+        to_remove = [r for r in self._records if r.version not in keep_set]
+        for r in to_remove:
+            self._records.remove(r)
+            logger.info("Cleaned up old model version", version=r.version, status=r.status)
+
+        return len(to_remove)
+
+
 # Singleton
 model_registry = ModelRegistry()

@@ -297,5 +297,175 @@ class SHAPHelpers:
             return {"error": str(e)}
 
 
+    def compute_global_shap(
+        self,
+        model,
+        X: np.ndarray,
+        feature_names: List[str],
+        sample_size: int = 100,
+    ) -> Dict[str, float]:
+        """Global SHAP importance — tüm veri seti üzerinde.
+
+        Args:
+            model: Eğitilmiş model
+            X: Feature matrix
+            feature_names: Feature isimleri
+            sample_size: Örnekleme boyutu (hız için)
+
+        Returns:
+            {feature_name: mean_abs_shap}
+        """
+        try:
+            import shap
+
+            # Sampling (büyük veri setleri için)
+            if len(X) > sample_size:
+                indices = np.random.choice(len(X), sample_size, replace=False)
+                X_sample = X[indices]
+            else:
+                X_sample = X
+
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_sample)
+
+            # Mean absolute SHAP
+            mean_shap = np.abs(shap_values).mean(axis=0)
+
+            if len(feature_names) == len(mean_shap):
+                return dict(sorted(
+                    zip(feature_names, mean_shap.tolist()),
+                    key=lambda x: x[1],
+                    reverse=True,
+                ))
+            return {f"f{i}": float(v) for i, v in enumerate(mean_shap)}
+
+        except ImportError:
+            logger.warning("shap not installed")
+            # Fallback: model feature importance
+            if hasattr(model, "feature_importances_"):
+                importance = model.feature_importances_
+                if len(feature_names) == len(importance):
+                    return dict(zip(feature_names, importance.tolist()))
+            return {}
+        except Exception as e:
+            logger.error("Global SHAP failed", error=str(e))
+            return {}
+
+    def compute_shap_trends(
+        self,
+        shap_history: List[Dict[str, float]],
+        window_days: int = 30,
+    ) -> Dict[str, Dict[str, Any]]:
+        """Feature importance trend analizi.
+
+        Args:
+            shap_history: [{"date": str, "feature": float, ...}, ...]
+            window_days: Trend penceresi
+
+        Returns:
+            {feature: {avg_importance, trend, volatility}}
+        """
+        if len(shap_history) < 2:
+            return {}
+
+        # Feature'ları topla
+        feature_values: Dict[str, List[float]] = defaultdict(list)
+        for entry in shap_history[-window_days:]:
+            for feature, value in entry.items():
+                if feature != "date" and isinstance(value, (int, float)):
+                    feature_values[feature].append(float(value))
+
+        trends = {}
+        for feature, values in feature_values.items():
+            if len(values) < 2:
+                trends[feature] = {
+                    "avg_importance": round(float(np.mean(values)), 6),
+                    "trend": "STABLE",
+                    "volatility": 0.0,
+                }
+                continue
+
+            avg = float(np.mean(values))
+            std = float(np.std(values))
+
+            # Trend: ilk yarı vs ikinci yarı
+            mid = len(values) // 2
+            first_half = np.mean(values[:mid])
+            second_half = np.mean(values[mid:])
+            diff = second_half - first_half
+
+            if diff > avg * 0.2:
+                trend = "INCREASING"
+            elif diff < -avg * 0.2:
+                trend = "DECREASING"
+            else:
+                trend = "STABLE"
+
+            trends[feature] = {
+                "avg_importance": round(avg, 6),
+                "trend": trend,
+                "volatility": round(std, 6),
+                "latest": round(values[-1], 6),
+            }
+
+        # Önem sırasına göre sırala
+        return dict(sorted(trends.items(), key=lambda x: x[1]["avg_importance"], reverse=True))
+
+    def compute_feature_interactions(
+        self,
+        model,
+        X: np.ndarray,
+        feature_names: List[str],
+        top_n: int = 10,
+    ) -> List[Dict[str, Any]]:
+        """Feature interaction'ları hesapla.
+
+        Args:
+            model: Eğitilmiş model
+            X: Feature matrix
+            feature_names: Feature isimleri
+            top_n: En güçlü N interaction
+
+        Returns:
+            [{feature_1, feature_2, interaction_strength}, ...]
+        """
+        try:
+            import shap
+
+            if len(X) > 100:
+                indices = np.random.choice(len(X), 100, replace=False)
+                X_sample = X[indices]
+            else:
+                X_sample = X
+
+            explainer = shap.TreeExplainer(model)
+            interaction_values = explainer.shap_interaction_values(X_sample)
+
+            # Mean absolute interaction
+            mean_interaction = np.abs(interaction_values).mean(axis=0)
+
+            # Diagonal dışı en güçlü interaction'lar
+            interactions = []
+            n = len(feature_names)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    strength = float(mean_interaction[i, j])
+                    interactions.append({
+                        "feature_1": feature_names[i],
+                        "feature_2": feature_names[j],
+                        "interaction_strength": round(strength, 6),
+                    })
+
+            interactions.sort(key=lambda x: x["interaction_strength"], reverse=True)
+            return interactions[:top_n]
+
+        except ImportError:
+            logger.warning("shap not installed for interactions")
+            return []
+        except Exception as e:
+            logger.error("Feature interaction failed", error=str(e))
+            return []
+
+
 # Singleton
 shap_helpers = SHAPHelpers()
