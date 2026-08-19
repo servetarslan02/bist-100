@@ -1061,8 +1061,11 @@ class SPANMarginCalculator:
         delta_s = spot_price * scenario["price_change"]
         gamma_pnl = 0.5 * gamma * (delta_s ** 2)
 
-        # Vega P&L: vega × vol_change (vega zaten /100 cinsinden)
-        vega_pnl = vega * scenario["vol_change"] * 100
+        # Vega P&L: vega zaten "per 1% vol" cinsinden (calculate_greeks'te /100)
+        # vol_change=0.02 demek %2 vol artışı demek
+        # vega * vol_change * 100 = vega * (vol_change * 100) = vega * yüzde_değişimi
+        # yani: 0.1868 * 0.02 * 100 = 0.1868 * 2 = 0.3736 (2% vol artışı etkisi) ✓
+        vega_pnl = vega * scenario["vol_change"] * 100  # = vega × yüzde_vol_değişimi
 
         return delta_pnl + gamma_pnl + vega_pnl
 
@@ -1513,21 +1516,22 @@ class OptionsBacktestEngine:
             # Iron condor P&L
             # Max profit = net_credit (fiyat aralıkta kalırsa)
             # Max loss = spread_width - net_credit
+            spread_width = entry_price * width_pct
             if put_buy <= exit_price <= call_buy:
-                # Aralıkta → max profit
+                # Aralıkta (veya tam sınırda) → max profit
                 pnl = net_credit
-            elif exit_price < put_buy or exit_price > call_buy:
-                # Aralığın dışında → max loss
-                spread_width = entry_price * width_pct
+            elif exit_price < put_buy:
+                # Put spread'in altında → max loss
+                pnl = -(spread_width - net_credit)
+            elif exit_price > call_buy:
+                # Call spread'in üstünde → max loss
                 pnl = -(spread_width - net_credit)
             elif exit_price < put_sell:
-                # Put spread'te kısmi kayıp
+                # Put spread'te kısmi kayıp (put_buy < exit < put_sell)
                 pnl = net_credit - (put_sell - exit_price)
-            elif exit_price > call_sell:
-                # Call spread'te kısmi kayıp
-                pnl = net_credit - (exit_price - call_sell)
             else:
-                pnl = net_credit
+                # Call spread'te kısmi kayıp (call_sell < exit < call_buy)
+                pnl = net_credit - (exit_price - call_sell)
 
             pnl_pct = (pnl / entry_price) * 100
 
