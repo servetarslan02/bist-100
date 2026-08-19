@@ -184,7 +184,8 @@ class NewsProvider:
             feeds = config_manager.get("news.rss_feeds")
             if feeds:
                 return feeds
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="news_provider.py:187")
             pass
 
         # Fallback: varsayılan feed'ler

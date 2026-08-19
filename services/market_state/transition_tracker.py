@@ -306,7 +306,7 @@ class RegimeTransitionTracker:
             if end.tzinfo is None:
                 end = end.replace(tzinfo=timezone.utc)
             return (end - start).total_seconds() / 86400
-        except Exception:
+        except Exception as e:
             return 0.0
 
     def check_alerts(self) -> List[Dict[str, Any]]:

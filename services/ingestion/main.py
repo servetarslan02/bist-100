@@ -210,7 +210,7 @@ class IngestionService:
                                 },
                             )
                             publish_event(event, key=index_symbol)
-                    except Exception:
+                    except Exception as e:
                         pass  # Intentional: silent error handling
 
                 flush_producer()
@@ -393,7 +393,7 @@ class IngestionService:
                                 data={**msg, "ticker": ticker},
                             )
                             publish_event(event, key=f"social_{ticker}")
-                    except Exception:
+                    except Exception as e:
                         pass  # Intentional: silent error handling
 
                 flush_producer()

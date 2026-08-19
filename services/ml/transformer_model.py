@@ -175,7 +175,8 @@ class StockTransformer:
                 metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val[self._config.sequence_length:], val_pred))), 6)
                 if len(np.unique(val_pred)) > 1:
                     metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val[self._config.sequence_length:])[0, 1]), 4)
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="transformer_model.py:178")
                 pass
 
         logger.info("transformer_trained", **metrics)
@@ -198,7 +199,7 @@ class StockTransformer:
                 preds = self._model(X_tensor).squeeze().numpy()
 
             return preds if isinstance(preds, np.ndarray) else np.array([preds])
-        except Exception:
+        except Exception as e:
             return np.zeros(len(X))
 
     def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

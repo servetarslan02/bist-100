@@ -76,13 +76,13 @@ class ModelCalibration:
         # Brier score
         try:
             brier = float(brier_score_loss(y_true, y_prob))
-        except Exception:
+        except Exception as e:
             brier = 1.0
 
         # Log loss
         try:
             ll = float(log_loss(y_true, y_prob))
-        except Exception:
+        except Exception as e:
             ll = 1.0
 
         # Calibration curve
@@ -97,7 +97,7 @@ class ModelCalibration:
                     "fraction_positive": round(float(frac), 4),
                     "gap": round(abs(float(mean_pred) - float(frac)), 4),
                 })
-        except Exception:
+        except Exception as e:
             curve = []
 
         # ECE (Expected Calibration Error)
@@ -233,7 +233,8 @@ class ModelCalibration:
             calibrator = self._regime_calibrators[regime]
             try:
                 return calibrator.predict(y_prob)
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="calibration.py:236")
                 pass
 
         return y_prob
@@ -335,5 +336,5 @@ class ModelCalibration:
                 ece += bin_size * abs(bin_accuracy - bin_confidence)
 
             return ece
-        except Exception:
+        except Exception as e:
             return 0.0

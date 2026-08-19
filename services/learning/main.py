@@ -253,7 +253,7 @@ class LearningService:
 
             return None
 
-        except Exception:
+        except Exception as e:
             return None
 
     async def _get_last_training_time(self) -> Optional[datetime]:

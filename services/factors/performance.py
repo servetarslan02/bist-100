@@ -72,7 +72,7 @@ def track_factor_performance(
         else:
             skewness = 0.0
             kurt = 0.0
-    except Exception:
+    except Exception as e:
         skewness = 0.0
         kurt = 0.0
 

@@ -108,7 +108,7 @@ class InternalEventBus:
         if self._redis:
             try:
                 await self._redis.close()
-            except Exception:
+            except Exception as e:
                 pass  # Intentional: silent error handling
 
 
@@ -127,7 +127,7 @@ class InMemoryRedis:
                     await h({"type": "message", "channel": channel, "data": message})
                 else:
                     h({"type": "message", "channel": channel, "data": message})
-            except Exception:
+            except Exception as e:
                 pass  # Intentional: silent error handling
 
     def pubsub(self):
@@ -198,7 +198,7 @@ def get_producer():
                 "batch.size": 16384,
                 "enable.idempotence": True,
             })
-        except Exception:
+        except Exception as e:
             return None
     return _producer
 
@@ -228,13 +228,13 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
                 value=event.to_json().encode("utf-8"),
             )
             producer.poll(0)
-        except Exception:
+        except Exception as e:
             pass  # Intentional: silent error handling
 
     # Redis Pub/Sub (push-based) + Stream (durable ledger)
     try:
         asyncio.create_task(_publish_with_idempotency(event))
-    except Exception:
+    except Exception as e:
         pass  # Intentional: silent error handling
 
 
@@ -268,7 +268,8 @@ async def _check_and_mark_published(event_id: str) -> bool:
         if result is not None:
             return True
         return False
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="event_bus.py:271")
         pass
 
     # 2. PostgreSQL dene
@@ -284,7 +285,8 @@ async def _check_and_mark_published(event_id: str) -> bool:
             event_id
         )
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="event_bus.py:287")
         pass
 
     # 3. Fail-open
@@ -308,7 +310,8 @@ async def _publish_to_stream(event: CanonicalEvent):
         }, maxlen=10000)
         await r.close()
         return
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="event_bus.py:311")
         pass
 
     # 2. PostgreSQL dene
@@ -340,7 +343,7 @@ def ensure_topics():
         new_topics = [NewTopic(t, num_partitions=4, replication_factor=1) for t in TOPICS if t not in existing]
         if new_topics:
             admin.create_topics(new_topics)
-    except Exception:
+    except Exception as e:
         pass  # Intentional: silent error handling
 
 

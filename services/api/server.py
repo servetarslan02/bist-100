@@ -150,7 +150,7 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except Exception:
+            except Exception as e:
                 disconnected.append(connection)
 
         for conn in disconnected:
@@ -425,7 +425,8 @@ async def get_market_state_v2():
         raw = await redis_get("market_state")
         if raw:
             return json.loads(raw)
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:428")
         pass
     return {"error": "Market state not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -443,7 +444,8 @@ async def get_market_breadth():
                 "breadth": state.get("breadth", {}),
                 "timestamp": state.get("timestamp"),
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:446")
         pass
     return {"error": "Breadth data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -468,7 +470,8 @@ async def get_market_regime_v2():
                 "hmm_probabilities": state.get("hmm_probabilities", {}),
                 "timestamp": state.get("timestamp"),
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:471")
         pass
     return {"error": "Regime data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -490,7 +493,8 @@ async def get_market_transition():
                 "current_duration_days": state.get("regime_duration_days"),
                 "timestamp": state.get("timestamp"),
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:493")
         pass
     return {"error": "Transition data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -511,7 +515,8 @@ async def get_market_multi_tf():
                 "divergences": state.get("multi_tf_divergences", []),
                 "timestamp": state.get("timestamp"),
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:514")
         pass
     return {"error": "Multi-TF data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 
@@ -530,7 +535,8 @@ async def get_market_risk_appetite():
                 "risk_appetite_state": state.get("risk_appetite_state"),
                 "timestamp": state.get("timestamp"),
             }
-    except Exception:
+    except Exception as e:
+        logger.debug("Handled exception", error=str(e), context="server.py:533")
         pass
     return {"error": "Risk appetite not available", "timestamp": datetime.now(timezone.utc).isoformat()}
 

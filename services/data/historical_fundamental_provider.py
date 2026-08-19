@@ -71,7 +71,8 @@ class HistoricalFundamentalProvider:
                         # Earnings date = raporun açıklandığı tarih
                         if hasattr(idx, 'date'):
                             earnings_dates[str(idx.date())] = str(idx.date())
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="historical_fundamental_provider.py:74")
                 pass
 
             # Balance sheet (total_assets, total_equity vb. için)

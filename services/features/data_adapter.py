@@ -538,7 +538,8 @@ class DataAdapter:
             from email.utils import parsedate_to_datetime
             dt = parsedate_to_datetime(raw_date)
             return dt.strftime("%Y-%m-%d")
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="data_adapter.py:541")
             pass
 
         # Manuel parse ("06 Aug 2026" formatı)
@@ -553,7 +554,8 @@ class DataAdapter:
                 year = parts[3] if len(parts) > 3 else ""
                 if year and month and day:
                     return f"{year}-{month}-{day.zfill(2)}"
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="data_adapter.py:556")
             pass
 
         return ""

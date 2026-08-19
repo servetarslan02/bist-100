@@ -80,7 +80,8 @@ class UniverseEnhancements:
                     return "DELISTED"
                 elif days_since > 5:
                     return "SUSPENDED"
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="universe_enhancements.py:83")
                 pass
 
         return "ACTIVE"

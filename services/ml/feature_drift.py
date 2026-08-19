@@ -276,5 +276,5 @@ class FeatureDriftDetector:
 
             psi = float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
             return psi
-        except Exception:
+        except Exception as e:
             return 0.0

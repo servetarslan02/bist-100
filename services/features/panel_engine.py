@@ -174,7 +174,7 @@ class PanelFeatureEngine:
                 return TickerPanel(idx, open_, close, nan.copy(), nan.copy(),
                                    nan.copy(), nan.copy(), fallback, use_scalar=True)
             global_mask = np.asarray(raw_mask)
-        except Exception:
+        except Exception as e:
             return TickerPanel(idx, open_, close, nan.copy(), nan.copy(),
                                nan.copy(), nan.copy(), fallback, use_scalar=True)
 

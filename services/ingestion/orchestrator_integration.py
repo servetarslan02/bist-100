@@ -289,7 +289,7 @@ class IngestionOrchestrator:
             from ..core.config import settings
             tcmb_key = getattr(settings, 'tcmb_evds_api_key', None)
             fred_key = getattr(settings, 'fred_api_key', None)
-        except Exception:
+        except Exception as e:
             tcmb_key = None
             fred_key = None
 

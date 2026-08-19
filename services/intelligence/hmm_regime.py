@@ -277,7 +277,7 @@ class HMMRegimeDetector:
 
             return [name_mapping.get(i, f"REGIME_{i}") for i in range(len(probabilities))]
 
-        except Exception:
+        except Exception as e:
             return self.REGIME_NAMES[:len(probabilities)]
 
     def _rule_based_fallback(

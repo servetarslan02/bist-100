@@ -462,7 +462,7 @@ class ScannerBacktestRunner:
                         )
                         if features:
                             self._feature_cache.set(ticker, date_str, features)
-                    except Exception:
+                    except Exception as e:
                         data_quality_issues += 1
                         continue
 

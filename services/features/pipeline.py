@@ -431,7 +431,8 @@ class FeaturePipelineOrchestrator:
                 return ohlcv_df['Close'].tolist()
             elif hasattr(ohlcv_df, 'columns') and 'close' in ohlcv_df.columns:
                 return ohlcv_df['close'].tolist()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="pipeline.py:434")
             pass
         return None
 
@@ -445,7 +446,8 @@ class FeaturePipelineOrchestrator:
                 return ohlcv_df['Volume'].tolist()
             elif hasattr(ohlcv_df, 'columns') and 'volume' in ohlcv_df.columns:
                 return ohlcv_df['volume'].tolist()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="pipeline.py:448")
             pass
         return None
 

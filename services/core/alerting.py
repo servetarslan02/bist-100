@@ -440,7 +440,8 @@ class AlertingSystem:
                 self._check_escalations()
             except asyncio.CancelledError:
                 break
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="alerting.py:443")
                 pass
 
     def _check_escalations(self):

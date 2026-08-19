@@ -595,7 +595,7 @@ class SuperIntelligenceEngine:
                 ic = np.corrcoef(scores, actuals)[0, 1]
                 if np.isnan(ic):
                     ic = 0
-            except Exception:
+            except Exception as e:
                 ic = 0
 
         win_rate = wins / len(returns) if returns else 0

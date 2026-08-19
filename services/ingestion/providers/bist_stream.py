@@ -119,7 +119,7 @@ class BISTStreamProvider:
 
                             self._tick_count += 1
 
-                        except Exception:
+                        except Exception as e:
                             pass  # Intentional: silent error handling
 
                 # 60 saniye bekle (ücretsiz API limiti)
@@ -170,7 +170,7 @@ class BISTStreamProvider:
                                             await handler(tick)
                                         else:
                                             handler(tick)
-                                    except Exception:
+                                    except Exception as e:
                                         pass  # Intentional: silent error handling
 
                                 self._tick_count += 1
@@ -235,7 +235,7 @@ class BISTStreamProvider:
                                         await handler(tick)
                                     else:
                                         handler(tick)
-                                except Exception:
+                                except Exception as e:
                                     pass  # Intentional: silent error handling
 
                             self._tick_count += 1

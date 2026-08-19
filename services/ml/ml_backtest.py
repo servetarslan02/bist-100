@@ -140,7 +140,8 @@ class MLBacktestEngine:
                     X = feats[day_idx:day_idx + 1]
                     pred = predict_fn(X)
                     scores[ticker] = float(pred[0]) if hasattr(pred, '__len__') else float(pred)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception, continuing", error=str(e))
                     continue
 
             if not scores:
@@ -383,7 +384,8 @@ class MLBacktestEngine:
                     buy_dt = datetime.fromisoformat(buy_dates[t.ticker])
                     sell_dt = datetime.fromisoformat(t.timestamp)
                     holding_days.append((sell_dt - buy_dt).days)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="ml_backtest.py:386")
                     pass
                 del buy_dates[t.ticker]
         avg_holding = float(np.mean(holding_days)) if holding_days else 0.0

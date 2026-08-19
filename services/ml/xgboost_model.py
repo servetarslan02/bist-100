@@ -256,7 +256,7 @@ class XGBoostModel:
                 if hasattr(model, "predict_proba"):
                     return model.predict_proba(X)[:, 1]
                 return model.predict(X)
-        except Exception:
+        except Exception as e:
             return np.zeros(len(X))
 
     def predict_all_horizons(self, X: np.ndarray) -> Dict[int, np.ndarray]:
@@ -300,7 +300,7 @@ class XGBoostModel:
                 if self._feature_names:
                     return dict(zip(self._feature_names, importance.tolist()))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
-        except Exception:
+        except Exception as e:
             return None
 
     def shap_values(self, X: np.ndarray) -> Optional[np.ndarray]:
@@ -385,7 +385,8 @@ class XGBoostModel:
                     metrics["best_iteration"] = model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
                 else:
                     metrics["best_iteration"] = model.best_iteration if hasattr(model, "best_iteration") else self._config.n_estimators
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="xgboost_model.py:388")
                 pass
 
         if X_val is not None and y_val is not None:
@@ -396,7 +397,8 @@ class XGBoostModel:
                 try:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="xgboost_model.py:399")
                     pass
             else:
                 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -410,7 +412,8 @@ class XGBoostModel:
                     # IC
                     if len(np.unique(val_pred)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="xgboost_model.py:413")
                     pass
 
         return metrics
@@ -453,7 +456,8 @@ class XGBoostModel:
                 importance = self.feature_importance(imp_type, horizon)
                 if importance:
                     self._feature_importance_cache[f"{horizon}_{imp_type}"] = importance
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="xgboost_model.py:456")
                 pass
 
     def _check_overfitting(self, metrics: Dict[str, Any], horizon: int):

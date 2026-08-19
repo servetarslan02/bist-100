@@ -180,7 +180,7 @@ class SocialProvider:
 
             try:
                 text = await client.get_text(topic_url, params=None)
-            except Exception:
+            except Exception as e:
                 return []
 
             if not text:

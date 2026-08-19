@@ -68,7 +68,7 @@ class SHAPHelpers:
             # TreeExplainer (LightGBM, XGBoost için optimize)
             try:
                 explainer = shap.TreeExplainer(model)
-            except Exception:
+            except Exception as e:
                 # Fallback: KernelExplainer (yavaş ama genel)
                 logger.warning("TreeExplainer failed, falling back to KernelExplainer")
                 background = shap.sample(X_sample, min(100, len(X_sample)))

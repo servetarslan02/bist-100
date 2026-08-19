@@ -219,5 +219,5 @@ def wilcoxon_test(cars: List[float]) -> Dict[str, float]:
             "p_value": round(float(p_value), 4),
             "significant": bool(p_value < 0.05),
         }
-    except Exception:
+    except Exception as e:
         return {"statistic": 0.0, "p_value": 1.0, "significant": False}

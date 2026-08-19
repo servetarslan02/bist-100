@@ -349,7 +349,7 @@ class VirtualPortfolio:
             d1 = dt.strptime(entry_date, "%Y-%m-%d")
             d2 = dt.strptime(exit_date, "%Y-%m-%d")
             return max(0, (d2 - d1).days)
-        except Exception:
+        except Exception as e:
             return 0
 
     def reset(self):

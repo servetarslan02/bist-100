@@ -149,7 +149,7 @@ class IngestionMetrics:
         status = "success"
         try:
             yield
-        except Exception:
+        except Exception as e:
             status = "failure"
             raise
         finally:

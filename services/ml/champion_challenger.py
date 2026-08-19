@@ -147,7 +147,7 @@ class ChampionChallenger:
             z_alpha = norm.ppf(1 - self.significance_level / 2)
             ncp = abs(effect_size) * np.sqrt(n_champ * n_chall / (n_champ + n_chall))
             power = 1 - norm.cdf(z_alpha - ncp) + norm.cdf(-z_alpha - ncp)
-        except Exception:
+        except Exception as e:
             power = 0.0
 
         # Winner

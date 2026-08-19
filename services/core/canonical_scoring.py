@@ -278,7 +278,7 @@ class CanonicalScoringPipeline:
                 ml_pred = ml_model.predict(features)
                 ml_score = max(0, min(100, 50 + ml_pred * 10))
                 ml_confidence = min(1.0, abs(ml_pred) / 2.0)
-            except Exception:
+            except Exception as e:
                 pass  # ML prediction başarısızsa rule-based kullan
 
         # Ensemble: ML varsa %70 ML + %30 rule-based

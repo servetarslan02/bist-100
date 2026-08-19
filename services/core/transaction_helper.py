@@ -157,7 +157,8 @@ class TransactionHelper:
             if tx:
                 try:
                     await tx.rollback()
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="transaction_helper.py:160")
                     pass
             logger.error("Transaction rollback", error=str(e))
             raise
@@ -166,7 +167,8 @@ class TransactionHelper:
             if conn:
                 try:
                     await self._pool.release(conn)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="transaction_helper.py:169")
                     pass
 
     @asynccontextmanager
@@ -226,7 +228,7 @@ class TransactionHelper:
         try:
             yield conn
             await conn.execute(f"RELEASE SAVEPOINT {sp_name}")
-        except Exception:
+        except Exception as e:
             await conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
             raise
 

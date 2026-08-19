@@ -321,7 +321,7 @@ class HyperparameterTuner:
                 preds = model.predict(X_vl)
                 score = self._compute_objective(preds, y_vl, objective_type)
                 scores.append(score)
-            except Exception:
+            except Exception as e:
                 scores.append(0.0)
 
         return float(np.mean(scores)) if scores else 0.0
@@ -337,7 +337,7 @@ class HyperparameterTuner:
             from sklearn.metrics import roc_auc_score
             try:
                 return float(roc_auc_score(y_true, preds))
-            except Exception:
+            except Exception as e:
                 return 0.0
         elif objective_type == "directional":
             pred_dir = (preds > 0).astype(int)

@@ -313,7 +313,8 @@ class DatabaseLock:
                 await self._rollback_sqlite()
             else:
                 await self._rollback_pg()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="db_lock.py:316")
             pass
         finally:
             self._acquired = False
@@ -337,7 +338,8 @@ class DatabaseLock:
                     await self._renew_lease()
                 except asyncio.CancelledError:
                     break
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="db_lock.py:340")
                     pass
 
         try:
@@ -404,7 +406,7 @@ class DatabaseLock:
                 await self._rollback_sqlite()
                 return True
             return False
-        except Exception:
+        except Exception as e:
             return False
 
     async def _recover_pg(self) -> bool:
@@ -434,11 +436,12 @@ class DatabaseLock:
                         logger.warning("Recovered stale PG lock",
                                      key=self._key, dead_pid=pid)
                         return True
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Handled exception", error=str(e), context="db_lock.py:437")
                         pass
 
             return False
-        except Exception:
+        except Exception as e:
             return False
 
     # =====================================================
@@ -459,17 +462,19 @@ class DatabaseLock:
         """SQLite: COMMIT ile lock serbest."""
         try:
             self._db.commit()
-        except Exception:
+        except Exception as e:
             try:
                 self._db.rollback()
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="db_lock.py:465")
                 pass
 
     async def _rollback_sqlite(self):
         """SQLite: ROLLBACK."""
         try:
             self._db.rollback()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="db_lock.py:472")
             pass
 
     # =====================================================
@@ -496,14 +501,16 @@ class DatabaseLock:
                 "SELECT pg_advisory_unlock($1)",
                 self._key_id
             )
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="db_lock.py:499")
             pass
 
     async def _rollback_pg(self):
         """PostgreSQL: ROLLBACK."""
         try:
             await self._db.execute("ROLLBACK")
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="db_lock.py:506")
             pass
 
     # =====================================================

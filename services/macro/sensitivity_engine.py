@@ -338,7 +338,7 @@ class DynamicSensitivityEngine:
             corr = float(np.corrcoef(sr, mv)[0, 1])
             if np.isnan(corr):
                 return 0.0, 1.0
-        except Exception:
+        except Exception as e:
             return 0.0, 1.0
 
         # p-value (basitleştirilmiş — t-test)
@@ -351,7 +351,7 @@ class DynamicSensitivityEngine:
                 p_value = float(2 * stats.t.sf(abs(t_stat), n_obs - 2))
             else:
                 p_value = 1.0
-        except Exception:
+        except Exception as e:
             p_value = 1.0
 
         return round(corr, 4), round(p_value, 4)

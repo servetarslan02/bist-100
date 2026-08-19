@@ -87,7 +87,8 @@ class PortfolioService:
         if self._portfolio_id:
             try:
                 await self._save_equity_snapshot()
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="main.py:90")
                 pass
         logger.info("Portfolio Service v2.0 stopped")
 
@@ -249,7 +250,7 @@ class PortfolioService:
                     "equity_start": float(dr.get("equity_start") or 0),
                     "equity_end": float(dr.get("equity_end") or 0),
                 })
-        except Exception:
+        except Exception as e:
             pass  # daily_pnl tablosu yoksa atla
 
         # 7. Invariant doğrula
@@ -291,7 +292,7 @@ class PortfolioService:
                 self._portfolio_id, limit
             )
             return rows
-        except Exception:
+        except Exception as e:
             return []
 
     async def _update_daily_pnl(self, realized_pnl: float, commission: float):
@@ -429,19 +430,22 @@ class PortfolioService:
                         "UPDATE positions SET current_price = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                         price, self._position_cache[ticker]["id"]
                     )
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="main.py:432")
             pass
 
         # Portfolio totals güncelle
         try:
             await self._update_portfolio_totals()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="main.py:438")
             pass
 
         # Günlük snapshot
         try:
             await self._save_equity_snapshot()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="main.py:444")
             pass
 
     # =====================================================

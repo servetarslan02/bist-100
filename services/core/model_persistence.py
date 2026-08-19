@@ -42,7 +42,7 @@ class ModelPersistence:
         """
         try:
             from .database import pg_fetchrow, pg_fetchval
-        except Exception:
+        except Exception as e:
             logger.warning("DB not available, skipping model metadata save")
             return None
 
@@ -117,7 +117,7 @@ class ModelPersistence:
         """Champion model metadata'sını getir."""
         try:
             from .database import pg_fetchrow
-        except Exception:
+        except Exception as e:
             return None
 
         try:
@@ -141,7 +141,7 @@ class ModelPersistence:
         """Modeli champion yap (eski champion'ı candidate'a düşür)."""
         try:
             from .database import pg_execute, pg_fetchval
-        except Exception:
+        except Exception as e:
             return False
 
         try:
@@ -177,7 +177,7 @@ class ModelPersistence:
         """Model versiyonlarını listele."""
         try:
             from .database import pg_fetch
-        except Exception:
+        except Exception as e:
             return []
 
         try:

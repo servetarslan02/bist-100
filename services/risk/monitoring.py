@@ -241,7 +241,8 @@ class RiskMonitor:
                         elapsed = (datetime.now(timezone.utc) - last).total_seconds()
                         if elapsed < rule.cooldown_seconds:
                             continue
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Handled exception", error=str(e), context="monitoring.py:244")
                         pass
 
                 alert = Alert(

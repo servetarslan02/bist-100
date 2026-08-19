@@ -149,7 +149,8 @@ class CatBoostModel:
             try:
                 custom_loss = CatBoostAdjustedLoss(self._config.wrong_direction_penalty)
                 fit_params["eval_metric"] = "RMSE"  # Custom metric
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="catboost_model.py:152")
                 pass
 
         # Pool oluştur (daha efficient)
@@ -296,7 +297,7 @@ class CatBoostModel:
                 if self._feature_names:
                     return dict(zip(self._feature_names, importance.tolist()))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
-        except Exception:
+        except Exception as e:
             return None
 
     def get_feature_interactions(self, horizon: int = 5) -> Optional[Dict[str, float]]:
@@ -314,7 +315,8 @@ class CatBoostModel:
                     f2 = self._feature_names[int(f2_idx)] if int(f2_idx) < len(self._feature_names) else f"f{f2_idx}"
                     result[f"{f1}×{f2}"] = round(float(score), 4)
                 return result
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="catboost_model.py:317")
             pass
         return None
 
@@ -334,7 +336,7 @@ class CatBoostModel:
                     "type": "categorical",
                 }
             return stats
-        except Exception:
+        except Exception as e:
             return None
 
     def _create_model(self):
@@ -418,7 +420,8 @@ class CatBoostModel:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
                     metrics["val_log_loss"] = round(float(log_loss(y_val, val_pred)), 4)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="catboost_model.py:421")
                     pass
             else:
                 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -432,7 +435,8 @@ class CatBoostModel:
                     # IC (Information Coefficient)
                     if len(np.unique(val_pred)) > 1:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="catboost_model.py:435")
                     pass
 
         return metrics
@@ -464,7 +468,8 @@ class CatBoostModel:
                     f2 = feature_names[int(f2_idx)] if feature_names and int(f2_idx) < len(feature_names) else f"f{f2_idx}"
                     result[f"{f1}×{f2}"] = round(float(score), 4)
                 self._feature_interactions = result
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="catboost_model.py:467")
             pass
 
     def _check_overfitting(self, metrics: Dict[str, Any], horizon: int):

@@ -539,7 +539,7 @@ class PortfolioSimulatorV3:
             d1 = datetime.strptime(entry_date, "%Y-%m-%d")
             d2 = datetime.strptime(exit_date, "%Y-%m-%d")
             return max(0, (d2 - d1).days)
-        except Exception:
+        except Exception as e:
             return 0
 
     def _audit(self, date: str, entry_type: str, ticker: str, details: Dict[str, Any]):

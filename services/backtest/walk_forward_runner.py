@@ -468,14 +468,15 @@ class WalkForwardBacktestRunner:
                         training_data_start=train_start,
                         training_data_end=train_end,
                     ))
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="walk_forward_runner.py:471")
                     pass
                 finally:
                     loop.close()
 
             t = threading.Thread(target=_save, daemon=True)
             t.start()
-        except Exception:
+        except Exception as e:
             pass  # Best-effort, DB yoksa devam et
 
         return multi_model
@@ -487,7 +488,7 @@ class WalkForwardBacktestRunner:
         try:
             from ..core.canonical_scoring import get_canonical_features
             self._feature_names_cache = get_canonical_features()
-        except Exception:
+        except Exception as e:
             self._feature_names_cache = []
         return self._feature_names_cache
 

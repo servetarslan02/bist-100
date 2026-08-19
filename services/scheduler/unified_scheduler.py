@@ -139,7 +139,8 @@ class HolidayProvider:
                     data = json.load(f)
                     for h in data.get("holidays", []):
                         holidays.add(date.fromisoformat(h))
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="unified_scheduler.py:142")
             pass
 
         # 2. DB'den çek (varsa)
@@ -147,7 +148,8 @@ class HolidayProvider:
             # DB erişimi varsa config_holidays tablosundan çek
             # Bu kısım async değil, sync — startup'ta yüklenir
             pass
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="unified_scheduler.py:150")
             pass
 
         self._dynamic_holidays = holidays
@@ -583,7 +585,7 @@ class DBJobTracker:
                         timeout=3.0,
                     )
                 return [dict(r) for r in rows]
-            except Exception:
+            except Exception as e:
                 self._db_available = False
 
         # In-memory fallback
@@ -612,7 +614,7 @@ class DBJobTracker:
                 )
                 if row:
                     return dict(row)
-            except Exception:
+            except Exception as e:
                 self._db_available = False
 
         # In-memory fallback
@@ -640,7 +642,7 @@ class DBJobTracker:
             s.close()
             self._db_available = result == 0
             return self._db_available
-        except Exception:
+        except Exception as e:
             self._db_available = False
             return False
 

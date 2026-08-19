@@ -308,7 +308,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dic
                 r, _ = spearmanr(yt[half:], yp[half:])
                 ic2 = float(r) if np.isfinite(r) else 0.0
             defaults["ic_stability"] = float(1.0 - abs(ic1 - ic2))
-        except Exception:
+        except Exception as e:
             defaults["ic_stability"] = 0.0
 
     if n >= 10:

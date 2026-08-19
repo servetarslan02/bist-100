@@ -334,7 +334,7 @@ class WalkForwardEngine:
                 ic = np.corrcoef(all_scores, all_actuals)[0, 1]
                 if np.isnan(ic):
                     ic = 0
-            except Exception:
+            except Exception as e:
                 ic = 0
 
         # Deflated Sharpe (Multiple testing düzeltmesi)

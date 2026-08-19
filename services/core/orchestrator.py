@@ -611,7 +611,8 @@ class MasterOrchestrator:
                     try:
                         impact = macro_impact_analyzer.compute_cumulative_impact(ticker, sector)
                         features["macro_cumulative_impact"] = impact.get("cumulative_impact", 0)
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Handled exception", error=str(e), context="orchestrator.py:614")
                         pass
 
                 # Agent pipeline (varsa)

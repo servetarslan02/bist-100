@@ -72,7 +72,7 @@ class RegimeEngine:
             try:
                 from .hmm_regime import HMMRegimeDetector
                 self._hmm_detector = HMMRegimeDetector(n_regimes=4, rolling_window=63)
-            except Exception:
+            except Exception as e:
                 self._hmm_detector = None
 
     def detect_regime(self, features: Dict[str, float]) -> RegimeState:
@@ -120,7 +120,7 @@ class RegimeEngine:
                     regime_name = regime_key.value
                     hmm_prob = hmm_result.probabilities.get(regime_name, 0.0)
                     scores[regime_key] = scores[regime_key] * (1 - hmm_weight) + hmm_prob * hmm_weight * 100
-            except Exception:
+            except Exception as e:
                 hmm_result = None
 
         # Macro regime entegrasyonu
@@ -143,7 +143,8 @@ class RegimeEngine:
                     for target in target_regimes:
                         if target in scores:
                             scores[target] = scores[target] * (1 - macro_weight) + macro_score * macro_weight * 100
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="regime.py:146")
             pass
 
         # En yüksek skorlu rejimi seç

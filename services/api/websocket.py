@@ -45,7 +45,8 @@ class WebSocketConnection:
         """Bağlantıyı kapat."""
         try:
             await self.ws.close()
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="websocket.py:48")
             pass
 
 
@@ -156,7 +157,7 @@ class WebSocketServer:
                 for conn in connections:
                     try:
                         await conn.send(data)
-                    except Exception:
+                    except Exception as e:
                         dead.append(conn)
 
                 # Ölü bağlantıları temizle

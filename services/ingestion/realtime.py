@@ -91,7 +91,8 @@ class RealtimeDataProvider:
                                         handler(ticker, price, volume, change_pct)
                                 except Exception as e:
                                     logger.warning("Handler error", ticker=ticker, error=str(e))
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("Handled exception", error=str(e), context="realtime.py:94")
                         pass
 
                 elapsed = time.time() - start

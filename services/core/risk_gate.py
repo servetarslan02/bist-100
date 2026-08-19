@@ -165,7 +165,7 @@ class RiskGate:
                 reasons.append(f"SPK: {comp.reason}")
             elif comp.notification_required:
                 details["spk_notification"] = comp.reason
-        except Exception:
+        except Exception as e:
             pass  # BIST kuralları modülleri yoksa skip
         else:
             # Yalnızca bu blok içinde hiçbir alt-kontrol başarısız olmadıysa

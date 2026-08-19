@@ -500,7 +500,7 @@ class AlertPolicy:
                     loop = asyncio.new_event_loop()
                     loop.run_until_complete(self._send_webhook(url, payload))
                     loop.close()
-                except Exception:
+                except Exception as e:
                     logger.warning("Webhook notification failed (no event loop)")
 
     async def _send_webhook(self, url: str, payload: Dict[str, Any]):

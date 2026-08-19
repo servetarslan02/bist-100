@@ -185,7 +185,7 @@ class LearningScheduler:
             last = datetime.fromisoformat(config.last_run)
             elapsed_hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
             return elapsed_hours >= config.interval_hours
-        except Exception:
+        except Exception as e:
             return True
 
     def get_status(self) -> Dict[str, Any]:

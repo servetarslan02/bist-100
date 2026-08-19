@@ -190,7 +190,7 @@ class PerformanceTracker:
             from scipy import stats
             corr, _ = stats.spearmanr(predictions, actuals)
             return float(corr) if not np.isnan(corr) else 0.0
-        except Exception:
+        except Exception as e:
             return 0.0
 
     def compute_icir(self, ic_series: List[float]) -> float:

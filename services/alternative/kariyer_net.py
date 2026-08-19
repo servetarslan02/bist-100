@@ -145,7 +145,8 @@ class KariyerNetAdapter(BaseAdapter):
                     "is_remote": "uzaktan" in (title.text if title else "").lower() or
                                  "remote" in (title.text if title else "").lower(),
                 })
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception, continuing", error=str(e))
                 continue
 
         return postings

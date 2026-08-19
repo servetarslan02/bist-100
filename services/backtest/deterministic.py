@@ -335,7 +335,8 @@ class DeterministicRecovery:
                     "timestamp": data["timestamp"],
                     "hash": data["hash_state"],
                 })
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="deterministic.py:338")
                 pass
         return checkpoints
 

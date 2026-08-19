@@ -75,7 +75,7 @@ class EventImpactDecay:
             ss_tot = np.sum((log_ar - np.mean(log_ar)) ** 2)
             r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-        except Exception:
+        except Exception as e:
             decay_rate = 0.0
             half_life = float("inf")
             r_squared = 0.0

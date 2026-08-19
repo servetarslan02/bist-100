@@ -192,7 +192,7 @@ class StackingEnsemble:
             if hasattr(meta_learner, "predict_proba"):
                 return meta_learner.predict_proba(meta_features)[:, 1]
             return meta_learner.predict(meta_features)
-        except Exception:
+        except Exception as e:
             return np.zeros(len(X))
 
     def predict_with_confidence(
@@ -221,7 +221,8 @@ class StackingEnsemble:
                 else:
                     preds = model.predict(X)
                 all_preds.append(preds)
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:224")
                 pass
 
         if not all_preds:
@@ -268,7 +269,7 @@ class StackingEnsemble:
                 else:
                     pred = model.predict(X[:1])
                 model_preds[name] = float(pred[0]) if len(pred) > 0 else 0.5
-            except Exception:
+            except Exception as e:
                 model_preds[name] = 0.5
 
         # Weighted prediction
@@ -315,7 +316,8 @@ class StackingEnsemble:
                         name: round(float(abs(c) / total), 4)
                         for (name, _), c in zip(self._base_models.items(), model_coefs)
                     }
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:318")
             pass
 
         return self._model_weights
@@ -341,7 +343,7 @@ class StackingEnsemble:
                     meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
                 else:
                     meta_features[:, model_idx] = model.predict(X)
-            except Exception:
+            except Exception as e:
                 meta_features[:, model_idx] = 0.5
 
         if self._config.passthrough:
@@ -393,7 +395,8 @@ class StackingEnsemble:
                 else:
                     preds = model.predict(X)
                 all_preds.append((name, preds))
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:396")
                 pass
 
         if len(all_preds) < 2:
@@ -444,7 +447,7 @@ class StackingEnsemble:
                         if np.isnan(ic):
                             ic = 0.0
                         regime_scores[name] = abs(ic)
-                    except Exception:
+                    except Exception as e:
                         regime_scores[name] = 0.0
 
                 # Normalize to weights
@@ -470,7 +473,7 @@ class StackingEnsemble:
         from sklearn.metrics import roc_auc_score
         try:
             auc = float(roc_auc_score(y_val, val_pred))
-        except Exception:
+        except Exception as e:
             auc = 0.0
 
         # IC
@@ -478,7 +481,7 @@ class StackingEnsemble:
             ic = float(np.corrcoef(val_pred, y_val)[0, 1])
             if np.isnan(ic):
                 ic = 0.0
-        except Exception:
+        except Exception as e:
             ic = 0.0
 
         # Directional accuracy

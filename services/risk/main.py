@@ -28,7 +28,7 @@ async def _db_fetchrow(query, *args):
     try:
         from ..core.database_dev import dev_db
         return await dev_db.pg_fetchrow(query, *args)
-    except Exception:
+    except Exception as e:
         return await pg_fetchrow(query, *args)
 
 async def _db_fetchval(query, *args):
@@ -36,7 +36,7 @@ async def _db_fetchval(query, *args):
     try:
         from ..core.database_dev import dev_db
         return await dev_db.pg_fetchval(query, *args)
-    except Exception:
+    except Exception as e:
         return await pg_fetchval(query, *args)
 
 
@@ -95,7 +95,7 @@ class RiskEngine:
                     SELECT config_key, config_value FROM system_config
                     WHERE config_key LIKE 'risk.%'
                 """)
-            except Exception:
+            except Exception as e:
                 # Production modda PostgreSQL kullan
                 rows = await pg_fetch("""
                     SELECT config_key, config_value FROM system_config
@@ -114,7 +114,7 @@ class RiskEngine:
                 if isinstance(value, str):
                     try:
                         value = json.loads(value)
-                    except Exception:
+                    except Exception as e:
                         pass  # Intentional: silent error handling
                 self._risk_limits[key] = float(value) if value else 0
 

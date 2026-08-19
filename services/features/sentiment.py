@@ -264,7 +264,7 @@ class SentimentFeatureEngine:
                 from datetime import timezone
                 ts = ts.replace(tzinfo=timezone.utc)
             return (datetime.now(ts.tzinfo) - ts) < timedelta(hours=hours)
-        except Exception:
+        except Exception as e:
             return False
 
 

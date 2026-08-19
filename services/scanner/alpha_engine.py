@@ -238,7 +238,7 @@ class AlphaEngine:
                     close_list = [x for x in df["close"].to_list() if x is not None]
                     features["price"] = close_list[-1] if close_list else 0
                     features_map[ticker] = features
-            except Exception:
+            except Exception as e:
                 pass  # Intentional: silent error handling
         return features_map
 

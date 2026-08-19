@@ -143,7 +143,8 @@ class KAPUniverseProvider:
                                 name=name or ticker,
                                 source="kap_search",
                             )
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception, continuing", error=str(e))
                 continue
 
         return companies
@@ -206,7 +207,8 @@ class KAPUniverseProvider:
                         sector = match.group(1).strip().upper()
                         return self._normalize_sector(sector)
 
-        except Exception:
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="universe_provider.py:209")
             pass
 
         return "DIGER"
@@ -690,7 +692,7 @@ class UniverseAutoUpdater:
             mtime = datetime.fromtimestamp(self.CACHE_FILE.stat().st_mtime, tz=timezone.utc)
             age = datetime.now(timezone.utc) - mtime
             return age < timedelta(hours=self.CACHE_TTL_HOURS)
-        except Exception:
+        except Exception as e:
             return False
 
     def _load_from_cache(self):
@@ -791,16 +793,16 @@ if __name__ == "__main__":
     updater = UniverseAutoUpdater()
     universe = updater.refresh_universe()
 
-    print(f"\nToplam hisse: {len(universe)}")
-    print(f"XU100: {len(updater.get_index_members('XU100'))}")
-    print(f"XU030: {len(updater.get_index_members('XU030'))}")
-    print(f"XU050: {len(updater.get_index_members('XU050'))}")
+    logger.info("debug_output", message=f"\nToplam hisse: {len(universe)}")
+    logger.info("debug_output", message=f"XU100: {len(updater.get_index_members('XU100'))}")
+    logger.info("debug_output", message=f"XU030: {len(updater.get_index_members('XU030'))}")
+    logger.info("debug_output", message=f"XU050: {len(updater.get_index_members('XU050'))}")
 
-    print("\nSektör dağılımı:")
+    logger.info("debug_output", message="\nSektör dağılımı:")
     for sector, count in updater.get_sector_stats().items():
-        print(f"  {sector}: {count}")
+        logger.info("debug_output", message=f"  {sector}: {count}")
 
-    print("\nİlk 10 hisse:")
+    logger.info("debug_output", message="\nİlk 10 hisse:")
     for ticker in list(universe.keys())[:10]:
         info = universe[ticker]
-        print(f"  {ticker}: {info.name} ({info.sector}) MC:{info.market_cap:,.0f}")
+        logger.info("debug_output", message=f"  {ticker}: {info.name} ({info.sector}) MC:{info.market_cap:,.0f}")

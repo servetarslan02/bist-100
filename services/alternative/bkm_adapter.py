@@ -67,26 +67,21 @@ class BKMAdapter(BaseAdapter):
             return None
 
     async def _fetch_bkm_data(self, ticker: str, sector: str) -> Dict[str, Any]:
-        """BKM verisi çek (mock/placeholder).
+        """BKM verisi çek.
 
         Production'da bu method:
         1. BKM aylık raporunu scrape eder VEYA
         2. BKM API'sından çeker VEYA
         3. Manuel yüklenen CSV/JSON'dan okur
+
+        Şu an: Veri kaynağı olmadığı için None döndürür.
+        Placeholder/mock veri KULLANILMAZ — feature üretimi atlanır.
         """
-        # Mock data structure — gerçek BKM verisi bu formatta gelmeli
-        return {
-            "total_spend": 0,  # Gerçek veri buraya gelecek
-            "transaction_count": 0,
-            "avg_transaction": 0,
-            "online_ratio": 0,
-            "growth_yoy": 0,
-            "growth_mom": 0,
-            "sector_growth": 0,
-            "foreign_card_ratio": 0,
-            "data_source": "placeholder",
-            "timestamp": "2026-01-01T00:00:00Z",
-        }
+        # Gerçek veri kaynağı bağlanana kadar None döndür
+        # Bu, feature pipeline'ın bu veriyi atlamasını sağlar
+        logger.info("BKM data not available — no real data source connected",
+                   ticker=ticker, sector=sector)
+        return None
 
     def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
         """BKM feature'ları hesapla."""

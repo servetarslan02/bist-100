@@ -130,7 +130,7 @@ class JobWorker:
                 "SELECT * FROM system_jobs WHERE id = $1", job_id
             )
             return dict(row) if row else None
-        except Exception:
+        except Exception as e:
             return None
 
     async def cancel_job(self, job_id: int) -> bool:
@@ -145,7 +145,7 @@ class JobWorker:
             if task and not task.done():
                 task.cancel()
             return True
-        except Exception:
+        except Exception as e:
             return False
 
     async def shutdown(self, timeout: int = 30):
@@ -238,7 +238,7 @@ class JobWorker:
                 ),
                 timeout=3.0
             )
-        except Exception:
+        except Exception as e:
             return None
 
     async def _create_job(self, job_type: str, payload: Dict, priority: int,
@@ -272,7 +272,7 @@ class JobWorker:
             result = s.connect_ex(('127.0.0.1', 5432))
             s.close()
             return result == 0
-        except Exception:
+        except Exception as e:
             return False
 
     async def _update_job_status(self, job_id: int, status: JobStatus,

@@ -91,7 +91,7 @@ class ConnectionManager:
             for connection in self.active_connections[channel]:
                 try:
                     await connection.send_json(message)
-                except Exception:
+                except Exception as e:
                     pass  # Intentional: silent error handling
 
 
@@ -117,14 +117,14 @@ async def status():
     try:
         pg_ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if pg_ok else "unhealthy"
-    except Exception:
+    except Exception as e:
         services["postgresql"] = "unavailable"
 
     # Check ClickHouse
     try:
         ch_result = ch_execute("SELECT 1")
         services["clickhouse"] = "healthy" if len(ch_result.result_rows) > 0 else "unhealthy"
-    except Exception:
+    except Exception as e:
         services["clickhouse"] = "unavailable"
 
     # Check Redis
@@ -133,7 +133,7 @@ async def status():
         r = await get_redis()
         redis_ok = await r.ping()
         services["redis"] = "healthy" if redis_ok else "unhealthy"
-    except Exception:
+    except Exception as e:
         services["redis"] = "unavailable"
 
     return {
@@ -187,7 +187,7 @@ async def _compute_live_market_state():
                     elif change < 0:
                         declining += 1
                     total += 1
-            except Exception:
+            except Exception as e:
                 pass  # Intentional: silent error handling
 
         breadth = (advancing / total * 100) if total > 0 else 50
@@ -270,7 +270,7 @@ async def get_instrument_ohlcv(
                                    "low": float(row[3]), "close": float(row[4])})
                     volumes.append({"time": ts, "volume": int(row[5]), "open": float(row[1]), "close": float(row[4])})
                 return {"candles": candles, "volumes": volumes}
-        except Exception:
+        except Exception as e:
             pass  # Intentional: silent error handling
 
         # Fallback: yfinance
@@ -479,7 +479,7 @@ async def get_signals(
                         "expected_return_pct": round(features.get("momentum_20d", 0), 1),
                         "spec_category": spec.category,
                     })
-            except Exception:
+            except Exception as e:
                 pass  # Intentional: silent error handling
 
         signals.sort(key=lambda x: x["score"], reverse=True)
@@ -692,7 +692,7 @@ async def stream_events():
                 async for message in pubsub.listen():
                     if message["type"] == "message":
                         yield f"data: {message['data']}\n\n"
-            except Exception:
+            except Exception as e:
                 await asyncio.sleep(1)
 
     return StreamingResponse(

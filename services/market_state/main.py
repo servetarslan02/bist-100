@@ -440,7 +440,8 @@ class MarketStateService:
                     alert_count=len(transition_alerts),
                     critical_alerts=sum(1 for a in transition_alerts if a.get("severity") == "WARNING"),
                 )
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="main.py:443")
                 pass
 
             logger.info(
@@ -466,7 +467,8 @@ class MarketStateService:
                 prometheus_metrics.set_gauge("market_state_momentum", components.avg_momentum)
                 prometheus_metrics.set_gauge("market_state_volatility", components.avg_volatility)
                 prometheus_metrics.set_gauge("market_state_rsi", components.avg_rsi)
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="main.py:469")
                 pass
 
         except Exception as e:

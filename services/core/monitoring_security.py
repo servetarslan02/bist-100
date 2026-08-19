@@ -265,7 +265,8 @@ class JWTProvider(AuthProvider):
                 kid = unverified.get("kid", "")
                 if kid and kid in self._jwks_cache:
                     return self._jwks_cache[kid]
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="monitoring_security.py:268")
                 pass
 
         return self._secret

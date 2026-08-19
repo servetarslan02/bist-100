@@ -249,7 +249,8 @@ class CustomFilterEngine:
                 try:
                     if not f.condition(result):
                         blocked += 1
-                except Exception:
+                except Exception as e:
+                    logger.debug("Handled exception", error=str(e), context="custom_filters.py:252")
                     pass
 
             stats[f.name] = {

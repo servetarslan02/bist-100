@@ -256,7 +256,8 @@ class DataQualityValidator:
                         checks_failed += 1
                     else:
                         checks_passed += 1
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="base.py:259")
                 pass
 
         # Score hesapla

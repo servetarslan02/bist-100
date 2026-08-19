@@ -254,7 +254,7 @@ class YFinanceProvider:
                     "price": info.get("regularMarketPrice", 0),
                     "change_pct": info.get("regularMarketChangePercent", 0),
                 }
-            except Exception:
+            except Exception as e:
                 results[name] = {"price": 0, "change_pct": 0}
 
         return results

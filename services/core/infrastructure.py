@@ -97,7 +97,8 @@ class CatalystEngine:
                         "importance": c.importance,
                         "expected_impact": c.expected_impact,
                     })
-            except Exception:
+            except Exception as e:
+                logger.debug("Handled exception", error=str(e), context="infrastructure.py:100")
                 pass
 
         return sorted(upcoming, key=lambda x: x["days_until"])
