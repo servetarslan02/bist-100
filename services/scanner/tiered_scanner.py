@@ -529,12 +529,76 @@ class TieredScanner:
         return max(0, min(100, score))
 
     def _score_sector_divergence(self, features: Dict) -> float:
-        """Sektör sapma skoru (0-100)."""
-        return 50  # Basitleştirilmiş
+        """Sektör sapma skoru (0-100).
+        Hisse kendi sektöründen pozitif sapma gösteriyorsa yüksek skor.
+        Negatif sapma gösteriyorsa düşük skor.
+        """
+        score = 50.0
+
+        # Sektöre göre relatif performans
+        sector_rel = features.get("relative_strength_vs_sector", 0)
+        sector_mom = features.get("sector_momentum", 0)
+        price_vs_sma20 = features.get("price_vs_sma20", 0)
+        roc_5d = features.get("roc_5d", 0)
+
+        # Sektöre göre pozitif sapma
+        if sector_rel > 3:
+            score += min(sector_rel * 5, 25)
+        elif sector_rel < -3:
+            score += max(sector_rel * 5, -25)
+
+        # Sektör momentumu + hisse momentumu uyumu
+        if sector_mom > 0 and roc_5d > 0:
+            # İkisi de pozitif → uyumlu, +10
+            score += 10
+        elif sector_mom < 0 and roc_5d > 0:
+            # Sektör düşerken hisse çıkıyor → güçlü sapma, +15
+            score += 15
+        elif sector_mom > 0 and roc_5d < -3:
+            # Sektör çıkarken hisse düşüyor → negatif sapma, -15
+            score -= 15
+
+        # SMA20'ye göre konum
+        if price_vs_sma20 > 5:
+            score += 5
+        elif price_vs_sma20 < -5:
+            score -= 5
+
+        return max(0, min(100, score))
 
     def _score_flow_correlation(self, features: Dict) -> float:
-        """Akış korelasyon skoru (0-100)."""
-        return 50  # Basitleştirilmiş
+        """Akış korelasyon skoru (0-100).
+        Hacim-fiyat korelasyonunu ölçer.
+        Yüksek hacim + yükseliş = pozitif akış (yüksek skor)
+        Yüksek hacim + düşüş = negatşf akış (düşük skor)
+        """
+        score = 50.0
+
+        vol_z = features.get("volume_zscore", 0)
+        vol_ratio = features.get("volume_ratio_20d", 1)
+        roc_1d = features.get("return_1d", 0)
+        roc_5d = features.get("roc_5d", 0)
+
+        # Hacim-fiyat korelasyonu
+        # Pozitif korelasyon: hacim artarken fiyat da artıyor
+        if vol_z > 1.5 and roc_1d > 0:
+            score += min(vol_z * 8, 25)
+        elif vol_z > 1.5 and roc_1d < -1:
+            # Yüksek hacim + düşüş → satış baskısı
+            score -= min(vol_z * 6, 20)
+        elif vol_z < -1 and roc_1d > 0:
+            # Düşük hacim + yükseliş → sürdürülebilir değil
+            score -= 10
+
+        # Hacim ratio + 5 günlük momentum uyumu
+        if vol_ratio > 1.5 and roc_5d > 2:
+            score += 10  # Hacim artıyor + momentum pozitif
+        elif vol_ratio > 1.5 and roc_5d < -2:
+            score -= 10  # Hacim artıyor + momentum negatif (dağıtım)
+        elif vol_ratio < 0.7 and abs(roc_5d) < 1:
+            score += 5   # Düşük hacim + sakin fiyat → birikim olabilir
+
+        return max(0, min(100, score))
 
     def _score_liquidity(self, features: Dict) -> float:
         """Likidite skoru (0-100)."""

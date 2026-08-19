@@ -1,6 +1,7 @@
 # ALPHA BIST — Scanner System v2.0
 #
 # Modüller:
+# - scanner_interface: Abstract interface (backtest-scanner parity)
 # - alpha_engine: Ana motor (3 katmanlı tarama)
 # - alpha_scanner: Alpha tarama (quant scan + signal generation)
 # - tiered_scanner: 6 katmanlı tarama (Tier 0-5)
@@ -17,6 +18,7 @@
 # - custom_filters: BIST'e özel filtreler
 # - scan_api: Scan metrics API
 
+from .scanner_interface import ScannerInterface, ScanResult
 from .deduplicator import ScanDeduplicator, scan_deduplicator
 from .scan_scheduler import AdaptiveScanScheduler, scan_scheduler, ScanMode
 from .scan_persistence import ScanPersistence, scan_persistence
@@ -26,6 +28,8 @@ from .custom_filters import CustomFilterEngine, custom_filter_engine, CustomFilt
 from .scan_api import ScanAPI, scan_api
 
 __all__ = [
+    # Interface
+    "ScannerInterface", "ScanResult",
     # Deduplication
     "ScanDeduplicator", "scan_deduplicator",
     # Scheduler

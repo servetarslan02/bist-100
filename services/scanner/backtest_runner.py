@@ -539,19 +539,112 @@ class ScannerBacktestRunner:
         )
 
     def _compute_score(self, features: Dict[str, Any]) -> float:
+        """Opportunity score — alpha_scanner ile aynı mantık.
+
+        Ağırlıklar:
+        - momentum: 20%
+        - relative_strength: 15%
+        - volume_anomaly: 15%
+        - breakout: 10%
+        - volatility_structure: 10%
+        - regime_fit: 10%
+        - technical: 20% (event ve ML yerine)
+        """
         _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
-        score = 50.0
+
+        # Momentum skoru
+        roc_5d = _s(features.get("roc_5d", 0))
+        roc_20d = _s(features.get("momentum_20d", 0) or features.get("roc_20d", 0))
+        mom_score = 50
+        if roc_5d > 3:
+            mom_score += min(roc_5d * 5, 30)
+        elif roc_5d < -3:
+            mom_score += max(roc_5d * 5, -30)
+        if roc_20d > 5:
+            mom_score += min(roc_20d * 2, 20)
+        mom_score = max(0, min(100, mom_score))
+
+        # Relative strength skoru
+        price_vs_sma20 = _s(features.get("price_vs_sma20", 0))
+        rs_score = 50 + min(price_vs_sma20 * 5, 50)
+        rs_score = max(0, min(100, rs_score))
+
+        # Volume anomaly skoru
+        vol_z = _s(features.get("volume_zscore", 0))
+        vol_score = 50
+        if vol_z > 2:
+            vol_score += min(vol_z * 15, 40)
+        elif vol_z < -1:
+            vol_score += max(vol_z * 10, -30)
+        vol_score = max(0, min(100, vol_score))
+
+        # Breakout skoru
+        bb_pos = _s(features.get("bb_position", 0.5))
+        near_high = _s(features.get("near_20d_high", 0))
+        trend_slope = _s(features.get("trend_slope_20d", 0))
+        brk_score = 0
+        if bb_pos > 0.95:
+            brk_score += 30
+        elif bb_pos > 0.85:
+            brk_score += 15
+        if near_high:
+            brk_score += 25
+        if vol_z > 1.5:
+            brk_score += 20
+        if trend_slope > 0:
+            brk_score += 15
+        brk_score = min(100, brk_score)
+
+        # Volatility structure
+        atr_pct = _s(features.get("atr_14_pct", 2))
+        vol_struct = 50
+        if atr_pct < 2:
+            vol_struct = 70
+        elif atr_pct > 5:
+            vol_struct = 40
+
+        # Regime fit (basitleştirilmiş — backtest'te rejim bilinmiyor)
         rsi = _s(features.get("rsi_14", 50))
-        if rsi > 60: score += 10
-        elif rsi < 40: score -= 10
-        score += _s(features.get("momentum_20d", 0)) * 100
-        score += _s(features.get("roc_5d", 0)) * 2
-        score += _s(features.get("volume_zscore", 0)) * 5
-        return max(0, min(100, score))
+        regime_score = 50
+        if 40 < rsi < 60:
+            regime_score = 60  # Nötr bölge — çoğu rejimde iyi
+
+        # Technical (RSI tabanlı)
+        tech_score = 50
+        if rsi > 70:
+            tech_score -= 10
+        elif rsi < 30:
+            tech_score += 10
+        elif 40 < rsi < 60:
+            tech_score += 5
+        macd = _s(features.get("macd_histogram", 0))
+        if macd > 0:
+            tech_score += 5
+        elif macd < 0:
+            tech_score -= 5
+        tech_score = max(0, min(100, tech_score))
+
+        # Ağırlıklı toplam (alpha_scanner ile aynı ağırlıklar)
+        score = (
+            mom_score * 0.20
+            + rs_score * 0.15
+            + vol_score * 0.15
+            + brk_score * 0.10
+            + vol_struct * 0.10
+            + regime_score * 0.10
+            + tech_score * 0.20  # event ve ML yerine technical
+        )
+
+        return max(0, min(100, round(score, 1)))
 
     def _determine_signal(self, score: float, threshold: float) -> str:
-        if score >= threshold + 10: return "STRONG_BUY"
-        elif score >= threshold: return "BUY"
-        elif score <= 100 - threshold - 10: return "STRONG_SELL"
-        elif score <= 100 - threshold: return "SELL"
+        """Sinyal belirleme — alpha_scanner ile uyumlu."""
+        if score >= threshold + 15:
+            return "STRONG_BUY"
+        elif score >= threshold:
+            return "BUY"
+        elif score <= 100 - threshold - 15:
+            return "STRONG_SELL"
+        elif score <= 100 - threshold:
+            return "SELL"
         return "HOLD"

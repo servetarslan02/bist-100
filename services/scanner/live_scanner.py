@@ -54,13 +54,16 @@ class LiveScanner:
         state["last_update"] = ts.isoformat()
         state["tick_count"] += 1
 
-        # Fiyat geçmişi (son 100 tick)
+        # Fiyat geçmişi (son 100 tick — sliding window)
+        MAX_HISTORY = 100
         state["prices"].append(price)
-        state["prices"] = state["prices"][-100:]
+        if len(state["prices"]) > MAX_HISTORY:
+            state["prices"] = state["prices"][-MAX_HISTORY:]
 
         # Hacim geçmişi
         state["volumes"].append(volume)
-        state["volumes"] = state["volumes"][-100:]
+        if len(state["volumes"]) > MAX_HISTORY:
+            state["volumes"] = state["volumes"][-MAX_HISTORY:]
 
         # Değişim hesapla (tick bazlı, günlük değil)
         if state["prev_price"] > 0:
@@ -121,8 +124,8 @@ class LiveScanner:
             return {
                 "ticker": ticker,
                 "reason": "MOMENTUM_BUILD",
-                "score": min(momentum * 10 + vol_z * 10, 100),
-                "momentum": momentum,
+                "score": min(tick_momentum * 10 + vol_z * 10, 100),
+                "tick_momentum": tick_momentum,
                 "vol_z": vol_z,
                 "price": state["price"],
                 "timestamp": state["last_update"],

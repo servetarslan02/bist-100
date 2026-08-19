@@ -45,6 +45,18 @@ class AlphaEngine:
         self._queue = event_queue
         self._ml_loader = ml_model_loader
 
+        # Yeni modüller (SCANNER-NIHAI-SPEC entegrasyonu)
+        from .deduplicator import scan_deduplicator
+        from .scan_persistence import scan_persistence
+        from .performance_tracker import performance_tracker
+        from .scan_alerts import scan_alert_manager
+        from .custom_filters import custom_filter_engine
+        self._dedup = scan_deduplicator
+        self._persistence = scan_persistence
+        self._perf_tracker = performance_tracker
+        self._alert_manager = scan_alert_manager
+        self._filter_engine = custom_filter_engine
+
     def load_universe(self, tickers: List[str]):
         """BIST evrenini yükle."""
         try:
@@ -70,6 +82,20 @@ class AlphaEngine:
             # Event score güncelle
             event_score = self._events.get_event_score(ticker)
             result["event_score"] = event_score
+
+            # Live candidate alert kontrolü
+            if result["score"] > 80:
+                self._alert_manager.check_scan_results(
+                    [{
+                        "ticker": ticker,
+                        "score": result["score"],
+                        "signal": result["reason"],
+                        "volume_zscore": result.get("vol_z", 0),
+                        "breakout_score": 0,
+                        "price": price,
+                    }],
+                    regime=self._market_regime,
+                )
 
             logger.info("LIVE CANDIDATE",
                        ticker=ticker, reason=result["reason"],
@@ -112,10 +138,20 @@ class AlphaEngine:
             for ticker in self._universe
         }
 
-        # 6. Scanner çalıştır
+        # 6. Deduplication kontrolü — sadece tarama gereken hisseler
+        universe_to_scan = []
+        for ticker in self._features_map.keys():
+            if self._dedup.should_scan(ticker):
+                universe_to_scan.append(ticker)
+
+        if not universe_to_scan:
+            logger.info("All tickers in cooldown, skipping batch scan")
+            return {"skipped": True, "reason": "all_in_cooldown"}
+
+        # 7. Scanner çalıştır
         from .alpha_scanner import alpha_scanner
         results = alpha_scanner.scan(
-            universe=list(self._features_map.keys()),
+            universe=universe_to_scan,
             features_map=self._features_map,
             market_regime=self._market_regime,
             regime_confidence=self._regime_confidence,
@@ -124,7 +160,48 @@ class AlphaEngine:
         )
         self._last_scan_results = results
 
-        # 7. Özet
+        # 8. Custom filters uygula
+        result_dicts = [r.to_dict() if hasattr(r, 'to_dict') else {
+            "ticker": r.ticker, "score": r.opportunity_score,
+            "signal": r.signal_type, "direction": r.signal_direction,
+            "confidence": r.signal_confidence, "price": r.price,
+            "volume": r.volume, "volume_zscore": r.volume_zscore,
+            "breakout_score": r.breakout_score,
+        } for r in results]
+        filtered_results, filter_log = self._filter_engine.apply_filters(result_dicts)
+
+        # 9. Alert kontrolü
+        new_alerts = self._alert_manager.check_scan_results(
+            filtered_results, regime=self._market_regime
+        )
+
+        # 10. Persistence — sonuçları kaydet
+        self._persistence.save_batch_results(
+            scan_type="batch",
+            results=filtered_results[:50],
+            regime=self._market_regime,
+        )
+
+        # 11. Deduplication — tarama kaydet
+        for r in results:
+            self._dedup.record_scan(
+                ticker=r.ticker,
+                score=r.opportunity_score,
+                signal=r.signal_type,
+            )
+
+        # 12. Performance tracking
+        elapsed_ms = (time.time() - start) * 1000
+        self._perf_tracker.record_scan(
+            scan_type="batch",
+            tickers_scanned=len(universe_to_scan),
+            opportunities_found=len([r for r in results if r.opportunity_score > 60]),
+            signals_generated=len([r for r in results if r.signal_type]),
+            duration_ms=elapsed_ms,
+            regime=self._market_regime,
+        )
+
+        # 13. Özet
         summary = alpha_scanner.get_summary(results)
         summary["scan_count"] = self._scan_count
         summary["elapsed_seconds"] = round(time.time() - start, 1)
@@ -132,12 +209,17 @@ class AlphaEngine:
         summary["regime_confidence"] = self._regime_confidence
         summary["ml_scores_used"] = len([v for v in self._ml_scores.values() if v != 50])
         summary["event_scores_used"] = len([v for v in self._event_scores.values() if v != 50])
+        summary["dedup_stats"] = self._dedup.get_stats()
+        summary["alerts_generated"] = len(new_alerts)
+        summary["filtered_out"] = len(results) - len(filtered_results)
         self._last_scan_summary = summary
 
         logger.info("=== BATCH SCAN COMPLETE ===",
                     scanned=summary["total_scanned"],
                     signals=summary["signals_generated"],
-                    elapsed=summary["elapsed_seconds"])
+                    elapsed=summary["elapsed_seconds"],
+                    alerts=len(new_alerts),
+                    filtered_out=summary["filtered_out"])
 
         return summary
 
@@ -149,10 +231,12 @@ class AlphaEngine:
         """
         Event geldiğinde çalışır.
         1. Etkilenen hisseleri bul
-        2. Event score güncelle
-        3. Etkilenen hisseleri derin analiz yap
-        4. Opportunity Score yeniden hesapla
-        5. Sinyal üret
+        2. Dedup force scan — cooldown bypass
+        3. Event score güncelle
+        4. Etkilenen hisseleri derin analiz yap
+        5. Opportunity Score yeniden hesapla
+        6. Sinyal üret
+        7. Alert kontrolü
         """
         from .alpha_scanner import alpha_scanner
 
@@ -162,6 +246,9 @@ class AlphaEngine:
             return []
 
         logger.info("EVENT TRIGGERED", type=event_type, affected=affected)
+
+        # Dedup force scan — event-driven cooldown bypass
+        self._dedup.force_scan_batch(affected)
 
         results = []
         for ticker in affected:
@@ -184,7 +271,7 @@ class AlphaEngine:
                 # 4. Sinyal üret
                 if result.opportunity_score > 50:
                     alpha_scanner._generate_signal(result)
-                    results.append({
+                    result_dict = {
                         "ticker": ticker,
                         "opportunity_score": result.opportunity_score,
                         "signal_type": result.signal_type,
@@ -192,13 +279,49 @@ class AlphaEngine:
                         "signal_direction": result.signal_direction,
                         "event_type": event_type,
                         "event_importance": event_data.get("importance", 0),
-                    })
+                        "price": result.price,
+                        "volume": result.volume,
+                        "volume_zscore": result.volume_zscore,
+                        "breakout_score": result.breakout_score,
+                    }
+                    results.append(result_dict)
+
+                    # 5. Dedup kaydet
+                    self._dedup.record_scan(
+                        ticker=ticker,
+                        score=result.opportunity_score,
+                        signal=result.signal_type,
+                        forced=True,
+                    )
 
                     logger.info("EVENT RESCAN", ticker=ticker,
                                score=result.opportunity_score,
                                signal=result.signal_type)
 
-        # 6. Event scanner'dan temizle
+        # 6. Alert kontrolü
+        if results:
+            new_alerts = self._alert_manager.check_scan_results(
+                results, regime=self._market_regime
+            )
+
+            # Persistence
+            self._persistence.save_batch_results(
+                scan_type="event",
+                results=results,
+                regime=self._market_regime,
+            )
+
+            # Performance tracking
+            self._perf_tracker.record_scan(
+                scan_type="event",
+                tickers_scanned=len(affected),
+                opportunities_found=len(results),
+                signals_generated=len([r for r in results if r.get("signal_type")]),
+                duration_ms=0,  # Event anlık
+                regime=self._market_regime,
+            )
+
+        # 7. Event scanner'dan temizle
         for ticker in affected:
             self._events.clear_rescan(ticker)
 

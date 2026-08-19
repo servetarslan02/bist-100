@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
 
+from .scanner_interface import ScannerInterface, ScanResult
+
 logger = structlog.get_logger()
 
 
@@ -85,11 +87,12 @@ class ScannerResult:
 # Alpha Scanner
 # =====================================================
 
-class AlphaScanner:
+class AlphaScanner(ScannerInterface):
     """
     ALPHA'nın merkezi tarama motoru.
 
     800 hisseyi tarar, fırsatları bulur, sinyal üretir.
+    ScannerInterface implementasyonu — backtest ile aynı kod yolunu kullanır.
     """
 
     def __init__(self):
@@ -373,6 +376,62 @@ class AlphaScanner:
             r.risks.append(f"Yüksek volatilite: %{r.volatility:.0f}")
         if r.rsi > 75:
             r.risks.append(f"Aşırı alım: RSI={r.rsi:.0f}")
+
+    # =====================================================
+    # ScannerInterface Implementation
+    # =====================================================
+
+    def get_opportunities(
+        self,
+        results: List[ScannerResult],
+        top_n: int = 50,
+        min_score: float = 50.0,
+    ) -> List[ScannerResult]:
+        """En iyi fırsatları seç."""
+        filtered = [r for r in results if r.opportunity_score >= min_score]
+        filtered.sort(key=lambda r: r.opportunity_score, reverse=True)
+        return filtered[:top_n]
+
+    def generate_signals(
+        self,
+        results: List[ScannerResult],
+    ) -> List[ScannerResult]:
+        """Sinyal üret — ScannerInterface implementasyonu."""
+        for r in results:
+            self._generate_signal(r)
+        return [r for r in results if r.signal_type]
+
+    def to_scan_results(self, results: List[ScannerResult]) -> List[ScanResult]:
+        """ScannerResult'ları standart ScanResult formatına çevir."""
+        scan_results = []
+        for r in results:
+            sr = ScanResult(
+                ticker=r.ticker,
+                timestamp=r.timestamp,
+                price=r.price,
+                change_1d_pct=r.change_1d_pct,
+                volume=r.volume,
+                opportunity_score=r.opportunity_score,
+                risk_adjusted_score=r.opportunity_score,  # AlphaScanner'da aynı
+                opportunity_rank=r.opportunity_rank,
+                signal_type=r.signal_type,
+                signal_direction=r.signal_direction,
+                signal_score=r.signal_score,
+                signal_confidence=r.signal_confidence,
+                momentum_score=r.roc_5d * 10 + 50,  # Normalize
+                volume_anomaly_score=r.volume_zscore * 15 + 50,
+                breakout_score=r.breakout_score,
+                volatility_score=r.volatility,
+                relative_strength_score=r.relative_strength * 10 + 50,
+                technical_score=r.rsi,
+                regime_fit_score=r.market_regime_fit,
+                ml_score=0,
+                event_score=0,
+                evidence=r.evidence,
+                risks=r.risks,
+            )
+            scan_results.append(sr)
+        return scan_results
 
     def get_summary(self, results: List[ScannerResult]) -> Dict:
         """Tarama özeti."""

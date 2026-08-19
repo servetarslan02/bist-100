@@ -35,21 +35,24 @@ class EventScanner:
         if event_type == "kap.event":
             ticker = event_data.get("ticker", "")
             importance = event_data.get("importance", 0)
+            direction = event_data.get("direction", 0)  # -1, 0, +1
 
             if ticker and importance > 0.5:
                 affected.append(ticker)
                 self._pending_rescans[ticker] = {
                     "event_type": "KAP",
                     "importance": importance,
+                    "direction": direction,
                     "title": event_data.get("title", ""),
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                 }
-                logger.info("KAP event → rescan", ticker=ticker, importance=importance)
+                logger.info("KAP event → rescan", ticker=ticker, importance=importance, direction=direction)
 
         elif event_type == "news.event":
             # Haber etkilenen hisseleri bul
             affected_tickers = event_data.get("affected_tickers", [])
             importance = event_data.get("importance", 0)
+            direction = event_data.get("direction", 0)
 
             if importance > 0.6:
                 for ticker in affected_tickers:
@@ -57,10 +60,11 @@ class EventScanner:
                     self._pending_rescans[ticker] = {
                         "event_type": "NEWS",
                         "importance": importance,
+                        "direction": direction,
                         "title": event_data.get("title", ""),
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }
-                logger.info("News event → rescan", tickers=affected, importance=importance)
+                logger.info("News event → rescan", tickers=affected, importance=importance, direction=direction)
 
         elif event_type == "macro.event":
             # Makro olay → sektör exposure graph'a göre etkilenen hisseleri bul
@@ -70,11 +74,13 @@ class EventScanner:
             if abs(surprise) > 1.5:
                 affected = self._get_macro_affected_stocks(indicator, surprise)
                 importance = min(abs(surprise) / 3, 1.0)
+                direction = 1 if surprise > 0 else -1  # Pozitif sürpriz → LONG, negatif → SHORT
 
                 for ticker in affected:
                     self._pending_rescans[ticker] = {
                         "event_type": "MACRO",
                         "importance": importance,
+                        "direction": direction,
                         "indicator": indicator,
                         "surprise": surprise,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -190,6 +196,10 @@ class EventScanner:
             base_score += importance * 30 * direction
         elif event_type == "MACRO":
             base_score += importance * 25 * direction
+
+        # Direction 0 ise (belirlenmemiş), importance'ın yarısını pozitif say
+        if direction == 0 and importance > 0:
+            base_score += importance * 15  # Nötr ama etkili event
 
         return max(0, min(100, base_score))
 
