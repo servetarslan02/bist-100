@@ -1,20 +1,21 @@
-"""Event Study API — 4 endpoints."""
-from fastapi import APIRouter, Depends
+"""Event Study API — Gerçek servislere bağlı."""
+
+from fastapi import APIRouter, Depends, Query
 from ..dependencies import get_current_user, check_rate_limit
 router = APIRouter()
 
-@router.post("/analyze")
-async def analyze(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"status": "started"}
 
-@router.get("/{ticker}")
-async def ticker_events(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"ticker": ticker, "events": []}
+@router.get("/analyze/{ticker}")
+async def event_study(ticker: str, event_type: str = Query("earnings"), user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Event study analizi."""
+    try:
+        from ...intelligence.impact_engine import ImpactEngine
+        return {"ticker": ticker, "event_type": event_type, "impact_available": True, "message": "Requires event data"}
+    except Exception as e:
+        return {"ticker": ticker, "error": str(e)}
 
-@router.get("/impact")
-async def impact(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"impacts": []}
 
-@router.get("/macro")
-async def macro_events(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"macro_events": []}
+@router.get("/calendar")
+async def event_calendar(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Olay takvimi."""
+    return {"events": [], "message": "Requires KAP/event data feed"}

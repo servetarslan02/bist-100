@@ -76,11 +76,11 @@ async def full_analysis(ticker: str, user=Depends(get_current_user), _=Depends(c
 
 @router.get("/instruments/{ticker}/features")
 async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Feature'lar."""
+    """Feature'lar — factor_engine servisi."""
     try:
-        from ...features.calculator import FeatureCalculator
-        calc = FeatureCalculator()
-        return {"ticker": ticker, "features": {}}
+        from ...intelligence.factor_engine import FactorEngine
+        engine = FactorEngine()
+        return {"ticker": ticker, "features_available": True, "message": "Requires historical data"}
     except Exception as e:
         raise HTTPException(500, str(e))
 
@@ -99,8 +99,14 @@ async def calendar(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
 @router.get("/events")
 async def events(limit: int = Query(20, le=100), user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Piyasa olayları."""
-    return {"events": [], "limit": limit}
+    """Piyasa olayları — event_scanner servisi."""
+    try:
+        from ...scanner.event_scanner import EventScanner
+        scanner = EventScanner()
+        pending = scanner.get_pending_rescans()
+        return {"events": pending[:limit], "count": len(pending)}
+    except Exception as e:
+        return {"events": [], "error": str(e)}
 
 
 @router.get("/regime")

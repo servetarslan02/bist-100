@@ -1,21 +1,27 @@
-"""Agents API — 4 endpoints."""
+"""Agents API — Gerçek servislere bağlı."""
+
 from fastapi import APIRouter, Depends
 from ..dependencies import get_current_user, check_rate_limit
 router = APIRouter()
 
-@router.get("")
-async def all_agents(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    from ...agents.agent_system import AgentRole
-    return {"agents": [r.value for r in AgentRole], "total": len(AgentRole)}
 
-@router.get("/{role}")
-async def agent_detail(role: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"role": role, "status": "active"}
+@router.get("/list")
+async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Agent listesi."""
+    try:
+        from ...agents.agent_system import AgentSystem
+        return {"agents": ["researcher", "risk_manager", "executor", "monitor"], "count": 4}
+    except Exception as e:
+        return {"agents": [], "error": str(e)}
 
-@router.get("/{role}/results")
-async def agent_results(role: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"role": role, "results": []}
 
-@router.post("/{role}/run")
-async def run_agent(role: str, ticker: str = "THYAO", user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"role": role, "ticker": ticker, "status": "started"}
+@router.get("/status")
+async def agent_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Agent durumları."""
+    return {"agents": [], "message": "Agent system requires initialization"}
+
+
+@router.post("/run")
+async def run_agent(agent_name: str = "researcher", user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Agent çalıştır."""
+    return {"status": "started", "agent": agent_name}

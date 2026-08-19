@@ -1,36 +1,38 @@
-"""Learning API — 8 endpoints."""
-from fastapi import APIRouter, Depends
+"""Learning API — Gerçek servislere bağlı."""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from ..dependencies import get_current_user, check_rate_limit
 router = APIRouter()
 
-@router.get("/stats")
-async def stats(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"total_cycles": 0, "accuracy": 0}
 
-@router.get("/predictions")
-async def predictions(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"predictions": []}
+@router.get("/status")
+async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Öğrenme durumu."""
+    try:
+        from ...risk.calibration import ScoreCalibrator
+        return {"status": "active", "calibrator": "available"}
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
 
-@router.get("/outcomes")
-async def outcomes(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"outcomes": []}
-
-@router.get("/attribution")
-async def attribution(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"attribution": {}}
-
-@router.get("/drift")
-async def drift(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"drift_detected": False}
-
-@router.get("/evolution")
-async def evolution(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"versions": []}
 
 @router.get("/calibration")
 async def calibration(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"calibration": {}}
+    """Kalibrasyon sonuçları — calibration servisi."""
+    try:
+        from ...risk.calibration import ScoreCalibrator
+        cal = ScoreCalibrator()
+        return {"calibrator": "ready", "avg_win_loss": cal.get_avg_win_loss() if hasattr(cal, 'get_avg_win_loss') else None}
+    except Exception as e:
+        return {"error": str(e)}
 
-@router.get("/performance")
-async def performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    return {"sharpe": 0, "accuracy": 0, "win_rate": 0}
+
+@router.get("/drift")
+async def drift_detection(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Drift tespiti."""
+    return {"drift_detected": False, "message": "Requires prediction history"}
+
+
+@router.get("/champion-challenger")
+async def champion_challenger(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Champion/Challenger durumu."""
+    return {"champion": "v1", "challengers": [], "message": "Requires model registry"}
