@@ -830,7 +830,14 @@ class UnifiedScheduler:
                 logger.error("Trigger consumer error", error=str(e))
 
     async def _tick(self):
-        """Tek scheduler döngüsü."""
+        """Tek scheduler döngüsü.
+
+        Market fazına göre hangi job grubunun çalıştırılacağına karar verir.
+        Her faz için farklı sleep süresi uygulanır:
+        - ACTIVE: 30s (sık kontrol, trading job'ları için)
+        - NIGHT: 300s (nadir kontrol, tasarruf)
+        - BREAK: 60s (orta sıklık)
+        """
         phase = self._market.current_phase()
 
         if phase in [MarketPhase.CLOSED, MarketPhase.NIGHT]:
@@ -863,7 +870,12 @@ class UnifiedScheduler:
             await asyncio.sleep(120)
 
     async def _run_jobs_for_phase(self, phase_name: str):
-        """Belirli bir faz için job'ları priority sırasıyla çalıştır."""
+        """Belirli bir faz için job'ları priority sırasıyla çalıştır.
+
+        Priority sıralaması: p=1 (en yüksek) → p=10 (en düşük).
+        Bu sayede kritik job'lar (market_data, risk) her zaman önce çalışır.
+        Trading-only job'lar piyasa kapalıyken otomatik atlanır.
+        """
         # Priority bazlı sıralama: düşük sayı = yüksek öncelik
         eligible_jobs = []
         for job_type, config in self._configs.items():
@@ -903,7 +915,12 @@ class UnifiedScheduler:
         config: JobConfig,
         triggered_by: str = "scheduler",
     ):
-        """Retry ile job çalıştır."""
+        """Retry ile job çalıştır.
+
+        Exponential backoff: 1s → 2s → 4s (attempt 0 → 1 → 2).
+        Timeout: config.timeout_seconds kadar bekler, aşarsa TIMEOUT.
+        Tüm retry'lar başarısızsa FAILED olarak kaydeder.
+        """
         last_error = None
         start_time = time.time()
 

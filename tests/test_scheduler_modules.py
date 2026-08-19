@@ -585,6 +585,43 @@ class TestSchedulerAPI:
 # INTEGRATION TESTS
 # =====================================================
 
+class TestSchedulerRateLimiter:
+    """Rate limiter testleri."""
+
+    def test_rate_limiter_allows_normal(self):
+        from services.scheduler.scheduler_api import _RateLimiter
+        limiter = _RateLimiter(max_tokens=5, refill_rate=5/60)
+        for _ in range(5):
+            assert limiter.allow() is True
+
+    def test_rate_limiter_blocks_excess(self):
+        from services.scheduler.scheduler_api import _RateLimiter
+        limiter = _RateLimiter(max_tokens=3, refill_rate=0)
+        for _ in range(3):
+            limiter.allow()
+        assert limiter.allow() is False
+
+    def test_rate_limiter_remaining(self):
+        from services.scheduler.scheduler_api import _RateLimiter
+        limiter = _RateLimiter(max_tokens=5, refill_rate=5/60)
+        limiter.allow()
+        limiter.allow()
+        assert limiter.remaining == 3
+
+    def test_trigger_rate_limited(self):
+        from services.scheduler.scheduler_api import SchedulerAPI
+        api = SchedulerAPI()
+        # Rate limiter'ı tüket
+        api._trigger_limiter._tokens = 0
+        api._trigger_limiter._refill_rate = 0
+        result = asyncio.run(api.trigger_job("test"))
+        assert result["status"] == "RATE_LIMITED"
+
+
+# =====================================================
+# INTEGRATION TESTS
+# =====================================================
+
 class TestSchedulerIntegration:
     """Entegrasyon testleri."""
 
