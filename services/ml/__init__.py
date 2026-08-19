@@ -36,18 +36,21 @@ from .adjusted_loss import AdjustedMSELoss
 # Validation
 from .training_validator import TrainingDatasetValidator, CrossSectionalNormalizer
 from .walk_forward import WalkForwardValidation
-from .model_comparator import ModelComparator
+from .model_comparator import ModelComparator, ModelResult
 
 # Deep Learning
 from .lstm_model import StockLSTM
 from .transformer_model import StockTransformer
 
+# Backtest Integration
+from .ml_backtest import MLBacktestEngine, BacktestResult, ComparisonResult
+
 # Special
-from .fingpt import FinGPTSentiment
-from .hybrid_model import hybrid_predict
-from .finrl_bist import BISTTradingEnv
-from .rl_agent import train_rl_agent
-from .qlib_integration import QlibBIST
+from .fingpt import FinGPTSentiment, SentimentResult, AggregatedSentiment
+from .hybrid_model import hybrid_predict, HybridModel, HybridSignal
+from .finrl_bist import BISTTradingEnv, BISTEnvConfig
+from .rl_agent import train_rl_agent, evaluate_rl_agent, RLConfig
+from .qlib_integration import QlibBIST, QlibConfig
 
 __all__ = [
     # Core models
@@ -72,10 +75,15 @@ __all__ = [
     "AdjustedMSELoss",
     # Validation
     "TrainingDatasetValidator", "WalkForwardValidation",
-    "CrossSectionalNormalizer", "ModelComparator",
+    "CrossSectionalNormalizer", "ModelComparator", "ModelResult",
     # Deep Learning
     "StockLSTM", "StockTransformer",
+    # Backtest Integration
+    "MLBacktestEngine", "BacktestResult", "ComparisonResult",
     # Special
-    "FinGPTSentiment", "hybrid_predict",
-    "BISTTradingEnv", "train_rl_agent", "QlibBIST",
+    "FinGPTSentiment", "SentimentResult", "AggregatedSentiment",
+    "hybrid_predict", "HybridModel", "HybridSignal",
+    "BISTTradingEnv", "BISTEnvConfig",
+    "train_rl_agent", "evaluate_rl_agent", "RLConfig",
+    "QlibBIST", "QlibConfig",
 ]
