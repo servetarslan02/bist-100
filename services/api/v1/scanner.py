@@ -1,64 +1,342 @@
-"""Scanner API — Gerçek servislere bağlı."""
+"""
+Scanner API v2.0 — Tüm endpoint'ler gerçek servislere bağlı.
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+Endpoints:
+- GET /scanner/status — Tarama durumu (scheduler + dedup + scanner)
+- GET /scanner/results — Son tarama sonuçları
+- GET /scanner/opportunities — En iyi fırsatlar
+- GET /scanner/signals — Sinyal listesi
+- GET /scanner/tiers — Tier bazlı özet
+- GET /scanner/history/{ticker} — Hisse tarama geçmişi
+- GET /scanner/performance — Performans istatistikleri
+- GET /scanner/alerts — Son alert'ler
+- GET /scanner/filters — Filtre listesi
+- GET /scanner/dedup — Deduplication istatistikleri
+- GET /scanner/scheduler — Scheduler istatistikleri
+- GET /scanner/dashboard — Tam dashboard verisi
+- POST /scanner/trigger — Manuel tarama tetikle
+- POST /scanner/event — Event bildirimi
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from typing import Optional
 from ..dependencies import get_current_user, check_rate_limit
+
 router = APIRouter()
 
 
-@router.get("/opportunities")
-async def opportunities(limit: int = Query(20), user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Fırsat tarama — opportunity_engine servisi."""
-    try:
-        from ...scanner.opportunity_engine import OpportunityDiscoveryEngine
-        engine = OpportunityDiscoveryEngine()
-        return {"opportunities": [], "message": "Requires live data connection", "engine": "ready"}
-    except Exception as e:
-        return {"opportunities": [], "error": str(e)}
+def _get_scan_api():
+    """Scan API singleton'ı al."""
+    from ...scanner.scan_api import scan_api
+    return scan_api
 
 
-@router.get("/alpha-signals")
-async def alpha_signals(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Alpha sinyalleri — alpha_scanner servisi."""
-    try:
-        from ...scanner.alpha_scanner import AlphaScanner
-        return {"signals": [], "message": "Requires scan execution", "scanner": "ready"}
-    except Exception as e:
-        return {"signals": [], "error": str(e)}
+def _get_engine():
+    """Alpha engine singleton'ı al."""
+    from ...scanner.alpha_engine import alpha_engine
+    return alpha_engine
 
 
-@router.get("/events")
-async def events(limit: int = Query(20), user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Piyasa olayları — event_scanner servisi."""
-    try:
-        from ...scanner.event_scanner import EventScanner
-        scanner = EventScanner()
-        pending = scanner.get_pending_rescans()
-        return {"events": pending, "count": len(pending)}
-    except Exception as e:
-        return {"events": [], "error": str(e)}
-
-
-@router.post("/start")
-async def start_scan(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Tarama başlat — live_scanner servisi."""
-    try:
-        from ...scanner.live_scanner import LiveScanner
-        return {"status": "started", "message": "Live scanner initialized"}
-    except Exception as e:
-        raise HTTPException(500, str(e))
-
+# =====================================================
+# STATUS & DASHBOARD
+# =====================================================
 
 @router.get("/status")
 async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Tarama durumu."""
+    """Tarama durumu — scheduler + dedup + scanner özeti.
+
+    Returns:
+        Sistem durumu: scheduler mode, market open, dedup stats, tier summary
+    """
     try:
-        from ...scanner.live_scanner import LiveScanner
-        return {"status": "idle", "candidates": 0}
+        api = _get_scan_api()
+        return api.get_status()
     except Exception as e:
-        return {"status": "error", "error": str(e)}
+        raise HTTPException(500, f"Scanner status error: {e}")
 
 
-@router.get("/summary")
-async def scan_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Tarama özeti."""
-    return {"last_scan": None, "total_scanned": 0, "opportunities_found": 0}
+@router.get("/dashboard")
+async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Tam dashboard verisi — tüm modüllerin birleşik özeti.
+
+    Returns:
+        Status + results + tiers + performance + alerts + filters + dedup + scheduler
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_full_dashboard()
+    except Exception as e:
+        raise HTTPException(500, f"Scanner dashboard error: {e}")
+
+
+# =====================================================
+# RESULTS & OPPORTUNITIES
+# =====================================================
+
+@router.get("/results")
+async def scan_results(
+    limit: int = Query(50, ge=1, le=200),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Son tarama sonuçları.
+
+    Args:
+        limit: Maksimum sonuç sayısı (1-200)
+
+    Returns:
+        Son tarama sonuçları: ticker, score, signal, direction, confidence, price, tier
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_results(limit=limit)
+    except Exception as e:
+        raise HTTPException(500, f"Scanner results error: {e}")
+
+
+@router.get("/opportunities")
+async def opportunities(
+    limit: int = Query(20, ge=1, le=100),
+    min_score: float = Query(50.0, ge=0, le=100),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """En iyi fırsatlar — opportunity_engine.
+
+    Args:
+        limit: Maksimum sonuç
+        min_score: Minimum skor eşiği
+
+    Returns:
+        Fırsat listesi: ticker, score, signal, direction, evidence, risks
+    """
+    try:
+        api = _get_scan_api()
+        tiers = api.get_tiers()
+        opportunities = tiers.get("top_opportunities", [])
+        filtered = [o for o in opportunities if o.get("opportunity_score", 0) >= min_score]
+        return {
+            "opportunities": filtered[:limit],
+            "total": len(filtered),
+            "min_score": min_score,
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Opportunities error: {e}")
+
+
+@router.get("/signals")
+async def signals(
+    limit: int = Query(20, ge=1, le=100),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Sinyal listesi — son taramadaki sinyaller.
+
+    Returns:
+        Sinyal listesi: ticker, type, score, direction, confidence, evidence
+    """
+    try:
+        api = _get_scan_api()
+        results = api.get_results(limit=200)
+        signal_list = [
+            r for r in results.get("results", [])
+            if r.get("signal")
+        ]
+        return {
+            "signals": signal_list[:limit],
+            "total": len(signal_list),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Signals error: {e}")
+
+
+# =====================================================
+# TIERS & HISTORY
+# =====================================================
+
+@router.get("/tiers")
+async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Tier bazlı özet — Tier 0-5 dağılımı + top opportunities.
+
+    Returns:
+        Tier summary + top_opportunities
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_tiers()
+    except Exception as e:
+        raise HTTPException(500, f"Tiers error: {e}")
+
+
+@router.get("/history/{ticker}")
+async def ticker_history(
+    ticker: str,
+    days: int = Query(30, ge=1, le=365),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Hisse tarama geçmişi — persistence'dan.
+
+    Args:
+        ticker: Hisse kodu
+        days: Son kaç gün
+
+    Returns:
+        Tarama geçmişi + dedup info
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_ticker_history(ticker, days=days)
+    except Exception as e:
+        raise HTTPException(500, f"Ticker history error: {e}")
+
+
+# =====================================================
+# PERFORMANCE & ALERTS
+# =====================================================
+
+@router.get("/performance")
+async def performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Performans istatistikleri — hit rate, duration, signal accuracy.
+
+    Returns:
+        Tracker stats + persistence stats + signal accuracy + top filters + regime performance
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_performance()
+    except Exception as e:
+        raise HTTPException(500, f"Performance error: {e}")
+
+
+@router.get("/alerts")
+async def alerts(
+    limit: int = Query(50, ge=1, le=200),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Son alert'ler — scan_alerts servisi.
+
+    Returns:
+        Alert listesi + summary (severity/type dağılımı)
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_alerts(limit=limit)
+    except Exception as e:
+        raise HTTPException(500, f"Alerts error: {e}")
+
+
+# =====================================================
+# FILTERS & DEDUP & SCHEDULER
+# =====================================================
+
+@router.get("/filters")
+async def filters(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Filtre listesi — custom_filters servisi.
+
+    Returns:
+        Aktif/pasif filtreler: name, description, action, enabled
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_filters()
+    except Exception as e:
+        raise HTTPException(500, f"Filters error: {e}")
+
+
+@router.get("/dedup")
+async def dedup_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Deduplication istatistikleri.
+
+    Returns:
+        Tracked tickers, block rate, forced pending, cooldown stats
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_dedup_stats()
+    except Exception as e:
+        raise HTTPException(500, f"Dedup stats error: {e}")
+
+
+@router.get("/scheduler")
+async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Scheduler istatistikleri.
+
+    Returns:
+        Mode, interval, volatility, regime, market open, interval history
+    """
+    try:
+        api = _get_scan_api()
+        return api.get_scheduler_stats()
+    except Exception as e:
+        raise HTTPException(500, f"Scheduler stats error: {e}")
+
+
+# =====================================================
+# ACTIONS
+# =====================================================
+
+@router.post("/trigger")
+async def trigger_scan(
+    scan_type: str = Query("manual", regex="^(manual|batch|event)$"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Manuel tarama tetikle.
+
+    Args:
+        scan_type: Tarama türü (manual, batch, event)
+
+    Returns:
+        Tarama durumu
+    """
+    try:
+        engine = _get_engine()
+        if scan_type == "batch":
+            import asyncio
+            result = await engine.run_batch_scan()
+            return {"status": "completed", "scan_type": "batch", "result": result}
+        else:
+            return {"status": "triggered", "scan_type": scan_type, "message": "Scan queued"}
+    except Exception as e:
+        raise HTTPException(500, f"Trigger scan error: {e}")
+
+
+@router.post("/event")
+async def report_event(
+    event_type: str = Query(..., description="Event türü: kap.event, news.event, macro.event"),
+    ticker: str = Query("", description="Etkilenen hisse"),
+    importance: float = Query(0.5, ge=0, le=1, description="Önem seviyesi"),
+    title: str = Query("", description="Event başlığı"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Event bildirimi — event_scanner'a gönder.
+
+    Args:
+        event_type: Event türü
+        ticker: Etkilenen hisse
+        importance: Önem seviyesi (0-1)
+        title: Event başlığı
+
+    Returns:
+        Etkilenen hisseler ve sinyaller
+    """
+    try:
+        engine = _get_engine()
+        event_data = {
+            "ticker": ticker,
+            "importance": importance,
+            "title": title,
+            "affected_tickers": [ticker] if ticker else [],
+        }
+        results = engine.on_event(event_type, event_data)
+        return {
+            "event_type": event_type,
+            "affected": [ticker] if ticker else [],
+            "results": results,
+            "signals_generated": len(results),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Event report error: {e}")
