@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Learning Scheduler v1.0
+ALPHA BIST — Learning Scheduler v2.0
 
 Learning cycle ve model bakım job'larını zamanlar:
 - Learning cycle (günlük)
@@ -12,6 +12,7 @@ Kaynaklar: arXiv Agentic Trading (2026), Endüstri standardı
 """
 
 import asyncio
+import inspect
 from typing import Dict, Any, Optional, Callable, Awaitable
 from datetime import datetime, timezone
 from dataclasses import dataclass
@@ -38,6 +39,8 @@ class LearningScheduler:
     - Günlük: Learning cycle, drift detection
     - Haftalık: Model retrain, backtest
     - Aylık: Calibration update
+
+    Handler'lar async olmalıdır. Sync handler eklenirse uyarı loglanır.
     """
 
     def __init__(self):
@@ -78,13 +81,30 @@ class LearningScheduler:
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
         """Learning job handler'ı kaydet.
 
+        Handler async olmalıdır. Sync handler eklenirse uyarı loglanır
+        ve wrapper ile async'e çevrilir.
+
         Args:
             job_type: Job türü
             handler: Async handler fonksiyonu
         """
-        if job_type in self._jobs:
-            self._jobs[job_type].handler = handler
-            logger.info("Learning handler registered", job_type=job_type)
+        if job_type not in self._jobs:
+            logger.warning("Unknown learning job type", job_type=job_type)
+            return
+
+        # Async doğrulama
+        if not inspect.iscoroutinefunction(handler):
+            logger.warning("Handler is not async, wrapping in coroutine",
+                         job_type=job_type)
+            original = handler
+
+            async def _async_wrapper():
+                return original()
+
+            handler = _async_wrapper
+
+        self._jobs[job_type].handler = handler
+        logger.info("Learning handler registered", job_type=job_type)
 
     def enable_job(self, job_type: str, enabled: bool = True):
         """Job'ı aktif/pasif yap.
@@ -104,7 +124,7 @@ class LearningScheduler:
             interval_hours: Aralık (saat)
         """
         if job_type in self._jobs:
-            self._jobs[job_type].interval_hours = interval_hours
+            self._jobs[job_type].interval_hours = max(1, interval_hours)
 
     async def run_pending_jobs(self) -> Dict[str, Any]:
         """Zamanı gelen job'ları çalıştır.
@@ -177,6 +197,7 @@ class LearningScheduler:
         return {
             "total_jobs": len(self._jobs),
             "enabled_jobs": sum(1 for j in self._jobs.values() if j.enabled),
+            "jobs_with_handlers": sum(1 for j in self._jobs.values() if j.handler is not None),
             "jobs": {
                 name: {
                     "enabled": config.enabled,

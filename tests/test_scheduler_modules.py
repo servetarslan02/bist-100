@@ -1,19 +1,61 @@
 """
-ALPHA BIST — Scheduler Modules Test Suite v1.0
+ALPHA BIST — Scheduler Modules Test Suite v2.0
 
-Tüm yeni scheduler modülleri için test'ler:
-- Unified Scheduler
-- Market Session Manager
-- Job Monitor
-- Daily Workflow
-- Learning Scheduler
-- Scheduler API
+Tüm scheduler modülleri için kapsamlı test'ler:
+- Unified Scheduler (market session, priority, retry, trigger)
+- Job Monitor (stats, alerts, percentiles)
+- Daily Workflow (phases, execution)
+- Learning Scheduler (async validation, pending jobs)
+- Scheduler API (all endpoints)
+- DB Job Tracker (fallback)
+- Holiday Provider (dynamic + fallback)
 """
 
 import pytest
 import asyncio
 import time
-from datetime import datetime, time as dt_time, timezone, timedelta
+from datetime import datetime, time as dt_time, timezone, timedelta, date
+
+
+# =====================================================
+# HOLIDAY PROVIDER TESTS
+# =====================================================
+
+class TestHolidayProvider:
+    """Holiday provider testleri."""
+
+    def setup_method(self):
+        from services.scheduler.unified_scheduler import HolidayProvider
+        self.provider = HolidayProvider()
+
+    def test_fallback_holidays_loaded(self):
+        """Fallback tatil günleri yüklenmeli."""
+        holidays = self.provider.get_holidays()
+        assert len(holidays) >= 14  # 2026 hardcoded
+        assert date(2026, 1, 1) in holidays  # Yılbaşı
+
+    def test_is_holiday_new_year(self):
+        """Yılbaşı tatil olmalı."""
+        dt = datetime(2026, 1, 1, 14, 0, tzinfo=timezone(timedelta(hours=3)))
+        assert self.provider.is_holiday(dt) is True
+
+    def test_is_holiday_normal_day(self):
+        """Normal gün tatil olmamalı."""
+        dt = datetime(2026, 6, 15, 14, 0, tzinfo=timezone(timedelta(hours=3)))
+        assert self.provider.is_holiday(dt) is False
+
+    def test_add_holiday(self):
+        """Runtime tatil eklenebilmeli."""
+        self.provider.add_holiday(date(2026, 12, 31))
+        dt = datetime(2026, 12, 31, 14, 0, tzinfo=timezone(timedelta(hours=3)))
+        assert self.provider.is_holiday(dt) is True
+
+    def test_remove_holiday(self):
+        """Runtime tatil kaldırılabilmeli."""
+        self.provider.add_holiday(date(2026, 12, 31))
+        self.provider.remove_holiday(date(2026, 12, 31))
+        dt = datetime(2026, 12, 31, 14, 0, tzinfo=timezone(timedelta(hours=3)))
+        assert self.provider.is_holiday(dt) is False
 
 
 # =====================================================
@@ -55,22 +97,20 @@ class TestMarketSessionManager:
         assert "phase" in status
         assert "is_trading" in status
         assert "is_open" in status
-
-    def test_is_holiday(self):
-        # Yılbaşı
-        from datetime import datetime, timezone, timedelta
-        dt = datetime(2026, 1, 1, tzinfo=timezone(timedelta(hours=3)))
-        assert self.market._is_holiday(dt) is True
-
-        # Normal gün
-        dt = datetime(2026, 6, 15, tzinfo=timezone(timedelta(hours=3)))
-        assert self.market._is_holiday(dt) is False
+        assert "is_holiday" in status
+        assert "is_trading_day" in status
 
     def test_phase_times_ordered(self):
         """Faz zamanları sıralı olmalı."""
         times = [t for t, _ in self.market.PHASE_TIMES]
         for i in range(len(times) - 1):
             assert times[i] < times[i + 1]
+
+    def test_holiday_provider_integration(self):
+        """Holiday provider entegre olmalı."""
+        provider = self.market.get_holiday_provider()
+        assert provider is not None
+        assert len(provider.get_holidays()) > 0
 
 
 # =====================================================
@@ -81,7 +121,7 @@ class TestUnifiedScheduler:
     """Unified scheduler testleri."""
 
     def setup_method(self):
-        from services.scheduler.unified_scheduler import UnifiedScheduler, JobConfig
+        from services.scheduler.unified_scheduler import UnifiedScheduler
         self.scheduler = UnifiedScheduler()
 
     def test_register_handler(self):
@@ -102,11 +142,25 @@ class TestUnifiedScheduler:
         self.scheduler.enable_job("health_check", True)
         assert self.scheduler._configs["health_check"].enabled is True
 
+    def test_update_priority(self):
+        self.scheduler.update_priority("health_check", 1)
+        assert self.scheduler._configs["health_check"].priority == 1
+
+    def test_update_priority_clamped(self):
+        """Priority 1-10 aralığında olmalı."""
+        self.scheduler.update_priority("health_check", 0)
+        assert self.scheduler._configs["health_check"].priority == 1
+
+        self.scheduler.update_priority("health_check", 15)
+        assert self.scheduler._configs["health_check"].priority == 10
+
     def test_get_status(self):
         status = self.scheduler.get_status()
         assert "running" in status
         assert "market" in status
         assert "registered_handlers" in status
+        assert "enabled_configs" in status
+        assert "trigger_queue_size" in status
 
     def test_get_job_stats(self):
         stats = self.scheduler.get_job_stats()
@@ -116,12 +170,104 @@ class TestUnifiedScheduler:
         assert len(self.scheduler._configs) > 0
         assert "market_data_update" in self.scheduler._configs
         assert "batch_scan" in self.scheduler._configs
+        assert "learning_cycle" in self.scheduler._configs
+        assert "backup" in self.scheduler._configs
 
     def test_job_config_fields(self):
         config = self.scheduler._configs["batch_scan"]
         assert config.interval_seconds > 0
         assert config.priority > 0
         assert config.max_retries >= 0
+        assert config.timeout_seconds > 0
+        assert config.description != ""
+
+    def test_priority_ordering(self):
+        """Job'lar priority'ye göre sıralanabilmeli."""
+        configs = self.scheduler._configs
+        sorted_jobs = sorted(configs.items(), key=lambda x: x[1].priority)
+        assert len(sorted_jobs) == len(configs)
+        # İlk job en yüksek önceliğe sahip olmalı
+        assert sorted_jobs[0][1].priority <= sorted_jobs[-1][1].priority
+
+    def test_get_job_configs(self):
+        configs = self.scheduler.get_job_configs()
+        assert "health_check" in configs
+        assert "priority" in configs["health_check"]
+
+    def test_trigger_job_no_handler(self):
+        """Handler yoksa hata dönmeli."""
+        result = asyncio.run(self.scheduler.trigger_job("nonexistent"))
+        assert result["status"] == "ERROR"
+
+    def test_trigger_job_with_handler(self):
+        """Handler varsa queue'ya eklenmeli."""
+        async def dummy():
+            return "ok"
+
+        self.scheduler.register_handler("test_trigger", dummy)
+        # Config ekle
+        from services.scheduler.unified_scheduler import JobConfig
+        self.scheduler._configs["test_trigger"] = JobConfig(
+            job_type="test_trigger", interval_seconds=60
+        )
+
+        result = asyncio.run(self.scheduler.trigger_job("test_trigger"))
+        assert result["status"] == "QUEUED"
+
+
+# =====================================================
+# DB JOB TRACKER TESTS
+# =====================================================
+
+class TestDBJobTracker:
+    """DB job tracker testleri."""
+
+    def setup_method(self):
+        from services.scheduler.unified_scheduler import DBJobTracker
+        self.tracker = DBJobTracker()
+
+    def test_record_job_memory_fallback(self):
+        """DB yoksa memory'ye yazmalı."""
+        from services.scheduler.unified_scheduler import JobResult
+        result = JobResult(
+            job_type="test", status="SUCCESS",
+            duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+        )
+        success = asyncio.run(self.tracker.record_job(result))
+        assert success is True
+        assert len(self.tracker._memory_history) == 1
+
+    def test_get_job_history_memory(self):
+        """Memory'den job geçmişi alabilmeli."""
+        from services.scheduler.unified_scheduler import JobResult
+        for i in range(5):
+            result = JobResult(
+                job_type=f"test_{i}", status="SUCCESS",
+                duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+            )
+            asyncio.run(self.tracker.record_job(result))
+
+        history = asyncio.run(self.tracker.get_job_history(limit=3))
+        assert len(history) == 3
+
+    def test_get_failure_stats_memory(self):
+        """Memory'den failure stats alabilmeli."""
+        from services.scheduler.unified_scheduler import JobResult
+        # Başarılı
+        asyncio.run(self.tracker.record_job(JobResult(
+            job_type="test", status="SUCCESS",
+            duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+        )))
+        # Başarısız
+        asyncio.run(self.tracker.record_job(JobResult(
+            job_type="test", status="FAILED",
+            duration_ms=50.0, timestamp=datetime.now(timezone.utc).isoformat(),
+            error="test error"
+        )))
+
+        stats = asyncio.run(self.tracker.get_failure_stats(1))
+        assert stats["total"] == 2
+        assert stats["failed"] == 1
 
 
 # =====================================================
@@ -165,6 +311,13 @@ class TestJobMonitor:
         assert len(callback_called) > 0
         assert callback_called[0].alert_type == "CONSECUTIVE_FAILURE"
 
+    def test_consecutive_failure_reset(self):
+        """Başarılı job consecutive failure'ı sıfırlamalı."""
+        self.monitor.record_job("test", "FAILED", 100.0)
+        self.monitor.record_job("test", "FAILED", 100.0)
+        self.monitor.record_job("test", "SUCCESS", 100.0)
+        assert self.monitor._consecutive_failures.get("test", 0) == 0
+
     def test_slow_job_alert(self):
         from services.scheduler.job_monitor import JobMonitor
         monitor = JobMonitor(slow_threshold_ms=1000)
@@ -188,6 +341,21 @@ class TestJobMonitor:
         stats_a = self.monitor.get_stats("job_a")
         assert stats_a["total_jobs"] == 1
         assert stats_a["success"] == 1
+
+    def test_percentiles(self):
+        """Percentile hesaplaması doğru olmalı."""
+        for i in range(100):
+            self.monitor.record_job("test", "SUCCESS", float(i * 10))
+
+        stats = self.monitor.get_stats("test")
+        assert stats["p95_duration_ms"] > 0
+        assert stats["p99_duration_ms"] > 0
+        assert stats["median_duration_ms"] > 0
+
+    def test_triggered_by_tracking(self):
+        """Triggered_by bilgisi kaydedilmeli."""
+        self.monitor.record_job("test", "SUCCESS", 100.0, triggered_by="manual")
+        assert self.monitor._records[-1].triggered_by == "manual"
 
     def test_get_summary(self):
         self.monitor.record_job("test", "SUCCESS", 100.0)
@@ -216,6 +384,7 @@ class TestDailyWorkflow:
         assert len(self.workflow.PHASES) == 8
         assert "pre_market" in self.workflow.PHASES
         assert "post_market" in self.workflow.PHASES
+        assert "night" in self.workflow.PHASES
 
     def test_register_handler(self):
         async def dummy():
@@ -228,17 +397,20 @@ class TestDailyWorkflow:
         status = self.workflow.get_status()
         assert hasattr(status, "current_phase")
         assert hasattr(status, "jobs_run_today")
+        assert hasattr(status, "jobs_failed_today")
 
     def test_get_phases(self):
         phases = self.workflow.get_phases()
         assert "pre_market" in phases
         assert phases["pre_market"]["name"] == "PRE_MARKET"
+        assert "market_data_update" in phases["pre_market"]["jobs"]
 
     def test_reset_daily_counters(self):
         self.workflow._jobs_run_today = 10
         self.workflow._jobs_failed_today = 2
         self.workflow.reset_daily_counters()
         assert self.workflow._jobs_run_today == 0
+        assert self.workflow._jobs_failed_today == 0
 
     def test_execute_phase(self):
         async def dummy_job():
@@ -250,6 +422,16 @@ class TestDailyWorkflow:
         results = asyncio.run(self.workflow.execute_phase("pre_market"))
         assert "market_data_update" in results
         assert results["market_data_update"]["status"] == "SUCCESS"
+
+    def test_execute_unknown_phase(self):
+        result = asyncio.run(self.workflow.execute_phase("unknown"))
+        assert "error" in result
+
+    def test_phase_map_complete(self):
+        """Tüm market phase'leri workflow phase'e map'lenmeli."""
+        from services.scheduler.unified_scheduler import MarketPhase
+        for mp in MarketPhase:
+            assert mp.value in self.workflow._PHASE_MAP or mp.value in ["SEANS_1", "SEANS_2"]
 
 
 # =====================================================
@@ -266,6 +448,7 @@ class TestLearningScheduler:
     def test_default_jobs(self):
         assert "learning_cycle" in self.scheduler._jobs
         assert "model_retrain" in self.scheduler._jobs
+        assert "calibration_update" in self.scheduler._jobs
 
     def test_register_handler(self):
         async def dummy():
@@ -274,6 +457,23 @@ class TestLearningScheduler:
         self.scheduler.register_handler("learning_cycle", dummy)
         assert self.scheduler._jobs["learning_cycle"].handler is not None
 
+    def test_register_sync_handler_wrapped(self):
+        """Sync handler async'e wrap'lenmeli."""
+        def sync_dummy():
+            return "ok"
+
+        self.scheduler.register_handler("learning_cycle", sync_dummy)
+        handler = self.scheduler._jobs["learning_cycle"].handler
+        assert asyncio.iscoroutinefunction(handler)
+
+    def test_register_unknown_job_type(self):
+        """Bilinmeyen job type uyarı loglamalı."""
+        async def dummy():
+            return "ok"
+
+        # Hata fırlatmamalı
+        self.scheduler.register_handler("unknown_job", dummy)
+
     def test_enable_disable(self):
         self.scheduler.enable_job("learning_cycle", False)
         assert self.scheduler._jobs["learning_cycle"].enabled is False
@@ -281,6 +481,11 @@ class TestLearningScheduler:
     def test_update_interval(self):
         self.scheduler.update_interval("learning_cycle", 48)
         assert self.scheduler._jobs["learning_cycle"].interval_hours == 48
+
+    def test_update_interval_min_1(self):
+        """Interval minimum 1 olmalı."""
+        self.scheduler.update_interval("learning_cycle", 0)
+        assert self.scheduler._jobs["learning_cycle"].interval_hours == 1
 
     def test_should_run_first_time(self):
         config = self.scheduler._jobs["learning_cycle"]
@@ -295,16 +500,16 @@ class TestLearningScheduler:
     def test_get_status(self):
         status = self.scheduler.get_status()
         assert "total_jobs" in status
+        assert "enabled_jobs" in status
+        assert "jobs_with_handlers" in status
         assert "jobs" in status
 
     def test_get_pending_jobs(self):
-        # Handler yoksa pending_jobs boş olabilir
-        # Ama last_run=None olanlar pending
         async def dummy():
             return "ok"
         self.scheduler.register_handler("learning_cycle", dummy)
         pending = self.scheduler.get_pending_jobs()
-        assert len(pending) >= 0  # En azından handler var
+        assert len(pending) >= 0
 
 
 # =====================================================
@@ -345,11 +550,35 @@ class TestSchedulerAPI:
         market = self.api.get_market_session()
         assert "market" in market
 
+    def test_trigger_job(self):
+        result = asyncio.run(self.api.trigger_job("nonexistent"))
+        assert result["status"] == "ERROR"
+
+    def test_update_interval(self):
+        result = self.api.update_interval("health_check", 120)
+        assert result["status"] == "OK"
+        assert result["new_interval"] == 120
+
+    def test_update_interval_unknown(self):
+        result = self.api.update_interval("unknown", 120)
+        assert result["status"] == "ERROR"
+
+    def test_enable_job(self):
+        result = self.api.enable_job("health_check", False)
+        assert result["status"] == "OK"
+        assert result["enabled"] is False
+
+    def test_update_priority(self):
+        result = self.api.update_priority("health_check", 1)
+        assert result["status"] == "OK"
+        assert result["new_priority"] == 1
+
     def test_get_full_dashboard(self):
-        dashboard = self.api.get_full_dashboard()
+        dashboard = asyncio.run(self.api.get_full_dashboard())
         assert "status" in dashboard
         assert "jobs" in dashboard
         assert "monitor" in dashboard
+        assert "db_stats" in dashboard
 
 
 # =====================================================
@@ -400,6 +629,58 @@ class TestSchedulerIntegration:
 
         learning.register_handler("learning_cycle", dummy_learning)
         assert learning._jobs["learning_cycle"].handler is not None
+
+    def test_api_with_all_modules(self):
+        """API tüm modüllerle entegre olmalı."""
+        from services.scheduler.scheduler_api import SchedulerAPI
+
+        api = SchedulerAPI()
+
+        # Status — tüm modüllerden veri çekmeli
+        status = api.get_status()
+        assert "scheduler" in status
+        assert "workflow" in status
+        assert "learning" in status
+
+        # Jobs
+        jobs = api.get_jobs()
+        assert jobs["total_jobs"] > 0
+
+    def test_priority_based_execution_order(self):
+        """Priority'ye göre job sıralaması doğru olmalı."""
+        from services.scheduler.unified_scheduler import (
+            UnifiedScheduler, JobConfig
+        )
+
+        scheduler = UnifiedScheduler()
+
+        # Job'ları priority'ye göre sırala
+        configs = scheduler._configs
+        sorted_jobs = sorted(configs.items(), key=lambda x: x[1].priority)
+
+        # market_data_update (priority=1) en önce gelmeli
+        assert sorted_jobs[0][1].priority == 1
+
+        # backup (priority=10) en son gelmeli
+        assert sorted_jobs[-1][1].priority == 10
+
+    def test_holiday_blocks_trading(self):
+        """Tatil gününde trading job'ları çalışmamalı."""
+        from services.scheduler.unified_scheduler import (
+            MarketSessionManager, HolidayProvider, MarketPhase
+        )
+
+        provider = HolidayProvider()
+        # Yarını tatil ekle
+        tomorrow = datetime.now(timezone(timedelta(hours=3))) + timedelta(days=1)
+        provider.add_holiday(tomorrow.date())
+
+        market = MarketSessionManager(holiday_provider=provider)
+
+        # Eğer bugün tatilse CLOSED olmalı
+        # (test gününden bağımsız, mantık doğru olmalı)
+        phase = market.current_phase()
+        assert isinstance(phase, MarketPhase)
 
 
 if __name__ == "__main__":

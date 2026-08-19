@@ -1,13 +1,11 @@
 # ALPHA BIST — Scheduler System v2.0
 #
 # Modüller:
-# - unified_scheduler: Tek canonical scheduler (market-aware, config-driven)
-# - job_monitor: Job monitoring (status, duration, failure tracking)
+# - unified_scheduler: Tek canonical scheduler (market-aware, config-driven, DB-backed)
+# - job_monitor: Job monitoring (status, duration, failure tracking, alerting)
 # - daily_workflow: Günlük workflow otomasyonu (8 faz)
 # - learning_scheduler: Learning cycle scheduling (drift, retrain, backtest)
-# - scheduler_api: Scheduler API endpoints
-# - production_scheduler: Production scheduler (legacy)
-# - main: AlphaScheduler (legacy)
+# - scheduler_api: Scheduler API endpoints (status, jobs, monitor, trigger)
 # - daily_report: Günlük rapor üretici
 
 from .unified_scheduler import UnifiedScheduler, unified_scheduler, MarketPhase, MarketSessionManager, JobType, JobConfig

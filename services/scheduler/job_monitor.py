@@ -1,18 +1,19 @@
 """
-ALPHA BIST — Job Monitor v1.0
+ALPHA BIST — Job Monitor v2.0
 
 Job çalıştırma takibi ve istatistikleri:
 - Job status tracking
 - Duration monitoring
 - Failure rate tracking
 - Slow job detection
-- Job failure alerts
+- Consecutive failure alerts
+- Job failure alerting (callback-based)
 
 Kaynaklar: APScheduler best practices, Endüstri standardı
 """
 
 import time
-import numpy as np
+import math
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -41,12 +42,13 @@ class JobRecord:
     error: Optional[str] = None
     retry_count: int = 0
     phase: str = ""
+    triggered_by: str = "scheduler"
 
 
 @dataclass
 class JobAlert:
     """Job alert."""
-    alert_type: str      # FAILURE, SLOW, HIGH_FAILURE_RATE
+    alert_type: str      # FAILURE, SLOW, HIGH_FAILURE_RATE, CONSECUTIVE_FAILURE
     job_type: str
     message: str
     severity: str        # INFO, WARNING, CRITICAL
@@ -62,6 +64,7 @@ class JobMonitor:
     - Failure rate
     - Slow jobs
     - Consecutive failures
+    - Percentile durations (p50, p95, p99)
     """
 
     def __init__(self, max_history: int = 1000, slow_threshold_ms: float = 30000):
@@ -82,6 +85,7 @@ class JobMonitor:
         error: str = None,
         retry_count: int = 0,
         phase: str = "",
+        triggered_by: str = "scheduler",
     ):
         """Job kaydet.
 
@@ -92,6 +96,7 @@ class JobMonitor:
             error: Hata mesajı
             retry_count: Retry sayısı
             phase: Piyasa fazı
+            triggered_by: Tetikleyen (scheduler, manual, phase_change)
         """
         record = JobRecord(
             job_type=job_type,
@@ -101,6 +106,7 @@ class JobMonitor:
             error=error,
             retry_count=retry_count,
             phase=phase,
+            triggered_by=triggered_by,
         )
 
         self._records.append(record)
@@ -165,10 +171,12 @@ class JobMonitor:
             "timeouts": timeouts,
             "success_rate": round(success / total, 4) if total > 0 else 0,
             "failure_rate": round(failed / total, 4) if total > 0 else 0,
-            "avg_duration_ms": round(np.mean(durations), 2),
-            "median_duration_ms": round(np.median(durations), 2),
-            "p95_duration_ms": round(np.percentile(durations, 95), 2),
+            "avg_duration_ms": round(sum(durations) / len(durations), 2),
+            "median_duration_ms": round(self._percentile(durations, 50), 2),
+            "p95_duration_ms": round(self._percentile(durations, 95), 2),
+            "p99_duration_ms": round(self._percentile(durations, 99), 2),
             "max_duration_ms": round(max(durations), 2),
+            "min_duration_ms": round(min(durations), 2),
             "consecutive_failures": self._consecutive_failures.get(job_type or "", 0),
             "job_type": job_type or "all",
         }
@@ -211,6 +219,7 @@ class JobMonitor:
                 "duration_ms": round(r.duration_ms, 2),
                 "timestamp": r.timestamp,
                 "phase": r.phase,
+                "triggered_by": r.triggered_by,
             }
             for r in slow[-20:]  # Son 20
         ]
@@ -280,6 +289,21 @@ class JobMonitor:
         self._records.clear()
         self._alerts.clear()
         self._consecutive_failures.clear()
+
+    @staticmethod
+    def _percentile(data: List[float], percentile: float) -> float:
+        """Percentile hesapla (numpy bağımlılığı yok)."""
+        if not data:
+            return 0.0
+        sorted_data = sorted(data)
+        k = (len(sorted_data) - 1) * (percentile / 100.0)
+        f = math.floor(k)
+        c = math.ceil(k)
+        if f == c:
+            return sorted_data[int(k)]
+        d0 = sorted_data[int(f)] * (c - k)
+        d1 = sorted_data[int(c)] * (k - f)
+        return d0 + d1
 
 
 # Singleton

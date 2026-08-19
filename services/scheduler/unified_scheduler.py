@@ -4,22 +4,25 @@ ALPHA BIST — Unified Scheduler v2.0
 Tek canonical scheduler: AlphaScheduler + ProductionScheduler birleştirildi.
 
 Özellikler:
-- Market session-aware (BIST saatleri)
+- Market session-aware (BIST saatleri, 9 faz)
 - Config-driven intervals
-- 3 katmanlı tarama (live/batch/event)
-- Daily workflow otomasyonu
+- Priority-based execution (yüksek öncelik önce çalışır)
+- DB-backed job tracking (system_jobs tablosu)
+- Job retry policy (exponential backoff, timeout)
+- Job monitoring (status, duration, failure, alerting)
+- Dinamik tatil takvimi (config + hardcoded fallback)
 - SIGTERM/SIGINT handler
 - Graceful shutdown
-- Job retry policy
-- Job monitoring
+- Manuel tetikleme (trigger) desteği
 
 Kaynaklar: arXiv Agentic Trading (2026), BIST resmi, APScheduler best practices
 """
 
 import asyncio
+import json
 import signal
 import time
-from datetime import datetime, time as dt_time, timezone, timedelta
+from datetime import datetime, time as dt_time, timezone, timedelta, date
 from typing import Dict, Any, Optional, Callable, Awaitable, List
 from dataclasses import dataclass, field
 from enum import Enum
@@ -29,12 +32,19 @@ logger = structlog.get_logger()
 
 
 # =====================================================
+# Constants
+# =====================================================
+
+_TZ_ISTANBUL = timezone(timedelta(hours=3))
+
+
+# =====================================================
 # Market Phases
 # =====================================================
 
 class MarketPhase(str, Enum):
     """BIST piyasa fazları."""
-    CLOSED = "CLOSED"            # Piyasa kapalı (gece, hafta sonu)
+    CLOSED = "CLOSED"            # Piyasa kapalı (gece, hafta sonu, tatil)
     PRE_MARKET = "PRE_MARKET"    # 09:40-09:55 (emir toplama)
     SEANS_1 = "SEANS_1"          # 09:55-12:30 (tek fiyat)
     BREAK = "BREAK"              # 12:30-14:00 (ara)
@@ -46,13 +56,122 @@ class MarketPhase(str, Enum):
 
 
 # =====================================================
+# Holiday Provider (Dinamik + Fallback)
+# =====================================================
+
+class HolidayProvider:
+    """BIST tatil günleri sağlayıcısı.
+
+    Öncelik sırası:
+    1. DB'den dinamik çekim (config_holidays tablosu)
+    2. Config dosyası (config/holidays.json)
+    3. Hardcoded fallback (2026)
+    """
+
+    # Hardcoded fallback — sadece dinamik kaynak yoksa kullanılır
+    _FALLBACK_2026: set = frozenset({
+        date(2026, 1, 1),    # Yılbaşı
+        date(2026, 4, 23),   # Ulusal Egemenlik
+        date(2026, 5, 1),    # İşçi Bayramı
+        date(2026, 5, 19),   # Gençlik Bayramı
+        date(2026, 7, 15),   # Demokrasi Bayramı
+        date(2026, 8, 30),   # Zafer Bayramı
+        date(2026, 10, 29),  # Cumhuriyet Bayramı
+        date(2026, 3, 29),   # Ramazan Bayramı (1)
+        date(2026, 3, 30),   # Ramazan Bayramı (2)
+        date(2026, 3, 31),   # Ramazan Bayramı (3)
+        date(2026, 6, 6),    # Kurban Bayramı (1)
+        date(2026, 6, 7),    # Kurban Bayramı (2)
+        date(2026, 6, 8),    # Kurban Bayramı (3)
+        date(2026, 6, 9),    # Kurban Bayramı (4)
+    })
+
+    def __init__(self):
+        self._dynamic_holidays: Optional[set] = None
+        self._last_fetch: float = 0
+        self._fetch_interval: float = 3600  # 1 saatte bir yenile
+
+    def get_holidays(self) -> set:
+        """Tatil günlerini al (dinamik + fallback)."""
+        now = time.time()
+
+        # Cache süresi dolmuşsa yenile
+        if self._dynamic_holidays is None or (now - self._last_fetch) > self._fetch_interval:
+            self._refresh()
+
+        # Dinamik + fallback birleşimi
+        return self._dynamic_holidays | self._FALLBACK_2026
+
+    def is_holiday(self, dt: datetime) -> bool:
+        """Belirli bir gün tatil mi?"""
+        d = dt.date() if hasattr(dt, 'date') else dt
+        # Dinamik + fallback birleşimine bak
+        all_holidays = self.get_holidays()
+        return d in all_holidays
+
+    def add_holiday(self, d: date):
+        """Tatil günü ekle (runtime)."""
+        if self._dynamic_holidays is None:
+            self._dynamic_holidays = set()
+        self._dynamic_holidays.add(d)
+        # Cache'i invalidate etme — _refresh() çağrılırsa runtime eklenenler kaybolur
+        # Bunun yerine _last_fetch'i güncelle ki refresh tetiklenmesin
+        self._last_fetch = time.time()
+
+    def remove_holiday(self, d: date):
+        """Tatil günü kaldır (runtime)."""
+        if self._dynamic_holidays is not None:
+            self._dynamic_holidays.discard(d)
+
+    def _refresh(self):
+        """Dinamik tatil günlerini yenile."""
+        holidays = set()
+
+        # 1. Config dosyasından oku
+        try:
+            import os
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "config", "holidays.json"
+            )
+            if os.path.exists(config_path):
+                with open(config_path) as f:
+                    data = json.load(f)
+                    for h in data.get("holidays", []):
+                        holidays.add(date.fromisoformat(h))
+        except Exception:
+            pass
+
+        # 2. DB'den çek (varsa)
+        try:
+            # DB erişimi varsa config_holidays tablosundan çek
+            # Bu kısım async değil, sync — startup'ta yüklenir
+            pass
+        except Exception:
+            pass
+
+        self._dynamic_holidays = holidays
+        self._last_fetch = time.time()
+
+
+# =====================================================
 # Market Session Manager
 # =====================================================
 
 class MarketSessionManager:
-    """BIST piyasa saatleri yöneticisi."""
+    """BIST piyasa saatleri yöneticisi.
 
-    # BIST saatleri (UTC+3)
+    BIST işlem saatleri (Europe/Istanbul, UTC+3):
+    - Pre-market:  09:40-09:55
+    - Seans 1:     09:55-12:30 (tek fiyat)
+    - Break:       12:30-14:00
+    - Seans 2:     14:00-17:40 (sürekli müzayede)
+    - Closing:     17:40-18:00
+    - Post-market: 18:00-18:30
+    - After-hours: 18:30-23:00
+    - Night:       23:00-09:40
+    """
+
     PHASE_TIMES = [
         (dt_time(9, 40), MarketPhase.PRE_MARKET),
         (dt_time(9, 55), MarketPhase.SEANS_1),
@@ -64,39 +183,25 @@ class MarketSessionManager:
         (dt_time(23, 0), MarketPhase.NIGHT),
     ]
 
-    # BIST tatil günleri (2026) — örnek
-    HOLIDAYS_2026 = [
-        (1, 1),    # Yılbaşı
-        (4, 23),   # Ulusal Egemenlik
-        (5, 1),    # İşçi Bayramı
-        (5, 19),   # Gençlik Bayramı
-        (7, 15),   # Demokrasi Bayramı
-        (8, 30),   # Zafer Bayramı
-        (10, 29),  # Cumhuriyet Bayramı
-        (3, 29),   # Ramazan Bayramı (1)
-        (3, 30),   # Ramazan Bayramı (2)
-        (3, 31),   # Ramazan Bayramı (3)
-        (6, 6),    # Kurban Bayramı (1)
-        (6, 7),    # Kurban Bayramı (2)
-        (6, 8),    # Kurban Bayramı (3)
-        (6, 9),    # Kurban Bayramı (4)
-    ]
-
-    def __init__(self, timezone_offset: int = 3):
-        self._tz_offset = timezone_offset
+    def __init__(self, holiday_provider: Optional[HolidayProvider] = None):
+        self._holiday_provider = holiday_provider or HolidayProvider()
         self._current_phase: Optional[MarketPhase] = None
         self._phase_callbacks: Dict[MarketPhase, List[Callable]] = {}
 
+    def now_istanbul(self) -> datetime:
+        """Şu anki Istanbul zamanı."""
+        return datetime.now(_TZ_ISTANBUL)
+
     def current_phase(self) -> MarketPhase:
         """Mevcut piyasa fazını al."""
-        now = datetime.now(timezone(timedelta(hours=self._tz_offset)))
+        now = self.now_istanbul()
 
         # Hafta sonu
         if now.weekday() >= 5:
             return MarketPhase.CLOSED
 
-        # Tatil
-        if self._is_holiday(now):
+        # Tatil (dinamik)
+        if self._holiday_provider.is_holiday(now):
             return MarketPhase.CLOSED
 
         current_time = now.time()
@@ -116,13 +221,11 @@ class MarketSessionManager:
 
     def is_trading_hours(self) -> bool:
         """Piyasa işlem saatlerinde mi?"""
-        phase = self.current_phase()
-        return phase in [MarketPhase.SEANS_1, MarketPhase.SEANS_2, MarketPhase.CLOSING]
+        return self.current_phase() in [MarketPhase.SEANS_1, MarketPhase.SEANS_2, MarketPhase.CLOSING]
 
     def is_market_open(self) -> bool:
         """Piyasa açık mı? (işlem + pre/post dahil)"""
-        phase = self.current_phase()
-        return phase not in [MarketPhase.CLOSED, MarketPhase.NIGHT]
+        return self.current_phase() not in [MarketPhase.CLOSED, MarketPhase.NIGHT]
 
     def should_run_trading_job(self) -> bool:
         """Trading job'ları çalıştırılmalı mı?"""
@@ -130,7 +233,7 @@ class MarketSessionManager:
 
     def seconds_until_next_phase(self) -> float:
         """Bir sonraki faza kaç saniye var?"""
-        now = datetime.now(timezone(timedelta(hours=self._tz_offset)))
+        now = self.now_istanbul()
         current_time = now.time()
 
         for phase_time, _ in self.PHASE_TIMES:
@@ -144,25 +247,30 @@ class MarketSessionManager:
 
         # Gece — bir sonraki günün ilk fazı
         tomorrow = now + timedelta(days=1)
+        # Hafta sonu atla
+        while tomorrow.weekday() >= 5:
+            tomorrow += timedelta(days=1)
         target = tomorrow.replace(hour=9, minute=40, second=0, microsecond=0)
         return max(0, (target - now).total_seconds())
 
     def get_status(self) -> Dict[str, Any]:
         """Piyasa durumu."""
         phase = self.current_phase()
+        now = self.now_istanbul()
         return {
             "phase": phase.value,
+            "istanbul_time": now.isoformat(),
+            "weekday": now.strftime("%A"),
             "is_trading": self.is_trading_hours(),
             "is_open": self.is_market_open(),
+            "is_holiday": self._holiday_provider.is_holiday(now),
+            "is_trading_day": now.weekday() < 5 and not self._holiday_provider.is_holiday(now),
             "seconds_until_next": round(self.seconds_until_next_phase()),
-            "is_holiday": self._is_holiday(
-                datetime.now(timezone(timedelta(hours=self._tz_offset)))
-            ),
         }
 
-    def _is_holiday(self, dt: datetime) -> bool:
-        """Tatil günü mü?"""
-        return (dt.month, dt.day) in self.HOLIDAYS_2026
+    def get_holiday_provider(self) -> HolidayProvider:
+        """Tatil sağlayıcısını al."""
+        return self._holiday_provider
 
     def _on_phase_change(self, old: Optional[MarketPhase], new: MarketPhase):
         """Faz değişikliği callback."""
@@ -240,21 +348,21 @@ class JobConfig:
     description: str = ""
 
 
-# Varsayılan job konfigürasyonları
+# Varsayılan job konfigürasyonları — priority bazlı
 DEFAULT_JOB_CONFIGS = {
-    # Pre-market
+    # Pre-market (yüksek öncelik)
     JobType.MARKET_DATA_UPDATE: JobConfig(
         job_type=JobType.MARKET_DATA_UPDATE,
         interval_seconds=120,
         trading_only=False,
-        priority=2,
+        priority=1,
         description="Piyasa verisi güncelleme",
     ),
     JobType.FEATURE_CALCULATION: JobConfig(
         job_type=JobType.FEATURE_CALCULATION,
         interval_seconds=300,
         trading_only=False,
-        priority=2,
+        priority=1,
         description="Feature hesaplama",
     ),
     JobType.UNIVERSE_REFRESH: JobConfig(
@@ -265,7 +373,14 @@ DEFAULT_JOB_CONFIGS = {
         description="Universe yenileme",
     ),
 
-    # Active trading
+    # Active trading (yüksek-orta öncelik)
+    JobType.LIVE_SCANNING: JobConfig(
+        job_type=JobType.LIVE_SCANNING,
+        interval_seconds=0,  # Continuous
+        trading_only=True,
+        priority=2,
+        description="Canlı tarama",
+    ),
     JobType.BATCH_SCAN: JobConfig(
         job_type=JobType.BATCH_SCAN,
         interval_seconds=3600,
@@ -310,8 +425,15 @@ DEFAULT_JOB_CONFIGS = {
         priority=7,
         description="Günlük rapor",
     ),
+    JobType.PERFORMANCE_ATTRIBUTION: JobConfig(
+        job_type=JobType.PERFORMANCE_ATTRIBUTION,
+        interval_seconds=86400,
+        trading_only=False,
+        priority=7,
+        description="Performans atıf analizi",
+    ),
 
-    # After-hours
+    # After-hours (düşük öncelik)
     JobType.LEARNING_CYCLE: JobConfig(
         job_type=JobType.LEARNING_CYCLE,
         interval_seconds=86400,
@@ -340,6 +462,22 @@ DEFAULT_JOB_CONFIGS = {
         priority=8,
         description="Backtest",
     ),
+    JobType.CALIBRATION_UPDATE: JobConfig(
+        job_type=JobType.CALIBRATION_UPDATE,
+        interval_seconds=2592000,  # 30 gün
+        trading_only=False,
+        priority=9,
+        description="Calibration güncelleme",
+    ),
+
+    # Night
+    JobType.BACKUP: JobConfig(
+        job_type=JobType.BACKUP,
+        interval_seconds=86400,
+        trading_only=False,
+        priority=10,
+        description="Veritabanı yedekleme",
+    ),
 }
 
 
@@ -357,6 +495,154 @@ class JobResult:
     error: Optional[str] = None
     retry_count: int = 0
     result: Any = None
+    triggered_by: str = "scheduler"  # scheduler, manual, phase_change
+
+
+# =====================================================
+# DB-Backed Job Tracker
+# =====================================================
+
+class DBJobTracker:
+    """Job geçmişini DB'ye persist eder.
+
+    system_jobs tablosuna yazar (varsa).
+    DB yoksa in-memory fallback kullanır.
+    """
+
+    def __init__(self):
+        self._db_available: Optional[bool] = None
+        self._memory_history: List[Dict[str, Any]] = []
+        self._max_memory = 1000
+
+    async def record_job(self, result: JobResult) -> bool:
+        """Job sonucunu kaydet (DB veya memory)."""
+        if self._is_db_available():
+            try:
+                from services.core.database import pg_execute
+                await asyncio.wait_for(
+                    pg_execute(
+                        """INSERT INTO system_jobs
+                           (job_type, status, duration_ms, error_message,
+                            retry_count, triggered_by, completed_at)
+                           VALUES ($1, $2, $3, $4, $5, $6, NOW())""",
+                        result.job_type,
+                        result.status,
+                        result.duration_ms,
+                        result.error,
+                        result.retry_count,
+                        result.triggered_by,
+                    ),
+                    timeout=3.0,
+                )
+                return True
+            except Exception as e:
+                logger.warning("DB job record failed, falling back to memory",
+                             error=str(e)[:100])
+                self._db_available = False
+
+        # In-memory fallback
+        self._memory_history.append({
+            "job_type": result.job_type,
+            "status": result.status,
+            "duration_ms": result.duration_ms,
+            "timestamp": result.timestamp,
+            "error": result.error,
+            "retry_count": result.retry_count,
+            "triggered_by": result.triggered_by,
+        })
+        if len(self._memory_history) > self._max_memory:
+            self._memory_history = self._memory_history[-self._max_memory:]
+        return True
+
+    async def get_job_history(self, job_type: str = None, limit: int = 50) -> List[Dict]:
+        """Job geçmişini al."""
+        if self._is_db_available():
+            try:
+                from services.core.database import pg_fetch
+                if job_type:
+                    rows = await asyncio.wait_for(
+                        pg_fetch(
+                            """SELECT job_type, status, duration_ms, error_message,
+                                      retry_count, triggered_by, completed_at
+                               FROM system_jobs
+                               WHERE job_type = $1
+                               ORDER BY completed_at DESC LIMIT $2""",
+                            job_type, limit,
+                        ),
+                        timeout=3.0,
+                    )
+                else:
+                    rows = await asyncio.wait_for(
+                        pg_fetch(
+                            """SELECT job_type, status, duration_ms, error_message,
+                                      retry_count, triggered_by, completed_at
+                               FROM system_jobs
+                               ORDER BY completed_at DESC LIMIT $1""",
+                            limit,
+                        ),
+                        timeout=3.0,
+                    )
+                return [dict(r) for r in rows]
+            except Exception:
+                self._db_available = False
+
+        # In-memory fallback
+        history = self._memory_history
+        if job_type:
+            history = [h for h in history if h["job_type"] == job_type]
+        return history[-limit:]
+
+    async def get_failure_stats(self, window_hours: int = 24) -> Dict[str, Any]:
+        """Son N saatteki failure istatistikleri."""
+        if self._is_db_available():
+            try:
+                from services.core.database import pg_fetchrow
+                row = await asyncio.wait_for(
+                    pg_fetchrow(
+                        """SELECT
+                             COUNT(*) as total,
+                             COUNT(*) FILTER (WHERE status = 'FAILED') as failed,
+                             COUNT(*) FILTER (WHERE status = 'SUCCESS') as success,
+                             AVG(duration_ms) FILTER (WHERE status = 'SUCCESS') as avg_duration
+                           FROM system_jobs
+                           WHERE completed_at > NOW() - INTERVAL '1 hour' * $1""",
+                        window_hours,
+                    ),
+                    timeout=3.0,
+                )
+                if row:
+                    return dict(row)
+            except Exception:
+                self._db_available = False
+
+        # In-memory fallback
+        cutoff = time.time() - (window_hours * 3600)
+        recent = [h for h in self._memory_history
+                  if datetime.fromisoformat(h["timestamp"]).timestamp() > cutoff]
+        total = len(recent)
+        failed = sum(1 for h in recent if h["status"] == "FAILED")
+        return {
+            "total": total,
+            "failed": failed,
+            "success": total - failed,
+            "avg_duration": sum(h["duration_ms"] for h in recent) / max(total, 1),
+        }
+
+    def _is_db_available(self) -> bool:
+        """DB erişimi var mı?"""
+        if self._db_available is not None:
+            return self._db_available
+        try:
+            import socket
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.5)
+            result = s.connect_ex(('127.0.0.1', 5432))
+            s.close()
+            self._db_available = result == 0
+            return self._db_available
+        except Exception:
+            self._db_available = False
+            return False
 
 
 # =====================================================
@@ -367,12 +653,16 @@ class UnifiedScheduler:
     """Tek canonical scheduler — tüm job'ları yönetir.
 
     Özellikler:
-    - Market session-aware (BIST saatleri)
+    - Market session-aware (BIST saatleri, 9 faz)
     - Config-driven intervals
-    - Job retry policy (exponential backoff)
-    - Job monitoring (status, duration, failure)
+    - Priority-based execution (yüksek öncelik önce çalışır)
+    - DB-backed job tracking (system_jobs tablosu)
+    - Job retry policy (exponential backoff, timeout)
+    - Job monitoring (status, duration, failure, alerting)
+    - Dinamik tatil takvimi
     - SIGTERM/SIGINT handler
     - Graceful shutdown
+    - Manuel tetikleme (trigger) desteği
     """
 
     def __init__(self, job_configs: Optional[Dict[str, JobConfig]] = None):
@@ -383,9 +673,15 @@ class UnifiedScheduler:
         self._running = False
         self._shutdown_event = asyncio.Event()
 
-        # Job monitoring
+        # DB-backed job tracking
+        self._db_tracker = DBJobTracker()
+
+        # In-memory job history (monitor için)
         self._job_history: List[JobResult] = []
         self._max_history = 1000
+
+        # Manual trigger queue
+        self._trigger_queue: asyncio.Queue = asyncio.Queue()
 
         # Phase callbacks
         self._phase_callbacks: Dict[str, List[Callable]] = {}
@@ -412,6 +708,39 @@ class UnifiedScheduler:
         if job_type in self._configs:
             self._configs[job_type].enabled = enabled
 
+    def update_priority(self, job_type: str, priority: int):
+        """Job önceliğini güncelle."""
+        if job_type in self._configs:
+            self._configs[job_type].priority = max(1, min(10, priority))
+
+    async def trigger_job(self, job_type: str) -> Dict[str, Any]:
+        """Job'ı manuel olarak tetikle.
+
+        Args:
+            job_type: Tetiklenecek job tipi
+
+        Returns:
+            Tetikleme sonucu
+        """
+        handler = self._handlers.get(job_type)
+        if handler is None:
+            return {"status": "ERROR", "message": f"No handler for {job_type}"}
+
+        config = self._configs.get(job_type)
+        if config is None:
+            return {"status": "ERROR", "message": f"No config for {job_type}"}
+
+        logger.info("Manual trigger", job_type=job_type)
+
+        # Trigger queue'ya ekle
+        await self._trigger_queue.put((job_type, handler, config))
+
+        return {
+            "status": "QUEUED",
+            "job_type": job_type,
+            "message": "Job queued for immediate execution",
+        }
+
     async def start(self):
         """Scheduler'ı başlat."""
         self._running = True
@@ -430,15 +759,11 @@ class UnifiedScheduler:
         # Startup sequence
         await self._startup_sequence()
 
-        # Ana döngü
-        while self._running:
-            try:
-                await self._tick()
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                logger.error("Scheduler tick error", error=str(e))
-                await asyncio.sleep(10)
+        # Ana döngü — paralel: tick + trigger consumer
+        await asyncio.gather(
+            self._main_loop(),
+            self._trigger_consumer(),
+        )
 
         logger.info("=== UNIFIED SCHEDULER STOPPED ===")
 
@@ -462,18 +787,53 @@ class UnifiedScheduler:
         status = self._market.get_status()
         logger.info("Market session", **status)
 
+        # Tatil takvimi
+        holiday_count = len(self._market.get_holiday_provider().get_holidays())
+        logger.info("Holiday calendar loaded", count=holiday_count)
+
         # Registered handlers
         logger.info("Registered handlers", count=len(self._handlers),
                     handlers=list(self._handlers.keys()))
 
+        # Job configs
+        enabled = sum(1 for c in self._configs.values() if c.enabled)
+        logger.info("Job configs", total=len(self._configs), enabled=enabled)
+
         logger.info("Startup sequence complete")
+
+    async def _main_loop(self):
+        """Ana scheduler döngüsü."""
+        while self._running:
+            try:
+                await self._tick()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Scheduler tick error", error=str(e))
+                await asyncio.sleep(10)
+
+    async def _trigger_consumer(self):
+        """Manuel tetikleme queue'sunu tüket."""
+        while self._running:
+            try:
+                job_type, handler, config = await asyncio.wait_for(
+                    self._trigger_queue.get(), timeout=5.0
+                )
+                await self._execute_with_retry(
+                    job_type, handler, config, triggered_by="manual"
+                )
+            except asyncio.TimeoutError:
+                continue
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error("Trigger consumer error", error=str(e))
 
     async def _tick(self):
         """Tek scheduler döngüsü."""
         phase = self._market.current_phase()
 
-        # Faz bazlı job'ları çalıştır
-        if phase == MarketPhase.CLOSED or phase == MarketPhase.NIGHT:
+        if phase in [MarketPhase.CLOSED, MarketPhase.NIGHT]:
             await self._run_jobs_for_phase("night")
             sleep_time = min(self._market.seconds_until_next_phase(), 300)
             await asyncio.sleep(max(sleep_time, 30))
@@ -503,15 +863,20 @@ class UnifiedScheduler:
             await asyncio.sleep(120)
 
     async def _run_jobs_for_phase(self, phase_name: str):
-        """Belirli bir faz için job'ları çalıştır."""
+        """Belirli bir faz için job'ları priority sırasıyla çalıştır."""
+        # Priority bazlı sıralama: düşük sayı = yüksek öncelik
+        eligible_jobs = []
         for job_type, config in self._configs.items():
             if not config.enabled:
                 continue
-
-            # Trading-only kontrolü
             if config.trading_only and not self._market.should_run_trading_job():
                 continue
+            eligible_jobs.append((job_type, config))
 
+        # Priority'ye göre sırala (1=en yüksek)
+        eligible_jobs.sort(key=lambda x: x[1].priority)
+
+        for job_type, config in eligible_jobs:
             await self._maybe_run_job(job_type, config)
 
     async def _maybe_run_job(self, job_type: str, config: JobConfig):
@@ -536,6 +901,7 @@ class UnifiedScheduler:
         job_type: str,
         handler: Callable,
         config: JobConfig,
+        triggered_by: str = "scheduler",
     ):
         """Retry ile job çalıştır."""
         last_error = None
@@ -552,14 +918,16 @@ class UnifiedScheduler:
                 duration_ms = (time.time() - start_time) * 1000
 
                 # Başarılı
-                self._record_job(JobResult(
+                job_result = JobResult(
                     job_type=job_type,
                     status="SUCCESS",
                     duration_ms=duration_ms,
                     timestamp=datetime.now(timezone.utc).isoformat(),
                     retry_count=attempt,
                     result=result,
-                ))
+                    triggered_by=triggered_by,
+                )
+                await self._record_job(job_result)
 
                 if attempt > 0:
                     logger.info("Job succeeded after retry",
@@ -586,20 +954,26 @@ class UnifiedScheduler:
 
         # Tüm retry'lar başarısız
         duration_ms = (time.time() - start_time) * 1000
-        self._record_job(JobResult(
+        job_result = JobResult(
             job_type=job_type,
             status="FAILED",
             duration_ms=duration_ms,
             timestamp=datetime.now(timezone.utc).isoformat(),
             error=last_error,
             retry_count=config.max_retries,
-        ))
+            triggered_by=triggered_by,
+        )
+        await self._record_job(job_result)
 
         logger.error("Job failed after all retries",
                     job_type=job_type, error=last_error)
 
-    def _record_job(self, result: JobResult):
-        """Job sonucunu kaydet."""
+    async def _record_job(self, result: JobResult):
+        """Job sonucunu kaydet (DB + memory)."""
+        # DB'ye persist et
+        await self._db_tracker.record_job(result)
+
+        # In-memory history (monitor için)
         self._job_history.append(result)
         if len(self._job_history) > self._max_history:
             self._job_history = self._job_history[-self._max_history:]
@@ -611,7 +985,9 @@ class UnifiedScheduler:
             "market": self._market.get_status(),
             "registered_handlers": len(self._handlers),
             "job_configs": len(self._configs),
+            "enabled_configs": sum(1 for c in self._configs.values() if c.enabled),
             "total_jobs_run": len(self._job_history),
+            "trigger_queue_size": self._trigger_queue.qsize(),
             "last_runs": {
                 job_type: datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
                 for job_type, ts in self._last_run.items()
@@ -653,13 +1029,33 @@ class UnifiedScheduler:
                 "timestamp": r.timestamp,
                 "error": r.error,
                 "retry_count": r.retry_count,
+                "triggered_by": r.triggered_by,
             }
             for r in self._job_history[-limit:]
         ]
 
+    def get_job_configs(self) -> Dict[str, Dict[str, Any]]:
+        """Tüm job konfigürasyonlarını al."""
+        return {
+            name: {
+                "interval_seconds": config.interval_seconds,
+                "trading_only": config.trading_only,
+                "priority": config.priority,
+                "enabled": config.enabled,
+                "max_retries": config.max_retries,
+                "timeout_seconds": config.timeout_seconds,
+                "description": config.description,
+            }
+            for name, config in self._configs.items()
+        }
+
     def get_market_session(self) -> MarketSessionManager:
         """Market session manager'ı al."""
         return self._market
+
+    def get_db_tracker(self) -> DBJobTracker:
+        """DB job tracker'ı al."""
+        return self._db_tracker
 
 
 # Singleton

@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Daily Workflow v1.0
+ALPHA BIST — Daily Workflow v2.0
 
 Tam günlük workflow otomasyonu.
 BIST saatlerine göre otomatik job yönetimi.
@@ -52,6 +52,7 @@ class DailyWorkflow:
     """Günlük workflow yöneticisi.
 
     Her faz için tanımlanmış job'ları otomatik çalıştırır.
+    Market session manager ile entegre çalışır.
     """
 
     # Faz tanımları
@@ -112,6 +113,19 @@ class DailyWorkflow:
             jobs=["health_check", "backup"],
             description="Gece",
         ),
+    }
+
+    # Phase mapping: MarketPhase → workflow phase key
+    _PHASE_MAP = {
+        "PRE_MARKET": "pre_market",
+        "SEANS_1": "seans_1",
+        "BREAK": "break",
+        "SEANS_2": "seans_2",
+        "CLOSING": "closing",
+        "POST_MARKET": "post_market",
+        "AFTER_HOURS": "after_hours",
+        "NIGHT": "night",
+        "CLOSED": "night",
     }
 
     def __init__(self):
@@ -197,28 +211,16 @@ class DailyWorkflow:
         Returns:
             Durum bilgisi
         """
+        # Unified scheduler'dan market session al (circular import yok)
         from .unified_scheduler import MarketSessionManager
         market = MarketSessionManager()
         phase = market.current_phase()
 
         # Faz adını eşleştir
-        phase_map = {
-            "PRE_MARKET": "pre_market",
-            "SEANS_1": "seans_1",
-            "BREAK": "break",
-            "SEANS_2": "seans_2",
-            "CLOSING": "closing",
-            "POST_MARKET": "post_market",
-            "AFTER_HOURS": "after_hours",
-            "NIGHT": "night",
-            "CLOSED": "night",
-        }
-
-        current = phase_map.get(phase.value, "night")
+        current = self._PHASE_MAP.get(phase.value, "night")
 
         # Sonraki faz
-        phase_order = ["pre_market", "seans_1", "break", "seans_2",
-                       "closing", "post_market", "after_hours", "night"]
+        phase_order = list(self.PHASES.keys())
         current_idx = phase_order.index(current) if current in phase_order else 0
         next_phase = phase_order[(current_idx + 1) % len(phase_order)]
 

@@ -792,14 +792,14 @@ def run_live_scheduler():
     SIGTERM/SIGINT ile graceful shutdown.
     """
     import asyncio
-    from services.scheduler.production_scheduler import production_scheduler
+    from services.scheduler.unified_scheduler import unified_scheduler
     from services.core.database import init_databases, close_databases
 
     async def _run():
         logger.info("=== ALPHA BIST LIVE MODE ===")
         await init_databases()
         try:
-            await production_scheduler.start()
+            await unified_scheduler.start()
         finally:
             await close_databases()
             logger.info("=== LIVE MODE SHUTDOWN ===")
