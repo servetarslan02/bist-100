@@ -98,23 +98,25 @@
 - 9 dosyada bare `except:pass` → `except ImportError` + `except Exception` + debug log
 - **Etki:** Kritik hatalar artık sessizce yutulmuyor
 
+### 8. Config Hot-Reload → Settings Entegrasyonu
+- `config_hot_reload.py`: `SettingsBridge` sınıfı eklendi
+- JSON config → pydantic Settings köprüsü (36 güvenli alan, 11 secret alan)
+- **Etki:** Runtime config değişikliği artık mümkün
+
+### 9. Circuit Breaker → Prometheus HTTP Endpoint
+- `api/main.py`: `/metrics` endpoint eklendi
+- Circuit breaker, DLQ, transaction, system governor metrikleri
+- **Etki:** Prometheus scrape ile doğrudan entegre
+
 ---
 
 ## Açık Kararlar (Kullanıcıya Sorulacak)
 
-### 1. Config Hot-Reload → Settings Entegrasyonu
-`config_hot_reload.py` dosya tabanlı izleme yapıyor ama `config.py`'deki `Settings` (pydantic) ile entegre değil.
+### ~~1. Config Hot-Reload → Settings Entegrasyonu~~ ✅ ÇÖZÜLDÜ
+`SettingsBridge` ile pydantic Settings entegre edildi. Secret alanlar JSON'dan yüklenmez.
 
-**Seçenekler:**
-- A) Hot-reload callback'i `settings` objesini güncellesin (runtime config change)
-- B) Dosya tabanlı hot-reload yeterli, Settings restart gerektirir
-
-### 2. Circuit Breaker → Prometheus Export
-`circuit_breaker_metrics.py` var ama gerçek Prometheus exporter ile entegre edilmemiş.
-
-**Seçenekler:**
-- A) `prometheus_client` ile gerçek metrics endpoint ekle
-- B) JSON formatında export yeterli
+### ~~2. Circuit Breaker → Prometheus Export~~ ✅ ÇÖZÜLDÜ
+`/metrics` endpoint eklendi, Prometheus text format.
 
 ---
 

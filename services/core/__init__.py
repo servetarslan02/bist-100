@@ -16,7 +16,7 @@ from .dead_letter_queue import DeadLetterQueue, DLQEntry, DLQStatus, dead_letter
 from .jwt_manager import JWTManager, JWTClaims, JWTError, TokenType, jwt_manager
 from .transaction_helper import TransactionHelper, TransactionConnection, transaction_helper
 from .circuit_breaker_metrics import CircuitBreakerMetricsCollector, CircuitBreakerSnapshot, circuit_breaker_metrics
-from .config_hot_reload import ConfigHotReload, ConfigChange, config_hot_reload
+from .config_hot_reload import ConfigHotReload, ConfigChange, config_hot_reload, SettingsBridge, settings_bridge
 from .immutable_audit import ImmutableAuditLog, AuditEntry, immutable_audit_log
 from .distributed_tracing import (
     DistributedTracer, Span, Trace, SpanContextManager,
@@ -38,6 +38,7 @@ __all__ = [
     "CircuitBreakerMetricsCollector", "CircuitBreakerSnapshot", "circuit_breaker_metrics",
     # Config Hot-Reload
     "ConfigHotReload", "ConfigChange", "config_hot_reload",
+    "SettingsBridge", "settings_bridge",
     # Immutable Audit
     "ImmutableAuditLog", "AuditEntry", "immutable_audit_log",
     # Distributed Tracing

@@ -575,6 +575,29 @@ class ConfigHotReload:
 - **Çözüm:** Yön belirlemede sadece `weight` kullanılıyor, skor sadece `fused_score`'a yansıyor
 - **Etki:** Daha dengeli yön kararları, tek bir yüksek skorlu sinyal diğerlerini baskılamıyor
 
+### Düzeltme 7: Config Hot-Reload → Settings Entegrasyonu (2026-08-21)
+- **Dosya:** `config_hot_reload.py`
+- **Sorun:** Hot-reload dosya tabanlı çalışıyordu ama pydantic Settings ile entegre değildi
+- **Çözüm:** `SettingsBridge` sınıfı eklendi:
+  - JSON config değişikliğini algılar
+  - Sadece güvenli alanları (interval'lar, threshold'lar, ağırlıklar) günceller
+  - Secret alanlar (SECRET_KEY, JWT_SECRET, passwords) JSON'dan yüklenmez
+  - Pydantic Settings'in immutability garantisi korunur (yeni instance)
+  - Thread-safe: atomik reference swap
+  - Rollback: hatalı config → eski settings korunur
+- **Etki:** Runtime config değişikliği artık mümkün (restart gerektirmez)
+
+### Düzeltme 8: Circuit Breaker → Prometheus HTTP Endpoint (2026-08-21)
+- **Dosya:** `api/main.py`
+- **Sorun:** `circuit_breaker_metrics.py`'de `export_prometheus()` vardı ama HTTP endpoint yoktu
+- **Çözüm:** `/metrics` endpoint eklendi:
+  - Circuit breaker state, failures, requests, uptime
+  - DLQ entries, pushed, resolved
+  - Transaction committed, rolled_back, avg_duration
+  - System state (FULL/DEGRADED/READ_ONLY/RECOVERY/SHUTDOWN)
+  - Prometheus text format (v0.0.4)
+- **Etki:** Prometheus scrape config ile doğrudan entegre edilebilir
+
 ### Düzeltme 1: Event Bus → DLQ Entegrasyonu
 - **Dosya:** `event_bus.py`
 - **Sorun:** Handler crash → event kayboluyordu

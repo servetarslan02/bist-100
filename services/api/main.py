@@ -108,6 +108,95 @@ async def health():
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus metrics endpoint.
+
+    Circuit breaker, DLQ, transaction ve system governor metriklerini
+    Prometheus text formatında export eder.
+
+    Kullanım:
+        curl http://localhost:8000/metrics
+        # veya Prometheus scrape config:
+        # scrape_configs:
+        #   - job_name: 'alpha-bist'
+        #     static_configs:
+        #       - targets: ['localhost:8000']
+    """
+    from fastapi.responses import PlainTextResponse
+    from services.core.circuit_breaker_metrics import circuit_breaker_metrics
+    from services.core.dead_letter_queue import dead_letter_queue
+    from services.core.transaction_helper import transaction_helper
+    from services.core.system_governor import system_governor
+
+    lines = []
+
+    # ═══ Circuit Breaker Metrics ═══
+    lines.append("# HELP circuit_breaker_state Circuit breaker state (0=CLOSED, 1=OPEN, 2=HALF_OPEN)")
+    lines.append("# TYPE circuit_breaker_state gauge")
+    lines.append("# HELP circuit_breaker_failures_total Total failure count")
+    lines.append("# TYPE circuit_breaker_failures_total counter")
+    lines.append("# HELP circuit_breaker_requests_total Total request count")
+    lines.append("# TYPE circuit_breaker_requests_total counter")
+    lines.append("# HELP circuit_breaker_uptime_pct Uptime percentage")
+    lines.append("# TYPE circuit_breaker_uptime_pct gauge")
+
+    for name, breaker in circuit_breaker_metrics._tracked_breakers.items():
+        state_val = {"CLOSED": 0, "OPEN": 1, "HALF_OPEN": 2}.get(
+            breaker.state.value if hasattr(breaker.state, 'value') else str(breaker.state), -1
+        )
+        total_req = getattr(breaker, '_total_requests', 0)
+        total_fail = getattr(breaker, '_total_failures', 0)
+        total_succ = getattr(breaker, '_total_successes', 0)
+        uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
+        labels = f'name="{name}"'
+        lines.append(f'circuit_breaker_state{{{labels}}} {state_val}')
+        lines.append(f'circuit_breaker_failures_total{{{labels}}} {breaker.failure_count}')
+        lines.append(f'circuit_breaker_requests_total{{{labels}}} {total_req}')
+        lines.append(f'circuit_breaker_uptime_pct{{{labels}}} {uptime:.2f}')
+
+    # ═══ DLQ Metrics ═══
+    lines.append("# HELP dlq_entries_total Total DLQ entries")
+    lines.append("# TYPE dlq_entries_total gauge")
+    lines.append("# HELP dlq_pushed_total Total events pushed to DLQ")
+    lines.append("# TYPE dlq_pushed_total counter")
+    lines.append("# HELP dlq_resolved_total Total DLQ entries resolved")
+    lines.append("# TYPE dlq_resolved_total counter")
+
+    dlq_stats = await dead_letter_queue.get_stats()
+    lines.append(f'dlq_entries_total {dlq_stats.get("total_entries", 0)}')
+    lifetime = dlq_stats.get("lifetime", {})
+    lines.append(f'dlq_pushed_total {lifetime.get("total_pushed", 0)}')
+    lines.append(f'dlq_resolved_total {lifetime.get("total_resolved", 0)}')
+
+    # ═══ Transaction Metrics ═══
+    lines.append("# HELP tx_committed_total Total committed transactions")
+    lines.append("# TYPE tx_committed_total counter")
+    lines.append("# HELP tx_rolled_back_total Total rolled back transactions")
+    lines.append("# TYPE tx_rolled_back_total counter")
+    lines.append("# HELP tx_avg_duration_ms Average transaction duration")
+    lines.append("# TYPE tx_avg_duration_ms gauge")
+
+    tx_metrics = transaction_helper.get_metrics()
+    lines.append(f'tx_committed_total {tx_metrics.get("committed", 0)}')
+    lines.append(f'tx_rolled_back_total {tx_metrics.get("rolled_back", 0)}')
+    lines.append(f'tx_avg_duration_ms {tx_metrics.get("avg_duration_ms", 0)}')
+
+    # ═══ System Governor Metrics ═══
+    lines.append("# HELP system_state Current system state (0=FULL, 1=DEGRADED, 2=READ_ONLY, 3=RECOVERY, 4=SHUTDOWN)")
+    lines.append("# TYPE system_state gauge")
+
+    state_map = {"FULL": 0, "DEGRADED": 1, "READ_ONLY": 2, "RECOVERY": 3, "SHUTDOWN": 4}
+    current_state = system_governor.get_state()
+    state_name = current_state.value if hasattr(current_state, 'value') else str(current_state)
+    lines.append(f'system_state {state_map.get(state_name, -1)}')
+
+    return PlainTextResponse(
+        "\n".join(lines) + "\n",
+        media_type="text/plain; version=0.0.4; charset=utf-8",
+    )
+
+
 @app.get("/api/status")
 async def status():
     """System status endpoint."""

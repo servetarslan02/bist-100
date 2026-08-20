@@ -20,7 +20,7 @@ import json
 import time
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Any, Callable, Tuple
+from typing import Dict, List, Optional, Any, Callable, Tuple, Set
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -304,4 +304,188 @@ class ConfigHotReload:
 
 
 # Singleton
-config_hot_reload = ConfigHotReload("config.json")
+def _create_singleton() -> "ConfigHotReload":
+    """Singleton oluştur — config.json yolunu akıllıca belirle."""
+    import os
+    # Önce çalışma dizininde, sonra proje kökünde ara
+    candidates = [
+        "config.json",
+        "config/runtime.json",
+        "config/hot_reload.json",
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            return ConfigHotReload(path)
+    # Yoksa varsayılan oluştur (start() zamanında yaratılacak)
+    return ConfigHotReload("config/runtime.json")
+
+config_hot_reload = _create_singleton()
+
+
+# ═══════════════════════════════════════════════════════════
+# Settings Bridge — Pydantic Settings + Hot-Reload Entegrasyonu
+# ═══════════════════════════════════════════════════════════
+
+class SettingsBridge:
+    """
+    Pydantic Settings + Config Hot-Reload köprüsü.
+
+    Problem: Pydantic Settings immutable (değiştirilemez).
+    Çözüm: Hot-reload callback'i yeni Settings instance oluşturur
+    ve global settings referansını günceller.
+
+    Güvenlik:
+    - Secret'lar (SECRET_KEY, JWT_SECRET, passwords) JSON'dan DEĞİL,
+      sadece environment variable'dan okunur.
+    - JSON config sadece runtime-adjustable ayarları içerir:
+      interval'lar, threshold'lar, ağırlıklar, feature flag'ler.
+    - Production'da hassas alanlar JSON'dan yüklenmez.
+
+    Kullanım:
+        bridge = SettingsBridge()
+        bridge.start_watching()  # Arka planda izleme başlat
+        bridge.stop_watching()   # İzlemeyi durdur
+
+    Mathematiksel gerekçe:
+    - Pydantic Settings'in immutability garantisi korunur (yeni instance)
+    - Thread-safe: settings atomik olarak değiştirilir (reference swap)
+    - Rollback: hatalı config → eski settings korunur
+    """
+
+    # JSON'dan yüklenebilecek güvenli alanlar (secret olmayan)
+    _SAFE_FIELDS = {
+        "app_debug", "app_host", "app_port",
+        "interval_feature_calculation", "interval_live_inference",
+        "interval_health_check", "interval_market_data", "interval_ranking",
+        "breadth_mcclellan_ema_short", "breadth_mcclellan_ema_long",
+        "breadth_thrust_threshold", "breadth_liquidity_volume_min",
+        "regime_hmm_weight", "regime_score_weight", "regime_gmm_weight",
+        "regime_rolling_window", "regime_confidence_min",
+        "regime_transition_stability_window",
+        "risk_appetite_breadth_weight", "risk_appetite_momentum_weight",
+        "risk_appetite_volatility_weight", "risk_appetite_rsi_weight",
+        "risk_appetite_sentiment_weight", "risk_appetite_macro_weight",
+        "multi_tf_intraday_interval", "multi_tf_daily_interval",
+        "multi_tf_weekly_interval", "multi_tf_monthly_interval",
+        "liquidity_spread_threshold", "liquidity_volume_participation_min",
+        "sentiment_news_weight", "sentiment_social_weight",
+        "sentiment_options_weight",
+        "db_pool_min", "db_pool_max", "db_command_timeout",
+    }
+
+    # Secret alanlar — ASLA JSON'dan yüklenmez
+    _SECRET_FIELDS = {
+        "secret_key", "jwt_secret", "postgres_password",
+        "redis_password", "clickhouse_password",
+        "broker_api_key", "broker_api_secret",
+        "tcmb_evds_api_key", "news_api_key", "alpha_vantage_key",
+        "kap_api_key",
+    }
+
+    def __init__(self, reloader: Optional["ConfigHotReload"] = None):
+        self._reloader = reloader or config_hot_reload
+        self._watching = False
+        self._settings_history: List[Tuple[datetime, Dict[str, Any]]] = []
+        self._max_history = 50
+
+    def start_watching(self):
+        """Hot-reload izlemeyi başlat."""
+        if self._watching:
+            return
+
+        # Validator ekle: secret alanlar JSON'da varsa reddet
+        self._reloader.add_validator(self._validate_no_secrets)
+
+        # Callback ekle: Settings güncelle
+        self._reloader.on_change(self._on_config_change)
+
+        self._watching = True
+        logger.info("SettingsBridge started — watching for runtime config changes")
+
+    def stop_watching(self):
+        """İzlemeyi durdur."""
+        self._watching = False
+        logger.info("SettingsBridge stopped")
+
+    def _validate_no_secrets(self, config: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+        """JSON config'de secret alan varsa reddet."""
+        for key in config:
+            if key.lower() in self._SECRET_FIELDS:
+                return False, f"Secret field '{key}' not allowed in JSON config. Use environment variables."
+        return True, None
+
+    async def _on_config_change(
+        self,
+        old_config: Dict[str, Any],
+        new_config: Dict[str, Any],
+        changed_keys: List[str],
+    ):
+        """Config değişikliğinde Settings güncelle."""
+        import services.core.config as config_module
+
+        # Sadece güvenli alanları filtrele
+        safe_changes = {
+            k: v for k, v in new_config.items()
+            if k.lower() in self._SAFE_FIELDS
+        }
+
+        if not safe_changes:
+            logger.info("No safe fields to update in Settings")
+            return
+
+        try:
+            # Mevcut settings'i dict'e çevir
+            old_settings_dict = config_module.settings.model_dump()
+
+            # Değişiklikleri uygula (sadece güvenli alanlar)
+            merged = {**old_settings_dict, **safe_changes}
+
+            # Yeni Settings instance oluştur (pydantic immutable garantisi)
+            new_settings = config_module.Settings(**merged)
+
+            # Global settings referansını güncelle (atomik swap)
+            old_ref = config_module.settings
+            config_module.settings = new_settings
+
+            # modül seviyesinde de güncelle
+            config_module.get_settings = lambda: new_settings
+
+            # Geçmişe kaydet
+            self._settings_history.append((datetime.now(timezone.utc), safe_changes))
+            if len(self._settings_history) > self._max_history:
+                self._settings_history = self._settings_history[-self._max_history:]
+
+            logger.info(
+                "Settings updated via hot-reload",
+                changed_keys=list(safe_changes.keys()),
+                n_changes=len(safe_changes),
+            )
+
+        except Exception as e:
+            logger.error(
+                "Settings hot-reload failed, keeping old settings",
+                error=str(e),
+                changed_keys=changed_keys,
+            )
+            # Rollback: eski settings korunur (zaten değiştirilmedi)
+
+    def get_settings_history(self) -> List[Dict[str, Any]]:
+        """Settings değişiklik geçmişi."""
+        return [
+            {"timestamp": ts.isoformat(), "changes": changes}
+            for ts, changes in self._settings_history
+        ]
+
+    @staticmethod
+    def get_safe_fields() -> set:
+        """JSON'dan yüklenebilecek güvenli alanlar."""
+        return SettingsBridge._SAFE_FIELDS.copy()
+
+    @staticmethod
+    def get_secret_fields() -> set:
+        """Secret alanlar (JSON'dan yüklenemez)."""
+        return SettingsBridge._SECRET_FIELDS.copy()
+
+
+# Singleton
+settings_bridge = SettingsBridge()
