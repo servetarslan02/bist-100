@@ -27,6 +27,7 @@ from .bkm_adapter import bkm_adapter
 from .kariyer_net import kariyer_net_adapter
 from .eksi_sozluk import eksi_sozluk_adapter
 from .investing_adapter import investing_adapter
+from .satellite_adapter import satellite_adapter
 from .llm_sentiment import llm_sentiment
 from .reconciliation import reconciler
 from .feature_store import feature_store
@@ -58,6 +59,7 @@ class AlternativeFeatureEngine:
         adapter_registry.register(kariyer_net_adapter)
         adapter_registry.register(eksi_sozluk_adapter)
         adapter_registry.register(investing_adapter)
+        adapter_registry.register(satellite_adapter)
 
         self._initialized = True
         logger.info(
@@ -247,6 +249,10 @@ class AlternativeFeatureEngine:
             # Investing.com
             "investing_sentiment", "investing_volume", "investing_positive_ratio",
             "investing_negative_ratio", "investing_sentiment_std", "investing_technical_rating",
+            # Satellite
+            "sat_factory_activity", "sat_factory_ndvi", "sat_warehouse_activity",
+            "sat_airport_activity", "sat_office_activity",
+            "sat_ndvi_avg", "sat_ndbi_avg", "sat_activity_index", "sat_location_count",
             # Reconciliation
             "alt_reliability_score", "alt_consensus_score", "alt_source_count",
             # Composite

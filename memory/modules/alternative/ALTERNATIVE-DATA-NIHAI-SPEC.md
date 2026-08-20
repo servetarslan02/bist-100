@@ -595,7 +595,7 @@ class KariyerNetAdapter:
 |-------------|-------|---------------|-----|
 | Data Collection Pipeline | ✅ TAM | `base.py` | BaseAdapter + RateLimiter + CircuitBreaker + DataQuality |
 | Google Trends Adapter | ✅ TAM | `google_trends.py` | pytrends, 9 feature, BIST ticker mapping |
-| BKM Credit Card | ⚠️ KISMİ | `bkm_adapter.py` | Adapter yapısı var, veri kaynağı bağlanmamış (honest gap) |
+| BKM Credit Card | ✅ TAM | `bkm_adapter.py` | Web scraping + HTML parsing + Türkçe sayı formatı |
 | Kariyer.net Scraper | ✅ TAM | `kariyer_net.py` | Web scraping + tech/mgmt/remote ratio |
 | Ekşi Sözlük Scraper | ✅ TAM | `eksi_sozluk.py` | Web scraping + keyword sentiment + favorites |
 | Investing.com | ✅ TAM | `investing_adapter.py` | Web scraping + sentiment + technical rating |
@@ -604,11 +604,11 @@ class KariyerNetAdapter:
 | Cross-Source Reconciliation | ✅ TAM | `reconciliation.py` | Consensus + reliability + discrepancy detection |
 | Feature Store | ✅ TAM | `feature_store.py` | Versioning + point-in-time + persistence |
 | Feature Engine | ✅ TAM | `feature_engine.py` | 60+ feature, paralel toplama, composite features |
-| Satellite Imagery | ⚠️ KISMİ | `satellite.py` | Legacy feature fonksiyonu, Sentinel-2 entegrasyonu yok |
+| Satellite Imagery | ✅ TAM | `satellite_adapter.py` | Sentinel-2 NDVI/NDBI + Copernicus API + şirket lokasyon mapping |
 | Social Features | ✅ TAM | `social.py` | 10+ feature, platform breakdown |
 | Web Features | ✅ TAM | `web_scraping.py` | 6 feature |
 
-**Toplam: 12/14 TAM, 2/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
+**Toplam: 14/14 TAM, 0/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
 
 ### 8.2 Düzeltilen Bug'lar (2026-08-20)
 

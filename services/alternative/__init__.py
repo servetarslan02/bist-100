@@ -31,6 +31,7 @@ from .bkm_adapter import BKMAdapter, bkm_adapter
 from .kariyer_net import KariyerNetAdapter, kariyer_net_adapter
 from .eksi_sozluk import EksiSozlukAdapter, eksi_sozluk_adapter
 from .investing_adapter import InvestingAdapter, investing_adapter
+from .satellite_adapter import SatelliteAdapter, satellite_adapter
 
 # === LLM Sentiment ===
 from .llm_sentiment import LLMSentimentAnalyzer, llm_sentiment
@@ -62,6 +63,7 @@ __all__ = [
     "KariyerNetAdapter", "kariyer_net_adapter",
     "EksiSozlukAdapter", "eksi_sozluk_adapter",
     "InvestingAdapter", "investing_adapter",
+    "SatelliteAdapter", "satellite_adapter",
     # LLM
     "LLMSentimentAnalyzer", "llm_sentiment",
     # Reconciliation

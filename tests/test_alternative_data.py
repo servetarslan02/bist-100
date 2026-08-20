@@ -21,6 +21,7 @@ from services.alternative import (
     KariyerNetAdapter, kariyer_net_adapter,
     EksiSozlukAdapter, eksi_sozluk_adapter,
     InvestingAdapter, investing_adapter,
+    SatelliteAdapter, satellite_adapter,
     LLMSentimentAnalyzer, llm_sentiment,
     CrossSourceReconciler, ReconciliationReport, reconciler,
     FeatureStore, FeatureManifest, feature_store,
@@ -493,6 +494,54 @@ class TestFaz5_InvestingAdapter:
     def test_basic_sentiment(self):
         assert investing_adapter._basic_sentiment("yükseliş güçlü al") > 0
         assert investing_adapter._basic_sentiment("düşüş riski sat") < 0
+
+
+class TestFaz5_SatelliteAdapter:
+    """Sentinel-2 satellite adapter test'leri."""
+
+    def test_source_name(self):
+        assert satellite_adapter.source_name == "satellite"
+
+    def test_compute_features_empty(self):
+        features = satellite_adapter.compute_features({}, "THYAO")
+        assert features == {}
+
+    def test_compute_features_valid(self):
+        data = {
+            "locations": {
+                "IST Airport": {
+                    "ndvi_mean": 0.35,
+                    "ndbi_mean": 0.15,
+                    "location_type": "airport",
+                },
+            },
+        }
+        features = satellite_adapter.compute_features(data, "THYAO")
+        assert "sat_ndvi_avg" in features
+        assert "sat_activity_index" in features
+        assert "sat_airport_activity" in features
+        assert abs(features["sat_activity_index"] - 0.20) < 0.01
+
+    def test_compute_features_factory(self):
+        data = {
+            "locations": {
+                "Erdemir": {
+                    "ndvi_mean": 0.25,
+                    "ndbi_mean": 0.30,
+                    "location_type": "factory",
+                },
+            },
+        }
+        features = satellite_adapter.compute_features(data, "EREGL")
+        assert "sat_factory_activity" in features
+        assert features["sat_factory_activity"] < 0  # ndbi > ndvi = negative
+
+    def test_company_locations(self):
+        """Önemli şirketlerin lokasyon tanımları olmalı."""
+        from services.alternative.satellite_adapter import COMPANY_LOCATIONS
+        assert "THYAO" in COMPANY_LOCATIONS
+        assert "EREGL" in COMPANY_LOCATIONS
+        assert "ASELS" in COMPANY_LOCATIONS
 
 
 class TestFaz5_Reconciliation:
