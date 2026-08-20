@@ -257,8 +257,7 @@ class DataQualityValidator:
                     else:
                         checks_passed += 1
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="base.py:259")
-                pass
+                logger.debug("Staleness check parse error", error=str(e))
 
         # Score hesapla
         total_checks = checks_passed + checks_failed

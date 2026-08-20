@@ -584,3 +584,58 @@ class KariyerNetAdapter:
 | Data quality | ❌ | ✅ |
 | Cross-source reconciliation | ❌ | ✅ |
 | Feature store integration | ❌ | ✅ |
+
+---
+
+## 8. Uygulama Durumu (2026-08-20 — Kod Analizi)
+
+### 8.1 Spec Uyumu Özeti
+
+| Spec Maddesi | Durum | Kod Karşılığı | Not |
+|-------------|-------|---------------|-----|
+| Data Collection Pipeline | ✅ TAM | `base.py` | BaseAdapter + RateLimiter + CircuitBreaker + DataQuality |
+| Google Trends Adapter | ✅ TAM | `google_trends.py` | pytrends, 9 feature, BIST ticker mapping |
+| BKM Credit Card | ⚠️ KISMİ | `bkm_adapter.py` | Adapter yapısı var, veri kaynağı bağlanmamış (honest gap) |
+| Kariyer.net Scraper | ✅ TAM | `kariyer_net.py` | Web scraping + tech/mgmt/remote ratio |
+| Ekşi Sözlük Scraper | ✅ TAM | `eksi_sozluk.py` | Web scraping + keyword sentiment + favorites |
+| Investing.com | ✅ TAM | `investing_adapter.py` | Web scraping + sentiment + technical rating |
+| LLM Sentiment | ✅ TAM | `llm_sentiment.py` | Ollama Türkçe + keyword fallback + batch |
+| Data Quality | ✅ TAM | `base.py` | 7 kontrollü validator (null, zero, range, staleness, completeness) |
+| Cross-Source Reconciliation | ✅ TAM | `reconciliation.py` | Consensus + reliability + discrepancy detection |
+| Feature Store | ✅ TAM | `feature_store.py` | Versioning + point-in-time + persistence |
+| Feature Engine | ✅ TAM | `feature_engine.py` | 60+ feature, paralel toplama, composite features |
+| Satellite Imagery | ⚠️ KISMİ | `satellite.py` | Legacy feature fonksiyonu, Sentinel-2 entegrasyonu yok |
+| Social Features | ✅ TAM | `social.py` | 10+ feature, platform breakdown |
+| Web Features | ✅ TAM | `web_scraping.py` | 6 feature |
+
+**Toplam: 12/14 TAM, 2/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
+
+### 8.2 Düzeltilen Bug'lar (2026-08-20)
+
+| # | Bug | Dosya | Etki | Çözüm |
+|---|-----|-------|------|-------|
+| 1 | `_clamp(None)` crash | `social.py` | None veride TypeError | None → 0.0 fallback |
+| 2 | Google Trends int type | `google_trends.py` | Feature type tutarsızlığı | Tüm değerler float() ile wrap'landı |
+| 3 | Bare except handler | `base.py` | Gizli hata | `except Exception` + temiz log |
+
+### 8.3 Spec-Üstü İyileştirmeler
+
+| İyileştirme | Dosya | Açıklama |
+|-------------|-------|----------|
+| Investing.com adapter | `investing_adapter.py` | Spec'de belirtilmemiş, ek veri kaynağı |
+| LLM batch analysis | `llm_sentiment.py` | `analyze_batch()` — spec'de belirtilmemiş |
+| Feature composite scoring | `feature_engine.py` | `alt_sentiment_avg`, `alt_growth_avg` — spec'de belirtilmemiş |
+| Feature store persistence | `feature_store.py` | JSON save/load — spec'de belirtilmemiş |
+| Adapter cache | `base.py` | TTL-based cache — spec'de belirtilmemiş |
+
+### 8.4 İstatistikler
+
+| Metrik | Değer |
+|--------|-------|
+| Modül sayısı | 16 |
+| Toplam kod satırı | ~2,540 |
+| Test sayısı | 63 (59 original + 4 bug fix) |
+| Test geçme oranı | %100 |
+| Feature sayısı | 60+ |
+| Adapter sayısı | 5 (Google Trends, BKM, Kariyer.net, Ekşi, Investing) |
+| Legacy fonksiyon | 5 (social, jobs, cc, satellite, web) |

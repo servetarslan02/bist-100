@@ -604,6 +604,59 @@ class TestFaz5_Integration:
         assert "social_volume" in features
 
 
+class TestBugFixes:
+    """Düzeltilen bug'lar için test'ler."""
+
+    def test_clamp_none_handling(self):
+        """_clamp(None) crash yapmamalı."""
+        from services.alternative.social import _clamp
+        assert _clamp(None, -1, 1) == 0.0
+        assert _clamp(0.5, -1, 1) == 0.5
+        assert _clamp(2.0, -1, 1) == 1.0
+        assert _clamp(-2.0, -1, 1) == -1.0
+
+    def test_google_trends_float_types(self):
+        """Google Trends feature'ları float olmalı."""
+        data = {
+            "score": 75,
+            "avg_30d": 60,
+            "momentum_7d": 10,
+            "momentum_30d": 15,
+            "volatility": 12,
+            "percentile_90": 85,
+            "trend_direction": 1.0,
+        }
+        features = google_trends_adapter.compute_features(data, "THYAO")
+        for k, v in features.items():
+            assert isinstance(v, float), f"{k} should be float, got {type(v).__name__}"
+
+    def test_compute_features_contract(self):
+        """Tüm adapter'lar Dict[str, float} döndürmeli."""
+        adapters = [
+            (bkm_adapter, {}),
+            (google_trends_adapter, {}),
+            (kariyer_net_adapter, {}),
+            (eksi_sozluk_adapter, {}),
+            (investing_adapter, {}),
+        ]
+        for adapter, empty_data in adapters:
+            result = adapter.compute_features(empty_data, "THYAO")
+            assert isinstance(result, dict), f"{adapter.source_name} should return dict"
+            for k, v in result.items():
+                assert isinstance(v, (int, float)), f"{adapter.source_name}.{k} should be numeric"
+
+    @pytest.mark.asyncio
+    async def test_feature_engine_compute(self):
+        """Feature engine çalışmalı (boş veri ile)."""
+        engine = AlternativeFeatureEngine()
+        engine.initialize()
+        # Boş veri ile çalışmalı, crash yapmamalı
+        features = await engine.compute_all_features("THYAO")
+        assert isinstance(features, dict)
+        # En azından composite features olmalı
+        assert "alt_data_coverage" in features
+
+
 # =====================================================
 # MAIN
 # =====================================================

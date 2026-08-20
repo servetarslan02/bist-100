@@ -117,13 +117,13 @@ class GoogleTrendsAdapter(BaseAdapter):
                 "avg_7d": float(np.mean(values[-7:])),
                 "avg_30d": float(np.mean(values[-30:])) if len(values) >= 30 else float(np.mean(values)),
                 "momentum_7d": float(values[-1] - values[-7]),
-                "momentum_30d": float(values[-1] - values[-30]) if len(values) >= 30 else 0,
+                "momentum_30d": float(values[-1] - values[-30]) if len(values) >= 30 else 0.0,
                 "percentile_90": float(np.percentile(values, 90)),
                 "volatility": float(np.std(values)),
                 "max_90d": float(np.max(values)),
                 "min_90d": float(np.min(values)),
                 "trend_direction": 1.0 if values[-1] > values[-7] else -1.0,
-                "data_points": len(values),
+                "data_points": int(len(values)),
                 "timestamp": str(interest.index[-1]),
             }
         except Exception as e:
@@ -142,15 +142,15 @@ class GoogleTrendsAdapter(BaseAdapter):
         percentile_90 = data.get("percentile_90", 0)
 
         features = {
-            "google_trends_score": score,
-            "google_trends_avg_30d": avg_30d,
-            "google_trends_momentum_7d": data.get("momentum_7d", 0),
-            "google_trends_momentum_30d": momentum_30d,
-            "google_trends_volatility": volatility,
-            "google_trends_percentile": percentile_90,
-            "google_trends_relative": score / max(percentile_90, 1),  # 0-1 arası normalize
-            "google_trends_trend": data.get("trend_direction", 0),
-            "google_trends_zscore": (score - avg_30d) / max(volatility, 1) if volatility > 0 else 0,
+            "google_trends_score": float(score),
+            "google_trends_avg_30d": float(avg_30d),
+            "google_trends_momentum_7d": float(data.get("momentum_7d", 0)),
+            "google_trends_momentum_30d": float(momentum_30d),
+            "google_trends_volatility": float(volatility),
+            "google_trends_percentile": float(percentile_90),
+            "google_trends_relative": float(score / max(percentile_90, 1)),
+            "google_trends_trend": float(data.get("trend_direction", 0)),
+            "google_trends_zscore": float((score - avg_30d) / max(volatility, 1)) if volatility > 0 else 0.0,
         }
 
         return features

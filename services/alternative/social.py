@@ -62,4 +62,6 @@ def compute_social_features(social_data: Dict[str, Any], ticker: str) -> Dict[st
 
 def _clamp(value: float, min_val: float, max_val: float) -> float:
     """Değeri sınırla."""
+    if value is None:
+        return 0.0
     return max(min_val, min(max_val, float(value)))
