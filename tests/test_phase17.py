@@ -77,7 +77,7 @@ def test_observability():
     assert summary["total_cost_usd"] == 0.045
     assert summary["total_entries"] == 2
     passed += 1
-    print(f"  ✓ Cost: \${summary['total_cost_usd']}")
+    print(f"  ✓ Cost: ${summary['total_cost_usd']}")
 
     # 7. Config manager
     config_manager._config.clear()
