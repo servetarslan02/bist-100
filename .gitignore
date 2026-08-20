@@ -53,3 +53,4 @@ Thumbs.db
 docker-compose.override.yml
 data/universe_cache.json
 .alpha_checkpoints/
+catboost_info/
