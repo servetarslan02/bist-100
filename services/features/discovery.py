@@ -47,50 +47,29 @@ class FeatureDiscoveryEngine:
         self,
         features: Dict[str, List[float]],
         max_interactions: int = 500,
+        top_k_for_interactions: int = 30,
     ) -> List[DiscoveredFeature]:
-        """Feature interaction'ları üret.
+        """Feature interaction'ları üret — akıllı filtreleme ile.
+
+        Matematiksel yaklaşım:
+        1. Tüm feature'lar için lag features (düşük maliyet)
+        2. Varyans filtreleme → düşük varyanslı feature'ları ele
+        3. Sadece en önemli top-K feature için pairwise interaction üret
+        4. Top-K ile O(K²) = O(900) — O(N²) = O(4950) yerine
 
         Args:
-            features: {"rsi_14": [50, 55, 60, ...], "momentum_20d": [3, 5, 7, ...], ...}
+            features: {"rsi_14": [50, 55, 60, ...], ...}
+            max_interactions: Maksimum toplam candidate
+            top_k_for_interactions: Interaction için kullanılacak top feature sayısı
         """
         discovered = []
         feature_names = list(features.keys())
+        n = len(feature_names)
 
-        # Pairwise products
-        for i in range(len(feature_names)):
-            for j in range(i + 1, len(feature_names)):
-                f1, f2 = feature_names[i], feature_names[j]
-                discovered.append(DiscoveredFeature(
-                    name=f"{f1}_x_{f2}",
-                    formula=f"{f1} * {f2}",
-                    category="interaction",
-                    source_features=[f1, f2],
-                ))
+        if n == 0:
+            return discovered
 
-        # Ratios
-        for i in range(len(feature_names)):
-            for j in range(len(feature_names)):
-                if i != j:
-                    f1, f2 = feature_names[i], feature_names[j]
-                    discovered.append(DiscoveredFeature(
-                        name=f"{f1}_div_{f2}",
-                        formula=f"{f1} / {f2}",
-                        category="ratio",
-                        source_features=[f1, f2],
-                    ))
-
-        # Differences
-        for i in range(len(feature_names)):
-            for j in range(i + 1, len(feature_names)):
-                f1, f2 = feature_names[i], feature_names[j]
-                discovered.append(DiscoveredFeature(
-                    name=f"{f1}_minus_{f2}",
-                    formula=f"{f1} - {f2}",
-                    category="difference",
-                    source_features=[f1, f2],
-                ))
-
-        # Lag features
+        # ━━━ STEP 1: Lag features (tüm feature'lar için — düşük maliyet) ━━━
         for f in feature_names:
             for lag in [1, 2, 5]:
                 discovered.append(DiscoveredFeature(
@@ -100,10 +79,92 @@ class FeatureDiscoveryEngine:
                     source_features=[f],
                 ))
 
-        # Limit
-        discovered = discovered[:max_interactions]
+        # ━━━ STEP 2: Varyans filtreleme ━━━
+        variances = {}
+        for name, values in features.items():
+            if len(values) > 1:
+                v = np.array(values, dtype=float)
+                v = v[~np.isnan(v)]
+                if len(v) > 1:
+                    variances[name] = float(np.var(v))
 
-        logger.info("Feature interactions generated", total=len(discovered))
+        if not variances:
+            logger.info("No valid features for interaction generation")
+            return discovered
+
+        # Varyansa göre sırala (yüksek varyans = daha bilgilendirici)
+        sorted_by_var = sorted(variances.items(), key=lambda x: x[1], reverse=True)
+
+        # Sıfır/aşırı düşük varyanslı feature'ları ele
+        median_var = np.median([v for _, v in sorted_by_var])
+        valid_features = [
+            name for name, var in sorted_by_var
+            if var > median_var * 0.01  # Median'ın %1'inden yüksek varyans
+        ]
+
+        # ━━━ STEP 3: Top-K feature seç (varyansa göre) ━━━
+        top_k = valid_features[:top_k_for_interactions]
+
+        logger.info(
+            "Interaction generation: variance filter",
+            total=n,
+            valid=len(valid_features),
+            top_k=len(top_k),
+        )
+
+        # ━━━ STEP 4: Pairwise interactions (sadece top-K için) ━━━
+        # Products: C(K, 2) = K*(K-1)/2
+        for i in range(len(top_k)):
+            for j in range(i + 1, len(top_k)):
+                f1, f2 = top_k[i], top_k[j]
+                discovered.append(DiscoveredFeature(
+                    name=f"{f1}_x_{f2}",
+                    formula=f"{f1} * {f2}",
+                    category="interaction",
+                    source_features=[f1, f2],
+                ))
+
+        # Ratios: sadece top-K'in ilk 15'i arası (daha agresif filtre)
+        ratio_k = min(15, len(top_k))
+        for i in range(ratio_k):
+            for j in range(ratio_k):
+                if i != j:
+                    f1, f2 = top_k[i], top_k[j]
+                    discovered.append(DiscoveredFeature(
+                        name=f"{f1}_div_{f2}",
+                        formula=f"{f1} / {f2}",
+                        category="ratio",
+                        source_features=[f1, f2],
+                    ))
+
+        # Differences: sadece top-K'in ilk 10'u arası
+        diff_k = min(10, len(top_k))
+        for i in range(diff_k):
+            for j in range(i + 1, diff_k):
+                f1, f2 = top_k[i], top_k[j]
+                discovered.append(DiscoveredFeature(
+                    name=f"{f1}_minus_{f2}",
+                    formula=f"{f1} - {f2}",
+                    category="difference",
+                    source_features=[f1, f2],
+                ))
+
+        # ━━━ STEP 5: Hard cap ━━━
+        if len(discovered) > max_interactions:
+            # Lag'leri koru, interaction'ları kırp
+            lags = [d for d in discovered if d.category == "lag"]
+            others = [d for d in discovered if d.category != "lag"]
+            remaining = max_interactions - len(lags)
+            discovered = lags + others[:max(0, remaining)]
+
+        logger.info(
+            "Feature interactions generated",
+            total=len(discovered),
+            lags=sum(1 for d in discovered if d.category == "lag"),
+            interactions=sum(1 for d in discovered if d.category == "interaction"),
+            ratios=sum(1 for d in discovered if d.category == "ratio"),
+            differences=sum(1 for d in discovered if d.category == "difference"),
+        )
         return discovered
 
     def compute_interaction_values(

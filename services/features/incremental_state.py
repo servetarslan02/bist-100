@@ -1,13 +1,10 @@
-"""ALPHA BIST - Incremental Feature State v1.2
+"""ALPHA BIST - Incremental Feature State v1.3
 
+v1.3: Bar aggregation artık bar_engine.py'den kullanılıyor (kod tekrarı kaldırıldı).
 v1.2 Düzeltmeler:
 - ATR: completed bar'dan güncellenir, tick'ten değil
-- 5m aggregation: zaman bazlı bucket (timestamp bucket)
-- Daily bars: doğru aggregation
-- return_1d: günlük return (tick-to-tick değil)
-- momentum_5d/20d: timeframe bazlı
-- MACD signal: gerçek 9-period EMA
 - RSI: tek canonical Wilder implementation
+- MACD signal: gerçek 9-period EMA
 """
 
 import numpy as np
@@ -17,91 +14,9 @@ from datetime import datetime, timezone, timedelta
 from collections import deque
 import structlog
 
+from .bar_engine import BarEngine, Bar
+
 logger = structlog.get_logger()
-
-
-@dataclass
-class OHLCBar:
-    """Tek bir OHLC bar."""
-    timestamp: datetime
-    open: float
-    high: float
-    low: float
-    close: float
-    volume: int
-    trade_count: int = 0
-    vwap: float = 0.0
-    is_complete: bool = False
-
-
-@dataclass
-class TimeframeState:
-    """Belirli bir timeframe için state (1m, 5m, 15m, 1h, 1d)."""
-    timeframe: str
-    bar_duration: timedelta
-    current_bar: Optional[OHLCBar] = None
-    completed_bars: deque = field(default_factory=lambda: deque(maxlen=252))
-
-    def process_tick(self, price: float, volume: int, timestamp: datetime) -> Optional[OHLCBar]:
-        """Tick işle, gerekirse bar tamamla ve döndür."""
-        # Bar bucket timestamp
-        if self.bar_duration.total_seconds() >= 86400:
-            # Daily: günün başı
-            bar_ts = timestamp.replace(hour=0, minute=0, second=0, microsecond=0)
-        elif self.bar_duration.total_seconds() >= 3600:
-            # Hourly: saatin başı
-            bar_ts = timestamp.replace(minute=0, second=0, microsecond=0)
-        else:
-            # Minute-based: dakika bucket
-            total_seconds = timestamp.hour * 3600 + timestamp.minute * 60 + timestamp.second
-            bucket_seconds = int(self.bar_duration.total_seconds())
-            bucketed = (total_seconds // bucket_seconds) * bucket_seconds
-            bar_ts = timestamp.replace(
-                hour=bucketed // 3600,
-                minute=(bucketed % 3600) // 60,
-                second=bucketed % 60,
-                microsecond=0,
-            )
-
-        completed_bar = None
-
-        if self.current_bar is None:
-            # İlk bar
-            self.current_bar = OHLCBar(
-                timestamp=bar_ts, open=price, high=price, low=price,
-                close=price, volume=volume, trade_count=1, vwap=price,
-            )
-        elif bar_ts > self.current_bar.timestamp:
-            # Yeni bar zamanı → eski bar'ı tamamla
-            self.current_bar.is_complete = True
-            completed_bar = self.current_bar
-            self.completed_bars.append(self.current_bar)
-
-            # Yeni bar başlat
-            self.current_bar = OHLCBar(
-                timestamp=bar_ts, open=price, high=price, low=price,
-                close=price, volume=volume, trade_count=1, vwap=price,
-            )
-        else:
-            # Aynı bar içinde → güncelle
-            self.current_bar.high = max(self.current_bar.high, price)
-            self.current_bar.low = min(self.current_bar.low, price)
-            self.current_bar.close = price
-            self.current_bar.volume += volume
-            self.current_bar.trade_count += 1
-            total_val = self.current_bar.vwap * (self.current_bar.volume - volume) + price * volume
-            self.current_bar.vwap = total_val / self.current_bar.volume if self.current_bar.volume > 0 else price
-
-        return completed_bar
-
-    def get_all_bars(self) -> List[OHLCBar]:
-        """Tüm tamamlanmış bar'ları döndür."""
-        return list(self.completed_bars)
-
-    def get_last_n_bars(self, n: int) -> List[OHLCBar]:
-        """Son n tamamlanmış bar'ı döndür."""
-        bars = list(self.completed_bars)
-        return bars[-n:] if len(bars) >= n else bars
 
 
 @dataclass
@@ -117,12 +32,12 @@ class IncrementalAssetState:
     previous_price: float = 0.0
     previous_close_daily: float = 0.0  # Önceki günün kapanış fiyatı
 
-    # Timeframe states (zaman bazlı bar aggregation)
-    tf_1m: TimeframeState = field(default_factory=lambda: TimeframeState("1m", timedelta(minutes=1)))
-    tf_5m: TimeframeState = field(default_factory=lambda: TimeframeState("5m", timedelta(minutes=5)))
-    tf_15m: TimeframeState = field(default_factory=lambda: TimeframeState("15m", timedelta(minutes=15)))
-    tf_1h: TimeframeState = field(default_factory=lambda: TimeframeState("1h", timedelta(hours=1)))
-    tf_1d: TimeframeState = field(default_factory=lambda: TimeframeState("1d", timedelta(days=1)))
+    # Bar engine (bar_engine.py'den — kod tekrarı yok)
+    _bar_engine: Any = field(default=None, repr=False)
+
+    def __post_init__(self):
+        if self._bar_engine is None:
+            self._bar_engine = BarEngine(self.ticker)
 
     # Incremental RSI (Wilder's smoothing — tek canonical implementation)
     rsi_14: float = 50.0
@@ -152,31 +67,27 @@ class IncrementalAssetState:
 
     def process_tick(self, price: float, volume: int, timestamp: datetime):
         """
-        Yeni tick → tüm timeframe'leri güncelle.
+        Yeni tick → bar_engine ile bar'ları güncelle.
         Tamamlanan bar'lar → indicator güncelleme.
         """
         self.previous_price = self.price
         self.price = price
         self.last_update = timestamp
 
-        # Her timeframe için tick'i işle
-        for tf in [self.tf_1m, self.tf_5m, self.tf_15m, self.tf_1h, self.tf_1d]:
-            completed_bar = tf.process_tick(price, volume, timestamp)
+        # Bar engine ile tick'i işle → completed bar'ları al
+        completed = self._bar_engine.process_tick(price, volume, timestamp)
 
-            # 1m bar tamamlandı → RSI, EMA güncelle
-            if tf == self.tf_1m and completed_bar:
-                # RSI: bar'lar arası değişim (tick'ten değil)
-                self._update_rsi(completed_bar.close)
-                self._last_bar_close = completed_bar.close
-                self._update_ema(completed_bar.close)
-
-            # 1m bar tamamlandı → ATR güncelle (completed bar'dan)
-            if tf == self.tf_1m and completed_bar:
-                self._update_atr_from_bar(completed_bar)
+        for tf_name, bar in completed:
+            # 1m bar tamamlandı → RSI, EMA, ATR güncelle
+            if tf_name == "1m":
+                self._update_rsi(bar.close)
+                self._last_bar_close = bar.close
+                self._update_ema(bar.close)
+                self._update_atr_from_bar(bar)
 
             # 1d bar tamamlandı → günlük referans fiyat güncelle
-            if tf == self.tf_1d and completed_bar:
-                self.previous_close_daily = completed_bar.close
+            if tf_name == "1d":
+                self.previous_close_daily = bar.close
 
         # Volume history
         self._volume_history.append(volume)
@@ -243,7 +154,7 @@ class IncrementalAssetState:
     # ATR — Tamamlanmış Bar'lardan (Wilder's)
     # =====================================================
 
-    def _update_atr_from_bar(self, bar: OHLCBar):
+    def _update_atr_from_bar(self, bar):
         """ATR güncelle — completed bar'dan, tick'ten değil."""
         if self.previous_price == 0:
             # İlk bar, TR hesaplanamaz
@@ -308,8 +219,8 @@ class IncrementalAssetState:
             if vol_std > 0:
                 features["volume_zscore"] = (vol_arr[-1] - features["volume_avg"]) / vol_std
 
-        # Momentum from completed bars
-        bars_1d = self.tf_1d.get_all_bars()
+        # Momentum from completed bars (bar_engine'den)
+        bars_1d = self._bar_engine.get_bars("1d")
         if len(bars_1d) >= 5:
             features["momentum_5d"] = (bars_1d[-1].close / bars_1d[-5].close - 1) * 100
         if len(bars_1d) >= 20:

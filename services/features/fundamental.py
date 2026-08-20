@@ -78,9 +78,48 @@ class FundamentalFeatureEngine:
 
         return features
 
+    @staticmethod
+    def _detect_format(fundamentals: Dict[str, Any]) -> str:
+        """Kaynak verinin formatını tespit et (decimal vs percentage).
+
+        Matematiksel heuristic:
+        - Margin/ROE/ROA gibi rasyolar için tüm değerleri kontrol et.
+        - Eğer ÇOĞUNLUK [-1, 1] aralığındaysa → decimal (0.13 = 13%)
+        - Eğer ÇOĞUNLUK [-100, 100] aralığında ve |val| >= 1 → percentage (13.0 = 13%)
+        - Belirsizlik durumunda → percentage (daha güvenli, yanlış dönüşüm yok)
+        """
+        margin_fields = ["gross_margin", "ebitda_margin", "operating_margin",
+                        "profit_margin", "roe", "roa"]
+        values = []
+        for f in margin_fields:
+            v = fundamentals.get(f)
+            if v is not None:
+                values.append(float(v))
+
+        if not values:
+            return "percentage"  # Varsayılan
+
+        # Kaç tanesi [-1, 1] aralığında?
+        in_unit_interval = sum(1 for v in values if -1 <= v <= 1)
+        ratio = in_unit_interval / len(values)
+
+        # Eğer %80+ değer [-1, 1] aralığında VE en az 2 değer var → decimal
+        # Ama tek bir 0.5 değeri varsa ve diğerleri 10+ ise → percentage
+        if ratio >= 0.8 and len(values) >= 2:
+            # Ek kontrol: değerlerin medyanı gerçekten küçük mü?
+            median_val = sorted(values)[len(values) // 2]
+            if abs(median_val) < 1:
+                return "decimal"
+
+        return "percentage"
+
     def compute_profitability_features(self, fundamentals: Dict[str, Any]) -> Dict[str, float]:
         """Kârlılık metrikleri."""
         features = {}
+
+        # Format tespiti (tüm margin alanları üzerinden)
+        fmt = self._detect_format(fundamentals)
+        multiplier = 100.0 if fmt == "decimal" else 1.0
 
         for field, feature_name in [
             ("gross_margin", "gross_margin"),
@@ -92,11 +131,7 @@ class FundamentalFeatureEngine:
         ]:
             val = fundamentals.get(field)
             if val is not None:
-                val = float(val)
-                # DÖNÜŞTÜRME YAPILMIYOR: Kaynak verinin formatı bilinmiyor.
-                # Eski heuristic (abs(val)<1 → *100) tehlikeli: %0.5 marj
-                # gibi küçük ama geçerli yüzde değerlerini %50'ye çeviriyordu.
-                # Tüketici tarafında normalize edilmeli.
+                val = float(val) * multiplier
                 features[feature_name] = round(val, 2)
             else:
                 features[feature_name] = 0.0
@@ -118,19 +153,23 @@ class FundamentalFeatureEngine:
         """Büyüme metrikleri."""
         features = {}
 
+        # Growth rates: genellikle decimal format (0.15 = %15)
+        # Ama %150 büyüme gibi uç değerler percentage olabilir.
+        # Heuristic: |val| < 5 → decimal, |val| >= 5 → percentage
+        def _normalize_growth(val: float) -> float:
+            if abs(val) < 5:
+                return val * 100  # Decimal → percentage
+            return val  # Zaten percentage
+
         rev_growth = fundamentals.get("revenue_growth")
         if rev_growth is not None:
-            val = float(rev_growth)
-            # Dönüşüm yapılmıyor — kaynak format bilinmiyor
-            features["revenue_growth_pct"] = round(val, 2)
+            features["revenue_growth_pct"] = round(_normalize_growth(float(rev_growth)), 2)
         else:
             features["revenue_growth_pct"] = 0.0
 
         earn_growth = fundamentals.get("earnings_growth")
         if earn_growth is not None:
-            val = float(earn_growth)
-            # Dönüşüm yapılmıyor — kaynak format bilinmiyor
-            features["earnings_growth_pct"] = round(val, 2)
+            features["earnings_growth_pct"] = round(_normalize_growth(float(earn_growth)), 2)
         else:
             features["earnings_growth_pct"] = 0.0
 
