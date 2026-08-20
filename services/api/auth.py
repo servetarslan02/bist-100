@@ -11,6 +11,7 @@ Roller:
 - SYSTEM: Servisler arası (API key)
 """
 
+import os
 import time
 import hashlib
 import hmac
@@ -68,8 +69,10 @@ class JWTHandler:
     Bu implementasyon basit HMAC-SHA256 tabanlıdır.
     """
 
-    def __init__(self, secret_key: str = "alpha-bist-secret-key-change-in-production"):
-        self.secret_key = secret_key
+    def __init__(self, secret_key: str = None):
+        self.secret_key = secret_key or os.environ.get("JWT_SECRET")
+        if not self.secret_key:
+            raise RuntimeError("JWT_SECRET environment variable is required")
         self.algorithm = "HS256"
 
     def create_token(
@@ -211,9 +214,9 @@ jwt_handler = JWTHandler()
 api_key_manager = APIKeyManager()
 rbac_checker = RBACChecker()
 
-# Varsayılan API key'ler (production'da değiştirilmeli)
-api_key_manager.register_key(
-    "alpha-system-key-change-me",
-    "system",
-    ["GET", "POST", "PUT", "DELETE"],
-)
+# Varsayılan API key (environment variable'dan okunur)
+_default_key = os.environ.get("SYSTEM_API_KEY")
+if _default_key:
+    api_key_manager.register_key(_default_key, "system", ["GET", "POST", "PUT", "DELETE"])
+else:
+    logger.warning("SYSTEM_API_KEY not set — inter-service auth disabled")

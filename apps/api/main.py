@@ -1,5 +1,9 @@
 """
-ALPHA BIST — FastAPI Backend v3.0
+ALPHA BIST — FastAPI Backend v3.0 (STANDALONE)
+
+⚠️  Bu dosya BAĞIMSIZ bir servistir.
+    Canonical production server: services/api/app.py (port 8000)
+    Bu dosya port 8001'de çalışır ve farklı endpoint prefix'leri kullanır.
 
 ROADMAP v3.0 FAZ 7:
 - RESTful API endpoints
@@ -9,16 +13,16 @@ ROADMAP v3.0 FAZ 7:
 - Auto-generated OpenAPI docs
 
 Endpoints:
-    GET  /health          → Sistem sağlığı
-    GET  /regime          → Mevcut piyasa rejimi
-    GET  /opportunities   → Top fırsatlar
+    GET  /health              → Sistem sağlığı
+    GET  /regime              → Mevcut piyasa rejimi
+    GET  /opportunities       → Top fırsatlar
     GET  /opportunities/{ticker} → Hisse detayı
-    GET  /portfolio       → Portföy önerisi
-    GET  /backtest        → Backtest sonuçları
-    GET  /learning        → Öğrenme durumu
-    GET  /features/{ticker} → Feature vector
-    POST /predict         → Tahmin isteği
-    WS   /ws              → Real-time updates
+    GET  /portfolio           → Portföy önerisi
+    GET  /backtest            → Backtest sonuçları
+    GET  /learning            → Öğrenme durumu
+    GET  /features/{ticker}   → Feature vector
+    POST /predict             → Tahmin isteği
+    WS   /ws                  → Real-time updates (token gerekli)
 """
 
 import json
@@ -27,7 +31,7 @@ from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -86,8 +90,8 @@ async def lifespan(app: FastAPI):
     logger.info("ALPHA BIST API shutting down")
 
 app = FastAPI(
-    title="ALPHA BIST API",
-    description="Süper Akıllı Quantitative Trading System API",
+    title="ALPHA BIST API v3.0 (Standalone)",
+    description="Süper Akıllı Quantitative Trading System API — Standalone service (port 8001)",
     version="3.0.0",
     lifespan=lifespan,
 )
@@ -116,38 +120,35 @@ async def root():
         "health": "/health",
     }
 
-@app.get("/health", response_model=HealthResponse, tags=["System"])
+@app.get("/health", tags=["System"])
 async def health_check():
-    """Sistem sağlık kontrolü."""
-    from services.learning.super_intelligence import super_intelligence
-
-    health = super_intelligence.get_health_status()
-
-    return HealthResponse(
-        status=health.overall_status,
-        timestamp=datetime.now(timezone.utc).isoformat(),
-        uptime_hours=round(health.uptime_hours, 2),
-        version="3.0.0",
-        modules=health.module_status,
-    )
+    """Sistem sağlık kontrolü — standart format."""
+    try:
+        from services.learning.super_intelligence import super_intelligence
+        health = super_intelligence.get_health_status()
+        return {
+            "status": health.overall_status,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "version": "3.0.0",
+            "server": "standalone (apps/api/main.py)",
+            "services": health.module_status,
+        }
+    except Exception as e:
+        return {
+            "status": "unhealthy",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "version": "3.0.0",
+            "server": "standalone (apps/api/main.py)",
+            "error": str(e),
+        }
 
 @app.get("/regime", tags=["Market"])
 async def get_regime():
     """Mevcut piyasa rejimi."""
-    from services.core.regime_detector import regime_detector
-
-    # Son regime bilgisini döndür
-    history = regime_detector.get_regime_history()
-    if history:
-        latest = history[-1]
-        return {
-            "regime": latest["regime"],
-            "confidence": latest["confidence"],
-            "timestamp": latest["timestamp"],
-            "factors": latest.get("factors", {}),
-        }
-
-    return {"regime": "UNKNOWN", "confidence": 0, "timestamp": "", "factors": {}}
+    raise HTTPException(
+        status_code=301,
+        detail="This endpoint has moved. Use GET /api/v1/market/regime instead.",
+    )
 
 @app.get("/opportunities", tags=["Trading"])
 async def get_opportunities(
@@ -156,56 +157,25 @@ async def get_opportunities(
     min_confidence: float = 0.0,
 ):
     """En iyi fırsatları getir."""
-    from services.ml.ranking_model import ranking_model
-    from services.core.orchestrator import orchestrator
-
-    report = orchestrator.get_latest_report()
-    if not report:
-        raise HTTPException(status_code=404, detail="No report available")
-
-    opportunities = report.top_opportunities[:limit]
-
-    # Filtrele
-    if min_confidence > 0:
-        opportunities = [o for o in opportunities if o.get("confidence", 0) >= min_confidence]
-
-    return {
-        "date": report.date,
-        "regime": report.regime,
-        "count": len(opportunities),
-        "opportunities": opportunities,
-    }
+    raise HTTPException(
+        status_code=301,
+        detail="This endpoint has moved. Use GET /api/v1/scanner/opportunities instead.",
+    )
 
 @app.get("/opportunities/{ticker}", tags=["Trading"])
 async def get_opportunity_detail(ticker: str):
     """Belirli bir hissenin detaylı analizi."""
-    from services.ml.ranking_model import ranking_model
-
-    # TODO: Feature vector'ü getir
-    return {
-        "ticker": ticker,
-        "status": "available",
-        "features": {},  # TODO
-        "prediction": {},  # TODO
-    }
+    raise HTTPException(
+        status_code=501,
+        detail=f"Detail analysis for {ticker} not yet implemented. Run feature pipeline first.",
+    )
 
 @app.get("/portfolio", response_model=PortfolioResponse, tags=["Trading"])
 async def get_portfolio_recommendation():
     """Portföy önerisi."""
-    from services.core.orchestrator import orchestrator
-
-    report = orchestrator.get_latest_report()
-    if not report:
-        raise HTTPException(status_code=404, detail="No report available")
-
-    port = report.portfolio_recommendation
-
-    return PortfolioResponse(
-        date=report.date,
-        total_positions=port.get("total_positions", 0),
-        total_weight=port.get("total_weight", 0),
-        positions=port.get("positions", []),
-        risk_metrics=report.risk_metrics,
+    raise HTTPException(
+        status_code=301,
+        detail="This endpoint has moved. Use GET /api/v1/portfolio/summary instead.",
     )
 
 @app.get("/backtest", tags=["Analysis"])
@@ -225,16 +195,17 @@ async def get_backtest_results():
 @app.get("/learning", tags=["System"])
 async def get_learning_status():
     """Sürekli öğrenme durumu."""
-    from services.learning.continuous_learning import continuous_learning
-
-    return continuous_learning.get_learning_report()
+    raise HTTPException(
+        status_code=301,
+        detail="This endpoint has moved. Use GET /api/v1/learning/ instead.",
+    )
 
 @app.get("/features/{ticker}", tags=["Analysis"])
 async def get_features(ticker: str):
     """Hissenin feature vektörü."""
     raise HTTPException(
-        status_code=501,
-        detail=f"Feature computation not yet implemented for {ticker}. Run feature pipeline first.",
+        status_code=301,
+        detail=f"This endpoint has moved. Use GET /api/v1/intelligence/features/{ticker} instead.",
     )
 
 @app.post("/predict", response_model=PredictResponse, tags=["Trading"])
@@ -302,26 +273,45 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """Real-time WebSocket bağlantısı."""
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
+    """Real-time WebSocket bağlantısı — token doğrulama gerekli."""
+    if not token:
+        await websocket.close(code=4001, reason="Authentication required: pass ?token=YOUR_JWT_TOKEN")
+        return
+
+    # Token doğrulama
+    try:
+        from services.api.auth import jwt_handler
+        payload = jwt_handler.verify_token(token)
+        if not payload:
+            await websocket.close(code=4003, reason="Invalid or expired token")
+            return
+    except Exception:
+        await websocket.close(code=4003, reason="Token verification failed")
+        return
+
     await manager.connect(websocket)
     try:
+        # İlk bağlantıda mevcut durumu gönder
+        await websocket.send_json({
+            "type": "init",
+            "message": f"Connected as {payload.username}",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
+
         while True:
-            # Client'tan mesaj bekle
             data = await websocket.receive_text()
             message = json.loads(data)
 
             action = message.get("action", "")
 
             if action == "subscribe":
-                # Abonelik başlat
                 await websocket.send_json({
                     "type": "subscribed",
                     "channels": message.get("channels", []),
                 })
 
             elif action == "get_opportunities":
-                # Fırsatları gönder
                 from services.core.orchestrator import orchestrator
                 report = orchestrator.get_latest_report()
                 if report:
@@ -365,4 +355,4 @@ async def broadcast_updates():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -81,9 +81,13 @@ def create_app() -> FastAPI:
     )
 
     # CORS
+    allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+    if not allowed_origins or allowed_origins == [""]:
+        allowed_origins = ["http://localhost:3000"]  # Default: sadece local dev
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -140,24 +144,28 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
+        from datetime import datetime, timezone
         db_health = await check_db_health()
         all_healthy = all(v == "healthy" for v in db_health.values())
         return {
             "status": "healthy" if all_healthy else "degraded",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": "2.0.0",
             "server": "canonical (app.py)",
-            "databases": db_health,
+            "services": db_health,
         }
 
     @app.get("/health/detailed")
     async def health_detailed():
         """Detaylı sağlık raporu."""
+        from datetime import datetime, timezone
         db_health = await check_db_health()
         return {
             "status": "healthy" if all(v == "healthy" for v in db_health.values()) else "degraded",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": "2.0.0",
             "server": "canonical (app.py)",
-            "databases": db_health,
+            "services": db_health,
             "endpoints": {
                 "v1_router": "/api/v1",
                 "docs": "/docs",

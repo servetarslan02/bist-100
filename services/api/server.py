@@ -27,6 +27,7 @@ Endpoints:
 
 import asyncio
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
@@ -103,9 +104,13 @@ app = FastAPI(
 )
 
 # CORS
+allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+if not allowed_origins or allowed_origins == [""]:
+    allowed_origins = ["http://localhost:3000"]  # Default: sadece local dev
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -218,397 +223,84 @@ async def health_check():
         "version": "2.0.0",
     }
 
-@app.get("/api/market")
-async def get_market_data():
-    """Piyasa genel verileri."""
-    trace_id = distributed_tracing.start_trace("get_market_data")
-    start = datetime.now(timezone.utc)
+# NOTE: /api/market endpoint removed — canonical: v1/market.py via app.py
 
-    try:
-        regime = regime_engine.current_regime
+# NOTE: /api/opportunities endpoint removed — canonical: v1/scanner.py via app.py
 
-        result = {
-            "bist_100": {
-                "value": None,
-                "change_pct": None,
-                "change_points": None,
-            },
-            "regime": {
-                "current": regime.regime.value if regime else "UNKNOWN",
-                "confidence": regime.confidence if regime else 0,
-                "regime_scores": regime.features_used if regime else {},
-            },
-            "breadth": {
-                "advance_pct": None,
-                "advancing": None,
-                "declining": None,
-            },
-            "volatility": {
-                "vix_estimate": None,
-                "status": None,
-            },
-            "status": "no_data_source",
-            "message": "Connect a real data source to populate this endpoint",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+# NOTE: /api/portfolio endpoint removed — canonical: v1/portfolio.py via app.py
 
-        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-        distributed_tracing.add_span(trace_id, "get_market_data", latency_ms)
-        performance_monitor.record_latency("get_market_data", latency_ms)
-        prometheus_metrics.inc("api_requests_total", labels={"endpoint": "market"})
+# NOTE: /api/decisions endpoint removed — canonical: v1/decisions.py via app.py
 
-        return result
-    except Exception as e:
-        distributed_tracing.add_span(trace_id, "get_market_data", 0, "error")
-        logger.error("Market data error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+# NOTE: /api/learning endpoints removed — canonical: v1/learning.py via app.py
 
-@app.get("/api/opportunities")
-async def get_opportunities(
-    limit: int = Query(20, ge=1, le=100),
-    direction: Optional[str] = Query(None, pattern="^(LONG|SHORT)$"),
-    min_score: float = Query(0, ge=0, le=100),
-):
-    """Fırsat listesi."""
-    trace_id = distributed_tracing.start_trace("get_opportunities")
-    start = datetime.now(timezone.utc)
+# NOTE: /api/signals endpoint removed — canonical: v1/scanner.py via app.py
 
-    try:
-        latest_scan_results = getattr(opportunity_engine, "last_results", [])
-        opps = opportunity_engine.get_top_opportunities(latest_scan_results, limit=limit)
+# NOTE: /api/features/{ticker} endpoint removed — canonical: v1/intelligence.py via app.py
 
-        if direction:
-            opps = [o for o in opps if o.get("direction") == direction]
-        if min_score > 0:
-            opps = [o for o in opps if o.get("score", 0) >= min_score]
+# NOTE: /api/regime endpoint removed — canonical: v1/market.py via app.py
 
-        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-        distributed_tracing.add_span(trace_id, "get_opportunities", latency_ms)
-        performance_monitor.record_latency("get_opportunities", latency_ms)
-        prometheus_metrics.inc("api_requests_total", labels={"endpoint": "opportunities"})
-
-        return {
-            "count": len(opps),
-            "opportunities": opps,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error("Opportunities error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/portfolio")
-async def get_portfolio():
-    """Portföy durumu."""
-    trace_id = distributed_tracing.start_trace("get_portfolio")
-    start = datetime.now(timezone.utc)
-
-    try:
-        portfolio = portfolio_manager.get_portfolio()
-
-        latency_ms = (datetime.now(timezone.utc) - start).total_seconds() * 1000
-        distributed_tracing.add_span(trace_id, "get_portfolio", latency_ms)
-        performance_monitor.record_latency("get_portfolio", latency_ms)
-
-        return {
-            "portfolio": portfolio,
-            "metrics": portfolio_manager.get_metrics(),
-            "risk": portfolio_manager.get_risk_metrics(),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error("Portfolio error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/decisions")
-async def get_decisions(limit: int = Query(50, ge=1, le=500)):
-    """Son kararlar."""
-    decisions = audit_log.get_recent(limit)
-    return {
-        "count": len(decisions),
-        "decisions": decisions,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/learning")
-async def get_learning_stats():
-    """Öğrenme sistemi istatistikleri."""
-    trace_id = distributed_tracing.start_trace("get_learning")
-
-    try:
-        stats = learning_system.get_stats()
-        pending = outcome_tracker.get_pending_count()
-
-        distributed_tracing.add_span(trace_id, "get_learning", 0)
-
-        return {
-            "learning": stats,
-            "outcomes": {
-                "pending": pending,
-                "total_tracked": outcome_tracker.get_stats(),
-            },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
-    except Exception as e:
-        logger.error("Learning error", error=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/learning/predictions")
-async def get_predictions(limit: int = Query(20, ge=1, le=100)):
-    """Son tahminler."""
-    predictions = learning_system.get_recent_predictions(limit)
-    return {
-        "count": len(predictions),
-        "predictions": predictions,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/signals")
-async def get_signals(ticker: Optional[str] = Query(None)):
-    """Sinyaller."""
-    if ticker:
-        signals = signal_fusion.get_signals_for_ticker(ticker)
-        return {"ticker": ticker, "signals": signals}
-
-    return {
-        "fused": signal_fusion.get_fused_signals(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/features/{ticker}")
-async def get_features(ticker: str):
-    """Hisse feature'ları."""
-    features = feature_store.get_all(ticker)
-    if not features:
-        raise HTTPException(status_code=404, detail=f"{ticker} için feature bulunamadı")
-
-    return {
-        "ticker": ticker,
-        "features": features,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/regime")
-async def get_regime():
-    """Rejim durumu."""
-    regime = regime_engine.current_regime
-    history = regime_engine.get_history(limit=30)
-
-    return {
-        "current": {
-            "regime": regime.regime.value,
-            "confidence": regime.confidence,
-            "duration_hours": regime.duration_hours,
-        } if regime else None,
-        "history": history,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/risk")
-async def get_risk():
-    """Risk metrikleri."""
-    portfolio = portfolio_manager.get_portfolio()
-
-    return {
-        "portfolio_risk": portfolio_manager.get_risk_metrics(),
-        "position_limits": {
-            "max_position_pct": config_manager.get("risk.max_position_pct", 10.0),
-            "max_sector_pct": config_manager.get("risk.max_sector_pct", 30.0),
-            "max_drawdown_pct": config_manager.get("risk.max_drawdown_pct", 15.0),
-        },
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+# NOTE: /api/risk endpoint removed — canonical: v1/risk.py via app.py
 
 
 # =====================================================
 # Market State Engine v2.0 Endpoints
 # =====================================================
 
-@app.get("/api/market/state")
-async def get_market_state_v2():
-    """Market State Engine v2.0 — tam market state."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            return json.loads(raw)
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:428")
-        pass
-    return {"error": "Market state not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/state endpoint removed — canonical: v1/market.py via app.py
 
 
-@app.get("/api/market/breadth")
-async def get_market_breadth():
-    """Market breadth detayları."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            state = json.loads(raw)
-            return {
-                "breadth": state.get("breadth", {}),
-                "timestamp": state.get("timestamp"),
-            }
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:446")
-        pass
-    return {"error": "Breadth data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/breadth endpoint removed — canonical: v1/market.py via app.py
 
 
-@app.get("/api/market/regime")
-async def get_market_regime_v2():
-    """Ensemble regime detayları."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            state = json.loads(raw)
-            return {
-                "regime": state.get("regime"),
-                "confidence": state.get("regime_confidence"),
-                "consensus": state.get("regime_consensus"),
-                "stability": state.get("regime_stability"),
-                "duration_days": state.get("regime_duration_days"),
-                "confidence_trend": state.get("confidence_trend"),
-                "ensemble_methods": state.get("ensemble_methods", {}),
-                "hmm_probabilities": state.get("hmm_probabilities", {}),
-                "timestamp": state.get("timestamp"),
-            }
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:471")
-        pass
-    return {"error": "Regime data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/regime endpoint removed — canonical: v1/market.py via app.py
 
 
-@app.get("/api/market/transition")
-async def get_market_transition():
-    """Regime transition istatistikleri."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            state = json.loads(raw)
-            return {
-                "total_transitions": state.get("total_transitions", 0),
-                "transition_matrix": state.get("transition_matrix", {}),
-                "stability": state.get("regime_stability"),
-                "current_regime": state.get("regime"),
-                "current_duration_days": state.get("regime_duration_days"),
-                "timestamp": state.get("timestamp"),
-            }
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:493")
-        pass
-    return {"error": "Transition data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/transition endpoint removed — canonical: v1/market.py via app.py
 
 
-@app.get("/api/market/multi-tf")
-async def get_market_multi_tf():
-    """Multi-timeframe state."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            state = json.loads(raw)
-            return {
-                "daily_state": state.get("daily_state", {}),
-                "weekly_state": state.get("weekly_state", {}),
-                "alignment": state.get("multi_tf_alignment"),
-                "divergences": state.get("multi_tf_divergences", []),
-                "timestamp": state.get("timestamp"),
-            }
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:514")
-        pass
-    return {"error": "Multi-TF data not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/multi-tf endpoint removed — canonical: v1/market.py via app.py
 
 
-@app.get("/api/market/risk-appetite")
-async def get_market_risk_appetite():
-    """Risk appetite detayları."""
-    try:
-        from services.core.database import redis_get
-        import json
-        raw = await redis_get("market_state")
-        if raw:
-            state = json.loads(raw)
-            return {
-                "risk_appetite": state.get("risk_appetite"),
-                "risk_appetite_state": state.get("risk_appetite_state"),
-                "timestamp": state.get("timestamp"),
-            }
-    except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="server.py:533")
-        pass
-    return {"error": "Risk appetite not available", "timestamp": datetime.now(timezone.utc).isoformat()}
+# NOTE: /api/market/risk-appetite endpoint removed — canonical: v1/market.py via app.py
 
-@app.get("/api/notifications")
-async def get_notifications(
-    limit: int = Query(20, ge=1, le=100),
-    unread_only: bool = Query(False),
-):
-    """Bildirimler."""
-    if unread_only:
-        notifs = notification_system.get_unread(limit)
-    else:
-        notifs = notification_system._notifications[-limit:]
+# NOTE: /api/notifications endpoint removed — no v1 equivalent; use admin/alerts instead
 
-    return {
-        "count": len(notifs),
-        "notifications": notifs,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+# NOTE: /api/audit endpoint removed — canonical: v1/system.py via app.py
 
-@app.get("/api/audit")
-async def get_audit(
-    entity_type: Optional[str] = Query(None),
-    entity_id: Optional[str] = Query(None),
-    limit: int = Query(50, ge=1, le=500),
-):
-    """Audit log."""
-    if entity_type and entity_id:
-        entries = audit_log.get_entity_history(entity_type, entity_id)
-    else:
-        entries = audit_log.get_recent(limit)
+# NOTE: /api/stats endpoint removed — canonical: v1/system.py via app.py
 
-    return {
-        "count": len(entries),
-        "entries": entries,
-        "stats": audit_log.get_stats(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/stats")
-async def get_stats():
-    """Sistem istatistikleri."""
-    return {
-        "metrics": prometheus_metrics.get_metrics(),
-        "performance": performance_monitor.get_all_stats(),
-        "cache": cache_system.get_stats(),
-        "jobs": job_queue.get_stats(),
-        "health": health_checker.check_all(),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-@app.get("/api/tickers")
-async def get_tickers():
-    """Tüm hisseler."""
-    universe = BISTUniverse()
-    return {
-        "count": len(universe._tickers),
-        "tickers": universe._tickers,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
+# NOTE: /api/tickers endpoint removed — canonical: v1/market.py via app.py
 
 # ===================== WEBSOCKET =====================
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    """Gerçek zamanlı WebSocket bağlantısı."""
+async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
+    """Gerçek zamanlı WebSocket bağlantısı — token doğrulama gerekli."""
+    if not token:
+        await websocket.close(code=4001, reason="Authentication required: pass ?token=YOUR_API_KEY")
+        return
+
+    # API key veya JWT token doğrulama
+    authenticated = False
+    try:
+        from services.core.monitoring_security import monitoring_auth
+        if monitoring_auth.verify_admin_token(token) or monitoring_auth.verify_metrics_token(token):
+            authenticated = True
+    except Exception:
+        pass
+
+    if not authenticated:
+        try:
+            from services.api.auth import jwt_handler
+            payload = jwt_handler.verify_token(token)
+            if payload:
+                authenticated = True
+        except Exception:
+            pass
+
+    if not authenticated:
+        await websocket.close(code=4003, reason="Invalid or expired token")
+        return
+
     await manager.connect(websocket)
 
     try:

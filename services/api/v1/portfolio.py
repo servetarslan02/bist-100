@@ -316,20 +316,13 @@ async def attribution(
         equities = [e["equity"] for e in equity_curve]
         returns = np.array([(equities[i] / equities[i - 1] - 1) for i in range(1, len(equities))])
 
-        # Demo factor returns (gerçek uygulamada market data'dan gelecek)
-        np.random.seed(42)
-        factors = {
-            "value": np.random.normal(0.0005, 0.015, len(returns)),
-            "momentum": np.random.normal(0.001, 0.018, len(returns)),
-            "quality": np.random.normal(0.0003, 0.012, len(returns)),
-        }
-
-        factor_attr = performance_attribution.factor_attribution(returns, factors)
-
-        return {
-            "factor_attribution": factor_attr,
-            "total_return_annualized": round(float(np.mean(returns) * 252), 4),
-        }
+        # Gerçek factor returns — market data servisi bağlı değilse 501 döndür
+        raise HTTPException(
+            status_code=501,
+            detail="Factor attribution requires real market data service. Not connected.",
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"Attribution error: {e}")
 

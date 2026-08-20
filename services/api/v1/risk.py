@@ -224,26 +224,13 @@ async def var_report(
     try:
         calc = _get_var_calculator()
 
-        # Demo returns (gerçek uygulamada DB'den gelecek)
-        np.random.seed(42)
-        demo_returns = np.random.normal(0.001, 0.02, 252)
-
-        report = calc.calculate_full_var_report(
-            returns=demo_returns,
-            portfolio_value=portfolio_value,
-            holding_period_days=holding_days,
+        # Gerçek veri kaynağı bağlı değilse 501 döndür
+        raise HTTPException(
+            status_code=501,
+            detail="VaR calculation requires real return history. Data source not connected.",
         )
-
-        return {
-            "portfolio_value": portfolio_value,
-            "confidence": confidence,
-            "holding_days": holding_days,
-            "parametric": report["parametric"],
-            "historical": report["historical"],
-            "monte_carlo": report["monte_carlo"],
-            "consensus": report["consensus"],
-            "annualized_volatility": report.get("annualized_volatility", 0),
-        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, f"VaR report error: {e}")
 
@@ -264,13 +251,10 @@ async def portfolio_risk(
         from ...risk.main import assess_portfolio_risk
 
         portfolio = {"total_value": portfolio_value, "weights": {}}
-        np.random.seed(42)
-        returns = np.random.normal(0.001, 0.02, 252)
-
-        result = assess_portfolio_risk(
-            portfolio=portfolio,
-            returns_history=returns,
-            regime=regime,
+        # Gerçek veri kaynağı bağlı değilse 501 döndür
+        raise HTTPException(
+            status_code=501,
+            detail="Portfolio risk assessment requires real return history. Data source not connected.",
         )
         return result
     except Exception as e:
