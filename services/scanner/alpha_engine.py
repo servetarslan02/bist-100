@@ -342,8 +342,7 @@ class AlphaEngine:
 
     def _compute_all_features(self, data) -> Dict[str, Dict[str, float]]:
         import polars as pl
-        from ..features.calculator import FeatureCalculator
-        fc = FeatureCalculator()
+        from ..features.calculator import feature_calculator
         features_map = {}
 
         for ticker in self._universe:
@@ -356,7 +355,7 @@ class AlphaEngine:
                 df = df.rename({"Date": "timestamp", "Open": "open", "High": "high",
                                "Low": "low", "Close": "close", "Volume": "volume"})
                 df = df.drop_nulls(subset=["close"])
-                features = fc.compute_all_features(df)
+                features = feature_calculator.compute_all_features(df)
                 if features:
                     close_list = [x for x in df["close"].to_list() if x is not None]
                     features["price"] = close_list[-1] if close_list else 0
@@ -400,7 +399,7 @@ class AlphaEngine:
         """Tek hisse için hızlı feature hesaplama (event fallback)."""
         import yfinance as yf
         import polars as pl
-        from ..features.calculator import FeatureCalculator
+        from ..features.calculator import feature_calculator
 
         try:
             t = yf.Ticker(f"{ticker}.IS")
@@ -413,8 +412,7 @@ class AlphaEngine:
                            "Low": "low", "Close": "close", "Volume": "volume"})
             df = df.drop_nulls(subset=["close"])
 
-            fc = FeatureCalculator()
-            features = fc.compute_all_features(df)
+            features = feature_calculator.compute_all_features(df)
             if features:
                 close_list = [x for x in df["close"].to_list() if x is not None]
                 features["price"] = close_list[-1] if close_list else 0

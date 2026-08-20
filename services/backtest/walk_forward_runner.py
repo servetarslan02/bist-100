@@ -249,7 +249,7 @@ class WalkForwardBacktestRunner:
         """
         try:
             from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, DEFAULT_TARGETS
-            from ..features.calculator import FeatureCalculator
+            from ..features.calculator import feature_calculator
             from ..ml.training_validator import training_validator, cross_sectional_normalizer
         except ImportError:
             return None
@@ -268,7 +268,7 @@ class WalkForwardBacktestRunner:
             return None
 
         # 2) Her ticker × her uygun gün için sample oluştur
-        calc = FeatureCalculator()
+        calc = feature_calculator
         features_map: Dict[str, Dict] = {}
         returns: Dict[str, float] = {}
         date_groups: Dict[str, str] = {}

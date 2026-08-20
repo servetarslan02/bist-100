@@ -370,7 +370,7 @@ async def get_signals(ticker: Optional[str] = Query(None)):
 @app.get("/api/features/{ticker}")
 async def get_features(ticker: str):
     """Hisse feature'ları."""
-    features = feature_store.get(ticker)
+    features = feature_store.get_all(ticker)
     if not features:
         raise HTTPException(status_code=404, detail=f"{ticker} için feature bulunamadı")
 
@@ -633,7 +633,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
                 elif action == "get_ticker":
                     ticker = msg.get("ticker")
-                    features = feature_store.get(ticker)
+                    features = feature_store.get_all(ticker)
                     await manager.send_personal({
                         "type": "ticker_data",
                         "ticker": ticker,

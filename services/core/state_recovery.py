@@ -120,7 +120,7 @@ class StateRecovery:
         try:
             import yfinance as yf
             import polars as pl
-            from ..features.calculator import FeatureCalculator
+            from ..features.calculator import feature_calculator
 
             logger.info("Fallback: ClickHouse recovery", ticker=ticker)
 
@@ -136,8 +136,7 @@ class StateRecovery:
                 "Low": "low", "Close": "close", "Volume": "volume"
             })
 
-            fc = FeatureCalculator()
-            features = fc.compute_all_features(df)
+            features = feature_calculator.compute_all_features(df)
 
             if not features:
                 return None

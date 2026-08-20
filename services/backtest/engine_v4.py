@@ -228,8 +228,8 @@ class BacktestEngineV4:
         """Modülleri lazy-load et (test ortamında import hatası önlemek için)."""
         if self._calc is None:
             try:
-                from ..features.calculator import FeatureCalculator
-                self._calc = FeatureCalculator()
+                from ..features.calculator import feature_calculator
+                self._calc = feature_calculator
             except ImportError:
                 self._calc = _FallbackCalculator()
 

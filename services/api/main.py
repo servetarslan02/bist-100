@@ -390,7 +390,7 @@ async def get_instrument_full(ticker: str):
     """Get full instrument data: price + chart + features + signals."""
     try:
         import yfinance as yf
-        from ..features.calculator import FeatureCalculator
+        from ..features.calculator import feature_calculator
         from ..intelligence.spec_engine import spec_engine
         import polars as pl
 
@@ -423,25 +423,24 @@ async def get_instrument_full(ticker: str):
         if len(df) < 20:
             raise HTTPException(status_code=404, detail=f"Insufficient data for {ticker}")
 
-        fc = FeatureCalculator()
-        features = fc.compute_all_features(df)
+        features = feature_calculator.compute_all_features(df)
 
-        # 3. SPEC score
+        # 3. SPEC score — gerçek feature'lardan hesapla
         asset_state = {
             "volume_zscore": features.get("volume_zscore", 0),
             "price_change_1d_zscore": features.get("return_1d", 0) / 2,
             "volatility_zscore": features.get("volatility_ratio", 1) - 1,
             "bb_position": features.get("bb_position", 0.5),
             "near_20d_high": features.get("near_20d_high", 0),
-            "relative_strength_vs_sector": 1.0,
-            "kap_sentiment": 0.0,
+            "relative_strength_vs_sector": features.get("relative_strength_vs_sector", 0),
+            "kap_sentiment": features.get("kap_sentiment", 0),
             "roc_5d": features.get("roc_5d", 0),
             "price_acceleration": features.get("price_acceleration", 0),
-            "volatility_regime": "NORMAL",
-            "amihud_illiquidity": 0.001,
-            "correlation_to_index": 0.75,
+            "volatility_regime": features.get("volatility_regime", "NORMAL"),
+            "amihud_illiquidity": features.get("amihud_illiquidity", 0),
+            "correlation_to_index": features.get("correlation_to_index", 0),
             "momentum_20d": features.get("momentum_20d", 0),
-            "realized_vol_20d": features.get("realized_vol_20d", 20),
+            "realized_vol_20d": features.get("realized_vol_20d", 0),
         }
         spec = spec_engine.compute_spec(ticker, asset_state, {"regime": "RANGE"})
 
@@ -514,10 +513,9 @@ async def get_signals(
     try:
         import yfinance as yf
         from ..ingestion.bist_universe import BIST_STOCKS, get_sector
-        from ..features.calculator import FeatureCalculator
+        from ..features.calculator import feature_calculator
         from ..intelligence.spec_engine import spec_engine
 
-        fc = FeatureCalculator()
         signals = []
 
         # İlk 30 hisseyi tara
@@ -534,7 +532,7 @@ async def get_signals(
                 df = pl.from_pandas(td[["Date", "Open", "High", "Low", "Close", "Volume"]])
                 df = df.rename({"Date": "timestamp", "Open": "open", "High": "high", "Low": "low", "Close": "close", "Volume": "volume"})
 
-                features = fc.compute_all_features(df)
+                features = feature_calculator.compute_all_features(df)
                 if not features:
                     continue
 

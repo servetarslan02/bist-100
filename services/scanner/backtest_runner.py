@@ -21,7 +21,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import structlog
 
-from ..features.calculator import FeatureCalculator
+from ..features.calculator import feature_calculator
 from ..core.tradability_mask import TradabilityMask
 from ..core.data_quality import DataQualityChecker as DataQualityV2
 
@@ -360,7 +360,7 @@ class ScannerBacktestRunner:
         slippage_rate: float = 0.001,
         min_quality_score: float = 70.0,
     ):
-        self._calc = FeatureCalculator()
+        self._calc = feature_calculator
         self._tm = TradabilityMask()
         self._dq = DataQualityV2()
         self._initial_capital = initial_capital
