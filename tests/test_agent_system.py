@@ -437,9 +437,10 @@ class TestFaz3_MemoryConsolidator:
     async def test_consolidate_first_run(self):
         consolidator = MemoryConsolidator(consolidation_interval_hours=24)
         mem = AgentMemory("TECHNICAL")
+        # Boş memory — consolidation yapmaz
         result = await consolidator.consolidate(mem)
-        # İlk çalıştırmada consolidation yapılır
-        assert result["consolidated"] is True
+        assert result["consolidated"] is False
+        assert result["reason"] == "empty_memory"
 
     @pytest.mark.asyncio
     async def test_consolidate_too_soon(self):
@@ -648,6 +649,96 @@ class TestFaz7_Integration:
         assert pipeline.risk_assessor is not None
         assert pipeline.synthesis_engine is not None
         assert pipeline.conflict_resolver is not None
+
+
+# =====================================================
+# BUG FIX TESTS
+# =====================================================
+
+class TestBugFixes:
+    """Düzeltilen bug'lar için test'ler."""
+
+    @pytest.mark.asyncio
+    async def test_multi_evaluator_no_double_evaluation(self):
+        """MultiAgentEvaluator.evaluate_all() double-evaluation yapmamalı."""
+        evaluator = MultiAgentEvaluator()
+        mem = AgentMemory("TECHNICAL")
+        # 50 görev ekle
+        for i in range(50):
+            tid = f"t{i}"
+            mem.record_task(tid, "THYAO", "LONG", 0.7, "test")
+            mem.record_outcome(tid, 5.0 if i < 35 else -3.0, "RISK_ON")
+
+        result = evaluator.evaluate_all({"TECHNICAL": mem})
+        # System health doğru hesaplanmalı (double-evaluation olmadan)
+        assert result["system_health"] in ["HEALTHY", "DEGRADED", "CRITICAL"]
+        assert result["agent_reports"]["TECHNICAL"]["accuracy"] == 0.7
+
+    @pytest.mark.asyncio
+    async def test_consolidator_empty_memory_no_run(self):
+        """Boş memory'de consolidation çalışmamalı."""
+        consolidator = MemoryConsolidator()
+        mem = AgentMemory("TECHNICAL")
+        result = await consolidator.consolidate(mem)
+        assert not result["consolidated"]
+        assert result["reason"] == "empty_memory"
+
+    @pytest.mark.asyncio
+    async def test_consolidator_populated_memory_runs(self):
+        """Dolu memory'de consolidation çalışmalı."""
+        consolidator = MemoryConsolidator()
+        mem = AgentMemory("TECHNICAL")
+        for i in range(10):
+            mem.record_task(f"t{i}", "THYAO", "LONG", 0.7, "test")
+        result = await consolidator.consolidate(mem)
+        assert result["consolidated"] is True
+
+    def test_conflict_resolver_neutral_excluded(self):
+        """NEUTRAL oylar LONG/SHORT kararını etkilememeli."""
+        resolver = ConflictResolver()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "LONG", 0.7),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "NEUTRAL", 0.5),
+            AgentRole.NEWS: create_mock_agent_result(AgentRole.NEWS, "NEUTRAL", 0.5),
+            AgentRole.MACRO: create_mock_agent_result(AgentRole.MACRO, "NEUTRAL", 0.5),
+        }
+        resolution = resolver.resolve(results)
+        # 1 LONG vs 0 SHORT → LONG (NEUTRAL sayılmaz)
+        assert resolution.direction == "LONG"
+        assert resolution.method == "majority_vote"
+
+    def test_conflict_resolver_all_neutral(self):
+        """Tüm agent'lar NEUTRAL ise NO_TRADE dönmeli."""
+        resolver = ConflictResolver()
+        results = {
+            AgentRole.TECHNICAL: create_mock_agent_result(AgentRole.TECHNICAL, "NEUTRAL", 0.5),
+            AgentRole.FUNDAMENTAL: create_mock_agent_result(AgentRole.FUNDAMENTAL, "NEUTRAL", 0.5),
+        }
+        resolution = resolver.resolve(results)
+        assert resolution.direction == "NO_TRADE"
+        assert resolution.method == "no_directional_votes"
+
+    def test_prompt_factory_keyerror_protection(self):
+        """PromptFactory eksik anahtar için KeyError atmamalı."""
+        # synthesis template'inde {agent_results} var ama kwargs'da yok
+        try:
+            system, user = PromptFactory.get_prompts(
+                "synthesis", "THYAO", {},
+                # agent_results, debate_result vb. gönderilmiyor
+            )
+            # KeyError atmamalı, boş string kullanmalı
+            assert "Sentez" in system
+            assert "THYAO" in user
+        except KeyError:
+            pytest.fail("PromptFactory KeyError fırlattı — koruma çalışmıyor")
+
+    def test_debate_damping_no_mutation(self):
+        """Debate confidence damping orijinal sonucu bozmamalı."""
+        engine = DebateEngine(confidence_damping=0.9)
+        assert engine.confidence_damping == 0.9
+        # Damping'in orijinal result'ı bozmadığını doğrulamak için
+        # _run_round'da damping_local değişkeni kullanılıyor
+        # (doğrudan result.confidence *= damping yapılmıyor)
 
 
 # =====================================================

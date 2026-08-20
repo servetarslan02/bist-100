@@ -8,6 +8,9 @@ Version tracking ile.
 
 from typing import Dict, Any, List, Optional
 import json
+import structlog
+
+logger = structlog.get_logger()
 
 
 PROMPT_VERSION = "v1.0"
@@ -300,11 +303,11 @@ BEAR_USER_PROMPT_TUR1 = """Bull analistin argümanı:
 {ticker} hissesi için bu argümanları çürüterek DÜŞÜŞ tezini savun.
 Sadece JSON formatında yanıt ver."""
 
-BEAR_USER_PROMPT_TUR2 = """{ticker} hissesi için DÜŞÜŞ argümanlarını sun.
+BEAR_USER_PROMPT_TUR2 = """Bull analistin argümanı:
+{bull_argument}
 
-{context}
-
-Neden fiyat düşecek? Kanıtlarıyla açıkla. Sadece JSON formatında yanıt ver."""
+{ticker} hissesi için bu argümanları çürüterek DÜŞÜŞ tezini yeniden savun.
+Riskleri güçlendir. Sadece JSON formatında yanıt ver."""
 
 BEAR_USER_PROMPT_TUR3 = """Tartışma özeti:
 {debate_summary}
@@ -494,8 +497,36 @@ class PromptFactory:
             **kwargs,
         }
 
-        system_prompt = template["system"].format(**format_vars)
-        user_prompt = template["user"].format(**format_vars)
+        # Eksik anahtarlar için varsayılan değerler ekle — KeyError'ı önle
+        _safe_defaults = {
+            "agent_results": "",
+            "debate_result": "",
+            "risk_assessment": "",
+            "conflict_analysis": "",
+            "portfolio_info": "",
+            "bear_argument": "",
+            "bull_argument": "",
+            "debate_summary": "",
+        }
+        for key, default in _safe_defaults.items():
+            format_vars.setdefault(key, default)
+
+        try:
+            system_prompt = template["system"].format(**format_vars)
+            user_prompt = template["user"].format(**format_vars)
+        except KeyError as e:
+            logger.warning(
+                "Prompt template missing key",
+                template=template_name,
+                missing_key=str(e),
+            )
+            # Eksik anahtarları boş string ile doldur ve tekrar dene
+            import re
+            all_keys = set(re.findall(r'\{(\w+)\}', template["system"] + template["user"]))
+            for k in all_keys:
+                format_vars.setdefault(k, "")
+            system_prompt = template["system"].format(**format_vars)
+            user_prompt = template["user"].format(**format_vars)
 
         return system_prompt, user_prompt
 

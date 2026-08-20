@@ -282,10 +282,9 @@ class MultiAgentEvaluator:
                     "drift_detected": report.drift_detected,
                 })
 
-        # Genel sistem sağlığı
-        accuracies = [r.accuracy for r in [
-            self.evaluator.evaluate(m) for m in memories.values()
-        ]]
+        # Genel sistem sağlığı (double-evaluation'ı önlemek için
+        # zaten hesaplanmış report'ları kullan)
+        accuracies = [r["accuracy"] for r in reports.values()]
 
         system_health = "HEALTHY"
         if any(a < 0.45 for a in accuracies):

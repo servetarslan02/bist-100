@@ -224,12 +224,24 @@ class ConflictResolver:
                 direction_groups[direction] = []
             direction_groups[direction].append((role, result))
 
-        # Oy sayıları
+        # Oy sayıları (NEUTRAL hariç — sadece LONG/SHORT sayılır)
+        directional_votes = {d: len(v) for d, v in direction_groups.items() if d in ["LONG", "SHORT"]}
         vote_counts = {d: len(v) for d, v in direction_groups.items()}
 
-        # En çok oy alan yön
-        max_votes = max(vote_counts.values())
-        top_directions = [d for d, v in vote_counts.items() if v == max_votes]
+        if not directional_votes:
+            # Hiç LONG/SHORT yoksa NO_TRADE
+            return Resolution(
+                direction="NO_TRADE",
+                confidence=0.0,
+                method="no_directional_votes",
+                vote_distribution=vote_counts,
+                conflict=False,
+                agents={d: [r.value for r, _ in g] for d, g in direction_groups.items()},
+            )
+
+        # En çok oy alan yön (sadece LONG/SHORT)
+        max_votes = max(directional_votes.values())
+        top_directions = [d for d, v in directional_votes.items() if v == max_votes]
 
         if len(top_directions) == 1:
             # Net çoğunluk

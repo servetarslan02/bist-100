@@ -233,8 +233,8 @@ class DebateEngine:
         )
         bull_result = await bull_agent.execute(bull_task, llm_client)
 
-        # Confidence damping uygula
-        bull_result.confidence *= damping
+        # Confidence damping uygula — orijinali bozmamak için kopyala
+        bull_confidence = round(bull_result.confidence * damping, 4)
 
         # === BEAR CEVAP ===
         bear_prompt_vars = self._create_bear_prompt_vars(
@@ -250,17 +250,17 @@ class DebateEngine:
         )
         bear_result = await bear_agent.execute(bear_task, llm_client)
 
-        # Confidence damping uygula
-        bear_result.confidence *= damping
+        # Confidence damping uygula — orijinali bozmamak için kopyala
+        bear_confidence = round(bear_result.confidence * damping, 4)
 
         return DebateRound(
             round_num=round_num,
             bull_direction=bull_result.output.get("position") or bull_result.output.get("direction", "NEUTRAL"),
-            bull_confidence=bull_result.confidence,
+            bull_confidence=bull_confidence,
             bull_reasoning=bull_result.reasoning,
             bull_evidence=bull_result.evidence,
             bear_direction=bear_result.output.get("position") or bear_result.output.get("direction", "NEUTRAL"),
-            bear_confidence=bear_result.confidence,
+            bear_confidence=bear_confidence,
             bear_reasoning=bear_result.reasoning,
             bear_evidence=bear_result.evidence,
         )
@@ -290,10 +290,9 @@ class DebateEngine:
         history: List[DebateRound],
     ) -> Dict[str, str]:
         """Bear prompt değişkenlerini oluştur."""
-        if round_num == 0:
-            return {"bull_argument": bull_result.reasoning}
-        elif round_num == 1:
-            return {"bull_argument": bull_result.reasoning}
+        if round_num <= 1:
+            bull_reasoning = bull_result.reasoning if bull_result else ""
+            return {"bull_argument": bull_reasoning}
         else:
             return {"debate_summary": self._summarize_history(history)}
 

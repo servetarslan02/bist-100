@@ -472,9 +472,14 @@ class MemoryConsolidator:
         now = time.time()
         last = self._last_consolidation.get(memory.agent_role, 0)
 
-        # İlk çalıştırmada consolidation yap (last=0 ise)
+        # Zaman kontrolü — ilk çalıştırmada bile interval'e saygı göster
         if last > 0 and (now - last) < self.interval_hours * 3600:
             return {"consolidated": False, "reason": "too_soon"}
+
+        # Eğer hiç consolidation yapılmadıysa ve memory boşsa, sadece zaman damgası at
+        if last == 0 and len(memory.working.items) == 0 and len(memory.episodic.episodes) == 0:
+            self._last_consolidation[memory.agent_role] = now
+            return {"consolidated": False, "reason": "empty_memory"}
 
         # 1. Düşük güvenli working memory'yi temizle
         old_count = len(memory.working.items)

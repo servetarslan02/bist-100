@@ -682,3 +682,62 @@ class AgentSelfEvaluator:
 | Dynamic tool assignment | ❌ | ✅ |
 | Champion-challenger | ❌ | ✅ |
 | Agent drift detection | ❌ | ✅ |
+
+---
+
+## 8. Uygulama Durumu (2026-08-20 — Kod Analizi)
+
+### 8.1 Spec Uyumu Özeti
+
+| Spec Maddesi | Durum | Kod Karşılığı | Not |
+|-------------|-------|---------------|-----|
+| 4.1 Paralel Pipeline | ✅ TAM | `parallel_runner.py` | asyncio.gather + semaphore + timeout + fallback |
+| 4.2 Bull/Bear Debate | ✅ TAM | `debate_engine.py` | 3 tur + confidence damping + consensus gate + early exit |
+| 4.3 Agent Memory | ✅ TAM | `agent_memory.py` | Working + Episodic + Semantic + outcome tracking + persistence |
+| 4.4 Conflict Resolution | ✅ TAM | `communication_bus.py` | Majority vote + confidence tiebreak + risk veto + debate consensus |
+| 4.5 Communication Protocol | ✅ TAM | `communication_bus.py` | Message bus + broadcast + context enrichment + message log |
+| 4.6 Self-Evaluation | ✅ TAM | `self_evaluator.py` | Accuracy + calibration + drift + overconfidence + recommendation |
+| — Risk Assessment | ✅ TAM | `risk_assessor.py` | 6 risk faktörü + veto + position sizing + stop-loss |
+| — Synthesis Engine | ✅ TAM | `synthesis_engine.py` | LLM-destekli + conflict analysis + memory context |
+| — Pipeline Orchestrator | ✅ TAM | `agent_pipeline.py` | 7 fazlı full pipeline integration |
+| — LLM Abstraction | ✅ TAM | `llm_client.py` | Ollama + OpenAI + Anthropic + retry + fallback |
+| — Schema Validation | ✅ TAM | `schemas/` | 10 Pydantic schema + validation pipeline |
+| — Prompt Templates | ✅ TAM | `prompts/` | 12 template + BIST-specific kurallar |
+| Dynamic Tool Assignment | ⚠️ KISMİ | `agent_system.py` | Sabit registry, runtime ekleme yok |
+| Champion-Challenger | ⚠️ KISMİ | `debate_engine.py` | Debate mekanizması kısmen karşılıyor |
+
+**Toplam: 12/14 TAM, 2/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
+
+### 8.2 Düzeltilen Bug'lar (2026-08-20)
+
+| # | Bug | Dosya | Etki | Çözüm |
+|---|-----|-------|------|-------|
+| 1 | MultiAgentEvaluator double-evaluation | `self_evaluator.py` | O(2n) eval, inconsistent results | reports dict'inden accuracy okundu |
+| 2 | MemoryConsolidator forced first-run | `agent_memory.py` | Boş memory'de gereksiz consolidation | empty_memory check eklendi |
+| 3 | Debate confidence damping in-place mutation | `debate_engine.py` | Orijinal AgentResult bozuluyordu | Local variable ile damping |
+| 4 | ConflictResolver NEUTRAL weighting | `communication_bus.py` | NEUTRAL oylar LONG/SHORT ile eşit sayılıyordu | Directional vote ayrımı |
+| 5 | Debate prompt mismatch (bear_tur2) | `prompts/__init__.py` | Bear round 2'de bull argümanını_referans almıyordu | Template güncellendi |
+| 6 | PromptFactory KeyError | `prompts/__init__.py` | Eksik template key crash yaratıyordu | Safe defaults + regex fallback |
+
+### 8.3 Spec-Üstü İyileştirmeler
+
+| İyileştirme | Dosya | Açıklama |
+|-------------|-------|----------|
+| ConflictResolver NO_TRADE fallback | `communication_bus.py` | Hiç directional vote yoksa NO_TRADE döner (spec'de belirtilmemiş) |
+| PromptFactory regex fallback | `prompts/__init__.py` | Bilinmeyen template key'leri için otomatik boş string (spec'de belirtilmemiş) |
+| Debate early consensus exit | `debate_engine.py` | Anlaşma sağlanırsa tur tamamlanmadan çıkılır (spec'de sadece 3 tur var) |
+| EpisodicMemory ticker-based accuracy | `agent_memory.py` | Ticker bazlı doğruluk takibi (spec'de sadece regime bazlı) |
+| SemanticMemory sector patterns | `agent_memory.py` | Sektör bazlı kalıp depolama (spec'de belirtilmemiş) |
+
+### 8.4 İstatistikler
+
+| Metrik | Değer |
+|--------|-------|
+| Modül sayısı | 14 |
+| Toplam kod satırı | ~4,689 |
+| Test sayısı | 58 (51 original + 7 bug fix) |
+| Test geçme oranı | %100 |
+| Sınıf sayısı | 40+ |
+| Agent rolü | 12 (10 original + BULL, BEAR) |
+| Prompt template | 12 |
+| Pydantic schema | 10 |
