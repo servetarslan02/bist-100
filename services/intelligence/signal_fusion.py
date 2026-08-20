@@ -135,18 +135,23 @@ class SignalFusionEngine:
         result.fused_score = weighted_score / total_weight if total_weight > 0 else 50
 
         # Yön belirleme (çoğunluk + ağırlık)
+        # Düzeltme (v2.1): effective_weight = weight * (score/100) yerine
+        # sadece weight kullanılıyor. Neden: score/100 çarpanı yüksek skorlu
+        # sinyallerin yön kararını domine etmesine neden oluyordu.
+        # Örn: momentum_score=80, direction=LONG → 0.20 * 0.80 = 0.16
+        #       fundamental_score=40, direction=SHORT → 0.15 * 0.40 = 0.06
+        # momentum 2.67x daha ağır basıyor, oysa ağırlıklar 0.20 vs 0.15.
+        # Çözüm: Yön belirlemede sadece ağırlık kullan, skor sadece fused_score'a yansır.
         long_weight = 0.0
         short_weight = 0.0
 
         for component, weight in weights.items():
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
-            score = getattr(result, f"{component}_score", 50)
-            effective_weight = weight * (score / 100)
 
             if direction == "LONG":
-                long_weight += effective_weight
+                long_weight += weight
             elif direction == "SHORT":
-                short_weight += effective_weight
+                short_weight += weight
 
         if long_weight > short_weight * 1.3:
             result.fused_direction = "LONG"

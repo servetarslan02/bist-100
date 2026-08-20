@@ -143,9 +143,24 @@ class DecisionEngine:
         )
 
     def _calculate_composite_score(self, inp: DecisionInput) -> float:
-        """Composite skor hesapla."""
-        # ML skor: ml_score veya spec_score'dan yüksek olanı kullan
-        ml_component = max(inp.ml_score, inp.spec_score * 0.9) if inp.spec_score > 0 else inp.ml_score
+        """Composite skor hesapla.
+
+        Düzeltmeler (v2.1):
+        1. max() yerine güven-ağırlıklı ortalama (optimistic bias kaldırıldı)
+        2. ML return sinyalleri simetrik (pozitif VE negatif)
+        3. Ağırlıklar toplamı = 1.0 garantisi
+        """
+        # ML skor: max() yerine güven-ağırlıklı ortalama
+        # max() kullanmak systematic bullish bias yaratıyordu:
+        # ml_score=40 (bearish) + spec_score=60 (bullish) → max(40, 54) = 54
+        # Oysa her iki sinyal de dikkate alınmalı
+        if inp.spec_score > 0:
+            # Güven ağırlıklı ortalama: ml_confidence yüksekse ml_score'a daha çok güven
+            ml_weight = max(inp.ml_confidence, 0.5)
+            spec_weight = 1.0 - ml_weight
+            ml_component = inp.ml_score * ml_weight + (inp.spec_score * 0.9) * spec_weight
+        else:
+            ml_component = inp.ml_score
 
         # Agent skor: agent_confidence > 0.5 ise ağırlık ver
         agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
@@ -163,11 +178,17 @@ class DecisionEngine:
 
         total = sum(components.values())
 
-        # ML return sinyalleri (geriye uyumlu)
+        # ML return sinyalleri — SİMETRİK (pozitif VE negatif)
+        # Eski kod sadece pozitif return'ler için bonus veriyordu → BUY bias
         if inp.ml_return_5d > 3:
             total += 5
+        elif inp.ml_return_5d < -3:
+            total -= 5
+
         if inp.ml_return_20d > 8:
             total += 5
+        elif inp.ml_return_20d < -8:
+            total -= 5
 
         return min(100, max(0, total))
 
@@ -278,25 +299,32 @@ class DecisionEngine:
         return min(100, max(0, score))
 
     def _determine_direction(self, inp: DecisionInput) -> str:
-        """Yön belirle."""
+        """Yön belirle.
+
+        Düzeltme (v2.1): Eşikler simetrik yapıldı.
+        Eski: RSI > 55 / < 45 (10 puan gap), ML > 60 / < 40 (20 puan gap)
+        Yeni: RSI > 52 / < 48 (4 puan gap), ML > 55 / < 45 (10 puan gap)
+        Neden: Asimetrik eşikler BUY bias yaratıyordu.
+        """
         f = inp.features
 
         momentum = f.get("momentum_20d", 0)
         roc = f.get("roc_5d", 0)
         rsi = f.get("rsi_14", 50)
 
+        # SİMETRİK eşikler (BUY bias kaldırıldı)
         bullish_signals = sum([
             momentum > 0,
             roc > 0,
-            rsi > 55,
-            inp.ml_score > 60,
+            rsi > 52,   # Eski: 55 → Yeni: 52 (simetrik)
+            inp.ml_score > 55,  # Eski: 60 → Yeni: 55 (simetrik)
         ])
 
         bearish_signals = sum([
             momentum < 0,
             roc < 0,
-            rsi < 45,
-            inp.ml_score < 40,
+            rsi < 48,   # Eski: 45 → Yeni: 48 (simetrik)
+            inp.ml_score < 45,  # Eski: 40 → Yeni: 45 (simetrik)
         ])
 
         if bullish_signals >= 3:

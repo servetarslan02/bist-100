@@ -557,6 +557,24 @@ class ConfigHotReload:
 
 ## 7. ÇÖZÜLDÜ — Düzeltme Kayıtları (2026-08-20)
 
+### Düzeltme 5: Decision Engine → BUY/SELL Bias Düzeltmeleri (2026-08-21)
+- **Dosya:** `decision_engine.py`
+- **Sorunlar:**
+  1. `max()` optimistic selection: `max(ml_score, spec_score*0.9)` systematic BUY bias yaratıyordu
+  2. ML return bonus asimetrik: sadece pozitif return'ler için +5 veriyordu
+  3. Yön eşikleri asimetrik: RSI >55/<45 (10 puan gap), ML >60/<40 (20 puan gap)
+- **Çözümler:**
+  1. `max()` → güven-ağırlıklı ortalama (`ml_confidence * ml_score + (1-ml_confidence) * spec_score*0.9`)
+  2. ML return bonus simetrik: `>3 → +5`, `<-3 → -5` (ve 20d için de)
+  3. Yön eşikleri simetrik: RSI >52/<48, ML >55/<45
+- **Etki:** Systematic BUY bias kaldırıldı, LONG/SHORT kararları simetrik
+
+### Düzeltme 6: Signal Fusion → Yön Belirleme Düzeltmesi (2026-08-21)
+- **Dosya:** `signal_fusion.py`
+- **Sorun:** `effective_weight = weight * (score/100)` yüksek skorlu sinyallerin yön kararını domine etmesine neden oluyordu
+- **Çözüm:** Yön belirlemede sadece `weight` kullanılıyor, skor sadece `fused_score`'a yansıyor
+- **Etki:** Daha dengeli yön kararları, tek bir yüksek skorlu sinyal diğerlerini baskılamıyor
+
 ### Düzeltme 1: Event Bus → DLQ Entegrasyonu
 - **Dosya:** `event_bus.py`
 - **Sorun:** Handler crash → event kayboluyordu

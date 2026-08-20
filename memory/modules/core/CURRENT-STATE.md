@@ -82,6 +82,24 @@
 
 ---
 
+## Yapılan Değişiklikler (2026-08-21)
+
+### 5. Decision Engine → BUY/SELL Bias Düzeltmeleri
+- `decision_engine.py`: `max()` → güven-ağırlıklı ortalama
+- `decision_engine.py`: ML return bonus simetrik (pozitif + negatif)
+- `decision_engine.py`: Yön eşikleri simetrik (RSI 52/48, ML 55/45)
+- **Etki:** Systematic BUY bias kaldırıldı
+
+### 6. Signal Fusion → Yön Belirleme Düzeltmesi
+- `signal_fusion.py`: `effective_weight = weight * (score/100)` → sadece `weight`
+- **Etki:** Yüksek skorlu sinyaller yön kararını domine etmiyor
+
+### 7. except:pass Düzeltmeleri (88 adet)
+- 9 dosyada bare `except:pass` → `except ImportError` + `except Exception` + debug log
+- **Etki:** Kritik hatalar artık sessizce yutulmuyor
+
+---
+
 ## Açık Kararlar (Kullanıcıya Sorulacak)
 
 ### 1. Config Hot-Reload → Settings Entegrasyonu
