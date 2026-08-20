@@ -377,6 +377,238 @@ CREATE INDEX idx_knowledge_relations_source ON knowledge_relations(source_entity
 CREATE INDEX idx_knowledge_relations_target ON knowledge_relations(target_entity_id);
 
 -- =====================================================
+-- SYSTEM JOBS (Background task queue)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS system_jobs (
+    id SERIAL PRIMARY KEY,
+    job_type VARCHAR(50) NOT NULL,
+    status VARCHAR(20) DEFAULT 'PENDING' CHECK (status IN ('PENDING', 'RUNNING', 'COMPLETED', 'FAILED', 'CANCELLED')),
+    priority INTEGER DEFAULT 0,
+    payload_json TEXT DEFAULT '{}',
+    result_json TEXT DEFAULT '{}',
+    error_message TEXT,
+    idempotency_key VARCHAR(100) UNIQUE,
+    scheduled_at TIMESTAMPTZ DEFAULT NOW(),
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_system_jobs_status ON system_jobs(status);
+CREATE INDEX idx_system_jobs_type ON system_jobs(job_type);
+CREATE INDEX idx_system_jobs_idempotency ON system_jobs(idempotency_key);
+CREATE INDEX idx_system_jobs_scheduled ON system_jobs(scheduled_at);
+
+-- =====================================================
+-- STATE SNAPSHOTS (Market/asset state recovery)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS state_snapshots (
+    id SERIAL PRIMARY KEY,
+    ticker VARCHAR(20) NOT NULL,
+    state_data JSONB NOT NULL,
+    snapshot_time TIMESTAMPTZ DEFAULT NOW(),
+    snapshot_type VARCHAR(50) DEFAULT 'ASSET',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_state_snapshots_ticker ON state_snapshots(ticker);
+CREATE INDEX idx_state_snapshots_time ON state_snapshots(snapshot_time DESC);
+
+-- =====================================================
+-- POSITION HISTORY (Trade/position audit trail)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS position_history (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER REFERENCES portfolios(id),
+    ticker VARCHAR(20) NOT NULL,
+    action VARCHAR(20) NOT NULL CHECK (action IN ('OPEN', 'CLOSE', 'REDUCE', 'ADD')),
+    direction VARCHAR(10) DEFAULT 'LONG',
+    quantity INTEGER NOT NULL,
+    price DECIMAL(12, 4) NOT NULL,
+    commission DECIMAL(12, 4) DEFAULT 0,
+    avg_cost_before DECIMAL(12, 4) DEFAULT 0,
+    avg_cost_after DECIMAL(12, 4) DEFAULT 0,
+    quantity_before INTEGER DEFAULT 0,
+    quantity_after INTEGER DEFAULT 0,
+    realized_pnl DECIMAL(12, 4) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_position_history_portfolio ON position_history(portfolio_id);
+CREATE INDEX idx_position_history_ticker ON position_history(ticker);
+CREATE INDEX idx_position_history_action ON position_history(action);
+
+-- =====================================================
+-- SCAN RESULTS (Scanner output persistence)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS scan_results (
+    id SERIAL PRIMARY KEY,
+    scan_id VARCHAR(50) NOT NULL,
+    scan_type VARCHAR(50) NOT NULL,
+    ticker VARCHAR(20) NOT NULL,
+    score DECIMAL(5, 2),
+    signal VARCHAR(20),
+    direction VARCHAR(10),
+    confidence DECIMAL(5, 4),
+    tier INTEGER,
+    regime VARCHAR(30),
+    price DECIMAL(12, 4),
+    volume BIGINT,
+    features_json JSONB DEFAULT '{}',
+    timestamp TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_scan_results_scan ON scan_results(scan_id);
+CREATE INDEX idx_scan_results_ticker ON scan_results(ticker);
+CREATE INDEX idx_scan_results_score ON scan_results(score DESC);
+
+-- =====================================================
+-- DAILY PERFORMANCE (Paper trading daily stats)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS daily_performance (
+    date DATE PRIMARY KEY,
+    portfolio_value DECIMAL(15, 4) NOT NULL,
+    cash DECIMAL(15, 4) NOT NULL,
+    daily_return_pct DECIMAL(8, 4) NOT NULL,
+    cumulative_return_pct DECIMAL(8, 4) NOT NULL,
+    max_drawdown_pct DECIMAL(8, 4) NOT NULL,
+    benchmark_return_pct DECIMAL(8, 4) DEFAULT 0,
+    alpha_pct DECIMAL(8, 4) DEFAULT 0,
+    turnover DECIMAL(8, 4) DEFAULT 0,
+    transaction_cost DECIMAL(12, 4) DEFAULT 0,
+    num_positions INTEGER DEFAULT 0,
+    num_trades INTEGER DEFAULT 0,
+    json_data JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- EQUITY CURVE (Portfolio equity over time)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS equity_curve (
+    date DATE PRIMARY KEY,
+    equity DECIMAL(15, 4) NOT NULL,
+    cash DECIMAL(15, 4) NOT NULL,
+    market_value DECIMAL(15, 4) NOT NULL,
+    positions INTEGER DEFAULT 0,
+    drawdown DECIMAL(8, 4) DEFAULT 0,
+    daily_return DECIMAL(8, 4) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- =====================================================
+-- PORTFOLIO STATE (Paper trading current state)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS portfolio_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    date DATE NOT NULL,
+    cash DECIMAL(15, 4) NOT NULL,
+    initial_capital DECIMAL(15, 4) NOT NULL,
+    last_updated TIMESTAMPTZ DEFAULT NOW(),
+    json_data JSONB DEFAULT '{}'
+);
+
+-- =====================================================
+-- PAPER TRADES (Paper trading trade log)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS paper_trades (
+    trade_id VARCHAR(50) PRIMARY KEY,
+    date DATE NOT NULL,
+    ticker VARCHAR(20) NOT NULL,
+    side VARCHAR(10) NOT NULL,
+    quantity INTEGER NOT NULL,
+    entry_price DECIMAL(12, 4) NOT NULL,
+    exit_price DECIMAL(12, 4) NOT NULL,
+    realized_pnl DECIMAL(12, 4) NOT NULL,
+    commission DECIMAL(12, 4) DEFAULT 0,
+    reason TEXT,
+    json_data JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_paper_trades_ticker ON paper_trades(ticker);
+CREATE INDEX idx_paper_trades_date ON paper_trades(date);
+
+-- =====================================================
+-- PAPER AUDIT LOG (Paper trading audit trail)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS paper_audit_log (
+    entry_id SERIAL PRIMARY KEY,
+    timestamp TIMESTAMPTZ NOT NULL,
+    date DATE NOT NULL,
+    entry_type VARCHAR(50) NOT NULL,
+    ticker VARCHAR(20),
+    json_data JSONB NOT NULL,
+    entry_hash VARCHAR(64) NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_paper_audit_log_date ON paper_audit_log(date);
+CREATE INDEX idx_paper_audit_log_type ON paper_audit_log(entry_type);
+
+-- =====================================================
+-- BACKTEST RUNS (Backtest persistence)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS backtest_runs (
+    run_id VARCHAR(50) PRIMARY KEY,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    initial_capital DECIMAL(15, 4),
+    final_equity DECIMAL(15, 4),
+    total_return_pct DECIMAL(8, 4),
+    sharpe_ratio DECIMAL(8, 4),
+    max_drawdown_pct DECIMAL(8, 4),
+    total_trades INTEGER,
+    config_json JSONB DEFAULT '{}',
+    metrics_json JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS backtest_trades (
+    id SERIAL PRIMARY KEY,
+    run_id VARCHAR(50) REFERENCES backtest_runs(run_id),
+    trade_id INTEGER,
+    ticker VARCHAR(20),
+    side VARCHAR(10),
+    date DATE,
+    quantity INTEGER,
+    price DECIMAL(12, 4),
+    commission DECIMAL(12, 4),
+    slippage DECIMAL(12, 4),
+    pnl DECIMAL(12, 4),
+    pnl_pct DECIMAL(8, 4),
+    holding_days INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS backtest_equity (
+    id SERIAL PRIMARY KEY,
+    run_id VARCHAR(50) REFERENCES backtest_runs(run_id),
+    date DATE NOT NULL,
+    equity DECIMAL(15, 4),
+    cash DECIMAL(15, 4),
+    market_value DECIMAL(15, 4),
+    positions INTEGER,
+    drawdown DECIMAL(8, 4),
+    daily_return DECIMAL(8, 4)
+);
+
+CREATE INDEX idx_backtest_trades_run ON backtest_trades(run_id);
+CREATE INDEX idx_backtest_equity_run ON backtest_equity(run_id);
+CREATE INDEX idx_backtest_equity_date ON backtest_equity(run_id, date);
+
+-- =====================================================
 -- DEFAULT DATA
 -- =====================================================
 
