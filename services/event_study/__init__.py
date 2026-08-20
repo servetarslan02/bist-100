@@ -1,11 +1,12 @@
 """ALPHA BIST — Event Study Package (Nihai Sistem).
 
 MacKinlay (1997) metodolojisi ile BIST hisseleri için event study.
-14 modül, ~2,825 satır, Fama-French multi-factor destekli.
+16 modül, Fama-French multi-factor + trading calendar destekli.
 
 Modüller:
-    - estimation_window: Look-ahead bias önleme
-    - event_window: Gün bazlı pencereleme
+    - trading_calendar: BIST iş günleri takvimi (hafta sonu + tatil)
+    - estimation_window: Look-ahead bias önleme (trading day bazlı)
+    - event_window: Gün bazlı pencereleme (trading day bazlı)
     - expected_return: Multi-factor expected return (Market, FF3, FF5)
     - abnormal_return: AR hesaplama
     - car: Cumulative Abnormal Return
@@ -13,13 +14,15 @@ Modüller:
     - impact: Event-specific etki skoru
     - kap_event: KAP açıklaması event study
     - macro_event: TCMB, enflasyon, GSYH event study
-    - multi_factor: Fama-French factor hesaplama
+    - multi_factor: Fama-French factor hesaplama (skor bazlı)
+    - fama_french_factors: Fama-French time-series factor builder (SMB/HML/RMW/CMA)
     - cross_sectional: Birden fazla hisse için analysis
     - event_clustering: Event clustering tespiti
     - event_decay: Etki azalma analizi
     - sector_event: Sektör bazlı event study
 """
 
+from .trading_calendar import BISTTradingCalendar, get_trading_calendar
 from .estimation_window import EstimationWindowManager, ESTIMATION_WINDOWS
 from .event_window import EventWindowManager, EVENT_WINDOWS
 from .expected_return import (
@@ -52,21 +55,36 @@ from .macro_event import (
     MACRO_EVENT_TYPES,
 )
 from .multi_factor import MultiFactorModel, FamaFrenchFactors
+from .fama_french_factors import (
+    FamaFrenchFactorBuilder,
+    FamaFrenchDataFetcher,
+    StockData,
+    FactorReturns,
+    build_factor_arrays_from_series,
+)
 from .cross_sectional import CrossSectionalEventStudy
 from .event_clustering import EventClusteringDetector
 from .event_decay import EventImpactDecay
 from .sector_event import SectorEventAnalyzer, SECTOR_STOCKS
 
 __all__ = [
+    # Trading Calendar
+    "BISTTradingCalendar",
+    "get_trading_calendar",
     # Managers
     "EstimationWindowManager",
     "EventWindowManager",
     "MultiFactorModel",
     "FamaFrenchFactors",
+    "FamaFrenchFactorBuilder",
+    "FamaFrenchDataFetcher",
     "CrossSectionalEventStudy",
     "EventClusteringDetector",
     "EventImpactDecay",
     "SectorEventAnalyzer",
+    # Data classes
+    "StockData",
+    "FactorReturns",
     # Core functions
     "calculate_expected_return",
     "calculate_expected_return_value",
@@ -93,6 +111,7 @@ __all__ = [
     "analyze_tcmb_event",
     "analyze_macro_event",
     "analyze_macro_events_batch",
+    "build_factor_arrays_from_series",
     # Constants
     "ESTIMATION_WINDOWS",
     "EVENT_WINDOWS",
