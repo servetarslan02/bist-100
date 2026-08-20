@@ -1023,17 +1023,38 @@ class BacktestEngineV4:
         return self._compute_score_legacy(features)
 
     def _compute_score_legacy(self, features: Dict[str, Any]) -> float:
-        """Legacy skor (v2.0 ile aynı mantık)."""
+        """Legacy skor — normalize edilmiş ağırlıklar.
+
+        Her bileşen ±5-10 puan aralığına normalize edilir:
+        - RSI (0-100): ±10 puan (eşik 40/60)
+        - momentum_20d (ondalık, tipik ±0.05): ×200 → ±10 puan
+        - roc_5d (%, tipik ±5): ×1.5 → ±7.5 puan
+        - volume_zscore (z, tipik ±2): ×3 → ±6 puan
+
+        Skor aralığı: ~25-75 (normal), 0-100 (aşırı durumlar)
+        """
         _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
         score = 50.0
+
+        # RSI: 40-60 arası nötr, dışı ±10 puan
         rsi = _s(features.get("rsi_14", 50))
         if rsi > 60:
-            score += 10
+            score += min((rsi - 60) * 0.25, 10)   # 60→+0, 100→+10
         elif rsi < 40:
-            score -= 10
-        score += _s(features.get("momentum_20d", 0)) * 100
-        score += _s(features.get("roc_5d", 0)) * 2
-        score += _s(features.get("volume_zscore", 0)) * 5
+            score -= min((40 - rsi) * 0.25, 10)   # 40→-0, 0→-10
+
+        # Momentum 20d (ondalık): ×200 → ±10 puan
+        mom20 = _s(features.get("momentum_20d", 0))
+        score += max(-10, min(10, mom20 * 200))
+
+        # ROC 5d (%): ×1.5 → ±7.5 puan
+        roc5 = _s(features.get("roc_5d", 0))
+        score += max(-7.5, min(7.5, roc5 * 1.5))
+
+        # Volume z-score: ×3 → ±6 puan
+        vz = _s(features.get("volume_zscore", 0))
+        score += max(-6, min(6, vz * 3))
+
         return max(0, min(100, score))
 
     def _compute_score_canonical(self, features: Dict[str, Any],

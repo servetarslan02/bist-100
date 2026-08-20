@@ -253,15 +253,15 @@ class PortfolioSimulatorV3:
         cost_engine = _get_cost_engine() if self._use_realistic_costs else None
 
         if cost_engine is not None:
-            vol = volatility_ratio if volatility_ratio is not None else self._volatility_ratio
-            vol = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            adv = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            vol_r = volatility_ratio if volatility_ratio is not None else self._volatility_ratio
             cost_detail = cost_engine.calculate_total_cost(
                 side="BUY",
                 price=price,
                 quantity=quantity,
                 ticker=ticker,
-                avg_daily_volume=vol,
-                volatility_ratio=self._volatility_ratio,
+                avg_daily_volume=adv,
+                volatility_ratio=vol_r,
             )
             fill_price = cost_detail["execution_price"]
             commission = cost_detail["costs"]["commission"]
@@ -293,8 +293,8 @@ class PortfolioSimulatorV3:
             if cost_engine is not None:
                 cost_detail = cost_engine.calculate_total_cost(
                     side="BUY", price=price, quantity=quantity, ticker=ticker,
-                    avg_daily_volume=self._avg_daily_volume,
-                    volatility_ratio=self._volatility_ratio,
+                    avg_daily_volume=adv,
+                    volatility_ratio=vol_r,
                 )
                 fill_price = cost_detail["execution_price"]
                 commission = cost_detail["costs"]["commission"]
@@ -355,14 +355,15 @@ class PortfolioSimulatorV3:
         cost_engine = _get_cost_engine() if self._use_realistic_costs else None
 
         if cost_engine is not None:
-            vol = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            adv = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            vol_r = volatility_ratio if volatility_ratio is not None else self._volatility_ratio
             cost_detail = cost_engine.calculate_total_cost(
                 side="SELL",
                 price=price,
                 quantity=quantity,
                 ticker=ticker,
-                avg_daily_volume=vol,
-                volatility_ratio=volatility_ratio if volatility_ratio is not None else self._volatility_ratio,
+                avg_daily_volume=adv,
+                volatility_ratio=vol_r,
             )
             fill_price = cost_detail["execution_price"]
             # Komisyon market price üzerinden (BUY ile tutarlı)
