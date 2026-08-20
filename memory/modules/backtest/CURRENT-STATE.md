@@ -151,3 +151,51 @@ tests/test_backtest_integration.py — 25 passed, 0 failed
 | DeterministicRecovery | 2 | ✅ |
 | BiasDetector | 1 | ✅ |
 | ScannerParity | 2 | ✅ |
+
+---
+
+## Matematiksel Düzeltmeler (2026-08-20 — İkinci Tur)
+
+### Düzeltme 6: Slippage Double-Counting (KRİTİK)
+- **Dosya:** `portfolio_sim.py` — `execute_buy()` legacy path
+- **Sorun:** Slippage iki kez sayılıyordu
+  ```
+  ESKİ (HATALI):
+  fill_price = price * 1.001          # = 100.1 (slippage dahil)
+  amount = qty * fill_price           # = 100,100 (slippage dahil)
+  commission = BIST.compute(amount)   # = 37.42
+  slippage = amount * 0.001           # = 100.1 (İKİNCİ KEZ!)
+  total_cost = amount + commission + slippage  # = 100,237.52 ← FAZLA
+  ```
+  ```
+  YENİ (DOĞRU):
+  fill_price = price * 1.001          # = 100.1 (slippage dahil)
+  amount = qty * fill_price           # = 100,100 (slippage dahil)
+  commission = BIST.compute(amount)   # = 37.42
+  slippage = amount - qty*price       # = 100.1 (bilgi amaçlı)
+  total_cost = amount + commission    # = 100,137.42 ← DOĞRU
+  ```
+- **Etki:** Legacy backtest cost basis artık realistic ile aynı mantıkta
+
+### Düzeltme 7: SELL Komisyon Tutarlılığı
+- **Dosya:** `portfolio_sim.py` — `execute_sell()` realistic path
+- **Sorun:** SELL'de komisyon fill_price üzerinden, BUY'de market price üzerinden
+- **Çözüm:** Her iki yolda da komisyon market price (`qty * price`) üzerinden
+- **Formül:** `commission = BISTCommissionModel.compute(quantity * price)`
+
+### Doğru Maliyet Formülleri (Final)
+```
+BUY:
+  fill_price = market_price * (1 + slippage_rate)
+  notional = quantity * fill_price         ← slippage dahil
+  commission = BIST.compute(notional)      ← fill price üzerinden
+  total_cost = notional + commission       ← slippage TEK KEZ
+  cost_basis = total_cost
+
+SELL:
+  fill_price = market_price * (1 - slippage_rate)
+  notional = quantity * fill_price         ← slippage dahil
+  commission = BIST.compute(qty * market_price)  ← market price üzerinden
+  net_revenue = notional - commission
+  pnl = net_revenue - cost_basis
+```
