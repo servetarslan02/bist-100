@@ -232,26 +232,17 @@ async def get_learning_status():
 @app.get("/features/{ticker}", tags=["Analysis"])
 async def get_features(ticker: str):
     """Hissenin feature vektörü."""
-    # TODO: Feature cache'den getir
-    return {
-        "ticker": ticker,
-        "features": {},  # TODO
-        "feature_count": 0,
-    }
+    raise HTTPException(
+        status_code=501,
+        detail=f"Feature computation not yet implemented for {ticker}. Run feature pipeline first.",
+    )
 
 @app.post("/predict", response_model=PredictResponse, tags=["Trading"])
 async def predict(request: PredictRequest):
-    """Tahmin isteği."""
-    from services.ml.ranking_model import ranking_model
-
-    # TODO: Feature'ları hesapla ve tahmin yap
-    return PredictResponse(
-        ticker=request.ticker,
-        score=0.0,
-        rank=0,
-        direction="UNKNOWN",
-        confidence=0.0,
-        feature_importance={},
+    """Prediction endpoint — not yet implemented."""
+    raise HTTPException(
+        status_code=501,
+        detail="Prediction engine not yet connected. Run training pipeline first.",
     )
 
 @app.get("/pipeline/stats", tags=["System"])

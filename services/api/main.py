@@ -767,6 +767,9 @@ async def websocket_endpoint(websocket: WebSocket, channel: str):
                 await websocket.send_json({"type": "pong", "data": data})
     except WebSocketDisconnect:
         manager.disconnect(websocket, channel)
+    except Exception as e:
+        logger.warning("WebSocket error", channel=channel, error=str(e))
+        manager.disconnect(websocket, channel)
 
 
 @app.websocket("/ws/live")
@@ -821,10 +824,6 @@ async def stream_events():
 # =====================================================
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "services.api.main:app",
-        host=settings.app_host,
-        port=settings.app_port,
-        reload=settings.app_debug,
-    )
+    import sys
+    print("⚠️  DEPRECATED: Use services/api/app.py instead", file=sys.stderr)
+    sys.exit(1)

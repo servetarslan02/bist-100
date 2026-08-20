@@ -440,45 +440,59 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
         from .world_state import WorldStateManager
         ws = WorldStateManager()
         result["world_state"] = ws.get_state_dict() if hasattr(ws, "get_state_dict") else {}
-    except: result["world_state"] = {}
+    except Exception as e:
+        logger.warning("world_state failed", error=str(e))
+        result["world_state"] = {}
 
     # 2. Regime
     try:
         from .regime import regime_engine
         r = regime_engine.detect_regime(features)
         result["regime"] = r.regime if hasattr(r, "regime") else str(r)
-    except: result["regime"] = "UNKNOWN"
+    except Exception as e:
+        logger.warning("regime detection failed", error=str(e))
+        result["regime"] = "UNKNOWN"
 
     # 3. SPEC
     try:
         from .spec_engine import spec_engine
         s = spec_engine.compute_spec(ticker, features, market_state)
         result["spec"] = s.__dict__ if hasattr(s, "__dict__") else {}
-    except: result["spec"] = {}
+    except Exception as e:
+        logger.warning("spec_engine failed", error=str(e))
+        result["spec"] = {}
 
     # 4. Forecasting
     try:
         from .forecasting import ForecastingEngine
         result["forecasting"] = {"available": True}
-    except: result["forecasting"] = {}
+    except Exception as e:
+        logger.warning("forecasting failed", error=str(e))
+        result["forecasting"] = {}
 
     # 5. Monte Carlo
     try:
         from .monte_carlo import MonteCarloEngine
         result["monte_carlo"] = {"available": True}
-    except: result["monte_carlo"] = {}
+    except Exception as e:
+        logger.warning("monte_carlo failed", error=str(e))
+        result["monte_carlo"] = {}
 
     # 6. Probability
     try:
         from .probability import ProbabilityEngine
         result["probability"] = {"available": True}
-    except: result["probability"] = {}
+    except Exception as e:
+        logger.warning("probability failed", error=str(e))
+        result["probability"] = {}
 
     # 7. Scenario
     try:
         from .scenario import ScenarioEngine
         result["scenario"] = {"available": True}
-    except: result["scenario"] = {}
+    except Exception as e:
+        logger.warning("scenario failed", error=str(e))
+        result["scenario"] = {}
 
     # 8. Signal Fusion
     try:
@@ -493,70 +507,92 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
         }
         fused = sf.fuse_signals(ticker, signals, result.get("regime", "RANGE"))
         result["signal"] = fused.__dict__ if hasattr(fused, "__dict__") else {}
-    except: result["signal"] = {}
+    except Exception as e:
+        logger.warning("signal_fusion failed", error=str(e))
+        result["signal"] = {}
 
     # 9. Knowledge Graph
     try:
         from .knowledge_graph import KnowledgeGraph
         kg = KnowledgeGraph()
         result["knowledge_graph"] = {"loaded": True}
-    except: result["knowledge_graph"] = {}
+    except Exception as e:
+        logger.warning("knowledge_graph failed", error=str(e))
+        result["knowledge_graph"] = {}
 
     # 10. Research Memory
     try:
         from .research_memory import ResearchMemory
         result["research_memory"] = {"available": True}
-    except: result["research_memory"] = {}
+    except Exception as e:
+        logger.warning("research_memory failed", error=str(e))
+        result["research_memory"] = {}
 
     # 11. Evidence
     try:
         from .evidence_engine import EvidenceVerificationEngine
         result["evidence"] = {"available": True}
-    except: result["evidence"] = {}
+    except Exception as e:
+        logger.warning("evidence_engine failed", error=str(e))
+        result["evidence"] = {}
 
     # 12. Factors (B30)
     try:
         from .factor_engine import compute_financial_scores
         if fundamentals:
             result["factors"] = compute_financial_scores(fundamentals)
-    except: result["factors"] = {}
+    except Exception as e:
+        logger.warning("factor_engine failed", error=str(e))
+        result["factors"] = {}
 
     # 13. Impact (B31)
     try:
         from .impact_engine import analyze_event_impact
         result["event_impact"] = {"available": True}
-    except: result["event_impact"] = {}
+    except Exception as e:
+        logger.warning("impact_engine failed", error=str(e))
+        result["event_impact"] = {}
 
     # 14. Macro Sensitivity
     try:
         from .macro_sensitivity import MacroSensitivityEngine
         result["macro_sensitivity"] = {"available": True}
-    except: result["macro_sensitivity"] = {}
+    except Exception as e:
+        logger.warning("macro_sensitivity failed", error=str(e))
+        result["macro_sensitivity"] = {}
 
     # 15. News Pipeline
     try:
         from .news_pipeline import NewsPipeline
         if news:
             result["news"] = {"count": len(news)}
-    except: result["news"] = {}
+    except Exception as e:
+        logger.warning("news_pipeline failed", error=str(e))
+        result["news"] = {}
 
     # 16. Prediction Layer
     try:
         from .prediction_layer import Prediction
         result["prediction_layer"] = {"available": True}
-    except: result["prediction_layer"] = {}
+    except Exception as e:
+        logger.warning("prediction_layer failed", error=str(e))
+        result["prediction_layer"] = {}
 
     # 17. Trade Planner
     try:
         from .trade_planner import TradePlanner
         result["trade_planner"] = {"available": True}
-    except: result["trade_planner"] = {}
+    except Exception as e:
+        logger.warning("trade_planner failed", error=str(e))
+        result["trade_planner"] = {}
 
     # 18. KAP LLM Extractor
     try:
         from .kap_llm_extractor import KAPLLMExtractor
         result["kap_llm"] = {"available": True}
-    except: result["kap_llm"] = {}
+    except Exception as e:
+        logger.warning("kap_llm_extractor failed", error=str(e))
+        result["kap_llm"] = {}
 
     # 19. Analysis Engines
     try:
@@ -566,6 +602,8 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
             DrawdownEngine, PositionRiskEngine, ModelRiskEngine, DataConfidenceEngine
         )
         result["analysis_engines"] = {"count": 9}
-    except: result["analysis_engines"] = {}
+    except Exception as e:
+        logger.warning("analysis_engines failed", error=str(e))
+        result["analysis_engines"] = {}
 
     return result

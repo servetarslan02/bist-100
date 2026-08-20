@@ -52,8 +52,8 @@ class MasterOrchestrator:
             self._services["event_bus"] = event_bus
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="event_bus", error=str(e))
 
         # Feature servisleri
         try:
@@ -61,8 +61,8 @@ class MasterOrchestrator:
             self._services["feature_calculator"] = feature_calculator
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="feature_calculator", error=str(e))
 
         # Intelligence servisleri
         try:
@@ -70,112 +70,112 @@ class MasterOrchestrator:
             self._services["world_state"] = WorldStateManager()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="world_state", error=str(e))
 
         try:
             from services.intelligence.regime import regime_engine
             self._services["regime"] = regime_engine
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="regime", error=str(e))
 
         try:
             from services.intelligence.forecasting import ForecastingEngine
             self._services["forecasting"] = ForecastingEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="forecasting", error=str(e))
 
         try:
             from services.intelligence.monte_carlo import MonteCarloEngine
             self._services["monte_carlo"] = MonteCarloEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="monte_carlo", error=str(e))
 
         try:
             from services.intelligence.probability import ProbabilityEngine
             self._services["probability"] = ProbabilityEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="probability", error=str(e))
 
         try:
             from services.intelligence.spec_engine import spec_engine
             self._services["spec_engine"] = spec_engine
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="spec_engine", error=str(e))
 
         try:
             from services.intelligence.signal_fusion import SignalFusionEngine
             self._services["signal_fusion"] = SignalFusionEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="signal_fusion", error=str(e))
 
         try:
             from services.intelligence.knowledge_graph import KnowledgeGraph
             self._services["knowledge_graph"] = KnowledgeGraph()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="knowledge_graph", error=str(e))
 
         try:
             from services.intelligence.research_memory import ResearchMemory
             self._services["research_memory"] = ResearchMemory()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="research_memory", error=str(e))
 
         try:
             from services.intelligence.evidence_engine import EvidenceVerificationEngine
             self._services["evidence"] = EvidenceVerificationEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="evidence", error=str(e))
 
         try:
             from services.intelligence.factor_engine import FactorEngine
             self._services["factor_engine"] = FactorEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="factor_engine", error=str(e))
 
         try:
             from services.intelligence.impact_engine import ImpactEngine
             self._services["impact_engine"] = ImpactEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="impact_engine", error=str(e))
 
         try:
             from services.intelligence.macro_sensitivity import MacroSensitivityEngine
             self._services["macro_sensitivity"] = MacroSensitivityEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="macro_sensitivity", error=str(e))
 
         try:
             from services.intelligence.news_pipeline import NewsPipeline
             self._services["news_pipeline"] = NewsPipeline()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="news_pipeline", error=str(e))
 
         try:
             from services.intelligence.analysis_engines import (
@@ -189,16 +189,16 @@ class MasterOrchestrator:
             self._services["correlation"] = CorrelationEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="correlation", error=str(e))
 
         try:
             from services.intelligence.trade_planner import TradePlanner
             self._services["trade_planner"] = TradePlanner()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="trade_planner", error=str(e))
 
         # Decision servisleri
         try:
@@ -206,8 +206,8 @@ class MasterOrchestrator:
             self._services["decision_engine"] = DecisionEngine()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="decision_engine", error=str(e))
 
         # Risk servisleri
         try:
@@ -215,40 +215,40 @@ class MasterOrchestrator:
             self._services["risk_gate"] = RiskGate()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="risk_gate", error=str(e))
 
         try:
             from services.risk.position_sizing import PositionSizer
             self._services["position_sizing"] = PositionSizer()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="position_sizing", error=str(e))
 
         try:
             from services.core.compliance import compliance_checker
             self._services["compliance"] = compliance_checker
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="compliance", error=str(e))
 
         try:
             from services.core.short_selling import short_selling_monitor
             self._services["short_selling"] = short_selling_monitor
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="short_selling", error=str(e))
 
         try:
             from services.core.halt_monitor import halt_monitor
             self._services["halt_monitor"] = halt_monitor
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="halt_monitor", error=str(e))
 
         # Portfolio servisleri
         try:
@@ -257,8 +257,8 @@ class MasterOrchestrator:
             self._services["commission_model"] = CommissionModel()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="commission_model", error=str(e))
 
         # Learning servisleri
         try:
@@ -266,16 +266,16 @@ class MasterOrchestrator:
             self._services["outcome_tracker"] = OutcomeTracker()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="outcome_tracker", error=str(e))
 
         try:
             from services.learning.integrated_learning import IntegratedLearningSystem
             self._services["learning"] = IntegratedLearningSystem()
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="learning", error=str(e))
 
         # Macro servisleri (B28)
         try:
@@ -283,8 +283,8 @@ class MasterOrchestrator:
             self._services["macro_features"] = compute_all_macro_features
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="macro_features", error=str(e))
 
         # Factors (B30)
         try:
@@ -292,8 +292,8 @@ class MasterOrchestrator:
             self._services["financial_scores"] = compute_financial_scores
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="financial_scores", error=str(e))
 
         # Event Study (B31)
         try:
@@ -301,8 +301,8 @@ class MasterOrchestrator:
             self._services["event_impact"] = analyze_event_impact
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to load module", module="event_impact", error=str(e))
 
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
@@ -370,8 +370,8 @@ class MasterOrchestrator:
                     cds_data=market_data["macro"].get("cds"),
                 )
                 features.update(macro_f)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="macro_features", error=str(e))
 
         # ━━━ 3. WORLD STATE ━━━
         world_state = {}
@@ -379,8 +379,8 @@ class MasterOrchestrator:
             ws = self._services.get("world_state")
             if ws:
                 world_state = ws.get_state_dict() if hasattr(ws, "get_state_dict") else {}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="world_state", error=str(e))
         result["world_state"] = world_state
 
         # ━━━ 4. REGIME ━━━
@@ -390,8 +390,8 @@ class MasterOrchestrator:
             if re:
                 regime_result = re.detect_regime(features)
                 regime = regime_result.regime if hasattr(regime_result, "regime") else str(regime_result)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="regime", error=str(e))
         result["regime"] = regime
 
         # ━━━ 5. ANALYSIS ENGINES ━━━
@@ -405,8 +405,8 @@ class MasterOrchestrator:
             if se: analysis["sector"] = "computed"
             rs = self._services.get("relative_strength")
             if rs: analysis["relative_strength"] = "computed"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="analysis_engines", error=str(e))
         result["analysis"] = analysis
 
         # ━━━ 6. FORECASTING + PROBABILITY ━━━
@@ -415,8 +415,8 @@ class MasterOrchestrator:
             fe = self._services.get("forecasting")
             if fe:
                 forecast = {"horizons": [1, 5, 20]}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="forecasting_+_probability", error=str(e))
         result["forecast"] = forecast
 
         # ━━━ 7. MONTE CARLO ━━━
@@ -425,8 +425,8 @@ class MasterOrchestrator:
             mc = self._services.get("monte_carlo")
             if mc:
                 monte_carlo = {"simulated": True}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="monte_carlo", error=str(e))
         result["monte_carlo"] = monte_carlo
 
         # ━━━ 8. SPEC ENGINE ━━━
@@ -437,8 +437,8 @@ class MasterOrchestrator:
                 spec = se.compute_spec(ticker, features, world_state)
                 if hasattr(spec, "__dict__"):
                     spec = spec.__dict__
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="spec_engine", error=str(e))
         result["spec"] = spec
 
         # ━━━ 9. FACTORS (B30) ━━━
@@ -447,8 +447,8 @@ class MasterOrchestrator:
             fs_fn = self._services.get("financial_scores")
             if fs_fn and market_data.get("fundamentals"):
                 factors = fs_fn(market_data["fundamentals"])
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="factors_(b30)", error=str(e))
         result["factors"] = factors
 
         # ━━━ 9.5. AGENT PIPELINE (Nihai Mimari) ━━━
@@ -529,8 +529,8 @@ class MasterOrchestrator:
                         pass
             except ImportError:
                 pass
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Pipeline step failed", step="agent_event_publish", error=str(e))
 
         # ━━━ 10. SIGNAL FUSION (Agent sonuçları dahil) ━━━
         fused_signal = {}
@@ -550,8 +550,8 @@ class MasterOrchestrator:
                 }
                 fused = sf.fuse_signals(ticker, signals, regime)
                 fused_signal = fused.__dict__ if hasattr(fused, "__dict__") else {}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="signal_fusion", error=str(e))
         result["signal"] = fused_signal
 
         # ━━━ 11. DECISION ━━━
@@ -577,8 +577,8 @@ class MasterOrchestrator:
                 decision = d.__dict__ if hasattr(d, "__dict__") else {}
         except ImportError:
             pass
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="decision", error=str(e))
         result["decision"] = decision
 
         # ━━━ 12. TRADE PLAN ━━━
@@ -595,8 +595,8 @@ class MasterOrchestrator:
                 )
                 if hasattr(trade_plan, "__dict__"):
                     trade_plan = trade_plan.__dict__
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="trade_plan", error=str(e))
         result["trade_plan"] = trade_plan
 
         # ━━━ 13. RISK CHECK ━━━
@@ -614,8 +614,8 @@ class MasterOrchestrator:
                     model_confidence=fused_signal.get("fused_confidence", 0.5),
                 )
                 risk_check = risk_result.__dict__ if hasattr(risk_result, "__dict__") else {"allowed": True}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="risk_check", error=str(e))
         result["risk"] = risk_check
 
         # ━━━ 14. COMPLIANCE (B27) ━━━
@@ -628,8 +628,8 @@ class MasterOrchestrator:
                     trade_plan.get("quantity", 0) * float(prices[-1]) if isinstance(trade_plan, dict) else 0,
                     100000, 0
                 ).to_dict()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="compliance", error=str(e))
         result["compliance"] = compliance
 
         # ━━━ 15. KNOWLEDGE GRAPH + RESEARCH MEMORY ━━━
@@ -639,8 +639,8 @@ class MasterOrchestrator:
             if kg: context["knowledge"] = "available"
             rm = self._services.get("research_memory")
             if rm: context["memory"] = "available"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Pipeline step failed", step="knowledge_graph_+_research_memory", error=str(e))
         result["context"] = context
 
         return result
@@ -722,7 +722,6 @@ class MasterOrchestrator:
                         features["macro_cumulative_impact"] = impact.get("cumulative_impact", 0)
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="orchestrator.py:614")
-                        pass
 
                 # Agent pipeline (varsa)
                 agent_info = {}

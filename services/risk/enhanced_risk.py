@@ -391,7 +391,9 @@ def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> 
     try:
         from services.viop.hedging import hedge_portfolio
         return hedge_portfolio(portfolio_value, beta, futures_price)
-    except: return {"error": "VIOP hedging not available"}
+    except Exception as e:
+        logger.warning("VIOP hedging failed", error=str(e))
+        return {"error": "VIOP hedging not available"}
 
 
 def check_options_strategy(spot_price: float, strike: float, premium: float,
@@ -403,4 +405,6 @@ def check_options_strategy(spot_price: float, strike: float, premium: float,
             return create_covered_call(spot_price, strike, premium, 100)
         elif strategy_type == "protective_put":
             return create_protective_put(spot_price, strike, premium, 100)
-    except: return {"error": "VIOP strategies not available"}
+    except Exception as e:
+        logger.warning("VIOP strategies failed", error=str(e))
+        return {"error": "VIOP strategies not available"}

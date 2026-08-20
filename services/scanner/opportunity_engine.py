@@ -472,46 +472,46 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         results.append({"engine": "alpha", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="AlphaEngine", error=str(e))
     try:
         from .alpha_scanner import AlphaScanner
         scanner = AlphaScanner()
         results.append({"engine": "alpha_scanner", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="AlphaScanner", error=str(e))
     try:
         from .event_scanner import EventScanner
         scanner = EventScanner()
         results.append({"engine": "event_scanner", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="EventScanner", error=str(e))
     try:
         from .live_scanner import LiveScanner
         scanner = LiveScanner()
         results.append({"engine": "live_scanner", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="LiveScanner", error=str(e))
     try:
         from .tiered_scanner import TieredScanner
         scanner = TieredScanner()
         results.append({"engine": "tiered_scanner", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="TieredScanner", error=str(e))
     try:
         from .event_queue import EventQueue
         queue = EventQueue()
         results.append({"engine": "event_queue", "status": "available"})
     except ImportError:
         pass
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Failed to load module", module="EventQueue", error=str(e))
     return results

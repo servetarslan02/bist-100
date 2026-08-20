@@ -64,8 +64,6 @@ from services.core.alerting import alerting
 from services.learning.integrated_learning import learning_system
 from services.learning.outcome_tracker import outcome_tracker
 
-logger = structlog.get_logger()
-
 # ===================== LIFESPAN =====================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -231,9 +229,9 @@ async def get_market_data():
 
         result = {
             "bist_100": {
-                "value": 9847.32,
-                "change_pct": 1.24,
-                "change_points": 120.45,
+                "value": None,
+                "change_pct": None,
+                "change_points": None,
             },
             "regime": {
                 "current": regime.regime.value if regime else "UNKNOWN",
@@ -241,14 +239,16 @@ async def get_market_data():
                 "regime_scores": regime.features_used if regime else {},
             },
             "breadth": {
-                "advance_pct": 64.2,
-                "advancing": 312,
-                "declining": 174,
+                "advance_pct": None,
+                "advancing": None,
+                "declining": None,
             },
             "volatility": {
-                "vix_estimate": 18.4,
-                "status": "low",
+                "vix_estimate": None,
+                "status": None,
             },
+            "status": "no_data_source",
+            "message": "Connect a real data source to populate this endpoint",
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 

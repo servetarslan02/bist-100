@@ -108,8 +108,8 @@ class InternalEventBus:
                                     error=str(e),
                                     retry_count=0,
                                 )
-                            except Exception:
-                                pass  # DLQ bile çalışamıyorsa log yeterli
+                            except Exception as e:
+                                logger.warning("Operation failed", context="DLQ bile çalışamıyorsa log yeterli", error=str(e))
             except Exception as e:
                 logger.warning("PubSub listen error", error=str(e))
                 await asyncio.sleep(0.1)
@@ -282,7 +282,6 @@ async def _check_and_mark_published(event_id: str) -> bool:
         return False
     except Exception as e:
         logger.debug("Handled exception", error=str(e), context="event_bus.py:271")
-        pass
 
     # 2. PostgreSQL dene
     try:
@@ -299,7 +298,6 @@ async def _check_and_mark_published(event_id: str) -> bool:
         return True
     except Exception as e:
         logger.debug("Handled exception", error=str(e), context="event_bus.py:287")
-        pass
 
     # 3. Fail-open
     return True
@@ -324,7 +322,6 @@ async def _publish_to_stream(event: CanonicalEvent):
         return
     except Exception as e:
         logger.debug("Handled exception", error=str(e), context="event_bus.py:311")
-        pass
 
     # 2. PostgreSQL dene
     try:
@@ -412,8 +409,8 @@ class EventConsumer:
                         error=str(e),
                         retry_count=0,
                     )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning("Failed to load module", module="unknown", error=str(e))
 
     async def consume_loop(self):
         """Start listening — push-based, blocking."""

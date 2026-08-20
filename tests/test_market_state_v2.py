@@ -612,7 +612,8 @@ class TestOutputFormatter:
 
         assert output.regime != "UNKNOWN"
         assert output.breadth != {}
-        assert output.momentum_state != "NEUTRAL" or True  # Depends on data
+        # Note: momentum_state depends on input data
+        # assert output.momentum_state != "NEUTRAL"  # Enable with specific test data
 
     def test_to_dict(self, formatter):
         """to_dict() tüm alanları içermeli."""

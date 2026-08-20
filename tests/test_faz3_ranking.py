@@ -108,7 +108,8 @@ def test_rule_based_ranker():
     bull_a_score = next(p.rank_score for p in bull_preds if p.ticker == "A")
     bear_a_score = next(p.rank_score for p in bear_preds if p.ticker == "A")
     # A'nın skoru bull ve bear'da farklı olmalı
-    assert bull_a_score != bear_a_score or True  # Farklı olabilir ama zorunlu değil
+    # Note: bull_a_score and bear_a_score may be equal depending on data
+    # assert bull_a_score != bear_a_score  # Enable when deterministic test data is available
     passed += 1
     print(f"  ✓ Regime effect: BULL={bull_a_score:.3f}, BEAR={bear_a_score:.3f}")
 
