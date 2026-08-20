@@ -125,8 +125,8 @@ class FeaturePipelineOrchestrator:
     @property
     def store(self):
         if self._store is None:
-            from .store import FeatureStore
-            self._store = FeatureStore()
+            from .store import feature_store
+            self._store = feature_store
         return self._store
 
     @property

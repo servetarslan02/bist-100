@@ -355,10 +355,15 @@ class BISTFeatureEngine:
 
         # Sektör içi sıralama
         sector_stocks = sector_data.get("sector_stocks", {}).get(sector, [])
-        if sector_stocks and prices:
-            stock_return = (prices[-1] / prices[-20] - 1) * 100 if len(prices) >= 20 and prices[-20] != 0 else 0
-            # Basit sıralama (gerçek implementasyonda tüm sektör stokları gerekli)
-            features.sector_rank = 1  # Placeholder
+        sector_returns_map = sector_data.get("sector_stock_returns", {}).get(sector, {})
+        if sector_returns_map and prices and len(prices) >= 20:
+            stock_return = (prices[-1] / prices[-20] - 1) * 100 if prices[-20] != 0 else 0
+            # Tüm sektör hisselerinin getirilerine göre sırala
+            all_returns = list(sector_returns_map.values()) + [stock_return]
+            all_returns_sorted = sorted(all_returns, reverse=True)
+            features.sector_rank = all_returns_sorted.index(stock_return) + 1
+        elif sector_stocks:
+            features.sector_rank = 1  # Sadece tek hisse varsa rank=1
 
     # =====================================================
     # 5. KAP ETKİSİ

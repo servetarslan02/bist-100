@@ -544,40 +544,14 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
     except Exception as e:
         logger.debug("Macro features failed", error=str(e))
 
-    # 6. Bar Engine
-    try:
-        from services.features.bar_engine import BarEngine
-        # Bar engine OHLCV bar oluşturma
-    except ImportError:
-        logger.debug("BarEngine module not available")
-    except Exception as e:
-        logger.debug("Bar engine init failed", error=str(e))
+    # 6. Bar Engine — tick'ten bar üretimi (ayrı modül, burada çağrılmaz)
+    # Bar engine main.py'de kullanılır, compute_extended_features'a dahil değildir.
 
-    # 7. Discovery
-    try:
-        from services.features.discovery import DiscoveryEngine
-        # Discovery engine hisse keşfi
-    except ImportError:
-        logger.debug("DiscoveryEngine module not available")
-    except Exception as e:
-        logger.debug("Discovery engine init failed", error=str(e))
+    # 7. Discovery — feature interaction generation (ayrı pipeline)
+    # Discovery engine ayrı bir pipeline olarak çalıştırılır.
 
-    # 8. Store
-    try:
-        from services.features.store import FeatureStore
-        # Feature store'a yaz
-    except ImportError:
-        logger.debug("FeatureStore module not available")
-    except Exception as e:
-        logger.debug("Feature store init failed", error=str(e))
+    # 8. Store — feature store'a yazma pipeline.py üzerinden yapılır.
 
-    # 9. Feature Selector
-    try:
-        from services.features.feature_selector import feature_selector
-        # Feature selection opsiyonu
-    except ImportError:
-        logger.debug("Feature selector module not available")
-    except Exception as e:
-        logger.debug("Feature selector init failed", error=str(e))
+    # 9. Feature Selector — feature selection pipeline.py üzerinden yapılır.
 
     return features

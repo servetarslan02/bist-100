@@ -130,6 +130,7 @@ class IncrementalAssetState:
     _avg_loss: float = 0.0
     _rsi_initialized: bool = False
     _rsi_period: int = 14
+    _last_bar_close: float = 0.0  # RSI için önceki bar'ın kapanışı
 
     # Incremental EMA
     ema_12: float = 0.0
@@ -164,7 +165,9 @@ class IncrementalAssetState:
 
             # 1m bar tamamlandı → RSI, EMA güncelle
             if tf == self.tf_1m and completed_bar:
+                # RSI: bar'lar arası değişim (tick'ten değil)
                 self._update_rsi(completed_bar.close)
+                self._last_bar_close = completed_bar.close
                 self._update_ema(completed_bar.close)
 
             # 1m bar tamamlandı → ATR güncelle (completed bar'dan)
@@ -185,11 +188,17 @@ class IncrementalAssetState:
     # =====================================================
 
     def _update_rsi(self, close: float):
-        """Wilder's RSI — incremental."""
-        if self.previous_price == 0:
+        """Wilder's RSI — incremental.
+
+        close: tamamlanmış bar'ın kapanış fiyatı.
+        change: bu bar ile önceki bar arasındaki değişim.
+        """
+        if self._last_bar_close == 0:
+            # İlk bar — RSI hesaplanamaz, referans fiyat kaydet
+            self._last_bar_close = close
             return
 
-        change = close - self.previous_price
+        change = close - self._last_bar_close
         gain = max(change, 0)
         loss = max(-change, 0)
 

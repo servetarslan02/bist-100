@@ -345,11 +345,46 @@ class FeatureSelector:
 
     @staticmethod
     def _compute_vif(X: Any, keep_indices: List[int], n_features: int) -> List[float]:
-        """VIF hesapla (basitleştirilmiş — R² ile)."""
-        # Bu basitleştirilmiş bir VIF hesaplamasıdır
-        # Gerçek implementasyonda statsmodels veya lineer regresyon gerekli
-        # Şimdilik korelasyon matrisinden yaklaşık VIF
-        return [1.0] * len(keep_indices)  # Placeholder
+        """VIF hesapla — korelasyon matrisinden aproximasyon.
+
+        VIF_j = 1 / (1 - R²_j)
+        R²_j: j. feature'ın diğer feature'lara karşı R²'si.
+        """
+        try:
+            import numpy as np
+
+            # X'i array'e çevir
+            if hasattr(X, 'values'):
+                data = X.values[:, keep_indices]
+            elif hasattr(X, 'tolist'):
+                data = np.array(X)[:, keep_indices]
+            else:
+                data = np.array([list(row) for row in X])[:, keep_indices]
+
+            n_samples = data.shape[0]
+            n_feats = len(keep_indices)
+
+            if n_samples <= n_feats + 1:
+                return [1.0] * n_feats
+
+            # Korelasyon matrisi
+            corr = np.corrcoef(data, rowvar=False)
+            if corr.ndim < 2:
+                return [1.0] * n_feats
+
+            # VIF: 1 / (1 - R²)
+            # R²_j ≈ 1 - 1/corr_jj (eğer korelasyon matrisi kullanılıyorsa)
+            # Daha doğru: R²_j = 1 - 1/diag(C^{-1})_j  (C = korelasyon matrisi)
+            try:
+                inv_corr = np.linalg.inv(corr)
+                vifs = [float(inv_corr[j, j]) for j in range(n_feats)]
+                return [max(1.0, v) for v in vifs]
+            except np.linalg.LinAlgError:
+                # Singular matris — fallback
+                return [1.0] * n_feats
+
+        except Exception:
+            return [1.0] * len(keep_indices)
 
     @staticmethod
     def _select_columns(X: Any, indices: List[int]) -> Any:

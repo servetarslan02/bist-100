@@ -48,22 +48,24 @@ class MacroFeatureEngine:
             self.update_history("usdtry", usdtry)
 
             history = self._history.get("usdtry", [])
+
+            # Percentile (10+ veri noktası yeterli)
+            if len(history) >= 10:
+                # NOT: current value hariç (look-ahead bias koruması)
+                prior = history[:-1] if len(history) > 1 else history
+                percentile = sum(1 for v in prior if v <= usdtry) / len(prior) if prior else 0.5
+                features["usdtry_percentile"] = round(percentile, 4)
+
             if len(history) >= 20:
                 mean = np.mean(history[-60:])
                 std = np.std(history[-60:])
                 if std and std > 0:
                     features["usdtry_zscore"] = round((usdtry - mean) / std, 4)
 
-                if len(history) >= 20:
-                    features["usdtry_momentum_20d"] = round((usdtry / history[-20] - 1) * 100, 2)
+                features["usdtry_momentum_20d"] = round((usdtry / history[-20] - 1) * 100, 2)
 
-                if len(history) >= 10:
-                    percentile = sum(1 for v in history if v <= usdtry) / len(history)
-                    features["usdtry_percentile"] = round(percentile, 4)
-
-                if len(history) >= 20:
-                    returns = np.diff(np.log(history[-20:]))
-                    features["usdtry_volatility_20d"] = round(float(np.std(returns) * np.sqrt(252) * 100), 2)
+                returns = np.diff(np.log(history[-20:]))
+                features["usdtry_volatility_20d"] = round(float(np.std(returns) * np.sqrt(252) * 100), 2)
 
                 momentum = features.get("usdtry_momentum_20d", 0)
                 if momentum > 5:
@@ -149,7 +151,9 @@ class MacroFeatureEngine:
                 if std and std > 0:
                     features["vix_zscore"] = round((float(vix) - mean) / std, 4)
 
-                percentile = sum(1 for v in history if v <= vix) / len(history)
+                # NOT: current value hariç (look-ahead bias koruması)
+                prior = history[:-1] if len(history) > 1 else history
+                percentile = sum(1 for v in prior if v <= vix) / len(prior) if prior else 0.5
                 features["vix_percentile"] = round(percentile, 4)
 
                 if vix > 30:
@@ -222,7 +226,9 @@ class MacroFeatureEngine:
                 if std > 0:
                     features["cds_zscore"] = round((float(cds_5y) - mean) / std, 4)
 
-                percentile = sum(1 for v in hist if v <= cds_5y) / len(hist)
+                # NOT: current value hariç (look-ahead bias koruması)
+                prior = hist[:-1] if len(hist) > 1 else hist
+                percentile = sum(1 for v in prior if v <= cds_5y) / len(prior) if len(prior) > 0 else 0.5
                 features["cds_percentile"] = round(percentile, 4)
 
             if cds_5y < 150:

@@ -1,6 +1,6 @@
 # Features Nihai Sistem Dokümanı — Kod Analizi + Araştırma Bazlı
 
-**Tarih:** 2026-08-18
+**Tarih:** 2026-08-18 (Güncelleme: 2026-08-21 — ÇÖZÜLDÜ etiketleri eklendi)
 **Kaynaklar:** ScienceDirect Feature Importance (2025), arXiv Sentiment-Aware Stock Prediction (2026), Springer Stock Market Forecasting (2025), MDPI Macroeconomic Features (2025), Atlan Feature Store (2026), Introl Feature Stores (2026)
 
 ---
@@ -494,3 +494,52 @@ class FeatureImportanceTracker:
 | Feature contract | ✅ | ✅ |
 | Mask-first design | ✅ | ✅ |
 | Incremental state | ✅ | ✅ |
+
+---
+
+## 8. Düzeltme Kayıtları (2026-08-21)
+
+### ÇÖZÜLDÜ — RSI Tutarlılığı (technical_features.py ↔ incremental_state.py)
+- **Sorun:** technical_features.py basit mean RSI kullanıyordu, incremental_state.py Wilder's smoothing. İki farklı sonuç.
+- **Çözüm:** Her iki modül de artık Wilder's smoothing kullanıyor. Fark: 0.0000 (aynı veri ile).
+- **Dosya:** `services/features/technical_features.py` — `_rsi()` metodu yeniden yazıldı.
+
+### ÇÖZÜLDÜ — MACD Signal Line (technical_features.py)
+- **Sorun:** `macd_signal = macd` (kendisi) — signal line hesaplanmıyordu.
+- **Çözüm:** MACD serisinin 9-period EMA'sı artık gerçek signal line olarak hesaplanıyor.
+- **Dosya:** `services/features/technical_features.py` — `compute_trend_features()`
+
+### ÇÖZÜLDÜ — Incremental RSI Sıfır Değer Sorunu (incremental_state.py)
+- **Sorun:** `_update_rsi()` çağrısından önce `previous_price` güncellendiği için change her zaman 0 oluyordu. RSI 50.0'da kalıyordu.
+- **Çözüm:** `_last_bar_close` eklendi. RSI artık bar'lar arası değişimi kullanıyor.
+- **Dosya:** `services/features/incremental_state.py` — `process_tick()` ve `_update_rsi()`
+
+### ÇÖZÜLDÜ — BIST sector_rank Placeholder (bist_features.py)
+- **Sorun:** `sector_rank = 1` hardcoded placeholder.
+- **Çözüm:** `sector_stock_returns` map'inden gerçek sıralama hesaplanıyor.
+- **Dosya:** `services/features/bist_features.py` — `_compute_sector_features()`
+
+### ÇÖZÜLDÜ — Feature Selector VIF Placeholder (feature_selector.py)
+- **Sorun:** `_compute_vif()` her zaman `[1.0] * n` döndürüyordu.
+- **Çözüm:** Korelasyon matrisinin tersinden gerçek VIF hesaplanıyor.
+- **Dosya:** `services/features/feature_selector.py` — `_compute_vif()`
+
+### ÇÖZÜLDÜ — Macro Percentile Look-Ahead Bias (macro.py)
+- **Sorun:** Percentile hesaplaması current value'yu dahil ediyordu. Ayrıca `len(history)>=20` bloğu içindeydi, 10-19 arası veride çalışmıyordu.
+- **Çözüm:** Current value hariç tutuldu. Percentile check bağımsız `len(history)>=10` koşuluna taşındı.
+- **Dosya:** `services/features/macro.py` — `compute_currency_features()`
+
+### ÇÖZÜLDÜ — Fundamental %1 Heuristic (fundamental.py)
+- **Sorun:** `abs(val) < 1` kontrolü küçük ama geçerli yüzde değerlerini (ör. %0.5 marj) yanlışlıkla %50'ye çeviriyordu.
+- **Çözüm:** Otomatik dönüşüm kaldırıldı. Kaynak veri formatı bilinmiyorsa dokunulmuyor.
+- **Dosya:** `services/features/fundamental.py` — `compute_profitability_features()`, `compute_growth_features()`, `compute_quality_features()`
+
+### ÇÖZÜLDÜ — Pipeline Singleton (pipeline.py)
+- **Sorun:** `FeaturePipelineOrchestrator` kendi `FeatureStore()` instance'ını oluşturuyordu. Global singleton ile farklı state.
+- **Çözüm:** Artık `feature_store` singleton'ını kullanıyor.
+- **Dosya:** `services/features/pipeline.py` — `store` property
+
+### ÇÖZÜLDÜ — calculator.py Sessiz Except Blokları
+- **Sorun:** `compute_extended_features()` içinde 4 boş `try/except` bloğu (bar engine, discovery, store, selector). Import başarısızlıklarını sessizce yutuyordu.
+- **Çözüm:** Gereksiz import blokları kaldırıldı. Bu modüller ayrı pipeline'larda kullanılıyor.
+- **Dosya:** `services/features/calculator.py` — `compute_extended_features()`

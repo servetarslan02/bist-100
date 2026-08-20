@@ -39,7 +39,6 @@ def track_factor_performance(
     total_return = float(np.prod(1 + f) - 1)
     annual_return = float((1 + total_return) ** (252 / max(n, 1)) - 1)
     volatility = float(np.std(f, ddof=1) * np.sqrt(252))
-    daily_rf = risk_free_rate / 252
     sharpe = (annual_return - risk_free_rate) / max(volatility, 0.001) if volatility > 1e-10 else 0.0
 
     # Risk metrikleri
@@ -48,10 +47,12 @@ def track_factor_performance(
     drawdown = (cumulative - peak) / peak
     max_drawdown = float(np.min(drawdown))
 
-    # Sortino (sadece negatif getiriler)
-    downside = f[f < 0]
-    downside_std = float(np.std(downside, ddof=1) * np.sqrt(252)) if len(downside) > 1 else 0.001
-    sortino = (annual_return - risk_free_rate) / max(downside_std, 0.001)
+    # Sortino (downside deviation — tüm dönemlerde target altındaki sapmalar)
+    # Formül: sqrt(mean(min(r - daily_rf, 0)^2)) * sqrt(252)
+    daily_rf = risk_free_rate / 252
+    downside_diff = np.minimum(f - daily_rf, 0.0)
+    downside_dev = float(np.sqrt(np.mean(downside_diff ** 2)) * np.sqrt(252))
+    sortino = (annual_return - risk_free_rate) / max(downside_dev, 0.001)
 
     # Calmar (annual return / max drawdown)
     calmar = annual_return / max(abs(max_drawdown), 0.001)
@@ -101,22 +102,31 @@ def track_factor_performance(
         tracking_error = float(np.std(excess, ddof=1) * np.sqrt(252))
         info_ratio = alpha / max(tracking_error, 0.001)
 
-        # Beta
-        if n > 2:
+        # Beta: Cov(Rp, Rm) / Var(Rm)
+        if n >= 3:
             cov_matrix = np.cov(f, b)
-            beta = float(cov_matrix[0, 1] / max(cov_matrix[1, 1], 0.0001))
+            var_b = cov_matrix[1, 1]
+            if var_b > 1e-10:
+                beta = float(cov_matrix[0, 1] / var_b)
+            else:
+                beta = 0.0
         else:
-            beta = 1.0
+            beta = 0.0
 
-        # Treynor ratio
-        treynor = (annual_return - risk_free_rate) / max(abs(beta), 0.001)
+        # Treynor ratio: (Rp - Rf) / beta
+        # NOT: abs(beta) KULLANILMAZ — negatif beta anlamlı bir sinyaldir.
+        # Beta ~0 ise Treynor tanımsız; bu durumda None döndürülür.
+        if abs(beta) > 1e-6:
+            treynor = (annual_return - risk_free_rate) / beta
+        else:
+            treynor = None  # Beta sıfıra yakınsa Treynor tanımsız
 
         result.update({
             "alpha": round(alpha, 4),
             "beta": round(beta, 4),
             "tracking_error": round(tracking_error, 4),
             "information_ratio": round(info_ratio, 4),
-            "treynor_ratio": round(treynor, 4),
+            "treynor_ratio": round(treynor, 4) if treynor is not None else None,
             "correlation": round(float(np.corrcoef(f, b)[0, 1]), 4),
         })
 

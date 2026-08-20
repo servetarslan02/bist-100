@@ -33,11 +33,24 @@ class TechnicalFeatureEngine:
         features["ema_20"] = self._ema(prices, 20)
         features["ema_50"] = self._ema(prices, 50) if len(prices) >= 50 else features["ema_20"]
 
-        # MACD
+        # MACD + Signal Line (9-period EMA of MACD)
         ema_12 = self._ema(prices, 12)
         ema_26 = self._ema(prices, 26)
-        features["macd"] = ema_12 - ema_26
-        features["macd_signal"] = features["macd"]  # Basitleştirilmiş
+        macd_line = ema_12 - ema_26
+        features["macd"] = macd_line
+
+        # Signal line: MACD serisinin 9-period EMA'sı
+        # Son 35+ veri noktasından MACD serisi oluştur
+        if len(prices) >= 35:
+            macd_series = []
+            for i in range(26, len(prices) + 1):
+                ef = self._ema(prices[:i], 12)
+                es = self._ema(prices[:i], 26)
+                macd_series.append(ef - es)
+            features["macd_signal"] = self._ema(np.array(macd_series), 9)
+        else:
+            features["macd_signal"] = macd_line
+        features["macd_hist"] = features["macd"] - features["macd_signal"]
 
         # Crossover
         features["sma_20_50_cross"] = 1.0 if features["sma_20"] > features["sma_50"] else 0.0
@@ -151,14 +164,26 @@ class TechnicalFeatureEngine:
         return ema
 
     def _rsi(self, prices: np.ndarray, period: int = 14) -> float:
-        """Relative Strength Index."""
+        """Relative Strength Index — Wilder's Smoothing.
+
+        incremental_state.py ile AYNI formül kullanılır.
+        Fark: basit mean yerine Wilder's exponential smoothing.
+        """
         if len(prices) < period + 1:
             return 50.0
-        deltas = np.diff(prices[-(period+1):])
-        gains = np.where(deltas > 0, deltas, 0)
-        losses = np.where(deltas < 0, -deltas, 0)
-        avg_gain = np.mean(gains)
-        avg_loss = np.mean(losses)
+        deltas = np.diff(prices)
+        gains = np.where(deltas > 0, deltas, 0.0)
+        losses = np.where(deltas < 0, -deltas, 0.0)
+
+        # İlk ortalama: basit ortalama (Wilder's init)
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+
+        # Wilder's smoothing: (prev * (period-1) + current) / period
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
         if avg_loss == 0:
             return 100.0
         rs = avg_gain / avg_loss

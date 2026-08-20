@@ -92,10 +92,11 @@ class FundamentalFeatureEngine:
         ]:
             val = fundamentals.get(field)
             if val is not None:
-                # Bazı değerler ondalık (%0.13), bazıları yüzde (13.0)
                 val = float(val)
-                if abs(val) < 1:  # Ondalık format → yüzdeye çevir
-                    val = val * 100
+                # DÖNÜŞTÜRME YAPILMIYOR: Kaynak verinin formatı bilinmiyor.
+                # Eski heuristic (abs(val)<1 → *100) tehlikeli: %0.5 marj
+                # gibi küçük ama geçerli yüzde değerlerini %50'ye çeviriyordu.
+                # Tüketici tarafında normalize edilmeli.
                 features[feature_name] = round(val, 2)
             else:
                 features[feature_name] = 0.0
@@ -120,8 +121,7 @@ class FundamentalFeatureEngine:
         rev_growth = fundamentals.get("revenue_growth")
         if rev_growth is not None:
             val = float(rev_growth)
-            if abs(val) < 1:
-                val = val * 100
+            # Dönüşüm yapılmıyor — kaynak format bilinmiyor
             features["revenue_growth_pct"] = round(val, 2)
         else:
             features["revenue_growth_pct"] = 0.0
@@ -129,8 +129,7 @@ class FundamentalFeatureEngine:
         earn_growth = fundamentals.get("earnings_growth")
         if earn_growth is not None:
             val = float(earn_growth)
-            if abs(val) < 1:
-                val = val * 100
+            # Dönüşüm yapılmıyor — kaynak format bilinmiyor
             features["earnings_growth_pct"] = round(val, 2)
         else:
             features["earnings_growth_pct"] = 0.0
@@ -219,11 +218,9 @@ class FundamentalFeatureEngine:
         total_debt = fundamentals.get("total_debt", 0) or 0
         total_equity = fundamentals.get("total_equity", 0) or 0
 
-        # Normalize
-        if abs(rev_growth) < 1:
-            rev_growth = rev_growth * 100
-        if abs(profit_margin) < 1:
-            profit_margin = profit_margin * 100
+        # NOT: Dönüşüm yapılmıyor — kaynak format bilinmiyor.
+        # Eski heuristic (abs(val)<1 → *100) %0.5 marj gibi küçük
+        # ama geçerli değerleri yanlış %50'ye çeviriyordu.
 
         # Growth quality score
         score = 0
