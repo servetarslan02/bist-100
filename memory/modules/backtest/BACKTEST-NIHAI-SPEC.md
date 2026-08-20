@@ -358,16 +358,51 @@ Belirli bir günü yeniden çalıştırarak:
 | Purge/embargo | ✅ | ✅ |
 | Portfolio sim | ✅ | ✅ |
 | Persistence | ✅ | ✅ |
-| Look-ahead detection | ❌ | ✅ |
-| Survivorship handling | ❌ | ✅ |
-| Point-in-time validation | ❌ | ✅ |
-| Deflated Sharpe | ❌ | ✅ |
-| Realistic transaction cost | ⚠️ Basit | ✅ Detaylı |
-| Spread model | ❌ | ✅ |
-| Slippage model | ⚠️ Sabit | ✅ Volatilite bazlı |
-| Market impact | ❌ | ✅ |
-| Event replay | ❌ | ✅ |
-| Deterministic recovery | ❌ | ✅ |
-| API endpoint | ❌ | ✅ |
-| Multi-asset backtest | ❌ | ✅ |
-| Benchmark comparison | ❌ | ✅ |
+| Look-ahead detection | ✅ | ✅ |
+| Survivorship handling | ✅ | ✅ |
+| Point-in-time validation | ✅ | ✅ |
+| Deflated Sharpe | ✅ | ✅ |
+| Realistic transaction cost | ✅ | ✅ |
+| Spread model | ✅ | ✅ |
+| Slippage model | ✅ | ✅ |
+| Market impact | ✅ | ✅ |
+| Event replay | ✅ | ✅ |
+| Deterministic recovery | ✅ | ✅ |
+| API endpoint | ✅ | ✅ |
+| Multi-asset backtest | ✅ | ✅ |
+| Benchmark comparison | ✅ | ✅ |
+
+---
+
+## 10. ÇÖZÜLDÜ — Düzeltme Kayıtları (2026-08-20)
+
+### Düzeltme 1: TransactionCostEngine Entegrasyonu
+- **Dosya:** `portfolio_sim.py`
+- **Sorun:** PortfolioSimulatorV3 sadece sabit slippage_rate kullanıyordu, TransactionCostEngine entegre değildi
+- **Çözüm:** `use_realistic_costs=True` parametresi ile TransactionCostEngine opsiyonel olarak entegre edildi
+- **Etki:** `execute_buy()` ve `execute_sell()` artık spread, slippage, market impact modeli kullanabiliyor
+- **Geriye uyumluluk:** `use_realistic_costs=False` (varsayılan) → legacy davranış aynen korunur
+
+### Düzeltme 2: VaR/CVaR Metrikleri
+- **Dosya:** `portfolio_sim.py`, `engine_v4.py`
+- **Sorun:** Spec'te tanımlı VaR 95% ve CVaR 95% hesaplanmıyordu
+- **Çözüm:** Historical percentile method ile VaR/CVaR eklendi
+- **Etki:** `compute_metrics()` artık `var_95` ve `cvar_95` döndürüyor
+
+### Düzeltme 3: Max Drawdown Duration
+- **Dosya:** `portfolio_sim.py`
+- **Sorun:** Drawdown süresi (gün olarak) izlenmiyordu
+- **Çözüm:** `_drawdown_start_date` ve `_max_drawdown_duration_days` ile izleme eklendi
+- **Etki:** `compute_metrics()` artık `max_drawdown_duration_days` döndürüyor
+
+### Düzeltme 4: BUY/SELL Eşik Asimetrisi Dokümantasyonu
+- **Sorun:** Asimetri kodda var ama dokümante edilmemiş
+- **Çözüm:** CURRENT-STATE.md'de açıklandı
+- **SELL:** `score <= (100 - signal_threshold)` = 40 (esnek çıkış)
+- **BUY:** `score >= signal_threshold + 10` = 70 (seçici giriş)
+- **Hysteresis gap:** 30 puan → whipsaw önleme
+
+### Düzeltme 5: Entegrasyon Testleri
+- **Dosya:** `tests/test_backtest_integration.py` (yeni)
+- **İçerik:** 25 test, tüm backtest modüllerini kapsıyor
+- **Durum:** 25/25 PASSED

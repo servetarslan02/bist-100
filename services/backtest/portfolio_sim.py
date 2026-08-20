@@ -23,6 +23,19 @@ import structlog
 
 logger = structlog.get_logger()
 
+# Lazy import to avoid circular dependency
+_transaction_cost_engine = None
+
+def _get_cost_engine():
+    global _transaction_cost_engine
+    if _transaction_cost_engine is None:
+        try:
+            from .transaction_costs import bist_transaction_cost
+            _transaction_cost_engine = bist_transaction_cost
+        except ImportError:
+            _transaction_cost_engine = None
+    return _transaction_cost_engine
+
 
 # =====================================================
 # DATA CLASSES
@@ -160,6 +173,7 @@ class PortfolioSimulatorV3:
 
     v2.0 ile aynı finansal sonuçları üretir.
     Ek: audit trail, invariant checks, XU100 benchmark.
+    v4.1: TransactionCostEngine entegrasyonu (opsiyonel).
     """
 
     def __init__(
@@ -168,12 +182,18 @@ class PortfolioSimulatorV3:
         max_position_pct: float = 0.10,
         max_positions: int = 20,
         slippage_rate: float = 0.001,
+        use_realistic_costs: bool = False,
+        avg_daily_volume: float = 0,
+        volatility_ratio: float = 1.0,
     ):
         self._initial_capital = initial_capital
         self._cash = initial_capital
         self._max_position_pct = max_position_pct
         self._max_positions = max_positions
         self._slippage_rate = slippage_rate
+        self._use_realistic_costs = use_realistic_costs
+        self._avg_daily_volume = avg_daily_volume
+        self._volatility_ratio = volatility_ratio
 
         self._positions: Dict[str, Position] = {}
         self._trades: List[Trade] = []
@@ -187,6 +207,10 @@ class PortfolioSimulatorV3:
         # Benchmark
         self._benchmark_equity: List[Tuple[str, float]] = []
 
+        # MaxDD duration tracking
+        self._drawdown_start_date: Optional[str] = None
+        self._max_drawdown_duration_days: int = 0
+
     # ===================== CORE OPERATIONS =====================
 
     def execute_buy(
@@ -195,10 +219,13 @@ class PortfolioSimulatorV3:
         price: float,
         date: str,
         quantity: Optional[int] = None,
+        avg_daily_volume: Optional[float] = None,
+        volatility_ratio: Optional[float] = None,
     ) -> Optional[Trade]:
         """Alım emri execute et.
 
         quantity belirtilmezse max_position_pct'ye göre otomatik hesapla.
+        avg_daily_volume/volatility_ratio: realistic cost model için.
         """
         if ticker in self._positions:
             self._audit(date, "ERROR", ticker, {"reason": "already_holding"})
@@ -222,14 +249,38 @@ class PortfolioSimulatorV3:
             if quantity <= 0:
                 return None
 
-        # Slippage
-        slippage_pct = self._slippage_rate
-        fill_price = price * (1 + slippage_pct)
+        # Maliyet hesaplama: realistic veya legacy
+        cost_engine = _get_cost_engine() if self._use_realistic_costs else None
 
-        # Maliyet
-        amount = quantity * fill_price
-        commission = BISTCommissionModel.compute(amount)
-        total_cost = amount + commission
+        if cost_engine is not None:
+            vol = volatility_ratio if volatility_ratio is not None else self._volatility_ratio
+            vol = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            cost_detail = cost_engine.calculate_total_cost(
+                side="BUY",
+                price=price,
+                quantity=quantity,
+                ticker=ticker,
+                avg_daily_volume=vol,
+                volatility_ratio=self._volatility_ratio,
+            )
+            fill_price = cost_detail["execution_price"]
+            commission = cost_detail["costs"]["commission"]
+            slippage_amount = cost_detail["costs"]["slippage"]
+            # Notional at fill price (slippage dahil)
+            amount = quantity * fill_price
+            # total_cost = notional + commission
+            # Slippage zaten fill_price'a dahil, ayrıca eklenmez
+            total_cost = amount + commission
+        else:
+            # Legacy path (v2.0 ile aynı)
+            slippage_pct = self._slippage_rate
+            fill_price = price * (1 + slippage_pct)
+            amount = quantity * fill_price  # Slippage dahil notional
+            commission = BISTCommissionModel.compute(amount)
+            slippage_amount = amount - (quantity * price)  # Bilgi amaçlı
+            # total_cost = notional (slippage dahil) + commission
+            # Slippage zaten fill_price'a dahil, ayrıca eklenmez
+            total_cost = amount + commission
 
         # Cash kontrolü
         if total_cost > self._cash:
@@ -239,8 +290,20 @@ class PortfolioSimulatorV3:
                 self._audit(date, "ERROR", ticker, {"reason": "insufficient_cash",
                             "required": total_cost, "available": self._cash})
                 return None
+            if cost_engine is not None:
+                cost_detail = cost_engine.calculate_total_cost(
+                    side="BUY", price=price, quantity=quantity, ticker=ticker,
+                    avg_daily_volume=self._avg_daily_volume,
+                    volatility_ratio=self._volatility_ratio,
+                )
+                fill_price = cost_detail["execution_price"]
+                commission = cost_detail["costs"]["commission"]
+                slippage_amount = cost_detail["costs"]["slippage"]
+            else:
+                fill_price = price * (1 + self._slippage_rate)
+                slippage_amount = quantity * (fill_price - price)
+                commission = BISTCommissionModel.compute(quantity * fill_price)
             amount = quantity * fill_price
-            commission = BISTCommissionModel.compute(amount)
             total_cost = amount + commission
 
         # Execute
@@ -263,7 +326,7 @@ class PortfolioSimulatorV3:
             quantity=quantity,
             price=fill_price,
             commission=commission,
-            slippage=amount * slippage_pct,
+            slippage=slippage_amount,
         )
         self._trades.append(trade)
         self._audit(date, "BUY", ticker, trade.to_dict())
@@ -274,6 +337,8 @@ class PortfolioSimulatorV3:
         ticker: str,
         price: float,
         date: str,
+        avg_daily_volume: Optional[float] = None,
+        volatility_ratio: Optional[float] = None,
     ) -> Optional[Trade]:
         """Satım emri execute et (tam kapatma)."""
         if ticker not in self._positions:
@@ -286,12 +351,31 @@ class PortfolioSimulatorV3:
         pos = self._positions[ticker]
         quantity = pos.quantity
 
-        # Slippage
-        fill_price = price * (1 - self._slippage_rate)
+        # Maliyet hesaplama: realistic veya legacy
+        cost_engine = _get_cost_engine() if self._use_realistic_costs else None
+
+        if cost_engine is not None:
+            vol = avg_daily_volume if avg_daily_volume is not None else self._avg_daily_volume
+            cost_detail = cost_engine.calculate_total_cost(
+                side="SELL",
+                price=price,
+                quantity=quantity,
+                ticker=ticker,
+                avg_daily_volume=vol,
+                volatility_ratio=volatility_ratio if volatility_ratio is not None else self._volatility_ratio,
+            )
+            fill_price = cost_detail["execution_price"]
+            # Komisyon market price üzerinden (BUY ile tutarlı)
+            market_notional = quantity * price
+            commission = BISTCommissionModel.compute(market_notional)
+            slippage_amount = cost_detail["costs"]["slippage"]
+        else:
+            fill_price = price * (1 - self._slippage_rate)
+            slippage_amount = quantity * (price - fill_price)  # Bilgi amaçlı
+            commission = BISTCommissionModel.compute(quantity * price)
 
         # Revenue
         amount = quantity * fill_price
-        commission = BISTCommissionModel.compute(amount)
         net_revenue = amount - commission
 
         # P&L
@@ -314,7 +398,7 @@ class PortfolioSimulatorV3:
             quantity=quantity,
             price=fill_price,
             commission=commission,
-            slippage=amount * self._slippage_rate,
+            slippage=slippage_amount,
             pnl=pnl,
             pnl_pct=pnl_pct,
             holding_days=holding_days,
@@ -351,9 +435,26 @@ class PortfolioSimulatorV3:
         # High water mark
         if equity > self._high_water_mark:
             self._high_water_mark = equity
+            # Drawdown bitti
+            if self._drawdown_start_date is not None:
+                self._drawdown_start_date = None
 
         # Drawdown
         drawdown = (self._high_water_mark - equity) / self._high_water_mark if self._high_water_mark > 0 else 0
+
+        # Drawdown duration tracking
+        if drawdown > 0 and self._drawdown_start_date is None:
+            self._drawdown_start_date = date
+        if drawdown > 0 and self._drawdown_start_date is not None:
+            try:
+                from datetime import datetime
+                d1 = datetime.strptime(self._drawdown_start_date, "%Y-%m-%d")
+                d2 = datetime.strptime(date, "%Y-%m-%d")
+                dd_duration = (d2 - d1).days
+                if dd_duration > self._max_drawdown_duration_days:
+                    self._max_drawdown_duration_days = dd_duration
+            except Exception:
+                pass
 
         # Daily return
         daily_return = (equity / self._prev_equity - 1) if self._prev_equity > 0 else 0
@@ -435,6 +536,8 @@ class PortfolioSimulatorV3:
                 "open_positions": len(self._positions),
                 "benchmark_return_pct": 0, "alpha_pct": 0,
                 "daily_returns_count": 0,
+                "var_95": 0, "cvar_95": 0,
+                "max_drawdown_duration_days": 0,
             }
 
         final_equity = self._equity_curve[-1].equity
@@ -453,6 +556,12 @@ class PortfolioSimulatorV3:
         downside_returns = np.minimum(returns, 0)
         downside_std = float(np.sqrt(np.mean(downside_returns ** 2)))
         sortino = float(np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0.0
+
+        # VaR 95% (Historical)
+        var_95 = float(np.percentile(returns, 5)) if len(returns) >= 20 else 0.0
+
+        # CVaR 95% (Expected Shortfall)
+        cvar_95 = float(np.mean(returns[returns <= var_95])) if len(returns[returns <= var_95]) > 0 else var_95
 
         # Max drawdown
         max_dd = max(s.drawdown for s in self._equity_curve) * 100
@@ -496,6 +605,9 @@ class PortfolioSimulatorV3:
             "benchmark_return_pct": round(benchmark_return, 2),
             "alpha_pct": round(alpha, 2),
             "daily_returns_count": len(returns),
+            "var_95": round(var_95, 6),
+            "cvar_95": round(cvar_95, 6),
+            "max_drawdown_duration_days": self._max_drawdown_duration_days,
         }
 
     # ===================== INVARIANT CHECKS =====================
@@ -563,3 +675,5 @@ class PortfolioSimulatorV3:
         self._high_water_mark = self._initial_capital
         self._prev_equity = self._initial_capital
         self._trade_counter = 0
+        self._drawdown_start_date = None
+        self._max_drawdown_duration_days = 0

@@ -81,6 +81,9 @@ class BacktestMetrics:
     total_slippage: float = 0.0
     alpha_pct: float = 0.0
     benchmark_return_pct: float = 0.0
+    var_95: float = 0.0
+    cvar_95: float = 0.0
+    max_drawdown_duration_days: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {k: round(v, 4) if isinstance(v, float) else v
