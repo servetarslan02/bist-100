@@ -1,4 +1,13 @@
-"""ALPHA BIST - FastAPI Backend (Main Entry Point)"""
+"""
+⚠️  DEPRECATED — Bu entry point artık canonical değil.
+
+Canonical production server: app.py (services/api/app.py)
+Bu dosya eski endpoint'leri barındırır; yeni geliştirmeler app.py + v1_router'a yapılmalıdır.
+
+---
+
+ALPHA BIST - FastAPI Backend (Main Entry Point) — DEPRECATED
+"""
 
 import asyncio
 import json

@@ -1,5 +1,12 @@
 """
-ALPHA BIST — FastAPI Production Server v2.0
+⚠️  DEV/LEGACY SERVER — Bu dosya production DEĞİLDİR.
+
+Canonical production server: app.py
+Bu dosya sadece development/testing amaçlıdır (SQLite dev_db kullanır).
+
+---
+
+ALPHA BIST — FastAPI Development Server v2.0
 
 Endpoints:
 - GET /health → Sistem sağlığı

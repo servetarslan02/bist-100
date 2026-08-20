@@ -1,5 +1,5 @@
 """
-ALPHA BIST — API Application v2.0
+ALPHA BIST — API Application v2.0 (CANONICAL PRODUCTION SERVER)
 
 Tüm API bileşenlerini birleştiren ana uygulama.
 
@@ -11,6 +11,11 @@ Tüm API bileşenlerini birleştiren ana uygulama.
 - OpenAPI/Swagger
 - CORS
 - Health checks
+- PostgreSQL + ClickHouse + Redis
+
+NOT: Bu dosya CANONICAL production entry point'tir.
+- server.py → DEV/legacy (SQLite)
+- main.py → DEPRECATED (eski entry point)
 """
 
 import time
@@ -23,16 +28,23 @@ import structlog
 from .v1 import v1_router
 from .auth import jwt_handler, Role
 from .rate_limiter import rate_limiter
+from ..core.database import init_databases, close_databases, check_db_health
 
 logger = structlog.get_logger()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan."""
-    logger.info("ALPHA BIST API starting")
+    """Application lifespan — DB lifecycle dahil."""
+    logger.info("ALPHA BIST API starting (canonical production server)")
+
+    # Database connections başlat
+    await init_databases()
+
     yield
-    logger.info("ALPHA BIST API stopping")
+n    # Database connections kapat
+    await close_databases()
+    logger.info("ALPHA BIST API stopped")
 
 
 def create_app() -> FastAPI:
@@ -107,7 +119,30 @@ def create_app() -> FastAPI:
 
     @app.get("/health")
     async def health():
-        return {"status": "healthy", "version": "2.0.0"}
+        db_health = await check_db_health()
+        all_healthy = all(v == "healthy" for v in db_health.values())
+        return {
+            "status": "healthy" if all_healthy else "degraded",
+            "version": "2.0.0",
+            "server": "canonical (app.py)",
+            "databases": db_health,
+        }
+
+    @app.get("/health/detailed")
+    async def health_detailed():
+        """Detaylı sağlık raporu."""
+        db_health = await check_db_health()
+        return {
+            "status": "healthy" if all(v == "healthy" for v in db_health.values()) else "degraded",
+            "version": "2.0.0",
+            "server": "canonical (app.py)",
+            "databases": db_health,
+            "endpoints": {
+                "v1_router": "/api/v1",
+                "docs": "/docs",
+                "openapi": "/openapi.json",
+            },
+        }
 
     return app
 
