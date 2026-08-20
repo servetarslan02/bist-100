@@ -24,6 +24,8 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import structlog
+import orjson
+from fastapi.responses import Response as FastAPIResponse
 
 from .v1 import v1_router
 from .auth import jwt_handler, Role
@@ -47,6 +49,14 @@ n    # Database connections kapat
     logger.info("ALPHA BIST API stopped")
 
 
+class ORJSONResponse(FastAPIResponse):
+    """ORJSON tabanlı response — json'dan daha hızlı."""
+    media_type = "application/json"
+
+    def render(self, content: any) -> bytes:
+        return orjson.dumps(content)
+
+
 def create_app() -> FastAPI:
     """FastAPI uygulaması oluştur."""
     app = FastAPI(
@@ -57,6 +67,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         openapi_url="/openapi.json",
         lifespan=lifespan,
+        default_response_class=ORJSONResponse,
     )
 
     # CORS
