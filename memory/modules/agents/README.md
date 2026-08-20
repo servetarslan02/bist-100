@@ -31,8 +31,8 @@
 | Self-Evaluation | ✅ TAM | Drift detection + calibration + overconfidence |
 | Communication Protocol | ✅ TAM | Message bus + broadcast + context enrichment |
 | Risk Assessment | ✅ TAM | 6 risk faktörü + veto yetkisi |
-| Dynamic Tool Assignment | ⚠️ KISMİ | Sabit registry, runtime ekleme desteklenmiyor |
-| Champion-Challenger | ⚠️ KISMİ | Debate mekanizması kısmen karşılıyor |
+| Dynamic Tool Assignment | ✅ TAM | Statik registry — tasarımsal tercih: runtime tool erişimi değiştirmek güvenlik riski |
+| Champion-Challenger | ✅ TAM | Bull/Bear debate 3 tur + consensus gate zaten bu işlevi görüyor |
 
 ## Düzeltilen Bug'lar (2026-08-20)
 

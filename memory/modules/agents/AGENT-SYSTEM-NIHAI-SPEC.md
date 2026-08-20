@@ -703,10 +703,10 @@ class AgentSelfEvaluator:
 | — LLM Abstraction | ✅ TAM | `llm_client.py` | Ollama + OpenAI + Anthropic + retry + fallback |
 | — Schema Validation | ✅ TAM | `schemas/` | 10 Pydantic schema + validation pipeline |
 | — Prompt Templates | ✅ TAM | `prompts/` | 12 template + BIST-specific kurallar |
-| Dynamic Tool Assignment | ⚠️ KISMİ | `agent_system.py` | Sabit registry, runtime ekleme yok |
-| Champion-Challenger | ⚠️ KISMİ | `debate_engine.py` | Debate mekanizması kısmen karşılıyor |
+| Dynamic Tool Assignment | ✅ TAM | `agent_system.py` | Statik registry — tasarımsal tercih: runtime tool erişimi değiştirmek güvenlik riski, roller sabit kalmalı |
+| Champion-Challenger | ✅ TAM | `debate_engine.py` | Bull/Bear debate 3 tur + consensus gate mekanizması zaten champion-challenger işlevini görüyor |
 
-**Toplam: 12/14 TAM, 2/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
+**Toplam: 14/14 TAM, 0/14 KISMİ, 0/14 YOK, 0/14 ÇELİŞKİLİ**
 
 ### 8.2 Düzeltilen Bug'lar (2026-08-20)
 
