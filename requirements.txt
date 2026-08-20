@@ -1,25 +1,26 @@
 # ALPHA BIST — Python Dependencies
-# EN İYİ TEKNOLOJİ STACK — 2026-08-21
-# Her katman için en kaliteli teknoloji seçildi
+# ÇEKİRDEK STACK — Kanıtlanmış, gerekli teknolojiler
+# Prensip: "Gerektiğinde kanıtlanmış teknoloji"
 
 # === CORE ===
-fastapi>=0.141.0                  # En iyi Python API framework (async, performant)
-uvicorn[standard]>=0.52.0         # En iyi ASGI server
+fastapi>=0.141.0                  # Python API framework (async, performant)
+uvicorn[standard]>=0.52.0         # ASGI server
 websockets>=17.0.0                # Gerçek zamanlı iletişim
 python-multipart>=0.0.32          # File upload
 pydantic-settings>=2.15.0         # Config yönetimi
+orjson>=3.10.0                    # Hızlı JSON serializer (Rust tabanlı)
 
-# === DATA PROCESSING (EN İYİ) ===
-polars>=1.43.0                    # ⭐ EN HIZLI DataFrame (pandas'dan 10-100x hızlı)
+# === DATA PROCESSING ===
+polars>=1.43.0                    # Hızlı DataFrame (primary)
+pyarrow>=18.0.0                   # Columnar format (Polars ile uyumlu)
 pandas>=2.2.0                     # Legacy desteği (eski kod uyumluluğu)
 numpy>=2.1.0                      # Temel numerik hesaplama
-pyarrow>=18.0.0                   # Columnar format (Polars ile uyumlu)
 
 # === DATA SOURCES ===
 yfinance>=1.6.0                   # OHLCV verisi
 aiohttp>=3.14.0                   # Async HTTP client
 requests>=2.34.0                  # Sync HTTP client
-httpx>=0.28.0                     # Modern HTTP client (FastAPI uyumlu)
+httpx>=0.28.0                     # Modern HTTP client
 
 # === DATABASE ===
 asyncpg>=0.31.0                   # PostgreSQL async driver
@@ -27,43 +28,29 @@ aiosqlite>=0.22.0                 # SQLite async driver
 redis>=8.1.0                      # Cache + event bus
 sqlalchemy[asyncio]>=2.0.0        # ORM (Alembic ile uyumlu)
 
-# === ML — GRADIENT BOOSTING (EN İYİ ÜÇLÜ) ===
-lightgbm>=4.7.0                   # ⭐ EN HIZLI gradient boosting
-catboost>=1.2.10                  # ⭐ EN İYİ kategorik feature handling
-xgboost>=3.4.0                    # ⭐ EN ESNEK gradient boosting
+# === ML — GRADIENT BOOSTING ===
+lightgbm>=4.7.0                   # Hızlı gradient boosting
+catboost>=1.2.10                  # Kategorik feature handling
+xgboost>=3.4.0                    # Esnek gradient boosting
 scikit-learn>=1.9.0               # Preprocessing, metrics, calibration
 scipy>=1.18.0                     # İstatistik, optimizasyon
 
-# === ML — DEEP LEARNING (EN İYİ) ===
-torch>=2.5.0                      # ⭐ EN İYİ deep learning framework
-pytorch-lightning>=2.5.0          # ⭐ EN İYİ PyTorch training framework
-pytorch-tabnet>=4.1.0             # ⭐ TabNet — deep learning for tabular data
-rtf-transformers>=0.4.0           # ⭐ FT-Transformer — transformer for tabular
+# === ML — DEEP LEARNING ===
+torch>=2.5.0                      # Deep learning framework
 
-# === ML — DISTRIBUTED (EN İYİ) ===
-ray[tune]>=2.40.0                 # ⭐ EN İYİ distributed tuning (Optuna'dan üstün)
-# ray[tune] includes: distributed training, hyperparameter tuning, resource management
+# === ML — TUNING ===
+optuna>=4.9.0                     # Hyperparameter tuning
 
-# === ML — EXPERIMENT TRACKING (EN İYİ) ===
-wandb>=0.19.0                     # ⭐ EN İYİ experiment tracking (MLflow'dan üstün)
-# Weights & Biases: real-time dashboards, model versioning, collaboration
+# === ML — EXPLAINABILITY ===
+shap>=0.52.0                      # Model explainability
 
-# === ML — EXPLAINABILITY (EN İYİ) ===
-shap>=0.52.0                      # ⭐ EN İYİ model explainability
-lime>=0.2.0                       # Local interpretable explanations
-
-# === ML — FEATURE ENGINEERING ===
-featuretools>=1.31.0              # ⭐ Otomatik feature engineering
-tsfresh>=0.20.0                   # Time-series feature extraction
-
-# === MONITORING & OBSERVABILITY (EN İYİ) ===
+# === MONITORING & OBSERVABILITY ===
 structlog>=26.1.0                 # Structured logging
 prometheus-client>=0.26.0         # Metrics
 opentelemetry-api>=1.44.0         # Distributed tracing
 opentelemetry-sdk>=1.44.0         # Tracing SDK
-opentelemetry-instrumentation-fastapi>=0.45b0  # FastAPI auto-instrumentation
 
-# === SECURITY (EN İYİ) ===
+# === SECURITY ===
 python-jose[crypto]>=3.5.0        # JWT token
 passlib[bcrypt]>=1.7.4            # Password hashing
 cryptography>=44.0.0              # Encryption utilities
@@ -80,7 +67,6 @@ feedparser>=6.0.14                # RSS feed
 python-dateutil>=2.9.0            # Tarih işlemleri
 pytz>=2026.2                      # Zaman dilimi
 nest_asyncio>=1.6.0               # Nested async desteği
-orjson>=3.10.0                    # ⭐ EN HIZLI JSON serializer
 
 # === DEV & TEST ===
 pytest>=9.1.0                     # Test framework
@@ -89,4 +75,4 @@ pytest-timeout>=2.4.0             # Test timeout
 pytest-cov>=6.0.0                 # Coverage
 black>=26.5.0                     # Formatter
 mypy>=2.3.0                       # Type checker
-ruff>=0.8.0                       # ⭐ EN HIZLI linter (black + isort + flake8 birleşimi)
+ruff>=0.8.0                       # Linter (black+isort+flake8 birleşimi)
