@@ -1,7 +1,11 @@
+// ALPHA BIST — Market Radar (AG Grid ile)
+
 "use client";
 
 import { useState, useMemo } from "react";
 import { usePolling, type Instrument } from "@/lib/api";
+import { DataTable, defaultColumnDefs } from "@/components/table/DataTable";
+import { useSignalsStore } from "@/lib/store";
 
 interface EnrichedInstrument extends Instrument {
   price?: number;
@@ -11,52 +15,52 @@ interface EnrichedInstrument extends Instrument {
   vol_z?: number;
   anomaly?: number;
   spec?: number;
+  change?: number;
 }
 
 export default function MarketRadar() {
-  const { data: instruments, loading } = usePolling<Instrument[]>("/market/instruments?limit=500", 60000);
+  const { data: instruments, loading } = usePolling<Instrument[]>(
+    "/market/instruments?limit=500",
+    60000
+  );
+  const { selectTicker } = useSignalsStore();
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
-  const [sortCol, setSortCol] = useState<string>("spec");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const sectors = useMemo(() => {
     if (!instruments) return [];
-    return [...new Set(instruments.map(i => i.sector))].sort();
+    return [...new Set(instruments.map((i) => i.sector))].sort();
   }, [instruments]);
 
-  const filtered = useMemo(() => {
+  const rowData = useMemo(() => {
     if (!instruments) return [];
-    return instruments.filter(i => {
-      if (search && !i.symbol.toLowerCase().includes(search.toLowerCase()) &&
-          !i.name.toLowerCase().includes(search.toLowerCase())) return false;
-      if (sector && i.sector !== sector) return false;
-      return true;
-    });
+    return instruments
+      .filter((i) => {
+        if (
+          search &&
+          !i.symbol.toLowerCase().includes(search.toLowerCase()) &&
+          !i.name.toLowerCase().includes(search.toLowerCase())
+        )
+          return false;
+        if (sector && i.sector !== sector) return false;
+        return true;
+      })
+      .map((i) => ({
+        ...i,
+        price: undefined,
+        change: undefined,
+        rsi: undefined,
+        mom5: undefined,
+        mom20: undefined,
+        vol_z: undefined,
+        anomaly: undefined,
+        spec: undefined,
+      }));
   }, [instruments, search, sector]);
 
-  const handleSort = (col: string) => {
-    if (sortCol === col) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortCol(col);
-      setSortDir("desc");
-    }
+  const handleRowClick = (data: EnrichedInstrument) => {
+    selectTicker(data.symbol);
   };
-
-  const SortHeader = ({ col, label, align = "left" }: { col: string; label: string; align?: string }) => (
-    <th
-      className={`py-1.5 px-2 font-medium cursor-pointer hover:text-zinc-300 select-none ${align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left"}`}
-      onClick={() => handleSort(col)}
-    >
-      <span className="flex items-center gap-1" style={{ justifyContent: align === "right" ? "flex-end" : align === "center" ? "center" : "flex-start" }}>
-        {label}
-        {sortCol === col && (
-          <span className="text-zinc-600">{sortDir === "asc" ? "↑" : "↓"}</span>
-        )}
-      </span>
-    </th>
-  );
 
   return (
     <div className="p-4 space-y-3">
@@ -64,87 +68,42 @@ export default function MarketRadar() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-lg font-semibold text-zinc-100">Market Radar</h1>
-          <p className="text-[11px] text-zinc-600">{filtered.length} instruments • live scanning</p>
+          <p className="text-[11px] text-zinc-600">
+            {rowData.length} instruments • live scanning
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search..."
             className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 w-40"
           />
           <select
             value={sector}
-            onChange={e => setSector(e.target.value)}
+            onChange={(e) => setSector(e.target.value)}
             className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
           >
             <option value="">All Sectors</option>
-            {sectors.map(s => <option key={s} value={s}>{s}</option>)}
+            {sectors.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Table */}
+      {/* AG Grid Table */}
       <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-[11px]">
-            <thead>
-              <tr className="text-zinc-500 border-b border-zinc-800/60 bg-zinc-950/50">
-                <SortHeader col="symbol" label="TICKER" />
-                <SortHeader col="name" label="NAME" />
-                <SortHeader col="sector" label="SECTOR" />
-                <SortHeader col="price" label="PRICE" align="right" />
-                <SortHeader col="change" label="CHG%" align="right" />
-                <SortHeader col="rsi" label="RSI" align="right" />
-                <SortHeader col="mom5" label="MOM5" align="right" />
-                <SortHeader col="mom20" label="MOM20" align="right" />
-                <SortHeader col="vol_z" label="VOL Z" align="right" />
-                <SortHeader col="anomaly" label="ANOM" align="right" />
-                <SortHeader col="spec" label="SPEC" align="right" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={11} className="text-center py-12 text-zinc-600">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-                      Loading market data...
-                    </div>
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="text-center py-12 text-zinc-600">No instruments found</td>
-                </tr>
-              ) : (
-                filtered.map((inst, i) => (
-                  <tr
-                    key={inst.symbol}
-                    className="border-b border-zinc-800/20 row-hover cursor-pointer"
-                  >
-                    <td className="py-1.5 px-2 font-semibold text-zinc-200">{inst.symbol}</td>
-                    <td className="py-1.5 px-2 text-zinc-500 truncate max-w-[160px]">{inst.name}</td>
-                    <td className="py-1.5 px-2">
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">
-                        {inst.sector}
-                      </span>
-                    </td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-300">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-400">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-500">—</td>
-                    <td className="py-1.5 px-2 text-right font-mono text-zinc-400">—</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          rowData={rowData}
+          columnDefs={defaultColumnDefs}
+          height="calc(100vh - 200px)"
+          onRowClick={handleRowClick}
+          loading={loading}
+        />
       </div>
 
       {/* Footer */}

@@ -18,6 +18,7 @@ NOT: Bu dosya CANONICAL production entry point'tir.
 - main.py → DEPRECATED (eski entry point)
 """
 
+import os
 import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
@@ -31,6 +32,7 @@ from .v1 import v1_router
 from .auth import jwt_handler, Role
 from .rate_limiter import rate_limiter
 from ..core.database import init_databases, close_databases, check_db_health
+from ..core.otel import setup_telemetry, shutdown_telemetry
 
 logger = structlog.get_logger()
 
@@ -43,8 +45,16 @@ async def lifespan(app: FastAPI):
     # Database connections başlat
     await init_databases()
 
+    # OpenTelemetry başlat
+    otel_endpoint = os.getenv("OTEL_ENDPOINT")
+    setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
+
     yield
-n    # Database connections kapat
+
+    # OpenTelemetry kapat
+    shutdown_telemetry()
+
+    # Database connections kapat
     await close_databases()
     logger.info("ALPHA BIST API stopped")
 
