@@ -1,7 +1,7 @@
 """ALPHA BIST — Event Study Package (Nihai Sistem).
 
 MacKinlay (1997) metodolojisi ile BIST hisseleri için event study.
-14 modül, ~500 satır, Fama-French multi-factor destekli.
+14 modül, ~2,825 satır, Fama-French multi-factor destekli.
 
 Modüller:
     - estimation_window: Look-ahead bias önleme

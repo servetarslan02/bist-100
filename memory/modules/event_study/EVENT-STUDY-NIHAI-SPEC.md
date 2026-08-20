@@ -487,8 +487,8 @@ class EventImpactDecay:
 | Özellik | Mevcut | Nihai (✅) |
 |---------|--------|------------|
 | Modül sayısı | 7 | 14 |
-| Toplam satır | 77 | ~2,450 |
-| Test sayısı | 5 | 71 |
+| Toplam satır | 77 | ~2,825 |
+| Test sayısı | 5 | 72 |
 | Estimation window | ❌ | ✅ `EstimationWindowManager` |
 | Event window | ❌ | ✅ `EventWindowManager` |
 | Multi-factor model | ❌ | ✅ Fama-French 3/5 |
@@ -500,3 +500,18 @@ class EventImpactDecay:
 | TCMB detailed | ⚠️ Basit | ✅ Detaylı (surprise + FX + sector) |
 | Statistical test | ⚠️ Yaklaşık | ✅ t-dist + Bonferroni + BH + Wilcoxon |
 | Impact scoring | ⚠️ Basit | ✅ Event-specific ağırlıklar |
+
+---
+
+## 8. Doğrulama (2026-08-21)
+
+### Kod İnceleme Sonucu
+- 14 modül, 2,825 satır kod tamamen incelendi
+- Matematiksel formüller MacKinlay (1997) ile uyumlu
+- OLS regresyon (lstsq), t-distribution (scipy), exponential decay — hepsi doğru
+- Look-ahead bias önleme: estimation window event'ten önce bitiyor (GAP_DAYS=6)
+- Event-specific windows: 12 farklı event tipi için farklı pencere boyutları
+- 72/72 test PASSED
+
+### Düzeltme
+- `__init__.py` docstring: ~500 satır → ~2,825 satır olarak güncellendi
