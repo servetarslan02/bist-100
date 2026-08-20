@@ -1,86 +1,15 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #d4d4d8;
-}
+@theme {
+  --color-alpha-bg: #0a0a0f;
+  --color-alpha-surface: #12121a;
+  --color-alpha-border: #1e1e2e;
+  --color-alpha-text: #e0e0e8;
+  --color-alpha-muted: #6b6b80;
+  --color-alpha-accent: #00d4aa;
+  --color-alpha-danger: #ff4444;
+  --color-alpha-warning: #ffaa00;
+  --color-alpha-info: #4488ff;
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-feature-settings: "rlig" 1, "calt" 1;
-}
-
-/* Scrollbar */
-::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #27272a;
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
-}
-
-/* Terminal grid */
-.terminal-grid {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
-
-/* Glow effects */
-.glow-green {
-  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
-}
-
-.glow-red {
-  box-shadow: 0 0 12px rgba(239, 68, 68, 0.15);
-}
-
-.glow-amber {
-  box-shadow: 0 0 12px rgba(245, 158, 11, 0.15);
-}
-
-/* Pulse animation */
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.4; }
-}
-
-.pulse-dot {
-  animation: pulse-dot 2s ease-in-out infinite;
-}
-
-/* Number formatting */
-.tabular-nums {
-  font-variant-numeric: tabular-nums;
-}
-
-/* Selection */
-::selection {
-  background: rgba(16, 185, 129, 0.2);
-  color: #d4d4d8;
-}
-
-/* Focus */
-:focus-visible {
-  outline: 1px solid #10b981;
-  outline-offset: 1px;
-}
-
-/* Table rows */
-tr.row-hover:hover {
-  background: rgba(255, 255, 255, 0.02);
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }

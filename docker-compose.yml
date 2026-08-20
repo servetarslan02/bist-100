@@ -9,7 +9,7 @@ services:
   # === Data Stores ===
   postgres:
     <<: *common
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     container_name: alpha-postgres
     ports:
       - "5432:5432"
@@ -29,7 +29,7 @@ services:
 
   clickhouse:
     <<: *common
-    image: clickhouse/clickhouse-server:24.8-alpine
+    image: clickhouse/clickhouse-server:26.3-alpine
     container_name: alpha-clickhouse
     ports:
       - "8123:8123"
@@ -54,7 +54,7 @@ services:
 
   redis:
     <<: *common
-    image: redis:7-alpine
+    image: redis:8-alpine
     container_name: alpha-redis
     ports:
       - "6379:6379"
@@ -70,7 +70,7 @@ services:
 
   redpanda:
     <<: *common
-    image: redpandadata/redpanda:v24.2.8
+    image: redpandadata/redpanda:v25.3.17
     container_name: alpha-redpanda
     ports:
       - "9092:9092"
@@ -307,7 +307,7 @@ services:
   # === Monitoring ===
   prometheus:
     <<: *common
-    image: prom/prometheus:v2.53.0
+    image: prom/prometheus:v3.14.0
     container_name: alpha-prometheus
     ports:
       - "9090:9090"
@@ -318,7 +318,7 @@ services:
 
   grafana:
     <<: *common
-    image: grafana/grafana:11.1.0
+    image: grafana/grafana:13.0.7
     container_name: alpha-grafana
     ports:
       - "3001:3000"
@@ -332,7 +332,7 @@ services:
 
   mlflow:
     <<: *common
-    image: ghcr.io/mlflow/mlflow:v2.15.0
+    image: ghcr.io/mlflow/mlflow:v3.15.1
     container_name: alpha-mlflow
     ports:
       - "5000:5000"

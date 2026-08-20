@@ -378,3 +378,101 @@ DOCKER
 | Frontend | Next.js + React | + Recharts, AG Grid, Zustand |
 | Security | hashlib | + python-jose, passlib |
 | Data pipeline | Manuel | + Great Expectations |
+
+---
+
+## 9. ÇÖZÜLDÜ — 2026-08-21 Uygulama
+
+### requirements.txt'a Eklenen Paketler ✅
+- `catboost>=1.2.0`
+- `optuna>=3.4.0`
+- `shap>=0.44.0`
+- `mlflow>=2.15.0`
+- `python-jose[crypto]>=3.3.0`
+- `passlib[bcrypt]>=1.7.4`
+- `alembic>=1.13.0`
+- `opentelemetry-api>=1.20.0`
+- `opentelemetry-sdk>=1.20.0`
+
+### .env.example Güncellemesi ✅
+- `OLLAMA_MODEL=qwen3:8b` (default)
+- `OLLAMA_FALLBACK_MODEL=gemma4:12b-q4_0` (fallback)
+
+### Frontend package.json'a Eklenen Paketler ✅
+- `recharts@2.12.0`
+- `ag-grid-community@31.3.0`
+- `ag-grid-react@31.3.0`
+- `zustand@4.5.0`
+
+### Alınan Kararlar
+1. **TimescaleDB**: EKLENMEYECEK — ClickHouse yeterli
+2. **Alembic**: EKLENDİ ✅
+3. **Qwen3**: DEFAULT MODEL OLDU ✅
+4. **Frontend paketleri**: EKLENDİ ✅
+5. **Great Expectations**: ATLANACAK — mevcut data_quality.py yeterli
+6. **Prefect**: ATLANACAK — mevcut scheduler yeterli
+
+### Spec Üstü Durumlar (Kod Zaten Aşıyor)
+1. CatBoost — `services/ml/catboost_model.py` mevcut
+2. Optuna — `services/ml/hyperparameter_tuner.py` mevcut
+3. SHAP — 25+ dosyada aktif
+4. MLflow — docker-compose'da mevcut
+5. Grafana — docker-compose + provisioning mevcut
+6. OpenTelemetry — `distributed_tracing.py` mevcut
+7. Redpanda — docker-compose'da mevcut
+
+---
+
+## 10. TAM SİSTEM YÜKSELTMESİ — 2026-08-21
+
+### Python Paketleri (36 güncellendi)
+- fastapi: 0.104.0 → 0.141.0
+- uvicorn: 0.24.0 → 0.52.0
+- websockets: 12.0 → 17.0.0
+- pandas: 2.1.0 → 2.2.0
+- numpy: 1.26.0 → 2.1.0
+- yfinance: 0.2.28 → 1.6.0
+- redis: 5.0.0 → 8.1.0
+- lightgbm: 4.1.0 → 4.7.0
+- scikit-learn: 1.3.0 → 1.9.0
+- xgboost: 2.0.0 → 3.4.0
+- polars: 0.20.0 → 1.43.0
+- catboost: 1.2.0 → 1.2.10
+- optuna: 3.4.0 → 4.9.0
+- shap: 0.44.0 → 0.52.0
+- mlflow: 2.15.0 → 3.15.0
+- structlog: 23.2.0 → 26.1.0
+- prometheus-client: 0.19.0 → 0.26.0
+- opentelemetry-api: 1.20.0 → 1.44.0
+- opentelemetry-sdk: 1.20.0 → 1.44.0
+- python-jose: 3.3.0 → 3.5.0
+- alembic: 1.13.0 → 1.19.0
+- lxml: 4.9.3 → 6.1.0
+- beautifulsoup4: 4.12.0 → 4.15.0
+- httpx: 0.25.0 → 0.28.0
+- pytest: 7.4.0 → 9.1.0
+- black: 23.0.0 → 26.5.0
+- mypy: 1.7.0 → 2.3.0
+
+### Docker Image'ları (7 güncellendi)
+- postgres: 16-alpine → 17-alpine
+- clickhouse: 24.8-alpine → 26.3-alpine
+- redis: 7-alpine → 8-alpine
+- redpanda: v24.2.8 → v25.3.17
+- prometheus: v2.53.0 → v3.14.0
+- grafana: 11.1.0 → 13.0.7
+- mlflow: v2.15.0 → v3.15.1
+
+### Frontend (6 güncellendi, 5 eklendi)
+- next: 14.2.0 → 15.4.0
+- react: 18.3.1 → 19.1.0
+- recharts: 2.12.0 → 3.10.0
+- ag-grid: 31.3.0 → 36.1.0
+- zustand: 4.5.0 → 5.0.0
+- typescript: 5.4.5 → 5.8.0
+- Yeni: tailwindcss 4.1.0, date-fns 4.1.0, clsx 2.1.1, eslint 9.28.0
+
+### Altyapı
+- Python: 3.12-slim → 3.13-slim
+- Tailwind CSS: JS config → CSS config (v4)
+- TypeScript: es5 → es2022 target
