@@ -87,7 +87,7 @@ class AuthenticationService:
         return user
 
     def authenticate(self, username: str, password: str) -> Optional[str]:
-        """Kimlik doğrula, token döndür."""
+        """Kimlik doğrula, JWT token döndür."""
         user = self._find_user(username)
         if not user:
             return None
@@ -95,8 +95,15 @@ class AuthenticationService:
         if not self._verify_password(password, user.password_hash):
             return None
 
-        # Token oluştur
-        token = secrets.token_hex(32)
+        # JWT token oluştur (jwt_manager ile)
+        from .jwt_manager import jwt_manager, TokenType
+        permissions = [p.value for p in ROLE_PERMISSIONS.get(user.role, set())]
+        token = jwt_manager.generate_token(
+            user_id=user.user_id,
+            role=user.role.value,
+            permissions=permissions,
+            token_type=TokenType.ACCESS,
+        )
         user.session_token = token
         user.token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
         user.last_login = datetime.now(timezone.utc)
@@ -106,17 +113,16 @@ class AuthenticationService:
         return token
 
     def validate_token(self, token: str) -> Optional[User]:
-        """Token doğrula."""
-        user_id = self._sessions.get(token)
-        if not user_id:
+        """JWT token doğrula."""
+        from .jwt_manager import jwt_manager, JWTError
+        try:
+            claims = jwt_manager.validate_token(token)
+        except JWTError:
             return None
 
+        user_id = claims.sub
         user = self._users.get(user_id)
         if not user:
-            return None
-
-        if user.token_expires and datetime.now(timezone.utc) > user.token_expires:
-            self._sessions.pop(token, None)
             return None
 
         return user

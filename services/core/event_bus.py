@@ -98,6 +98,18 @@ class InternalEventBus:
                                 handler(event)
                         except Exception as e:
                             logger.error("Handler error", channel=channel, error=str(e))
+                            # DLQ'ya düşür (event kaybını önle)
+                            try:
+                                from .dead_letter_queue import dead_letter_queue
+                                await dead_letter_queue.push(
+                                    event_id=event.event_id,
+                                    event_type=event.event_type,
+                                    payload=event.to_json(),
+                                    error=str(e),
+                                    retry_count=0,
+                                )
+                            except Exception:
+                                pass  # DLQ bile çalışamıyorsa log yeterli
             except Exception as e:
                 logger.warning("PubSub listen error", error=str(e))
                 await asyncio.sleep(0.1)
@@ -390,6 +402,18 @@ class EventConsumer:
                     self._processed_ids = set(list(self._processed_ids)[-25000:])
             except Exception as e:
                 logger.error("Handler error", event_type=event.event_type, error=str(e))
+                # DLQ'ya düşür
+                try:
+                    from .dead_letter_queue import dead_letter_queue
+                    await dead_letter_queue.push(
+                        event_id=event.event_id,
+                        event_type=event.event_type,
+                        payload=event.to_json(),
+                        error=str(e),
+                        retry_count=0,
+                    )
+                except Exception:
+                    pass
 
     async def consume_loop(self):
         """Start listening — push-based, blocking."""

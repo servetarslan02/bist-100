@@ -22,7 +22,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.config_watcher import ConfigWatcher
-from services.core.data_quality_v2 import DataQualityV2
+from services.core.data_quality import DataQualityChecker as DataQualityV2
 from services.ingestion.data_pipeline import DataPipeline
 from services.scanner.backtest_runner import ScannerBacktestRunner, PortfolioSimulator
 from services.features.calculator import FeatureCalculator

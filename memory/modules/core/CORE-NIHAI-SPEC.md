@@ -542,13 +542,40 @@ class ConfigHotReload:
 
 | Özellik | Mevcut | Hedef |
 |---------|--------|-------|
-| Event Bus | ✅ Redis/PG | ✅ + DLQ |
-| Database | ✅ PG/SQLite | ✅ + Transaction helper |
-| Config | ✅ Static | ✅ + Hot-reload |
-| Security | ⚠️ Password only | ✅ + JWT + RBAC |
-| Circuit Breaker | ✅ Working | ✅ + Metrics export |
-| Observability | ⚠️ Basic | ✅ + OpenTelemetry |
-| Audit Log | ⚠️ No immutability | ✅ + DB trigger |
-| Recovery | ⚠️ Basic | ✅ + Deterministic |
-| Resilience | ⚠️ Basic | ✅ + Graceful degradation |
-| Data Quality | ⚠️ v1+v2 coexist | ✅ v1 only |
+| Event Bus | ✅ | ✅ + DLQ |
+| Database | ✅ | ✅ + Transaction helper |
+| Config | ✅ | ✅ + Hot-reload |
+| Security | ✅ | ✅ + JWT + RBAC |
+| Circuit Breaker | ✅ | ✅ + Metrics export |
+| Observability | ✅ | ✅ + Distributed Tracing |
+| Audit Log | ✅ | ✅ + Immutable (hash chain) |
+| Recovery | ✅ | ✅ + Graceful degradation |
+| Resilience | ✅ | ✅ + System Governor |
+| Data Quality | ✅ | ✅ v1 only (v2 deprecated) |
+
+---
+
+## 7. ÇÖZÜLDÜ — Düzeltme Kayıtları (2026-08-20)
+
+### Düzeltme 1: Event Bus → DLQ Entegrasyonu
+- **Dosya:** `event_bus.py`
+- **Sorun:** Handler crash → event kayboluyordu
+- **Çözüm:** `InternalEventBus.start_listening()` ve `EventConsumer._handle_event()`'te catch bloğuna DLQ push eklendi
+- **Etki:** Başarısız event'ler artık `dead_letter_queue`'ya düşüyor, retry mekanizması ile kurtarılabiliyor
+
+### Düzeltme 2: Security → JWT Manager Entegrasyonu
+- **Dosya:** `security.py`
+- **Sorun:** AuthenticationService kendi random token mekanizmasını kullanıyordu (JWT standardı yok)
+- **Çözüm:** `authenticate()` → `jwt_manager.generate_token()`, `validate_token()` → `jwt_manager.validate_token()`
+- **Etki:** Tüm authentication JWT standardına geçti, RBAC permission'ları token içinde taşıyor
+
+### Düzeltme 3: Data Quality v2 Kaldırıldı
+- **Dosya:** `data_quality_v2.py` → `data_quality_v2.py.deprecated`
+- **Sorun:** v1 ve v2 birlikte duruyordu, kafa karışıklığı
+- **Çözüm:** v2 `.deprecated` olarak yeniden adlandırıldı, import'lar v1'e yönlendirildi
+- **Etki:** Tek veri kalitesi modülü (`data_quality.py`) kaldı
+
+### Düzeltme 4: Entegrasyon Testleri
+- **Dosya:** `tests/test_core_integration.py` (yeni)
+- **İçerik:** 25 test, tüm core modüllerini kapsıyor
+- **Durum:** 25/25 PASSED
