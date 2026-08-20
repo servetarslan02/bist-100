@@ -802,5 +802,8 @@ def get_portfolio_enhancements() -> Dict[str, Any]:
         result["benchmark_engine"] = BenchmarkEngine()
         result["performance_attribution"] = PerformanceAttribution()
         result["multi_currency"] = MultiCurrencyHandler()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     return result

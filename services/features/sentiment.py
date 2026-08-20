@@ -283,25 +283,40 @@ def compute_alternative_features(alt_data: Dict = None) -> Dict[str, float]:
         from services.alternative.web_scraping import compute_web_features
         if alt_data.get("web"):
             features.update({f"web_{k}": v for k, v in compute_web_features(alt_data["web"], "").items()})
-    except: pass
+    except ImportError:
+        logger.debug("Web scraping module not available")
+    except Exception as e:
+        logger.debug("Web features failed", error=str(e))
     try:
         from services.alternative.social import compute_social_features
         if alt_data.get("social"):
             features.update({f"social_{k}": v for k, v in compute_social_features(alt_data["social"], "").items()})
-    except: pass
+    except ImportError:
+        logger.debug("Social module not available")
+    except Exception as e:
+        logger.debug("Social features failed", error=str(e))
     try:
         from services.alternative.jobs import compute_job_features
         if alt_data.get("jobs"):
             features.update({f"job_{k}": v for k, v in compute_job_features(alt_data["jobs"], "").items()})
-    except: pass
+    except ImportError:
+        logger.debug("Jobs module not available")
+    except Exception as e:
+        logger.debug("Job features failed", error=str(e))
     try:
         from services.alternative.credit_card import compute_cc_features
         if alt_data.get("cc"):
             features.update({f"cc_{k}": v for k, v in compute_cc_features(alt_data["cc"], "").items()})
-    except: pass
+    except ImportError:
+        logger.debug("Credit card module not available")
+    except Exception as e:
+        logger.debug("Credit card features failed", error=str(e))
     try:
         from services.alternative.satellite import compute_satellite_features
         if alt_data.get("satellite"):
             features.update({f"sat_{k}": v for k, v in compute_satellite_features(alt_data["satellite"], "").items()})
-    except: pass
+    except ImportError:
+        logger.debug("Satellite module not available")
+    except Exception as e:
+        logger.debug("Satellite features failed", error=str(e))
     return features

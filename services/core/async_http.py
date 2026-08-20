@@ -102,7 +102,7 @@ class AsyncHTTPClient:
                         try:
                             import json
                             return json.loads(text)
-                        except:
+                        except Exception:
                             return text
                     else:
                         logger.warning("POST error", url=url, status=resp.status)

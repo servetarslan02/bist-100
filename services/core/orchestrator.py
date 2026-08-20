@@ -50,84 +50,132 @@ class MasterOrchestrator:
         try:
             from services.core.event_bus import event_bus
             self._services["event_bus"] = event_bus
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Feature servisleri
         try:
             from services.features.calculator import feature_calculator
             self._services["feature_calculator"] = feature_calculator
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Intelligence servisleri
         try:
             from services.intelligence.world_state import WorldStateManager
             self._services["world_state"] = WorldStateManager()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.regime import regime_engine
             self._services["regime"] = regime_engine
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.forecasting import ForecastingEngine
             self._services["forecasting"] = ForecastingEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.monte_carlo import MonteCarloEngine
             self._services["monte_carlo"] = MonteCarloEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.probability import ProbabilityEngine
             self._services["probability"] = ProbabilityEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.spec_engine import spec_engine
             self._services["spec_engine"] = spec_engine
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.signal_fusion import SignalFusionEngine
             self._services["signal_fusion"] = SignalFusionEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.knowledge_graph import KnowledgeGraph
             self._services["knowledge_graph"] = KnowledgeGraph()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.research_memory import ResearchMemory
             self._services["research_memory"] = ResearchMemory()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.evidence_engine import EvidenceVerificationEngine
             self._services["evidence"] = EvidenceVerificationEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.factor_engine import FactorEngine
             self._services["factor_engine"] = FactorEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.impact_engine import ImpactEngine
             self._services["impact_engine"] = ImpactEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.macro_sensitivity import MacroSensitivityEngine
             self._services["macro_sensitivity"] = MacroSensitivityEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.news_pipeline import NewsPipeline
             self._services["news_pipeline"] = NewsPipeline()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.analysis_engines import (
@@ -139,80 +187,122 @@ class MasterOrchestrator:
             self._services["sector_engine"] = SectorEngine()
             self._services["relative_strength"] = RelativeStrengthEngine()
             self._services["correlation"] = CorrelationEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.intelligence.trade_planner import TradePlanner
             self._services["trade_planner"] = TradePlanner()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Decision servisleri
         try:
             from services.core.decision_engine import DecisionEngine
             self._services["decision_engine"] = DecisionEngine()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Risk servisleri
         try:
             from services.core.risk_gate import RiskGate
             self._services["risk_gate"] = RiskGate()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.risk.position_sizing import PositionSizer
             self._services["position_sizing"] = PositionSizer()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.core.compliance import compliance_checker
             self._services["compliance"] = compliance_checker
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.core.short_selling import short_selling_monitor
             self._services["short_selling"] = short_selling_monitor
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.core.halt_monitor import halt_monitor
             self._services["halt_monitor"] = halt_monitor
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Portfolio servisleri
         try:
             from services.portfolio.portfolio_manager import PortfolioManager, CommissionModel
             self._services["portfolio_manager"] = PortfolioManager()
             self._services["commission_model"] = CommissionModel()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Learning servisleri
         try:
             from services.learning.outcome_tracker import OutcomeTracker
             self._services["outcome_tracker"] = OutcomeTracker()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         try:
             from services.learning.integrated_learning import IntegratedLearningSystem
             self._services["learning"] = IntegratedLearningSystem()
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Macro servisleri (B28)
         try:
             from services.features.macro import compute_all_macro_features
             self._services["macro_features"] = compute_all_macro_features
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Factors (B30)
         try:
             from services.intelligence.factor_engine import compute_financial_scores
             self._services["financial_scores"] = compute_financial_scores
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # Event Study (B31)
         try:
             from services.intelligence.impact_engine import analyze_event_impact
             self._services["event_impact"] = analyze_event_impact
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
 
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
@@ -280,7 +370,8 @@ class MasterOrchestrator:
                     cds_data=market_data["macro"].get("cds"),
                 )
                 features.update(macro_f)
-        except: pass
+        except Exception:
+            pass
 
         # ━━━ 3. WORLD STATE ━━━
         world_state = {}
@@ -288,7 +379,8 @@ class MasterOrchestrator:
             ws = self._services.get("world_state")
             if ws:
                 world_state = ws.get_state_dict() if hasattr(ws, "get_state_dict") else {}
-        except: pass
+        except Exception:
+            pass
         result["world_state"] = world_state
 
         # ━━━ 4. REGIME ━━━
@@ -298,7 +390,8 @@ class MasterOrchestrator:
             if re:
                 regime_result = re.detect_regime(features)
                 regime = regime_result.regime if hasattr(regime_result, "regime") else str(regime_result)
-        except: pass
+        except Exception:
+            pass
         result["regime"] = regime
 
         # ━━━ 5. ANALYSIS ENGINES ━━━
@@ -312,7 +405,8 @@ class MasterOrchestrator:
             if se: analysis["sector"] = "computed"
             rs = self._services.get("relative_strength")
             if rs: analysis["relative_strength"] = "computed"
-        except: pass
+        except Exception:
+            pass
         result["analysis"] = analysis
 
         # ━━━ 6. FORECASTING + PROBABILITY ━━━
@@ -321,7 +415,8 @@ class MasterOrchestrator:
             fe = self._services.get("forecasting")
             if fe:
                 forecast = {"horizons": [1, 5, 20]}
-        except: pass
+        except Exception:
+            pass
         result["forecast"] = forecast
 
         # ━━━ 7. MONTE CARLO ━━━
@@ -330,7 +425,8 @@ class MasterOrchestrator:
             mc = self._services.get("monte_carlo")
             if mc:
                 monte_carlo = {"simulated": True}
-        except: pass
+        except Exception:
+            pass
         result["monte_carlo"] = monte_carlo
 
         # ━━━ 8. SPEC ENGINE ━━━
@@ -341,7 +437,8 @@ class MasterOrchestrator:
                 spec = se.compute_spec(ticker, features, world_state)
                 if hasattr(spec, "__dict__"):
                     spec = spec.__dict__
-        except: pass
+        except Exception:
+            pass
         result["spec"] = spec
 
         # ━━━ 9. FACTORS (B30) ━━━
@@ -350,7 +447,8 @@ class MasterOrchestrator:
             fs_fn = self._services.get("financial_scores")
             if fs_fn and market_data.get("fundamentals"):
                 factors = fs_fn(market_data["fundamentals"])
-        except: pass
+        except Exception:
+            pass
         result["factors"] = factors
 
         # ━━━ 9.5. AGENT PIPELINE (Nihai Mimari) ━━━
@@ -429,7 +527,10 @@ class MasterOrchestrator:
                         _asyncio.get_event_loop().create_task(eb.publish("agent.analysis", event))
                     except RuntimeError:
                         pass
-            except: pass
+            except ImportError:
+                pass
+            except Exception:
+                pass
 
         # ━━━ 10. SIGNAL FUSION (Agent sonuçları dahil) ━━━
         fused_signal = {}
@@ -449,7 +550,8 @@ class MasterOrchestrator:
                 }
                 fused = sf.fuse_signals(ticker, signals, regime)
                 fused_signal = fused.__dict__ if hasattr(fused, "__dict__") else {}
-        except: pass
+        except Exception:
+            pass
         result["signal"] = fused_signal
 
         # ━━━ 11. DECISION ━━━
@@ -473,7 +575,10 @@ class MasterOrchestrator:
                 )
                 d = de.decide(inp)
                 decision = d.__dict__ if hasattr(d, "__dict__") else {}
-        except: pass
+        except ImportError:
+            pass
+        except Exception:
+            pass
         result["decision"] = decision
 
         # ━━━ 12. TRADE PLAN ━━━
@@ -490,7 +595,8 @@ class MasterOrchestrator:
                 )
                 if hasattr(trade_plan, "__dict__"):
                     trade_plan = trade_plan.__dict__
-        except: pass
+        except Exception:
+            pass
         result["trade_plan"] = trade_plan
 
         # ━━━ 13. RISK CHECK ━━━
@@ -508,7 +614,8 @@ class MasterOrchestrator:
                     model_confidence=fused_signal.get("fused_confidence", 0.5),
                 )
                 risk_check = risk_result.__dict__ if hasattr(risk_result, "__dict__") else {"allowed": True}
-        except: pass
+        except Exception:
+            pass
         result["risk"] = risk_check
 
         # ━━━ 14. COMPLIANCE (B27) ━━━
@@ -521,7 +628,8 @@ class MasterOrchestrator:
                     trade_plan.get("quantity", 0) * float(prices[-1]) if isinstance(trade_plan, dict) else 0,
                     100000, 0
                 ).to_dict()
-        except: pass
+        except Exception:
+            pass
         result["compliance"] = compliance
 
         # ━━━ 15. KNOWLEDGE GRAPH + RESEARCH MEMORY ━━━
@@ -531,7 +639,8 @@ class MasterOrchestrator:
             if kg: context["knowledge"] = "available"
             rm = self._services.get("research_memory")
             if rm: context["memory"] = "available"
-        except: pass
+        except Exception:
+            pass
         result["context"] = context
 
         return result

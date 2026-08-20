@@ -322,23 +322,38 @@ def get_learning_systems() -> Dict[str, Any]:
     try:
         from .outcome_tracker import OutcomeTracker
         result["outcome_tracker"] = OutcomeTracker()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .attribution import AttributionEngine
         result["attribution"] = AttributionEngine()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .learning_loop import LearningLoop
         result["learning_loop"] = LearningLoop()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .continuous_learning import ContinuousLearning
         result["continuous_learning"] = ContinuousLearning()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .super_intelligence import SuperIntelligence
         result["super_intelligence"] = SuperIntelligence()
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     return result
 
 

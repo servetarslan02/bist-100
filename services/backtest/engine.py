@@ -274,29 +274,50 @@ def get_backtest_systems() -> Dict[str, Any]:
     try:
         from .engine_v4 import BacktestEngineV4
         systems["engine_v4"] = BacktestEngineV4
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .enhanced_walk_forward import PurgeEmbargoWalkForward
         systems["enhanced_wf"] = PurgeEmbargoWalkForward
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .portfolio_sim import PortfolioSimulator
         systems["portfolio_sim"] = PortfolioSimulator
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .walk_forward import WalkForwardEngine
         systems["walk_forward"] = WalkForwardEngine
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .walk_forward_runner import WalkForwardRunner
         systems["wf_runner"] = WalkForwardRunner
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .canonical_adapter import CanonicalBacktestAdapter
         systems["canonical_adapter"] = CanonicalBacktestAdapter
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     try:
         from .persistence import BacktestPersistence
         systems["persistence"] = BacktestPersistence
-    except: pass
+    except ImportError:
+        pass
+    except Exception:
+        pass
     return systems
