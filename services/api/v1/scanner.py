@@ -279,7 +279,7 @@ async def scheduler_stats(user=Depends(get_current_user), _=Depends(check_rate_l
 
 @router.post("/trigger")
 async def trigger_scan(
-    scan_type: str = Query("manual", regex="^(manual|batch|event)$"),
+    scan_type: str = Query("manual", pattern="^(manual|batch|event)$"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):

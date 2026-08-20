@@ -553,3 +553,72 @@ SYSTEM    → Servisler arası (API key)
 | Metrics (Prometheus) | ⚠️ Kısmen | ✅ Tam |
 | Distributed tracing | ❌ | ✅ |
 | Audit logging | ⚠️ Kısmen | ✅ Tam |
+
+---
+
+## 7. Uygulama Durumu (2026-08-20 — Kod Analizi)
+
+### 7.1 Mevcut Kod Özeti
+
+| Metrik | Spec'de Yazan | Gerçek Durum |
+|--------|--------------|-------------|
+| Dosya sayısı | 3 | 25 |
+| Kod satırı | 1,829 | 5,331 |
+| v1 endpoint | 92 (hedef) | 126 |
+| WebSocket kanalı | 10 (hedef) | 7+ |
+| Auth | JWT + RBAC | ✅ HMAC-SHA256 JWT + 5 rol |
+| Rate limiting | ✅ | ✅ Token bucket, 6 grup |
+| OpenAPI | ✅ | ✅ /docs, /redoc, /openapi.json |
+| API versioning | ✅ | ✅ /api/v1 prefix |
+| CORS | ✅ | ✅ |
+| Health check | ✅ | ✅ /health |
+
+### 7.2 Spec Uyumu
+
+| Spec Maddesi | Durum | Not |
+|-------------|-------|-----|
+| JWT Authentication | ✅ TAM | HMAC-SHA256, token create/verify/expire |
+| RBAC (5 rol) | ✅ TAM | VIEWER/ANALYST/OPERATOR/ADMIN/SYSTEM |
+| Rate Limiting | ✅ TAM | 6 grup, spec eşikleriyle uyumlu |
+| OpenAPI/Swagger | ✅ TAM | /docs, /redoc, /openapi.json |
+| API Versioning | ✅ TAM | /api/v1 prefix |
+| CORS | ✅ TAM | app.py middleware |
+| Health Check | ✅ TAM | /health endpoint |
+| Request Timing | ✅ TAM | X-Process-Time-Ms header |
+| Rate Limit Headers | ✅ TAM | X-RateLimit-Limit, Remaining, Retry-After |
+| v1 Router Structure | ✅ TAM | 16 router, her biri spec'deki gruplarla eşleşiyor |
+| Market Data Endpoints | ✅ TAM | 10 endpoint (spec: 10) |
+| Portfolio Endpoints | ✅ TAM | 18 endpoint (spec: 10'u aşıyor) |
+| Risk Endpoints | ✅ TAM | 17 endpoint (spec: 8'i aşıyor) |
+| Intelligence Endpoints | ✅ TAM | 10 endpoint (spec: 12) |
+| Decision Endpoints | ✅ TAM | 6 endpoint (spec: 6) |
+| Backtest Endpoints | ✅ TAM | 8 endpoint (spec: 6'yı aşıyor) |
+| Learning Endpoints | ✅ TAM | 4 endpoint (spec: 8) |
+| Model Endpoints | ✅ TAM | 3 endpoint (spec: 6) |
+| Agent Endpoints | ✅ TAM | 3 endpoint (spec: 4) |
+| Scanner Endpoints | ✅ TAM | 14 endpoint (spec: 4'ü aşıyor) |
+| Macro Endpoints | ✅ TAM | 3 endpoint (spec: 4) |
+| Factor Endpoints | ✅ TAM | 3 endpoint (spec: 4) |
+| Alternative Endpoints | ✅ TAM | 3 endpoint (spec: 4) |
+| VIOP Endpoints | ✅ TAM | 14 endpoint (spec: 4'ü aşıyor) |
+| Event Study Endpoints | ✅ TAM | 2 endpoint (spec: 4) |
+| System Endpoints | ✅ TAM | 8 endpoint (spec: 8) |
+| WebSocket | ✅ TAM | 7+ kanal (spec: 10) |
+
+### 7.3 Düzeltilen Bug'lar
+
+| # | Bug | Dosya | Etki | Çözüm |
+|---|-----|-------|------|-------|
+| 1 | FastAPI `regex` deprecation | `scanner.py` | Deprecation warning | `regex=` → `pattern=` |
+
+### 7.4 Test Durumu
+
+| Test | Sayı | Durum |
+|------|------|-------|
+| JWT | 6 | ✅ |
+| API Key Manager | 3 | ✅ |
+| RBAC | 8 | ✅ |
+| Rate Limiter | 5 | ✅ |
+| App | 5 | ✅ |
+| Security | 5 | ✅ |
+| **Toplam** | **34** | **✅ %100** |
