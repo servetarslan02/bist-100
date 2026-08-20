@@ -57,13 +57,23 @@ def calculate_factor_correlation(
                     "correlation": round(float(corr_matrix[i, j]), 4),
                 })
 
-    # Çoklu doğrusallık uyarısı
+    # Çoklu doğrusallık uyarısı (VIF)
+    # VIF = 1 / (1 - R²), burada R² = factor_i'nin diğer faktörlerle açıklanan varyansı
+    # Basitleştirilmiş: max off-diagonal korelasyon kullanarak yaklaşık VIF
     vif_warnings = []
     for i in range(n_factors):
-        # VIF = 1 / (1 - R²)
-        r_squared = 1 - (1 / max(1 - corr_matrix[i, i] ** 2, 0.001))
-        if r_squared > 0.8:
-            vif_warnings.append({"factor": names[i], "vif": round(float(r_squared), 2)})
+        # Factor i'nin diğer faktörlerle max korelasyonu
+        off_diag = [abs(corr_matrix[i, j]) for j in range(n_factors) if i != j]
+        max_corr = max(off_diag) if off_diag else 0.0
+        # VIF ≈ 1 / (1 - max_corr²)
+        r_squared = max_corr ** 2
+        vif = 1.0 / max(1.0 - r_squared, 0.001)
+        if vif > 5.0:  # VIF > 5 = yüksek çoklu doğrusallık
+            vif_warnings.append({
+                "factor": names[i],
+                "vif": round(float(vif), 2),
+                "max_corr_with": names[[j for j in range(n_factors) if j != i][np.argmax(off_diag)]],
+            })
 
     # Korelasyon matrisini dict'e çevir
     corr_dict = {}

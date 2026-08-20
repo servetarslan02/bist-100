@@ -566,7 +566,25 @@ class BISTSpecificFactors:
 
 ---
 
-## 5. Uygulama Planı — ✅ TAMAMLANDI
+## 7. ÇÖZÜLDÜ — Düzeltme Kayıtları (2026-08-21)
+
+### Düzeltme 1: VIF Hesaplama Düzeltmesi
+- **Dosya:** `factor_correlation.py`
+- **Sorun:** VIF hesaplaması tamamen yanlıştı: `corr_matrix[i, i]` her zaman 1.0 → `1 - 1² = 0` → `1/0.001 = 1000` → `r_squared = -999`
+- **Çözüm:** Off-diagonal max korelasyon kullanarak doğru VIF: `VIF = 1 / (1 - max_corr²)`
+- **Etki:** VIF > 5 olan faktör çiftleri artık doğru tespit ediliyor
+
+### Düzeltme 2: Risk Adjustment Düzeltmesi
+- **Dosya:** `ranking.py`
+- **Sorun:** `risk_adjusted_score = total_score * (risk_score / 100)` → risk_score=50 ise skor yarıya iniyordu
+- **Çözüm:** `risk_penalty = (risk_score / 100) * risk_aversion` → `risk_adjusted_score = total_score * (1 - risk_penalty)`
+- **Etki:** Düşük riskli hisseler artık yüksek riskli hisselerden yüksek skor alıyor
+
+### Düzeltme 3: FX/Enflasyon/Faiz Sensitivity Düzeltmesi
+- **Dosya:** `bist_anomalies.py`
+- **Sorun:** `abs()` kullanılıyordu → ihracatçı (pozitif beta) ve ithalatçı (negatif beta) aynı skor alıyordu
+- **Çözüm:** `abs()` kaldırıldı, yön bilgisi korundu
+- **Etki:** İhracatçı şirketler artık FX sensitivity'de yüksek skor alıyor (tercih edilen)
 
 ### Faz 1: Kritik Düzeltmeler ✅
 1. ✅ Piotroski F-Score — ağırlıklar, sub-scores eklendi

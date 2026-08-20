@@ -78,13 +78,22 @@ def calculate_bist_anomalies(
     anomalies["liquidity_premium"] = 1.0 - min(avg_vol / 10_000_000, 1.0)
 
     # 3. Kur hassasiyeti
-    anomalies["fx_sensitivity"] = min(abs(stock.get("usdtry_beta", 0)) / 2.0, 1.0)
+    # Düzeltme (v2.1): abs() kaldırıldı — yön önemli
+    # Pozitif beta = USDTRY artarken hisse de artar (ihracatçı → tercih edilen)
+    # Negatif beta = USDTRY artarken hisse düşer (ithalatçı → riskli)
+    # abs() kullanmak ihracatçı ve ithalatçı şirketleri aynı skorluyordu
+    fx_beta = stock.get("usdtry_beta", 0)
+    anomalies["fx_sensitivity"] = min(max(fx_beta / 2.0, 0.0), 1.0)
 
     # 4. Enflasyon hassasiyeti
-    anomalies["inflation_sensitivity"] = min(abs(stock.get("inflation_beta", 0)) / 2.0, 1.0)
+    # Düzeltme (v2.1): abs() kaldırıldı — pozitif beta = enflasyon hedge
+    inf_beta = stock.get("inflation_beta", 0)
+    anomalies["inflation_sensitivity"] = min(max(inf_beta / 2.0, 0.0), 1.0)
 
     # 5. Faiz hassasiyeti
-    anomalies["rate_sensitivity"] = min(abs(stock.get("rate_beta", 0)) / 2.0, 1.0)
+    # Düzeltme (v2.1): abs() kaldırıldı — negatif beta = faiz artarken düşer (riskli)
+    rate_beta = stock.get("rate_beta", 0)
+    anomalies["rate_sensitivity"] = min(max(-rate_beta / 2.0, 0.0), 1.0)
 
     # 6. Sektör momentum
     anomalies["sector_momentum"] = min(max(stock.get("sector_momentum", 0) / 20.0, -1.0), 1.0)

@@ -101,10 +101,15 @@ def rank_stocks(
             }
 
         # Risk adjustment
+        # Düzeltme (v2.1): risk_score yüksek = yüksek risk = düşük skor olmalı
+        # Eski: total_score * (risk_score / 100) → risk_score=50 ise skor yarıya iniyordu
+        # Yeni: risk_penalty = 1 - (risk_score / 100) * risk_aversion
+        # risk_score=0 → penalty=0 (güvenli), risk_score=100 → penalty=0.5 (riskli)
         risk_score = stock.get("risk_score", 50)
         if risk_adjust and risk_score > 0:
-            risk_factor = risk_score / 100
-            risk_adjusted_score = total_score * risk_factor
+            risk_aversion = 0.5  # Risk cezası gücü (0=ceza yok, 1=tam ceza)
+            risk_penalty = (risk_score / 100) * risk_aversion
+            risk_adjusted_score = total_score * (1 - risk_penalty)
         else:
             risk_adjusted_score = total_score
 
