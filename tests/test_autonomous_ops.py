@@ -17,7 +17,6 @@ import os
 import asyncio
 import json
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.alerting import (
     AlertingSystem, Alert, AlertType, AlertSeverity, AlertStatus,
@@ -70,7 +69,7 @@ async def test_alert_lifecycle_states():
     if alert2.is_active:
         issues.append("RESOLVED active olmamalı")
 
-    return "Alert Lifecycle States", len(issues) == 0, issues
+    assert len(issues) == 0, f"Alert Lifecycle States: {issues}"
 
 
 async def test_alert_serialization():
@@ -105,7 +104,7 @@ async def test_alert_serialization():
     if pd.get("event_action") != "trigger":
         issues.append(f"pd event_action: {pd.get('event_action')}")
 
-    return "Alert Serialization", len(issues) == 0, issues
+    assert len(issues) == 0, f"Alert Serialization: {issues}"
 
 
 async def test_escalation_timeout():
@@ -123,7 +122,7 @@ async def test_escalation_timeout():
     active = alerting.get_active_alerts()
     if not active:
         issues.append("Alert yok")
-        return "Escalation Timeout", False, issues
+        assert False, f"Escalation Timeout: {issues}"
 
     # Manuel olarak timestamp'i eski yap
     for a in alerting._alerts:
@@ -139,7 +138,7 @@ async def test_escalation_timeout():
         if escalated["severity"] != "CRITICAL":
             issues.append(f"Escalation sonrası severity: {escalated['severity']}")
 
-    return "Escalation Timeout", len(issues) == 0, issues
+    assert len(issues) == 0, f"Escalation Timeout: {issues}"
 
 
 async def test_acknowledge_stops_escalation():
@@ -157,7 +156,7 @@ async def test_acknowledge_stops_escalation():
     active = alerting.get_active_alerts()
     if not active:
         issues.append("Alert yok")
-        return "Acknowledge Stops Escalation", False, issues
+        assert False, f"Acknowledge Stops Escalation: {issues}"
 
     fp = active[0]["fingerprint"]
 
@@ -175,7 +174,7 @@ async def test_acknowledge_stops_escalation():
         if active[0]["status"] == "ESCALATED":
             issues.append("Acknowledged alert escalate edildi")
 
-    return "Acknowledge Stops Escalation", len(issues) == 0, issues
+    assert len(issues) == 0, f"Acknowledge Stops Escalation: {issues}"
 
 
 # =====================================================
@@ -206,7 +205,7 @@ async def test_alert_db_persistence():
     elif rows[0]["status"] != "CREATED":
         issues.append(f"DB status: {rows[0]['status']}")
 
-    return "Alert DB Persistence", len(issues) == 0, issues
+    assert len(issues) == 0, f"Alert DB Persistence: {issues}"
 
 
 async def test_alert_restart_recovery():
@@ -233,7 +232,7 @@ async def test_alert_restart_recovery():
     if len(active) < 1:
         issues.append(f"Restart sonrası alert yüklenemedi: {len(active)}")
 
-    return "Alert Restart Recovery", len(issues) == 0, issues
+    assert len(issues) == 0, f"Alert Restart Recovery: {issues}"
 
 
 # =====================================================
@@ -264,7 +263,7 @@ async def test_notification_routing():
     if len(crit_providers) != 3:
         issues.append(f"CRITICAL providers: {len(crit_providers)} (beklenen: 3)")
 
-    return "Notification Routing", len(issues) == 0, issues
+    assert len(issues) == 0, f"Notification Routing: {issues}"
 
 
 async def test_slack_payload_format():
@@ -283,7 +282,7 @@ async def test_slack_payload_format():
         if "title" not in att:
             issues.append("title eksik")
 
-    return "Slack Payload Format", len(issues) == 0, issues
+    assert len(issues) == 0, f"Slack Payload Format: {issues}"
 
 
 async def test_discord_payload_format():
@@ -300,7 +299,7 @@ async def test_discord_payload_format():
         if embed.get("color") != 0xFF9900:
             issues.append(f"color: {embed.get('color')}")
 
-    return "Discord Payload Format", len(issues) == 0, issues
+    assert len(issues) == 0, f"Discord Payload Format: {issues}"
 
 
 async def test_pagerduty_payload_format():
@@ -317,7 +316,7 @@ async def test_pagerduty_payload_format():
     if "dedup_key" not in payload:
         issues.append("dedup_key eksik")
 
-    return "PagerDuty Payload Format", len(issues) == 0, issues
+    assert len(issues) == 0, f"PagerDuty Payload Format: {issues}"
 
 
 async def test_log_provider_notification():
@@ -334,7 +333,7 @@ async def test_log_provider_notification():
     if provider.min_severity() != "INFO":
         issues.append(f"min_severity: {provider.min_severity()}")
 
-    return "Log Provider Notification", len(issues) == 0, issues
+    assert len(issues) == 0, f"Log Provider Notification: {issues}"
 
 
 # =====================================================
@@ -348,7 +347,7 @@ async def test_jwt_validation():
     try:
         import jwt as pyjwt
     except ImportError:
-        return "JWT Validation", False, ["PyJWT not installed"]
+        assert False, "JWT Validation: PyJWT not installed"
 
     secret = "test_secret_key_12345"
     provider = JWTProvider(secret=secret, algorithm="HS256")
@@ -387,7 +386,7 @@ async def test_jwt_validation():
     if result.authenticated:
         issues.append("Boş token kabul edildi")
 
-    return "JWT Validation", len(issues) == 0, issues
+    assert len(issues) == 0, f"JWT Validation: {issues}"
 
 
 async def test_jwt_role_extraction():
@@ -397,7 +396,7 @@ async def test_jwt_role_extraction():
     try:
         import jwt as pyjwt
     except ImportError:
-        return "JWT Role Extraction", False, ["PyJWT not installed"]
+        assert False, "JWT Role Extraction: PyJWT not installed"
 
     secret = "test_secret"
 
@@ -416,7 +415,7 @@ async def test_jwt_role_extraction():
     if result2.roles != ["operator"]:
         issues.append(f"String role: {result2.roles}")
 
-    return "JWT Role Extraction", len(issues) == 0, issues
+    assert len(issues) == 0, f"JWT Role Extraction: {issues}"
 
 
 # =====================================================
@@ -437,7 +436,7 @@ async def test_role_permissions():
     elif "write" in ROLE_PERMISSIONS.get("viewer", []):
         issues.append("viewer write permission almamalı")
 
-    return "Role Permissions", len(issues) == 0, issues
+    assert len(issues) == 0, f"Role Permissions: {issues}"
 
 
 async def test_rbac_admin_access():
@@ -452,7 +451,7 @@ async def test_rbac_admin_access():
         if not result.authenticated:
             issues.append(f"Admin {perm} reddedildi")
 
-    return "RBAC Admin Access", len(issues) == 0, issues
+    assert len(issues) == 0, f"RBAC Admin Access: {issues}"
 
 
 async def test_rbac_viewer_restrictions():
@@ -474,7 +473,7 @@ async def test_rbac_viewer_restrictions():
         if result.authenticated and not result.error:
             issues.append(f"Viewer {perm} izni var (olmamalı)")
 
-    return "RBAC Viewer Restrictions", len(issues) == 0, issues
+    assert len(issues) == 0, f"RBAC Viewer Restrictions: {issues}"
 
 
 async def test_rbac_operator_permissions():
@@ -494,7 +493,7 @@ async def test_rbac_operator_permissions():
     if result.authenticated and not result.error:
         issues.append("Operator admin izni var (olmamalı)")
 
-    return "RBAC Operator Permissions", len(issues) == 0, issues
+    assert len(issues) == 0, f"RBAC Operator Permissions: {issues}"
 
 
 async def test_oauth_provider_without_secret():
@@ -506,7 +505,7 @@ async def test_oauth_provider_without_secret():
     if result.authenticated:
         issues.append("Secret yokken token kabul edildi")
 
-    return "OAuth Without Secret", len(issues) == 0, issues
+    assert len(issues) == 0, f"OAuth Without Secret: {issues}"
 
 
 async def test_auth_manager_multi_provider():
@@ -528,7 +527,7 @@ async def test_auth_manager_multi_provider():
     if len(providers) < 1:
         issues.append("Provider yok")
 
-    return "Auth Manager Multi Provider", len(issues) == 0, issues
+    assert len(issues) == 0, f"Auth Manager Multi Provider: {issues}"
 
 
 # =====================================================
@@ -573,19 +572,24 @@ async def run_all():
 
     for test_func in tests:
         try:
-            name, ok, issues = await test_func()
+            await test_func()
+            name = test_func.__name__
+            passed += 1
+            print(f"\n✅ {name}")
+            print("   PASSED")
+        except AssertionError as e:
+            name = test_func.__name__
+            failed += 1
+            issues = [str(e)]
+            print(f"\n❌ {name}")
+            for i in issues:
+                print(f"   ❌ {i}")
+                all_issues.append(f"{name}: {i}")
         except Exception as e:
             name = test_func.__name__
-            ok = False
-            issues = [f"Exception: {e}"]
-
-        icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
-        if ok:
-            passed += 1
-            print("   PASSED")
-        else:
             failed += 1
+            issues = [f"Exception: {e}"]
+            print(f"\n❌ {name}")
             for i in issues:
                 print(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")

@@ -638,7 +638,25 @@ class TestFaz5_Integration:
             compute_cc_features, compute_satellite_features,
             compute_web_features,
         )
-        assert True
+        assert BaseAdapter is not None
+        assert RateLimiter is not None
+        assert CircuitBreaker is not None
+        assert DataQualityValidator is not None
+        assert AdapterRegistry is not None
+        assert google_trends_adapter is not None
+        assert bkm_adapter is not None
+        assert kariyer_net_adapter is not None
+        assert eksi_sozluk_adapter is not None
+        assert investing_adapter is not None
+        assert llm_sentiment is not None
+        assert alt_feature_engine is not None
+        assert reconciler is not None
+        assert feature_store is not None
+        assert callable(compute_social_features)
+        assert callable(compute_job_features)
+        assert callable(compute_cc_features)
+        assert callable(compute_satellite_features)
+        assert callable(compute_web_features)
 
     def test_adapter_registry_singleton(self):
         """Singleton registry'nin doğru çalıştığını doğrula."""

@@ -619,7 +619,19 @@ class TestFaz7_Integration:
             AgentPipelineOrchestrator, AgentCommunicationBus,
             AgentSelfEvaluator, MultiAgentEvaluator,
         )
-        assert True  # Import başarılı
+        assert AgentRole is not None
+        assert AgentTask is not None
+        assert AgentResult is not None
+        assert ParallelAgentRunner is not None
+        assert ConflictDetector is not None
+        assert DebateEngine is not None
+        assert AgentMemory is not None
+        assert SynthesisEngine is not None
+        assert RiskAssessor is not None
+        assert AgentPipelineOrchestrator is not None
+        assert AgentCommunicationBus is not None
+        assert AgentSelfEvaluator is not None
+        assert MultiAgentEvaluator is not None
 
     def test_pipeline_result_structure(self):
         """PipelineResult yapısını doğrula."""

@@ -11,9 +11,15 @@ Kullanım:
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime, timezone, date, time, timedelta
+
+# Dynamic date calculation for market calendar tests
+today = date.today()
+monday = today - timedelta(days=today.weekday())
+saturday = monday + timedelta(days=5)
+sunday = monday + timedelta(days=6)
+prev_monday = monday - timedelta(days=7)
 
 
 def test_market_calendar():
@@ -25,8 +31,7 @@ def test_market_calendar():
     failed = 0
 
     # Test 1: Hafta içi tatil değilse işlem günü
-    # 2026-08-18 Pazartesi
-    d = date(2026, 8, 18)
+    d = monday
     if cal.is_trading_day(d):
         print(f"  ✓ Pazartesi işlem günü: {d}")
         passed += 1
@@ -35,7 +40,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 2: Cumartesi işlem günü değil
-    d = date(2026, 8, 15)
+    d = saturday
     if not cal.is_trading_day(d):
         print(f"  ✓ Cumartesi işlem günü değil: {d}")
         passed += 1
@@ -44,7 +49,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 3: Pazar işlem günü değil
-    d = date(2026, 8, 16)
+    d = sunday
     if not cal.is_trading_day(d):
         print(f"  ✓ Pazar işlem günü değil: {d}")
         passed += 1
@@ -62,7 +67,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 5: Market açık (Pazartesi 11:00)
-    dt = datetime(2026, 8, 18, 11, 0)
+    dt = datetime(monday.year, monday.month, monday.day, 11, 0)
     if cal.is_market_open(dt):
         print(f"  ✓ Pazar 11:00 market açık")
         passed += 1
@@ -71,7 +76,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 6: Market kapalı (gece)
-    dt = datetime(2026, 8, 18, 23, 0)
+    dt = datetime(monday.year, monday.month, monday.day, 23, 0)
     if not cal.is_market_open(dt):
         print(f"  ✓ Gece 23:00 market kapalı")
         passed += 1
@@ -80,7 +85,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 7: Öğle arası
-    dt = datetime(2026, 8, 18, 13, 30)
+    dt = datetime(monday.year, monday.month, monday.day, 13, 30)
     if not cal.is_market_open(dt):
         print(f"  ✓ Öğle arası market kapalı")
         passed += 1
@@ -89,7 +94,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 8: Pre-market
-    dt = datetime(2026, 8, 18, 9, 50)
+    dt = datetime(monday.year, monday.month, monday.day, 9, 50)
     session = cal.get_session(dt)
     if session == MarketSession.PRE_MARKET:
         print(f"  ✓ 09:50 pre-market")
@@ -99,7 +104,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 9: Morning session
-    dt = datetime(2026, 8, 18, 10, 30)
+    dt = datetime(monday.year, monday.month, monday.day, 10, 30)
     session = cal.get_session(dt)
     if session == MarketSession.MORNING:
         print(f"  ✓ 10:30 morning session")
@@ -109,7 +114,7 @@ def test_market_calendar():
         failed += 1
 
     # Test 10: next_open
-    dt = datetime(2026, 8, 15, 20, 0)  # Cumartesi akşam
+    dt = datetime(saturday.year, saturday.month, saturday.day, 20, 0)  # Cumartesi akşam
     next_o = cal.next_open(dt)
     if next_o.weekday() == 0:  # Pazartesi
         print(f"  ✓ Cumartesi akşamı next_open: {next_o}")
@@ -119,8 +124,8 @@ def test_market_calendar():
         failed += 1
 
     # Test 11: trading_days_between
-    start = date(2026, 8, 10)  # Pazartesi
-    end = date(2026, 8, 15)    # Cumartesi
+    start = prev_monday  # Pazartesi
+    end = saturday    # Cumartesi
     days = cal.trading_days_between(start, end)
     if days == 5:
         print(f"  ✓ 5 işlem günü (Pzt-Cuma)")
@@ -131,8 +136,8 @@ def test_market_calendar():
 
     # Test 12: Devre kesici
     from datetime import time as t
-    cal.add_halt(date(2026, 8, 18), t(11, 0), t(11, 30))
-    dt = datetime(2026, 8, 18, 11, 15)
+    cal.add_halt(monday, t(11, 0), t(11, 30))
+    dt = datetime(monday.year, monday.month, monday.day, 11, 15)
     if cal.get_status(dt) == MarketStatus.HALT:
         print(f"  ✓ Devre kesici 11:15")
         passed += 1
@@ -140,7 +145,7 @@ def test_market_calendar():
         print(f"  ✗ Devre kesici olmalı 11:15")
         failed += 1
 
-    return passed, failed
+    assert failed == 0, f"Market Calendar: {failed} test(s) failed out of {passed + failed}"
 
 
 def test_corporate_actions():
@@ -271,7 +276,7 @@ def test_corporate_actions():
         print(f"  ✗ KAP sınıflandırma: DIVIDEND bekleniyor, {action_type}")
         failed += 1
 
-    return passed, failed
+    assert failed == 0, f"Corporate Actions: {failed} test(s) failed out of {passed + failed}"
 
 
 def test_circuit_breaker():
@@ -341,7 +346,7 @@ def test_circuit_breaker():
         print(f"  ✗ OPEN olmalı, {cb.state}")
         failed += 1
 
-    return passed, failed
+    assert failed == 0, f"Circuit Breaker: {failed} test(s) failed out of {passed + failed}"
 
 
 def test_rate_limiter():
@@ -375,7 +380,7 @@ def test_rate_limiter():
         print(f"  ✗ 6. çağrı beklemeli")
         failed += 1
 
-    return passed, failed
+    assert failed == 0, f"Rate Limiter: {failed} test(s) failed out of {passed + failed}"
 
 
 def test_provider_reliability():
@@ -433,7 +438,7 @@ def test_provider_reliability():
         print(f"  ✗ Orta-yüksek skor bekleniyor: {score}")
         failed += 1
 
-    return passed, failed
+    assert failed == 0, f"Provider Reliability: {failed} test(s) failed out of {passed + failed}"
 
 
 def main():
@@ -455,9 +460,12 @@ def main():
     for name, test_func in tests:
         print(f"\n--- {name} ---")
         try:
-            p, f = test_func()
-            total_passed += p
-            total_failed += f
+            test_func()
+            total_passed += 1
+            print(f"  ✓ {name} PASSED")
+        except AssertionError as e:
+            total_failed += 1
+            print(f"  ✗ {name}: {e}")
         except Exception as e:
             print(f"  ✗ Test crashed: {e}")
             import traceback

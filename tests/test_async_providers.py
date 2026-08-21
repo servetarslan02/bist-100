@@ -14,7 +14,6 @@ import os
 import asyncio
 import json
 import tempfile
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.async_http import AsyncHTTPClient, get_client, close_all_clients
 
@@ -34,7 +33,7 @@ async def test_client_creation():
         issues.append(f"Max retries: {client._max_retries}")
 
     await client.close()
-    return "Client Creation", len(issues) == 0, issues
+    assert len(issues) == 0, f"Client Creation: {issues}"
 
 
 async def test_client_singleton():
@@ -48,7 +47,7 @@ async def test_client_singleton():
         issues.append("Singleton farklı instance döndürdü")
 
     await close_all_clients()
-    return "Client Singleton", len(issues) == 0, issues
+    assert len(issues) == 0, f"Client Singleton: {issues}"
 
 
 async def test_client_timeout():
@@ -63,7 +62,8 @@ async def test_client_timeout():
     # Timeout olmalı (result None veya hata)
     # Not: Gerçek sunucuya bağlı — mock ile daha iyi test edilir
     await client.close()
-    return "Client Timeout", True, ["Timeout davranışı manuel doğrulama gerekli"]
+    # Timeout behavior requires manual verification
+    assert True, "Client Timeout: manual verification required"
 
 
 async def test_client_retry():
@@ -79,7 +79,7 @@ async def test_client_retry():
         issues.append("Var olmayan URL sonuç döndürdü")
 
     await client.close()
-    return "Client Retry", len(issues) == 0, issues
+    assert len(issues) == 0, f"Client Retry: {issues}"
 
 
 async def test_client_close():
@@ -97,7 +97,7 @@ async def test_client_close():
     if not session.closed:
         issues.append("Close sonrası session açık")
 
-    return "Client Close", len(issues) == 0, issues
+    assert len(issues) == 0, f"Client Close: {issues}"
 
 
 async def test_context_manager():
@@ -111,7 +111,7 @@ async def test_context_manager():
 
     # Context sonrası kapalı olmalı
     # Not: client._session hâlâ referans tutuyor ama closed=True
-    return "Context Manager", len(issues) == 0, issues
+    assert len(issues) == 0, f"Context Manager: {issues}"
 
 
 # =====================================================
@@ -137,7 +137,7 @@ async def test_bist_provider_async():
         issues.append("fetch_stock_price async değil")
 
     await bist_provider.close()
-    return "BIST Provider Async", len(issues) == 0, issues
+    assert len(issues) == 0, f"BIST Provider Async: {issues}"
 
 
 async def test_kap_provider_async():
@@ -153,7 +153,7 @@ async def test_kap_provider_async():
         issues.append("fetch_company_info async değil")
 
     await kap_provider.close()
-    return "KAP Provider Async", len(issues) == 0, issues
+    assert len(issues) == 0, f"KAP Provider Async: {issues}"
 
 
 async def test_news_provider_async():
@@ -167,7 +167,7 @@ async def test_news_provider_async():
     if not inspect.iscoroutinefunction(provider.fetch_financial_news_rss):
         issues.append("fetch_news async değil")
 
-    return "News Provider Async", len(issues) == 0, issues
+    assert len(issues) == 0, f"News Provider Async: {issues}"
 
 
 # =====================================================
@@ -185,7 +185,7 @@ async def test_config_file_exists():
     if not os.path.exists(os.path.join(config_dir, "alpha_config.json")):
         issues.append("alpha_config.json eksik")
 
-    return "Config File Exists", len(issues) == 0, issues
+    assert len(issues) == 0, f"Config File Exists: {issues}"
 
 
 async def test_config_json_valid():
@@ -205,7 +205,7 @@ async def test_config_json_valid():
             except json.JSONDecodeError as e:
                 issues.append(f"{filename}: geçersiz JSON: {e}")
 
-    return "Config JSON Valid", len(issues) == 0, issues
+    assert len(issues) == 0, f"Config JSON Valid: {issues}"
 
 
 async def test_config_values():
@@ -231,7 +231,7 @@ async def test_config_values():
         if risk.get("max_drawdown_pct", 0) <= 0 or risk.get("max_drawdown_pct", 0) > 100:
             issues.append(f"max_drawdown_pct: {risk.get('max_drawdown_pct')}")
 
-    return "Config Values", len(issues) == 0, issues
+    assert len(issues) == 0, f"Config Values: {issues}"
 
 
 # =====================================================
@@ -267,20 +267,24 @@ async def run_all():
 
     for test_func in tests:
         try:
-            name, ok, issues = await test_func()
+            await test_func()
+            name = test_func.__name__
+            passed += 1
+            print(f"\n✅ {name}")
+            print("   PASSED")
+        except AssertionError as e:
+            name = test_func.__name__
+            failed += 1
+            issues = [str(e)]
+            print(f"\n❌ {name}")
+            for i in issues:
+                print(f"   ❌ {i}")
+                all_issues.append(f"{name}: {i}")
         except Exception as e:
             name = test_func.__name__
-            ok = False
-            issues = [f"Exception: {e}"]
-
-        icon = "✅" if ok else "❌"
-        print(f"\n{icon} {name}")
-        if ok:
-            passed += 1
-            for i in issues[:2]:
-                print(f"   {i}")
-        else:
             failed += 1
+            issues = [f"Exception: {e}"]
+            print(f"\n❌ {name}")
             for i in issues:
                 print(f"   ❌ {i}")
                 all_issues.append(f"{name}: {i}")
