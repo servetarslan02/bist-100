@@ -251,13 +251,16 @@ class TradePlanner:
 
         # Momentum bazlı ayarlama
         if mom20 > 10:
-            target2 *= 1.2
-            target3 *= 1.3
+            # Scale the projected move, not the entire price.  Multiplying
+            # target2 directly makes a 6% target on a 100 TL share become
+            # 127.2 TL instead of 107.2 TL.
+            target2 = price + (target2 - price) * 1.2
+            target3 = price + (target3 - price) * 1.3
 
         # SPEC skoru yüksekse hedefleri artır
         if spec_score > 80:
-            target1 *= 1.1
-            target2 *= 1.2
+            target1 = price + (target1 - price) * 1.1
+            target2 = price + (target2 - price) * 1.2
 
         return round(target1, 2), round(target2, 2), round(target3, 2)
 

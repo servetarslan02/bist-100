@@ -46,12 +46,26 @@ def black_scholes(S: float, K: float, T: float, r: float, sigma: float,
     Returns:
         Opsiyon teorik fiyatı (TL)
     """
-    if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
-        # Vade dolmuş veya geçersiz parametre → intrinsic value
+    if option_type not in {"call", "put"}:
+        raise ValueError("option_type must be 'call' or 'put'")
+
+    if S <= 0 or K <= 0:
+        return 0.0
+
+    if T <= 0:
+        # Vade dolmuş → intrinsic value
         if option_type == "call":
             return max(S - K, 0.0)
-        else:
-            return max(K - S, 0.0)
+        return max(K - S, 0.0)
+
+    if sigma <= 0:
+        # Deterministic Black-Scholes limit: the strike is paid at expiry,
+        # therefore it must be discounted.  Using max(S-K, 0) here breaks
+        # put-call parity whenever T > 0 and r != 0.
+        discounted_strike = K * np.exp(-r * T)
+        if option_type == "call":
+            return max(S - discounted_strike, 0.0)
+        return max(discounted_strike - S, 0.0)
 
     d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
     d2 = d1 - sigma * np.sqrt(T)

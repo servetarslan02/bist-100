@@ -408,6 +408,17 @@ class TestAdvancedMonteCarlo:
         result = mc.gbm_sim("TEST", 100, 0.15, 0.25, horizon_days=20, n_sims=500, seed=42)
         assert result.sample_paths is not None
         assert result.sample_paths.shape[0] <= 200
+        assert result.sample_paths.shape[1] == 21  # t=0 + 20 günlük hareket
+
+    def test_jump_diffusion_horizon_has_requested_daily_moves(self):
+        """20 günlük ufuk, başlangıçtan sonra tam 20 günlük adım içermeli."""
+        mc = AdvancedMonteCarloEngine()
+        result = mc.jump_diffusion_sim(
+            "TEST", 100, mu=0.252, sigma=0,
+            jump_intensity=0, horizon_days=20, n_sims=10, seed=42,
+        )
+        expected = 100 * np.exp(0.252 * 20 / 252)
+        assert abs(result.p50 - expected) < 0.01
 
 
 # =====================================================

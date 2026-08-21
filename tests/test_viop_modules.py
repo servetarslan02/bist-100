@@ -59,10 +59,11 @@ class TestBlackScholes:
         assert price > 45, f"Deep ITM put {price} > 45 olmalı"
 
     def test_zero_vol(self):
-        """Sıfır volatilite → intrinsic value."""
+        """Sıfır vol limitinde kullanım fiyatı vadeye iskonto edilir."""
         from services.viop.enhanced_options import black_scholes
         price = black_scholes(S=100, K=90, T=0.25, r=0.15, sigma=0, option_type="call")
-        assert abs(price - 10) < 0.01, f"Zero vol call intrinsic {price} != 10"
+        expected = 100 - 90 * np.exp(-0.15 * 0.25)
+        assert abs(price - expected) < 0.01, f"Zero vol call {price} != {expected}"
 
     def test_zero_T(self):
         """Sıfır vade → intrinsic value."""

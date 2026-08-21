@@ -358,14 +358,18 @@ class StressTestEngine:
         mu = np.mean(returns_history)
         sigma = np.std(returns_history, ddof=1)
 
+        # Simülasyon.  Sabit getiri serisine yapay %2 volatilite eklemek
+        # hiç olmayan bir stres riski üretir.  Günlük getirileri de toplamak
+        # yerine bileşikleştiriyoruz; P&L'nin portföy değeriyle tutarlı
+        # olması için gerekli olan budur.
         if sigma <= 0:
-            sigma = 0.02  # Minimum volatilite
-
-        # Simülasyon
-        simulated_pnl = np.zeros(n_simulations)
-        for _ in range(holding_days):
-            daily_returns = np.random.normal(mu, sigma, n_simulations)
-            simulated_pnl += daily_returns * total_value
+            cumulative_returns = np.full(
+                n_simulations, (1.0 + mu) ** holding_days - 1.0
+            )
+        else:
+            daily_returns = np.random.normal(mu, sigma, (n_simulations, holding_days))
+            cumulative_returns = np.prod(1.0 + daily_returns, axis=1) - 1.0
+        simulated_pnl = cumulative_returns * total_value
 
         # İstatistikler
         percentiles = {

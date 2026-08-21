@@ -12,6 +12,7 @@ interface StatCardProps {
   sparkData?: number[];
   subtext?: string;
   size?: "sm" | "md" | "lg";
+  accent?: string;
 }
 
 export function StatCard({
@@ -24,47 +25,49 @@ export function StatCard({
   sparkData,
   subtext,
   size = "md",
+  accent,
 }: StatCardProps) {
-  const sizeClasses = {
-    sm: "p-2",
-    md: "p-3",
-    lg: "p-4",
-  };
+  const numValue = typeof value === "number" ? value : parseFloat(value as string);
+  const derivedAccent = accent
+    ? accent
+    : color === "green" ? "#00e5a0"
+    : color === "red" ? "#ff4466"
+    : color === "auto" ? (numValue >= 0 ? "#00e5a0" : "#ff4466")
+    : "#8892a4";
 
-  const valueClasses = {
-    sm: "text-base",
-    md: "text-xl",
-    lg: "text-2xl",
-  };
+  const textSize = size === "sm" ? "text-lg" : size === "md" ? "text-xl" : "text-2xl";
 
   return (
-    <div className={`bg-zinc-900/60 border border-zinc-800/60 rounded-lg ${sizeClasses[size]} hover:border-zinc-700/60 transition-colors`}>
-      <div className="flex items-center justify-between mb-1">
-        <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-medium">{label}</p>
-        {sparkData && (
-          <svg width={48} height={16} className="opacity-60">
-            {sparkData.slice(-20).map((v, i, arr) => {
-              const min = Math.min(...arr);
-              const max = Math.max(...arr);
-              const range = max - min || 1;
-              const x = (i / (arr.length - 1)) * 48;
-              const y = 14 - ((v - min) / range) * 12;
-              return i > 0 ? (
-                <line
-                  key={i}
-                  x1={(i - 1) / (arr.length - 1) * 48}
-                  y1={14 - ((arr[i - 1] - min) / range) * 12}
-                  x2={x}
-                  y2={y}
-                  stroke={v >= arr[0] ? "#10b981" : "#ef4444"}
-                  strokeWidth={1}
-                />
-              ) : null;
-            })}
-          </svg>
-        )}
+    <div
+      className="card-hover rounded-xl p-4 space-y-2"
+      style={{
+        background: "var(--color-bg-card)",
+        border: "1px solid var(--color-border-subtle)",
+        borderTop: `1px solid ${derivedAccent}30`,
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>
+          {label}
+        </p>
+        {sparkData && sparkData.length > 1 && (() => {
+          const min = Math.min(...sparkData);
+          const max = Math.max(...sparkData);
+          const range = max - min || 1;
+          const points = sparkData.slice(-20).map((v, i, arr) => {
+            const x = (i / (arr.length - 1)) * 48;
+            const y = 14 - ((v - min) / range) * 12;
+            return `${x},${y}`;
+          }).join(" ");
+          return (
+            <svg width={48} height={16} className="opacity-50">
+              <polyline points={points} fill="none" stroke={derivedAccent} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          );
+        })()}
       </div>
-      <div className="flex items-baseline gap-1">
+
+      <div className="flex items-baseline gap-0.5">
         {typeof value === "number" ? (
           <AnimatedNumber
             value={value}
@@ -72,13 +75,18 @@ export function StatCard({
             prefix={prefix}
             suffix={suffix}
             color={color}
-            className={`font-semibold ${valueClasses[size]}`}
+            className={`font-bold font-data ${textSize}`}
           />
         ) : (
-          <span className={`font-semibold ${valueClasses[size]} text-zinc-100`}>{value}</span>
+          <span className={`font-bold font-data ${textSize}`} style={{ color: "var(--color-text-primary)" }}>
+            {prefix}{value}{suffix}
+          </span>
         )}
       </div>
-      {subtext && <p className="text-[10px] text-zinc-600 mt-0.5">{subtext}</p>}
+
+      {subtext && (
+        <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{subtext}</p>
+      )}
     </div>
   );
 }

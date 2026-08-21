@@ -108,8 +108,12 @@ class TechnicalFeatureEngine:
             features["atr_14"] = self._atr(highs, lows, closes, 14)
             features["atr_pct"] = (features["atr_14"] / prices[-1] * 100) if prices[-1] > 0 else 0
         else:
-            features["atr_14"] = features["realized_vol_20d"] * prices[-1] / 100
-            features["atr_pct"] = features["realized_vol_20d"]
+            # realized_vol_20d is annualised (%).  ATR is a one-day price
+            # range proxy, so using the annualised number directly inflates
+            # stops and risk penalties by sqrt(252).
+            daily_vol_pct = features["realized_vol_20d"] / np.sqrt(252)
+            features["atr_14"] = daily_vol_pct * prices[-1] / 100
+            features["atr_pct"] = daily_vol_pct
 
         # Bollinger Bands
         sma_20 = np.mean(prices[-20:])

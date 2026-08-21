@@ -2,47 +2,54 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  LayoutDashboard, Radar, Map, Zap,
+  Target, LineChart, Globe, FlaskConical,
+  Briefcase, TestTube, TrendingUp,
+  Cpu, Database, Bell, Activity,
+  ChevronRight
+} from "lucide-react";
 
 const NAV_ITEMS = [
   {
     group: "CORE",
     items: [
-      { href: "/", label: "Overview", icon: "◉" },
-      { href: "/radar", label: "Market Radar", icon: "◎" },
-      { href: "/map", label: "Market Map", icon: "◫" },
-      { href: "/events", label: "Event Center", icon: "⚡" },
+      { href: "/", label: "Overview", icon: LayoutDashboard },
+      { href: "/radar", label: "Market Radar", icon: Radar },
+      { href: "/map", label: "Market Map", icon: Map },
+      { href: "/events", label: "Event Center", icon: Zap },
     ],
   },
   {
     group: "INTELLIGENCE",
     items: [
-      { href: "/opportunities", label: "Opportunities", icon: "◈" },
-      { href: "/asset", label: "Asset Intel", icon: "◉" },
-      { href: "/world", label: "World Intel", icon: "⊕" },
-      { href: "/research", label: "AI Research", icon: "◎" },
+      { href: "/opportunities", label: "Opportunities", icon: Target },
+      { href: "/asset", label: "Asset Intel", icon: LineChart },
+      { href: "/world", label: "World Intel", icon: Globe },
+      { href: "/research", label: "AI Research", icon: FlaskConical },
     ],
   },
   {
     group: "PORTFOLIO",
     items: [
-      { href: "/portfolio", label: "Portfolio", icon: "▦" },
-      { href: "/scenario", label: "Scenario Lab", icon: "◧" },
-      { href: "/strategy", label: "Strategy", icon: "◨" },
+      { href: "/portfolio", label: "Portfolio", icon: Briefcase },
+      { href: "/scenario", label: "Scenario Lab", icon: TestTube },
+      { href: "/strategy", label: "Strategy", icon: TrendingUp },
     ],
   },
   {
     group: "MODELS",
     items: [
-      { href: "/models", label: "Model Center", icon: "⬡" },
-      { href: "/learning", label: "Learning Lab", icon: "⬢" },
+      { href: "/models", label: "Model Center", icon: Cpu },
+      { href: "/learning", label: "Learning Lab", icon: Activity },
     ],
   },
   {
     group: "SYSTEM",
     items: [
-      { href: "/data", label: "Data Center", icon: "▤" },
-      { href: "/alerts", label: "Alert Center", icon: "⚑" },
-      { href: "/system", label: "System Health", icon: "⚙" },
+      { href: "/data", label: "Data Center", icon: Database },
+      { href: "/alerts", label: "Alert Center", icon: Bell },
+      { href: "/system", label: "System Health", icon: Activity },
     ],
   },
 ];
@@ -51,41 +58,68 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-[200px] bg-zinc-950 border-r border-zinc-800/60 flex flex-col h-screen sticky top-0">
+    <aside
+      style={{ background: "var(--color-bg-secondary)", borderRight: "1px solid var(--color-border-subtle)" }}
+      className="w-[220px] flex flex-col h-screen sticky top-0 overflow-hidden"
+    >
       {/* Logo */}
-      <div className="px-4 py-4 border-b border-zinc-800/60">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
-            <span className="text-emerald-400 text-xs font-bold">A</span>
+      <div className="px-5 py-5" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
+        <div className="flex items-center gap-3">
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{
+              background: "linear-gradient(135deg, rgba(0,229,160,0.2) 0%, rgba(0,200,255,0.1) 100%)",
+              border: "1px solid rgba(0,229,160,0.3)",
+              boxShadow: "0 0 16px rgba(0,229,160,0.1)"
+            }}
+          >
+            <span className="text-sm font-bold gradient-text">A</span>
           </div>
           <div>
-            <h1 className="text-sm font-semibold text-zinc-100 tracking-tight">ALPHA</h1>
-            <p className="text-[9px] text-zinc-600 uppercase tracking-widest">BIST Intelligence</p>
+            <h1 className="text-sm font-bold tracking-tight" style={{ color: "var(--color-text-primary)" }}>
+              ALPHA BIST
+            </h1>
+            <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
+              Intelligence
+            </p>
           </div>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-2 px-2">
+      <nav className="flex-1 overflow-y-auto py-3 px-2">
         {NAV_ITEMS.map((group) => (
-          <div key={group.group} className="mb-3">
-            <p className="text-[9px] uppercase tracking-widest text-zinc-600 font-medium px-2 mb-1">
+          <div key={group.group} className="mb-4">
+            <p
+              className="text-[9px] uppercase tracking-widest font-semibold px-3 mb-1.5"
+              style={{ color: "var(--color-text-faint)" }}
+            >
               {group.group}
             </p>
             {group.items.map((item) => {
               const isActive = pathname === item.href;
+              const Icon = item.icon;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-2 px-2 py-1.5 rounded text-[13px] transition-colors ${
-                    isActive
-                      ? "bg-zinc-800/80 text-zinc-100"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/40"
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-all duration-150 group ${
+                    isActive ? "nav-active" : "hover:bg-white/5"
                   }`}
+                  style={{
+                    color: isActive ? "var(--color-accent-green)" : "var(--color-text-secondary)",
+                    borderLeft: isActive ? undefined : "2px solid transparent",
+                  }}
                 >
-                  <span className="text-[11px] w-4 text-center opacity-60">{item.icon}</span>
-                  <span>{item.label}</span>
+                  <Icon
+                    size={14}
+                    className="flex-shrink-0"
+                    style={{ opacity: isActive ? 1 : 0.6 }}
+                  />
+                  <span className="flex-1 font-medium">{item.label}</span>
+                  {isActive && (
+                    <ChevronRight size={11} style={{ opacity: 0.5 }} />
+                  )}
                 </Link>
               );
             })}
@@ -93,15 +127,20 @@ export function Sidebar() {
         ))}
       </nav>
 
-      {/* Status */}
-      <div className="px-3 py-3 border-t border-zinc-800/60">
+      {/* Footer */}
+      <div className="px-4 py-3" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-[10px] text-zinc-500 uppercase tracking-wider">Live</span>
+          <div
+            className="w-1.5 h-1.5 rounded-full live-dot flex-shrink-0"
+            style={{ background: "var(--color-accent-green)" }}
+          />
+          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
+            Live
+          </span>
+          <span className="text-[10px] font-data ml-auto" style={{ color: "var(--color-text-faint)" }}>
+            {new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+          </span>
         </div>
-        <p className="text-[10px] text-zinc-600 mt-1">
-          {new Date().toLocaleTimeString("tr-TR")}
-        </p>
       </div>
     </aside>
   );

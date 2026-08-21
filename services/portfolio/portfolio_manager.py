@@ -945,10 +945,13 @@ class PortfolioManager:
             except Exception:
                 # Fallback: basit percentile
                 sorted_returns = np.sort(returns)
-                idx = int(0.05 * len(sorted_returns))
-                var_95 = abs(float(sorted_returns[idx])) * total_value
+                idx = max(0, int(np.ceil(0.05 * len(sorted_returns))) - 1)
+                threshold = float(sorted_returns[idx])
+                # A positive left-tail quantile is not a loss.  Keeping abs()
+                # here would report risk for a strictly positive return series.
+                var_95 = max(0.0, -threshold) * total_value
                 tail = sorted_returns[:idx + 1]
-                cvar_95 = abs(float(np.mean(tail))) * total_value if len(tail) > 0 else var_95
+                cvar_95 = max(0.0, -float(np.mean(tail))) * total_value if len(tail) > 0 else var_95
 
         # Risk level
         if max_position_pct > 15 or max_sector_pct > 40:

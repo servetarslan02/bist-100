@@ -114,7 +114,7 @@ class VaRCalculator:
     ) -> float:
         """Parametrik VaR (Normal dağılım varsayımı).
 
-        VaR = μ + σ × z_α × √t
+        VaR = max(0, -(μt + σ × z_(1-α) × √t)) × V
 
         Args:
             returns: Günlük getiri dizisi
@@ -127,15 +127,20 @@ class VaRCalculator:
         """
         from scipy.stats import norm
 
+        if len(returns) < 2 or holding_period_days < 1:
+            return 0.0
+
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
 
         if sigma <= 0:
-            return 0.0
+            return float(max(0.0, -mu * holding_period_days * portfolio_value))
 
         z_alpha = norm.ppf(1 - confidence)
-        var_pct = mu + sigma * z_alpha * np.sqrt(holding_period_days)
-        var_amount = abs(var_pct * portfolio_value)
+        # The return quantile is on the left tail.  VaR is a *loss*, so a
+        # positive quantile means there is no loss at this confidence level.
+        horizon_quantile = mu * holding_period_days + sigma * z_alpha * np.sqrt(holding_period_days)
+        var_amount = max(0.0, -horizon_quantile * portfolio_value)
 
         return float(var_amount)
 
@@ -148,7 +153,7 @@ class VaRCalculator:
     ) -> float:
         """Parametrik CVaR (Normal dağılım — Expected Shortfall).
 
-        CVaR = μ + σ × φ(z_α) / (1-α) × √t
+        CVaR = max(0, -(μt - σ × φ(z_(1-α)) × √t / (1-α))) × V
 
         Args:
             returns: Günlük getiri dizisi
@@ -161,16 +166,24 @@ class VaRCalculator:
         """
         from scipy.stats import norm
 
+        if len(returns) < 2 or holding_period_days < 1:
+            return 0.0
+
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
 
         if sigma <= 0:
-            return 0.0
+            return float(max(0.0, -mu * holding_period_days * portfolio_value))
 
         z_alpha = norm.ppf(1 - confidence)
         phi_z = norm.pdf(z_alpha)
-        cvar_pct = mu + sigma * phi_z / (1 - confidence) * np.sqrt(holding_period_days)
-        cvar_amount = abs(cvar_pct * portfolio_value)
+        # E[R | R <= q_(1-alpha)] for a normal distribution.  The sign in
+        # front of phi is negative because this is the left (loss) tail.
+        tail_mean = (
+            mu * holding_period_days
+            - sigma * np.sqrt(holding_period_days) * phi_z / (1 - confidence)
+        )
+        cvar_amount = max(0.0, -tail_mean * portfolio_value)
 
         return float(cvar_amount)
 
@@ -204,7 +217,8 @@ class VaRCalculator:
         sorted_returns = np.sort(returns)
         index = self._historical_percentile_index(confidence, len(sorted_returns))
 
-        var_pct = abs(sorted_returns[index])
+        # Do not turn an all-positive return history into a loss with abs().
+        var_pct = max(0.0, -float(sorted_returns[index]))
         var_amount = var_pct * portfolio_value * np.sqrt(holding_period_days)
 
         return float(var_amount)
@@ -235,13 +249,16 @@ class VaRCalculator:
         sorted_returns = np.sort(returns)
         index = self._historical_percentile_index(confidence, len(sorted_returns))
 
-        var_threshold = sorted_returns[index]
+        var_threshold = float(sorted_returns[index])
+        if var_threshold >= 0:
+            return 0.0
+
         tail_returns = sorted_returns[sorted_returns <= var_threshold]
 
         if len(tail_returns) == 0:
             return abs(float(var_threshold)) * portfolio_value * np.sqrt(holding_period_days)
 
-        cvar_pct = abs(np.mean(tail_returns))
+        cvar_pct = max(0.0, -float(np.mean(tail_returns)))
         cvar_amount = cvar_pct * portfolio_value * np.sqrt(holding_period_days)
 
         return float(cvar_amount)
@@ -280,28 +297,35 @@ class VaRCalculator:
         else:
             rng = np.random.default_rng()
 
+        if len(returns) < 2 or holding_period_days < 1:
+            return MonteCarloResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                    n_simulations, holding_period_days, {})
+
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
 
-        if sigma <= 0:
-            sigma = 0.01  # Minimum volatilite
-
         # Simülasyon: günlük getirilerden toplam getiri
-        simulated_returns = np.zeros(n_simulations)
-        for _ in range(holding_period_days):
-            daily_returns = rng.normal(mu, sigma, n_simulations)
-            simulated_returns += daily_returns
+        if sigma <= 0:
+            simulated_returns = np.full(n_simulations, mu * holding_period_days)
+        else:
+            simulated_returns = rng.normal(
+                mu * holding_period_days,
+                sigma * np.sqrt(holding_period_days),
+                n_simulations,
+            )
 
         # VaR/CVaR hesapla
-        var_95 = abs(float(np.percentile(simulated_returns, (1 - 0.95) * 100)))
-        var_99 = abs(float(np.percentile(simulated_returns, (1 - 0.99) * 100)))
+        q_95 = float(np.percentile(simulated_returns, 5))
+        q_99 = float(np.percentile(simulated_returns, 1))
+        var_95 = max(0.0, -q_95)
+        var_99 = max(0.0, -q_99)
 
         # CVaR: VaR'ı aşan kayıpların ortalaması
-        tail_95 = simulated_returns[simulated_returns <= -var_95]
-        cvar_95 = abs(float(np.mean(tail_95))) if len(tail_95) > 0 else var_95
+        tail_95 = simulated_returns[simulated_returns <= q_95]
+        cvar_95 = max(0.0, -float(np.mean(tail_95))) if len(tail_95) > 0 else var_95
 
-        tail_99 = simulated_returns[simulated_returns <= -var_99]
-        cvar_99 = abs(float(np.mean(tail_99))) if len(tail_99) > 0 else var_99
+        tail_99 = simulated_returns[simulated_returns <= q_99]
+        cvar_99 = max(0.0, -float(np.mean(tail_99))) if len(tail_99) > 0 else var_99
 
         # Percentiles
         percentiles = {

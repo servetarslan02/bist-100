@@ -235,6 +235,15 @@ class TestJumpDiffusionMonteCarlo:
         with_jump = self.mc.simulate(100.0, 0.0004, 0.02, 50000, 20, jump_intensity=0.10, seed=42)
         assert with_jump.std_return_pct > no_jump.std_return_pct
 
+    def test_daily_drift_is_accumulated_over_horizon(self):
+        """daily_return günlük parametredir; yıllık gibi tekrar ölçeklenmemeli."""
+        result = self.mc.simulate(
+            100.0, daily_return=0.001, daily_vol=0.0,
+            num_sims=100, horizon=20, jump_intensity=0, seed=42,
+        )
+        expected_return_pct = (np.exp(0.001 * 20) - 1) * 100
+        assert abs(result.expected_return_pct - expected_return_pct) < 0.01
+
 
 # =====================================================
 # CORRELATED MONTE CARLO TESTS

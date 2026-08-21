@@ -1,11 +1,10 @@
-// ALPHA BIST — Market Radar (AG Grid ile)
-
 "use client";
 
 import { useState, useMemo } from "react";
 import { usePolling, type Instrument } from "@/lib/api";
 import { DataTable, defaultColumnDefs } from "@/components/table/DataTable";
 import { useSignalsStore } from "@/lib/store";
+import { Radar, Search, Filter, RefreshCw } from "lucide-react";
 
 interface EnrichedInstrument extends Instrument {
   price?: number;
@@ -63,53 +62,89 @@ export default function MarketRadar() {
   };
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Market Radar</h1>
-          <p className="text-[11px] text-zinc-600">
-            {rowData.length} instruments • live scanning
+          <h1 className="text-xl font-bold gradient-text">Market Radar</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            {rowData.length} instruments · live scanning
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search..."
-            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 w-40"
-          />
-          <select
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
+          {/* Search */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
           >
-            <option value="">All Sectors</option>
-            {sectors.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+            <Search size={12} style={{ color: "var(--color-text-muted)" }} />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search ticker or name..."
+              className="bg-transparent text-xs focus:outline-none w-44"
+              style={{ color: "var(--color-text-primary)" }}
+            />
+          </div>
+          {/* Sector filter */}
+          <div
+            className="flex items-center gap-2 px-3 py-2 rounded-lg"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <Filter size={12} style={{ color: "var(--color-text-muted)" }} />
+            <select
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+              className="bg-transparent text-xs focus:outline-none"
+              style={{ color: "var(--color-text-primary)" }}
+            >
+              <option value="">All Sectors</option>
+              {sectors.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          {/* Refresh indicator */}
+          <div
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <RefreshCw size={11} style={{ color: "var(--color-text-muted)" }} className={loading ? "animate-spin" : ""} />
+            <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>60s</span>
+          </div>
         </div>
       </div>
 
-      {/* AG Grid Table */}
-      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg overflow-hidden">
+      {/* Table */}
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+      >
+        <div
+          className="flex items-center gap-2.5 px-5 py-3"
+          style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
+        >
+          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,229,160,0.12)" }}>
+            <Radar size={13} style={{ color: "#00e5a0" }} />
+          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
+            Instruments
+          </h2>
+        </div>
         <DataTable
           rowData={rowData}
           columnDefs={defaultColumnDefs}
-          height="calc(100vh - 200px)"
+          height="calc(100vh - 220px)"
           onRowClick={handleRowClick}
           loading={loading}
         />
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-between text-[10px] text-zinc-600">
+      <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--color-text-faint)" }}>
         <span>Data: yfinance (15min delayed)</span>
-        <span>Refresh: 60s</span>
+        <span>Auto-refresh: every 60s</span>
       </div>
     </div>
   );

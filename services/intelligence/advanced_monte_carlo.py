@@ -125,10 +125,11 @@ class AdvancedMonteCarloEngine:
         drift = (mu - 0.5 * sigma**2 - compensator) * dt
         diffusion = sigma * np.sqrt(dt)
 
-        prices = np.zeros((n_sims, horizon_days))
+        # Include t=0 so a horizon of N contains exactly N daily moves.
+        prices = np.zeros((n_sims, horizon_days + 1))
         prices[:, 0] = current_price
 
-        for t in range(1, horizon_days):
+        for t in range(1, horizon_days + 1):
             Z = np.random.standard_normal(n_sims)
 
             # Diffusion component
@@ -239,12 +240,14 @@ class AdvancedMonteCarloEngine:
         theta = sigma**2  # Uzun dönem ortalama variance
         xi = vol_of_vol   # Vol of vol
 
-        prices = np.zeros((n_sims, horizon_days))
-        vols = np.zeros((n_sims, horizon_days))
+        # Include t=0 for the same reason as the GBM and jump-diffusion
+        # paths; otherwise the requested horizon is shortened by one day.
+        prices = np.zeros((n_sims, horizon_days + 1))
+        vols = np.zeros((n_sims, horizon_days + 1))
         prices[:, 0] = current_price
         vols[:, 0] = sigma
 
-        for t in range(1, horizon_days):
+        for t in range(1, horizon_days + 1):
             Z1 = np.random.standard_normal(n_sims)
             Z2 = np.random.standard_normal(n_sims)
             # Korelasyon: -0.7 (asimetrik — fiyat düşünce vol artar)

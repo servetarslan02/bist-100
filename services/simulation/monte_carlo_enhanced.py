@@ -103,7 +103,8 @@ class JumpDiffusionMonteCarlo:
         paths = np.zeros((num_sims, horizon + 1))
         paths[:, 0] = current_price
 
-        dt = 1 / 252  # Günlük
+        # Input parameters are explicitly daily.  Applying a further 1/252
+        # here made both the drift and jump frequency about 252x too small.
         drift = daily_return - jump_intensity * jump_mean
 
         for t in range(1, horizon + 1):
@@ -111,15 +112,18 @@ class JumpDiffusionMonteCarlo:
             z = rng.standard_normal(num_sims)
 
             # Jump process (Poisson)
-            n_jumps = rng.poisson(jump_intensity * dt, num_sims)
+            n_jumps = rng.poisson(jump_intensity, num_sims)
             max_jumps = max(n_jumps.max(), 1)
             jump_sizes_all = rng.normal(jump_mean, jump_std, (num_sims, max_jumps))
-            jump_effect = np.sum(jump_sizes_all, axis=1) * (n_jumps > 0).astype(float)
+            # A path with one jump must receive one jump size, not every
+            # generated size up to the batch maximum.
+            jump_mask = np.arange(max_jumps) < n_jumps[:, None]
+            jump_effect = np.sum(jump_sizes_all * jump_mask, axis=1)
 
             # Fiyat güncelleme: GBM + jump
             # daily_vol zaten günlük std (yıllık değil), √dt ile çarpılmaz
-            # log-return: drift*dt + σ*z + J*dN
-            log_return = drift * dt + daily_vol * z + jump_effect
+            # log-return: daily drift + daily σ*z + sum of daily jumps
+            log_return = drift + daily_vol * z + jump_effect
             paths[:, t] = paths[:, t - 1] * np.exp(log_return)
 
         # İstatistikler

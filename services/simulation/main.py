@@ -134,10 +134,13 @@ class SimulationEngine:
         simulations[:, 0] = current_price
 
         # Volatility clustering: basit GARCH(1,1)
-        current_vol = daily_vol
-        omega = daily_vol * 0.05  # uzun vadeli vol
         alpha = 0.1  # yesterday's shock
         beta = 0.85  # persistence
+        current_vol = daily_vol
+        # GARCH recursion is for variance, not volatility.  Calibrating
+        # omega as sigma²(1-alpha-beta) preserves daily_vol as the
+        # unconditional volatility; daily_vol * 0.05 inflated it sharply.
+        omega = daily_vol ** 2 * max(1.0 - alpha - beta, 0.0)
 
         for day in range(1, horizon_days + 1):
             # Fat-tailed random returns
@@ -151,9 +154,13 @@ class SimulationEngine:
 
             simulations[:, day] = simulations[:, day-1] * (1 + random_returns)
 
-            # Volatility clustering güncelle
-            avg_return = np.mean(random_returns)
-            current_vol = np.sqrt(omega + alpha * avg_return**2 + beta * current_vol**2)
+            # Volatility clustering update must use squared innovations.
+            # Squaring the cross-simulation mean cancels shocks out and
+            # effectively disables the ARCH term as the scenario count grows.
+            innovations = random_returns - adjusted_return
+            current_vol = np.sqrt(
+                omega + alpha * np.mean(innovations ** 2) + beta * current_vol ** 2
+            )
 
         # Calculate statistics
         final_prices = simulations[:, -1]

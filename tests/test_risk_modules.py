@@ -108,6 +108,20 @@ class TestVaRCalculator:
         var = self.calc.calculate_historical_var(np.array([]), 0.95, self.portfolio_value)
         assert var == 0.0
 
+    def test_positive_only_returns_have_no_loss_var(self):
+        """VaR, pozitif getiriyi abs() ile zarara çevirmemeli."""
+        returns = np.full(30, 0.01)
+        assert self.calc.calculate_parametric_var(returns, 0.95, self.portfolio_value) == 0.0
+        assert self.calc.calculate_historical_var(returns, 0.95, self.portfolio_value) == 0.0
+        assert self.calc.calculate_historical_cvar(returns, 0.95, self.portfolio_value) == 0.0
+
+    def test_parametric_cvar_uses_left_tail(self):
+        """Normal dağılımda ES, aynı güven seviyesindeki VaR'dan büyük olmalı."""
+        returns = np.array([-0.03, -0.02, -0.01, 0.0, 0.01, 0.02, 0.03])
+        var = self.calc.calculate_parametric_var(returns, 0.95, self.portfolio_value)
+        cvar = self.calc.calculate_parametric_cvar(returns, 0.95, self.portfolio_value)
+        assert cvar > var
+
 
 # =====================================================
 # DYNAMIC RISK LIMITS TESTS
@@ -217,6 +231,15 @@ class TestStressTestEngine:
         assert result["portfolio_value"] == 1000000
         assert "percentiles" in result
         assert result["prob_loss"] > 0
+
+    def test_monte_carlo_stress_constant_positive_returns_have_no_loss(self):
+        """Volatilitesi sıfır olan pozitif seri yapay stres riski üretmemeli."""
+        result = self.engine.run_monte_carlo_stress(
+            self.portfolio, np.full(30, 0.001), n_simulations=100, holding_days=5, seed=42
+        )
+        assert result["prob_loss"] == 0.0
+        expected_pnl = 1000000 * ((1.001 ** 5) - 1)
+        assert abs(result["mean_pnl"] - expected_pnl) < 1e-6
 
     def test_breaking_point(self):
         result = self.engine.find_breaking_point(self.portfolio, max_loss_pct=20)

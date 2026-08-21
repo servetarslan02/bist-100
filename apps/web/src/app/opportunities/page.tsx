@@ -2,8 +2,31 @@
 
 import { useState, useMemo } from "react";
 import { usePolling, type Signal } from "@/lib/api";
+import { Target, ArrowUpRight, ArrowDownRight, Flame, Eye, Star, Layers } from "lucide-react";
 
 const CATEGORIES = ["ALL", "HIGH_CONVICTION", "CANDIDATE", "WATCH", "NORMAL"] as const;
+type Category = typeof CATEGORIES[number];
+
+const CAT_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
+  HIGH_CONVICTION: { label: "High Conviction", color: "#ff4466", bg: "rgba(255,68,102,0.1)", icon: Flame },
+  CANDIDATE:       { label: "Candidate",       color: "#ffaa00", bg: "rgba(255,170,0,0.1)", icon: Star },
+  WATCH:           { label: "Watch",           color: "#00c8ff", bg: "rgba(0,200,255,0.1)", icon: Eye },
+  NORMAL:          { label: "Normal",          color: "#8892a4", bg: "rgba(136,146,164,0.1)", icon: Layers },
+};
+
+function CatBadge({ cat }: { cat: string }) {
+  const cfg = CAT_CONFIG[cat] ?? { color: "#8892a4", bg: "rgba(136,146,164,0.1)", icon: Layers, label: cat };
+  const Icon = cfg.icon;
+  return (
+    <span
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+      style={{ background: cfg.bg, color: cfg.color }}
+    >
+      <Icon size={9} />
+      {cfg.label}
+    </span>
+  );
+}
 
 export default function Opportunities() {
   const { data: signals, loading } = usePolling<Signal[]>("/signals?limit=100", 15000);
@@ -16,7 +39,7 @@ export default function Opportunities() {
   }, [signals, filter]);
 
   const counts = useMemo(() => {
-    if (!signals) return {};
+    if (!signals) return {} as Record<string, number>;
     return {
       ALL: signals.length,
       HIGH_CONVICTION: signals.filter(s => s.spec_category === "HIGH_CONVICTION").length,
@@ -27,105 +50,169 @@ export default function Opportunities() {
   }, [signals]);
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-zinc-100">Opportunities</h1>
-          <p className="text-[11px] text-zinc-600">SPEC • Momentum • Breakout • Value • Event Driven</p>
+          <h1 className="text-xl font-bold gradient-text">Opportunities</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            SPEC · Momentum · Breakout · Value · Event Driven
+          </p>
+        </div>
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-semibold"
+          style={{ background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.2)", color: "#00e5a0" }}
+        >
+          <div className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: "#00e5a0" }} />
+          {signals?.length ?? 0} signals
         </div>
       </div>
 
       {/* Category Filter */}
-      <div className="flex gap-1.5">
-        {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            onClick={() => setFilter(cat)}
-            className={`px-2.5 py-1 text-[10px] rounded transition-colors ${
-              filter === cat
-                ? "bg-zinc-800 text-zinc-200 border border-zinc-700"
-                : "bg-zinc-900 text-zinc-600 border border-zinc-800 hover:text-zinc-400"
-            }`}
-          >
-            {cat.replace("_", " ")}
-            <span className="ml-1 text-zinc-600">({counts[cat] || 0})</span>
-          </button>
-        ))}
+      <div className="flex gap-2">
+        {CATEGORIES.map(cat => {
+          const cfg = cat === "ALL" ? null : CAT_CONFIG[cat];
+          const active = filter === cat;
+          return (
+            <button
+              key={cat}
+              onClick={() => setFilter(cat)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150"
+              style={{
+                background: active ? (cfg?.bg ?? "rgba(0,229,160,0.1)") : "var(--color-bg-card)",
+                border: `1px solid ${active ? (cfg?.color ?? "#00e5a0") + "40" : "var(--color-border-subtle)"}`,
+                color: active ? (cfg?.color ?? "#00e5a0") : "var(--color-text-muted)",
+              }}
+            >
+              {cfg && <cfg.icon size={10} />}
+              {cat === "ALL" ? "All" : cfg?.label}
+              <span
+                className="ml-0.5 px-1.5 py-0.5 rounded-full text-[9px]"
+                style={{
+                  background: active ? "rgba(0,0,0,0.2)" : "rgba(255,255,255,0.05)",
+                }}
+              >
+                {(counts as Record<string,number>)[cat] ?? 0}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Table */}
-      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg overflow-hidden">
-        <table className="w-full text-[11px]">
-          <thead>
-            <tr className="text-zinc-500 border-b border-zinc-800/60 bg-zinc-950/50">
-              <th className="text-left py-1.5 px-3 font-medium">TICKER</th>
-              <th className="text-left py-1.5 px-3 font-medium">NAME</th>
-              <th className="text-right py-1.5 px-3 font-medium">SCORE</th>
-              <th className="text-center py-1.5 px-3 font-medium">DIR</th>
-              <th className="text-center py-1.5 px-3 font-medium">RISK</th>
-              <th className="text-center py-1.5 px-3 font-medium">HORIZON</th>
-              <th className="text-right py-1.5 px-3 font-medium">EXP RET</th>
-              <th className="text-center py-1.5 px-3 font-medium">CATEGORY</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <tr><td colSpan={8} className="text-center py-12 text-zinc-600">
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-                  Scanning...
-                </div>
-              </td></tr>
-            ) : filtered.length === 0 ? (
-              <tr><td colSpan={8} className="text-center py-12 text-zinc-600">No opportunities found</td></tr>
-            ) : (
-              filtered.map((s, i) => (
-                <tr key={i} className="border-b border-zinc-800/20 row-hover cursor-pointer">
-                  <td className="py-1.5 px-3 font-semibold text-zinc-200">{s.ticker}</td>
-                  <td className="py-1.5 px-3 text-zinc-500 truncate max-w-[140px]">{s.name}</td>
-                  <td className="py-1.5 px-3 text-right">
-                    <span className={`font-mono font-semibold ${
-                      s.score >= 80 ? "text-emerald-400" :
-                      s.score >= 60 ? "text-amber-400" : "text-zinc-400"
-                    }`}>
-                      {s.score?.toFixed(0)}
-                    </span>
-                  </td>
-                  <td className="py-1.5 px-3 text-center">
-                    <span className={`font-medium ${s.direction === "LONG" ? "text-emerald-400" : "text-red-400"}`}>
-                      {s.direction}
-                    </span>
-                  </td>
-                  <td className="py-1.5 px-3 text-center">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded ${
-                      s.risk_level === "LOW" ? "bg-emerald-950 text-emerald-400" :
-                      s.risk_level === "HIGH" ? "bg-red-950 text-red-400" :
-                      "bg-amber-950 text-amber-400"
-                    }`}>
-                      {s.risk_level}
-                    </span>
-                  </td>
-                  <td className="py-1.5 px-3 text-center text-zinc-500">{s.horizon}</td>
-                  <td className="py-1.5 px-3 text-right font-mono">
-                    <span className={s.expected_return_pct > 0 ? "text-emerald-400" : "text-red-400"}>
-                      {s.expected_return_pct > 0 ? "+" : ""}{s.expected_return_pct?.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="py-1.5 px-3 text-center">
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
-                      s.spec_category === "HIGH_CONVICTION" ? "bg-red-950 text-red-400" :
-                      s.spec_category === "CANDIDATE" ? "bg-amber-950 text-amber-400" :
-                      s.spec_category === "WATCH" ? "bg-zinc-800 text-zinc-400" :
-                      "bg-zinc-900 text-zinc-600"
-                    }`}>
-                      {s.spec_category}
-                    </span>
+      <div
+        className="rounded-xl overflow-hidden"
+        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+      >
+        <div
+          className="flex items-center gap-2.5 px-5 py-3"
+          style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
+        >
+          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,229,160,0.12)" }}>
+            <Target size={13} style={{ color: "#00e5a0" }} />
+          </div>
+          <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
+            Signal List
+          </h2>
+          <span className="text-[10px] ml-auto" style={{ color: "var(--color-text-muted)" }}>
+            {filtered.length} results
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr
+                className="text-[10px] uppercase tracking-wider font-semibold"
+                style={{ color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.01)" }}
+              >
+                <th className="text-left py-2.5 px-5">Ticker</th>
+                <th className="text-left py-2.5 px-3">Name</th>
+                <th className="text-right py-2.5 px-3">Score</th>
+                <th className="text-center py-2.5 px-3">Dir</th>
+                <th className="text-center py-2.5 px-3">Risk</th>
+                <th className="text-center py-2.5 px-3">Horizon</th>
+                <th className="text-right py-2.5 px-3">Exp Ret</th>
+                <th className="text-center py-2.5 px-5">Category</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-16">
+                    <div className="flex items-center justify-center gap-2" style={{ color: "var(--color-text-muted)" }}>
+                      <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
+                      Scanning signals...
+                    </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="text-center py-16">
+                    <Target size={28} className="mx-auto mb-3" style={{ color: "var(--color-text-faint)" }} />
+                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No opportunities found</p>
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((s, i) => {
+                  const up = s.direction === "LONG";
+                  const score = s.score ?? 0;
+                  const scoreColor = score >= 80 ? "#00e5a0" : score >= 60 ? "#ffaa00" : "#ff4466";
+                  const retPos = (s.expected_return_pct ?? 0) > 0;
+                  const riskCfg: Record<string, { bg: string; color: string }> = {
+                    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0" },
+                    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00" },
+                    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466" },
+                  };
+                  const risk = riskCfg[s.risk_level ?? "MEDIUM"] ?? riskCfg.MEDIUM;
+                  return (
+                    <tr key={i} className="row-hover cursor-pointer text-[12px]" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                      <td className="py-3 px-5">
+                        <span className="font-bold font-data" style={{ color: "var(--color-text-primary)" }}>{s.ticker}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="text-[11px] truncate max-w-[140px] block" style={{ color: "var(--color-text-secondary)" }}>{s.name}</span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <div className="w-10 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${score}%`, background: scoreColor }} />
+                          </div>
+                          <span className="font-data font-semibold text-[11px]" style={{ color: scoreColor }}>{score.toFixed(0)}</span>
+                        </div>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          style={{ background: up ? "rgba(0,229,160,0.12)" : "rgba(255,68,102,0.12)", color: up ? "#00e5a0" : "#ff4466" }}
+                        >
+                          {up ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
+                          {s.direction}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: risk.bg, color: risk.color }}>
+                          {s.risk_level}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 text-center">
+                        <span className="text-[11px] font-data" style={{ color: "var(--color-text-secondary)" }}>{s.horizon}</span>
+                      </td>
+                      <td className="py-3 px-3 text-right">
+                        <span className="font-data font-semibold" style={{ color: retPos ? "#00e5a0" : "#ff4466" }}>
+                          {retPos ? "+" : ""}{s.expected_return_pct?.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-5 text-center">
+                        <CatBadge cat={s.spec_category ?? "NORMAL"} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
