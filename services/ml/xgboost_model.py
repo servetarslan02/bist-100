@@ -209,7 +209,7 @@ class XGBoostModel:
         # Overfitting detection
         self._check_overfitting(metrics, horizon)
 
-        logger.info("xgboost_trained", horizon=horizon, **metrics)
+        logger.info("xgboost_trained", **metrics)
         return metrics
 
     def train_multi_horizon(
