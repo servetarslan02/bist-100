@@ -104,11 +104,14 @@ services:
       start_period: 15s
 
   # === Application Services ===
+  # 'api' is the ONLY service that builds the shared image.
+  # All other Python services reuse the resulting 'alpha-bist-base' image.
   api:
     <<: *common
     build:
       context: .
       dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-api
     ports:
       - "8000:8000"
@@ -134,9 +137,7 @@ services:
 
   ingestion:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-ingestion
     command: python -m services.ingestion.main
     volumes:
@@ -144,6 +145,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 256m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
@@ -155,9 +158,7 @@ services:
 
   feature-engine:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-feature-engine
     command: python -m services.features.main
     volumes:
@@ -166,6 +167,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 512m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
@@ -177,9 +180,7 @@ services:
 
   market-state:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-market-state
     command: python -m services.market_state.main
     volumes:
@@ -187,6 +188,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 256m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
@@ -198,9 +201,7 @@ services:
 
   intelligence:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-intelligence
     command: python -m services.intelligence.main
     volumes:
@@ -210,6 +211,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 512m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
@@ -221,9 +224,7 @@ services:
 
   simulation:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-simulation
     command: python -m services.simulation.main
     volumes:
@@ -232,6 +233,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 512m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
@@ -241,9 +244,7 @@ services:
 
   risk:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-risk
     command: python -m services.risk.main
     volumes:
@@ -251,6 +252,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 256m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
@@ -260,9 +263,7 @@ services:
 
   portfolio:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-portfolio
     command: python -m services.portfolio.main
     volumes:
@@ -270,6 +271,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 256m
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       redis:
@@ -277,9 +280,7 @@ services:
 
   learning:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
+    image: alpha-bist-base
     container_name: alpha-learning
     command: python -m services.learning.main
     volumes:
@@ -288,6 +289,8 @@ services:
       - ./.env:/app/.env:ro
     mem_limit: 1g
     depends_on:
+      api:
+        condition: service_started
       postgres:
         condition: service_healthy
       clickhouse:
