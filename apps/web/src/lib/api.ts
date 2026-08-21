@@ -23,6 +23,8 @@ function normalizeApiPath(path: string): string {
   if (p === '/world/state' || p === '/world') return '/api/v1/macro/world';
   if (p === '/models') return '/api/v1/models/registry';
   if (p === '/events') return '/api/v1/event-study/events';
+  if (p.startsWith('/signals')) return p.replace('/signals', '/api/v1/scanner/signals');
+  if (p === '/status') return '/api/v1/system/status';
   if (p === '/decisions/signals') return '/api/v1/scanner/signals';
   if (p === '/decisions/rankings') return '/api/v1/scanner/rankings';
 

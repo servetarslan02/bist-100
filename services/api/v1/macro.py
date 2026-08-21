@@ -25,6 +25,11 @@ async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_li
         "geopolitical_risk": 0.42,
         "inflation_pressure": 0.38,
         "us_rate_pressure": 0.52,
+        "vix_level": 14.8,
+        "usd_strength": 0.62,
+        "turkey_macro_risk": 0.44,
+        "oil_pressure": 0.55,
+        "fed_rate_cut_prob": 0.78,
         "indicators": ["USDTRY", "CDS", "VIX", "TCMB_RATE", "DXY", "BRENT"],
     }
 
