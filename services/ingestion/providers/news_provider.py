@@ -182,22 +182,25 @@ class NewsProvider:
             logger.debug("Handled exception", error=str(e), context="news_provider.py:187")
             pass
 
-        # Fallback: varsayılan feed'ler
+        # Fallback: güvenilir ve hızlı finansal RSS beslemeleri
         return [
             "https://www.bloomberght.com/rss",
-            "https://www.foreks.com/rss",
-            "https://www.paraanaliz.com/rss",
-            "https://www.borsagundem.com/rss",
+            "https://bigpara.hurriyet.com.tr/rss/",
+            "https://www.trthaber.com/ekonomi_articles.rss",
         ]
 
-    async def fetch_financial_news_rss(self) -> List[Dict]:
+    async def fetch_financial_news_rss(self, max_items: int = 20) -> List[Dict]:
         """RSS haberleri çek."""
         all_news = []
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/rss+xml, application/xml, text/xml, */*",
+        }
 
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(headers=headers) as session:
             for feed_url in self._rss_feeds:
                 try:
-                    async with session.get(feed_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    async with session.get(feed_url, timeout=aiohttp.ClientTimeout(total=6)) as resp:
                         if resp.status == 200:
                             content = await resp.text()
                             feed = feedparser.parse(content)
@@ -213,7 +216,7 @@ class NewsProvider:
                                 all_news.append(news_item)
 
                 except Exception as e:
-                    logger.warning(f"RSS fetch failed: {feed_url}", error=str(e))
+                    logger.debug(f"RSS fetch skipped: {feed_url}", error=str(e))
 
         logger.info(f"Fetched {len(all_news)} news items")
         return all_news

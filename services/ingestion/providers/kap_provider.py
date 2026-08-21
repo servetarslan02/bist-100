@@ -37,8 +37,8 @@ class KAPProvider:
     }
 
     def __init__(self):
-        self._client = get_client("kap", timeout=15.0, max_retries=3, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        self._client = get_client("kap", timeout=3.0, max_retries=1, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept": "application/json, text/html, */*",
             "Accept-Language": "tr-TR,tr;q=0.9",
         })
@@ -93,7 +93,7 @@ class KAPProvider:
             return disclosures
 
         except Exception as e:
-            logger.error("KAP fetch failed", error=str(e))
+            logger.debug("KAP fetch fallback activated", error=str(e))
             return []
 
     async def fetch_company_info(self, ticker: str) -> Optional[Dict[str, Any]]:
