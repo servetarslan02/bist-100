@@ -85,7 +85,9 @@ class AdvancedMonteCarloEngine:
         Z = np.random.standard_normal((n_sims, horizon_days))
         log_returns = drift + diffusion * Z
         log_returns_cum = np.cumsum(log_returns, axis=1)
-        prices = current_price * np.exp(log_returns_cum)
+        sim_prices = current_price * np.exp(log_returns_cum)
+        initial_col = np.full((n_sims, 1), current_price)
+        prices = np.hstack([initial_col, sim_prices])
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
 

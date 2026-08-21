@@ -63,8 +63,8 @@ class EstimationWindowManager:
     BIST takvimi (hafta sonları + resmi tatiller) otomatik uygulanır.
     """
 
-    def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS):
-        self.gap_trading_days = gap_trading_days
+    def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS, gap_days: Optional[int] = None):
+        self.gap_trading_days = gap_days if gap_days is not None else gap_trading_days
 
     def get_window(
         self, event_date: datetime, event_type: str = "DEFAULT"

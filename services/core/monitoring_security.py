@@ -220,7 +220,10 @@ class JWTProvider(AuthProvider):
         try:
             import jwt as pyjwt
         except ImportError:
-            return AuthResult(authenticated=False, error="PyJWT not installed")
+            try:
+                from jose import jwt as pyjwt
+            except ImportError:
+                return AuthResult(authenticated=False, error="PyJWT not installed")
 
         try:
             # Key seçimi
@@ -243,12 +246,12 @@ class JWTProvider(AuthProvider):
 
         except pyjwt.ExpiredSignatureError:
             return AuthResult(authenticated=False, error="Token expired")
-        except pyjwt.InvalidKeyError:
+        except getattr(pyjwt, "InvalidKeyError", ()):
             # Key rotation — cache temizle ve tekrar dene
             self._jwks_cache.clear()
             self._jwks_last_fetch = 0
             return AuthResult(authenticated=False, error="Key rotation detected, retry")
-        except pyjwt.InvalidTokenError as e:
+        except Exception as e:
             return AuthResult(authenticated=False, error=f"Invalid token: {e}")
 
     async def _get_key(self, token: str, pyjwt) -> str:

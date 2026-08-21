@@ -190,7 +190,7 @@ class TestVIOPMonitor:
 
 class TestCompliance:
     @pytest.mark.parametrize("amount,expected_action,expected_flag", [
-        (10000, "OK", "notification_required"),
+        (10000, "OK", None),
         (60000, "NOTIFY", "notification_required"),
         (110000, "BLOCK", "violation"),
     ])
@@ -198,7 +198,10 @@ class TestCompliance:
         c = ComplianceChecker()
         r = c.check_spk_compliance("BUY", "THYAO", amount, 1000000, 0)
         assert r.action == expected_action
-        assert getattr(r, expected_flag)
+        if expected_flag:
+            assert getattr(r, expected_flag)
+        else:
+            assert not r.notification_required and not r.violation
 
     def test_zero_portfolio(self):
         c = ComplianceChecker()

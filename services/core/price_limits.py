@@ -42,10 +42,10 @@ class PriceLimitResult:
 class PriceLimitMonitor:
     """BIST fiyat limitleri kontrolü."""
 
-    # Varsayılan limitler (pazara göre)
-    DEFAULT_LIMIT = 15.0    # %15 (Ana Pazar varsayılan)
-    YILDIZ_LIMIT = 20.0     # %20 (Yıldız Pazar)
-    ANA_LIMIT = 15.0        # %15 (Ana Pazar)
+    # Varsayılan limitler (BIST standardı: ±%10)
+    DEFAULT_LIMIT = 10.0    # %10 (Standart BIST Fiyat Marjı)
+    YILDIZ_LIMIT = 10.0     # %10 (Yıldız Pazar)
+    ANA_LIMIT = 10.0        # %10 (Ana Pazar)
     ALT_LIMIT = 10.0        # %10 (Alt Pazar)
     VOLATILE_LIMIT = 5.0    # %5 (devre kesici sonrası)
     WIDE_LIMIT = 20.0       # %20

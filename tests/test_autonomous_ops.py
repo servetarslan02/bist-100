@@ -347,7 +347,10 @@ async def test_jwt_validation():
     try:
         import jwt as pyjwt
     except ImportError:
-        assert False, "JWT Validation: PyJWT not installed"
+        try:
+            from jose import jwt as pyjwt
+        except ImportError:
+            assert False, "JWT Validation: PyJWT not installed"
 
     secret = "test_secret_key_12345"
     provider = JWTProvider(secret=secret, algorithm="HS256")
@@ -396,7 +399,10 @@ async def test_jwt_role_extraction():
     try:
         import jwt as pyjwt
     except ImportError:
-        assert False, "JWT Role Extraction: PyJWT not installed"
+        try:
+            from jose import jwt as pyjwt
+        except ImportError:
+            assert False, "JWT Role Extraction: PyJWT not installed"
 
     secret = "test_secret"
 

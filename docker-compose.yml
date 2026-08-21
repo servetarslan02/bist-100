@@ -117,6 +117,9 @@ services:
       - ./ml:/app/ml
       - ./ai:/app/ai
       - ./backtest:/app/backtest
+      - ./tests:/app/tests
+      - ./config:/app/config
+      - ./data:/app/data
       - ./.env:/app/.env:ro
     mem_limit: 512m
     depends_on:

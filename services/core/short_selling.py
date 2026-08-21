@@ -72,7 +72,7 @@ class ShortSellingMonitor:
         if ticker not in bist50:
             return ShortSellingDecision(
                 allowed=False,
-                reason=f"{ticker} BIST-50'de değil — açığa satış sadece BIST-50",
+                reason=f"{ticker} BIST-30 / BIST-50 listesinde değil — açığa satış sadece BIST-30/50",
                 details=details,
             )
 
