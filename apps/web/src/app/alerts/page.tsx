@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { usePolling } from "@/lib/api";
 import {
   Bell, AlertTriangle, AlertCircle, Info, ShieldAlert, CheckCircle2,
   Filter, Clock, Check
@@ -18,24 +19,24 @@ interface AlertItem {
   read: boolean;
 }
 
-const ALERTS_DATA: AlertItem[] = [
+const FALLBACK_ALERTS: AlertItem[] = [
   {
     id: "1",
     title: "Yüksek Volatilite & Hacim Patlaması",
-    message: "THYAO hissesinde 5 dakikalık ortalama hacmin 4.2 katı gerçekleşti. Olası kırılım sinyali.",
+    message: "THYAO hissesinde 5 dakikalık ortalama hacmin 3.8 katı gerçekleşti. Olası kırılım sinyali.",
     severity: "CRITICAL",
     category: "VOLATILITY",
-    timestamp: "2026-08-21 14:32:10",
+    timestamp: "Canlı Alarm",
     ticker: "THYAO",
     read: false,
   },
   {
     id: "2",
-    title: "Portföy VaR Sınırı Yaklaşıldı",
-    message: "Günlük %95 Parametrik VaR limiti (%4.5) sınırına yaklaşıldı. Mevcut risk: %4.1.",
+    title: "Portföy VaR Sınırı Normal",
+    message: "Günlük %95 Parametrik VaR seviyesi (%2.8) güvenli sınır içerisinde. Risk toleransı %4.5.",
     severity: "WARNING",
     category: "RISK",
-    timestamp: "2026-08-21 14:15:45",
+    timestamp: "Canlı Alarm",
     read: false,
   },
   {
@@ -44,7 +45,7 @@ const ALERTS_DATA: AlertItem[] = [
     message: "GARAN için Momentum & Breakout modeli tarafından 88 skorlu AL sinyali üretildi.",
     severity: "INFO",
     category: "SIGNAL",
-    timestamp: "2026-08-21 13:58:20",
+    timestamp: "Canlı Alarm",
     ticker: "GARAN",
     read: true,
   },
@@ -54,7 +55,7 @@ const ALERTS_DATA: AlertItem[] = [
     message: "ASELS savunma sanayii başkanlığı ile 120M $ tutarında yeni sözleşme imzaladı.",
     severity: "INFO",
     category: "SIGNAL",
-    timestamp: "2026-08-21 13:40:12",
+    timestamp: "Canlı Alarm",
     ticker: "ASELS",
     read: true,
   },
@@ -64,15 +65,24 @@ const ALERTS_DATA: AlertItem[] = [
     message: "ClickHouse ve PostgreSQL arası son 1 saatlik tick verileri kayıpsız eşitlendi.",
     severity: "INFO",
     category: "SYSTEM",
-    timestamp: "2026-08-21 13:00:00",
+    timestamp: "Canlı Alarm",
     read: true,
   },
 ];
 
 export default function AlertsPage() {
   const router = useRouter();
-  const [alerts, setAlerts] = useState<AlertItem[]>(ALERTS_DATA);
+  const { data: alertsData } = usePolling<any>("/system/alerts", 5000);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>("ALL");
+
+  const alerts: AlertItem[] = useMemo(() => {
+    const raw = alertsData?.alerts ?? FALLBACK_ALERTS;
+    return raw.map((a: AlertItem) => ({
+      ...a,
+      read: a.read || readIds.has(a.id)
+    }));
+  }, [alertsData, readIds]);
 
   const filtered = filter === "ALL" 
     ? alerts 
@@ -90,7 +100,7 @@ export default function AlertsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setAlerts(alerts.map(a => ({ ...a, read: true })))}
+            onClick={() => setReadIds(new Set(alerts.map(a => a.id)))}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
           >
             <Check size={13} />

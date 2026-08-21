@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { usePolling } from "@/lib/api";
 import {
   Database, Server, HardDrive, Radio, RefreshCw, Layers, CheckCircle2, Zap
 } from "lucide-react";
@@ -16,7 +17,7 @@ interface DatabaseInfo {
   tables: Array<{ name: string; rows: string; size: string }>;
 }
 
-const DATABASES: DatabaseInfo[] = [
+const FALLBACK_DATABASES: DatabaseInfo[] = [
   {
     name: "ClickHouse (Sütunsal Analitik)",
     type: "Columnar OLAP",
@@ -26,9 +27,9 @@ const DATABASES: DatabaseInfo[] = [
     status: "ONLINE",
     latency_ms: 1.8,
     tables: [
-      { name: "bist_ticks", rows: "62.4M", size: "3.2 GB" },
-      { name: "bist_bars_1m", rows: "14.8M", size: "980 MB" },
-      { name: "technical_features", rows: "7.0M", size: "620 MB" },
+      {"name": "bist_ticks", "rows": "62.4M", "size": "3.2 GB"},
+      {"name": "bist_bars_1m", "rows": "14.8M", "size": "980 MB"},
+      {"name": "technical_features", "rows": "7.0M", "size": "620 MB"},
     ],
   },
   {
@@ -40,9 +41,9 @@ const DATABASES: DatabaseInfo[] = [
     status: "ONLINE",
     latency_ms: 0.9,
     tables: [
-      { name: "portfolio_positions", rows: "24.5K", size: "48 MB" },
-      { name: "executed_trades", rows: "180.2K", size: "120 MB" },
-      { name: "system_audit_logs", rows: "995K", size: "472 MB" },
+      {"name": "portfolio_positions", "rows": "24.5K", "size": "48 MB"},
+      {"name": "executed_trades", "rows": "180.2K", "size": "120 MB"},
+      {"name": "model_predictions", "rows": "995K", "size": "472 MB"},
     ],
   },
   {
@@ -54,9 +55,9 @@ const DATABASES: DatabaseInfo[] = [
     status: "ONLINE",
     latency_ms: 0.2,
     tables: [
-      { name: "cache:market:ticks", rows: "850 Key", size: "12 MB" },
-      { name: "cache:signals:active", rows: "120 Key", size: "4 MB" },
-      { name: "session:locks", rows: "45 Key", size: "1 MB" },
+      {"name": "cache:market:ticks", "rows": "850 Key", "size": "12 MB"},
+      {"name": "cache:signals:active", "rows": "120 Key", "size": "4 MB"},
+      {"name": "session:locks", "rows": "45 Key", "size": "1 MB"},
     ],
   },
   {
@@ -68,14 +69,16 @@ const DATABASES: DatabaseInfo[] = [
     status: "ONLINE",
     latency_ms: 2.4,
     tables: [
-      { name: "topic:market.tick", rows: "12.8M Msg", size: "750 MB" },
-      { name: "topic:signal.generated", rows: "4.2M Msg", size: "320 MB" },
-      { name: "topic:order.placed", rows: "1.4M Msg", size: "130 MB" },
+      {"name": "topic:market.tick", "rows": "12.8M Msg", "size": "750 MB"},
+      {"name": "topic:signal.generated", "rows": "4.2M Msg", "size": "320 MB"},
+      {"name": "topic:order.placed", "rows": "1.4M Msg", "size": "130 MB"},
     ],
   },
 ];
 
 export default function DataCenterPage() {
+  const { data: dbData } = usePolling<any>("/system/databases", 5000);
+  const databases: DatabaseInfo[] = useMemo(() => dbData?.databases ?? FALLBACK_DATABASES, [dbData]);
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
@@ -96,7 +99,7 @@ export default function DataCenterPage() {
 
       {/* Database Cards */}
       <div className="space-y-4">
-        {DATABASES.map((db) => (
+        {databases.map((db) => (
           <div
             key={db.name}
             className="rounded-xl p-5 select-none"
