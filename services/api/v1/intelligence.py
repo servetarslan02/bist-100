@@ -103,3 +103,36 @@ async def analysis(ticker: str, user=Depends(get_current_user), _=Depends(check_
         "pb_ratio": 1.1,
         "rsi_14": 62.4,
     }
+
+
+@router.post("/ask_gemini")
+async def ask_gemini_endpoint(
+    body: Dict[str, Any],
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Google Gemini 2.5 Flash canlı araştırma ve analiz endpoint'i."""
+    prompt = body.get("prompt", "Borsa İstanbul piyasa durumu hakkında özet ver.")
+    try:
+        from ...intelligence.gemini_service import call_gemini
+        response = call_gemini(prompt)
+        return {"response": response, "model": "gemini-2.5-flash", "status": "ok"}
+    except Exception as e:
+        return {"response": f"Hata: {e}", "model": "gemini-2.5-flash", "status": "error"}
+
+
+@router.get("/gemini_report/{ticker}")
+async def gemini_report(
+    ticker: str,
+    price: float = 100.0,
+    sector: str = "BIST",
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Belirli bir hisse için canlı Gemini 2.5 araştırma raporu."""
+    try:
+        from ...intelligence.gemini_service import analyze_company_gemini
+        report = analyze_company_gemini(ticker, price, sector)
+        return {"ticker": ticker, "report": report, "model": "gemini-2.5-flash", "status": "ok"}
+    except Exception as e:
+        return {"ticker": ticker, "report": f"Rapor üretilemedi: {e}", "model": "gemini-2.5-flash", "status": "error"}
