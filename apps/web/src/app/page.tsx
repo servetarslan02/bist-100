@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { usePolling, type MarketState, type Signal, type WorldState, type SystemStatus } from "@/lib/api";
 import {
   TrendingUp, TrendingDown, Minus,
@@ -213,6 +214,7 @@ function RegimePill({ regime }: { regime?: string }) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Overview() {
+  const router = useRouter();
   const [timeStr, setTimeStr] = useState<string>("");
 
   useEffect(() => {
@@ -416,7 +418,8 @@ export default function Overview() {
                 {signals.map((s, i) => (
                   <tr
                     key={i}
-                    className="row-hover cursor-pointer text-[12px]"
+                    onClick={() => router.push(`/asset?ticker=${s.ticker}`)}
+                    className="row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40"
                     style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
                   >
                     <td className="py-3 px-5">

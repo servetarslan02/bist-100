@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { usePolling, type PortfolioData } from "@/lib/api";
 import { Briefcase, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
@@ -29,6 +30,7 @@ function MetricCard({ label, value, prefix = "", suffix = "", color }: {
 }
 
 export default function PortfolioPage() {
+  const router = useRouter();
   const { data, loading } = usePolling<PortfolioData>("/portfolio", 15000);
   const [rebalancing, setRebalancing] = useState(false);
   const [rebalanceMsg, setRebalanceMsg] = useState<string | null>(null);
@@ -170,7 +172,8 @@ export default function PortfolioPage() {
                   return (
                     <tr
                       key={i}
-                      className="row-hover cursor-pointer text-[12px]"
+                      onClick={() => router.push(`/asset?ticker=${pos.ticker}`)}
+                      className="row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40"
                       style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
                     >
                       <td className="py-3 px-5">

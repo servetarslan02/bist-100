@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { usePolling } from "@/lib/api";
-import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff } from "lucide-react";
+import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff, Filter, TrendingUp, Zap, Target } from "lucide-react";
 
 interface RadarRow {
   symbol: string;
@@ -23,6 +24,8 @@ interface RadarResponse {
   status: string;
 }
 
+type FilterCategory = "ALL" | "BIST100" | "GAINERS" | "LOSERS" | "OVERSOLD" | "OVERBOUGHT" | "HIGH_SCORE";
+
 // BIST: 10:00 - 18:00 İstanbul (UTC+3)
 function isBistOpen(): boolean {
   const now = new Date();
@@ -36,7 +39,9 @@ function isBistOpen(): boolean {
 }
 
 export default function MarketRadar() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<FilterCategory>("ALL");
   const [sortField, setSortField] = useState<keyof RadarRow>("score");
   const [sortAsc, setSortAsc] = useState(false);
   const [marketOpen, setMarketOpen] = useState(isBistOpen());
@@ -60,6 +65,15 @@ export default function MarketRadar() {
   const filteredRows = useMemo(() => {
     return allRows
       .filter(r => {
+        // Category filter
+        if (activeCategory === "BIST100" && !r.isBist100) return false;
+        if (activeCategory === "GAINERS" && r.change <= 0) return false;
+        if (activeCategory === "LOSERS" && r.change >= 0) return false;
+        if (activeCategory === "OVERSOLD" && (r.rsi === null || r.rsi >= 40)) return false;
+        if (activeCategory === "OVERBOUGHT" && (r.rsi === null || r.rsi <= 70)) return false;
+        if (activeCategory === "HIGH_SCORE" && r.score < 70) return false;
+
+        // Search query
         if (!search) return true;
         const q = search.toLowerCase();
         return r.symbol.toLowerCase().includes(q);
@@ -69,7 +83,7 @@ export default function MarketRadar() {
         const valB = b[sortField] ?? 0;
         return sortAsc ? (Number(valA) - Number(valB)) : (Number(valB) - Number(valA));
       });
-  }, [allRows, search, sortField, sortAsc]);
+  }, [allRows, search, activeCategory, sortField, sortAsc]);
 
   const handleSort = (field: keyof RadarRow) => {
     if (sortField === field) setSortAsc(!sortAsc);
@@ -88,14 +102,14 @@ export default function MarketRadar() {
   return (
     <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Piyasa Radarı</h1>
+          <h1 className="text-xl font-bold gradient-text">Canlı Piyasa Radarı</h1>
           <div className="flex items-center gap-2 mt-0.5">
             <p className="text-[11px]" style={{ color: "var(--color-text-muted)" }}>
               {loading && allRows.length === 0
                 ? "Yükleniyor..."
-                : `${filteredRows.length} / ${allRows.length} hisse`}
+                : `${filteredRows.length} / ${allRows.length} hisse listeleniyor`}
               {rawData?.errors && rawData.errors > 0 ? ` · ${rawData.errors} hisse verisi yok` : ""}
             </p>
             {/* Borsa durumu göstergesi */}
@@ -111,7 +125,7 @@ export default function MarketRadar() {
             </span>
             {lastUpdated && (
               <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>
-                · {lastUpdated.toLocaleTimeString("tr-TR")}
+                · Son Güncelleme: {lastUpdated.toLocaleTimeString("tr-TR")}
               </span>
             )}
           </div>
@@ -124,10 +138,74 @@ export default function MarketRadar() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Sembol ara..."
-            className="bg-transparent text-xs text-zinc-200 focus:outline-none w-36"
+            placeholder="Sembol ara (THYAO)..."
+            className="bg-transparent text-xs text-zinc-200 focus:outline-none w-44 font-data uppercase"
           />
         </div>
+      </div>
+
+      {/* Quick Filter Categories */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none">
+        <button
+          onClick={() => setActiveCategory("ALL")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "ALL"
+              ? "bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Tüm Hisseler ({allRows.length})
+        </button>
+        <button
+          onClick={() => setActiveCategory("BIST100")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "BIST100"
+              ? "bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Sadece BİST-100
+        </button>
+        <button
+          onClick={() => setActiveCategory("GAINERS")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "GAINERS"
+              ? "bg-emerald-500 text-zinc-950 font-bold shadow-md shadow-emerald-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Yükselenler ↗
+        </button>
+        <button
+          onClick={() => setActiveCategory("OVERSOLD")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "OVERSOLD"
+              ? "bg-cyan-500 text-zinc-950 font-bold shadow-md shadow-cyan-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Aşırı Satım (RSI &lt; 40)
+        </button>
+        <button
+          onClick={() => setActiveCategory("OVERBOUGHT")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "OVERBOUGHT"
+              ? "bg-amber-500 text-zinc-950 font-bold shadow-md shadow-amber-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Aşırı Alım (RSI &gt; 70)
+        </button>
+        <button
+          onClick={() => setActiveCategory("HIGH_SCORE")}
+          className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "HIGH_SCORE"
+              ? "bg-purple-500 text-zinc-100 font-bold shadow-md shadow-purple-500/20"
+              : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-zinc-200"
+          }`}
+        >
+          Yüksek Skor (Skor &ge; 70)
+        </button>
       </div>
 
       {/* Loading */}
@@ -171,7 +249,11 @@ export default function MarketRadar() {
                   const scoreColor = row.score >= 70 ? "#00e5a0" : row.score >= 55 ? "#00c8ff" : "#ffaa00";
 
                   return (
-                    <tr key={row.symbol} className="hover:bg-white/[0.03] transition-colors cursor-pointer">
+                    <tr
+                      key={row.symbol}
+                      onClick={() => router.push(`/asset?ticker=${row.symbol}`)}
+                      className="hover:bg-white/[0.05] transition-colors cursor-pointer"
+                    >
                       <td className="py-2.5 px-4 font-bold font-data text-zinc-100">
                         <div className="flex items-center gap-1.5">
                           <span>{row.symbol}</span>

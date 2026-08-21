@@ -427,3 +427,128 @@ async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         return {"regime": r}
     except Exception as e:
         return {"regime": "UNKNOWN", "error": str(e)}
+
+
+@router.get("/heatmap")
+async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """BIST gercek canli sektor isi haritasi."""
+    radar_res = await market_radar(limit=200)
+    stock_map = {item["symbol"]: item for item in radar_res.get("data", [])}
+
+    SECTOR_DEFINITIONS = [
+        {
+            "name": "Bankacılık & Finans",
+            "weight": 22.5,
+            "symbols": ["GARAN", "AKBNK", "ISCTR", "YKBNK", "VAKBN", "HALKB", "ISMEN", "TSKB"],
+            "names": {
+                "GARAN": "Garanti BBVA", "AKBNK": "Akbank", "ISCTR": "İş Bankası (C)", "YKBNK": "Yapı Kredi",
+                "VAKBN": "Vakıfbank", "HALKB": "Halkbank", "ISMEN": "İş Yatırım Menkul", "TSKB": "T.S.K.B."
+            }
+        },
+        {
+            "name": "Holding & Yatırım",
+            "weight": 18.0,
+            "symbols": ["KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL"],
+            "names": {
+                "KCHOL": "Koç Holding", "SAHOL": "Sabancı Holding", "ALARK": "Alarko Holding",
+                "ENKAI": "Enka İnşaat", "AGHOL": "Anadolu Grubu", "DOHOL": "Doğan Holding"
+            }
+        },
+        {
+            "name": "Havacılık & Ulaştırma",
+            "weight": 14.5,
+            "symbols": ["THYAO", "PGSUS", "TAVHL", "CLEBI"],
+            "names": {
+                "THYAO": "Türk Hava Yolları", "PGSUS": "Pegasus", "TAVHL": "TAV Havalimanları", "CLEBI": "Çelebi Hava"
+            }
+        },
+        {
+            "name": "Sanayi & Demir-Çelik",
+            "weight": 12.0,
+            "symbols": ["EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA"],
+            "names": {
+                "EREGL": "Ereğli Demir Çelik", "KRDMD": "Kardemir (D)", "SISE": "Şişecam",
+                "ARCLK": "Arçelik", "VESTL": "Vestel", "CIMSA": "Çimsa Çimento"
+            }
+        },
+        {
+            "name": "Savunma & Teknoloji",
+            "weight": 10.5,
+            "symbols": ["ASELS", "SDTTR", "KFEIN", "LOGO", "MIATK", "VBTYZ"],
+            "names": {
+                "ASELS": "Aselsan", "SDTTR": "SDT Uzay", "KFEIN": "Kafein Yazılım",
+                "LOGO": "Logo Yazılım", "MIATK": "Mia Teknoloji", "VBTYZ": "VBT Yazılım"
+            }
+        },
+        {
+            "name": "Enerji & Petrol Rafineri",
+            "weight": 9.0,
+            "symbols": ["TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR"],
+            "names": {
+                "TUPRS": "Tüpraş", "ASTOR": "Astor Enerji", "ENJSA": "Enerjisa",
+                "AKSEN": "Aksa Enerji", "EUPWR": "Europower", "KONTR": "Kontrolmatik"
+            }
+        },
+        {
+            "name": "Otomotiv & Yan Sanayi",
+            "weight": 7.5,
+            "symbols": ["FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR"],
+            "names": {
+                "FROTO": "Ford Otosan", "TOASO": "Tofaş Oto", "TTRAK": "Türk Traktör",
+                "DOAS": "Doğuş Otomotiv", "OTKAR": "Otokar"
+            }
+        },
+        {
+            "name": "Perakende & Gıda",
+            "weight": 6.0,
+            "symbols": ["BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM"],
+            "names": {
+                "BIMAS": "BİM Mağazalar", "MGROS": "Migros", "CCOLA": "Coca-Cola İçecek",
+                "ULKER": "Ülker Bisküvi", "SOKM": "Şok Marketler"
+            }
+        },
+    ]
+
+    sectors = []
+    for sec in SECTOR_DEFINITIONS:
+        stock_list = []
+        chg_sum = 0.0
+        valid_cnt = 0
+        for sym in sec["symbols"]:
+            live = stock_map.get(sym)
+            if live:
+                p = live["price"]
+                chg = live["change"]
+                vol = live["volume"]
+                score = live["score"]
+            else:
+                p = 100.0
+                chg = 0.0
+                vol = 1000000
+                score = 70
+            
+            vol_str = f"{(vol/1000000):.1f}M ₺" if vol >= 1000000 else f"{(vol/1000):.0f}K ₺"
+            stock_list.append({
+                "symbol": sym,
+                "name": sec["names"].get(sym, sym),
+                "price": p,
+                "change_pct": chg,
+                "volume": vol_str,
+                "score": score,
+            })
+            chg_sum += chg
+            valid_cnt += 1
+
+        avg_chg = round(chg_sum / max(1, valid_cnt), 2)
+        sectors.append({
+            "name": sec["name"],
+            "weight": sec["weight"],
+            "change_pct": avg_chg,
+            "volume_total": f"{round(sum(stock_map.get(s, {}).get('volume', 0) for s in sec['symbols']) / 1000000000, 1)} Milyar ₺",
+            "stocks": stock_list,
+        })
+
+    return {
+        "status": "ok",
+        "sectors": sectors,
+    }

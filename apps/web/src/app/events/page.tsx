@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Zap, Filter, Clock, ExternalLink, Radio, CheckCircle2,
   TrendingUp, TrendingDown, AlertCircle
@@ -36,6 +37,7 @@ const MOCK_EVENTS: EventItem[] = [
 ];
 
 export default function EventCenterPage() {
+  const router = useRouter();
   const [filter, setFilter] = useState<string>("ALL");
   const [events] = useState<EventItem[]>(MOCK_EVENTS);
 
@@ -88,7 +90,8 @@ export default function EventCenterPage() {
           return (
             <div
               key={ev.id}
-              className="rounded-xl p-4 transition-all duration-150 hover:border-zinc-700/60 select-none flex items-start gap-4"
+              onClick={() => ev.ticker && router.push(`/asset?ticker=${ev.ticker}`)}
+              className={`rounded-xl p-4 transition-all duration-150 select-none flex items-start gap-4 ${ev.ticker ? "cursor-pointer hover:bg-white/[0.04] hover:scale-[1.005]" : ""}`}
               style={{
                 background: "var(--color-bg-card)",
                 border: "1px solid var(--color-border-subtle)",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { usePolling, type Signal } from "@/lib/api";
 import { Target, ArrowUpRight, ArrowDownRight, Flame, Eye, Star, Layers } from "lucide-react";
 
@@ -28,6 +29,7 @@ function CatBadge({ cat }: { cat: string }) {
 }
 
 export default function Opportunities() {
+  const router = useRouter();
   const { data: signals, loading } = usePolling<Signal[]>("/signals?limit=100", 15000);
   const [filter, setFilter] = useState<string>("ALL");
 
@@ -176,7 +178,12 @@ export default function Opportunities() {
                   };
                   const risk = riskCfg[s.risk_level ?? "MEDIUM"] ?? riskCfg.MEDIUM;
                   return (
-                    <tr key={i} className="row-hover cursor-pointer text-[12px]" style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                    <tr
+                      key={i}
+                      onClick={() => router.push(`/asset?ticker=${s.ticker}`)}
+                      className="row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40"
+                      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+                    >
                       <td className="py-3 px-5">
                         <span className="font-bold font-data" style={{ color: "var(--color-text-primary)" }}>{s.ticker}</span>
                       </td>

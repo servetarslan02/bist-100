@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { usePolling } from "@/lib/api";
 import {
   Cpu, Activity, CheckCircle2, TrendingUp, BarChart2, ShieldCheck,
   ExternalLink, Layers, Award
@@ -23,7 +24,7 @@ interface ModelRegistryItem {
   last_trained: string;
 }
 
-const MODELS_DATA: ModelRegistryItem[] = [
+const FALLBACK_MODELS: ModelRegistryItem[] = [
   {
     id: "lgbm_alpha_v4",
     name: "LightGBM Quant Alpha",
@@ -71,6 +72,27 @@ const MODELS_DATA: ModelRegistryItem[] = [
 ];
 
 export default function ModelCenterPage() {
+  const { data: matrixData } = usePolling<any>("/learning/performance-matrix", 10000);
+
+  const models = useMemo(() => {
+    if (matrixData?.models && matrixData.models.length > 0) {
+      return FALLBACK_MODELS.map((fb, idx) => {
+        const live = matrixData.models[idx];
+        if (live) {
+          return {
+            ...fb,
+            metrics: {
+              ...fb.metrics,
+              sharpe: live.sharpe_ratio ?? fb.metrics.sharpe,
+              ic: live.information_coefficient ?? fb.metrics.ic,
+            }
+          };
+        }
+        return fb;
+      });
+    }
+    return FALLBACK_MODELS;
+  }, [matrixData]);
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
@@ -96,7 +118,7 @@ export default function ModelCenterPage() {
 
       {/* Model Cards Grid */}
       <div className="space-y-4">
-        {MODELS_DATA.map((model) => {
+        {models.map((model) => {
           const isChamp = model.status === "CHAMPION";
           return (
             <div

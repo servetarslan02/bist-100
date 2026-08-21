@@ -147,6 +147,28 @@ export default function AIResearchPage() {
         </button>
       </form>
 
+      {/* Quick Suggestion Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 select-none text-[11px]">
+        <span className="text-zinc-500 font-semibold flex items-center gap-1 flex-shrink-0">
+          <Sparkles size={11} className="text-purple-400" />
+          Örnek Sorular:
+        </span>
+        {[
+          "ASELSAN güncel teknik seviyeler ve hedef fiyat nedir?",
+          "THYAO yolcu doluluğu ve bilanço görünümü nasıl?",
+          "BİST-100 genel piyasa rejimi ve risk faktörleri neler?",
+          "Bankacılık sektörü faiz marjı beklentileri nasıl?",
+        ].map((sug, i) => (
+          <button
+            key={i}
+            onClick={() => setQuery(sug)}
+            className="px-2.5 py-1 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-purple-500/40 transition-colors whitespace-nowrap cursor-pointer"
+          >
+            {sug}
+          </button>
+        ))}
+      </div>
+
       {/* Report View Grid */}
       <div className="grid grid-cols-3 gap-4">
         {/* Reports List */}

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search, TrendingUp, TrendingDown, Sparkles,
   BarChart3, Activity, ShieldCheck, Zap, Layers,
@@ -49,9 +50,12 @@ const TIMEFRAME_CONFIG: Record<TimeframeType, { label: string; period: string; i
   "1M": { label: "AYLIK (1A)", period: "5y", interval: "1mo" },
 };
 
-export default function AssetIntelPage() {
-  const [tickerInput, setTickerInput] = useState("THYAO");
-  const [activeTicker, setActiveTicker] = useState("THYAO");
+function AssetIntelContent() {
+  const searchParams = useSearchParams();
+  const initialTicker = searchParams.get("ticker")?.toUpperCase() || "THYAO";
+
+  const [tickerInput, setTickerInput] = useState(initialTicker);
+  const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [timeframe, setTimeframe] = useState<TimeframeType>("1D");
   const [asset, setAsset] = useState<LiveAssetData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +64,14 @@ export default function AssetIntelPage() {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const qTicker = searchParams.get("ticker");
+    if (qTicker && qTicker.toUpperCase() !== activeTicker) {
+      setActiveTicker(qTicker.toUpperCase());
+      setTickerInput(qTicker.toUpperCase());
+    }
+  }, [searchParams]);
 
   // Fetch real live intelligence data from backend
   useEffect(() => {
@@ -428,5 +440,18 @@ export default function AssetIntelPage() {
         </>
       )}
     </div>
+  );
+}
+
+export default function AssetIntelPage() {
+  return (
+    <Suspense fallback={
+      <div className="p-8 text-center text-xs text-zinc-500">
+        <RefreshCw size={20} className="mx-auto mb-2 text-emerald-400 animate-spin" />
+        Varlık verileri yükleniyor...
+      </div>
+    }>
+      <AssetIntelContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell, AlertTriangle, AlertCircle, Info, ShieldAlert, CheckCircle2,
   Filter, Clock, Check
@@ -69,6 +70,7 @@ const ALERTS_DATA: AlertItem[] = [
 ];
 
 export default function AlertsPage() {
+  const router = useRouter();
   const [alerts, setAlerts] = useState<AlertItem[]>(ALERTS_DATA);
   const [filter, setFilter] = useState<string>("ALL");
 
@@ -108,7 +110,8 @@ export default function AlertsPage() {
           return (
             <div
               key={alert.id}
-              className="rounded-xl p-4 transition-all duration-150 select-none flex items-start gap-3.5"
+              onClick={() => alert.ticker && router.push(`/asset?ticker=${alert.ticker}`)}
+              className={`rounded-xl p-4 transition-all duration-150 select-none flex items-start gap-3.5 ${alert.ticker ? "cursor-pointer hover:bg-white/[0.04] hover:scale-[1.005]" : ""}`}
               style={{
                 background: "var(--color-bg-card)",
                 border: "1px solid var(--color-border-subtle)",

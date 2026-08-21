@@ -10,12 +10,42 @@ export default function WorldIntelPage() {
   const { data: world } = usePolling<WorldState>("/world/state", 5000);
 
   const MACRO_ASSETS = [
-    { name: "Dolar Endeksi (DXY)", value: "103.85", change: "+%0.35", pos: true },
-    { name: "ABD 10 Yıllık Tahvil", value: "%4.28", change: "-2 bps", pos: false },
-    { name: "Brent Petrol", value: "$82.40", change: "-%1.10", pos: false },
-    { name: "Ons Altın (XAU/USD)", value: "$2,485", change: "+%0.65", pos: true },
-    { name: "Türkiye 5Y CDS Primi", value: "264 bps", change: "-4 bps", pos: false },
-    { name: "USD / TRY", value: "33.85", change: "+%0.12", pos: true },
+    {
+      name: "Dolar Endeksi (DXY)",
+      value: (world as any)?.dxy ? `${(world as any).dxy.toFixed(2)}` : "103.85",
+      change: `${((world as any)?.dxy_change_pct ?? 0.35) >= 0 ? "+" : ""}%${((world as any)?.dxy_change_pct ?? 0.35).toFixed(2)}`,
+      pos: ((world as any)?.dxy_change_pct ?? 0.35) >= 0
+    },
+    {
+      name: "ABD 10 Yıllık Tahvil",
+      value: (world as any)?.us10y ? `%${(world as any).us10y.toFixed(2)}` : "%4.28",
+      change: "-2 bps",
+      pos: false
+    },
+    {
+      name: "Brent Petrol",
+      value: (world as any)?.brent_crude ? `$${(world as any).brent_crude.toFixed(2)}` : "$82.40",
+      change: "-%1.10",
+      pos: false
+    },
+    {
+      name: "Ons Altın (XAU/USD)",
+      value: (world as any)?.gold_ounce ? `$${(world as any).gold_ounce.toLocaleString("en-US")}` : "$2,485",
+      change: "+%0.65",
+      pos: true
+    },
+    {
+      name: "Türkiye 5Y CDS Primi",
+      value: (world as any)?.turkey_cds_5y ? `${(world as any).turkey_cds_5y.toFixed(0)} bps` : "264 bps",
+      change: "-4 bps",
+      pos: false
+    },
+    {
+      name: "USD / TRY",
+      value: (world as any)?.usd_try ? `₺${(world as any).usd_try.toFixed(2)}` : "₺33.85",
+      change: "+%0.12",
+      pos: true
+    },
   ];
 
   return (

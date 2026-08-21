@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { usePolling } from "@/lib/api";
 import {
   Map, TrendingUp, TrendingDown, Layers, Filter, Search, BarChart2,
-  PieChart, ArrowUpRight, ArrowDownRight, Sparkles
+  PieChart, ArrowUpRight, ArrowDownRight, Sparkles, RefreshCw
 } from "lucide-react";
 
 interface SectorHeatmap {
@@ -21,7 +23,12 @@ interface SectorHeatmap {
   }>;
 }
 
-const COMPREHENSIVE_SECTORS: SectorHeatmap[] = [
+interface HeatmapResponse {
+  status: string;
+  sectors: SectorHeatmap[];
+}
+
+const FALLBACK_SECTORS: SectorHeatmap[] = [
   {
     name: "Bankacılık & Finans",
     weight: 22.5,
@@ -79,7 +86,7 @@ const COMPREHENSIVE_SECTORS: SectorHeatmap[] = [
     ],
   },
   {
-    name: "Savunma & Bilişim Teknolojileri",
+    name: "Savunma & Teknoloji",
     weight: 10.5,
     change_pct: 2.90,
     volume_total: "5.4 Milyar ₺",
@@ -135,11 +142,15 @@ const COMPREHENSIVE_SECTORS: SectorHeatmap[] = [
 ];
 
 export default function MarketMapPage() {
+  const router = useRouter();
   const [selectedSector, setSelectedSector] = useState<string>("ALL");
   const [search, setSearch] = useState<string>("");
 
+  const { data: heatmapData, loading, lastUpdated } = usePolling<HeatmapResponse>("/market/heatmap", 15000);
+  const sectors = useMemo(() => heatmapData?.sectors ?? FALLBACK_SECTORS, [heatmapData]);
+
   const filteredSectors = useMemo(() => {
-    return COMPREHENSIVE_SECTORS.map(sec => {
+    return sectors.map(sec => {
       let matchingStocks = sec.stocks;
       if (search) {
         const q = search.toLowerCase();
@@ -153,11 +164,11 @@ export default function MarketMapPage() {
       if (selectedSector !== "ALL" && sec.name !== selectedSector) return false;
       return sec.stocks.length > 0;
     });
-  }, [selectedSector, search]);
+  }, [sectors, selectedSector, search]);
 
   const totalMarketVolume = "59.4 Milyar ₺";
-  const advancingSectors = COMPREHENSIVE_SECTORS.filter(s => s.change_pct > 0).length;
-  const decliningSectors = COMPREHENSIVE_SECTORS.filter(s => s.change_pct < 0).length;
+  const advancingSectors = sectors.filter(s => s.change_pct > 0).length;
+  const decliningSectors = sectors.filter(s => s.change_pct < 0).length;
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -190,7 +201,7 @@ export default function MarketMapPage() {
             className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-200 focus:outline-none cursor-pointer"
           >
             <option value="ALL">Tüm Sektörler (Genel Görünüm)</option>
-            {COMPREHENSIVE_SECTORS.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            {sectors.map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
           </select>
         </div>
       </div>
@@ -275,7 +286,8 @@ export default function MarketMapPage() {
                   return (
                     <div
                       key={st.symbol}
-                      className="p-2.5 rounded-lg flex items-center justify-between transition-all duration-150 hover:bg-white/[0.04] cursor-pointer"
+                      onClick={() => router.push(`/asset?ticker=${st.symbol}`)}
+                      className="p-2.5 rounded-lg flex items-center justify-between transition-all duration-150 hover:bg-white/[0.08] hover:scale-[1.01] cursor-pointer"
                       style={{
                         background: stPos ? "rgba(0,229,160,0.03)" : "rgba(255,68,102,0.03)",
                         border: `1px solid ${stPos ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)"}`,
