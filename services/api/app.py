@@ -23,6 +23,7 @@ import time
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 import structlog
 import orjson
@@ -162,6 +163,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Otomatik GZip Sıkıştırma (1KB'dan büyük tüm yanıtları %85-90 sıkıştırır)
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Request timing middleware
     @app.middleware("http")
