@@ -1,1 +1,0 @@
-# ALPHA BIST — Database Migrations
