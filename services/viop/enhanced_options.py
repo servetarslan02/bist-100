@@ -97,12 +97,12 @@ def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
         delta = norm.cdf(d1)
         theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))
                  - r * K * np.exp(-r * T) * norm.cdf(d2)) / 365
-        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100
+        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100  # /100: %1 faiz değişimi etkisi
     else:
         delta = norm.cdf(d1) - 1
         theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))
                  + r * K * np.exp(-r * T) * norm.cdf(-d2)) / 365
-        rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100
+        rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100  # /100: %1 faiz değişimi etkisi
 
     return {
         "delta": round(delta, 6),

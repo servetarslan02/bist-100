@@ -99,8 +99,8 @@ class FeatureStore:
                     source=source,
                     description=f"Auto-registered from {source}",
                     dtype="float",
-                    range_min=-100,
-                    range_max=100,
+                    range_min=-1000,
+                    range_max=1000,
                 ))
 
     def get(

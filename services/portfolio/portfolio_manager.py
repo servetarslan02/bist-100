@@ -310,6 +310,7 @@ class PortfolioManager:
         self._daily_realized_pnl: float = 0.0
         self._daily_commission: float = 0.0
         self._last_snapshot_date: str = ""
+        self._cached_max_drawdown: Optional[float] = None
 
         # İlk nakit kaydı
         self._record_cash(0.0, initial_capital, "DEPOSIT", "Başlangıç sermayesi")
@@ -421,6 +422,9 @@ class PortfolioManager:
         # HWM güncelle
         if total_equity > self._high_water_mark:
             self._high_water_mark = total_equity
+
+        # Invalidate cached drawdown
+        self._cached_max_drawdown = None
 
         # v2.0: Günlük snapshot (günde bir kez)
         today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -815,15 +819,18 @@ class PortfolioManager:
             cagr = 0.0
 
         # Drawdown
-        max_dd = 0.0
-        peak = initial
-        for point in self._equity_curve:
-            equity = point["equity"]
-            if equity > peak:
-                peak = equity
-            dd = (peak - equity) / peak * 100
-            if dd > max_dd:
-                max_dd = dd
+        max_dd = self._cached_max_drawdown
+        if max_dd is None:
+            max_dd = 0.0
+            peak = initial
+            for point in self._equity_curve:
+                equity = point["equity"]
+                if equity > peak:
+                    peak = equity
+                dd = (peak - equity) / peak * 100
+                if dd > max_dd:
+                    max_dd = dd
+            self._cached_max_drawdown = max_dd
 
         # Daily returns (snapshot bazlı)
         daily_returns = []
@@ -951,7 +958,18 @@ class PortfolioManager:
         else:
             risk_level = "DÜŞÜK"
 
-        max_dd = self.get_metrics().get("max_drawdown_pct", 0)
+        max_dd = self._cached_max_drawdown
+        if max_dd is None:
+            max_dd = 0.0
+            peak = self._initial_capital
+            for point in self._equity_curve:
+                equity = point["equity"]
+                if equity > peak:
+                    peak = equity
+                dd = (peak - equity) / peak * 100
+                if dd > max_dd:
+                    max_dd = dd
+            self._cached_max_drawdown = max_dd
 
         return {
             "risk_level": risk_level,

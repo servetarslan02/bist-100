@@ -369,15 +369,35 @@ class SocialProvider:
     # =====================================================
 
     def _analyze_sentiment(self, text: str) -> float:
-        """Gelişmiş Türkçe/İngilizce sentiment analizi (-1.0 ile +1.0 arası)."""
+        """Gelişmiş Türkçe/İngilizce sentiment analizi (-1.0 ile +1.0 arası).
+        Negation handling ile: 'iyi değil' → negative, 'kötü değil' → positive.
+        """
         if not text:
             return 0.0
 
         text_lower = text.lower()
+        words = text_lower.split()
 
-        # Pozitif ve negatif kelime sayıları
-        pos_count = sum(1 for w in TURKISH_POSITIVE if w in text_lower)
-        neg_count = sum(1 for w in TURKISH_NEGATIVE if w in text_lower)
+        pos_count = 0
+        neg_count = 0
+        negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
+        negate = False
+        for word in words:
+            if word in negation_words:
+                negate = True
+                continue
+            if word in TURKISH_POSITIVE:
+                if negate:
+                    neg_count += 1
+                else:
+                    pos_count += 1
+                negate = False
+            elif word in TURKISH_NEGATIVE:
+                if negate:
+                    pos_count += 1
+                else:
+                    neg_count += 1
+                negate = False
 
         total = pos_count + neg_count
         if total == 0:

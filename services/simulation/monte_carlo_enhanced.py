@@ -96,7 +96,9 @@ class JumpDiffusionMonteCarlo:
             MonteCarloResult
         """
         if seed is not None:
-            np.random.seed(seed)
+            rng = np.random.default_rng(seed)
+        else:
+            rng = np.random.default_rng()
 
         paths = np.zeros((num_sims, horizon + 1))
         paths[:, 0] = current_price
@@ -106,12 +108,12 @@ class JumpDiffusionMonteCarlo:
 
         for t in range(1, horizon + 1):
             # Brownian motion: z ~ N(0,1)
-            z = np.random.standard_normal(num_sims)
+            z = rng.standard_normal(num_sims)
 
             # Jump process (Poisson)
-            n_jumps = np.random.poisson(jump_intensity * dt, num_sims)
+            n_jumps = rng.poisson(jump_intensity * dt, num_sims)
             max_jumps = max(n_jumps.max(), 1)
-            jump_sizes_all = np.random.normal(jump_mean, jump_std, (num_sims, max_jumps))
+            jump_sizes_all = rng.normal(jump_mean, jump_std, (num_sims, max_jumps))
             jump_effect = np.sum(jump_sizes_all, axis=1) * (n_jumps > 0).astype(float)
 
             # Fiyat güncelleme: GBM + jump
@@ -219,7 +221,9 @@ class CorrelatedMonteCarlo:
             Portföy Monte Carlo sonuçları
         """
         if seed is not None:
-            np.random.seed(seed)
+            rng = np.random.default_rng(seed)
+        else:
+            rng = np.random.default_rng()
 
         n_assets = len(tickers)
         n_days = returns_matrix.shape[0]
@@ -247,7 +251,7 @@ class CorrelatedMonteCarlo:
 
         for sim in range(num_sims):
             # Bağımsız random returns
-            independent_z = np.random.standard_normal((horizon, n_assets))
+            independent_z = rng.standard_normal((horizon, n_assets))
 
             # Korelli returns
             correlated_z = independent_z @ L.T

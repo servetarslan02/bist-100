@@ -295,13 +295,13 @@ class RetryPolicy:
 
 # BIST'e özgü retry policy'ler
 BIST_RETRY_POLICIES = {
-    "yfinance": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=15.0),
-    "kap": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=30.0),
-    "tcmb": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=30.0),
-    "bist": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=15.0),
-    "matriks": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=15.0),
-    "social": RetryPolicy(max_attempts=2, base_delay_s=2.0, max_delay_s=30.0),
-    "news": RetryPolicy(max_attempts=2, base_delay_s=1.0, max_delay_s=15.0),
+    "yfinance": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=60.0),
+    "kap": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
+    "tcmb": RetryPolicy(max_attempts=3, base_delay_s=2.0, max_delay_s=60.0),
+    "bist": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=60.0),
+    "matriks": RetryPolicy(max_attempts=3, base_delay_s=1.0, max_delay_s=60.0),
+    "social": RetryPolicy(max_attempts=2, base_delay_s=2.0, max_delay_s=60.0),
+    "news": RetryPolicy(max_attempts=2, base_delay_s=1.0, max_delay_s=60.0),
 }
 
 

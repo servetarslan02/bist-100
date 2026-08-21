@@ -167,8 +167,9 @@ class EksiSozlukAdapter(BaseAdapter):
         return features
 
     def _basic_sentiment(self, text: str) -> float:
-        """Basit keyword-based sentiment (-1 ile +1)."""
+        """Keyword-based sentiment with negation handling (-1 ile +1)."""
         text_lower = text.lower()
+        words = text_lower.split()
 
         positive_words = [
             "güzel", "harika", "mükemmel", "başarılı", "iyi", "yükseliş",
@@ -182,8 +183,26 @@ class EksiSozlukAdapter(BaseAdapter):
             "iflas", "skandal", "düzenleme", "sorun", "kriz", "çöküş",
         ]
 
-        pos_count = sum(1 for w in positive_words if w in text_lower)
-        neg_count = sum(1 for w in negative_words if w in text_lower)
+        pos_count = 0
+        neg_count = 0
+        negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
+        negate = False
+        for word in words:
+            if word in negation_words:
+                negate = True
+                continue
+            if word in positive_words:
+                if negate:
+                    neg_count += 1
+                else:
+                    pos_count += 1
+                negate = False
+            elif word in negative_words:
+                if negate:
+                    pos_count += 1
+                else:
+                    neg_count += 1
+                negate = False
 
         total = pos_count + neg_count
         if total == 0:

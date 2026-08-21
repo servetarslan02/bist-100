@@ -55,7 +55,7 @@ class EventDeduplicator:
             str(event_data.get("event_type", "")),
             str(event_data.get("source", "")),
             str(event_data.get("ticker", "")),
-            str(event_data.get("price", "")),
+            str(round(float(event_data.get("price", 0)), 2)),
             str(event_data.get("timestamp", "")),
             str(event_data.get("kap_id", "")),
             str(event_data.get("social_id", "")),

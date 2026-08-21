@@ -262,18 +262,28 @@ class JobWorker:
             logger.warning("Failed to create job in DB (DB unavailable)", error=str(e)[:100])
             return None
 
+    _db_cache_until: float = 0.0
+
     @staticmethod
     def _db_available() -> bool:
-        """DB hızlı erişim kontrolü (retry yok)."""
+        """DB hızlı erişim kontrolü (5s TTL cache)."""
+        now = time.monotonic()
+        if now < JobWorker._db_cache_until:
+            return JobWorker._db_cache_result
         try:
             import socket
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
             result = s.connect_ex(('127.0.0.1', 5432))
             s.close()
-            return result == 0
-        except Exception as e:
-            return False
+            available = result == 0
+        except Exception:
+            available = False
+        JobWorker._db_cache_result = available
+        JobWorker._db_cache_until = now + 5.0
+        return available
+
+    _db_cache_result: bool = False
 
     async def _update_job_status(self, job_id: int, status: JobStatus,
                                  retry_count: Optional[int] = None):

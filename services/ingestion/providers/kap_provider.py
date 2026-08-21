@@ -222,8 +222,22 @@ class KAPProvider:
         """KAP açıklaması sentiment skoru."""
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
-        positive = ["artış", "büyüme", "kâr", "rekor", "yükseliş", "pozitif", "başarı"]
-        negative = ["düşüş", "kayıp", "zarar", "azalma", "gerileme", "iptal", "risk"]
+        positive = [
+            "artış", "büyüme", "kâr", "rekor", "yükseliş", "pozitif", "başarı",
+            "sermaye artırımı", "temettü", "kar payı", "ciro artışı", "sipariş",
+            "sözleşme", "anlaşma", "işbirliği", "ihale", "yatırım", "genişleme",
+            "ihracat", "büyüme hedefi", "kapasite artışı", "verimlilik", "optimizasyon",
+            "iyileştirme", "güçlü", "sağlıklı", "istikrarlı", "toparlanma", "yükseltme",
+            "alım", "tavsiye", "hedef fiyat", "endeks üstü", "outperform",
+        ]
+        negative = [
+            "düşüş", "kayıp", "zarar", "azalma", "gerileme", "iptal", "risk",
+            "iflas", "erteleme", "daralma", "borç", "temerrüt", "dava", "ceza",
+            "soruşturma", "yaptırım", "kısıtlama", "askıya alma", "durdurma",
+            "ihraç", "geri çağırma", "recall", "kriz", "çöküş", "bunalım",
+            "zayıf", "olumsuz", "negatif", "satış", "çıkış", "azaltma",
+            "downgrade", "sat", "ağırlık azalt", "underperform",
+        ]
 
         pos = sum(1 for w in positive if w in title)
         neg = sum(1 for w in negative if w in title)

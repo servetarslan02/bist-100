@@ -14,6 +14,7 @@ LLM: Ollama (gemma4:12b-q4_0 veya benzeri Türkçe model)
 
 import asyncio
 import json
+import time
 from typing import Dict, Any, Optional, List
 import structlog
 
@@ -57,7 +58,7 @@ class LLMSentimentAnalyzer:
 
     def __init__(self, llm_client=None):
         self._llm_client = llm_client
-        self._cache: Dict[str, Dict] = {}
+        self._cache: Dict[str, tuple] = {}  # key → (result, cached_at)
 
     def set_llm_client(self, client):
         """LLM client ayarla."""
@@ -82,10 +83,12 @@ class LLMSentimentAnalyzer:
         if not text or len(text.strip()) < 20:
             return self._neutral_result()
 
-        # Cache kontrolü
+        # Cache kontrolü (TTL-based)
         cache_key = f"{ticker}:{hash(text[:200])}"
         if cache_key in self._cache:
-            return self._cache[cache_key]
+            result, cached_at = self._cache[cache_key]
+            if time.time() - cached_at < 3600:
+                return result
 
         # LLM varsa kullan
         if self._llm_client:
@@ -94,13 +97,12 @@ class LLMSentimentAnalyzer:
             # Fallback: keyword-based
             result = self._keyword_analyze(text)
 
-        # Cache'e yaz
-        self._cache[cache_key] = result
+        # Cache'e yaz (TTL-based)
+        self._cache[cache_key] = (result, time.time())
+        # Cleanup: remove expired entries
         if len(self._cache) > 1000:
-            # Eski cache'i temizle
-            keys = list(self._cache.keys())
-            for k in keys[:500]:
-                del self._cache[k]
+            now = time.time()
+            self._cache = {k: v for k, v in self._cache.items() if now - v[1] < 3600}
 
         return result
 
@@ -141,8 +143,9 @@ class LLMSentimentAnalyzer:
             return self._keyword_analyze(text)
 
     def _keyword_analyze(self, text: str) -> Dict[str, Any]:
-        """Keyword-based sentiment (fallback)."""
+        """Keyword-based sentiment with negation handling (fallback)."""
         text_lower = text.lower()
+        words = text_lower.split()
 
         # Finansal pozitif kelimeler
         positive = [
@@ -162,8 +165,26 @@ class LLMSentimentAnalyzer:
             "işten çıkarma", "tasfiye", "kayıp", "zarar",
         ]
 
-        pos_count = sum(1 for w in positive if w in text_lower)
-        neg_count = sum(1 for w in negative if w in text_lower)
+        pos_count = 0
+        neg_count = 0
+        negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
+        negate = False
+        for word in words:
+            if word in negation_words:
+                negate = True
+                continue
+            if word in positive:
+                if negate:
+                    neg_count += 1
+                else:
+                    pos_count += 1
+                negate = False
+            elif word in negative:
+                if negate:
+                    pos_count += 1
+                else:
+                    neg_count += 1
+                negate = False
 
         total = pos_count + neg_count
         if total == 0:

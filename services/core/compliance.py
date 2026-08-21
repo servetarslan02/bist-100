@@ -90,13 +90,23 @@ class ComplianceChecker:
             )
 
         # %5 bildirim yükümlülüğü
-        if new_position_pct >= self.NOTIFICATION_THRESHOLD and current_position_pct < self.NOTIFICATION_THRESHOLD:
-            return ComplianceResult(
-                notification_required=True,
-                action="NOTIFY",
-                reason=f"SPK %5 bildirim yükümlülüğü: {new_position_pct*100:.1f}%",
-                details={**details, "new_position_pct": new_position_pct},
-            )
+        if action == "BUY":
+            if new_position_pct >= self.NOTIFICATION_THRESHOLD and current_position_pct < self.NOTIFICATION_THRESHOLD:
+                return ComplianceResult(
+                    notification_required=True,
+                    action="NOTIFY",
+                    reason=f"SPK %5 bildirim yükümlülüğü: {new_position_pct*100:.1f}%",
+                    details={**details, "new_position_pct": new_position_pct},
+                )
+        else:
+            # SELL: pozisyon azalırken de kontrol et
+            if current_position_pct >= self.NOTIFICATION_THRESHOLD and new_position_pct < self.NOTIFICATION_THRESHOLD:
+                return ComplianceResult(
+                    notification_required=True,
+                    action="NOTIFY",
+                    reason=f"SPK %5 bildirim altına düşüş: {new_position_pct*100:.1f}%",
+                    details={**details, "new_position_pct": new_position_pct},
+                )
 
         return ComplianceResult(action="OK", details=details)
 

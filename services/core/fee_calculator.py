@@ -72,8 +72,8 @@ class FeeCalculator:
         # MKK payı
         mkk_fee = amount * self.MKK_FEE_RATE
 
-        # BSMV (sadece komisyon üzerinden)
-        bsmv = broker_fee * self.BSMV_RATE
+        # BSMV (toplam komisyon üzerinden)
+        bsmv = (broker_fee + bist_fee + mkk_fee) * self.BSMV_RATE
 
         # Toplam
         total = broker_fee + bist_fee + mkk_fee + bsmv

@@ -44,6 +44,8 @@ class AlternativeFeatureEngine:
     def __init__(self, llm_client=None):
         self._initialized = False
         self._feature_cache: Dict[str, Dict[str, float]] = {}
+        self._feature_cache_ttl: Dict[str, float] = {}
+        self._cache_ttl_seconds = 3600  # 1 hour
 
         # LLM client'ı sentiment analyzer'a bağla
         if llm_client:
@@ -90,10 +92,11 @@ class AlternativeFeatureEngine:
 
         start = time.monotonic()
 
-        # Cache kontrolü
+        # Cache kontrolü (TTL-based)
         cache_key = f"{ticker}:{','.join(sorted(sources or []))}"
         if cache_key in self._feature_cache:
-            return self._feature_cache[cache_key]
+            if time.time() - self._feature_cache_ttl.get(cache_key, 0) < self._cache_ttl_seconds:
+                return self._feature_cache[cache_key]
 
         # Paralel veri toplama
         all_features: Dict[str, float] = {}
@@ -136,8 +139,9 @@ class AlternativeFeatureEngine:
             non_zero=sum(1 for v in all_features.values() if v != 0),
         )
 
-        # Cache
+        # Cache (with TTL)
         self._feature_cache[cache_key] = all_features
+        self._feature_cache_ttl[cache_key] = time.time()
 
         return all_features
 

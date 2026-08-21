@@ -289,6 +289,7 @@ class BaseAdapter(ABC):
 
     source_name: str = "unknown"
     rate_limit: int = 60
+    DEFAULT_CACHE_TTL: int = 3600  # Configurable per adapter
     circuit_breaker: CircuitBreaker = None
 
     def __init__(self):
@@ -391,10 +392,11 @@ class BaseAdapter(ABC):
                 del self._cache_ttl[key]
         return None
 
-    def _set_cached(self, key: str, value: Dict[str, float], ttl_seconds: int = 3600):
+    def _set_cached(self, key: str, value: Dict[str, float], ttl_seconds: Optional[int] = None):
         """Cache'e yaz."""
+        ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
         self._cache[key] = value
-        self._cache_ttl[key] = time.time() + ttl_seconds
+        self._cache_ttl[key] = time.time() + ttl
 
     def get_status(self) -> Dict[str, Any]:
         """Adapter durumu."""

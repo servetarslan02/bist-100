@@ -11,7 +11,7 @@ KURAL: BULL'da momentum, BEAR'da quality, SIDEWAYS'da mean reversion.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass
 from collections import deque
 from datetime import datetime, timezone
@@ -43,7 +43,7 @@ class RegimeDetector:
 
     def detect_regime(
         self,
-        market_data: Dict[str, any],  # {ticker: DataFrame}
+        market_data: Dict[str, Any],  # {ticker: DataFrame}
         benchmark_ticker: str = "XU100",
     ) -> RegimeState:
         """Piyasa rejimini tespit et."""

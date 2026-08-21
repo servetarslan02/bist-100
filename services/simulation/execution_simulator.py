@@ -146,15 +146,15 @@ class ExecutionSimulator:
         elif order.order_type == OrderType.LIMIT:
             if order.side == OrderSide.BUY:
                 fill_price = min(order.price, market_price * (1 + slippage))
-                if order.price < market_price * (1 - spread_pct / 100):
+                if order.price < market_price * (1 - 0.05):
                     order.status = OrderStatus.REJECTED
-                    order.notes = "Limit price too far from market"
+                    order.notes = "Limit price too far from market (>5% below)"
                     return order
             else:
                 fill_price = max(order.price, market_price * (1 - slippage))
-                if order.price > market_price * (1 + spread_pct / 100):
+                if order.price > market_price * (1 + 0.05):
                     order.status = OrderStatus.REJECTED
-                    order.notes = "Limit price too far from market"
+                    order.notes = "Limit price too far from market (>5% above)"
                     return order
         else:
             fill_price = market_price

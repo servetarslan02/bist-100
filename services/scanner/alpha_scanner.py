@@ -328,6 +328,7 @@ class AlphaScanner(ScannerInterface):
         elif r.rsi < 25 and r.roc_20d < -10:
             r.signal_type = SignalType.REVERSAL
             r.signal_score = score
+            r.signal_direction = "LONG"  # Dip dönüş → LONG
         elif r.market_regime_fit > 70:
             r.signal_type = SignalType.REGIME
             r.signal_score = score
@@ -346,8 +347,8 @@ class AlphaScanner(ScannerInterface):
 
         # Yön — sinyal türüne göre akıllı belirleme
         if r.signal_type == SignalType.REVERSAL:
-            # Reversal: düşüş sonrası LONG (dip dönüş)
-            r.signal_direction = "LONG" if r.rsi < 35 else "SHORT"
+            # Reversal: düşüş sonrası LONG (dip dönüş) — trigger ile aynı eşik
+            r.signal_direction = "LONG" if r.rsi < 25 else "SHORT"
         elif r.signal_type == SignalType.ACCUMULATION:
             # Accumulation: genellikle LONG
             r.signal_direction = "LONG"

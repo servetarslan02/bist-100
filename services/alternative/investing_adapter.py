@@ -149,12 +149,39 @@ class InvestingAdapter(BaseAdapter):
         return features
 
     def _basic_sentiment(self, text: str) -> float:
-        """Basit sentiment."""
+        """Keyword-based sentiment with negation handling."""
         text_lower = text.lower()
-        pos = ["yükseliş", "artış", "güçlü", "olumlu", "al", "hedef", "potansiyel", "kâr"]
-        neg = ["düşüş", "zarar", "zayıf", "sat", "risk", "tehlike", "kısa", "short"]
-        p = sum(1 for w in pos if w in text_lower)
-        n = sum(1 for w in neg if w in text_lower)
+        words = text_lower.split()
+        pos = [
+            "yükseliş", "artış", "güçlü", "olumlu", "al", "hedef", "potansiyel", "kâr",
+            "büyüme", "rekor", "başarı", "destek", "teşvik", "ihracat", "yatırım",
+            "genişleme", "iyileşme", "toparlanma", "temettü", "sipariş", "sözleşme",
+        ]
+        neg = [
+            "düşüş", "zarar", "zayıf", "sat", "risk", "tehlike", "kısa", "short",
+            "kayıp", "azalma", "gerileme", "iptal", "iflas", "borç", "dava",
+            "ceza", "soruşturma", "kriz", "olumsuz", "daralma", "temerrüt",
+        ]
+        p = 0
+        n = 0
+        negation_words = {"değil", "yok", "olmayan", "değildir", "olmaz", "hiç", "asla", "ne", "olmadı"}
+        negate = False
+        for word in words:
+            if word in negation_words:
+                negate = True
+                continue
+            if word in pos:
+                if negate:
+                    n += 1
+                else:
+                    p += 1
+                negate = False
+            elif word in neg:
+                if negate:
+                    p += 1
+                else:
+                    n += 1
+                negate = False
         t = p + n
         return (p - n) / t if t > 0 else 0
 

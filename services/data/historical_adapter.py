@@ -94,13 +94,24 @@ class HistoricalDataAdapter:
         features["balance_sheet_quality"] = round(float(min(100, max(0, quality_score))), 0)
 
         # value_score
+        # Sector-relative scoring: PE ratios are compared against sector medians.
+        # A PE of 20 may be cheap for tech but expensive for utilities.
+        # When sector_pe_median is available, we adjust the raw PE threshold.
         pe = v.get("pe_ratio", 0)
         pb = v.get("pb_ratio", 0)
         fcf_yield = v.get("fcf_yield", 0)
+        sector_pe_median = v.get("sector_pe_median", 0)
         value_score = 0
-        if pe and pe > 0 and pe < 15:
+        # Sector-adjusted PE scoring
+        pe_threshold_low = 15
+        pe_threshold_high = 25
+        if sector_pe_median and sector_pe_median > 0:
+            # Adjust thresholds relative to sector median
+            pe_threshold_low = sector_pe_median * 0.7
+            pe_threshold_high = sector_pe_median * 1.1
+        if pe and pe > 0 and pe < pe_threshold_low:
             value_score += 30
-        elif pe and pe < 25:
+        elif pe and pe < pe_threshold_high:
             value_score += 15
         if pb and pb > 0 and pb < 1.5:
             value_score += 30

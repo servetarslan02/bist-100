@@ -143,7 +143,7 @@ class RiskGate:
 
             # Açığa satış kontrolü
             if side == "SELL" and ticker not in current_positions:
-                ss = short_selling_monitor.can_short_sell(ticker, price)
+                ss = short_selling_monitor.can_short_sell(ticker, price, last_trade_price=price)
                 if not ss.allowed:
                     checks_failed += 1
                     reasons.append(f"Short selling: {ss.reason}")

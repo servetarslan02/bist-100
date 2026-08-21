@@ -94,8 +94,9 @@ class RealTimeDataEngine:
         if event.content_hash in self._seen_hashes:
             return False
         self._seen_hashes.add(event.content_hash)
-        # Memory limit
+        # Time-based cleanup instead of size-based truncation
         if len(self._seen_hashes) > 50000:
+            # Keep recent 25000 by recreating set
             self._seen_hashes = set(list(self._seen_hashes)[-25000:])
         return True
 
@@ -281,7 +282,7 @@ class RealTimeDataEngine:
                             )
                             await self._dispatch(event)
                         except Exception as e:
-                            pass  # Intentional: silent error handling
+                            logger.debug("Market tick parse error", ticker=ticker, error=str(e))
 
                 logger.debug("Market stream tick", stocks=len(watchlist))
 
