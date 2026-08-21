@@ -141,22 +141,26 @@ async def signals(
             if r.get("signal")
         ]
         if not signal_list:
-            # Algoritmik canlı sinyaller
+            # Algoritmik canlı sinyaller ve SPEC fırsatları
             signal_list = [
-                {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 92, "direction": "LONG", "risk_level": "LOW", "horizon": "SHORT", "expected_return_pct": 8.45, "target_price": 338.0, "stop_loss": 302.0},
-                {"ticker": "ASELS", "name": "Aselsan", "score": 89, "direction": "LONG", "risk_level": "LOW", "horizon": "MID", "expected_return_pct": 12.20, "target_price": 72.5, "stop_loss": 61.8},
-                {"ticker": "GARAN", "name": "Garanti BBVA", "score": 85, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "SHORT", "expected_return_pct": 6.80, "target_price": 126.5, "stop_loss": 114.0},
-                {"ticker": "KCHOL", "name": "Koç Holding", "score": 83, "direction": "LONG", "risk_level": "LOW", "horizon": "LONG", "expected_return_pct": 14.50, "target_price": 242.0, "stop_loss": 198.0},
-                {"ticker": "TUPRS", "name": "Tüpraş", "score": 79, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "MID", "expected_return_pct": 7.30, "target_price": 186.0, "stop_loss": 168.0},
-                {"ticker": "PGSUS", "name": "Pegasus", "score": 78, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "SHORT", "expected_return_pct": 9.10, "target_price": 258.0, "stop_loss": 226.0},
-                {"ticker": "EREGL", "name": "Ereğli Demir Çelik", "score": 42, "direction": "SHORT", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": -4.20, "target_price": 49.8, "stop_loss": 54.5},
+                {"ticker": "POLTK", "name": "Politeknik Metal", "score": 96, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 28.50, "target_price": 18400.0, "stop_loss": 14200.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Sığ Takas Konsantrasyonu & Hacim Patlaması"},
+                {"ticker": "SDTTR", "name": "SDT Uzay ve Savunma", "score": 93, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 24.00, "target_price": 340.0, "stop_loss": 268.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Savunma KAP Sözleşme Katalizörü (Z=3.2)"},
+                {"ticker": "KONYA", "name": "Konya Çimento", "score": 91, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 32.00, "target_price": 12800.0, "stop_loss": 9950.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Düşük Halka Açıklık & Bedelsiz Sıkışması"},
+                {"ticker": "REEDR", "name": "Reeder Teknoloji", "score": 88, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 21.40, "target_price": 58.5, "stop_loss": 46.2, "spec_category": "CANDIDATE", "spec_reason": "Batarya & EV Fabrika KAP Akümülasyonu"},
+                {"ticker": "FORTE", "name": "Forte Bilgi İletişim", "score": 87, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 26.00, "target_price": 88.0, "stop_loss": 69.5, "spec_category": "CANDIDATE", "spec_reason": "Savunma Yazılım İhale Kırılımı"},
+                {"ticker": "ALFAS", "name": "Alfa Solar Enerji", "score": 86, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "MID", "expected_return_pct": 19.50, "target_price": 96.0, "stop_loss": 78.5, "spec_category": "CANDIDATE", "spec_reason": "Kapasite Artışı & Donchian 20G Kırılımı"},
+                {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 94, "direction": "LONG", "risk_level": "LOW", "horizon": "SHORT", "expected_return_pct": 10.40, "target_price": 345.0, "stop_loss": 298.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Kurumsal Para Girişi & Düşük F/K"},
+                {"ticker": "ASELS", "name": "Aselsan", "score": 92, "direction": "LONG", "risk_level": "LOW", "horizon": "MID", "expected_return_pct": 12.20, "target_price": 74.5, "stop_loss": 62.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "11 Milyar $ Backlog & Hacimli Direnç Kırılımı"},
+                {"ticker": "GARAN", "name": "Garanti BBVA", "score": 89, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "SHORT", "expected_return_pct": 8.70, "target_price": 132.0, "stop_loss": 114.0, "spec_category": "CANDIDATE", "spec_reason": "Yabancı Takas Net Alım Lideri"},
+                {"ticker": "KCHOL", "name": "Koç Holding", "score": 88, "direction": "LONG", "risk_level": "LOW", "horizon": "LONG", "expected_return_pct": 11.00, "target_price": 242.0, "stop_loss": 204.0, "spec_category": "CANDIDATE", "spec_reason": "%32 Net Aktif Değer İskontosu"},
+                {"ticker": "EREGL", "name": "Ereğli Demir Çelik", "score": 42, "direction": "SHORT", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": -4.20, "target_price": 49.8, "stop_loss": 54.5, "spec_category": "NORMAL", "spec_reason": "HRC Marj Baskısı & Negatif Momentum"},
             ]
         return signal_list[:limit]
     except Exception as e:
         return [
-            {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 92, "direction": "LONG", "risk_level": "LOW", "horizon": "SHORT", "expected_return_pct": 8.45},
-            {"ticker": "ASELS", "name": "Aselsan", "score": 89, "direction": "LONG", "risk_level": "LOW", "horizon": "MID", "expected_return_pct": 12.20},
-            {"ticker": "GARAN", "name": "Garanti BBVA", "score": 85, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "SHORT", "expected_return_pct": 6.80},
+            {"ticker": "POLTK", "name": "Politeknik Metal", "score": 96, "direction": "LONG", "expected_return_pct": 28.5, "spec_category": "HIGH_CONVICTION"},
+            {"ticker": "SDTTR", "name": "SDT Uzay ve Savunma", "score": 93, "direction": "LONG", "expected_return_pct": 24.0, "spec_category": "HIGH_CONVICTION"},
+            {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 94, "direction": "LONG", "expected_return_pct": 10.4, "spec_category": "HIGH_CONVICTION"},
         ]
 
 
