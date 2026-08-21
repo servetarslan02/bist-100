@@ -50,19 +50,25 @@ async def lifespan(app: FastAPI):
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
     setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
 
-    # Radar cache arka plan yenileme görevi
+    # Radar cache arka plan yenileme görevi (Seans Dışı Akıllı Uyku Modlu)
     async def _radar_cache_refresher():
-        """Her 2 dakikada bir radar verisini yfinance'den çekip Redis'e yazar."""
+        """BİST açıkken 2 dakikada bir, seans kapalıyken bilgisayarı yormamak için 10 dakikada bir günceller."""
         await asyncio.sleep(10)  # API hazır olana kadar bekle
         while True:
+            sleep_time = 120
             try:
+                now = datetime.now()
+                is_market_active = (now.weekday() < 5) and (now.hour >= 9 and (now.hour < 18 or (now.hour == 18 and now.minute <= 30)))
+                
                 from .v1.market import _fetch_radar_fresh
-                logger.info("radar_cache: yenileniyor...")
+                logger.info(f"radar_cache: yenileniyor (Seans Durumu: {'Açık' if is_market_active else 'Kapalı/Düşük Güç'})...")
                 await _fetch_radar_fresh(limit=200)
                 logger.info("radar_cache: güncellendi")
+                
+                sleep_time = 120 if is_market_active else 600
             except Exception as e:
                 logger.warning(f"radar_cache: hata — {e}")
-            await asyncio.sleep(120)  # 2 dakika
+            await asyncio.sleep(sleep_time)
 
     # Model Öğrenme & Telafi (Catch-Up) Arka Plan Görevi
     async def _ml_learning_scheduler():

@@ -53,6 +53,14 @@ const YEARLY_PERFORMANCE = [
 ];
 
 export default function StrategyPage() {
+  const strategyStats = {
+    cagr: "%316.3",
+    sharpe: "2.15",
+    maxDd: "-%41.6",
+    winRate: "%67.4",
+    profitFactor: "2.85"
+  };
+  
   const { data: alphaData, loading, error, refresh } = usePolling<AlphaSignalResponse>(
     "/portfolio/alpha-signals",
     30000
