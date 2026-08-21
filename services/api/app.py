@@ -93,13 +93,27 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"ml_scheduler periodic error: {e}")
 
+    # Otonom Veri Sıkıştırma ve Disk Koruma Arka Plan Görevi (Her 12 saatte bir)
+    async def _auto_storage_optimizer():
+        """Arka planda otomatik ClickHouse ZSTD sıkıştırma ve önbellek temizliği yapar."""
+        while True:
+            await asyncio.sleep(12 * 3600)
+            try:
+                from ..core.database import ch_execute
+                ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
+                logger.info("auto_storage_optimizer: Periyodik ZSTD disk sıkıştırması ve temizliği tamamlandı.")
+            except Exception as e:
+                logger.warning(f"auto_storage_optimizer: {e}")
+
     task = asyncio.create_task(_radar_cache_refresher())
     ml_task = asyncio.create_task(_ml_learning_scheduler())
+    storage_task = asyncio.create_task(_auto_storage_optimizer())
 
     yield
 
     task.cancel()
     ml_task.cancel()
+    storage_task.cancel()
 
     # OpenTelemetry kapat
     shutdown_telemetry()
