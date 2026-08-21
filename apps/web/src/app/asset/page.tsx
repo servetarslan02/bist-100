@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Search, TrendingUp, TrendingDown, Sparkles,
   BarChart3, Activity, ShieldCheck, Zap, Layers
