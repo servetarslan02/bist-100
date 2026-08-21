@@ -101,21 +101,39 @@ class LearningPipeline:
         """3. Adım: Tüm modellerin geçmişini değerlendir, güven skorlarını ve sinyal ağırlıklarını güncelle."""
         all_metrics: List[PerformanceMetrics] = []
         all_trust_scores: List[ModelTrustScore] = []
+        window_250_metrics: List[PerformanceMetrics] = []
+        window_500_metrics: List[PerformanceMetrics] = []
 
         for m_info in self.registered_models:
             m_id = m_info["id"]
             m_ver = m_info["version"]
 
             # Modelin değerlendirilmiş tahminlerini çek
-            evaluated_data = self.store.get_evaluated_predictions_for_model(m_id)
+            evaluated_data = self.store.get_evaluated_predictions_for_model(m_id, limit=2000)
             
-            # Kapsamlı performans metriklerini hesapla
+            # Kapsamlı performans metriklerini hesapla (Tüm örneklem)
             metrics = self.perf_engine.calculate_metrics(
                 model_id=m_id,
                 model_version=m_ver,
                 predictions_with_outcomes=evaluated_data,
             )
             all_metrics.append(metrics)
+
+            # Son 250 ve Son 500 pencere metrikleri
+            if len(evaluated_data) >= 50:
+                m250 = self.perf_engine.calculate_metrics(
+                    model_id=m_id,
+                    model_version=m_ver,
+                    predictions_with_outcomes=evaluated_data[:250],
+                )
+                window_250_metrics.append(m250)
+
+                m500 = self.perf_engine.calculate_metrics(
+                    model_id=m_id,
+                    model_version=m_ver,
+                    predictions_with_outcomes=evaluated_data[:500],
+                )
+                window_500_metrics.append(m500)
 
             # Dinamik güvenilirlik (trust/reliability) skoru üret
             trust = self.trust_engine.compute_trust_score(
@@ -143,10 +161,17 @@ class LearningPipeline:
         self.store.record_fusion_weights(fusion_weights, current_regime)
 
         # Otomatik rapor üret
+        window_comp = {
+            "250": window_250_metrics,
+            "500": window_500_metrics,
+            "all": all_metrics,
+        } if window_250_metrics else None
+
         report_md = self.reporter.generate_markdown_report(
             metrics_list=all_metrics,
             trust_scores=all_trust_scores,
             current_regime=current_regime,
+            window_comparison=window_comp,
         )
 
         return {

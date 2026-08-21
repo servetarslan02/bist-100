@@ -128,6 +128,76 @@ class ModelMemoryStore:
                 )
             )
 
+    def save_batch_records(self, records: List[Dict[str, Any]]):
+        """Büyük hacimli tahmin ve outcome kayıtlarını tek atomik işlemde toplu kaydeder."""
+        if not records:
+            return
+
+        cost_pct = 0.074
+        pos_val = 10000.0
+
+        pred_tuples = []
+        outcome_tuples = []
+
+        for r in records:
+            p_id = r["prediction_id"]
+            m_id = r["model_id"]
+            m_ver = r.get("model_version", "v1.0")
+            ticker = r["ticker"]
+            t_stamp = r.get("timestamp", datetime.now(timezone.utc).isoformat())
+            pred_dir = r.get("predicted_direction", "UP").upper()
+            conf = float(r.get("confidence", 0.65))
+            regime = r.get("market_regime", "BULL_TREND")
+            horizon = r.get("prediction_horizon", "1-5D")
+            entry_p = float(r.get("entry_price", 100.0))
+            features = json.dumps(r.get("features", {}))
+
+            pred_tuples.append((
+                p_id, m_id, m_ver, ticker, t_stamp, pred_dir, conf,
+                regime, horizon, entry_p, features, 'EVALUATED'
+            ))
+
+            if "actual_price" in r:
+                act_p = float(r["actual_price"])
+                eval_at = r.get("evaluated_at", t_stamp)
+                actual_ret = ((act_p - entry_p) / entry_p) * 100.0 if entry_p > 0 else 0.0
+                act_dir = "UP" if actual_ret >= 0 else "DOWN"
+                is_corr = 1 if (pred_dir == act_dir) else 0
+
+                trade_ret = actual_ret if pred_dir in ["UP", "LONG", "BUY"] else -actual_ret
+                gross_pnl = pos_val * (trade_ret / 100.0)
+                cost = pos_val * (cost_pct / 100.0)
+                net_pnl = gross_pnl - cost
+
+                outcome_tuples.append((
+                    p_id, m_id, m_ver, ticker, eval_at, act_p, entry_p,
+                    actual_ret, act_dir, is_corr, gross_pnl, net_pnl, cost
+                ))
+
+        with self._get_conn() as conn:
+            conn.execute("BEGIN TRANSACTION;")
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO predictions (
+                    prediction_id, model_id, model_version, ticker, timestamp,
+                    predicted_direction, confidence, market_regime, prediction_horizon,
+                    entry_price, features_json, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                pred_tuples
+            )
+            conn.executemany(
+                """
+                INSERT OR REPLACE INTO outcomes (
+                    prediction_id, model_id, model_version, ticker, evaluated_at,
+                    actual_price, entry_price, actual_return, actual_direction,
+                    is_correct, gross_pnl, net_pnl, transaction_cost
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                outcome_tuples
+            )
+            conn.commit()
+
     def save_outcome(
         self,
         prediction_id: str,
