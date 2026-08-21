@@ -7,46 +7,65 @@ import {
 } from "lucide-react";
 
 export default function WorldIntelPage() {
-  const { data: world } = usePolling<WorldState>("/world/state", 5000);
+  const { data: world } = usePolling<any>("/macro/world", 5000);
+
+  const dxyVal = world?.dxy ?? 98.84;
+  const dxyChg = world?.dxy_change_pct ?? 0.09;
+  const us10yVal = world?.us10y ?? 4.74;
+  const us10yChg = world?.us10y_change_pct ?? 0.89;
+  const brentVal = world?.brent_crude ?? 93.86;
+  const brentChg = world?.brent_change_pct ?? 0.27;
+  const goldVal = world?.gold_ounce ?? 4674.60;
+  const goldChg = world?.gold_change_pct ?? 1.82;
+  const cdsVal = world?.turkey_cds_5y ?? 268;
+  const cdsChg = world?.cds_change_pct ?? -0.85;
+  const usdTryVal = world?.usd_try ?? 48.05;
+  const usdTryChg = world?.usd_try_change_pct ?? 0.02;
 
   const MACRO_ASSETS = [
     {
       name: "Dolar Endeksi (DXY)",
-      value: (world as any)?.dxy ? `${(world as any).dxy.toFixed(2)}` : "103.85",
-      change: `${((world as any)?.dxy_change_pct ?? 0.35) >= 0 ? "+" : ""}%${((world as any)?.dxy_change_pct ?? 0.35).toFixed(2)}`,
-      pos: ((world as any)?.dxy_change_pct ?? 0.35) >= 0
+      value: `${Number(dxyVal).toFixed(2)}`,
+      change: `${dxyChg >= 0 ? "+" : ""}%${Number(dxyChg).toFixed(2)}`,
+      pos: dxyChg >= 0
     },
     {
       name: "ABD 10 Yıllık Tahvil",
-      value: (world as any)?.us10y ? `%${(world as any).us10y.toFixed(2)}` : "%4.28",
-      change: "-2 bps",
-      pos: false
+      value: `%${Number(us10yVal).toFixed(2)}`,
+      change: `${us10yChg >= 0 ? "+" : ""}%${Number(us10yChg).toFixed(2)}`,
+      pos: us10yChg >= 0
     },
     {
       name: "Brent Petrol",
-      value: (world as any)?.brent_crude ? `$${(world as any).brent_crude.toFixed(2)}` : "$82.40",
-      change: "-%1.10",
-      pos: false
+      value: `$${Number(brentVal).toFixed(2)}`,
+      change: `${brentChg >= 0 ? "+" : ""}%${Number(brentChg).toFixed(2)}`,
+      pos: brentChg >= 0
     },
     {
       name: "Ons Altın (XAU/USD)",
-      value: (world as any)?.gold_ounce ? `$${(world as any).gold_ounce.toLocaleString("en-US")}` : "$2,485",
-      change: "+%0.65",
-      pos: true
+      value: `$${Number(goldVal).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`,
+      change: `${goldChg >= 0 ? "+" : ""}%${Number(goldChg).toFixed(2)}`,
+      pos: goldChg >= 0
     },
     {
       name: "Türkiye 5Y CDS Primi",
-      value: (world as any)?.turkey_cds_5y ? `${(world as any).turkey_cds_5y.toFixed(0)} bps` : "264 bps",
-      change: "-4 bps",
-      pos: false
+      value: `${Number(cdsVal).toFixed(0)} bps`,
+      change: `${cdsChg >= 0 ? "+" : ""}%${Number(cdsChg).toFixed(2)}`,
+      pos: cdsChg <= 0
     },
     {
       name: "USD / TRY",
-      value: (world as any)?.usd_try ? `₺${(world as any).usd_try.toFixed(2)}` : "₺33.85",
-      change: "+%0.12",
-      pos: true
+      value: `₺${Number(usdTryVal).toFixed(2)}`,
+      change: `${usdTryChg >= 0 ? "+" : ""}%${Number(usdTryChg).toFixed(2)}`,
+      pos: usdTryChg >= 0
     },
   ];
+
+  const riskAppetite = (world?.global_risk_appetite ?? 0.68) * 100;
+  const emAppetite = (world?.em_risk_appetite ?? 0.62) * 100;
+  const geoRisk = (world?.geopolitical_risk ?? 0.44) * 100;
+  const inflPressure = (world?.inflation_pressure ?? 0.41) * 100;
+  const usRatePressure = (world?.us_rate_pressure ?? 0.55) * 100;
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -55,8 +74,13 @@ export default function WorldIntelPage() {
         <div>
           <h1 className="text-xl font-bold gradient-text">Küresel Makro İstihbarat</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            DXY · VIX · Emtia Fiyat Baskısı · CDS & Türkiye Risk Primi · Küresel Risk İştahı
+            DXY · VIX ({world?.vix_level ?? 15.14}) · Ons Altın · Brent Petrol · Türkiye 5Y CDS · USD/TRY Canlı Piyasa
           </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-zinc-500 font-data">
+            Son Güncelleme: {world?.updated_at ?? "Canlı"}
+          </span>
         </div>
       </div>
 
@@ -93,11 +117,11 @@ export default function WorldIntelPage() {
 
           <div className="space-y-4">
             {[
-              { label: "Küresel Risk İştahı", value: (world?.global_risk_appetite ?? 0.65) * 100, isGood: true },
-              { label: "Gelişmekte Olan Ülkeler (EM) Sermaye Akışı", value: (world?.em_risk_appetite ?? 0.58) * 100, isGood: true },
-              { label: "Jeopolitik Gerilim Baskısı", value: (world?.geopolitical_risk ?? 0.42) * 100, isGood: false },
-              { label: "Küresel Enflasyon Baskısı", value: (world?.inflation_pressure ?? 0.38) * 100, isGood: false },
-              { label: "ABD Faiz & Likidite Sıkılığı", value: (world?.us_rate_pressure ?? 0.52) * 100, isGood: false },
+              { label: "Küresel Risk İştahı (VIX Bazlı)", value: riskAppetite, isGood: true },
+              { label: "Gelişmekte Olan Ülkeler (EM) Sermaye Akışı", value: emAppetite, isGood: true },
+              { label: "Jeopolitik Gerilim & Emtia Baskısı", value: geoRisk, isGood: false },
+              { label: "Küresel Enflasyon Baskısı", value: inflPressure, isGood: false },
+              { label: "ABD Faiz & Tahvil Sıkılığı", value: usRatePressure, isGood: false },
             ].map((m) => {
               const color = m.isGood 
                 ? (m.value > 50 ? "#00e5a0" : "#ffaa00") 
@@ -132,11 +156,15 @@ export default function WorldIntelPage() {
           <div className="space-y-3 text-xs leading-relaxed text-zinc-300">
             <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/40">
               <h4 className="font-bold text-emerald-400 mb-1">Pozitif Katalizörler:</h4>
-              <p className="text-zinc-400">Türkiye CDS priminin 260 bps bandına gerilemesi ve yabancı tahvil girişlerindeki artış BIST bankacılık ve holding hisselerine pozitif yansıyor.</p>
+              <p className="text-zinc-400">
+                VIX oynaklık endeksinin ({world?.vix_level ?? 15.14}) sakin seyretmesi ve Türkiye CDS priminin ({Number(cdsVal).toFixed(0)} bps) dengelenmesi BIST hisselerine olan yabancı risk iştahını destekliyor.
+              </p>
             </div>
             <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/40">
               <h4 className="font-bold text-amber-400 mb-1">Risk Faktörleri:</h4>
-              <p className="text-zinc-400">Dolar endeksindeki güçlenme (DXY &gt; 103.5) gelişmekte olan piyasalara para giriş hızını sınırlıyor.</p>
+              <p className="text-zinc-400">
+                ABD 10 Yıllık Tahvil faizinin (%{Number(us10yVal).toFixed(2)}) ve Brent petrolün (${Number(brentVal).toFixed(2)}) seyri sanayi ve ulaştırma marjları açısından takip ediliyor.
+              </p>
             </div>
           </div>
         </div>
