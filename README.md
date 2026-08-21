@@ -1,6 +1,6 @@
 # ALPHA BIST — Market Intelligence & Quant Engine
 
-> BIST'teki 800+ hisseyi 7/24 tarayan, otonom piyasa zekâsı platformu.
+> BIST'teki 400+ hisseyi 7/24 tarayan, otonom piyasa zekâsı platformu.
 
 ## Hızlı Başlangıç
 
