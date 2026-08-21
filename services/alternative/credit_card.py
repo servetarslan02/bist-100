@@ -24,10 +24,16 @@ def compute_cc_features(cc_data: Dict[str, Any], ticker: str) -> Dict[str, float
     if not cc_data:
         return features
 
-    features["cc_spend_growth"] = cc_data.get("spend_growth", 0)
-    features["cc_vs_sector"] = cc_data.get("vs_sector", 0)
-    features["cc_seasonal_deviation"] = cc_data.get("seasonal_deviation", 0)
-    features["cc_online_ratio"] = cc_data.get("online_ratio", 0)
-    features["cc_transaction_count"] = float(cc_data.get("transaction_count", 0))
+    key_feature_map = {
+        "spend_growth": "cc_spend_growth",
+        "vs_sector": "cc_vs_sector",
+        "seasonal_deviation": "cc_seasonal_deviation",
+        "online_ratio": "cc_online_ratio",
+        "transaction_count": "cc_transaction_count",
+    }
+    for key, feature_name in key_feature_map.items():
+        value = cc_data.get(key)
+        if value is not None:
+            features[feature_name] = float(value) if key == "transaction_count" else value
 
     return features

@@ -401,13 +401,29 @@ class MasterOrchestrator:
         analysis = {}
         try:
             pa = self._services.get("price_action")
-            if pa: analysis["price_action"] = "computed"
+            if pa:
+                try:
+                    analysis["price_action"] = pa.analyze(features) if hasattr(pa, 'analyze') else "available"
+                except Exception:
+                    analysis["price_action"] = "error"
             ve = self._services.get("volume_engine")
-            if ve: analysis["volume"] = "computed"
+            if ve:
+                try:
+                    analysis["volume"] = ve.analyze(features) if hasattr(ve, 'analyze') else "available"
+                except Exception:
+                    analysis["volume"] = "error"
             se = self._services.get("sector_engine")
-            if se: analysis["sector"] = "computed"
+            if se:
+                try:
+                    analysis["sector"] = se.analyze(features) if hasattr(se, 'analyze') else "available"
+                except Exception:
+                    analysis["sector"] = "error"
             rs = self._services.get("relative_strength")
-            if rs: analysis["relative_strength"] = "computed"
+            if rs:
+                try:
+                    analysis["relative_strength"] = rs.analyze(features) if hasattr(rs, 'analyze') else "available"
+                except Exception:
+                    analysis["relative_strength"] = "error"
         except Exception as e:
             logger.warning("Pipeline step failed", step="analysis_engines", error=str(e))
         result["analysis"] = analysis

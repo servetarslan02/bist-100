@@ -182,7 +182,7 @@ class VaRCalculator:
             return 0.0
 
         sorted_returns = np.sort(returns)
-        index = int((1 - confidence) * len(sorted_returns))
+        index = max(0, int((1 - confidence) * len(sorted_returns)) - 1)
         index = max(0, min(index, len(sorted_returns) - 1))
 
         var_pct = abs(sorted_returns[index])

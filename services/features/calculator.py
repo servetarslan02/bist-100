@@ -200,14 +200,14 @@ class FeatureCalculator:
         """Mask-aware SMA."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
-            return valid[-1] if len(valid) > 0 else 0
+            return valid[-1] if len(valid) > 0 else float('nan')
         return float(np.mean(valid[-period:]))
 
     def _ema_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware EMA."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
-            return valid[-1] if len(valid) > 0 else 0
+            return valid[-1] if len(valid) > 0 else float('nan')
         alpha = 2 / (period + 1)
         ema = valid[0]
         for price in valid[1:]:
@@ -218,14 +218,14 @@ class FeatureCalculator:
         """Mask-aware ROC."""
         valid = data[~np.isnan(data)]
         if len(valid) <= period:
-            return 0
+            return float('nan')
         return (valid[-1] / valid[-period - 1] - 1) * 100
 
     def _momentum_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware momentum."""
         valid = data[~np.isnan(data)]
         if len(valid) <= period:
-            return 0
+            return float('nan')
         return (valid[-1] - valid[-period - 1]) / valid[-period - 1] * 100
 
     def _rsi_masked(self, data: np.ndarray, period: int = 14) -> float:
@@ -327,7 +327,7 @@ class FeatureCalculator:
         l = low[valid_mask]
         c = close[valid_mask]
         if len(c) < period + 1:
-            return 0
+            return float('nan')
         tr_values = []
         for i in range(1, len(c)):
             tr1 = h[i] - l[i]
@@ -373,7 +373,7 @@ class FeatureCalculator:
         """Mask-aware volume z-score."""
         valid = volume[~np.isnan(volume)]
         if len(valid) < 20:
-            return 0
+            return float('nan')
         mean = np.mean(valid[-20:])
         std = np.std(valid[-20:])
         if std == 0:
@@ -384,7 +384,7 @@ class FeatureCalculator:
         """Mask-aware volume trend."""
         valid = volume[~np.isnan(volume)]
         if len(valid) < 10:
-            return 0
+            return float('nan')
         recent = np.mean(valid[-5:])
         prev = np.mean(valid[-10:-5])
         if prev == 0:
@@ -397,7 +397,7 @@ class FeatureCalculator:
         c = close[valid_mask]
         v = volume[valid_mask]
         if len(c) < 2:
-            return 0
+            return float('nan')
         obv = 0
         for i in range(1, len(c)):
             if c[i] > c[i-1]:
@@ -410,7 +410,7 @@ class FeatureCalculator:
         """Mask-aware volatility."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
-            return 0
+            return float('nan')
         returns = np.diff(valid[-period:]) / valid[-period:-1]
         return float(np.std(returns) * np.sqrt(252) * 100)
 
@@ -481,7 +481,7 @@ class FeatureCalculator:
             features: Bu hissenin feature'ları
             universe_features: Tüm hisselerin feature'ları
         """
-        from services.features.cross_sectional import cross_sectional_engine
+        from .cross_sectional import cross_sectional_engine
         return cross_sectional_engine.compute_rank_features(ticker, features, universe_features)
 
 
@@ -499,7 +499,7 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
 
     # 1. Technical Features
     try:
-        from services.features.technical_features import technical_feature_engine
+        from .technical_features import technical_feature_engine
         features.update(technical_feature_engine.compute_trend_features(prices))
         features.update(technical_feature_engine.compute_momentum_features(prices, highs, lows))
         features.update(technical_feature_engine.compute_volatility_features(prices, highs, lows, closes))
@@ -510,7 +510,7 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
 
     # 2. Extended Indicators
     try:
-        from services.features.extended_indicators import ExtendedIndicators
+        from .extended_indicators import ExtendedIndicators
         ei = ExtendedIndicators()
         if highs is not None and lows is not None:
             features.update(ei.compute_all(prices, highs, lows, closes or prices, volumes or np.ones(len(prices))))
@@ -521,7 +521,7 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
 
     # 3. Fundamental Features
     try:
-        from services.features.fundamental import FundamentalFeatureEngine
+        from .fundamental import FundamentalFeatureEngine
         if fundamentals:
             features.update(FundamentalFeatureEngine().compute(fundamentals))
     except ImportError:
@@ -531,7 +531,7 @@ def compute_extended_features(prices, highs=None, lows=None, closes=None, volume
 
     # 4. Sentiment Features
     try:
-        from services.features.sentiment import SentimentFeatureEngine
+        from .sentiment import SentimentFeatureEngine
         if news_data:
             features.update(SentimentFeatureEngine().compute(news_data))
     except ImportError:

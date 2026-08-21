@@ -57,10 +57,10 @@ class StreamingAnomalyDetector:
         history = self._price_history[ticker]
         history.append(price)
 
-        # Z-score hesapla
-        if len(history) >= 10:
-            mean = np.mean(history)
-            std = np.std(history)
+        # Z-score hesapla (current price hariç — data leakage önleme)
+        if len(history) >= 11:
+            mean = np.mean(list(history)[:-1])
+            std = np.std(list(history)[:-1])
             zscore = abs(price - mean) / std if std > 0 else 0
         else:
             zscore = 0

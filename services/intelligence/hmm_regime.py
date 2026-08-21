@@ -329,7 +329,8 @@ class HMMRegimeDetector:
             for p in row:
                 if p > 0:
                     entropy -= p * np.log2(p)
-        return round(float(entropy / self.n_regimes), 4)
+        max_entropy = np.log2(self.n_regimes) if self.n_regimes > 1 else 1
+        return round(float(entropy / (self.n_regimes * max_entropy)), 4)
 
     def get_transition_matrix(self) -> Optional[Dict[str, Dict[str, float]]]:
         """Geçiş matrisi (okunabilir format)."""

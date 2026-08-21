@@ -469,7 +469,11 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
     try:
         from .alpha_engine import AlphaEngine
         alpha = AlphaEngine()
-        results.append({"engine": "alpha", "status": "available"})
+        if hasattr(alpha, 'scan'):
+            scan_result = alpha.scan(universe, market_data)
+            results.append({"engine": "alpha", "status": "ok", "results": scan_result})
+        else:
+            results.append({"engine": "alpha", "status": "available"})
     except ImportError:
         pass
     except Exception as e:
@@ -477,7 +481,11 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
     try:
         from .alpha_scanner import AlphaScanner
         scanner = AlphaScanner()
-        results.append({"engine": "alpha_scanner", "status": "available"})
+        if hasattr(scanner, 'scan'):
+            scan_result = scanner.scan(universe, market_data or {})
+            results.append({"engine": "alpha_scanner", "status": "ok", "results": scan_result})
+        else:
+            results.append({"engine": "alpha_scanner", "status": "available"})
     except ImportError:
         pass
     except Exception as e:
@@ -485,7 +493,11 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
     try:
         from .event_scanner import EventScanner
         scanner = EventScanner()
-        results.append({"engine": "event_scanner", "status": "available"})
+        if hasattr(scanner, 'scan'):
+            scan_result = scanner.scan(universe, market_data)
+            results.append({"engine": "event_scanner", "status": "ok", "results": scan_result})
+        else:
+            results.append({"engine": "event_scanner", "status": "available"})
     except ImportError:
         pass
     except Exception as e:
@@ -493,7 +505,11 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
     try:
         from .live_scanner import LiveScanner
         scanner = LiveScanner()
-        results.append({"engine": "live_scanner", "status": "available"})
+        if hasattr(scanner, 'scan'):
+            scan_result = scanner.scan(universe, market_data)
+            results.append({"engine": "live_scanner", "status": "ok", "results": scan_result})
+        else:
+            results.append({"engine": "live_scanner", "status": "available"})
     except ImportError:
         pass
     except Exception as e:
@@ -501,7 +517,11 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
     try:
         from .tiered_scanner import TieredScanner
         scanner = TieredScanner()
-        results.append({"engine": "tiered_scanner", "status": "available"})
+        if hasattr(scanner, 'scan'):
+            scan_result = scanner.scan(universe, market_data)
+            results.append({"engine": "tiered_scanner", "status": "ok", "results": scan_result})
+        else:
+            results.append({"engine": "tiered_scanner", "status": "available"})
     except ImportError:
         pass
     except Exception as e:

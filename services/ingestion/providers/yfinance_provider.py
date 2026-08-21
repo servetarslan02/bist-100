@@ -248,14 +248,14 @@ class YFinanceProvider:
                 t = yf.Ticker(yf_symbol)
                 info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
                 if info is None:
-                    results[name] = {"price": 0, "change_pct": 0}
+                    results[name] = {"price": None, "change_pct": None, "error": "no data"}
                     continue
                 results[name] = {
                     "price": info.get("regularMarketPrice", 0),
                     "change_pct": info.get("regularMarketChangePercent", 0),
                 }
             except Exception as e:
-                results[name] = {"price": 0, "change_pct": 0}
+                results[name] = {"price": None, "change_pct": None, "error": str(e)}
 
         return results
 

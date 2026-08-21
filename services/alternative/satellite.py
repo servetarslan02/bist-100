@@ -24,10 +24,16 @@ def compute_satellite_features(sat_data: Dict[str, Any], ticker: str) -> Dict[st
     if not sat_data:
         return features
 
-    features["factory_traffic_change"] = sat_data.get("factory_traffic", 0)
-    features["store_traffic_change"] = sat_data.get("store_traffic", 0)
-    features["parking_lot_occupancy"] = sat_data.get("parking_occupancy", 0)
-    features["port_activity"] = sat_data.get("port_activity", 0)
-    features["construction_progress"] = sat_data.get("construction_progress", 0)
+    key_feature_map = {
+        "factory_traffic": "factory_traffic_change",
+        "store_traffic": "store_traffic_change",
+        "parking_occupancy": "parking_lot_occupancy",
+        "port_activity": "port_activity",
+        "construction_progress": "construction_progress",
+    }
+    for key, feature_name in key_feature_map.items():
+        value = sat_data.get(key)
+        if value is not None:
+            features[feature_name] = value
 
     return features

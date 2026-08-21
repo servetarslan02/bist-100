@@ -104,7 +104,7 @@ def calculate_f_score(
     details["asset_turnover_increasing"] = {"current": at_curr, "previous": at_prev, "passed": passed, "weight": w["asset_turnover_increasing"]}
 
     # Normalize score to 0-9 range
-    normalized_score = round(score * 9 / max_score) if max_score > 0 else 0
+    normalized_score = int(score * 9 / max_score + 0.5) if max_score > 0 else 0
 
     # Category
     if normalized_score >= 7:

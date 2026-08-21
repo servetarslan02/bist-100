@@ -231,7 +231,7 @@ class BacktestEngine:
 
         return BacktestMetrics(
             total_return_pct=round(total_return, 2),
-            cagr_pct=round(((final / initial_capital) ** (1 / max(len(equity_curve) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0,
+            cagr_pct=round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0,
             sharpe_ratio=round(sharpe, 2),
             sortino_ratio=round(sortino, 2),
             calmar_ratio=round(total_return / max_dd, 2) if max_dd > 0 else 0,

@@ -42,9 +42,7 @@ class TCMBProvider:
         url = f"{TCMB_BASE_URL}/series={series_code}&startDate={start_date}&endDate={end_date}&type=json&key={self.api_key}"
 
         try:
-            resp = await self._client.get_json(url)
-            resp.raise_for_status()
-            data = resp
+            data = await self._client.get_json(url)
 
             items = data.get("items", [])
             logger.info("TCMB data fetched", series=series_code, count=len(items))
@@ -85,7 +83,7 @@ class TCMBProvider:
                 if data and len(data) > 0:
                     latest = data[-1]
                     result[name] = {
-                        "value": latest.get("value", 0),
+                        "value": float(latest.get("value", 0)) if latest.get("value") is not None else None,
                         "date": latest.get("date", ""),
                         "series": series,
                     }

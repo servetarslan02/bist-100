@@ -265,18 +265,31 @@ async def _publish_with_idempotency(event: CanonicalEvent):
     await _publish_to_stream(event)
 
 
+async def _get_redis():
+    """Reuse module-level Redis connection."""
+    global _redis_conn
+    if _redis_conn is None:
+        try:
+            import redis.asyncio as aioredis
+            _redis_conn = aioredis.from_url(settings.redis_url, decode_responses=True)
+        except ImportError:
+            _redis_conn = InMemoryRedis()
+    return _redis_conn
+
+
+_redis_conn = None
+
+
 async def _check_and_mark_published(event_id: str) -> bool:
     """Idempotency check — aynı event_id tekrar publish edilmesin.
     Returns True if this is a new event, False if duplicate.
     Öncelik: Redis > PostgreSQL > fail-open
     """
-    # 1. Redis dene
+    # 1. Redis dene (reuse connection)
     try:
-        import redis.asyncio as aioredis
-        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        r = await _get_redis()
         key = f"event_published:{event_id}"
         result = await r.set(key, "1", ex=3600, nx=True)
-        await r.close()
         if result is not None:
             return True
         return False

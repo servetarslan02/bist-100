@@ -226,5 +226,23 @@ class FeatureStore:
             logger.warning("Failed to load feature store", path=load_path, error=str(e))
 
 
+    def __del__(self):
+        """Auto-save on garbage collection."""
+        try:
+            if self._store_path and (self._manifests or self._feature_values):
+                self.save()
+        except Exception:
+            pass
+
+    def shutdown(self):
+        """Explicit save and cleanup."""
+        try:
+            if self._store_path:
+                self.save()
+                logger.info("Feature store shutdown complete", path=self._store_path)
+        except Exception as e:
+            logger.warning("Feature store shutdown failed", error=str(e))
+
+
 # Singleton
 feature_store = FeatureStore()

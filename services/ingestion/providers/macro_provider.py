@@ -98,7 +98,7 @@ class MacroProvider:
                 return name, result
             except Exception as e:
                 logger.debug("Yahoo macro fetch failed", symbol=name, error=str(e))
-                return name, {"price": 0, "change_pct": 0, "source": "yahoo", "error": str(e)}
+                return name, {"price": None, "change_pct": None, "source": "yahoo", "error": str(e)}
 
         tasks = [_fetch_one(name, sym) for name, sym in self.YAHOO_SYMBOLS.items()]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -184,14 +184,22 @@ class MacroProvider:
                     observations = data.get("observations", [])
                     if observations:
                         latest = observations[0]
+                        try:
+                            val = float(latest.get("value", 0))
+                        except (ValueError, TypeError):
+                            val = None
+                        history = []
+                        for o in observations[:5]:
+                            try:
+                                h_val = float(o.get("value", 0))
+                            except (ValueError, TypeError):
+                                h_val = None
+                            history.append({"value": h_val, "date": o.get("date")})
                         return name, {
-                            "value": float(latest.get("value", 0)),
+                            "value": val,
                             "date": latest.get("date", ""),
                             "source": "fred",
-                            "history": [
-                                {"value": float(o.get("value", 0)), "date": o.get("date")}
-                                for o in observations[:5]
-                            ],
+                            "history": history,
                         }
                 return name, {"value": None, "source": "fred"}
             except Exception as e:

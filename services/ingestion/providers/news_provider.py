@@ -119,7 +119,6 @@ class NewsProvider:
         "klsyn": "Kaleseramik",
         "klsER": "Kaleseramik",
         "knfrt": "Konfrut",
-        "konya": "Konya Cimento",
         "kords": "Kordsa",
         "krpls": "Koroplast",
         "krstl": "Kristal Kola",
@@ -145,9 +144,7 @@ class NewsProvider:
         "prkme": "Park Elektrik",
         "przma": "Prizma Pres",
         "psgyo": "Pasar GYO",
-        "quagr": "Qua Granite",
         "rbn": "Rubenis",
-        "rtalb": "Rotal Yatirim",
         "sanel": "Sanel",
         "snkrn": "Sanko Pazarlama",
         "srvgY": "Servet GYO",
@@ -157,7 +154,6 @@ class NewsProvider:
         "trcas": "Trakya Cam",
         "trgyo": "Torunlar GYO",
         "tskb": "Türkiye Sinai Kalkinma",
-        "ttrak": "Turk Traktor",
         "tuclk": "Tuclas",
         "ulkER": "Ulker",
         "ulufa": "Ulufan",
@@ -166,9 +162,7 @@ class NewsProvider:
         "vesbe": "Vestel Beyaz Esya",
         "vkgyo": "Vakif GYO",
         "yggyo": "Yeni Gimat GYO",
-        "ykbnk": "Yapi Kredi",
         "yylgd": "Yayla Gida",
-        "zoren": "Zorlu Enerji",
     }
 
     def __init__(self):

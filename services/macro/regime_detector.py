@@ -17,7 +17,7 @@ KURAL: Rejim değişimi smoothing ile filtrelenmeli (chatter önleme).
 import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -186,7 +186,7 @@ class MacroRegimeDetector:
         # Rejim değişimi (son 30 günde değişti mi?)
         recent_transitions = [
             t for t in self._transitions
-            if t.timestamp > (datetime.now(timezone.utc) - __import__("datetime").timedelta(days=30)).isoformat()
+            if t.timestamp > (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
         ]
         features["macro_regime_changed_30d"] = 1.0 if recent_transitions else 0.0
 

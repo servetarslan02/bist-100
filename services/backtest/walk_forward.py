@@ -322,7 +322,7 @@ class WalkForwardEngine:
         sharpe = (np.mean(returns_arr) / np.std(returns_arr) * np.sqrt(252)) if np.std(returns_arr) > 0 else 0
 
         # Max Drawdown
-        cumulative = np.cumsum(returns_arr)
+        cumulative = np.cumprod(1 + returns_arr)
         peak = np.maximum.accumulate(cumulative)
         drawdown = (peak - cumulative) / np.maximum(peak, 1e-10)
         max_dd = np.max(drawdown) * 100 if len(drawdown) > 0 else 0

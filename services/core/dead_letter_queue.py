@@ -202,6 +202,7 @@ class DeadLetterQueue:
                     entry.status = DLQStatus.RESOLVED
                     entry.resolved_at = datetime.now(timezone.utc)
                     self._total_resolved += 1
+                    self._total_retried += 1
                     retried += 1
 
                     logger.info("DLQ entry resolved",

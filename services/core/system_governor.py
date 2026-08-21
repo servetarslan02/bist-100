@@ -284,7 +284,7 @@ class SystemStateGovernor:
                     "auto"
                 )
 
-        elif self._state in (SystemState.DEGRADED, SystemState.READ_ONLY):
+        elif self._state in (SystemState.DEGRADED, SystemState.READ_ONLY, SystemState.RECOVERY):
             if unhealthy_ratio < self._degradation_threshold:
                 self.transition(
                     SystemState.FULL,

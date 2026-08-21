@@ -50,7 +50,7 @@ class FundamentalProvider:
         cached = self._cache.get(ticker)
         if cached:
             cached_time = cached.get("_cached_at", 0)
-            if (datetime.now(timezone.utc).timestamp() - cached_time) < self._cache_ttl_seconds:
+            if cached_time and (datetime.now(timezone.utc).timestamp() - cached_time) < self._cache_ttl_seconds:
                 return cached
 
         # yfinance'dan çek
