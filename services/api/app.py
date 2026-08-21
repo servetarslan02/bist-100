@@ -143,6 +143,7 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/health")
+    @app.get("/api/health")
     async def health():
         from datetime import datetime, timezone
         db_health = await check_db_health()

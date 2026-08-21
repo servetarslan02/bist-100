@@ -462,7 +462,7 @@ class MigrationRunner:
 
     async def _begin_transaction(self):
         if self._dialect == "sqlite":
-            self._db.execute("BEGIN")
+            pass  # SQLite auto-transaction; executescript manages its own
         else:
             await self._db.execute("BEGIN")
 
@@ -540,13 +540,27 @@ class MigrationRunner:
         s = re.sub(r"\bTRUE\b", "1", s)
         s = re.sub(r"\bFALSE\b", "0", s)
         s = s.replace("NOW()", "CURRENT_TIMESTAMP")
+        s = re.sub(r"\bBIGSERIAL\b", "INTEGER", s, flags=re.IGNORECASE)
         s = re.sub(r"\bSERIAL\b", "INTEGER", s, flags=re.IGNORECASE)
         s = re.sub(r"VARCHAR\(\d+\)", "TEXT", s, flags=re.IGNORECASE)
         s = re.sub(r"\$(\d+)", "?", s)
-        s = re.sub(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", "OR IGNORE", s, flags=re.IGNORECASE)
+        # INSERT ... ON CONFLICT (...) DO NOTHING  ->  INSERT OR IGNORE ...
+        s = re.sub(
+            r"\bINSERT\b",
+            "INSERT OR IGNORE",
+            s,
+            flags=re.IGNORECASE,
+        ) if re.search(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", s, re.IGNORECASE) else s
+        s = re.sub(r"ON CONFLICT\s+\([^)]+\)\s+DO NOTHING", "", s, flags=re.IGNORECASE)
+        # Partial indexes (WHERE clause) - SQLite supports them but strip them from UNIQUE CREATE INDEX WHERE for safety
+        s = re.sub(r"(CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:IF NOT EXISTS\s+)?\w+\s+ON\s+\w+\s*\([^)]+\))\s+WHERE\s+[^\n;]+",
+                   r"\1", s, flags=re.IGNORECASE)
         s = re.sub(r"\s+FOR UPDATE", "", s, flags=re.IGNORECASE)
         s = re.sub(r"GENERATED ALWAYS AS\s*\([^)]+\)", "", s, flags=re.IGNORECASE)
         s = re.sub(r"ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+IF NOT EXISTS", r"ALTER TABLE \1 ADD COLUMN", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bDOUBLE PRECISION\b", "REAL", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bJSONB\b", "TEXT", s, flags=re.IGNORECASE)
+        s = re.sub(r"\bDECIMAL\(\d+,\d+\)\b", "REAL", s, flags=re.IGNORECASE)
         return s
 
     # =====================================================
@@ -568,7 +582,13 @@ class MigrationRunner:
 
     async def _execute(self, sql: str, *args):
         if self._dialect == "sqlite":
-            cursor = self._db.execute(sql, args)
+            if args:
+                # Parametreli sorgular tek statement olmalı
+                cursor = self._db.execute(sql, args)
+            else:
+                # Parametresiz: executescript kullan (multi-statement destekli)
+                self._db.executescript(sql)
+                cursor = None
             self._db.commit()
             return cursor
         else:

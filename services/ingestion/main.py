@@ -55,6 +55,19 @@ class IngestionService:
         logger.info("Ingestion Service started",
                     instruments=len(self._instrument_map),
                     universe_size=len(BIST_ALL))
+        
+        # Start loops in the background
+        self._tasks = [
+            asyncio.create_task(self._market_data_loop()),
+            asyncio.create_task(self._kap_loop()),
+            asyncio.create_task(self._macro_loop()),
+            asyncio.create_task(self._news_loop()),
+            asyncio.create_task(self._social_loop())
+        ]
+        
+        # Keep the service running
+        while self._running:
+            await asyncio.sleep(1)
 
     async def _refresh_universe(self):
         """Hisse evrenini otomatik yenile."""

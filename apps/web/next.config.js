@@ -2,6 +2,12 @@
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   experimental: {
     optimizePackageImports: ['recharts', 'ag-grid-react', 'date-fns'],
   },

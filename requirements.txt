@@ -25,6 +25,7 @@ httpx>=0.28.0                     # Modern HTTP client
 # === DATABASE ===
 asyncpg>=0.31.0                   # PostgreSQL async driver
 aiosqlite>=0.22.0                 # SQLite async driver
+clickhouse-connect>=0.8.0         # ClickHouse driver
 redis>=8.1.0                      # Cache + event bus
 sqlalchemy[asyncio]>=2.0.0        # ORM (Alembic ile uyumlu)
 

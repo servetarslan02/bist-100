@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_ticks (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
-TTL timestamp + INTERVAL 5 YEAR
+TTL toDateTime(timestamp) + INTERVAL 5 YEAR
 SETTINGS index_granularity = 8192;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.market_trades (
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_trades (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
-TTL timestamp + INTERVAL 5 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.orderbook_snapshots (
     instrument_id UInt32,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.orderbook_snapshots (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, timestamp)
-TTL timestamp + INTERVAL 1 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 1 YEAR;
 
 -- =====================================================
 -- OHLCV (Aggregated candles)
@@ -60,7 +60,7 @@ TTL timestamp + INTERVAL 1 YEAR;
 CREATE TABLE IF NOT EXISTS alpha_bist.ohlcv (
     instrument_id UInt32,
     timestamp DateTime('Europe/Istanbul'),
-    timeframe Enum8('1m' = 1, '5m' = 5, '15m' = 15, '1h' = 60, '1d' = 1440),
+    timeframe Enum16('1m' = 1, '5m' = 5, '15m' = 15, '1h' = 60, '1d' = 1440),
     open Decimal(12, 4),
     high Decimal(12, 4),
     low Decimal(12, 4),
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.ohlcv (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY (toYYYYMMDD(timestamp), timeframe)
 ORDER BY (instrument_id, timeframe, timestamp)
-TTL timestamp + INTERVAL 5 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 
 -- =====================================================
 -- FEATURES (Computed features per instrument)
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.features (
 ) ENGINE = ReplacingMergeTree(feature_version)
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, feature_name, timestamp)
-TTL timestamp + INTERVAL 3 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 3 YEAR;
 
 -- =====================================================
 -- ASSET STATES (Current state per instrument)
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.asset_states (
     state_string String DEFAULT '',
     confidence Float32 DEFAULT 1.0,
     updated_by LowCardinality(String) DEFAULT 'SYSTEM'
-) ENGINE = ReplacingMergeTree(updated_by)
+) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (instrument_id, state_name, timestamp);
 
@@ -118,7 +118,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.market_states (
     volatility_regime LowCardinality(String),
     liquidity_level LowCardinality(String),
     risk_appetite Float32,
-    details JSON
+    details String DEFAULT '{}'
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.world_states (
     turkey_macro_risk Float32,
     vix_level Float32,
     news_shock Float32,
-    details JSON
+    details String DEFAULT '{}'
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
@@ -166,7 +166,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.events (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (event_type, timestamp)
-TTL timestamp + INTERVAL 3 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 3 YEAR;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.kap_events (
     kap_id String,
@@ -184,7 +184,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.kap_events (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (company_id, timestamp)
-TTL timestamp + INTERVAL 5 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 5 YEAR;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.news_events (
     news_id String,
@@ -203,7 +203,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.news_events (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (source, timestamp)
-TTL timestamp + INTERVAL 2 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 2 YEAR;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.social_events (
     social_id String,
@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.social_events (
 ) ENGINE = ReplacingMergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (platform, timestamp)
-TTL timestamp + INTERVAL 1 YEAR;
+TTL toDateTime(timestamp) + INTERVAL 1 YEAR;
 
 CREATE TABLE IF NOT EXISTS alpha_bist.macro_events (
     macro_id String,
@@ -255,7 +255,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.signals_history (
     horizon LowCardinality(String),
     expected_return_pct Float32,
     expected_volatility_pct Float32,
-    edge_decomposition JSON DEFAULT '{}',
+    edge_decomposition String DEFAULT '{}',
     model_version LowCardinality(String) DEFAULT '',
     strategy_id UInt32 DEFAULT 0,
     status LowCardinality(String) DEFAULT 'ACTIVE'
@@ -278,7 +278,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.model_predictions (
     probability_positive Float32,
     predicted_volatility_pct Float32,
     confidence Float32,
-    features_used JSON DEFAULT '{}',
+    features_used String DEFAULT '{}',
     created_at DateTime DEFAULT now()
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMM(prediction_date)
@@ -310,7 +310,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.anomalies (
     score Float32,
     sigma Float32,
     description String,
-    evidence JSON DEFAULT '{}',
+    evidence String DEFAULT '{}',
     resolved Boolean DEFAULT false,
     resolved_at Nullable(DateTime64(3, 'Europe/Istanbul'))
 ) ENGINE = MergeTree()
@@ -328,7 +328,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.regime_history (
     confidence Float32,
     trigger String,
     duration_hours Float32,
-    details JSON DEFAULT '{}'
+    details String DEFAULT '{}'
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY timestamp;
@@ -351,7 +351,7 @@ CREATE TABLE IF NOT EXISTS alpha_bist.data_quality_log (
 ) ENGINE = MergeTree()
 PARTITION BY toYYYYMMDD(timestamp)
 ORDER BY (source, data_type, timestamp)
-TTL timestamp + INTERVAL 6 MONTH;
+TTL toDateTime(timestamp) + INTERVAL 6 MONTH;
 
 -- =====================================================
 -- MATERIALIZED VIEWS (Auto-aggregations)

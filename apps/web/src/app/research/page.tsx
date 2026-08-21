@@ -20,7 +20,7 @@ export default function AIResearch() {
 
   useEffect(() => {
     // Gerçek veri çek
-    async function fetch() {
+    async function fetchData() {
       try {
         const res = await fetch("/api/events?limit=50");
         if (res.ok) {
@@ -41,8 +41,8 @@ export default function AIResearch() {
         }
       } catch {}
     }
-    fetch();
-    const interval = setInterval(fetch, 30000);
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
 

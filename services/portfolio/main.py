@@ -807,3 +807,14 @@ def get_portfolio_enhancements() -> Dict[str, Any]:
     except Exception:
         pass
     return result
+
+async def main():
+    try:
+        await portfolio_service.start()
+        while portfolio_service._running:
+            await asyncio.sleep(1)
+    except KeyboardInterrupt:
+        await portfolio_service.stop()
+
+if __name__ == '__main__':
+    asyncio.run(main())

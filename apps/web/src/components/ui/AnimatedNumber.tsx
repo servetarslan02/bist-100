@@ -23,7 +23,7 @@ export function AnimatedNumber({
 }: AnimatedNumberProps) {
   const [display, setDisplay] = useState(value);
   const prevRef = useRef(value);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | null>(null);
 
   useEffect(() => {
     const start = prevRef.current;

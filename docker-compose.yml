@@ -1,7 +1,7 @@
-version: '3.8'
-
 x-common: &common
   restart: unless-stopped
+  env_file:
+    - .env
   networks:
     - alpha-net
 
@@ -22,10 +22,11 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     mem_limit: 1g
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U alpha"]
+      test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_bist"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 15s
 
   clickhouse:
     <<: *common
@@ -39,18 +40,20 @@ services:
       - ./database/clickhouse/init:/docker-entrypoint-initdb.d
     environment:
       CLICKHOUSE_DB: alpha_bist
-      CLICKHOUSE_USER: default
-      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     mem_limit: 2g
     ulimits:
       nofile:
         soft: 262144
         hard: 262144
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--user", "alpha", "--password", "alpha", "--query", "SELECT 1"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 15
+      start_period: 15s
 
   redis:
     <<: *common
@@ -66,7 +69,8 @@ services:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
 
   redpanda:
     <<: *common
@@ -82,7 +86,7 @@ services:
       - start
       - --overprovisioned
       - --smp 2
-      - --memory 1G
+      - --memory 768M
       - --reserve-memory 0M
       - --node-id 0
       - --check=false
@@ -93,10 +97,11 @@ services:
       - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:8084
     mem_limit: 1g
     healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9092"]
-      interval: 10s
+      test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9644"]
+      interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 20
+      start_period: 15s
 
   # === Application Services ===
   api:
@@ -336,10 +341,9 @@ services:
     container_name: alpha-mlflow
     ports:
       - "5000:5000"
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts --allowed-hosts "*"
     volumes:
       - mlflow_data:/mlflow
-    mem_limit: 256m
 
 volumes:
   postgres_data:

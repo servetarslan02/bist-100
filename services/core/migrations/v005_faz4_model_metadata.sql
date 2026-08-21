@@ -63,8 +63,8 @@ CREATE TABLE IF NOT EXISTS feature_snapshots (
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_signals_instrument_date ON signals(instrument_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signals_status ON signals(status) WHERE status = 'ACTIVE';
-CREATE INDEX IF NOT EXISTS idx_model_predictions_date ON model_predictions(prediction_date DESC);
-CREATE INDEX IF NOT EXISTS idx_model_predictions_horizon ON model_predictions(horizon_days);
+
+
 CREATE INDEX IF NOT EXISTS idx_orders_portfolio ON orders(portfolio_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status) WHERE status IN ('PENDING', 'PARTIAL');
 CREATE INDEX IF NOT EXISTS idx_fills_order ON fills(order_id);
