@@ -18,7 +18,6 @@ from unittest.mock import patch, MagicMock
 # Modülleri import et
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.market_state.breadth_engine import MarketBreadthEngine, BreadthResult
 from services.market_state.component_states import ComponentStateEngine, ComponentStates

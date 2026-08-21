@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.ingestion.reconciliation import SourceReconciler, ReconciliationResult
 from services.ingestion.point_in_time import PointInTimeValidator

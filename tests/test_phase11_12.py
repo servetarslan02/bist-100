@@ -6,7 +6,6 @@ Position Sizing, Reconciliation, Backtest Engine, Walk-Forward testleri.
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_position_sizing():

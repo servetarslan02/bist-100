@@ -5,7 +5,6 @@ Portfolio Service v2.0 — Async DB-backed Testleri
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
 from services.portfolio.main import PortfolioService

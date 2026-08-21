@@ -18,7 +18,6 @@ import os
 import numpy as np
 from datetime import datetime, timezone, timedelta
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ===================== HELPERS =====================

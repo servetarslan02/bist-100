@@ -7,7 +7,6 @@ Ledoit-Wolf, Volatility Targeting, Kelly Criterion, Rebalance, Concentration tes
 import sys
 import os
 import numpy as np
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_ledoit_wolf():

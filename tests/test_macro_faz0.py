@@ -19,7 +19,6 @@ import pytest
 import sys
 import os
 import tempfile
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.macro.config.macro_config import MacroConfig, macro_config
 from services.macro.surprise_model import MacroSurpriseModel, macro_surprise_model

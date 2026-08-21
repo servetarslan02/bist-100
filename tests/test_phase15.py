@@ -8,7 +8,6 @@ Forecasting, Notification/Alert, Snapshot, Cache, Job Queue testleri.
 import sys
 import os
 import asyncio
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_extended_indicators():

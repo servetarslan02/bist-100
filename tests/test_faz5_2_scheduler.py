@@ -9,7 +9,6 @@ import os
 import asyncio
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ────────────────────────────────────────────────────────────
@@ -392,7 +391,7 @@ def test_worker_job_execution():
             payload={"ticker": "THYAO"},
             idempotency_key="test_key_1",
         )
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.05)
         return job_id
 
     loop = asyncio.new_event_loop()

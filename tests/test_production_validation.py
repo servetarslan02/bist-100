@@ -19,7 +19,6 @@ import tempfile
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.config_watcher import ConfigWatcher
 from services.core.data_quality import DataQualityChecker as DataQualityV2

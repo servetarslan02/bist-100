@@ -16,7 +16,6 @@ import os
 import asyncio
 import sqlite3
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.migrations.runner import MigrationRunner, MigrationLockError
 from services.portfolio.main import PortfolioService

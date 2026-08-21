@@ -8,7 +8,6 @@ import sys
 import os
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # ────────────────────────────────────────────────────────────
@@ -312,7 +311,7 @@ def test_circuit_breaker_recovery():
 
     cb = CircuitBreaker(
         name="test", failure_threshold=3,
-        recovery_timeout_seconds=1, state=CircuitState.CLOSED
+        recovery_timeout_seconds=0.01, state=CircuitState.CLOSED
     )
 
     # 3 failure → OPEN
@@ -321,8 +320,8 @@ def test_circuit_breaker_recovery():
     assert cb.state == CircuitState.OPEN
     assert not cb.can_execute()
 
-    # 1 saniye bekle → HALF_OPEN
-    time.sleep(1.1)
+    # recovery_timeout bekle → HALF_OPEN
+    time.sleep(0.02)
     assert cb.can_execute()
     assert cb.state == CircuitState.HALF_OPEN
 
@@ -349,14 +348,14 @@ def test_circuit_breaker_half_open_failure():
 
     cb = CircuitBreaker(
         name="test", failure_threshold=2,
-        recovery_timeout_seconds=1, state=CircuitState.CLOSED
+        recovery_timeout_seconds=0.01, state=CircuitState.CLOSED
     )
 
     cb.record_failure()
     cb.record_failure()
     assert cb.state == CircuitState.OPEN
 
-    time.sleep(1.1)
+    time.sleep(0.02)
     assert cb.can_execute()  # HALF_OPEN
 
     cb.record_failure()  # Half-open failure

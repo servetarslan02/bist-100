@@ -18,7 +18,6 @@ import os
 import asyncio
 import json
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.alerting import (
     AlertingSystem, Alert, AlertType, AlertSeverity,

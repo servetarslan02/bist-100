@@ -14,7 +14,6 @@ from typing import Dict, List, Any, Optional
 from collections import defaultdict
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import yfinance as yf
 import polars as pl

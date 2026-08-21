@@ -18,7 +18,6 @@ import json
 import asyncio
 import sqlite3
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.alert_policy import (
     AlertPolicy, PolicyDiff, VersionConflictError, SilenceRule,

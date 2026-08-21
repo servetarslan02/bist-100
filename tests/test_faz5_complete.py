@@ -7,10 +7,10 @@ market data → features → intelligence → ranking → prediction → signal 
 
 import sys
 import os
+import pytest
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _make_ohlcv(n=80, seed=42):
@@ -116,28 +116,20 @@ def test_intelligence_health():
 # 3. Prediction layer — multi-horizon
 # ────────────────────────────────────────────────────────────
 
-def test_prediction_multi_horizon():
+@pytest.mark.parametrize("horizon", [1, 5, 20, 60])
+def test_prediction_multi_horizon(horizon):
     """Multi-horizon prediction çalışmalı."""
     from services.intelligence.prediction_layer import compute_prediction
 
-    passed = 0
-    failed = 0
-
     features = {"volatility_20d": 25, "atr_pct": 3, "momentum_20d": 5}
 
-    for horizon in [1, 5, 20, 60]:
-        pred = compute_prediction(
-            ticker="TEST", ml_prediction=3.0, ml_confidence=0.6,
-            features=features, horizon=horizon
-        )
-        assert pred.time_horizon == horizon
-        assert pred.direction == "UP"
-        assert pred.quality_grade in ("A+", "A", "B", "C", "D")
-
-    print(f"  ✓ Multi-horizon: 1d/5d/20d/60d predictions computed")
-    passed += 1
-
-    return passed, failed
+    pred = compute_prediction(
+        ticker="TEST", ml_prediction=3.0, ml_confidence=0.6,
+        features=features, horizon=horizon
+    )
+    assert pred.time_horizon == horizon
+    assert pred.direction == "UP"
+    assert pred.quality_grade in ("A+", "A", "B", "C", "D")
 
 
 # ────────────────────────────────────────────────────────────

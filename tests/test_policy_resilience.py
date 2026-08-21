@@ -19,7 +19,6 @@ import sqlite3
 import time
 from aiohttp import web
 import aiohttp
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.alert_policy import (
     AlertPolicy, PolicyDiff, VersionConflictError,

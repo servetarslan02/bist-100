@@ -17,7 +17,6 @@ import asyncio
 import time
 import sqlite3
 import tempfile
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.alert_policy import AlertPolicy, SilenceRule, FALLBACK_ESCALATION_TIMEOUT_S
 from services.core.alerting import AlertingSystem, AlertType

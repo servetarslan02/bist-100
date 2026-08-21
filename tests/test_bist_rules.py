@@ -2,7 +2,6 @@
 import pytest
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.core.short_selling import ShortSellingMonitor
 from services.core.fee_calculator import FeeCalculator
@@ -93,17 +92,15 @@ class TestPriceLimits:
         r = m.check_price_limit("THYAO", 105, 100)
         assert not r.limit_hit
 
-    def test_upper_limit_hit(self):
+    @pytest.mark.parametrize("price,expected_direction", [
+        (110, "UP"),
+        (90, "DOWN"),
+    ])
+    def test_price_limit_hit_direction(self, price, expected_direction):
         m = PriceLimitMonitor()
-        r = m.check_price_limit("THYAO", 110, 100)
+        r = m.check_price_limit("THYAO", price, 100)
         assert r.limit_hit
-        assert r.direction == "UP"
-
-    def test_lower_limit_hit(self):
-        m = PriceLimitMonitor()
-        r = m.check_price_limit("THYAO", 90, 100)
-        assert r.limit_hit
-        assert r.direction == "DOWN"
+        assert r.direction == expected_direction
 
     def test_custom_limit(self):
         m = PriceLimitMonitor()
@@ -192,23 +189,16 @@ class TestVIOPMonitor:
 
 
 class TestCompliance:
-    def test_no_notification(self):
+    @pytest.mark.parametrize("amount,expected_action,expected_flag", [
+        (10000, "OK", "notification_required"),
+        (60000, "NOTIFY", "notification_required"),
+        (110000, "BLOCK", "violation"),
+    ])
+    def test_spk_compliance_thresholds(self, amount, expected_action, expected_flag):
         c = ComplianceChecker()
-        r = c.check_spk_compliance("BUY", "THYAO", 10000, 1000000, 0)
-        assert not r.notification_required
-        assert r.action == "OK"
-
-    def test_five_pct_notification(self):
-        c = ComplianceChecker()
-        r = c.check_spk_compliance("BUY", "THYAO", 60000, 1000000, 0)
-        assert r.notification_required
-        assert r.action == "NOTIFY"
-
-    def test_ten_pct_blocked(self):
-        c = ComplianceChecker()
-        r = c.check_spk_compliance("BUY", "THYAO", 110000, 1000000, 0)
-        assert r.violation
-        assert r.action == "BLOCK"
+        r = c.check_spk_compliance("BUY", "THYAO", amount, 1000000, 0)
+        assert r.action == expected_action
+        assert getattr(r, expected_flag)
 
     def test_zero_portfolio(self):
         c = ComplianceChecker()

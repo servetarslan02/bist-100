@@ -8,7 +8,6 @@ import sys
 import os
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_e2e_real_data():

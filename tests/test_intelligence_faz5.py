@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.intelligence.ml_signal_fusion import MLSignalFusion, MLFusedSignal
 from services.intelligence.prediction_layer import (

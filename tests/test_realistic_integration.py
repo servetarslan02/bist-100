@@ -20,7 +20,6 @@ import pandas as pd
 from datetime import datetime
 from aiohttp import web
 import aiohttp
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.async_http import AsyncHTTPClient, close_all_clients
 from services.core.config_loader import ConfigLoader

@@ -30,8 +30,10 @@ warn_unused_configs = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+pythonpath = ["."]
+asyncio_mode = "strict"
 testpaths = ["tests"]
+addopts = "--tb=short -q"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

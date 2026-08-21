@@ -12,11 +12,11 @@ Her canonical mapping için integration test:
 
 import sys
 import os
+import pytest
 import numpy as np
 import pandas as pd
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 # =====================================================
@@ -203,28 +203,20 @@ def test_alias_fundamental_names():
 # 2. CROSS-SECTIONAL RETURN MAPPING
 # =====================================================
 
-def test_return_alias_mapping():
-    """return_5d/20d/60d → roc_5d/20d/60d mapping çalışıyor mu?"""
+@pytest.mark.parametrize("period", [1, 5, 20, 60])
+def test_return_alias_mapping(period):
+    """return_Xd → roc_Xd mapping çalışıyor mu?"""
     from services.features.seven_motors import seven_motor_engine
-    issues = []
 
     df, close, high, low, open_, volume = _make_test_data()
     all_features = seven_motor_engine.compute_all('TEST', df)
 
-    for period in [1, 5, 20, 60]:
-        roc_key = f'roc_{period}d'
-        ret_key = f'return_{period}d'
+    roc_key = f'roc_{period}d'
+    ret_key = f'return_{period}d'
 
-        if roc_key not in all_features:
-            issues.append(f"{roc_key} üretilmiyor")
-            continue
-
-        if ret_key not in all_features:
-            issues.append(f"{ret_key} alias'ı oluşmadı (kaynak: {roc_key})")
-        elif all_features[ret_key] != all_features[roc_key]:
-            issues.append(f"{ret_key} değeri {roc_key} ile eşleşmiyor")
-
-    return "Return alias mapping", len(issues) == 0, issues
+    assert roc_key in all_features, f"{roc_key} üretilmiyor"
+    assert ret_key in all_features, f"{ret_key} alias'ı oluşmadı (kaynak: {roc_key})"
+    assert all_features[ret_key] == all_features[roc_key], f"{ret_key} değeri {roc_key} ile eşleşmiyor"
 
 
 # =====================================================

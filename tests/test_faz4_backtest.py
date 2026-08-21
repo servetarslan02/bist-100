@@ -7,7 +7,6 @@ Walk-forward, Precision@K, IC, Deflated Sharpe testleri.
 import sys
 import os
 import numpy as np
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_walk_forward_split():

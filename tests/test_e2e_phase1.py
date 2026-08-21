@@ -9,7 +9,6 @@ Bu test FAZ 1'in tamamının entegrasyonunu doğrular.
 import sys
 import os
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from datetime import datetime, timezone
 

@@ -4,7 +4,6 @@ ALPHA BIST — FAZ 6 Test Suite (KAP Extractor & Sector Chain)
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_kap_extractor():

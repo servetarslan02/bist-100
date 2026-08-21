@@ -26,7 +26,6 @@ import numpy as np
 import pandas as pd
 
 # Add parent to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.paper_trading.state_store import PaperStateStore
 from services.paper_trading.virtual_portfolio import VirtualPortfolio

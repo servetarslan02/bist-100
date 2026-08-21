@@ -16,7 +16,6 @@ import sys
 import os
 import asyncio
 import sqlite3
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.portfolio.portfolio_manager import (
     PortfolioManager, MAX_TRADES, MAX_CASH_LEDGER,

@@ -25,7 +25,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.backtest.engine_v4 import BacktestEngineV4, BacktestConfig
 from services.backtest.walk_forward_runner import WalkForwardBacktestRunner

@@ -27,7 +27,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):

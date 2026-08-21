@@ -15,7 +15,6 @@ import os
 import json
 import asyncio
 import time
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.monitoring_security import (
     MonitoringAuth, AuthConfig, extract_bearer_token, extract_api_key,

@@ -19,7 +19,6 @@ import tempfile
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.core.config_watcher import ConfigWatcher
 from services.core.data_quality import DataQualityChecker as DataQualityV2
@@ -71,15 +70,15 @@ async def test_config_watcher_portfolio_integration():
         state["reload_count"] += 1
 
     watcher = ConfigWatcher(config_path, reload_fn=lambda: None,
-                           on_change=on_config_change, watch_interval_s=0.2)
+                           on_change=on_config_change, watch_interval_s=0.01)
     watcher.start()
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.02)
 
     # Config değiştir
     with open(config_path, "w") as f:
         json.dump({"version": 2, "risk": {"max_drawdown_pct": 10}}, f)
 
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.05)
     watcher.stop()
 
     if state["risk"] is None:
@@ -110,15 +109,15 @@ async def test_config_watcher_rollback():
             return ["Port negatif"]
         return []
 
-    watcher = ConfigWatcher(config_path, reload_fn, validate_fn=validate_fn, watch_interval_s=0.2)
+    watcher = ConfigWatcher(config_path, reload_fn, validate_fn=validate_fn, watch_interval_s=0.01)
     watcher.start()
-    await asyncio.sleep(0.3)
+    await asyncio.sleep(0.02)
 
     # Geçersiz config
     with open(config_path, "w") as f:
         json.dump({"version": 2, "port": -1}, f)
 
-    await asyncio.sleep(0.5)
+    await asyncio.sleep(0.05)
     watcher.stop()
 
     if state["config"].get("port") != 8000:

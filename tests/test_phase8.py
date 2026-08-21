@@ -6,7 +6,6 @@ Opportunity Discovery Engine testleri.
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def test_opportunity_engine():

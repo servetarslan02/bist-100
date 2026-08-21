@@ -214,7 +214,7 @@ class VaRCalculator:
             return 0.0
 
         sorted_returns = np.sort(returns)
-        index = int((1 - confidence) * len(sorted_returns))
+        index = max(0, int((1 - confidence) * len(sorted_returns)) - 1)
         index = max(0, min(index, len(sorted_returns) - 1))
 
         var_threshold = sorted_returns[index]
@@ -258,7 +258,9 @@ class VaRCalculator:
             MonteCarloResult
         """
         if seed is not None:
-            np.random.seed(seed)
+            rng = np.random.default_rng(seed)
+        else:
+            rng = np.random.default_rng()
 
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
@@ -269,7 +271,7 @@ class VaRCalculator:
         # Simülasyon: günlük getirilerden toplam getiri
         simulated_returns = np.zeros(n_simulations)
         for _ in range(holding_period_days):
-            daily_returns = np.random.normal(mu, sigma, n_simulations)
+            daily_returns = rng.normal(mu, sigma, n_simulations)
             simulated_returns += daily_returns
 
         # VaR/CVaR hesapla

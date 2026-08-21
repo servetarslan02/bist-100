@@ -11,7 +11,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
 def _make_market_data(n_stocks=10, n_days=300, seed=42):

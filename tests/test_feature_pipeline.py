@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.features.seven_motors import seven_motor_engine
 from services.features.calculator import feature_calculator

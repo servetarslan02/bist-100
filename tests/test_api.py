@@ -106,13 +106,13 @@ class TestRBACChecker:
     def test_analyst_cannot_delete(self):
         assert not rbac_checker.check_permission(Role.ANALYST, "DELETE")
 
-    def test_admin_can_all(self):
-        for method in ["GET", "POST", "PUT", "DELETE"]:
-            assert rbac_checker.check_permission(Role.ADMIN, method)
+    @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
+    def test_admin_can_all(self, method):
+        assert rbac_checker.check_permission(Role.ADMIN, method)
 
-    def test_system_can_all(self):
-        for method in ["GET", "POST", "PUT", "DELETE"]:
-            assert rbac_checker.check_permission(Role.SYSTEM, method)
+    @pytest.mark.parametrize("method", ["GET", "POST", "PUT", "DELETE"])
+    def test_system_can_all(self, method):
+        assert rbac_checker.check_permission(Role.SYSTEM, method)
 
     def test_operator_can_put(self):
         assert rbac_checker.check_permission(Role.OPERATOR, "PUT")
@@ -126,9 +126,9 @@ class TestRBACChecker:
         assert not rbac_checker.check_endpoint_access(Role.VIEWER, "/admin/policy")
         assert not rbac_checker.check_endpoint_access(Role.ANALYST, "/admin/policy")
 
-    def test_normal_endpoint_all_roles(self):
-        for role in Role:
-            assert rbac_checker.check_endpoint_access(role, "/api/v1/market/state")
+    @pytest.mark.parametrize("role", list(Role))
+    def test_normal_endpoint_all_roles(self, role):
+        assert rbac_checker.check_endpoint_access(role, "/api/v1/market/state")
 
 
 # =====================================================

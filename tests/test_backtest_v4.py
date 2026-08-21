@@ -22,7 +22,6 @@ import pandas as pd
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from services.backtest.portfolio_sim import (
     PortfolioSimulatorV3, BISTCommissionModel, Trade, Position, EquitySnapshot,
