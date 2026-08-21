@@ -65,6 +65,7 @@ class DeflatedSharpeCalculator:
         num_observations: int,
         skewness: float = 0.0,
         kurtosis: float = 3.0,
+        periods_per_year: int = 1,
     ) -> Tuple[float, float]:
         """
         N stratejiden beklenen max Sharpe'ı hesapla.
@@ -74,6 +75,13 @@ class DeflatedSharpeCalculator:
             num_observations: Gözlem sayısı (trading days)
             skewness: Getiri dağılımının çarpıklığı
             kurtosis: Getiri dağılımının basıklığı
+            periods_per_year: observed_sharpe'ın yıllıklaştırma çarpanı
+                (örn. günlük veri için 252). observed_sharpe yıllıklaştırılmış
+                geliyorsa (per_period_SR * sqrt(periods_per_year)), bu
+                fonksiyonun döndürdüğü expected_max_sr/std_max_sr de AYNI
+                birimde olmalı — aksi halde deflated_sharpe birim
+                uyuşmazlığından dolayı ~periods_per_year kat şişer/küçülür.
+                Varsayılan 1 = per-period (yıllıklaştırılmamış) birim.
 
         Returns:
             (expected_max_sharpe, std_max_sharpe)
@@ -81,29 +89,38 @@ class DeflatedSharpeCalculator:
         # Euler-Mascheroni sabiti
         euler_mascheroni = 0.5772156649
 
-        # Standart normal'in N gözleminin max'ının beklenen değeri
-        # E[max(Z_1,...,Z_N)] ≈ sqrt(2*ln(N)) - (ln(ln(N)) + ln(4π)) / (2*sqrt(2*ln(N)))
+        # Standart normal'in N gözleminin max'ının beklenen değeri.
+        # Bailey & Lopez de Prado (2014), "The Deflated Sharpe Ratio",
+        # Denklem 5-6: E[max Z_1..Z_N] ≈ (1-γ)·Φ⁻¹(1-1/N) + γ·Φ⁻¹(1-1/(N·e))
+        # (Önceki sqrt(2·ln(N)) yaklaşımı Monte Carlo ile doğrulandığında
+        # sistematik olarak ~0.13-0.2 düşük çıkıyordu — bu da deflated_sr'ı
+        # olduğundan yüksek gösterip DSR'ın asıl amacı olan 'çoklu-test/
+        # şans eseri iyi görünen stratejileri eleme' işlevini zayıflatıyordu.)
         if num_strategies <= 1:
             return 0.0, 1.0
 
-        ln_n = np.log(num_strategies)
-        sqrt_2_ln_n = np.sqrt(2 * ln_n)
+        from scipy.stats import norm as _norm
+        n = num_strategies
+        expected_max_z = (
+            (1 - euler_mascheroni) * _norm.ppf(1 - 1.0 / n)
+            + euler_mascheroni * _norm.ppf(1 - 1.0 / (n * np.e))
+        )
 
-        expected_max_z = sqrt_2_ln_n - (np.log(ln_n) + np.log(4 * np.pi)) / (2 * sqrt_2_ln_n)
-
-        # Sharpe'a dönüştür (sqrt(T) ile ölçekle)
+        # Sharpe'a dönüştür (sqrt(T) ile ölçekle, periods_per_year ile
+        # observed_sharpe'la AYNI birime getir)
+        annualization = np.sqrt(periods_per_year)
         sqrt_t = np.sqrt(num_observations)
-        expected_max_sr = expected_max_z / sqrt_t
+        expected_max_sr = expected_max_z * annualization / sqrt_t
 
         # Standart sapma
-        std_max_sr = 1.0 / sqrt_t
+        std_max_sr = annualization / sqrt_t
 
         # Higher-order moments düzeltmesi
         if skewness != 0 or kurtosis != 3.0:
             # Cornish-Fisher expansion
             skew_adj = skewness / 6 * (expected_max_z**2 - 1)
             kurt_adj = (kurtosis - 3) / 24 * (expected_max_z**3 - 3 * expected_max_z)
-            expected_max_sr += (skew_adj + kurt_adj) / sqrt_t
+            expected_max_sr += (skew_adj + kurt_adj) * annualization / sqrt_t
 
         return expected_max_sr, std_max_sr
 
@@ -114,6 +131,7 @@ class DeflatedSharpeCalculator:
         num_observations: int,
         skewness: float = 0.0,
         kurtosis: float = 3.0,
+        periods_per_year: int = 1,
     ) -> DeflatedSharpeResult:
         """
         Deflated Sharpe Ratio hesapla.
@@ -124,12 +142,18 @@ class DeflatedSharpeCalculator:
             num_observations: Gözlem sayısı
             skewness: Getiri çarpıklığı
             kurtosis: Getiri basıklığı
+            periods_per_year: observed_sharpe yıllıklaştırılmışsa (örn.
+                günlük veriden sqrt(252) ile ölçeklenmişse) buraya 252
+                verilmeli — aksi halde expected_max_sr/std_max_sr farklı
+                birimde hesaplanır ve deflated_sharpe ~periods_per_year
+                kat şişer/küçülür. observed_sharpe zaten per-period ise
+                varsayılan 1 kullanılır.
 
         Returns:
             DeflatedSharpeResult
         """
         expected_max_sr, std_max_sr = DeflatedSharpeCalculator.compute_expected_max_sharpe(
-            num_strategies, num_observations, skewness, kurtosis
+            num_strategies, num_observations, skewness, kurtosis, periods_per_year
         )
 
         # Deflated Sharpe = (SR - E[max_SR]) / Std[max_SR]
@@ -218,6 +242,7 @@ class DeflatedSharpeCalculator:
             num_observations=len(returns),
             skewness=skewness,
             kurtosis=kurtosis,
+            periods_per_year=periods_per_year,
         )
 
 
