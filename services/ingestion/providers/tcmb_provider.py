@@ -24,7 +24,7 @@ default_baseline = {
     "industrial_production": 2.5,
     "unemployment": 8.5,
     "gold_price": 2850.0,
-    "bist_100": 9850.0,
+    # bist_100 kaldırıldı — TCMB EVDS'te BIST-100 endeksi yok
 }
 
 
@@ -63,7 +63,8 @@ class TCMBProvider:
         "industrial_production": "TP.TG2.Y1",
         "unemployment": "TP.TIGJ01",
         "gold_price": "TP.XKUSD.B.A",
-        "bist_100": "TP.TUFE1YI1",
+        # NOTE: BIST-100 endeksi TCMB EVDS'te mevcut değil.
+        # Gerçek veri BIST provider'dan (bist_provider.py) gelmeli.
     }
 
     def __init__(self, api_key: Optional[str] = None):

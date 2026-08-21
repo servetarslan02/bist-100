@@ -1,0 +1,15 @@
+{
+  "policy_rate": 50.0,
+  "overnight_rate": 50.0,
+  "cpi": 48.5,
+  "ppi": 41.2,
+  "usd_try": 36.5,
+  "eur_try": 38.2,
+  "gbp_try": 45.8,
+  "current_account": -1500.0,
+  "industrial_production": 2.5,
+  "unemployment": 8.5,
+  "gold_price": 2850.0,
+  "_comment": "Bu değerler manuel güncellenmeli. TCMB API key varsa canlı veri kullanılır.",
+  "_last_updated": "2026-08-22"
+}

@@ -210,10 +210,6 @@ def create_app() -> FastAPI:
     # v1 router
     app.include_router(v1_router)
 
-    # Legacy router aliases for backward test compatibility
-    from .v1.learning import router as learning_router
-    app.include_router(learning_router, prefix="/api/learning", tags=["Learning Legacy"])
-
     # Root endpoints
     @app.get("/")
     async def root():

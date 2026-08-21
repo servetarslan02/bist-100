@@ -414,16 +414,25 @@ class MultiCurrencyHandler:
     """Çoklu para birimi desteği."""
 
     def __init__(self):
+        # Başlangıç kurları — update_rate() ile güncellenmeli
+        # Gerçek değerler TCMB API veya config'den yüklenmeli
         self._rates: Dict[str, float] = {"TRY": 1.0, "USD": 47.88, "EUR": 55.38}
+        self._rates_stale = True  # Kurların güncel olup olmadığını takip et
 
     def update_rate(self, currency: str, rate_to_try: float):
         """Döviz kuru güncelle."""
         self._rates[currency] = rate_to_try
+        self._rates_stale = False
 
     def convert(self, amount: float, from_currency: str, to_currency: str) -> float:
         """Para birimi çevir."""
         if from_currency == to_currency:
             return amount
+
+        if self._rates_stale:
+            import structlog
+            logger = structlog.get_logger()
+            logger.warning("FX rates are stale — using default rates. Call update_rate() or load from API.")
 
         from_rate = self._rates.get(from_currency, 1.0)
         to_rate = self._rates.get(to_currency, 1.0)

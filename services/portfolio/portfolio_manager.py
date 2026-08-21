@@ -1211,26 +1211,8 @@ class PortfolioManager:
     def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Otonom portfoy yeniden dengeleme (SPEC Anomalileri + Kurumsal Liderler)."""
         if not signals:
-            signals = [
-                {"ticker": "POLTK", "price": 14600.0, "score": 96, "stop_loss": 14200.0, "target": 18400.0, "sector": "Metal & SPEC Anomali"},
-                {"ticker": "SDTTR", "price": 284.00, "score": 93, "stop_loss": 268.0, "target": 340.0, "sector": "Savunma & Uzay SPEC"},
-                {"ticker": "KONYA", "price": 10400.0, "score": 91, "stop_loss": 9950.0, "target": 12800.0, "sector": "Çimento & Bedelsiz SPEC"},
-                {"ticker": "REEDR", "price": 48.60, "score": 88, "stop_loss": 46.2, "target": 58.5, "sector": "Teknoloji & EV SPEC"},
-                {"ticker": "FORTE", "price": 72.50, "score": 87, "stop_loss": 69.5, "target": 88.0, "sector": "Yazılım & İhale SPEC"},
-                {"ticker": "ALFAS", "price": 82.30, "score": 86, "stop_loss": 78.5, "target": 96.0, "sector": "Solar Enerji SPEC"},
-                {"ticker": "THYAO", "price": 312.50, "score": 94, "stop_loss": 298.0, "target": 345.0, "sector": "Havacılık & Ulaştırma"},
-                {"ticker": "ASELS", "price": 66.80, "score": 92, "stop_loss": 62.0, "target": 74.5, "sector": "Savunma Sanayi"},
-                {"ticker": "GARAN", "price": 121.40, "score": 89, "stop_loss": 114.0, "target": 132.0, "sector": "Bankacılık"},
-                {"ticker": "KCHOL", "price": 218.00, "score": 88, "stop_loss": 204.0, "target": 242.0, "sector": "Holding"},
-                {"ticker": "TUPRS", "price": 174.50, "score": 87, "stop_loss": 164.0, "target": 192.0, "sector": "Enerji & Petrol"},
-                {"ticker": "PGSUS", "price": 242.80, "score": 86, "stop_loss": 226.0, "target": 268.0, "sector": "Havacılık & Ulaştırma"},
-                {"ticker": "FROTO", "price": 1120.00, "score": 85, "stop_loss": 1050.0, "target": 1240.0, "sector": "Otomotiv"},
-                {"ticker": "BIMAS", "price": 542.00, "score": 84, "stop_loss": 510.0, "target": 590.0, "sector": "Perakende Ticaret"},
-                {"ticker": "AKBNK", "price": 61.20, "score": 83, "stop_loss": 57.5, "target": 67.0, "sector": "Bankacılık"},
-                {"ticker": "SISE",  "price": 46.90, "score": 82, "stop_loss": 43.8, "target": 51.5, "sector": "Cam & Sanayi"},
-                {"ticker": "ENJSA", "price": 68.40, "score": 81, "stop_loss": 64.0, "target": 75.0, "sector": "Enerji"},
-                {"ticker": "ASTOR", "price": 104.20, "score": 80, "stop_loss": 96.5, "target": 116.0, "sector": "Elektrik & Sanayi"},
-            ]
+            logger.warning("execute_auto_rebalance called with no signals — skipping")
+            return {"executed": [], "reason": "no_signals_provided"}
 
         executed = []
         total_equity = self._cash + sum(p.market_value for p in self._positions.values())
