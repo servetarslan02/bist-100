@@ -273,19 +273,18 @@ async def events(limit: int = Query(20, le=100), user=Depends(get_current_user),
 @router.get("/radar")
 async def market_radar(
     limit: int = Query(200, le=1000),
-    bist100_only: bool = Query(False),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
-    """Piyasa radarı — gerçek zamanlı fiyat, günlük değişim, RSI ve kantitatif skor."""
+    """Piyasa radarı — batch yfinance ile tüm BIST hisseleri tek seferde."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
-    from ...data.data_source import data_source
     from ...ingestion.bist_universe import BISTUniverse
+    import yfinance as yf
 
     uni = BISTUniverse()
     bist100 = set(getattr(uni, 'BIST_100_TICKERS', []))
-    all_tickers = list(bist100) if bist100_only else getattr(uni, 'BIST_ALL_TICKERS', list(bist100))
+    all_tickers = getattr(uni, 'BIST_ALL_TICKERS', list(bist100))
     tickers_to_fetch = all_tickers[:limit]
 
     def _calc_rsi(closes, period=14):
@@ -304,48 +303,61 @@ async def market_radar(
         rs = avg_gain / avg_loss
         return round(100 - 100 / (1 + rs), 1)
 
-    def _fetch_ticker(ticker):
-        try:
-            yf_ticker = f"{ticker}.IS"
-            data = data_source.get_stock_data(yf_ticker, period="3mo", interval="1d")
-            if data is None or data.empty or len(data) < 2:
-                return None
-            closes = data["Close"].dropna().tolist()
-            if len(closes) < 2:
-                return None
-            last_close = closes[-1]
-            prev_close = closes[-2]
-            change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0
-            volume = float(data["Volume"].iloc[-1]) if "Volume" in data.columns else 0
-            high = float(data["High"].iloc[-1]) if "High" in data.columns else last_close
-            low = float(data["Low"].iloc[-1]) if "Low" in data.columns else last_close
-            rsi = _calc_rsi(closes)
-            ma20 = sum(closes[-20:]) / min(20, len(closes))
-            trend_score = 60 if last_close > ma20 else 40
-            rsi_score = 80 if (rsi and 40 < rsi < 65) else (50 if rsi and rsi <= 40 else 35)
-            mom_score = min(100, max(0, 50 + change_pct * 5))
-            score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
-            return {
-                "symbol": ticker,
-                "price": round(last_close, 2),
-                "change": change_pct,
-                "volume": int(volume),
-                "high": round(high, 2),
-                "low": round(low, 2),
-                "rsi": rsi,
-                "score": score,
-                "isBist100": ticker in bist100,
-            }
-        except Exception:
-            return None
+    def _batch_fetch():
+        yf_tickers = [f"{t}.IS" for t in tickers_to_fetch]
+        # Tek seferde tüm hisseleri indir
+        raw = yf.download(
+            tickers=" ".join(yf_tickers),
+            period="3mo",
+            interval="1d",
+            group_by="ticker",
+            auto_adjust=True,
+            progress=False,
+            threads=True,
+        )
+        results = []
+        for ticker, yf_ticker in zip(tickers_to_fetch, yf_tickers):
+            try:
+                if len(tickers_to_fetch) == 1:
+                    df = raw
+                else:
+                    df = raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
+                if df is None or df.empty or len(df) < 2:
+                    continue
+                closes = df["Close"].dropna().tolist()
+                if len(closes) < 2:
+                    continue
+                last_close = float(closes[-1])
+                prev_close = float(closes[-2])
+                change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0
+                volume = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 0
+                high = float(df["High"].iloc[-1]) if "High" in df.columns else last_close
+                low = float(df["Low"].iloc[-1]) if "Low" in df.columns else last_close
+                rsi = _calc_rsi(closes)
+                ma20 = sum(closes[-20:]) / min(20, len(closes))
+                trend_score = 60 if last_close > ma20 else 40
+                rsi_score = 80 if (rsi and 40 < rsi < 65) else (50 if rsi and rsi <= 40 else 35)
+                mom_score = min(100, max(0, 50 + change_pct * 5))
+                score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
+                results.append({
+                    "symbol": ticker,
+                    "price": round(last_close, 2),
+                    "change": change_pct,
+                    "volume": int(volume),
+                    "high": round(high, 2),
+                    "low": round(low, 2),
+                    "rsi": rsi,
+                    "score": score,
+                    "isBist100": ticker in bist100,
+                })
+            except Exception:
+                continue
+        return results
 
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=20) as executor:
-        raw = await asyncio.gather(
-            *[loop.run_in_executor(executor, _fetch_ticker, t) for t in tickers_to_fetch]
-        )
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        results = await loop.run_in_executor(executor, _batch_fetch)
 
-    results = [r for r in raw if r is not None]
     errors_count = len(tickers_to_fetch) - len(results)
     results.sort(key=lambda x: x["score"], reverse=True)
 
@@ -355,6 +367,7 @@ async def market_radar(
         "errors": errors_count,
         "status": "ok",
     }
+
 
 
 
