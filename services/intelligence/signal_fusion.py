@@ -79,12 +79,20 @@ class SignalFusionEngine:
     }
 
     REGIME_WEIGHT_OVERRIDES = {
+        "BULL": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
+        "BULL_ACCELERATING": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
+        "BULL_NORMAL": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
         "TRENDING-UP": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
+        "BEAR": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
+        "BEAR_NORMAL": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
+        "BEAR_CRASH": {"macro": 0.25, "valuation": 0.15},
         "TRENDING-DOWN": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
+        "HIGH_VOL": {"macro": 0.20, "valuation": 0.20, "momentum": 0.10},
         "HIGH-VOLATILITY": {"macro": 0.20, "valuation": 0.20, "momentum": 0.10},
         "RISK-ON": {"momentum": 0.25, "sentiment": 0.15},
         "RISK-OFF": {"macro": 0.20, "valuation": 0.20, "fundamental": 0.20},
         "PANIC": {"macro": 0.25, "valuation": 0.15},
+        "CRISIS": {"macro": 0.25, "valuation": 0.15},
         "RECOVERY": {"fundamental": 0.25, "valuation": 0.20, "sentiment": 0.15},
     }
 

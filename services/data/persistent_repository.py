@@ -302,3 +302,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         if self._conn:
             self._conn.close()
             self._conn = None
+
+
+# Singleton Instance
+persistent_repository = PersistentHistoricalRepository()

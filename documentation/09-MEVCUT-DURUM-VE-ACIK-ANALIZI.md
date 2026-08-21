@@ -90,6 +90,17 @@ geçmişine bakınız):
   yeniden yazıldı; `test_faz3_ranking.py` ise sahte adapter sınıfları
   uydurup "geçirmek" yerine, gerekçesi açıkça belirtilerek skip edildi.
 
+- `services/core/data_quality.py`'de Mask-First ihlali (P1) düzeltildi. `apply_mask` fonksiyonu artık post-hoc olarak feature'ları null yapmak yerine direkt olarak input ham fiyat/hacim verilerini maskelemektedir. Ayrıca mask öncelik sırasındaki (sıfır hacim maskının ezilmesi) mantık hataları giderildi.
+- `services/core/event_bus.py` içindeki sessiz hata yönetimi (P2) fail-open `except: pass` blokları logger'larla değiştirilerek düzeltildi.
+- `services/core/regime_detector.py`'deki `transition_matrix` içine eksik olan `LOW_VOL` rejimi eklenip olasılık toplamları 1.0 olacak şekilde düzeltildi.
+
 Bu liste, "P0/P1 açıkların bir kısmı zaten kapatılmaya başlandı" anlamına
-gelir ama **tamamı kapatılmamıştır** — özellikle sahte/sabit veri (P0),
-walk-forward gerçekliği (P1) ve mask-first ihlali (P1) hâlâ açıktır.
+gelir ama **tamamı kapatılmamıştır** — özellikle sahte/sabit veri (P0) ve 
+walk-forward gerçekliği (P1) hâlâ açıktır. Ancak Mask-first ihlali çözülmüştür.
+
+### services/core Modülü Denetim Tamamlama Notu (21.08.2026)
+- 64 dosyanın 64'ü de satır-satır okunup doğrulandı.
+- DecisionEngine stop-loss parametreleri Canonical Strateji (%6.5 hard stop fallback, 2.5x ATR, min %4.0) ile birleştirildi.
+- RiskGate negatif emir miktarı/fiyat zafiyeti ve Orchestrator dict risk bypass zafiyeti çözüldü.
+- Tüm 6 regression testi geçildi.
+- services/core tamamlama şartlarının tamamı sağlandı.

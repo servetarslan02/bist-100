@@ -26,8 +26,12 @@ logger = structlog.get_logger()
 class HistoricalDataAdapter:
     """Historical data repository → canonical scoring adapter."""
 
-    def __init__(self, repository: HistoricalDataRepository):
-        self._repo = repository
+    def __init__(self, repository: Optional[HistoricalDataRepository] = None):
+        if repository is None:
+            from .persistent_repository import PersistentHistoricalRepository
+            self._repo = PersistentHistoricalRepository()
+        else:
+            self._repo = repository
 
     def get_fundamental_features(
         self,
@@ -334,3 +338,7 @@ class HistoricalDataAdapter:
         features["catalyst_time_decay_score"] = round(float(sum(time_decay_scores)), 4)
 
         return features
+
+
+# Singleton Instance
+historical_adapter = HistoricalDataAdapter()

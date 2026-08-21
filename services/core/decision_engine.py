@@ -355,17 +355,17 @@ class DecisionEngine:
         if price <= 0:
             return 0, 0
 
-        # ATR bazlı stop mesafesi
+        # ATR bazlı stop mesafesi (Canonical Strateji Parametreleri: frozen_strategy_engine.py ile senkronize)
         if atr > 0:
-            stop_distance = atr * 2.0  # 2x ATR
+            stop_distance = atr * 2.5  # Canonical: 2.5x ATR
             stop_pct = (stop_distance / price) * 100
         elif atr_pct > 0:
             stop_pct = atr_pct * 1.5
         else:
-            stop_pct = 5.0  # Fallback %5
+            stop_pct = 6.5  # Canonical Hard Stop Fallback: %6.5 (hard_stop_pct = -6.5%)
 
-        # Sınırla: min %3, max %10
-        stop_pct = max(3.0, min(10.0, stop_pct))
+        # Sınırla: min %4.0 (min_atr_pct), max %10.0
+        stop_pct = max(4.0, min(10.0, stop_pct))
 
         # Risk/Ödül oranı 1:2
         target_pct = stop_pct * 2.0

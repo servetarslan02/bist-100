@@ -632,7 +632,12 @@ class MasterOrchestrator:
                     current_positions={},
                     model_confidence=fused_signal.get("fused_confidence", 0.5),
                 )
-                risk_check = risk_result.__dict__ if hasattr(risk_result, "__dict__") else {"allowed": True}
+                if isinstance(risk_result, dict):
+                    risk_check = risk_result
+                elif hasattr(risk_result, "__dict__"):
+                    risk_check = risk_result.__dict__
+                else:
+                    risk_check = {"allowed": False, "reason": "Invalid risk result format"}
         except Exception as e:
             logger.warning("Pipeline step failed", step="risk_check", error=str(e))
         result["risk"] = risk_check

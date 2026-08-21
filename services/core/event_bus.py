@@ -121,7 +121,7 @@ class InternalEventBus:
             try:
                 await self._redis.close()
             except Exception as e:
-                pass  # Intentional: silent error handling
+                logger.debug("Redis close failed", error=str(e))
 
 
 class InMemoryRedis:
@@ -140,7 +140,7 @@ class InMemoryRedis:
                 else:
                     h({"type": "message", "channel": channel, "data": message})
             except Exception as e:
-                pass  # Intentional: silent error handling
+                logger.error("InMemoryRedis handler error", channel=channel, error=str(e))
 
     def pubsub(self):
         """Pubsub instance dondur."""
@@ -241,13 +241,13 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
             )
             producer.poll(0)
         except Exception as e:
-            pass  # Intentional: silent error handling
+            logger.error("Kafka produce failed", event_type=event.event_type, error=str(e))
 
     # Redis Pub/Sub (push-based) + Stream (durable ledger)
     try:
         asyncio.create_task(_publish_with_idempotency(event))
     except Exception as e:
-        pass  # Intentional: silent error handling
+        logger.error("Redis Pub/Sub create_task failed", event_type=event.event_type, error=str(e))
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
@@ -366,7 +366,7 @@ def ensure_topics():
         if new_topics:
             admin.create_topics(new_topics)
     except Exception as e:
-        pass  # Intentional: silent error handling
+        logger.warning("Failed to create Kafka topics", error=str(e))
 
 
 # =====================================================

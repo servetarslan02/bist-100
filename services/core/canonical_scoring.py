@@ -279,7 +279,8 @@ class CanonicalScoringPipeline:
                 ml_score = max(0, min(100, 50 + ml_pred * 10))
                 ml_confidence = min(1.0, abs(ml_pred) / 2.0)
             except Exception as e:
-                pass  # ML prediction başarısızsa rule-based kullan
+                import structlog
+                structlog.get_logger().warning("ML prediction failed, falling back to rule-based", error=str(e))
 
         # Ensemble: ML varsa %70 ML + %30 rule-based
         if ml_score is not None:

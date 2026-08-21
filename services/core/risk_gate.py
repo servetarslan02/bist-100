@@ -79,6 +79,10 @@ class RiskGate:
         if not data_valid:
             return RiskDecision(False, "Invalid/stale data", 0, 1, {"data": "invalid"})
 
+        # 3b. Order quantity and price validation
+        if quantity <= 0 or price <= 0:
+            return RiskDecision(False, f"Invalid order quantity ({quantity}) or price ({price})", 0, 1, {"order": "invalid_parameters"})
+
         checks_passed += 3
 
         # 4. Portfolio exposure
@@ -166,7 +170,7 @@ class RiskGate:
             elif comp.notification_required:
                 details["spk_notification"] = comp.reason
         except Exception as e:
-            pass  # BIST kuralları modülleri yoksa skip
+            logger.warning("BIST compliance check skipped due to error", error=str(e))
         else:
             # Yalnızca bu blok içinde hiçbir alt-kontrol başarısız olmadıysa
             # "geçti" say (önceki hali, içeride bir kural reddetse bile

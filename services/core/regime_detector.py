@@ -257,13 +257,14 @@ class RegimeDetector:
         """Rejim geçiş olasılıklarını tahmin et."""
         # Basit geçiş matrisi (gerçek veri ile güncellenebilir)
         transition_matrix = {
-            "BULL": {"BULL": 0.7, "BEAR": 0.15, "SIDEWAYS": 0.1, "HIGH_VOL": 0.05},
-            "BEAR": {"BULL": 0.1, "BEAR": 0.6, "SIDEWAYS": 0.2, "HIGH_VOL": 0.1},
-            "SIDEWAYS": {"BULL": 0.25, "BEAR": 0.25, "SIDEWAYS": 0.4, "HIGH_VOL": 0.1},
-            "HIGH_VOL": {"BULL": 0.2, "BEAR": 0.3, "SIDEWAYS": 0.2, "HIGH_VOL": 0.3},
+            "BULL": {"BULL": 0.65, "BEAR": 0.15, "SIDEWAYS": 0.1, "HIGH_VOL": 0.05, "LOW_VOL": 0.05},
+            "BEAR": {"BULL": 0.1, "BEAR": 0.55, "SIDEWAYS": 0.2, "HIGH_VOL": 0.1, "LOW_VOL": 0.05},
+            "SIDEWAYS": {"BULL": 0.2, "BEAR": 0.2, "SIDEWAYS": 0.4, "HIGH_VOL": 0.1, "LOW_VOL": 0.1},
+            "HIGH_VOL": {"BULL": 0.15, "BEAR": 0.3, "SIDEWAYS": 0.2, "HIGH_VOL": 0.3, "LOW_VOL": 0.05},
+            "LOW_VOL": {"BULL": 0.2, "BEAR": 0.15, "SIDEWAYS": 0.15, "HIGH_VOL": 0.1, "LOW_VOL": 0.4},
         }
 
-        return transition_matrix.get(current_regime, {r: 0.25 for r in self.REGIMES})
+        return transition_matrix.get(current_regime, {r: 0.2 for r in self.REGIMES})
 
     def get_regime_history(self) -> List[Dict]:
         return list(self._regime_history)

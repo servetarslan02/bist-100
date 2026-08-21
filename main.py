@@ -578,11 +578,11 @@ def run_health_check():
     print(f"    Dosya: {cache_stats['files']}")
     print(f"    Boyut: {cache_stats['total_size_mb']} MB")
     print(f"\n  Pipeline Istatistikleri:")
-    print(f"    Toplam Calisma: {stats['total_runs']}")
-    print(f"    Basari Orani: {stats['success_rate']:.1%}")
-    print(f"    Ortalama Sure: {stats['avg_duration_ms']:.0f}ms")
-    print(f"    Son Hatalar: {stats['recent_errors']}")
-    print(f"    Son Uyarilar: {stats['recent_warnings']}")
+    print(f"    Toplam Calisma: {stats.get('total_runs', 0)}")
+    print(f"    Basari Orani: {stats.get('success_rate', 1.0):.1%}")
+    print(f"    Ortalama Sure: {stats.get('avg_duration_ms', 0):.0f}ms")
+    print(f"    Son Hatalar: {stats.get('recent_errors', 0)}")
+    print(f"    Son Uyarilar: {stats.get('recent_warnings', 0)}")
 
     if health.last_error:
         print(f"\n  Son Hata: {health.last_error}")

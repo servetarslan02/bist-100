@@ -89,7 +89,7 @@ class DataQualityEngine:
             is_tradable = False
 
         # 4. Aşırı düşük hacim (likidite yok)
-        if volume < 1000:  # 1000 lot altı
+        if 0 < volume < 1000:  # 1000 lot altı
             reasons.append("Düşük likidite")
             volume_mask = 0.5  # Kısmen kullan
 
@@ -104,7 +104,8 @@ class DataQualityEngine:
             intraday_range = (high - low) / prev_close * 100
             if intraday_range > 15:
                 reasons.append(f"Aşırı volatilite: %{intraday_range:.1f}")
-                price_mask = 0.3  # Kısmen kullan
+                if price_mask > 0.3:
+                    price_mask = 0.3  # Kısmen kullan
 
         mask = TradabilityMask(
             ticker=ticker,
@@ -123,24 +124,22 @@ class DataQualityEngine:
 
         return mask
 
-    def apply_mask(self, features: Dict[str, Any], mask: TradabilityMask) -> Dict[str, Any]:
-        """Feature'lara mask uygula."""
+    def apply_mask(self, raw_data: Dict[str, Any], mask: TradabilityMask) -> Dict[str, Any]:
+        """Ham veriye mask uygula. 
+        KURAL: Mask=0 olan fiyat, hiçbir feature hesaplamasına girmemeli (Mask-First Design).
+        """
         if mask.price_mask == 0.0:
-            # Fiyat bazlı feature'ları NaN/None yap
-            price_features = ["roc_5d", "roc_20d", "momentum_20d", "rsi_14", 
-                            "macd", "macd_signal", "macd_hist", "bb_position",
-                            "stoch_k", "stoch_d", "adx", "price_vs_sma20", "price_vs_sma50"]
-            for feat in price_features:
-                if feat in features:
-                    features[feat] = None  # Mask = kullanma
-
+            # Mask-first: Ham fiyatı null yap ki feature motorları bunu kullanmasın
+            price_cols = ["open", "high", "low", "close"]
+            for col in price_cols:
+                if col in raw_data:
+                    raw_data[col] = None
+                    
         if mask.volume_mask == 0.0:
-            volume_features = ["volume_zscore", "volume_trend", "obv"]
-            for feat in volume_features:
-                if feat in features:
-                    features[feat] = None
+            if "volume" in raw_data:
+                raw_data["volume"] = None
 
-        return features
+        return raw_data
 
     def get_mask(self, ticker: str) -> Optional[TradabilityMask]:
         """Hisse mask'ını getir."""
