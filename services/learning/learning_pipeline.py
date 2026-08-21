@@ -217,3 +217,37 @@ class LearningPipeline:
 
         # Öğrenme döngüsünü tetikle
         return self.run_learning_cycle(current_regime=regime)
+
+    def check_and_catchup_if_needed(self) -> Dict[str, Any]:
+        """PC kapali kaldiginda kacirilan egitim dongulerini ve eksik verileri kontrol edip telafi eder."""
+        try:
+            latest = self.store.get_latest_metrics_all_models()
+            should_run = False
+            reason = ""
+            
+            if not latest:
+                should_run = True
+                reason = "Ilk baslatma veya kayitli metrik bulunamadi"
+            else:
+                last_time_str = latest[0].get("evaluated_at")
+                if last_time_str:
+                    try:
+                        last_dt = datetime.fromisoformat(last_time_str.replace("Z", "+00:00"))
+                        now_dt = datetime.now(timezone.utc)
+                        diff_hours = (now_dt - last_dt).total_seconds() / 3600.0
+                        if diff_hours >= 6.0:
+                            should_run = True
+                            reason = f"Son egitim {diff_hours:.1f} saat once yapilmis (Hedef aralik: 6 saat)"
+                    except Exception:
+                        should_run = True
+                        reason = "Tarih ayrıştırma"
+            
+            if should_run:
+                logger.info("ml_catchup_triggered", reason=reason)
+                return self.run_learning_cycle(current_regime="BULL_MOMENTUM")
+            else:
+                logger.info("ml_models_up_to_date")
+                return {"status": "up_to_date", "models": len(latest)}
+        except Exception as e:
+            logger.warning("check_and_catchup_failed", error=str(e))
+            return {"status": "error", "error": str(e)}

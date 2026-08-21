@@ -64,11 +64,42 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"radar_cache: hata — {e}")
             await asyncio.sleep(120)  # 2 dakika
 
+    # Model Öğrenme & Telafi (Catch-Up) Arka Plan Görevi
+    async def _ml_learning_scheduler():
+        """PC kapalı kaldığında kaçırılan eğitimleri anında tamamlar ve 4 saatte bir otonom öğrenir."""
+        await asyncio.sleep(15)  # API ve veritabanı tam hazır olana kadar bekle
+        
+        # 1. Başlangıç Telafi Kontrolü
+        try:
+            from ..learning.learning_pipeline import LearningPipeline
+            pipeline = LearningPipeline()
+            loop = asyncio.get_event_loop()
+            logger.info("ml_scheduler: Başlangıç eksik eğitim/veri telafi kontrolü yapılıyor...")
+            await loop.run_in_executor(None, pipeline.check_and_catchup_if_needed)
+            logger.info("ml_scheduler: Başlangıç telafi kontrolü tamamlandı.")
+        except Exception as e:
+            logger.warning(f"ml_scheduler startup catchup error: {e}")
+            
+        # 2. Düzenli Otonom Öğrenme Döngüsü (Her 4 saatte bir)
+        while True:
+            await asyncio.sleep(4 * 3600)
+            try:
+                from ..learning.learning_pipeline import LearningPipeline
+                pipeline = LearningPipeline()
+                loop = asyncio.get_event_loop()
+                logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
+                await loop.run_in_executor(None, pipeline.run_learning_cycle)
+                logger.info("ml_scheduler: Periyodik öğrenme başarıyla tamamlandı.")
+            except Exception as e:
+                logger.warning(f"ml_scheduler periodic error: {e}")
+
     task = asyncio.create_task(_radar_cache_refresher())
+    ml_task = asyncio.create_task(_ml_learning_scheduler())
 
     yield
 
     task.cancel()
+    ml_task.cancel()
 
     # OpenTelemetry kapat
     shutdown_telemetry()
