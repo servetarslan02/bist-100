@@ -95,45 +95,13 @@ async def scan_results(
 
 
 @router.get("/opportunities")
-@router.get("/rankings")
-async def scan_opportunities(
-    tier: Optional[str] = Query(None, description="Tier filtresi (TIER_1, TIER_2, TIER_3)"),
-    limit: int = Query(20, ge=1, le=100, description="Maksimum sonuç"),
-    min_score: float = Query(50.0, ge=0, le=100),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit),
-):
-    """En iyi fırsatlar — opportunity_engine.
-
-    Args:
-        limit: Maksimum sonuç
-        min_score: Minimum skor eşiği
-
-    Returns:
-        Fırsat listesi: ticker, score, signal, direction, evidence, risks
-    """
-    try:
-        api = _get_scan_api()
-        tiers = api.get_tiers()
-        opportunities = tiers.get("top_opportunities", [])
-        filtered = [o for o in opportunities if o.get("opportunity_score", 0) >= min_score]
-        return {
-            "opportunities": filtered[:limit],
-            "total": len(filtered),
-            "min_score": min_score,
-        }
-    except Exception as e:
-        raise HTTPException(500, f"Opportunities error: {e}")
-
-
 @router.get("/signals")
-@router.get("/opportunities")
-async def signals(
+async def scan_opportunities(
     limit: int = Query(50, ge=1, le=100),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Sinyal ve Fırsat listesi — Gerçek zamanlı dinamik algoritma taraması."""
+    """En iyi fırsatlar — Dynamic Algorithmic Opportunity Engine."""
     import json
     import redis as redis_lib
 
