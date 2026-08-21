@@ -66,7 +66,7 @@ class Position:
 
     @property
     def unrealized_pnl_pct(self) -> float:
-        if self.entry_price == 0:
+        if self.cost_basis <= 0:
             return 0.0
         return (self.unrealized_pnl / self.cost_basis) * 100
 
