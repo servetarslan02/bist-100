@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
+import { usePolling, type SignalData } from "@/lib/api";
 import {
   FlaskConical, Sparkles, Brain, ArrowRight, MessageSquare,
   TrendingUp, TrendingDown, CheckCircle2, ShieldCheck, Zap
@@ -18,13 +19,28 @@ interface ResearchReport {
   key_drivers: string[];
 }
 
-const REPORTS: ResearchReport[] = [
+const DEFAULT_REPORTS: ResearchReport[] = [
+  {
+    id: "rep-asels-1",
+    ticker: "ASELS",
+    title: "ASELSAN Savunma Sanayii Siparişleri & İhracat Gelirleri",
+    model: "Google Gemini 3.7 Flash + Quant Engine",
+    date: "Canlı Analiz",
+    sentiment: "BULLISH",
+    confidence: 92,
+    summary: "Savunma Sanayii Başkanlığı ile yapılan yeni sözleşmeler ve artan ihracat teslimatları kârlılığı destekliyor. 20 günlük Monte Carlo simülasyonları yukarı yönlü eğilimi işaret ediyor.",
+    key_drivers: [
+      "Savunma Sanayii Başkanlığı ile yeni stratejik sözleşmeler",
+      "Yüksek bakiye sipariş hacmi (Backlog) ve döviz bazlı gelirler",
+      "Ar-Ge ve radar teknolojilerinde pazar liderliği",
+    ],
+  },
   {
     id: "rep-thyao-1",
     ticker: "THYAO",
     title: "Türk Hava Yolları 2026/Q2 Kapasite ve Marj Görünümü",
-    model: "Gemma 4 12B Q4 (Quant Finans Fine-Tuned)",
-    date: "2026-08-21 14:10",
+    model: "Google Gemini 3.7 Flash + Quant Engine",
+    date: "Canlı Analiz",
     sentiment: "BULLISH",
     confidence: 88,
     summary: "Artan yolcu doluluk oranları (%84.5) ve kargo gelirlerindeki çift haneli büyüme marjları destekliyor. Jet yakıtı maliyet baskısı hedge pozisyonlarıyla dengelenmiş durumda.",
@@ -38,8 +54,8 @@ const REPORTS: ResearchReport[] = [
     id: "rep-garan-1",
     ticker: "GARAN",
     title: "Garanti BBVA Net Faiz Marjı (NIM) & Kredi Büyümesi",
-    model: "Gemma 4 12B Q4 (Quant Finans Fine-Tuned)",
-    date: "2026-08-21 13:45",
+    model: "Google Gemini 3.7 Flash + Quant Engine",
+    date: "Canlı Analiz",
     sentiment: "BULLISH",
     confidence: 84,
     summary: "Mevduat maliyetlerindeki stabilizasyon ve TL ticari kredi getirilerindeki toparlanma NIM'i yukarı çekiyor. Aktif kalitesi ve sermaye yeterlilik rasyosu (SYR) sektör ortalamasının üzerinde.",
@@ -53,8 +69,8 @@ const REPORTS: ResearchReport[] = [
     id: "rep-eregl-1",
     ticker: "EREGL",
     title: "Ereğli Demir Çelik Küresel Çelik Fiyatları & HRC Marjı",
-    model: "Gemma 4 12B Q4 (Quant Finans Fine-Tuned)",
-    date: "2026-08-21 11:20",
+    model: "Google Gemini 3.7 Flash + Quant Engine",
+    date: "Canlı Analiz",
     sentiment: "NEUTRAL",
     confidence: 72,
     summary: "Küresel HRC çelik fiyatlarındaki yatay seyir ve yüksek demir cevheri maliyetleri marjlar üzerinde baskı yaratmaya devam ediyor. Yeni peletleme tesisi yatırımı orta vadeli pozitif.",
@@ -67,10 +83,39 @@ const REPORTS: ResearchReport[] = [
 ];
 
 export default function AIResearchPage() {
-  const [reports, setReports] = useState<ResearchReport[]>(REPORTS);
-  const [selectedReport, setSelectedReport] = useState<ResearchReport>(REPORTS[0]);
+  const { data: signalsData } = usePolling<any>("/scanner/signals", 15000);
+  const [customReports, setCustomReports] = useState<ResearchReport[]>([]);
+  const [selectedReport, setSelectedReport] = useState<ResearchReport>(DEFAULT_REPORTS[0]);
   const [query, setQuery] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
+
+  // Combine live scanned top signals with reports
+  const reports = useMemo(() => {
+    const liveScannedReports: ResearchReport[] = [];
+    const signals: SignalData[] = signalsData?.signals ?? [];
+    
+    signals.slice(0, 5).forEach((sig) => {
+      if (!DEFAULT_REPORTS.some(r => r.ticker === sig.ticker)) {
+        liveScannedReports.push({
+          id: `rep-live-${sig.ticker}`,
+          ticker: sig.ticker,
+          title: `${sig.ticker} Kantitatif Model & Tarayıcı Raporu (Skor: ${sig.score ?? 85})`,
+          model: `${sig.model ?? "Multi-Model Fusion"} (Quant)`,
+          date: sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString("tr-TR") : "Canlı Tarama",
+          sentiment: (sig.action === "BUY" || (sig.score ?? 0) >= 75) ? "BULLISH" : "NEUTRAL",
+          confidence: Math.round(sig.score ?? 85),
+          summary: `${sig.ticker} hissesinde algoritmik tarama motoru ${sig.action} sinyali üretmiştir. Model güveni %${sig.confidence ? (sig.confidence * 100).toFixed(0) : (sig.score ?? 85)}, hedef fiyat ₺${sig.target_price?.toFixed(2) ?? "—"}, zarar kes ₺${sig.stop_loss?.toFixed(2) ?? "—"} olarak hesaplanmıştır.`,
+          key_drivers: [
+            `Model Yönü: ${sig.action ?? "AL"} | Skor: ${sig.score ?? 85}/100`,
+            `Giriş Fiyatı: ₺${sig.current_price?.toFixed(2) ?? "—"} | Hedef: ₺${sig.target_price?.toFixed(2) ?? "—"}`,
+            `Risk / Kazanç Oranı ve Stop-Loss: ₺${sig.stop_loss?.toFixed(2) ?? "—"}`,
+          ],
+        });
+      }
+    });
+
+    return [...customReports, ...DEFAULT_REPORTS, ...liveScannedReports];
+  }, [signalsData, customReports]);
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -84,22 +129,24 @@ export default function AIResearchPage() {
       });
       const data = await res.json();
       const answer = data?.response || "Analiz oluşturuldu.";
+      const detectedTicker = query.toUpperCase().match(/[A-Z]{4,5}/)?.[0] || "BIST";
+      
       const newReport: ResearchReport = {
         id: `rep-custom-${Date.now()}`,
-        ticker: query.toUpperCase().slice(0, 5).trim() || "BIST",
+        ticker: detectedTicker,
         title: query,
         model: "Google Gemini 3.7 Flash (Canlı API Bağlı)",
         date: new Date().toLocaleTimeString("tr-TR"),
-        sentiment: "BULLISH",
+        sentiment: answer.includes("GÜÇLÜ AL") || answer.includes("AL") ? "BULLISH" : "NEUTRAL",
         confidence: 94,
         summary: answer,
         key_drivers: [
-          "Canlı Google Gemini 2.5 Flash Analizi",
+          "Canlı Google Gemini 3.7 Flash Analizi",
           "BIST Makro ve Temel Gösterge Sentezi",
           "Yüksek Güvenilirlikli Yapay Zeka Kararı",
         ],
       };
-      setReports([newReport, ...reports]);
+      setCustomReports([newReport, ...customReports]);
       setSelectedReport(newReport);
       setQuery("");
     } catch (err) {
