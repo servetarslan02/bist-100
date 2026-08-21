@@ -39,7 +39,7 @@ function StatCard({
 
   return (
     <div
-      className="card-hover rounded-xl p-4 flex flex-col gap-3"
+      className="card-hover rounded-xl p-4 flex flex-col gap-3 select-none"
       style={{
         background: "var(--color-bg-card)",
         border: "1px solid var(--color-border-subtle)",
@@ -76,32 +76,33 @@ function StatCard({
 
 // ─── Signal Direction Badge ───────────────────────────────────────────────────
 function DirBadge({ dir }: { dir: string }) {
-  const up = dir === "LONG";
+  const up = dir === "LONG" || dir === "AL";
+  const label = up ? "AL" : "SAT";
   return (
     <div
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold"
       style={{
         background: up ? "rgba(0,229,160,0.12)" : "rgba(255,68,102,0.12)",
         color: up ? "#00e5a0" : "#ff4466",
       }}
     >
       {up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-      {dir}
+      {label}
     </div>
   );
 }
 
 // ─── Risk Badge ───────────────────────────────────────────────────────────────
 function RiskBadge({ level }: { level: string }) {
-  const cfg: Record<string, { bg: string; color: string }> = {
-    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0" },
-    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00" },
-    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466" },
+  const cfg: Record<string, { bg: string; color: string; text: string }> = {
+    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0", text: "DÜŞÜK" },
+    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00", text: "ORTA" },
+    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466", text: "YÜKSEK" },
   };
   const c = cfg[level] ?? cfg.MEDIUM;
   return (
-    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: c.bg, color: c.color }}>
-      {level}
+    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: c.bg, color: c.color }}>
+      {c.text}
     </span>
   );
 }
@@ -127,14 +128,14 @@ function WorldMetric({ label, value, invert }: { label: string; value: number; i
   const color = isGood ? "#00e5a0" : isBad ? "#ff4466" : "#ffaa00";
   return (
     <div className="flex items-center gap-3">
-      <span className="text-[11px] w-24 flex-shrink-0" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
+      <span className="text-[11px] w-32 flex-shrink-0" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
       <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
         <div
           className="h-full rounded-full transition-all duration-700"
           style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}80, ${color})` }}
         />
       </div>
-      <span className="text-[10px] font-data w-8 text-right" style={{ color }}>{pct.toFixed(0)}%</span>
+      <span className="text-[10px] font-data w-8 text-right" style={{ color }}>%{pct.toFixed(0)}</span>
     </div>
   );
 }
@@ -157,7 +158,7 @@ function ServiceRow({ name, health }: { name: string; health: string }) {
           color: ok ? "#00e5a0" : "#ff4466",
         }}
       >
-        {health}
+        {ok ? "Çalışıyor" : "Kesinti"}
       </span>
     </div>
   );
@@ -192,11 +193,19 @@ function RegimePill({ regime }: { regime?: string }) {
   const down = regime.includes("DOWN") || regime.includes("PANIC") || regime.includes("BEAR");
   const color = up ? "#00e5a0" : down ? "#ff4466" : "#ffaa00";
   const Icon = up ? TrendingUp : down ? TrendingDown : Minus;
+  
+  let label = regime;
+  if (regime === "BULL_TREND") label = "BOĞA TRENDİ";
+  else if (regime === "BEAR_TREND") label = "AYI TRENDİ";
+  else if (regime === "HIGH_VOLATILITY") label = "YÜKSEK VOLATİLİTE";
+  else if (regime === "LOW_VOLATILITY") label = "DÜŞÜK VOLATİLİTE";
+  else if (regime === "EXPANSION") label = "GENİŞLEME DÖNEMİ";
+
   return (
     <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full"
       style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
       <Icon size={11} style={{ color }} />
-      <span className="text-[11px] font-bold" style={{ color }}>{regime}</span>
+      <span className="text-[11px] font-bold" style={{ color }}>{label}</span>
     </div>
   );
 }
@@ -219,13 +228,13 @@ export default function Overview() {
           <div>
             <h1 className="text-xl font-bold tracking-tight gradient-text">ALPHA BIST</h1>
             <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
-              Market Intelligence Platform
+              Piyasa İstihbarat & Kantitatif Karar Destek Platformu
             </p>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
             style={{ background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)" }}>
             <div className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: "#00e5a0" }} />
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#00e5a0" }}>Live</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#00e5a0" }}>CANLI</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -241,7 +250,7 @@ export default function Overview() {
             }}
           >
             {systemOk ? <Shield size={11} /> : <AlertTriangle size={11} />}
-            {systemOk ? "All Systems" : "Degraded"}
+            {systemOk ? "Tüm Servisler Aktif" : "Kısmi Kesinti"}
           </div>
         </div>
       </div>
@@ -254,19 +263,19 @@ export default function Overview() {
         <div className="grid grid-cols-6 gap-4">
           {/* Regime */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Regime</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Piyasa Rejimi</p>
             <RegimePill regime={market?.regime} />
           </div>
           {/* Breadth */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Breadth</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Piyasa Genişliği</p>
             <p className="text-xl font-bold font-data" style={{ color: "var(--color-text-primary)" }}>
-              {market?.breadth_pct?.toFixed(1) ?? "—"}<span className="text-sm" style={{ color: "var(--color-text-secondary)" }}>%</span>
+              %{market?.breadth_pct?.toFixed(1) ?? "—"}
             </p>
           </div>
           {/* Adv/Dec */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Adv / Dec</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Yükselen / Düşen</p>
             <p className="text-lg font-bold font-data">
               <span style={{ color: "#00e5a0" }}>{market?.advancing ?? 0}</span>
               <span className="mx-1" style={{ color: "var(--color-text-faint)" }}>/</span>
@@ -275,7 +284,7 @@ export default function Overview() {
           </div>
           {/* RSI */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Avg RSI</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Ort. RSI (Göreceli Güç)</p>
             <p className="text-xl font-bold font-data"
               style={{
                 color: (market?.avg_rsi ?? 50) > 70 ? "#ff4466" :
@@ -286,7 +295,7 @@ export default function Overview() {
           </div>
           {/* Anomalies */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Anomalies</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Tespit Edilen Anomali</p>
             <p className="text-xl font-bold font-data"
               style={{ color: (market?.anomaly_count ?? 0) > 10 ? "#ffaa00" : "var(--color-text-primary)" }}>
               {market?.anomaly_count ?? 0}
@@ -294,11 +303,11 @@ export default function Overview() {
           </div>
           {/* Risk Appetite */}
           <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Risk Appetite</p>
+            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Risk İştahı</p>
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-data font-semibold" style={{ color: "#00e5a0" }}>
-                  {((market?.risk_appetite ?? 0) * 100).toFixed(0)}%
+                  %{((market?.risk_appetite ?? 0) * 100).toFixed(0)}
                 </span>
               </div>
               <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
@@ -318,7 +327,7 @@ export default function Overview() {
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         <StatCard
-          label="Global Risk"
+          label="Küresel Risk"
           value={(world?.global_risk_appetite ?? 0) * 100}
           suffix="%" decimals={0}
           icon={Globe}
@@ -326,7 +335,7 @@ export default function Overview() {
           trend={world && world.global_risk_appetite > 0.6 ? "up" : "down"}
         />
         <StatCard
-          label="VIX"
+          label="VIX Volatilite"
           value={world?.vix_level}
           decimals={1}
           icon={BarChart2}
@@ -334,14 +343,14 @@ export default function Overview() {
           trend={world && world.vix_level > 25 ? "up" : "down"}
         />
         <StatCard
-          label="USD Strength"
+          label="Dolar Endeksi (DXY)"
           value={(world?.usd_strength ?? 0) * 100}
           suffix="%" decimals={0}
           icon={TrendingUp}
           accent="#9966ff"
         />
         <StatCard
-          label="Turkey Macro Risk"
+          label="Türkiye Makro Risk"
           value={(world?.turkey_macro_risk ?? 0) * 100}
           suffix="%" decimals={0}
           icon={AlertTriangle}
@@ -349,7 +358,7 @@ export default function Overview() {
           trend={world && world.turkey_macro_risk > 0.6 ? "up" : "neutral"}
         />
         <StatCard
-          label="Oil Pressure"
+          label="Petrol Fiyat Baskısı"
           value={(world?.oil_pressure ?? 0) * 100}
           suffix="%" decimals={0}
           icon={Activity}
@@ -364,15 +373,15 @@ export default function Overview() {
       >
         <SectionHeader
           icon={TargetIcon}
-          title="Opportunity Engine"
-          sub={`${signals?.length ?? 0} active signals`}
+          title="Fırsat Motoru (Algoritmik Sinyaller)"
+          sub={`${signals?.length ?? 0} aktif sinyal`}
           accent="#00e5a0"
         />
 
         {!signals || signals.length === 0 ? (
           <div className="py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
             <TargetIcon size={24} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm">No active signals</p>
+            <p className="text-sm">Şu an için aktif sinyal bulunmuyor</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -383,13 +392,13 @@ export default function Overview() {
                     color: "var(--color-text-muted)",
                     borderBottom: "1px solid var(--color-border-subtle)"
                   }}>
-                  <th className="text-left py-2.5 px-5">Ticker</th>
-                  <th className="text-left py-2.5 px-3">Name</th>
-                  <th className="text-right py-2.5 px-3">Score</th>
-                  <th className="text-center py-2.5 px-3">Dir</th>
+                  <th className="text-left py-2.5 px-5">Sembol</th>
+                  <th className="text-left py-2.5 px-3">Şirket Adı</th>
+                  <th className="text-right py-2.5 px-3">Model Skoru</th>
+                  <th className="text-center py-2.5 px-3">Yön</th>
                   <th className="text-center py-2.5 px-3">Risk</th>
-                  <th className="text-center py-2.5 px-3">Horizon</th>
-                  <th className="text-right py-2.5 px-5">Return</th>
+                  <th className="text-center py-2.5 px-3">Vade</th>
+                  <th className="text-right py-2.5 px-5">Beklenen Getiri</th>
                 </tr>
               </thead>
               <tbody>
@@ -420,7 +429,7 @@ export default function Overview() {
                     </td>
                     <td className="py-3 px-3 text-center">
                       <span className="text-[11px] font-data" style={{ color: "var(--color-text-secondary)" }}>
-                        {s.horizon}
+                        {s.horizon === "SHORT" ? "Kısa Vade" : s.horizon === "MID" ? "Orta Vade" : s.horizon === "LONG" ? "Uzun Vade" : s.horizon}
                       </span>
                     </td>
                     <td className="py-3 px-5 text-right">
@@ -428,7 +437,7 @@ export default function Overview() {
                         className="font-data font-semibold text-[13px]"
                         style={{ color: (s.expected_return_pct ?? 0) > 0 ? "#00e5a0" : "#ff4466" }}
                       >
-                        {(s.expected_return_pct ?? 0) > 0 ? "+" : ""}{s.expected_return_pct?.toFixed(1)}%
+                        {(s.expected_return_pct ?? 0) > 0 ? "+" : ""}%{s.expected_return_pct?.toFixed(1)}
                       </span>
                     </td>
                   </tr>
@@ -446,7 +455,7 @@ export default function Overview() {
           className="rounded-xl overflow-hidden"
           style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
         >
-          <SectionHeader icon={Activity} title="System Health" accent="#00c8ff" />
+          <SectionHeader icon={Activity} title="Sistem Sağlığı ve Servisler" accent="#00c8ff" />
           <div className="px-5 py-3 divide-y" style={{ borderColor: "rgba(255,255,255,0.03)" }}>
             {status?.services && Object.entries(status.services).length > 0
               ? Object.entries(status.services).map(([name, health]) => (
@@ -454,7 +463,7 @@ export default function Overview() {
               ))
               : (
                 <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
-                  Loading...
+                  Yükleniyor...
                 </p>
               )
             }
@@ -466,18 +475,18 @@ export default function Overview() {
           className="rounded-xl overflow-hidden"
           style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
         >
-          <SectionHeader icon={Globe} title="World State" accent="#9966ff" />
+          <SectionHeader icon={Globe} title="Küresel Makro Göstergeler" accent="#9966ff" />
           <div className="px-5 py-4 space-y-4">
             {world ? [
-              { label: "Geopolitical Risk", value: world.geopolitical_risk, invert: true },
-              { label: "EM Risk Appetite", value: world.em_risk_appetite, invert: false },
-              { label: "Inflation Pressure", value: world.inflation_pressure, invert: true },
-              { label: "US Rate Pressure", value: world.us_rate_pressure, invert: true },
+              { label: "Jeopolitik Risk", value: world.geopolitical_risk, invert: true },
+              { label: "Gelişmekte Olan Risk İştahı", value: world.em_risk_appetite, invert: false },
+              { label: "Enflasyon Baskısı", value: world.inflation_pressure, invert: true },
+              { label: "ABD Faiz Baskısı", value: world.us_rate_pressure, invert: true },
             ].map(f => (
               <WorldMetric key={f.label} label={f.label} value={f.value} invert={f.invert} />
             )) : (
               <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
-                Loading world state...
+                Küresel veriler alınıyor...
               </p>
             )}
           </div>

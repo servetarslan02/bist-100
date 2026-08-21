@@ -4,27 +4,27 @@ import { usePolling, type SystemStatus } from "@/lib/api";
 import { Activity, Cpu, HardDrive, MemoryStick, Server, Zap, Database, Radio, CheckCircle2, XCircle } from "lucide-react";
 
 const RESOURCES = [
-  { label: "CPU", value: 34, icon: Cpu },
-  { label: "RAM", value: 51, icon: MemoryStick },
-  { label: "GPU", value: 28, icon: Zap },
-  { label: "Disk", value: 22, icon: HardDrive },
+  { label: "İşlemci (CPU)", value: 34, icon: Cpu },
+  { label: "Bellek (RAM)", value: 51, icon: MemoryStick },
+  { label: "Ekran Kartı (GPU)", value: 28, icon: Zap },
+  { label: "Disk Alanı", value: 22, icon: HardDrive },
 ];
 
 const SYSTEM_INFO = [
-  { label: "Version", value: "ALPHA BIST v1.2" },
-  { label: "Database", value: "PostgreSQL + ClickHouse" },
-  { label: "Event Bus", value: "Redpanda" },
-  { label: "ML Models", value: "5 active" },
-  { label: "LLM", value: "Gemma 4 12B Q4" },
-  { label: "Instruments", value: "800+" },
+  { label: "Versiyon", value: "ALPHA BIST v1.2" },
+  { label: "Veritabanı", value: "PostgreSQL + ClickHouse" },
+  { label: "Olay Hattı (Bus)", value: "Redpanda" },
+  { label: "Aktif Modeller", value: "5 Aktif ML Modeli" },
+  { label: "Yapay Zeka (LLM)", value: "Gemma 4 12B Q4" },
+  { label: "Taranan Enstrüman", value: "800+ BIST Hissesi" },
 ];
 
 const PIPELINE_STATS = [
-  { label: "Events/sec", value: "~4,800" },
-  { label: "Latency", value: "17ms" },
-  { label: "Dropped", value: "0" },
-  { label: "Completeness", value: "99.99%" },
-  { label: "Uptime", value: "99.98%" },
+  { label: "Olay / Saniye", value: "~4.800" },
+  { label: "Gecikme (Latency)", value: "17ms" },
+  { label: "Düşen Paket", value: "0" },
+  { label: "Veri Bütünlüğü", value: "%99.99" },
+  { label: "Çalışma Süresi", value: "%99.98" },
 ];
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -45,7 +45,7 @@ function ResourceBar({ label, value, icon: Icon }: { label: string; value: numbe
           <Icon size={11} style={{ color: "var(--color-text-muted)" }} />
           <span className="text-[11px]" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
         </div>
-        <span className="text-[11px] font-data font-semibold" style={{ color }}>{value}%</span>
+        <span className="text-[11px] font-data font-semibold" style={{ color }}>%{value}</span>
       </div>
       <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
         <div
@@ -69,8 +69,8 @@ export default function SystemHealth() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">System Health</h1>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>Infrastructure monitoring</p>
+          <h1 className="text-xl font-bold gradient-text">Sistem Sağlığı</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>Mikroservis ve altyapı canlı izleme</p>
         </div>
         <div
           className="flex items-center gap-2 px-4 py-2 rounded-xl"
@@ -84,7 +84,7 @@ export default function SystemHealth() {
             : <XCircle size={14} style={{ color: "#ff4466" }} />
           }
           <span className="text-sm font-semibold" style={{ color: allHealthy ? "#00e5a0" : "#ff4466" }}>
-            {allHealthy ? "All Systems Operational" : "Degraded"}
+            {allHealthy ? "Tüm Servisler Sorunsuz" : "Kısmi Kesinti"}
           </span>
           <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
             {healthyCount}/{totalCount}
@@ -102,11 +102,11 @@ export default function SystemHealth() {
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,229,160,0.12)" }}>
               <Server size={13} style={{ color: "#00e5a0" }} />
             </div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Services</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Bağımsız Servisler</h2>
           </div>
           <div className="px-5 py-2">
             {Object.entries(services).length === 0 ? (
-              <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Loading...</p>
+              <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Yükleniyor...</p>
             ) : (
               Object.entries(services).map(([name, health]) => {
                 const ok = health === "healthy";
@@ -122,7 +122,7 @@ export default function SystemHealth() {
                       className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
                       style={{ background: ok ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)", color: ok ? "#00e5a0" : "#ff4466" }}
                     >
-                      {health as string}
+                      {ok ? "Çalışıyor" : "Hata"}
                     </span>
                   </div>
                 );
@@ -140,7 +140,7 @@ export default function SystemHealth() {
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,200,255,0.12)" }}>
               <Activity size={13} style={{ color: "#00c8ff" }} />
             </div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Resources</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Sistem Kaynakları</h2>
           </div>
           <div className="px-5 py-4 space-y-4">
             {RESOURCES.map(r => <ResourceBar key={r.label} {...r} />)}
@@ -156,11 +156,11 @@ export default function SystemHealth() {
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(153,102,255,0.12)" }}>
               <Database size={13} style={{ color: "#9966ff" }} />
             </div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>System Info</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Sistem Detayları</h2>
           </div>
           <div className="px-5 py-2">
             {SYSTEM_INFO.map(item => <InfoRow key={item.label} {...item} />)}
-            <InfoRow label="Last Update" value={status?.timestamp ? new Date(status.timestamp).toLocaleString("tr-TR") : "—"} />
+            <InfoRow label="Son Veri Güncellemesi" value={status?.timestamp ? new Date(status.timestamp).toLocaleString("tr-TR") : "—"} />
           </div>
         </div>
 
@@ -173,7 +173,7 @@ export default function SystemHealth() {
             <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(255,170,0,0.12)" }}>
               <Radio size={13} style={{ color: "#ffaa00" }} />
             </div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Data Pipeline</h2>
+            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Veri Akış Hattı</h2>
           </div>
           <div className="px-5 py-2">
             {PIPELINE_STATS.map(item => <InfoRow key={item.label} {...item} />)}

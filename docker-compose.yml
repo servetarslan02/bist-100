@@ -305,7 +305,8 @@ services:
       - ./apps/web:/app
       - /app/node_modules
       - /app/.next
-    mem_limit: 512m
+    environment:
+      - API_URL=http://api:8000
     depends_on:
       - api
 

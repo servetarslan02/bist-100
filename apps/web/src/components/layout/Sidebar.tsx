@@ -12,44 +12,44 @@ import {
 
 const NAV_ITEMS = [
   {
-    group: "CORE",
+    group: "ÇEKİRDEK",
     items: [
-      { href: "/", label: "Overview", icon: LayoutDashboard },
-      { href: "/radar", label: "Market Radar", icon: Radar },
-      { href: "/map", label: "Market Map", icon: Map },
-      { href: "/events", label: "Event Center", icon: Zap },
+      { href: "/", label: "Genel Bakış", icon: LayoutDashboard },
+      { href: "/radar", label: "Piyasa Radarı", icon: Radar },
+      { href: "/map", label: "Piyasa Haritası", icon: Map },
+      { href: "/events", label: "Olay Merkezi", icon: Zap },
     ],
   },
   {
-    group: "INTELLIGENCE",
+    group: "İSTİHBARAT & ANALİZ",
     items: [
-      { href: "/opportunities", label: "Opportunities", icon: Target },
-      { href: "/asset", label: "Asset Intel", icon: LineChart },
-      { href: "/world", label: "World Intel", icon: Globe },
-      { href: "/research", label: "AI Research", icon: FlaskConical },
+      { href: "/opportunities", label: "Fırsatlar", icon: Target },
+      { href: "/asset", label: "Varlık Analizi", icon: LineChart },
+      { href: "/world", label: "Küresel Durum", icon: Globe },
+      { href: "/research", label: "Yapay Zeka Analiz", icon: FlaskConical },
     ],
   },
   {
-    group: "PORTFOLIO",
+    group: "PORTFÖY & İŞLEM",
     items: [
-      { href: "/portfolio", label: "Portfolio", icon: Briefcase },
-      { href: "/scenario", label: "Scenario Lab", icon: TestTube },
-      { href: "/strategy", label: "Strategy", icon: TrendingUp },
+      { href: "/portfolio", label: "Portföy", icon: Briefcase },
+      { href: "/scenario", label: "Senaryo Testi", icon: TestTube },
+      { href: "/strategy", label: "Stratejiler", icon: TrendingUp },
     ],
   },
   {
-    group: "MODELS",
+    group: "MODELLER & ML",
     items: [
-      { href: "/models", label: "Model Center", icon: Cpu },
-      { href: "/learning", label: "Learning Lab", icon: Activity },
+      { href: "/models", label: "Model Merkezi", icon: Cpu },
+      { href: "/learning", label: "Öğrenme Laboratuvarı", icon: Activity },
     ],
   },
   {
-    group: "SYSTEM",
+    group: "SİSTEM & VERİ",
     items: [
-      { href: "/data", label: "Data Center", icon: Database },
-      { href: "/alerts", label: "Alert Center", icon: Bell },
-      { href: "/system", label: "System Health", icon: Activity },
+      { href: "/data", label: "Veri Merkezi", icon: Database },
+      { href: "/alerts", label: "Alarm Merkezi", icon: Bell },
+      { href: "/system", label: "Sistem Sağlığı", icon: Activity },
     ],
   },
 ];
@@ -60,7 +60,7 @@ export function Sidebar() {
   return (
     <aside
       style={{ background: "var(--color-bg-secondary)", borderRight: "1px solid var(--color-border-subtle)" }}
-      className="w-[220px] flex flex-col h-screen sticky top-0 overflow-hidden"
+      className="w-[220px] flex flex-col h-screen sticky top-0 overflow-hidden select-none"
     >
       {/* Logo */}
       <div className="px-5 py-5" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
@@ -80,7 +80,7 @@ export function Sidebar() {
               ALPHA BIST
             </h1>
             <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
-              Intelligence
+              Kantitatif İstihbarat
             </p>
           </div>
         </div>
@@ -135,7 +135,7 @@ export function Sidebar() {
             style={{ background: "var(--color-accent-green)" }}
           />
           <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            Live
+            CANLI
           </span>
           <span className="text-[10px] font-data ml-auto" style={{ color: "var(--color-text-faint)" }}>
             {new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}

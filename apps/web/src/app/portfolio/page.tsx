@@ -1,7 +1,7 @@
 "use client";
 
 import { usePolling, type PortfolioData } from "@/lib/api";
-import { Briefcase, TrendingUp, TrendingDown, DollarSign, Wallet, PieChart, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { Briefcase, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 function MetricCard({ label, value, prefix = "", suffix = "", color }: {
   label: string; value?: number; prefix?: string; suffix?: string; color?: string;
@@ -10,7 +10,7 @@ function MetricCard({ label, value, prefix = "", suffix = "", color }: {
   const accent = color === "auto" ? (isPos ? "#00e5a0" : "#ff4466") : color ?? "#00c8ff";
   return (
     <div
-      className="rounded-xl p-4 space-y-2"
+      className="rounded-xl p-4 space-y-2 select-none"
       style={{
         background: "var(--color-bg-card)",
         border: "1px solid var(--color-border-subtle)",
@@ -39,9 +39,9 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Portfolio</h1>
+          <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Paper trading · {positions.length} positions
+            Sanal İşlem (Paper Trading) · {positions.length} aktif pozisyon
           </p>
         </div>
         <div
@@ -56,18 +56,18 @@ export default function PortfolioPage() {
             {totalPnlPos ? "+" : ""}₺{(p?.total_pnl ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
           </span>
           <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
-            ({totalPnlPos ? "+" : ""}{(p?.total_return_pct ?? 0).toFixed(2)}%)
+            ({totalPnlPos ? "+" : ""}%{(p?.total_return_pct ?? 0).toFixed(2)})
           </span>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-3">
-        <MetricCard label="Capital" value={p?.current_capital} prefix="₺" accent="#00c8ff" />
-        <MetricCard label="Invested" value={p?.invested_value} prefix="₺" accent="#9966ff" />
-        <MetricCard label="Cash" value={p?.cash_balance} prefix="₺" accent="#ffaa00" />
-        <MetricCard label="P&L" value={p?.total_pnl} prefix="₺" color="auto" />
-        <MetricCard label="Return" value={p?.total_return_pct} suffix="%" color="auto" />
+        <MetricCard label="Toplam Sermaye" value={p?.current_capital} prefix="₺" accent="#00c8ff" />
+        <MetricCard label="Yatırımdaki Tutar" value={p?.invested_value} prefix="₺" accent="#9966ff" />
+        <MetricCard label="Nakit Bakiye" value={p?.cash_balance} prefix="₺" accent="#ffaa00" />
+        <MetricCard label="Toplam K/Z" value={p?.total_pnl} prefix="₺" color="auto" />
+        <MetricCard label="Toplam Getiri" value={p?.total_return_pct} suffix="%" color="auto" />
       </div>
 
       {/* Positions Table */}
@@ -84,42 +84,42 @@ export default function PortfolioPage() {
               <Briefcase size={13} style={{ color: "#00c8ff" }} />
             </div>
             <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
-              Positions
+              Açık Pozisyonlar
             </h2>
           </div>
-          <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{positions.length} holdings</span>
+          <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>{positions.length} hisse</span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr
-                className="text-[10px] uppercase tracking-wider"
+                className="text-[10px] uppercase tracking-wider font-semibold"
                 style={{
                   color: "var(--color-text-muted)",
                   borderBottom: "1px solid var(--color-border-subtle)",
                   background: "rgba(255,255,255,0.01)"
                 }}
               >
-                <th className="text-left py-3 px-5">Ticker</th>
-                <th className="text-left py-3 px-3">Name</th>
-                <th className="text-right py-3 px-3">Qty</th>
-                <th className="text-right py-3 px-3">Avg Cost</th>
-                <th className="text-right py-3 px-3">Current</th>
-                <th className="text-right py-3 px-3">Value</th>
-                <th className="text-right py-3 px-3">P&L</th>
-                <th className="text-right py-3 px-3">P&L%</th>
-                <th className="text-right py-3 px-5">Weight</th>
+                <th className="text-left py-3 px-5">Sembol</th>
+                <th className="text-left py-3 px-3">Şirket Adı</th>
+                <th className="text-right py-3 px-3">Adet</th>
+                <th className="text-right py-3 px-3">Ort. Maliyet</th>
+                <th className="text-right py-3 px-3">Güncel Fiyat</th>
+                <th className="text-right py-3 px-3">Piyasa Değeri</th>
+                <th className="text-right py-3 px-3">Kâr / Zarar</th>
+                <th className="text-right py-3 px-3">K/Z %</th>
+                <th className="text-right py-3 px-5">Portföy Payı</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="text-center py-16" style={{ color: "var(--color-text-muted)" }}>Loading...</td></tr>
+                <tr><td colSpan={9} className="text-center py-16" style={{ color: "var(--color-text-muted)" }}>Veriler yükleniyor...</td></tr>
               ) : positions.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="text-center py-16">
                     <Wallet size={28} className="mx-auto mb-3" style={{ color: "var(--color-text-faint)" }} />
-                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No positions yet</p>
+                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Henüz açık pozisyon bulunmuyor</p>
                   </td>
                 </tr>
               ) : (
@@ -161,7 +161,7 @@ export default function PortfolioPage() {
                       </td>
                       <td className="py-3 px-3 text-right">
                         <span className="font-data font-semibold" style={{ color: pnlPos ? "#00e5a0" : "#ff4466" }}>
-                          {pnlPos ? "+" : ""}{pos.unrealized_pnl_pct?.toFixed(2)}%
+                          {pnlPos ? "+" : ""}%{pos.unrealized_pnl_pct?.toFixed(2)}
                         </span>
                       </td>
                       <td className="py-3 px-5 text-right">
@@ -170,7 +170,7 @@ export default function PortfolioPage() {
                             <div className="h-full rounded-full" style={{ width: `${pos.weight_pct ?? 0}%`, background: "#00c8ff" }} />
                           </div>
                           <span className="font-data text-[11px]" style={{ color: "var(--color-text-secondary)" }}>
-                            {pos.weight_pct?.toFixed(1)}%
+                            %{pos.weight_pct?.toFixed(1)}
                           </span>
                         </div>
                       </td>

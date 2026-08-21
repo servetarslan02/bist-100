@@ -66,9 +66,9 @@ export default function MarketRadar() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Market Radar</h1>
+          <h1 className="text-xl font-bold gradient-text">Piyasa Radarı</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            {rowData.length} instruments · live scanning
+            {rowData.length} BIST hissesi · canlı anomali ve momentum taraması
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -82,8 +82,8 @@ export default function MarketRadar() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search ticker or name..."
-              className="bg-transparent text-xs focus:outline-none w-44"
+              placeholder="Sembol veya şirket ara..."
+              className="bg-transparent text-xs focus:outline-none w-48"
               style={{ color: "var(--color-text-primary)" }}
             />
           </div>
@@ -96,12 +96,12 @@ export default function MarketRadar() {
             <select
               value={sector}
               onChange={(e) => setSector(e.target.value)}
-              className="bg-transparent text-xs focus:outline-none"
+              className="bg-transparent text-xs focus:outline-none cursor-pointer"
               style={{ color: "var(--color-text-primary)" }}
             >
-              <option value="">All Sectors</option>
+              <option value="" style={{ background: "#0d111a" }}>Tüm Sektörler</option>
               {sectors.map((s) => (
-                <option key={s} value={s}>{s}</option>
+                <option key={s} value={s} style={{ background: "#0d111a" }}>{s}</option>
               ))}
             </select>
           </div>
@@ -111,7 +111,7 @@ export default function MarketRadar() {
             style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
           >
             <RefreshCw size={11} style={{ color: "var(--color-text-muted)" }} className={loading ? "animate-spin" : ""} />
-            <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>60s</span>
+            <span className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>60sn</span>
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export default function MarketRadar() {
             <Radar size={13} style={{ color: "#00e5a0" }} />
           </div>
           <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
-            Instruments
+            Hisse Senetleri Listesi
           </h2>
         </div>
         <DataTable
@@ -143,8 +143,8 @@ export default function MarketRadar() {
 
       {/* Footer */}
       <div className="flex items-center justify-between text-[10px]" style={{ color: "var(--color-text-faint)" }}>
-        <span>Data: yfinance (15min delayed)</span>
-        <span>Auto-refresh: every 60s</span>
+        <span>Veri: yfinance (15 dk gecikmeli)</span>
+        <span>Otomatik Yenileme: Her 60 saniyede bir</span>
       </div>
     </div>
   );

@@ -5,13 +5,12 @@ import { usePolling, type Signal } from "@/lib/api";
 import { Target, ArrowUpRight, ArrowDownRight, Flame, Eye, Star, Layers } from "lucide-react";
 
 const CATEGORIES = ["ALL", "HIGH_CONVICTION", "CANDIDATE", "WATCH", "NORMAL"] as const;
-type Category = typeof CATEGORIES[number];
 
 const CAT_CONFIG: Record<string, { label: string; color: string; bg: string; icon: React.ElementType }> = {
-  HIGH_CONVICTION: { label: "High Conviction", color: "#ff4466", bg: "rgba(255,68,102,0.1)", icon: Flame },
-  CANDIDATE:       { label: "Candidate",       color: "#ffaa00", bg: "rgba(255,170,0,0.1)", icon: Star },
-  WATCH:           { label: "Watch",           color: "#00c8ff", bg: "rgba(0,200,255,0.1)", icon: Eye },
-  NORMAL:          { label: "Normal",          color: "#8892a4", bg: "rgba(136,146,164,0.1)", icon: Layers },
+  HIGH_CONVICTION: { label: "Yüksek Güven", color: "#ff4466", bg: "rgba(255,68,102,0.1)", icon: Flame },
+  CANDIDATE:       { label: "Güçlü Aday",   color: "#ffaa00", bg: "rgba(255,170,0,0.1)", icon: Star },
+  WATCH:           { label: "İzleme Listesi",color: "#00c8ff", bg: "rgba(0,200,255,0.1)", icon: Eye },
+  NORMAL:          { label: "Standart",     color: "#8892a4", bg: "rgba(136,146,164,0.1)", icon: Layers },
 };
 
 function CatBadge({ cat }: { cat: string }) {
@@ -19,7 +18,7 @@ function CatBadge({ cat }: { cat: string }) {
   const Icon = cfg.icon;
   return (
     <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold"
       style={{ background: cfg.bg, color: cfg.color }}
     >
       <Icon size={9} />
@@ -54,9 +53,9 @@ export default function Opportunities() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Opportunities</h1>
+          <h1 className="text-xl font-bold gradient-text">Piyasa Fırsatları</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            SPEC · Momentum · Breakout · Value · Event Driven
+            SPEC · Momentum · Kırılım · Değer · Olay Odaklı Stratejiler
           </p>
         </div>
         <div
@@ -64,12 +63,12 @@ export default function Opportunities() {
           style={{ background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.2)", color: "#00e5a0" }}
         >
           <div className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: "#00e5a0" }} />
-          {signals?.length ?? 0} signals
+          {signals?.length ?? 0} aktif sinyal
         </div>
       </div>
 
       {/* Category Filter */}
-      <div className="flex gap-2">
+      <div className="flex gap-2 select-none">
         {CATEGORIES.map(cat => {
           const cfg = cat === "ALL" ? null : CAT_CONFIG[cat];
           const active = filter === cat;
@@ -77,7 +76,7 @@ export default function Opportunities() {
             <button
               key={cat}
               onClick={() => setFilter(cat)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all duration-150 cursor-pointer"
               style={{
                 background: active ? (cfg?.bg ?? "rgba(0,229,160,0.1)") : "var(--color-bg-card)",
                 border: `1px solid ${active ? (cfg?.color ?? "#00e5a0") + "40" : "var(--color-border-subtle)"}`,
@@ -85,7 +84,7 @@ export default function Opportunities() {
               }}
             >
               {cfg && <cfg.icon size={10} />}
-              {cat === "ALL" ? "All" : cfg?.label}
+              {cat === "ALL" ? "Tümü" : cfg?.label}
               <span
                 className="ml-0.5 px-1.5 py-0.5 rounded-full text-[9px]"
                 style={{
@@ -112,10 +111,10 @@ export default function Opportunities() {
             <Target size={13} style={{ color: "#00e5a0" }} />
           </div>
           <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
-            Signal List
+            Sinyal Listesi
           </h2>
           <span className="text-[10px] ml-auto" style={{ color: "var(--color-text-muted)" }}>
-            {filtered.length} results
+            {filtered.length} sonuç listelendi
           </span>
         </div>
 
@@ -126,14 +125,14 @@ export default function Opportunities() {
                 className="text-[10px] uppercase tracking-wider font-semibold"
                 style={{ color: "var(--color-text-muted)", borderBottom: "1px solid var(--color-border-subtle)", background: "rgba(255,255,255,0.01)" }}
               >
-                <th className="text-left py-2.5 px-5">Ticker</th>
-                <th className="text-left py-2.5 px-3">Name</th>
-                <th className="text-right py-2.5 px-3">Score</th>
-                <th className="text-center py-2.5 px-3">Dir</th>
+                <th className="text-left py-2.5 px-5">Sembol</th>
+                <th className="text-left py-2.5 px-3">Şirket Adı</th>
+                <th className="text-right py-2.5 px-3">Model Skoru</th>
+                <th className="text-center py-2.5 px-3">Yön</th>
                 <th className="text-center py-2.5 px-3">Risk</th>
-                <th className="text-center py-2.5 px-3">Horizon</th>
-                <th className="text-right py-2.5 px-3">Exp Ret</th>
-                <th className="text-center py-2.5 px-5">Category</th>
+                <th className="text-center py-2.5 px-3">Vade</th>
+                <th className="text-right py-2.5 px-3">Beklenen Getiri</th>
+                <th className="text-center py-2.5 px-5">Kategori</th>
               </tr>
             </thead>
             <tbody>
@@ -142,7 +141,7 @@ export default function Opportunities() {
                   <td colSpan={8} className="text-center py-16">
                     <div className="flex items-center justify-center gap-2" style={{ color: "var(--color-text-muted)" }}>
                       <div className="w-4 h-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
-                      Scanning signals...
+                      Fırsatlar taranıyor...
                     </div>
                   </td>
                 </tr>
@@ -150,19 +149,19 @@ export default function Opportunities() {
                 <tr>
                   <td colSpan={8} className="text-center py-16">
                     <Target size={28} className="mx-auto mb-3" style={{ color: "var(--color-text-faint)" }} />
-                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>No opportunities found</p>
+                    <p className="text-sm" style={{ color: "var(--color-text-muted)" }}>Filtreye uygun sinyal bulunamadı</p>
                   </td>
                 </tr>
               ) : (
                 filtered.map((s, i) => {
-                  const up = s.direction === "LONG";
+                  const up = s.direction === "LONG" || s.direction === "AL";
                   const score = s.score ?? 0;
                   const scoreColor = score >= 80 ? "#00e5a0" : score >= 60 ? "#ffaa00" : "#ff4466";
                   const retPos = (s.expected_return_pct ?? 0) > 0;
-                  const riskCfg: Record<string, { bg: string; color: string }> = {
-                    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0" },
-                    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00" },
-                    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466" },
+                  const riskCfg: Record<string, { bg: string; color: string; text: string }> = {
+                    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0", text: "DÜŞÜK" },
+                    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00", text: "ORTA" },
+                    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466", text: "YÜKSEK" },
                   };
                   const risk = riskCfg[s.risk_level ?? "MEDIUM"] ?? riskCfg.MEDIUM;
                   return (
@@ -183,24 +182,26 @@ export default function Opportunities() {
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold"
                           style={{ background: up ? "rgba(0,229,160,0.12)" : "rgba(255,68,102,0.12)", color: up ? "#00e5a0" : "#ff4466" }}
                         >
                           {up ? <ArrowUpRight size={9} /> : <ArrowDownRight size={9} />}
-                          {s.direction}
+                          {up ? "AL" : "SAT"}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: risk.bg, color: risk.color }}>
-                          {s.risk_level}
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: risk.bg, color: risk.color }}>
+                          {risk.text}
                         </span>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className="text-[11px] font-data" style={{ color: "var(--color-text-secondary)" }}>{s.horizon}</span>
+                        <span className="text-[11px] font-data" style={{ color: "var(--color-text-secondary)" }}>
+                          {s.horizon === "SHORT" ? "Kısa Vade" : s.horizon === "MID" ? "Orta Vade" : s.horizon === "LONG" ? "Uzun Vade" : s.horizon}
+                        </span>
                       </td>
                       <td className="py-3 px-3 text-right">
                         <span className="font-data font-semibold" style={{ color: retPos ? "#00e5a0" : "#ff4466" }}>
-                          {retPos ? "+" : ""}{s.expected_return_pct?.toFixed(1)}%
+                          {retPos ? "+" : ""}%{s.expected_return_pct?.toFixed(1)}
                         </span>
                       </td>
                       <td className="py-3 px-5 text-center">
