@@ -1,155 +1,109 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Search, TrendingUp, TrendingDown, Sparkles,
-  BarChart3, Activity, ShieldCheck, Zap, Layers
+  BarChart3, Activity, ShieldCheck, Zap, Layers,
+  Compass, ArrowUpRight, ArrowDownRight, RefreshCw,
+  Cpu, Target, CheckCircle2
 } from "lucide-react";
 import { TradingViewChart } from "@/components/charts/TradingViewChart";
 
-interface AssetProfile {
+interface LiveAssetData {
   symbol: string;
   name: string;
-  price: number;
-  change_pct: number;
   sector: string;
+  price: number;
+  prev_price: number;
+  change_pct: number;
   market_cap: string;
   pe_ratio: number;
   pb_ratio: number;
   rsi_14: number;
-  macd_signal: string;
+  sma_20: number;
+  sma_50: number;
   support: number;
   resistance: number;
-  recommendation: "STRONG_BUY" | "BUY" | "HOLD";
+  atr_14: number;
+  macd_val: number;
+  macd_sig_val: number;
+  macd_signal: string;
+  recommendation: "STRONG_BUY" | "BUY" | "HOLD" | "SELL";
+  recommendation_text: string;
+  recommendation_score: number;
+  candles: Array<{ time: string; open: number; high: number; low: number; close: number; volume: number }>;
+  is_real_data: boolean;
 }
 
-const STOCK_NAMES: Record<string, { name: string; sector: string; base_price: number }> = {
-  THYAO: { name: "Türk Hava Yolları A.O.", sector: "Havacılık & Ulaştırma", base_price: 312.50 },
-  ASELS: { name: "Aselsan Elektronik Sanayi", sector: "Savunma Sanayi", base_price: 66.80 },
-  GARAN: { name: "Garanti BBVA", sector: "Bankacılık", base_price: 121.40 },
-  AKBNK: { name: "Akbank T.A.Ş.", sector: "Bankacılık", base_price: 61.20 },
-  KCHOL: { name: "Koç Holding", sector: "Holding", base_price: 218.00 },
-  TUPRS: { name: "Tüpraş Türkiye Petrol Rafinerileri", sector: "Enerji & Petrol", base_price: 174.50 },
-  EREGL: { name: "Ereğli Demir ve Çelik Fabrikaları", sector: "Demir & Çelik", base_price: 52.30 },
-  BIMAS: { name: "BİM Birleşik Mağazalar", sector: "Perakende Ticaret", base_price: 542.00 },
-  FROTO: { name: "Ford Otosan", sector: "Otomotiv", base_price: 1120.00 },
-  PGSUS: { name: "Pegasus Hava Taşımacılığı", sector: "Havacılık & Ulaştırma", base_price: 242.80 },
-  SISE:  { name: "Türkiye Şişe ve Cam Fabrikaları", sector: "Cam & Sanayi", base_price: 46.90 },
-};
+const POPULAR_TICKERS = [
+  "THYAO", "ASELS", "GARAN", "AKBNK", "KCHOL",
+  "TUPRS", "EREGL", "BIMAS", "FROTO", "PGSUS",
+  "SISE", "ASTOR", "TCELL", "ISCTR"
+];
 
 export default function AssetIntelPage() {
   const [tickerInput, setTickerInput] = useState("THYAO");
   const [activeTicker, setActiveTicker] = useState("THYAO");
+  const [asset, setAsset] = useState<LiveAssetData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
 
-  const asset = useMemo<AssetProfile>(() => {
-    const sym = activeTicker.toUpperCase().trim() || "THYAO";
-    const meta = STOCK_NAMES[sym] || {
-      name: `${sym} Şirket Grubu`,
-      sector: "BIST Sanayi & Ticaret",
-      base_price: 50.0 + (sym.charCodeAt(0) % 200),
-    };
-    const charSum = sym.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const p = meta.base_price;
-    const change = -2.0 + ((charSum % 60) / 10.0);
-    const rsi = 38.0 + (charSum % 36);
-    const pe = 4.2 + ((charSum % 100) / 10.0);
-    const pb = 0.85 + ((charSum % 35) / 10.0);
-
-    return {
-      symbol: sym,
-      name: meta.name,
-      price: p,
-      change_pct: change,
-      sector: meta.sector,
-      market_cap: `${(p * 1.4).toFixed(1)} Milyar ₺`,
-      pe_ratio: Number(pe.toFixed(1)),
-      pb_ratio: Number(pb.toFixed(2)),
-      rsi_14: Number(rsi.toFixed(1)),
-      macd_signal: change > 0 ? "POZİTİF KESİŞİM (AL)" : "NÖTR / İZLE",
-      support: Number((p * 0.94).toFixed(2)),
-      resistance: Number((p * 1.07).toFixed(2)),
-      recommendation: rsi > 55 ? "STRONG_BUY" : rsi > 45 ? "BUY" : "HOLD",
-    };
-  }, [activeTicker]);
-
-  const [liveCandles, setLiveCandles] = useState<any[] | null>(null);
-
-  // Fetch real OHLCV candlestick data from backend
+  // Fetch real live intelligence data from backend
   useEffect(() => {
     let isMounted = true;
-    async function fetchLiveCandles() {
+    async function fetchAssetData() {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`/api/v1/market/instruments/${activeTicker}/ohlcv?period=3mo`);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.data && json.data.length > 0) {
-            const formatted = json.data.map((c: any, idx: number) => {
-              const d = c.Date ? new Date(c.Date) : new Date(Date.now() - (json.data.length - idx) * 86400000);
-              const dateStr = d.toISOString().split("T")[0];
-              return {
-                time: dateStr,
-                open: Number((c.Open ?? c.open ?? 100).toFixed(2)),
-                high: Number((c.High ?? c.high ?? 100).toFixed(2)),
-                low: Number((c.Low ?? c.low ?? 100).toFixed(2)),
-                close: Number((c.Close ?? c.close ?? 100).toFixed(2)),
-              };
-            });
-            if (isMounted) setLiveCandles(formatted);
-          }
+        const res = await fetch(`/api/v1/market/instruments/${activeTicker}/live_intel`);
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${activeTicker} için canlı veri alınamadı`);
         }
-      } catch (err) {
-        console.warn("Could not fetch live candles, using simulated data", err);
+        const data = await res.json();
+        if (isMounted) {
+          setAsset(data);
+        }
+      } catch (err: any) {
+        if (isMounted) {
+          setError(err.message || "Veri çekme hatası");
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
-    fetchLiveCandles();
-    return () => { isMounted = false; };
+
+    fetchAssetData();
+    return () => {
+      isMounted = false;
+    };
   }, [activeTicker]);
-
-  // Fallback candlestick generator if live data is not available
-  const fallbackCandleData = useMemo(() => {
-    const data = [];
-    const base = asset.price * 0.85;
-    let current = base;
-    const now = new Date();
-    
-    for (let i = 60; i >= 0; i--) {
-      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const dateStr = d.toISOString().split("T")[0];
-      const dailyVol = (Math.sin(i * 0.4) + Math.cos(i * 0.2)) * (asset.price * 0.02);
-      const open = current;
-      const close = Math.max(10, current + dailyVol + (i === 0 ? asset.price - current : (Math.random() - 0.48) * (asset.price * 0.03)));
-      const high = Math.max(open, close) + Math.random() * (asset.price * 0.015);
-      const low = Math.min(open, close) - Math.random() * (asset.price * 0.015);
-      
-      data.push({
-        time: dateStr,
-        open: Number(open.toFixed(2)),
-        high: Number(high.toFixed(2)),
-        low: Number(low.toFixed(2)),
-        close: Number(close.toFixed(2)),
-      });
-      current = close;
-    }
-    return data;
-  }, [asset.price]);
-
-  const candleData = liveCandles && liveCandles.length > 0 ? liveCandles : fallbackCandleData;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (tickerInput.trim()) {
-      setActiveTicker(tickerInput.trim().toUpperCase());
+      const sym = tickerInput.trim().toUpperCase();
+      setActiveTicker(sym);
       setAiReport(null);
-      setLiveCandles(null);
     }
   };
 
+  const handleSelectTicker = (sym: string) => {
+    setTickerInput(sym);
+    setActiveTicker(sym);
+    setAiReport(null);
+  };
+
   const handleAskGemini = async () => {
+    if (!asset) return;
     setLoadingAi(true);
     try {
-      const res = await fetch(`/api/v1/intelligence/gemini_report/${asset.symbol}?price=${asset.price}&sector=${encodeURIComponent(asset.sector)}`);
+      const res = await fetch(
+        `/api/v1/intelligence/gemini_report/${asset.symbol}?price=${asset.price}&sector=${encodeURIComponent(asset.sector)}`
+      );
       const data = await res.json();
       setAiReport(data?.report || "Rapor oluşturuldu.");
     } catch (err) {
@@ -159,16 +113,24 @@ export default function AssetIntelPage() {
     }
   };
 
+  const isPos = (asset?.change_pct ?? 0) >= 0;
+
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
-      {/* Header & Search */}
-      <div className="flex items-center justify-between">
+      {/* Header & Quick Ticker Selector */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Tekil Varlık & Canlı TradingView Grafik Laboratuvarı</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold gradient-text">Canlı Varlık İstihbarat Laboratuvarı</h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              %100 Gerçek BİST Verisi
+            </span>
+          </div>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            BIST Şirket Değerleme Çarpanları · TradingView Mum Grafikleri · Gemini 3.7 İstihbarat Entegrasyonu
+            BIST Şirket Değerleme Göstergeleri · TradingView Mum Grafiği · Gemini 3.7 Canlı İstihbaratı
           </p>
         </div>
+
         <form onSubmit={handleSearch} className="flex items-center gap-2">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800">
             <Search size={12} className="text-zinc-500" />
@@ -189,143 +151,229 @@ export default function AssetIntelPage() {
         </form>
       </div>
 
-      {/* Asset Hero Card */}
-      <div
-        className="rounded-xl p-5 select-none"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20">
-              <span className="text-base font-bold font-data text-emerald-400">{asset.symbol}</span>
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-zinc-100">{asset.name}</h2>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">{asset.sector}</span>
-              </div>
-              <p className="text-[11px] text-zinc-500 mt-0.5">Piyasa Değeri: {asset.market_cap}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleAskGemini}
-              disabled={loadingAi}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer transition-all"
-            >
-              <Sparkles size={12} className={loadingAi ? "animate-spin" : ""} />
-              {loadingAi ? "Gemini 3.7 Analiz Ediyor..." : "Gemini 3.7 Canlı Raporu"}
-            </button>
-            <div className="text-right">
-              <span className="text-2xl font-bold font-data block text-zinc-100">₺{asset.price.toFixed(2)}</span>
-              <span className={`text-xs font-bold font-data ${asset.change_pct >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                {asset.change_pct >= 0 ? "+" : ""}%{asset.change_pct.toFixed(2)} (Bugün)
-              </span>
-            </div>
-          </div>
-        </div>
+      {/* Quick Select Tickers */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 select-none">
+        <span className="text-[10px] text-zinc-500 font-semibold uppercase tracking-wider mr-1">Popüler:</span>
+        {POPULAR_TICKERS.map((sym) => (
+          <button
+            key={sym}
+            onClick={() => handleSelectTicker(sym)}
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-data font-bold transition-all cursor-pointer ${
+              activeTicker === sym
+                ? "bg-emerald-500 text-zinc-950 shadow-md shadow-emerald-500/20"
+                : "bg-zinc-900/80 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700"
+            }`}
+          >
+            {sym}
+          </button>
+        ))}
       </div>
 
-      {/* Interactive Candlestick Chart */}
-      <div
-        className="rounded-xl p-5 select-none space-y-3"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
-          <div className="flex items-center gap-2">
-            <BarChart3 size={14} className="text-emerald-400" />
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-              {asset.symbol} — TradingView İnteraktif Mum Grafiği (60 Günlük)
-            </h3>
-          </div>
-          <div className="flex gap-1 text-[10px] font-semibold text-zinc-400">
-            <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">GÜNLÜK (1G)</span>
-            <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">HAFTALIK (1H)</span>
-            <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">AYLIK (1A)</span>
-          </div>
-        </div>
-
-        <div className="w-full h-[320px] rounded-lg overflow-hidden bg-black/20 p-2">
-          <TradingViewChart data={candleData} height={300} />
-        </div>
-      </div>
-
-      {/* Multi-Indicator Cards */}
-      <div className="grid grid-cols-4 gap-3">
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Fiyat / Kazanç (F/K)</span>
-          <span className="text-xl font-bold font-data text-emerald-400">{asset.pe_ratio}x</span>
-          <span className="text-[10px] text-zinc-500 block">Sektör Ortalaması: 7.2x (İskontolu)</span>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Piyasa / Defter Değeri (PD/DD)</span>
-          <span className="text-xl font-bold font-data text-cyan-400">{asset.pb_ratio}x</span>
-          <span className="text-[10px] text-zinc-500 block">Özkaynak Güçlü</span>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">14 Günlük RSI</span>
-          <span className="text-xl font-bold font-data text-zinc-200">{asset.rsi_14}</span>
-          <span className="text-[10px] text-emerald-400 block">Pozitif Momentum Bölgesinde</span>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Model Kararı</span>
-          <span className="text-xl font-bold font-data text-emerald-400">{asset.recommendation === "STRONG_BUY" ? "GÜÇLÜ AL" : asset.recommendation === "BUY" ? "AL" : "TUT"}</span>
-          <span className="text-[10px] text-zinc-500 block">Güven Seviyesi: %88</span>
-        </div>
-      </div>
-
-      {/* AI Intelligence Live Report Box if generated */}
-      {aiReport && (
-        <div
-          className="rounded-xl p-5 border border-purple-500/30 bg-purple-950/10 space-y-3"
-        >
-          <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
-            <Sparkles size={14} />
-            Google Gemini 3.7 Flash — {asset.symbol} Canlı Raporu
-          </div>
-          <div className="text-xs text-zinc-300 whitespace-pre-line leading-relaxed font-sans bg-black/20 p-4 rounded-lg">
-            {aiReport}
-          </div>
+      {loading && (
+        <div className="rounded-xl p-12 text-center bg-zinc-900/40 border border-zinc-800/60">
+          <RefreshCw size={24} className="mx-auto mb-3 text-emerald-400 animate-spin" />
+          <p className="text-xs text-zinc-400">{activeTicker} için gerçek piyasa verileri ve indikatörler hesaplanıyor...</p>
         </div>
       )}
 
-      {/* Support & Resistance */}
-      <div
-        className="rounded-xl p-5"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-4">Teknik Seviyeler & Pivotlar</h3>
-        <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-900/60 border border-zinc-800/40 text-xs font-data">
-          <div>
-            <span className="text-[10px] text-zinc-500 uppercase block">Kritik Destek (S1)</span>
-            <span className="text-sm font-bold text-red-400">₺{asset.support.toFixed(2)}</span>
-          </div>
-          <div className="text-center">
-            <span className="text-[10px] text-zinc-500 uppercase block">Mevcut Fiyat</span>
-            <span className="text-base font-bold text-zinc-100">₺{asset.price.toFixed(2)}</span>
-          </div>
-          <div className="text-right">
-            <span className="text-[10px] text-zinc-500 uppercase block">Hedef Direnç (R1)</span>
-            <span className="text-sm font-bold text-emerald-400">₺{asset.resistance.toFixed(2)}</span>
-          </div>
+      {error && (
+        <div className="rounded-xl p-6 bg-red-950/20 border border-red-500/30 text-center">
+          <p className="text-xs text-red-400 font-medium">{error}</p>
+          <button
+            onClick={() => setActiveTicker("THYAO")}
+            className="mt-3 px-3 py-1.5 rounded bg-zinc-800 text-xs text-zinc-200 hover:bg-zinc-700 cursor-pointer"
+          >
+            THYAO ile Devam Et
+          </button>
         </div>
-      </div>
+      )}
+
+      {!loading && asset && (
+        <>
+          {/* Asset Hero Card */}
+          <div
+            className="rounded-xl p-5 select-none"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="text-base font-bold font-data text-emerald-400">{asset.symbol}</span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-zinc-100">{asset.name}</h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">
+                      {asset.sector}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5">
+                    Piyasa Değeri: {asset.market_cap} · Son Güncelleme: Gerçek Zamanlı BİST
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={handleAskGemini}
+                  disabled={loadingAi}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer transition-all shadow-md"
+                >
+                  <Sparkles size={13} className={loadingAi ? "animate-spin" : ""} />
+                  {loadingAi ? "Gemini 3.7 Analiz Ediyor..." : "Gemini 3.7 Canlı Raporu"}
+                </button>
+                <div className="text-right">
+                  <span className="text-2xl font-bold font-data block text-zinc-100">₺{asset.price.toFixed(2)}</span>
+                  <div className="flex items-center justify-end gap-1">
+                    {isPos ? <ArrowUpRight size={12} className="text-emerald-400" /> : <ArrowDownRight size={12} className="text-red-400" />}
+                    <span className={`text-xs font-bold font-data ${isPos ? "text-emerald-400" : "text-red-400"}`}>
+                      {isPos ? "+" : ""}%{asset.change_pct.toFixed(2)} (Bugün)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive TradingView Candlestick Chart */}
+          <div
+            className="rounded-xl p-5 select-none space-y-3"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <div className="flex items-center justify-between border-b border-zinc-800/60 pb-3">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={14} className="text-emerald-400" />
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+                  {asset.symbol} — TradingView İnteraktif Mum Grafiği ({asset.candles?.length || 0} Günlük Gerçek Mumlar)
+                </h3>
+              </div>
+              <div className="flex gap-1 text-[10px] font-semibold text-zinc-400">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  GÜNLÜK (1G)
+                </span>
+                <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">HAFTALIK (1H)</span>
+                <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">AYLIK (1A)</span>
+              </div>
+            </div>
+
+            <div className="w-full h-[320px] rounded-lg overflow-hidden bg-black/20 p-2">
+              <TradingViewChart data={asset.candles || []} height={300} />
+            </div>
+          </div>
+
+          {/* Multi-Indicator Cards (Real Calculated Metrics) */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div
+              className="rounded-xl p-4 space-y-1.5"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Fiyat / Kazanç (F/K)</span>
+              <span className="text-xl font-bold font-data text-emerald-400">{asset.pe_ratio}x</span>
+              <span className="text-[10px] text-zinc-500 block">Sektörel Çarpan</span>
+            </div>
+
+            <div
+              className="rounded-xl p-4 space-y-1.5"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Piyasa / Defter (PD/DD)</span>
+              <span className="text-xl font-bold font-data text-cyan-400">{asset.pb_ratio}x</span>
+              <span className="text-[10px] text-zinc-500 block">Özkaynak Çarpanı</span>
+            </div>
+
+            <div
+              className="rounded-xl p-4 space-y-1.5"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">14 Günlük RSI</span>
+              <span className={`text-xl font-bold font-data ${asset.rsi_14 > 70 ? "text-red-400" : asset.rsi_14 < 35 ? "text-emerald-400" : "text-zinc-200"}`}>
+                {asset.rsi_14}
+              </span>
+              <span className="text-[10px] text-zinc-500 block">
+                {asset.rsi_14 > 70 ? "Aşırı Alım Bölgesi" : asset.rsi_14 < 35 ? "Aşırı Satım (Fırsat)" : "Nötr Momentum"}
+              </span>
+            </div>
+
+            <div
+              className="rounded-xl p-4 space-y-1.5"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Karar Motoru</span>
+              <span className="text-xl font-bold font-data text-emerald-400">{asset.recommendation_text}</span>
+              <span className="text-[10px] text-zinc-500 block">Skor: {asset.recommendation_score} / 100</span>
+            </div>
+          </div>
+
+          {/* Technical Moving Averages & Levels */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div
+              className="rounded-xl p-4 space-y-2"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Hareketli Ortalamalar</span>
+              <div className="space-y-1 text-xs font-data">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">20 Günlük SMA:</span>
+                  <span className="font-bold text-zinc-200">₺{asset.sma_20.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">50 Günlük SMA:</span>
+                  <span className="font-bold text-zinc-200">₺{asset.sma_50.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl p-4 space-y-2"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Oynaklık & MACD</span>
+              <div className="space-y-1 text-xs font-data">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">14 Günlük ATR:</span>
+                  <span className="font-bold text-cyan-400">₺{asset.atr_14.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">MACD Sinyali:</span>
+                  <span className={`font-bold ${asset.macd_signal.includes("AL") ? "text-emerald-400" : "text-amber-400"}`}>
+                    {asset.macd_signal}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl p-4 space-y-2"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Destek / Direnç Kanalı</span>
+              <div className="space-y-1 text-xs font-data">
+                <div className="flex justify-between">
+                  <span className="text-red-400 font-semibold">Destek (S1):</span>
+                  <span className="font-bold text-red-400">₺{asset.support.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-emerald-400 font-semibold">Direnç (R1):</span>
+                  <span className="font-bold text-emerald-400">₺{asset.resistance.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* AI Intelligence Live Report Box if generated */}
+          {aiReport && (
+            <div className="rounded-xl p-5 border border-purple-500/30 bg-purple-950/10 space-y-3">
+              <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
+                <Sparkles size={14} />
+                Google Gemini 3.7 Flash — {asset.symbol} Canlı Raporu
+              </div>
+              <div className="text-xs text-zinc-300 whitespace-pre-line leading-relaxed font-sans bg-black/20 p-4 rounded-lg">
+                {aiReport}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
