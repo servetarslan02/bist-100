@@ -127,41 +127,40 @@ async def scan_opportunities(
 
 
 @router.get("/signals")
+@router.get("/opportunities")
 async def signals(
-    limit: int = Query(20, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=100),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Sinyal listesi — son taramadaki sinyaller."""
+    """Sinyal ve Fırsat listesi — Gerçek zamanlı dinamik algoritma taraması."""
+    import json
+    import redis as redis_lib
+
+    # Redis Cache Kontrolü
     try:
-        api = _get_scan_api()
-        results = api.get_results(limit=200)
-        signal_list = [
-            r for r in results.get("results", [])
-            if r.get("signal")
-        ]
-        if not signal_list:
-            # Algoritmik canlı sinyaller ve SPEC fırsatları
-            signal_list = [
-                {"ticker": "POLTK", "name": "Politeknik Metal", "score": 96, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 28.50, "target_price": 18400.0, "stop_loss": 14200.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Sığ Takas Konsantrasyonu & Hacim Patlaması"},
-                {"ticker": "SDTTR", "name": "SDT Uzay ve Savunma", "score": 93, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 24.00, "target_price": 340.0, "stop_loss": 268.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Savunma KAP Sözleşme Katalizörü (Z=3.2)"},
-                {"ticker": "KONYA", "name": "Konya Çimento", "score": 91, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 32.00, "target_price": 12800.0, "stop_loss": 9950.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Düşük Halka Açıklık & Bedelsiz Sıkışması"},
-                {"ticker": "REEDR", "name": "Reeder Teknoloji", "score": 88, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 21.40, "target_price": 58.5, "stop_loss": 46.2, "spec_category": "CANDIDATE", "spec_reason": "Batarya & EV Fabrika KAP Akümülasyonu"},
-                {"ticker": "FORTE", "name": "Forte Bilgi İletişim", "score": 87, "direction": "LONG", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": 26.00, "target_price": 88.0, "stop_loss": 69.5, "spec_category": "CANDIDATE", "spec_reason": "Savunma Yazılım İhale Kırılımı"},
-                {"ticker": "ALFAS", "name": "Alfa Solar Enerji", "score": 86, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "MID", "expected_return_pct": 19.50, "target_price": 96.0, "stop_loss": 78.5, "spec_category": "CANDIDATE", "spec_reason": "Kapasite Artışı & Donchian 20G Kırılımı"},
-                {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 94, "direction": "LONG", "risk_level": "LOW", "horizon": "SHORT", "expected_return_pct": 10.40, "target_price": 345.0, "stop_loss": 298.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "Kurumsal Para Girişi & Düşük F/K"},
-                {"ticker": "ASELS", "name": "Aselsan", "score": 92, "direction": "LONG", "risk_level": "LOW", "horizon": "MID", "expected_return_pct": 12.20, "target_price": 74.5, "stop_loss": 62.0, "spec_category": "HIGH_CONVICTION", "spec_reason": "11 Milyar $ Backlog & Hacimli Direnç Kırılımı"},
-                {"ticker": "GARAN", "name": "Garanti BBVA", "score": 89, "direction": "LONG", "risk_level": "MEDIUM", "horizon": "SHORT", "expected_return_pct": 8.70, "target_price": 132.0, "stop_loss": 114.0, "spec_category": "CANDIDATE", "spec_reason": "Yabancı Takas Net Alım Lideri"},
-                {"ticker": "KCHOL", "name": "Koç Holding", "score": 88, "direction": "LONG", "risk_level": "LOW", "horizon": "LONG", "expected_return_pct": 11.00, "target_price": 242.0, "stop_loss": 204.0, "spec_category": "CANDIDATE", "spec_reason": "%32 Net Aktif Değer İskontosu"},
-                {"ticker": "EREGL", "name": "Ereğli Demir Çelik", "score": 42, "direction": "SHORT", "risk_level": "HIGH", "horizon": "SHORT", "expected_return_pct": -4.20, "target_price": 49.8, "stop_loss": 54.5, "spec_category": "NORMAL", "spec_reason": "HRC Marj Baskısı & Negatif Momentum"},
-            ]
-        return signal_list[:limit]
+        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
+        cached = r.get("scanner:opportunities")
+        if cached:
+            data = json.loads(cached)
+            return data[:limit]
+    except Exception:
+        pass
+
+    try:
+        from ...scanner.dynamic_opportunity_scanner import dynamic_scanner
+        results = dynamic_scanner.scan_opportunities(limit=limit)
+        
+        # Redis'e 5 dakika cache yaz
+        try:
+            r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
+            r.setex("scanner:opportunities", 300, json.dumps(results))
+        except Exception:
+            pass
+
+        return results
     except Exception as e:
-        return [
-            {"ticker": "POLTK", "name": "Politeknik Metal", "score": 96, "direction": "LONG", "expected_return_pct": 28.5, "spec_category": "HIGH_CONVICTION"},
-            {"ticker": "SDTTR", "name": "SDT Uzay ve Savunma", "score": 93, "direction": "LONG", "expected_return_pct": 24.0, "spec_category": "HIGH_CONVICTION"},
-            {"ticker": "THYAO", "name": "Türk Hava Yolları", "score": 94, "direction": "LONG", "expected_return_pct": 10.4, "spec_category": "HIGH_CONVICTION"},
-        ]
+        return []
 
 
 # =====================================================

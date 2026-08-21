@@ -337,6 +337,41 @@ export default function Overview() {
         </div>
       </div>
 
+      {/* ── Alpha Engine Highlight Banner ────────────────────────────── */}
+      <div
+        onClick={() => router.push("/strategy")}
+        className="rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer group transition-all hover:border-emerald-500/40"
+        style={{
+          background: "linear-gradient(135deg, rgba(0,229,160,0.08) 0%, rgba(0,200,255,0.05) 100%)",
+          border: "1px solid rgba(0,229,160,0.25)"
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/20 text-emerald-400 font-bold text-lg shrink-0">
+            ★
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+                Doğrulanmış Alpha Strateji Motoru (Dual Momentum + PPF Kalkanı)
+              </span>
+              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400">
+                %105.4 YILLIK CAGR
+              </span>
+            </div>
+            <p className="text-[11px] text-zinc-400 mt-0.5">
+              B&H Endeks (%65.4) karşısında +%40.0 net alpha · Sharpe: 2.56 · 2025 OOS: +%35.4 (4.4x Üstünlük)
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-xs font-bold text-emerald-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+            Stratejiyi İncele & Uygula →
+          </span>
+        </div>
+      </div>
+
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         <StatCard

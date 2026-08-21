@@ -52,7 +52,7 @@ const TIMEFRAME_CONFIG: Record<TimeframeType, { label: string; period: string; i
 
 function AssetIntelContent() {
   const searchParams = useSearchParams();
-  const initialTicker = searchParams.get("ticker")?.toUpperCase() || "THYAO";
+  const initialTicker = (searchParams.get("symbol") || searchParams.get("ticker"))?.toUpperCase() || "THYAO";
 
   const [tickerInput, setTickerInput] = useState(initialTicker);
   const [activeTicker, setActiveTicker] = useState(initialTicker);
@@ -66,10 +66,10 @@ function AssetIntelContent() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const qTicker = searchParams.get("ticker");
-    if (qTicker && qTicker.toUpperCase() !== activeTicker) {
-      setActiveTicker(qTicker.toUpperCase());
-      setTickerInput(qTicker.toUpperCase());
+    const qTicker = (searchParams.get("symbol") || searchParams.get("ticker"))?.toUpperCase();
+    if (qTicker && qTicker !== activeTicker) {
+      setActiveTicker(qTicker);
+      setTickerInput(qTicker);
     }
   }, [searchParams]);
 
