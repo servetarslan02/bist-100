@@ -154,11 +154,8 @@ async def test_portfolio_trade_lock():
     """Paralel alım/satım işlemleri lock ile korunmalı."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
-    for t in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
-        try:
-            await dev_db.pg_execute(f"DELETE FROM {t}")
-        except Exception:
-            pass
+    from conftest import safe_cleanup_tables
+    await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
     await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
@@ -197,11 +194,8 @@ async def test_portfolio_invariant_check():
     """Invariant ihlali tespit edilmeli."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
-    for t in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
-        try:
-            await dev_db.pg_execute(f"DELETE FROM {t}")
-        except Exception:
-            pass
+    from conftest import safe_cleanup_tables
+    await safe_cleanup_tables(dev_db)
 
     svc = PortfolioService(initial_capital=100000)
     await svc.start()
@@ -241,11 +235,8 @@ async def test_oversell_prevention():
     """Oversell engeli — mevcut pozisyondan fazla satılamamalı."""
     dev_db._db = None  # Fresh DB
     await dev_db.init()
-    for t in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
-        try:
-            await dev_db.pg_execute(f"DELETE FROM {t}")
-        except Exception:
-            pass
+    from conftest import safe_cleanup_tables
+    await safe_cleanup_tables(dev_db)
 
     await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
     await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")

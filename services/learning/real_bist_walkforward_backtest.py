@@ -53,8 +53,15 @@ def download_real_bist_data(tickers: List[str], period: str = "2y") -> Dict[str,
     return data
 
 
-def compute_strict_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Look-ahead bias olmadan teknik feature'ları hesaplar."""
+def compute_strict_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    """Look-ahead bias olmadan teknik feature'ları hesaplar.
+
+    F-004 düzeltmesi: future_ret_5d ve future_price_5d ayrı label DataFrame'ine taşındı.
+    Feature ve label'lar ayrı tutularak look-ahead bias önlenir.
+
+    Returns:
+        (feature_df, label_df) — ikisi de aynı index'e sahip
+    """
     feats = pd.DataFrame(index=df.index)
     close = df["Close"]
     high = df["High"]
@@ -91,12 +98,16 @@ def compute_strict_features(df: pd.DataFrame) -> pd.DataFrame:
     bb_lower = sma20 - 2 * bb_std
     feats["bb_position"] = (close - bb_lower) / (bb_upper - bb_lower).replace(0, 1.0)
 
-    # 5 Günlük Gelecek Getiri (SADECE Hedef / Label olarak kullanılır)
-    feats["future_ret_5d"] = (close.shift(-5) / close - 1.0) * 100.0
-    feats["future_price_5d"] = close.shift(-5)
     feats["current_price"] = close
 
-    return feats.dropna()
+    # Label'lar ayrı DataFrame'de (F-004)
+    labels = pd.DataFrame(index=df.index)
+    labels["future_ret_5d"] = (close.shift(-5) / close - 1.0) * 100.0
+    labels["future_price_5d"] = close.shift(-5)
+
+    # Her iki DataFrame de aynı satırları at
+    combined = feats.join(labels).dropna()
+    return combined[feats.columns], combined[labels.columns]
 
 
 def classify_real_regime(trend_pct: float, vol_pct: float) -> str:
@@ -127,10 +138,12 @@ def run_real_bist_walkforward_backtest():
 
     # 2. Her hisse için bias-free feature'ları çıkar
     features_by_ticker = {}
+    labels_by_ticker = {}
     for ticker, df in stock_dfs.items():
-        feat_df = compute_strict_features(df)
+        feat_df, label_df = compute_strict_features(df)
         if len(feat_df) >= 60:
             features_by_ticker[ticker] = feat_df
+            labels_by_ticker[ticker] = label_df
 
     feature_cols = [
         "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
@@ -149,6 +162,12 @@ def run_real_bist_walkforward_backtest():
         conn.commit()
 
     pipeline = LearningPipeline(memory_store=store)
+
+    # F-005: Walk-forward model eğitimi için ML modelleri
+    lgbm_trainer = LightGBMTrainer()
+    catboost_model = CatBoostModel()
+    xgboost_model = XGBoostModel()
+    ml_models = {"LightGBM": lgbm_trainer, "CatBoost": catboost_model, "XGBoost": xgboost_model}
 
     models_list = [
         {"id": "LightGBM_LambdaRank", "version": "v3.2"},
@@ -169,6 +188,8 @@ def run_real_bist_walkforward_backtest():
     print(f"  • Tarih Aralığı: {eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')}")
 
     real_batch_records = []
+    walk_forward_train_interval = 20  # Her 20 günde bir yeniden eğit
+    last_train_idx = -walk_forward_train_interval  # İlk iterasyonda eğitilsin
 
     for t_idx, eval_date in enumerate(eval_dates):
         # O günkü BIST 100 genel rejimini hesapla (THYAO/GARAN/KCHOL ortalaması)
@@ -181,11 +202,48 @@ def run_real_bist_walkforward_backtest():
         row_sample = features_by_ticker[sample_tk].loc[eval_date]
         regime = classify_real_regime(row_sample["price_vs_sma20"], row_sample["volatility_20d"])
 
+        # F-005: Walk-forward model eğitimi — her split'te train ile fit() çağrısı
+        if t_idx - last_train_idx >= walk_forward_train_interval:
+            last_train_idx = t_idx
+            # Eğitim verisini hazırla (eval_date'e kadar olan veriler)
+            train_features_all = []
+            train_labels_all = []
+            for tk in day_tickers:
+                feat_df = features_by_ticker[tk]
+                lab_df = labels_by_ticker[tk]
+                # Sadece eval_date öncesi verileri kullan (look-ahead bias yok)
+                train_mask = feat_df.index < eval_date
+                train_feats = feat_df.loc[train_mask, feature_cols]
+                train_labs = lab_df.loc[train_mask, "future_ret_5d"]
+                # Son walk_forward_train_interval günü hariç tut (purge gap)
+                if len(train_feats) > walk_forward_train_interval:
+                    train_feats = train_feats.iloc[:-walk_forward_train_interval]
+                    train_labs = train_labs.iloc[:-walk_forward_train_interval]
+                train_features_all.append(train_feats)
+                train_labels_all.append(train_labs)
+
+            if train_features_all:
+                X_train = pd.concat(train_features_all).dropna()
+                y_train = pd.concat(train_labels_all).dropna()
+                # Ortak index
+                common_idx = X_train.index.intersection(y_train.index)
+                X_train = X_train.loc[common_idx]
+                y_train = y_train.loc[common_idx]
+
+                if len(X_train) >= 100:
+                    # Her ML modelini fit() ile eğit
+                    for model_name, model in ml_models.items():
+                        try:
+                            model.fit(X_train.values, y_train.values)
+                        except Exception as e:
+                            pass  # Model eğitimi başarısızsa devam et
+
         for ticker in day_tickers:
             row = features_by_ticker[ticker].loc[eval_date]
+            label_row = labels_by_ticker[ticker].loc[eval_date]
             entry_p = float(row["current_price"])
-            actual_p = float(row["future_price_5d"])
-            actual_ret_5d = float(row["future_ret_5d"])
+            actual_p = float(label_row["future_price_5d"])
+            actual_ret_5d = float(label_row["future_ret_5d"])
             date_str = eval_date.strftime("%Y-%m-%d")
 
             # 1. Cross_Sectional_Momentum Modeli (20 günlük momentum bazlı)

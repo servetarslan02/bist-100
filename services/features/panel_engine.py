@@ -278,11 +278,11 @@ class PanelFeatureEngine:
         lookback: int,
         period: int,
     ) -> np.ndarray:
-        """RSI: son `period` geçerli delta üzerinden (Wilder DEĞİL — calculator ile aynı).
+        """RSI: Wilder's Smoothing ile uyumlu (calculator.py ile birebir).
 
-        Scalar: len(valid_window) < period + 1 → 50.
-        avg_gain = mean(gains[-period:]), avg_loss = mean(losses[-period:])
-        avg_loss == 0 → 100; aksi halde 100 - 100/(1 + rs).
+        Wilder's smoothing: avg_gain = (avg_gain_prev * (period-1) + gain) / period
+        İlk ortalama: basit ortalama (ilk period delta).
+        Sonrası: Wilder's smoothing (EMA, alpha = 1/period).
         """
         n = len(close)
         out = np.full(n, 50.0)
@@ -294,30 +294,41 @@ class PanelFeatureEngine:
 
         # Rank uzayında delta/gain/loss
         vc = close[vrows]
-        delta = np.diff(vc)                      # rank r >= 1 ↔ delta[r-1]
+        delta = np.diff(vc)
         gains = np.where(delta > 0, delta, 0.0)
         losses = np.where(delta < 0, -delta, 0.0)
-        Gp = np.concatenate([[0.0], np.cumsum(gains)])   # Gp[k] = sum gain[0..k-1]
-        Lp = np.concatenate([[0.0], np.cumsum(losses)])
 
+        # Wilder's smoothing ile RSI hesapla (her valid pozisyon için)
+        # Sonuç: her vrows indexi için RSI değeri
+        rsi_at_rank = np.full(len(vc), 50.0)
+
+        if len(gains) >= period:
+            # İlk ortalama: basit ortalama
+            avg_g = np.mean(gains[:period])
+            avg_l = np.mean(losses[:period])
+
+            if avg_l == 0:
+                rsi_at_rank[period] = 100.0
+            else:
+                rsi_at_rank[period] = 100.0 - 100.0 / (1.0 + avg_g / avg_l)
+
+            # Wilder's smoothing: alpha = 1/period
+            for i in range(period, len(gains)):
+                avg_g = (avg_g * (period - 1) + gains[i]) / period
+                avg_l = (avg_l * (period - 1) + losses[i]) / period
+                if avg_l == 0:
+                    rsi_at_rank[i + 1] = 100.0
+                else:
+                    rsi_at_rank[i + 1] = 100.0 - 100.0 / (1.0 + avg_g / avg_l)
+
+        # Rank'tan pozisyona map et
         cv = np.cumsum(valid)
         r_hi = cv - 1
-
         ok = (counts >= period + 1) & (np.arange(n) >= lookback - 1)
         pos_ok = np.flatnonzero(ok)
-        rh = r_hi[pos_ok]            # >= period
-        # son period delta: ranklar rh-period+1 .. rh  ↔  delta index rh-period .. rh-1
-        sum_g = Gp[rh] - Gp[rh - period]
-        sum_l = Lp[rh] - Lp[rh - period]
-        avg_g = sum_g / period
-        avg_l = sum_l / period
-
-        rsi_vals = np.where(
-            avg_l == 0,
-            100.0,
-            100.0 - 100.0 / (1.0 + avg_g / np.where(avg_l == 0, 1.0, avg_l)),
-        )
-        out[pos_ok] = rsi_vals
+        rh = r_hi[pos_ok]
+        # rh rank'ındaki RSI değerini al
+        out[pos_ok] = rsi_at_rank[rh]
         out[np.arange(n) < lookback - 1] = np.nan
         return out
 

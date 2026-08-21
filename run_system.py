@@ -2,12 +2,22 @@
 """
 ALPHA BIST — System Runner
 
+.. deprecated:: 4.1
+    Bu dosya yerine ``python main.py`` kullanın.
+    ``main.py`` canonical entry point olarak belirlenmiştir.
+    Bu dosya geriye uyumluluk için tutulmaktadır ve gelecekte kaldırılabilir.
+
 Sistem çalıştırıcı — tek tarama veya sürekli çalışma modu.
 
-Kullanım:
+Kullanım (deprecated):
     python3 run_system.py --scan-once    # Tek tarama yap ve çık
     python3 run_system.py --continuous   # Sürekli çalışma
     python3 run_system.py --health       # Sağlık kontrolü
+
+Kullanım (canonical):
+    python main.py --mode daily
+    python main.py --mode live
+    python main.py --mode health
 """
 
 import sys
@@ -19,7 +29,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ALPHA BIST System Runner")
+    import warnings
+    warnings.warn(
+        "run_system.py is deprecated. Use 'python main.py' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    parser = argparse.ArgumentParser(description="ALPHA BIST System Runner (deprecated, use main.py)")
     parser.add_argument("--scan-once", action="store_true", help="Tek tarama yap ve çık")
     parser.add_argument("--continuous", action="store_true", help="Sürekli çalışma modu")
     parser.add_argument("--health", action="store_true", help="Sistem sağlık kontrolü")

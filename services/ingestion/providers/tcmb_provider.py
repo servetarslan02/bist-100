@@ -1,5 +1,6 @@
 """ALPHA BIST - TCMB EVDS (Electronic Data Distribution System) Provider"""
 
+import os
 import structlog
 from ...core.async_http import get_client
 from datetime import datetime, timedelta
@@ -8,6 +9,42 @@ from typing import Optional, List, Dict, Any
 logger = structlog.get_logger()
 
 TCMB_BASE_URL = "https://evds2.tcmb.gov.tr/service/evds"
+
+
+# Default baseline values — can be overridden via config file
+default_baseline = {
+    "policy_rate": 50.0,
+    "overnight_rate": 50.0,
+    "cpi": 48.5,
+    "ppi": 41.2,
+    "usd_try": 36.5,
+    "eur_try": 38.2,
+    "gbp_try": 45.8,
+    "current_account": -1500.0,
+    "industrial_production": 2.5,
+    "unemployment": 8.5,
+    "gold_price": 2850.0,
+    "bist_100": 9850.0,
+}
+
+
+def _load_baseline_config() -> dict:
+    """Load baseline values from config file, falling back to defaults."""
+    import json as _json
+    config_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "tcmb_baseline.json")
+    config_path = os.path.normpath(config_path)
+    try:
+        with open(config_path, "r") as f:
+            loaded = _json.load(f)
+            merged = {**default_baseline, **loaded}
+            logger.info("TCMB baseline config loaded", path=config_path)
+            return merged
+    except FileNotFoundError:
+        logger.info("TCMB baseline config not found, using defaults", path=config_path)
+        return default_baseline.copy()
+    except Exception as e:
+        logger.warning("Failed to load TCMB baseline config, using defaults", error=str(e))
+        return default_baseline.copy()
 
 
 class TCMBProvider:
@@ -34,6 +71,7 @@ class TCMBProvider:
         self.api_key = api_key or os.getenv("TCMB_API_KEY") or os.getenv("EVDS_API_KEY")
         self._client = get_client("tcmb", timeout=10.0, max_retries=2)
         self._warned_no_key = False
+        self.baseline_values = _load_baseline_config()
 
     async def _make_request(self, series_code: str, start_date: str, end_date: str) -> Optional[List[Dict]]:
         """Make a request to TCMB EVDS API."""
@@ -78,22 +116,9 @@ class TCMBProvider:
         """Fetch all key macro indicators (with canonical baseline fallback)."""
         result = {}
         now_str = datetime.now().strftime("%d-%m-%Y")
+        now_iso = datetime.now().isoformat()
 
-        # Canonical baseline values used when EVDS API key is not present
-        baseline_values = {
-            "policy_rate": 50.0,
-            "overnight_rate": 50.0,
-            "cpi": 48.5,
-            "ppi": 41.2,
-            "usd_try": 36.5,
-            "eur_try": 38.2,
-            "gbp_try": 45.8,
-            "current_account": -1500.0,
-            "industrial_production": 2.5,
-            "unemployment": 8.5,
-            "gold_price": 2850.0,
-            "bist_100": 9850.0,
-        }
+        baseline_values = self.baseline_values
 
         for name, series in self.SERIES.items():
             try:
@@ -109,22 +134,32 @@ class TCMBProvider:
                         "date": latest.get("date", now_str),
                         "series": series,
                         "is_live": True,
+                        "last_updated": now_iso,
                     }
                 else:
+                    logger.warning(
+                        "Using baseline value (not live data)",
+                        series=name, baseline_value=baseline_values.get(name),
+                    )
                     result[name] = {
                         "value": baseline_values.get(name),
                         "date": now_str,
                         "series": series,
                         "is_live": False,
+                        "last_updated": now_iso,
                     }
 
             except Exception as e:
-                logger.debug("Failed to fetch macro series, using baseline", series=name, error=str(e))
+                logger.warning(
+                    "Failed to fetch macro series, using baseline",
+                    series=name, error=str(e),
+                )
                 result[name] = {
                     "value": baseline_values.get(name),
                     "date": now_str,
                     "series": series,
                     "is_live": False,
+                    "last_updated": now_iso,
                 }
 
         return result

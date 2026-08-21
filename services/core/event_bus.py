@@ -211,6 +211,7 @@ def get_producer():
                 "enable.idempotence": True,
             })
         except Exception as e:
+            logger.warning("Kafka producer creation failed", error=str(e))
             return None
     return _producer
 
@@ -294,7 +295,7 @@ async def _check_and_mark_published(event_id: str) -> bool:
             return True
         return False
     except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="event_bus.py:271")
+        logger.warning("Redis idempotency check failed", error=str(e), context="event_bus.py:271")
 
     # 2. PostgreSQL dene
     try:
@@ -310,7 +311,7 @@ async def _check_and_mark_published(event_id: str) -> bool:
         )
         return True
     except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="event_bus.py:287")
+        logger.warning("PostgreSQL idempotency check failed", error=str(e), context="event_bus.py:287")
 
     # 3. Fail-open
     return True
@@ -334,7 +335,7 @@ async def _publish_to_stream(event: CanonicalEvent):
         await r.close()
         return
     except Exception as e:
-        logger.debug("Handled exception", error=str(e), context="event_bus.py:311")
+        logger.warning("Redis Stream write failed", error=str(e), context="event_bus.py:311")
 
     # 2. PostgreSQL dene
     try:
@@ -345,7 +346,7 @@ async def _publish_to_stream(event: CanonicalEvent):
         )
         return
     except Exception as e:
-        logger.debug("PG event ledger write failed", error=str(e))
+        logger.warning("PG event ledger write failed", error=str(e))
 
 
 def flush_producer():

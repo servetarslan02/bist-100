@@ -1,6 +1,33 @@
 """Test configuration and shared fixtures."""
 import os
+import logging
 import pytest
+
+logger = logging.getLogger(__name__)
+
+# Test veritabanı tabloları — temizlik sırasında kullanılacak
+TEST_TABLES = [
+    'daily_pnl', 'equity_snapshots', 'position_history',
+    'cash_ledger', 'positions', 'portfolios',
+]
+
+
+async def safe_cleanup_tables(dev_db):
+    """Test DB tablolarını temizle — tablo yoksa sessizce geç, diğer hataları raporla.
+
+    except Exception: pass yerine kullanılır.
+    """
+    _TABLE_NOT_FOUND = ('does not exist', 'undefined table', 'no such table')
+    for t in TEST_TABLES:
+        try:
+            await dev_db.pg_execute(f"DELETE FROM {t}")
+        except Exception as e:
+            err_str = str(e).lower()
+            if any(kw in err_str for kw in _TABLE_NOT_FOUND):
+                logger.debug("Tablo mevcut değil, atlanıyor: %s (%s)", t, e)
+            else:
+                logger.warning("Tablo temizlenirken hata: %s — %s", t, e)
+                raise
 
 
 @pytest.fixture(autouse=True)

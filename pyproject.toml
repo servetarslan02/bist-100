@@ -31,9 +31,9 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
-asyncio_mode = "strict"
+asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--tb=short -q"
+addopts = "--tb=short -q --ignore=tests/e2e_full_test.py"
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]

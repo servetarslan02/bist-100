@@ -68,6 +68,8 @@ class RegimeEngine:
         self._transition_counts: Dict[str, Dict[str, int]] = {}
         self._use_hmm = use_hmm
         self._hmm_detector = None
+        self._return_history: List[float] = []  # Gerçek rolling return serisi
+        self._vol_history: List[float] = []      # Gerçek rolling volatilite serisi
         if use_hmm:
             try:
                 from .hmm_regime import HMMRegimeDetector
@@ -109,9 +111,19 @@ class RegimeEngine:
         hmm_result = None
         if self._hmm_detector:
             try:
-                # Features'tan return ve volatility üret
-                returns = np.array([features.get("momentum_avg", 0) / 100] * 63)
-                vol = np.array([features.get("volatility_avg", 20) / 100] * 63)
+                # Gerçek rolling return ve volatility serisi kullan (son 63 gözlem)
+                current_ret = features.get("momentum_avg", 0) / 100
+                current_vol = features.get("volatility_avg", 20) / 100
+                self._return_history.append(current_ret)
+                self._vol_history.append(current_vol)
+                # Son 63 gözleme odaklan (rolling window)
+                window = 63
+                returns = np.array(self._return_history[-window:])
+                vol = np.array(self._vol_history[-window:])
+                # Yeterli veri yoksa mevcut veriyi tekrarla (warm-up)
+                if len(returns) < window:
+                    returns = np.pad(returns, (0, window - len(returns)), mode="edge")
+                    vol = np.pad(vol, (0, window - len(vol)), mode="edge")
                 hmm_result = self._hmm_detector.predict_regime(returns, vol)
 
                 # HMM skorlarını rule-based skorlarla birleştir (ağırlıklı)
@@ -198,8 +210,9 @@ class RegimeEngine:
         """Bull market skoru — sürekli değerlerle."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
-        if breadth > 60:
-            score += min((breadth - 50) / 30, 0.3)  # 50-80 arası linear
+        # Tek lineer ölçek: 50→0, 80→0.3 (tekrarlanan koşulları önler)
+        if breadth > 50:
+            score += min((breadth - 50) / 30, 0.3)
         mom = f.get("momentum_avg", 0)
         if mom > 0:
             score += min(mom / 15, 0.3)  # 0-15 arası linear

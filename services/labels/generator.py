@@ -50,6 +50,7 @@ class LabelGenerator:
         mask: np.ndarray,
         sector_returns: Optional[np.ndarray] = None,
         benchmark_returns: Optional[np.ndarray] = None,
+        purge_days: int = 0,
     ) -> LabelResult:
         """Tek hisse için tüm label'ları üret.
 
@@ -87,7 +88,7 @@ class LabelGenerator:
             if sector_returns is not None and len(sector_returns) == n:
                 sector_fwd = np.full(n, np.nan)
                 for i in range(n - period):
-                    if not np.isnan(sector_returns[i]) and not np.isnan(forward_ret[i]):
+                    if mask[i] == 1 and not np.isnan(sector_returns[i]) and not np.isnan(forward_ret[i]):
                         sector_fwd[i] = forward_ret[i] - sector_returns[i] * period
                 labels[f"y_{period}d_vs_sector"] = sector_fwd
 
@@ -95,7 +96,7 @@ class LabelGenerator:
             if benchmark_returns is not None and len(benchmark_returns) == n:
                 bench_fwd = np.full(n, np.nan)
                 for i in range(n - period):
-                    if not np.isnan(benchmark_returns[i]) and not np.isnan(forward_ret[i]):
+                    if mask[i] == 1 and not np.isnan(benchmark_returns[i]) and not np.isnan(forward_ret[i]):
                         bench_fwd[i] = forward_ret[i] - benchmark_returns[i] * period
                 labels[f"y_{period}d_vs_benchmark"] = bench_fwd
                 labels[f"y_{period}d_outperform"] = np.where(bench_fwd > 0, 1, 0).astype(float)
@@ -121,6 +122,13 @@ class LabelGenerator:
             if len(valid_returns) >= 10:
                 fwd_vol[i] = float(np.std(valid_returns) * np.sqrt(252) * 100)
         labels["y_volatility_20d"] = fwd_vol
+
+        # Purge gap: Feature hesaplama penceresinin son purge_days barını label'dan hariç tut
+        # Bu, label ile feature arasında sızıntıyı (look-ahead bias) önler.
+        if purge_days > 0:
+            for label_name, label_values in labels.items():
+                label_values[-purge_days:] = np.nan
+                labels[label_name] = label_values
 
         # Valid mask (en az bir label hesaplanabilir mi?)
         for label_name, label_values in labels.items():

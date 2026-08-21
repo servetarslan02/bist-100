@@ -14,10 +14,13 @@ import sys
 import os
 import json
 import asyncio
+import logging
 import time
 import tempfile
 import numpy as np
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 from datetime import datetime, timedelta
 
 from services.core.config_watcher import ConfigWatcher
@@ -461,8 +464,8 @@ async def benchmark_scanner(n_stocks: int):
             features = calc.compute_all_features(df, mask=mask.mask, ticker=ticker)
             if features:
                 results += 1
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Scanner hatası: %s — %s", ticker, e)
     elapsed = time.time() - start
 
     return {

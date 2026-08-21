@@ -1,8 +1,19 @@
 """
-⚠️  DEV/LEGACY SERVER — Bu dosya production DEĞİLDİR.
+⚠️  DEPRECATED — Bu dosya production DEĞİLDİR ve artık canonical değildir.
 
-Canonical production server: app.py
+Canonical production server: services/api/app.py
+Canonical redirect (geriye uyumluluk): services/api/main.py
 Bu dosya sadece development/testing amaçlıdır (SQLite dev_db kullanır).
+
+Kullanım:
+    # Eski (DEPRECATED — bu dosya):
+    uvicorn services.api.server:app
+
+    # Canonical:
+    uvicorn services.api.app:app
+
+    # Geriye uyumlu redirect:
+    uvicorn services.api.main:app
 
 ---
 
@@ -28,7 +39,9 @@ Endpoints:
 import asyncio
 import json
 import os
+import sys
 import uuid
+import warnings
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from contextlib import asynccontextmanager
@@ -37,6 +50,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Quer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 import structlog
+
+warnings.warn(
+    "services.api.server is DEPRECATED. Use services.api.app instead. "
+    "This file exists only for development/testing purposes.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 # Internal imports
 from services.core.database_dev import dev_db

@@ -337,8 +337,36 @@ class RankingModel:
         return np.array(X), np.array(y), np.array([])
 
     def _feature_vector(self, features: Dict) -> List[float]:
-        """Feature dict'ten vektör oluştur."""
-        return [float(features.get(name, 0) or 0) for name in self._feature_names]
+        """Feature dict'ten vektör oluştur.
+
+        R-001 düzeltmesi: Feature isim uyuşmazlıklarını tolere et.
+        seven_motors ve calculator farklı isimler üretebilir.
+        """
+        _FALLBACKS = {
+            "volume_percentile": ["volume_percentile_20d", "volume_percentile_5d"],
+            "volume_up_down_ratio": ["volume_up_down_ratio_20d"],
+            "tick_rule": ["tick_rule_20d"],
+            "vwap_deviation": ["vwap_deviation_20d"],
+            "breakout_failure": ["breakout_failure_20d"],
+            "recovery_strength": ["recovery_strength_20d"],
+            "rs_peer_rank": ["rs_peer_rank_5d"],
+            "fall_market_selloff": ["fall_market_selloff_5d"],
+            "fall_sector_selloff": ["fall_sector_selloff_5d"],
+            "roe": ["raw_roe"],
+            "roa": ["raw_roa"],
+            "profit_margin_pct": ["raw_profit_margin"],
+        }
+        vals = []
+        for name in self._feature_names:
+            val = features.get(name)
+            if val is None:
+                # Fallback dene
+                for fallback_name in _FALLBACKS.get(name, []):
+                    val = features.get(fallback_name)
+                    if val is not None:
+                        break
+            vals.append(float(val or 0))
+        return vals
 
     def _apply_regime_weights(self, X: np.ndarray, regime: str) -> np.ndarray:
         """Rejim bazlı feature ağırlıkları uygula."""

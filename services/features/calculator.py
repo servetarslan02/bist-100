@@ -204,13 +204,16 @@ class FeatureCalculator:
         return float(np.mean(valid[-period:]))
 
     def _ema_masked(self, data: np.ndarray, period: int) -> float:
-        """Mask-aware EMA."""
+        """Mask-aware EMA — son period * 3 bara odaklan."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
             return valid[-1] if len(valid) > 0 else float('nan')
+        # Son period * 3 bara odaklan (tüm geçerli değerleri kullanmak yerine)
+        focus_len = min(len(valid), period * 3)
+        focus = valid[-focus_len:]
         alpha = 2 / (period + 1)
-        ema = valid[0]
-        for price in valid[1:]:
+        ema = focus[0]
+        for price in focus[1:]:
             ema = alpha * price + (1 - alpha) * ema
         return float(ema)
 

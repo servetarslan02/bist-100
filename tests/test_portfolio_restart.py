@@ -21,11 +21,8 @@ from services.core.database_dev import dev_db
 async def reset_db():
     if dev_db._db is None:
         await dev_db.init()
-    for tbl in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
-        try:
-            await dev_db.pg_execute(f"DELETE FROM {tbl}")
-        except Exception:
-            pass
+    from conftest import safe_cleanup_tables
+    await safe_cleanup_tables(dev_db)
 
 
 async def seed_instruments():

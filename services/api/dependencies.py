@@ -86,8 +86,8 @@ async def get_current_user(
         return TokenPayload(
             sub="anonymous",
             username="dashboard_viewer",
-            role=Role.ADMIN.value if not auth_strict else Role.VIEWER.value,
-            permissions=["GET", "POST", "PUT", "DELETE"] if not auth_strict else ["GET"],
+            role=Role.VIEWER.value,
+            permissions=["GET"],
             exp=time.time() + 86400,
             iat=time.time(),
         )

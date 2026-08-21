@@ -59,11 +59,11 @@ async def test_client_timeout():
     # Çok kısa timeout ile istek
     result = await client.get_text("http://httpbin.org/delay/5")
 
-    # Timeout olmalı (result None veya hata)
-    # Not: Gerçek sunucuya bağlı — mock ile daha iyi test edilir
+    # Timeout olmalı: çok kısa timeout ile uzak sunucuya istek atıldığında
+    # result None dönmeli veya exception fırlatılmalı
+    timeout_detected = (result is None) or (isinstance(result, str) and "timeout" in result.lower())
     await client.close()
-    # Timeout behavior requires manual verification
-    assert True, "Client Timeout: manual verification required"
+    assert timeout_detected, f"Client Timeout: beklenen None veya timeout hatası, alınan: {type(result).__name__}={result!r}"
 
 
 async def test_client_retry():

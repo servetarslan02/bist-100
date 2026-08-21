@@ -741,8 +741,8 @@ async def test_scanner_performance():
             result = scanner._scan_single(ticker, features)
             if result:
                 results.append(result)
-        except Exception:
-            pass
+        except Exception as e:
+            issues.append(f"Scanner hatası ({ticker}): {e}")
     elapsed = time.time() - start
 
     if elapsed > 30:

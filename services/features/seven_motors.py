@@ -608,9 +608,17 @@ class KAPNewsMotor:
         kap_events: List[Dict],
         news_events: List[Dict],
         llm_analysis: Optional[Dict] = None,
+        as_of_date: Optional[str] = None,
     ) -> Dict[str, float]:
         """KAP + haber feature'ları hesapla."""
         features = {}
+
+        # as_of_date ile temporal filtreleme (look-ahead bias önleme)
+        if as_of_date:
+            from datetime import datetime as _dt
+            cutoff = _dt.fromisoformat(as_of_date)
+            kap_events = [e for e in kap_events if e.get("date", "") and _dt.fromisoformat(e["date"].replace("Z", "+00:00").split("+")[0]) <= cutoff]
+            news_events = [e for e in news_events if e.get("date", "") and _dt.fromisoformat(e["date"].replace("Z", "+00:00").split("+")[0]) <= cutoff]
 
         # === KAP ANALİZİ ===
         if kap_events:
@@ -775,9 +783,28 @@ class CatalystMotor:
         self,
         ticker: str,
         upcoming_events: List[Dict],
+        as_of_date: Optional[str] = None,
     ) -> Dict[str, float]:
         """Katalizör feature'ları hesapla."""
         features = {}
+
+        # as_of_date ile temporal filtreleme (look-ahead bias önleme)
+        if as_of_date and upcoming_events:
+            from datetime import datetime as _dt
+            cutoff = _dt.fromisoformat(as_of_date)
+            filtered = []
+            for event in upcoming_events:
+                event_date = event.get("date", "")
+                if event_date:
+                    try:
+                        ed = _dt.fromisoformat(event_date.replace("Z", "+00:00").split("+")[0])
+                        if ed <= cutoff:
+                            filtered.append(event)
+                    except (ValueError, IndexError):
+                        filtered.append(event)
+                else:
+                    filtered.append(event)
+            upcoming_events = filtered
 
         if not upcoming_events:
             features["catalyst_count"] = 0
@@ -1043,12 +1070,18 @@ class MeanReversionMotor:
 
         # CCI (Commodity Channel Index)
         if n >= 20:
-            tp = (valid_close[-20:] + valid_close[-20:] + valid_close[-20:]) / 3  # Simplified
-            sma_tp = np.mean(tp)
-            std_tp = np.std(tp)
-            if std_tp > 0:
-                cci = (valid_close[-1] - sma_tp) / (0.015 * std_tp)
-                features["cci_20d"] = round(float(cci), 4)
+            # F-006 düzeltmesi: tp = (high + low + close) / 3 olmalı
+            valid_high_mr = high[~np.isnan(high)]
+            valid_low_mr = low[~np.isnan(low)]
+            n_hl = min(len(valid_high_mr), len(valid_low_mr), n)
+            if n_hl >= 20:
+                tp = (valid_high_mr[-20:] + valid_low_mr[-20:] + valid_close[-20:]) / 3
+                sma_tp = np.mean(tp)
+                std_tp = np.std(tp)
+                if std_tp > 0:
+                    current_tp = (valid_high_mr[-1] + valid_low_mr[-1] + valid_close[-1]) / 3
+                    cci = (current_tp - sma_tp) / (0.015 * std_tp)
+                    features["cci_20d"] = round(float(cci), 4)
 
         # Mean reversion signal (oversold + high quality)
         rsi_14 = features.get("rsi_14d", 50)
@@ -1080,7 +1113,17 @@ class SeasonalityMotor:
             close = np.where(mask == 1, close, np.nan)
 
         valid_close = close[~np.isnan(close)]
-        valid_dates = [d for d, m in zip(dates, mask if mask is not None else [1]*len(dates)) if m == 1]
+
+        # M-001 düzeltmesi: valid_close ve valid_dates birleşik filtreleme
+        # close mask-aware filtrelendi, dates de aynı maskeyle filtrelenmeli
+        if mask is not None:
+            valid_dates = [d for d, m in zip(dates, mask) if m == 1]
+        else:
+            valid_dates = list(dates)
+        # Uzunlukları eşitle
+        min_len = min(len(valid_close), len(valid_dates))
+        valid_close = valid_close[:min_len]
+        valid_dates = valid_dates[:min_len]
 
         if len(valid_close) < 252 or len(valid_dates) < 252:
             return features
@@ -1186,6 +1229,7 @@ class SevenMotorEngine:
         sector_return_5d: float = 0,
         sector_return_20d: float = 0,
         market_regime: str = "UNKNOWN",
+        as_of_date: Optional[str] = None,
     ) -> Dict[str, float]:
         """Tüm 9 motoru çalıştır ve feature'ları birleştir."""
 
@@ -1217,11 +1261,11 @@ class SevenMotorEngine:
             all_features.update(m4)
 
         # Motor 5: KAP + Haber
-        m5 = self.motor5.compute(ticker, kap_events or [], news_events or [], llm_analysis)
+        m5 = self.motor5.compute(ticker, kap_events or [], news_events or [], llm_analysis, as_of_date=as_of_date)
         all_features.update(m5)
 
         # Motor 6: Katalizör
-        m6 = self.motor6.compute(ticker, upcoming_events or [])
+        m6 = self.motor6.compute(ticker, upcoming_events or [], as_of_date=as_of_date)
         all_features.update(m6)
 
         # Motor 7: Neden Düşüyor?

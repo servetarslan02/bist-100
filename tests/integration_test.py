@@ -164,10 +164,15 @@ class AlphaIntegrationTest:
                             "ticker": t, "timestamp": str(row.Date),
                             "price": row.Close, "volume": row.Volume,
                         })
-            except Exception:
-                pass  # Intentional: silent error handling
+            except Exception as e:
+                errors = getattr(self, '_fetch_errors', [])
+                errors.append(f"{t}: {e}")
+                self._fetch_errors = errors
 
-        self.assert_test("Real data fetched", success == 5, f"{success}/5 stocks")
+        fetch_errors = getattr(self, '_fetch_errors', [])
+        if fetch_errors:
+            print(f"  ⚠️ Veri çekme hataları: {fetch_errors}")
+        self.assert_test("Real data fetched", success == 5, f"{success}/5 stocks (errors: {len(fetch_errors)})")
         self.assert_test("Data stored in DB", db.count("market_ticks") > 0, f"{db.count('market_ticks')} rows")
         print()
 

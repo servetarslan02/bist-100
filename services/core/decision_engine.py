@@ -283,7 +283,7 @@ class DecisionEngine:
 
         # Macro impact (sektör bazlı etki)
         if inp.macro_impact != 0:
-            score += inp.macro_impact * 100  # Etki skora yansıt
+            score += inp.macro_impact * 15  # Düzeltme: 100→15, aşırı skor bozulması önlendi
 
         # Macro regime bonusları
         regime_bonuses = {
