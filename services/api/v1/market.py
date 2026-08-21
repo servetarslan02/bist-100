@@ -90,7 +90,13 @@ async def ohlcv(ticker: str, period: str = "6mo", interval: str = "1d", user=Dep
 
 @router.get("/instruments/{ticker}/live_intel")
 @router.get("/instruments/{ticker}/full")
-async def live_intel_analysis(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
+async def live_intel_analysis(
+    ticker: str,
+    period: str = Query("6mo", description="Historical period: 1mo, 3mo, 6mo, 1y, 2y, 5y"),
+    interval: str = Query("1d", description="Bar interval: 1d, 1wk, 1mo"),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit)
+):
     """Gerçek zamanlı piyasa verisi, hesaplanmış teknik indikatörler ve mum grafiği."""
     sym = ticker.upper().replace(".IS", "").strip()
     yf_ticker = f"{sym}.IS"
@@ -132,8 +138,15 @@ async def live_intel_analysis(ticker: str, user=Depends(get_current_user), _=Dep
         import numpy as np
         from ...data.data_source import data_source
 
+        # Fetch timeframe chart data (daily, weekly, monthly)
+        df_chart = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
+
+        # Base daily data for technical indicator calculations
         df = data_source.get_stock_data(yf_ticker, period="6mo", interval="1d")
-        if df is None or df.empty or len(df) < 5:
+        if df is None or df.empty or len(df) < 2:
+            df = df_chart
+
+        if df is None or df.empty or len(df) < 2:
             raise HTTPException(404, f"No real data available for {sym}")
 
         # Real latest price & change
@@ -191,9 +204,10 @@ async def live_intel_analysis(ticker: str, user=Depends(get_current_user), _=Dep
             rec_text = "TUT"
             rec_score = 55.0
 
-        # Format 60 real candlesticks for TradingView Lightweight Charts
+        # Format candlesticks for TradingView Lightweight Charts
+        target_df = df_chart if df_chart is not None and not df_chart.empty else df
         candles = []
-        for idx, row in df.tail(60).iterrows():
+        for idx, row in target_df.tail(120).iterrows():
             date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx).split("T")[0]
             candles.append({
                 "time": date_str,
@@ -276,7 +290,32 @@ async def market_radar(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
-    """Piyasa radarı — batch yfinance ile tüm BIST hisseleri tek seferde."""
+    """Piyasa radarı — Redis cache'den anında döner (<50ms). Cache 2dk'da bir yenilenir."""
+    import json
+    import redis as redis_lib
+
+    try:
+        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
+        cached = r.get("radar:data")
+        cached_at = r.get("radar:updated_at")
+        if cached:
+            return {
+                "data": json.loads(cached),
+                "count": len(json.loads(cached)),
+                "errors": 0,
+                "status": "ok",
+                "cached_at": cached_at.decode() if cached_at else None,
+                "from_cache": True,
+            }
+    except Exception:
+        pass
+
+    # Cache yoksa direkt çek
+    return await _fetch_radar_fresh(limit)
+
+
+async def _fetch_radar_fresh(limit: int = 200):
+    """yfinance batch download ile tüm BIST hisselerini çek."""
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from ...ingestion.bist_universe import BISTUniverse
@@ -305,7 +344,6 @@ async def market_radar(
 
     def _batch_fetch():
         yf_tickers = [f"{t}.IS" for t in tickers_to_fetch]
-        # Tek seferde tüm hisseleri indir
         raw = yf.download(
             tickers=" ".join(yf_tickers),
             period="3mo",
@@ -318,10 +356,9 @@ async def market_radar(
         results = []
         for ticker, yf_ticker in zip(tickers_to_fetch, yf_tickers):
             try:
-                if len(tickers_to_fetch) == 1:
-                    df = raw
-                else:
-                    df = raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
+                df = raw if len(tickers_to_fetch) == 1 else (
+                    raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
+                )
                 if df is None or df.empty or len(df) < 2:
                     continue
                 closes = df["Close"].dropna().tolist()
@@ -358,16 +395,26 @@ async def market_radar(
     with ThreadPoolExecutor(max_workers=1) as executor:
         results = await loop.run_in_executor(executor, _batch_fetch)
 
-    errors_count = len(tickers_to_fetch) - len(results)
     results.sort(key=lambda x: x["score"], reverse=True)
+
+    # Cache'e yaz (TTL: 3 dakika güvenlik payı)
+    try:
+        import json
+        import redis as redis_lib
+        from datetime import datetime, timezone
+        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
+        r.setex("radar:data", 180, json.dumps(results))
+        r.setex("radar:updated_at", 180, datetime.now(timezone.utc).isoformat())
+    except Exception:
+        pass
 
     return {
         "data": results,
         "count": len(results),
-        "errors": errors_count,
+        "errors": len(tickers_to_fetch) - len(results),
         "status": "ok",
+        "from_cache": False,
     }
-
 
 
 

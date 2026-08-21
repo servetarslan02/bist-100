@@ -40,6 +40,7 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — DB lifecycle dahil."""
+    import asyncio
     logger.info("ALPHA BIST API starting (canonical production server)")
 
     # Database connections başlat
@@ -49,7 +50,25 @@ async def lifespan(app: FastAPI):
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
     setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
 
+    # Radar cache arka plan yenileme görevi
+    async def _radar_cache_refresher():
+        """Her 2 dakikada bir radar verisini yfinance'den çekip Redis'e yazar."""
+        await asyncio.sleep(10)  # API hazır olana kadar bekle
+        while True:
+            try:
+                from .v1.market import _fetch_radar_fresh
+                logger.info("radar_cache: yenileniyor...")
+                await _fetch_radar_fresh(limit=200)
+                logger.info("radar_cache: güncellendi")
+            except Exception as e:
+                logger.warning(f"radar_cache: hata — {e}")
+            await asyncio.sleep(120)  # 2 dakika
+
+    task = asyncio.create_task(_radar_cache_refresher())
+
     yield
+
+    task.cancel()
 
     # OpenTelemetry kapat
     shutdown_telemetry()

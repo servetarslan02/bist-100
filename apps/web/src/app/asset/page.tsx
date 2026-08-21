@@ -5,7 +5,7 @@ import {
   Search, TrendingUp, TrendingDown, Sparkles,
   BarChart3, Activity, ShieldCheck, Zap, Layers,
   Compass, ArrowUpRight, ArrowDownRight, RefreshCw,
-  Cpu, Target, CheckCircle2
+  Cpu, Target, CheckCircle2, Copy, Check
 } from "lucide-react";
 import { TradingViewChart } from "@/components/charts/TradingViewChart";
 
@@ -41,23 +41,39 @@ const POPULAR_TICKERS = [
   "SISE", "ASTOR", "TCELL", "ISCTR"
 ];
 
+type TimeframeType = "1D" | "1W" | "1M";
+
+const TIMEFRAME_CONFIG: Record<TimeframeType, { label: string; period: string; interval: string }> = {
+  "1D": { label: "GÜNLÜK (1G)", period: "6mo", interval: "1d" },
+  "1W": { label: "HAFTALIK (1H)", period: "2y", interval: "1wk" },
+  "1M": { label: "AYLIK (1A)", period: "5y", interval: "1mo" },
+};
+
 export default function AssetIntelPage() {
   const [tickerInput, setTickerInput] = useState("THYAO");
   const [activeTicker, setActiveTicker] = useState("THYAO");
+  const [timeframe, setTimeframe] = useState<TimeframeType>("1D");
   const [asset, setAsset] = useState<LiveAssetData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Fetch real live intelligence data from backend
   useEffect(() => {
     let isMounted = true;
     async function fetchAssetData() {
-      setLoading(true);
+      if (!asset) setLoading(true);
+      else setChartLoading(true);
       setError(null);
+
+      const tf = TIMEFRAME_CONFIG[timeframe];
       try {
-        const res = await fetch(`/api/v1/market/instruments/${activeTicker}/live_intel`);
+        const res = await fetch(
+          `/api/v1/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`
+        );
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ${activeTicker} için canlı veri alınamadı`);
         }
@@ -72,6 +88,7 @@ export default function AssetIntelPage() {
       } finally {
         if (isMounted) {
           setLoading(false);
+          setChartLoading(false);
         }
       }
     }
@@ -80,7 +97,7 @@ export default function AssetIntelPage() {
     return () => {
       isMounted = false;
     };
-  }, [activeTicker]);
+  }, [activeTicker, timeframe]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,15 +118,30 @@ export default function AssetIntelPage() {
     if (!asset) return;
     setLoadingAi(true);
     try {
-      const res = await fetch(
-        `/api/v1/intelligence/gemini_report/${asset.symbol}?price=${asset.price}&sector=${encodeURIComponent(asset.sector)}`
-      );
+      const queryParams = new URLSearchParams({
+        price: String(asset.price),
+        sector: asset.sector,
+        rsi: String(asset.rsi_14),
+        pe: String(asset.pe_ratio),
+        pb: String(asset.pb_ratio),
+        support: String(asset.support),
+        resistance: String(asset.resistance),
+      });
+      const res = await fetch(`/api/v1/intelligence/gemini_report/${asset.symbol}?${queryParams.toString()}`);
       const data = await res.json();
       setAiReport(data?.report || "Rapor oluşturuldu.");
     } catch (err) {
       setAiReport("Gemini analizi alınamadı.");
     } finally {
       setLoadingAi(false);
+    }
+  };
+
+  const handleCopyReport = () => {
+    if (aiReport) {
+      navigator.clipboard.writeText(aiReport);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -144,7 +176,7 @@ export default function AssetIntelPage() {
           </div>
           <button
             type="submit"
-            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-zinc-950 hover:bg-emerald-400 cursor-pointer"
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-500 text-zinc-950 hover:bg-emerald-400 cursor-pointer transition-all"
           >
             İncele
           </button>
@@ -169,7 +201,7 @@ export default function AssetIntelPage() {
         ))}
       </div>
 
-      {loading && (
+      {loading && !asset && (
         <div className="rounded-xl p-12 text-center bg-zinc-900/40 border border-zinc-800/60">
           <RefreshCw size={24} className="mx-auto mb-3 text-emerald-400 animate-spin" />
           <p className="text-xs text-zinc-400">{activeTicker} için gerçek piyasa verileri ve indikatörler hesaplanıyor...</p>
@@ -188,7 +220,7 @@ export default function AssetIntelPage() {
         </div>
       )}
 
-      {!loading && asset && (
+      {asset && (
         <>
           {/* Asset Hero Card */}
           <div
@@ -208,7 +240,7 @@ export default function AssetIntelPage() {
                     </span>
                   </div>
                   <p className="text-[11px] text-zinc-500 mt-0.5">
-                    Piyasa Değeri: {asset.market_cap} · Son Güncelleme: Gerçek Zamanlı BİST
+                    Piyasa Değeri: {asset.market_cap} · Son Güncelleme: Canlı BİST
                   </p>
                 </div>
               </div>
@@ -217,7 +249,7 @@ export default function AssetIntelPage() {
                 <button
                   onClick={handleAskGemini}
                   disabled={loadingAi}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer transition-all shadow-md"
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer transition-all shadow-md active:scale-95"
                 >
                   <Sparkles size={13} className={loadingAi ? "animate-spin" : ""} />
                   {loadingAi ? "Gemini 3.7 Analiz Ediyor..." : "Gemini 3.7 Canlı Raporu"}
@@ -244,15 +276,26 @@ export default function AssetIntelPage() {
               <div className="flex items-center gap-2">
                 <BarChart3 size={14} className="text-emerald-400" />
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
-                  {asset.symbol} — TradingView İnteraktif Mum Grafiği ({asset.candles?.length || 0} Günlük Gerçek Mumlar)
+                  {asset.symbol} — TradingView İnteraktif Mum Grafiği ({TIMEFRAME_CONFIG[timeframe].label})
                 </h3>
+                {chartLoading && <RefreshCw size={11} className="text-zinc-500 animate-spin ml-2" />}
               </div>
-              <div className="flex gap-1 text-[10px] font-semibold text-zinc-400">
-                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  GÜNLÜK (1G)
-                </span>
-                <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">HAFTALIK (1H)</span>
-                <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400">AYLIK (1A)</span>
+              
+              {/* Working Interactive Timeframe Switcher */}
+              <div className="flex gap-1 text-[10px] font-semibold">
+                {(["1D", "1W", "1M"] as TimeframeType[]).map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
+                      timeframe === tf
+                        ? "bg-emerald-500 text-zinc-950 font-bold shadow-sm"
+                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-zinc-200"
+                    }`}
+                  >
+                    {TIMEFRAME_CONFIG[tf].label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -360,14 +403,24 @@ export default function AssetIntelPage() {
             </div>
           </div>
 
-          {/* AI Intelligence Live Report Box if generated */}
+          {/* AI Intelligence Live Report Box if generated - Full Height & Rich Typography */}
           {aiReport && (
-            <div className="rounded-xl p-5 border border-purple-500/30 bg-purple-950/10 space-y-3">
-              <div className="flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-wider">
-                <Sparkles size={14} />
-                Google Gemini 3.7 Flash — {asset.symbol} Canlı Raporu
+            <div className="rounded-xl p-5 border border-purple-500/30 bg-purple-950/20 space-y-4 shadow-xl">
+              <div className="flex items-center justify-between border-b border-purple-500/20 pb-3">
+                <div className="flex items-center gap-2 text-purple-300 text-xs font-bold uppercase tracking-wider">
+                  <Sparkles size={16} className="text-purple-400" />
+                  Google Gemini 3.7 Flash — {asset.symbol} Canlı İstihbarat Raporu
+                </div>
+                <button
+                  onClick={handleCopyReport}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-purple-500/20 text-purple-200 text-[11px] font-medium border border-purple-500/30 hover:bg-purple-500/30 cursor-pointer transition-all"
+                >
+                  {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  {copied ? "Kopyalandı" : "Raporu Kopyala"}
+                </button>
               </div>
-              <div className="text-xs text-zinc-300 whitespace-pre-line leading-relaxed font-sans bg-black/20 p-4 rounded-lg">
+
+              <div className="text-xs text-zinc-200 leading-relaxed font-sans bg-black/40 p-5 rounded-lg border border-purple-500/20 whitespace-pre-wrap selection:bg-purple-500/30">
                 {aiReport}
               </div>
             </div>

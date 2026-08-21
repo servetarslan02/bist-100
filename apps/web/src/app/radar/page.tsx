@@ -41,8 +41,8 @@ export default function MarketRadar() {
   const [sortAsc, setSortAsc] = useState(false);
   const [marketOpen, setMarketOpen] = useState(isBistOpen());
 
-  // Borsa açıksa 30 saniyede bir, kapalıysa 5 dakikada bir güncelle
-  const pollInterval = marketOpen ? 30_000 : 300_000;
+  // Cache'den anında geldiği için borsa açıksa 10s, kapalıysa 60s
+  const pollInterval = marketOpen ? 10_000 : 60_000;
 
   const { data: rawData, loading, lastUpdated } = usePolling<RadarResponse>(
     "/market/radar?limit=200",

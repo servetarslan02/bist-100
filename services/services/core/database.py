@@ -1,0 +1,343 @@
+"""ALPHA BIST — Database Connections v2.0 (Production-Hardened)
+
+FAZ 5.1:
+- Connection retry with exponential backoff
+- Health check on startup
+- Graceful failure handling (no uncontrolled crash)
+- Transaction support
+- Connection pool tuning
+"""
+
+import asyncio
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator, Optional, Any, List, Dict
+import structlog
+
+try:
+    import asyncpg
+except ImportError:
+    asyncpg = None
+
+try:
+    import clickhouse_connect
+except ImportError:
+    clickhouse_connect = None
+
+try:
+    import redis.asyncio as aioredis
+except ImportError:
+    aioredis = None
+
+from .config import settings
+
+logger = structlog.get_logger()
+
+# =====================================================
+# RETRY CONFIG
+# =====================================================
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0  # seconds
+
+
+async def _retry_async(coro_factory, name: str, max_retries: int = _MAX_RETRIES):
+    """Retry async operation with exponential backoff."""
+    last_error = None
+    for attempt in range(max_retries + 1):
+        try:
+            return await coro_factory()
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries:
+                delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                logger.warning(f"{name} attempt {attempt + 1} failed, retrying in {delay}s",
+                             error=str(e))
+                await asyncio.sleep(delay)
+    logger.error(f"{name} failed after {max_retries + 1} attempts", error=str(last_error))
+    raise last_error
+
+
+# =====================================================
+# PostgreSQL (Async)
+# =====================================================
+
+_pg_pool = None
+_pg_healthy = False
+
+
+async def get_pg_pool():
+    """Get or create PostgreSQL connection pool with retry."""
+    global _pg_pool, _pg_healthy
+    if asyncpg is None:
+        raise RuntimeError("asyncpg not installed. Run: pip install asyncpg")
+    if _pg_pool is None:
+        async def _create():
+            return await asyncpg.create_pool(
+                host=settings.postgres_host,
+                port=settings.postgres_port,
+                database=settings.postgres_db,
+                user=settings.postgres_user,
+                password=settings.postgres_password,
+                min_size=settings.db_pool_min,
+                max_size=settings.db_pool_max,
+                command_timeout=settings.db_command_timeout,
+            )
+        _pg_pool = await _retry_async(_create, "PostgreSQL pool creation")
+        _pg_healthy = True
+        logger.info("PostgreSQL pool created", host=settings.postgres_host)
+    return _pg_pool
+
+
+async def close_pg_pool():
+    global _pg_pool, _pg_healthy
+    if _pg_pool:
+        await _pg_pool.close()
+        _pg_pool = None
+        _pg_healthy = False
+        logger.info("PostgreSQL pool closed")
+
+
+@asynccontextmanager
+async def get_pg_connection():
+    """Get a PostgreSQL connection from the pool."""
+    pool = await get_pg_pool()
+    async with pool.acquire() as conn:
+        yield conn
+
+
+@asynccontextmanager
+async def get_pg_transaction():
+    """Get a PostgreSQL connection with transaction."""
+    pool = await get_pg_pool()
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            yield conn
+
+
+async def pg_execute(query: str, *args) -> str:
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.execute(query, *args)
+    except Exception as e:
+        logger.error("pg_execute failed", query=query[:100], error=str(e))
+        raise
+
+
+async def pg_fetch(query: str, *args):
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetch(query, *args)
+    except Exception as e:
+        logger.error("pg_fetch failed", query=query[:100], error=str(e))
+        raise
+
+
+async def pg_fetchrow(query: str, *args):
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetchrow(query, *args)
+    except Exception as e:
+        logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
+        raise
+
+
+async def pg_fetchval(query: str, *args) -> Any:
+    try:
+        async with get_pg_connection() as conn:
+            return await conn.fetchval(query, *args)
+    except Exception as e:
+        logger.error("pg_fetchval failed", query=query[:100], error=str(e))
+        raise
+
+
+# =====================================================
+# ClickHouse
+# =====================================================
+
+_ch_client = None
+_ch_healthy = False
+
+
+def get_ch_client():
+    global _ch_client, _ch_healthy
+    if clickhouse_connect is None:
+        raise RuntimeError("clickhouse-connect not installed")
+    if _ch_client is None:
+        _ch_client = clickhouse_connect.get_client(
+            host=settings.clickhouse_host,
+            port=settings.clickhouse_http_port,
+            username=settings.clickhouse_user,
+            password=settings.clickhouse_password,
+            database=settings.clickhouse_db,
+        )
+        _ch_healthy = True
+        logger.info("ClickHouse client created", host=settings.clickhouse_host)
+    return _ch_client
+
+
+def close_ch_client():
+    global _ch_client, _ch_healthy
+    if _ch_client:
+        _ch_client.close()
+        _ch_client = None
+        _ch_healthy = False
+        logger.info("ClickHouse client closed")
+
+
+def ch_execute(query: str, parameters: Optional[Dict] = None) -> Any:
+    client = get_ch_client()
+    return client.query(query, parameters=parameters)
+
+
+def ch_insert(table: str, data: List[List[Any]], column_names: Optional[List[str]] = None):
+    client = get_ch_client()
+    client.insert(table, data, column_names=column_names)
+
+
+def ch_query_df(query: str, parameters: Optional[Dict] = None):
+    import polars as pl
+    client = get_ch_client()
+    result = client.query_df(query, parameters=parameters)
+    return pl.from_pandas(result)
+
+
+# =====================================================
+# Redis
+# =====================================================
+
+_redis = None
+_redis_healthy = False
+
+
+async def get_redis():
+    global _redis, _redis_healthy
+    if aioredis is None:
+        raise RuntimeError("redis not installed")
+    if _redis is None:
+        _redis = aioredis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            max_connections=20,
+        )
+        _redis_healthy = True
+        logger.info("Redis connection created", host=settings.redis_host)
+    return _redis
+
+
+async def close_redis():
+    global _redis, _redis_healthy
+    if _redis:
+        await _redis.close()
+        _redis = None
+        _redis_healthy = False
+        logger.info("Redis connection closed")
+
+
+async def redis_get(key: str) -> Optional[str]:
+    r = await get_redis()
+    return await r.get(key)
+
+
+async def redis_set(key: str, value: str, ex: Optional[int] = None):
+    r = await get_redis()
+    await r.set(key, value, ex=ex)
+
+
+async def redis_delete(key: str):
+    r = await get_redis()
+    await r.delete(key)
+
+
+async def redis_hgetall(key: str) -> Dict[str, str]:
+    r = await get_redis()
+    return await r.hgetall(key)
+
+
+async def redis_hset(key: str, mapping: Dict[str, str]):
+    r = await get_redis()
+    await r.hset(key, mapping=mapping)
+
+
+async def redis_publish(channel: str, message: str):
+    r = await get_redis()
+    await r.publish(channel, message)
+
+
+# =====================================================
+# Health Check
+# =====================================================
+
+async def check_db_health() -> Dict[str, Any]:
+    """Check health of all database connections."""
+    health = {"postgres": "unavailable", "clickhouse": "unavailable", "redis": "unavailable"}
+
+    # PostgreSQL
+    try:
+        pool = await get_pg_pool()
+        async with pool.acquire() as conn:
+            result = await conn.fetchval("SELECT 1")
+            if result == 1:
+                health["postgres"] = "healthy"
+    except Exception as e:
+        health["postgres"] = f"error: {str(e)[:100]}"
+
+    # ClickHouse
+    try:
+        client = get_ch_client()
+        result = client.query("SELECT 1")
+        if result.result_rows and result.result_rows[0][0] == 1:
+            health["clickhouse"] = "healthy"
+    except Exception as e:
+        health["clickhouse"] = f"error: {str(e)[:100]}"
+
+    # Redis
+    try:
+        r = await get_redis()
+        if await r.ping():
+            health["redis"] = "healthy"
+    except Exception as e:
+        health["redis"] = f"error: {str(e)[:100]}"
+
+    return health
+
+
+# =====================================================
+# Lifecycle
+# =====================================================
+
+async def init_databases():
+    """Initialize all database connections. Graceful on failure."""
+    global _pg_healthy, _ch_healthy, _redis_healthy
+
+    try:
+        await get_pg_pool()
+    except Exception as e:
+        _pg_healthy = False
+        logger.warning(f"PostgreSQL not available: {e}")
+
+    try:
+        get_ch_client()
+    except Exception as e:
+        _ch_healthy = False
+        logger.warning(f"ClickHouse not available: {e}")
+
+    try:
+        await get_redis()
+    except Exception as e:
+        _redis_healthy = False
+        logger.warning(f"Redis not available: {e}")
+
+    health = await check_db_health()
+    for svc, status in health.items():
+        if status == "healthy":
+            logger.info(f"DB health: {svc} = OK")
+        else:
+            logger.warning(f"DB health: {svc} = {status}")
+
+    logger.info("Database initialization completed")
+
+
+async def close_databases():
+    await close_pg_pool()
+    close_ch_client()
+    await close_redis()
+    logger.info("All database connections closed")

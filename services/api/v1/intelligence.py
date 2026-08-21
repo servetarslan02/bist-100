@@ -126,13 +126,27 @@ async def gemini_report(
     ticker: str,
     price: float = 100.0,
     sector: str = "BIST",
+    rsi: Optional[float] = None,
+    pe: Optional[float] = None,
+    pb: Optional[float] = None,
+    support: Optional[float] = None,
+    resistance: Optional[float] = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
     """Belirli bir hisse için canlı Gemini 3.7 araştırma raporu."""
     try:
         from ...intelligence.gemini_service import analyze_company_gemini
-        report = analyze_company_gemini(ticker, price, sector)
+        report = analyze_company_gemini(
+            ticker=ticker,
+            price=price,
+            sector=sector,
+            rsi=rsi,
+            pe=pe,
+            pb=pb,
+            support=support,
+            resistance=resistance,
+        )
         return {"ticker": ticker, "report": report, "model": "gemini-3.7-flash", "status": "ok"}
     except Exception as e:
         return {"ticker": ticker, "report": f"Rapor üretilemedi: {e}", "model": "gemini-3.7-flash", "status": "error"}

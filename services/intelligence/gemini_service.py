@@ -163,17 +163,17 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
         ],
         "generationConfig": {
             "temperature": 0.3,
-            "maxOutputTokens": 1500,
+            "maxOutputTokens": 8192,
         }
     }
     
-    sys_prompt = system_instruction or "Sen ALPHA BIST kurumsal yapay zeka istihbarat motorusun (Gemini 3.7 Flash). Sistemdeki gerçek sayısal verileri ve Monte Carlo simülasyonlarını kullanarak analiz yap."
+    sys_prompt = system_instruction or "Sen ALPHA BIST kurumsal yapay zeka istihbarat motorusun (Gemini 3.7 Flash). Sistemdeki gerçek sayısal verileri ve Monte Carlo simülasyonlarını kullanarak analiz yap. Raporunu her zaman eksiksiz, profesyonel, anlaşılır ve Türkçe olarak tamamla."
     payload["systemInstruction"] = {
         "parts": [{"text": sys_prompt}]
     }
 
     api_key = os.getenv("GEMINI_API_KEY", "")
-    models_to_try = [os.getenv("GEMINI_MODEL", "gemini-3.7-flash"), "gemini-2.5-flash", "gemini-2.5-pro"]
+    models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), "gemini-2.5-pro", "gemini-3.7-flash"]
     
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}" if api_key else f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
@@ -183,7 +183,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=20) as resp:
+            with urllib.request.urlopen(req, timeout=30) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
@@ -193,25 +193,50 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
     return "Gemini Analizi: BIST-100 makro dinamikleri ve teknik göstergeler ışığında pozitif eğilim korunmaktadır."
 
 
-def analyze_company_gemini(ticker: str, price: float, sector: str) -> str:
+def analyze_company_gemini(
+    ticker: str,
+    price: float = 100.0,
+    sector: str = "BIST",
+    rsi: Optional[float] = None,
+    pe: Optional[float] = None,
+    pb: Optional[float] = None,
+    support: Optional[float] = None,
+    resistance: Optional[float] = None,
+) -> str:
     """Sirket icin anlik derin yapay zeka degerlendirmesi üret."""
     m = tool_get_stock_metrics(ticker)
     mc = tool_run_monte_carlo_forecast(ticker, days=20)
     
+    live_p = price if price and price > 0 else m['price_tl']
+    live_rsi = rsi if rsi is not None else m['rsi_14']
+    live_pe = pe if pe is not None else m['pe_ratio']
+    live_pb = pb if pb is not None else m['pb_ratio']
+    live_sup = support if support is not None else m['support_level']
+    live_res = resistance if resistance is not None else m['resistance_level']
+    
     prompt = f"""
     Sen Türkiye Borsa İstanbul (BIST) uzmanı üst düzey bir Kantitatif Finans ve Araştırma Analistisin.
     
-    Hisse: {ticker}
+    Hisse Senedi: {ticker.upper()}
     Sektör: {sector}
-    Güncel Fiyat: ₺{m['price_tl']:.2f}
-    Teknik Göstergeler: 14G RSI={m['rsi_14']}, F/K={m['pe_ratio']}, PD/DD={m['pb_ratio']}, 20G Momentum=%{m['momentum_20d_pct']}
-    Monte Carlo Simülasyonu (20 Gün): Beklenen=₺{mc['expected_price']}, En Kötü %5=₺{mc['p5_worst_case']}, En İyi %95=₺{mc['p95_best_case']}, Kâr İhtimali=%{mc['prob_profit_pct']}
+    Güncel Piyasa Fiyatı: ₺{live_p:.2f}
+    Teknik Seviyeler: 14 Günlük RSI={live_rsi}, F/K Çarpanı={live_pe}x, PD/DD Çarpanı={live_pb}x
+    Destek (S1): ₺{live_sup:.2f}, Hedef Direnç (R1): ₺{live_res:.2f}
+    Monte Carlo Simülasyonu (20 Günlük Projeksiyon): Beklenen=₺{mc['expected_price']}, En Kötü %5=₺{mc['p5_worst_case']}, En İyi %95=₺{mc['p95_best_case']}, Kâr İhtimali=%{mc['prob_profit_pct']}
     
-    Lütfen bu sayısal verileri kullanarak profesyonel, maddeler halinde Türkçe bir istihbarat raporu oluştur:
-    1. Temel ve Sektörel Görünüm
-    2. Kısa/Orta Vade Teknik & Momentum Beklentisi
-    3. Monte Carlo Olasılık Dağılımı ve Riskler
-    4. Kurumsal Portföy İçin Özet Karar (AL / TUT / İZLE)
+    Lütfen yukarıdaki net sayısal verileri kullanarak kurumsal yatırımcılar için eksiksiz ve derinlemesine bir Türkçe istihbarat raporu oluştur:
+    
+    ### 1. Şirket ve Sektörel Genel Değerlendirme
+    (Sektörel konum, değerleme çarpanlarının analizi)
+    
+    ### 2. Teknik Görünüm, Momentum ve Kritik Seviyeler
+    (RSI={live_rsi}, Destek=₺{live_sup:.2f}, Direnç=₺{live_res:.2f} ışığında alım/satım baskısı)
+    
+    ### 3. Monte Carlo Risk ve Getiri Dağılımı
+    (20 günlük fiyat olasılıkları ve aşağı yönlü riskler)
+    
+    ### 4. Kurumsal Portföy Stratejisi ve Karar Özeti
+    (AL, TUT veya KADEMELİ ALIM önerisi, hedef fiyat ve stop-loss seviyesi)
     """
-    system_prompt = "Sen ALPHA BIST kurumsal kantitatif araştırma yapay zekasısın. Yanıtların her zaman profesyonel, net, sayısal verilerle kanıtlanmış ve Türkçe olsun."
+    system_prompt = "Sen ALPHA BIST kurumsal kantitatif araştırma yapay zekasısın. Raporunu her zaman başlıkları ve maddeleriyle eksiksiz olarak tamamla. Cümleyi asla yarım bırakma."
     return call_gemini(prompt, system_prompt)
