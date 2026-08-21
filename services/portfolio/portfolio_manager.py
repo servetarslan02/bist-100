@@ -289,7 +289,7 @@ class PortfolioManager:
         if len(lst) > max_size:
             del lst[:len(lst) - max_size]
 
-    def __init__(self, initial_capital: float = 100000.0):
+    def __init__(self, initial_capital: float = 10000000.0):
         # v1.0 mevcut alanlar
         self._initial_capital = initial_capital
         self._cash = initial_capital
@@ -350,6 +350,15 @@ class PortfolioManager:
         )
         self._cash_ledger.append(entry)
         self._trim_list(self._cash_ledger, MAX_CASH_LEDGER)
+
+    def deposit_cash(self, amount: float, description: str = "Sermaye Ekleme") -> float:
+        """Portfoye nakit ekle."""
+        if amount > 0:
+            self._cash += amount
+            self._record_cash(amount, self._cash, "DEPOSIT", description)
+            self._record_equity()
+            logger.info("cash_deposited", amount=amount, new_cash=self._cash)
+        return self._cash
 
     def get_cash_ledger(self, limit: int = 100) -> List[Dict]:
         """Nakit hareket geçmişi."""
@@ -1200,30 +1209,50 @@ class PortfolioManager:
         return orders
 
     def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        """Otonom portfoy yeniden dengeleme (Auto-Rebalance Bot)."""
+        """Otonom portfoy yeniden dengeleme (Sinirsiz Yapay Zeka Al-Sat Motoru)."""
         if not signals:
             signals = [
-                {"ticker": "THYAO", "price": 312.50, "score": 92, "stop_loss": 298.0, "target": 345.0, "sector": "Ulaştırma"},
-                {"ticker": "ASELS", "price": 66.80, "score": 89, "stop_loss": 62.0, "target": 74.5, "sector": "Savunma"},
-                {"ticker": "GARAN", "price": 121.40, "score": 85, "stop_loss": 114.0, "target": 132.0, "sector": "Bankacılık"},
-                {"ticker": "KCHOL", "price": 218.00, "score": 83, "stop_loss": 204.0, "target": 242.0, "sector": "Holding"},
+                {"ticker": "THYAO", "price": 312.50, "score": 94, "stop_loss": 298.0, "target": 345.0, "sector": "Havacılık & Ulaştırma"},
+                {"ticker": "ASELS", "price": 66.80, "score": 92, "stop_loss": 62.0, "target": 74.5, "sector": "Savunma Sanayi"},
+                {"ticker": "GARAN", "price": 121.40, "score": 89, "stop_loss": 114.0, "target": 132.0, "sector": "Bankacılık"},
+                {"ticker": "KCHOL", "price": 218.00, "score": 88, "stop_loss": 204.0, "target": 242.0, "sector": "Holding"},
+                {"ticker": "TUPRS", "price": 174.50, "score": 87, "stop_loss": 164.0, "target": 192.0, "sector": "Enerji & Petrol"},
+                {"ticker": "PGSUS", "price": 242.80, "score": 86, "stop_loss": 226.0, "target": 268.0, "sector": "Havacılık & Ulaştırma"},
+                {"ticker": "FROTO", "price": 1120.00, "score": 85, "stop_loss": 1050.0, "target": 1240.0, "sector": "Otomotiv"},
+                {"ticker": "BIMAS", "price": 542.00, "score": 84, "stop_loss": 510.0, "target": 590.0, "sector": "Perakende Ticaret"},
+                {"ticker": "AKBNK", "price": 61.20, "score": 83, "stop_loss": 57.5, "target": 67.0, "sector": "Bankacılık"},
+                {"ticker": "SISE",  "price": 46.90, "score": 82, "stop_loss": 43.8, "target": 51.5, "sector": "Cam & Sanayi"},
+                {"ticker": "ENJSA", "price": 68.40, "score": 81, "stop_loss": 64.0, "target": 75.0, "sector": "Enerji"},
+                {"ticker": "ASTOR", "price": 104.20, "score": 80, "stop_loss": 96.5, "target": 116.0, "sector": "Elektrik & Sanayi"},
+                {"ticker": "SAHOL", "price": 98.60, "score": 79, "stop_loss": 92.0, "target": 108.0, "sector": "Holding"},
+                {"ticker": "CCOLA", "price": 680.00, "score": 78, "stop_loss": 635.0, "target": 740.0, "sector": "Gıda & İçecek"},
+                {"ticker": "TCELL", "price": 102.50, "score": 77, "stop_loss": 95.0, "target": 112.0, "sector": "Telekomünikasyon"},
+                {"ticker": "MGROS", "price": 515.00, "score": 76, "stop_loss": 480.0, "target": 560.0, "sector": "Perakende Ticaret"},
             ]
 
         executed = []
         total_equity = self._cash + sum(p.market_value for p in self._positions.values())
-        target_allocation_per_stock = 0.20
+        
+        # Sort signals by score descending
+        qualified_signals = [s for s in signals if s.get("score", 0) >= 75]
+        qualified_signals.sort(key=lambda s: s.get("score", 0), reverse=True)
 
-        for sig in signals:
+        for sig in qualified_signals:
             ticker = sig.get("ticker", "")
             if not ticker or ticker in self._positions:
                 continue
 
             price = float(sig.get("price", 100.0))
-            allocation = total_equity * target_allocation_per_stock
-            if self._cash < allocation * 0.5:
+            score = float(sig.get("score", 80))
+            
+            # Dynamic Score-Weighted Sizing (Score 90+ gets up to 7-8%, Score 75-80 gets 4-5%)
+            weight = 0.04 + ((score - 75) / 20.0) * 0.04
+            allocation = total_equity * weight
+            
+            if self._cash < allocation * 0.3:
                 break
 
-            alloc_to_use = min(allocation, self._cash * 0.8)
+            alloc_to_use = min(allocation, self._cash * 0.9)
             quantity = int(alloc_to_use // price)
             if quantity <= 0:
                 continue
@@ -1242,9 +1271,11 @@ class PortfolioManager:
                     "ticker": ticker,
                     "quantity": quantity,
                     "price": price,
+                    "score": score,
                     "allocated_tl": round(quantity * price, 2),
                     "stop_loss": sig.get("stop_loss"),
                     "target": sig.get("target"),
+                    "sector": sig.get("sector"),
                 })
 
         return {
@@ -1259,4 +1290,5 @@ class PortfolioManager:
 
 # Singleton
 portfolio_manager = PortfolioManager()
+
 

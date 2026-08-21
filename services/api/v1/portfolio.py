@@ -499,3 +499,26 @@ async def trigger_auto_rebalance(
     except Exception as e:
         raise HTTPException(500, f"Auto-rebalance error: {e}")
 
+
+@router.post("/deposit")
+async def deposit_funds(
+    body: Dict[str, Any] = Body(...),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Portföye nakit ekleme endpoint'i."""
+    try:
+        amount = float(body.get("amount", 10000000.0))
+        desc = body.get("description", "Yatırımcı Nakit Transferi")
+        pm = _get_pm()
+        new_cash = pm.deposit_cash(amount=amount, description=desc)
+        return {
+            "success": True,
+            "deposited_amount": amount,
+            "new_cash": new_cash,
+            "total_value": pm.get_portfolio().get("total_value", 0),
+        }
+    except Exception as e:
+        raise HTTPException(500, f"Deposit error: {e}")
+
+
