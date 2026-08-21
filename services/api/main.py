@@ -29,10 +29,9 @@ warnings.warn(
 )
 
 if __name__ == "__main__":
-    logger.info(
+    logger.warning(
         "⚠️  DEPRECATED: services/api/main.py artık canonical değil.\n"
         "   Canonical server: services/api/app.py\n"
-        "   Çalıştırmak için: uvicorn services.api.app:app --reload\n",
-        file=sys.stderr,
+        "   Çalıştırmak için: uvicorn services.api.app:app --reload\n"
     )
     sys.exit(1)

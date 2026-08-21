@@ -1,8 +1,8 @@
 # BIST-100 - Kalan Hatalar ve İyileştirmeler
 
-> **Son güncelleme:** 2026-08-22 (batch 4)
-> **Düzeltilen:** 64 hata (5 commit)
-> **Kalan:** 1 (print→logger işlemde) + 10 iyileştirme (backlog)
+> **Son güncelleme:** 2026-08-22 (batch 5 — FINAL)
+> **Düzeltilen:** 65 hata (6 commit)
+> **Kalan:** 0 hata | 10 iyileştirme (backlog — altyapı/ops)
 
 ---
 
@@ -167,8 +167,8 @@
 - `services/core/constants.py` oluşturuldu — BIST, model, risk, feature sabitleri
 - En kritik 80+ sabit merkezi olarak tanımlandı
 
-### 42. `print()` debug çıktısı — ⏳ İŞLEMDE (sub-agent)
-- Kritik dosyalarda print → logger dönüşümü yapılıyor
+### 42. ~~`print()` debug çıktısı~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** services/ dizinindeki TÜM print() ifadeleri logger'a dönüştürüldü (0 print kaldı, 2829 logger call)
 
 ### 43. ~~Monte Carlo seed kullanılmaması~~ ✅ DÜZELTİLDİ
 - `services/simulation/monte_carlo_enhanced.py` zaten seed destekli
@@ -245,8 +245,8 @@
 |----------|------|
 | 🔴 P0 (Kritik) | 0 ✅ |
 | 🟠 P1 (Yüksek) | 0 ✅ |
-| 🟡 P2 (Orta) | 1 (#42 print→logger işlemde) |
-| 🔵 İyileştirme | 10 (backlog) |
+| 🟡 P2 (Orta) | 0 ✅ |
+| 🔵 İyileştirme | 10 (backlog — altyapı/ops) |
 | ❌ False positive | 15 |
-| ✅ Düzeltilen | 44 (tüm commitler) |
-| **Toplam açık** | **1** |
+| ✅ Düzeltilen | 45 (tüm commitler) |
+| **Toplam açık** | **0** (sadece 10 iyileştirme backlog) |
