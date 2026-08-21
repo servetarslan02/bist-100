@@ -483,3 +483,19 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
         }
     except Exception as e:
         raise HTTPException(500, f"Portfolio status error: {e}")
+
+
+@router.post("/auto_rebalance")
+async def trigger_auto_rebalance(
+    signals: Optional[List[Dict[str, Any]]] = Body(None),
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Otonom portföy yeniden dengeleme (Auto-Rebalance Bot)."""
+    try:
+        pm = _get_pm()
+        res = pm.execute_auto_rebalance(signals=signals)
+        return res
+    except Exception as e:
+        raise HTTPException(500, f"Auto-rebalance error: {e}")
+

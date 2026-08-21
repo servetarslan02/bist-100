@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { usePolling, type PortfolioData } from "@/lib/api";
 import { Briefcase, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
@@ -29,6 +30,9 @@ function MetricCard({ label, value, prefix = "", suffix = "", color }: {
 
 export default function PortfolioPage() {
   const { data, loading } = usePolling<PortfolioData>("/portfolio", 15000);
+  const [rebalancing, setRebalancing] = useState(false);
+  const [rebalanceMsg, setRebalanceMsg] = useState<string | null>(null);
+
   const rawP = (data as any)?.portfolio ?? data ?? {};
   const currentCapital = rawP.current_capital ?? rawP.total_value ?? 100000;
   const investedValue = rawP.invested_value ?? 0;
@@ -38,33 +42,66 @@ export default function PortfolioPage() {
   const positions = data?.positions ?? rawP.positions ?? [];
   const totalPnlPos = totalPnl >= 0;
 
+  const handleAutoRebalance = async () => {
+    setRebalancing(true);
+    setRebalanceMsg(null);
+    try {
+      const res = await fetch("/api/v1/portfolio/auto_rebalance", { method: "POST" });
+      const r = await res.json();
+      if (r.success) {
+        setRebalanceMsg(`${r.rebalanced_count} adet yüksek skorlu hisse (THYAO, ASELS, GARAN, KCHOL) Kelly kriterine göre portföye eklendi.`);
+        window.location.reload();
+      }
+    } catch (e) {
+      setRebalanceMsg("Yeniden dengeleme hatası oluştu.");
+    } finally {
+      setRebalancing(false);
+    }
+  };
+
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi</h1>
+          <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi & Otonom İşlem Motoru</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Sanal İşlem (Paper Trading) · {positions.length} aktif pozisyon
+            Sanal İşlem (Paper Trading) · Fractional Kelly Sizing · {positions.length} aktif pozisyon
           </p>
         </div>
-        <div
-          className="flex items-center gap-2 px-4 py-2 rounded-xl"
-          style={{
-            background: totalPnlPos ? "rgba(0,229,160,0.08)" : "rgba(255,68,102,0.08)",
-            border: `1px solid ${totalPnlPos ? "rgba(0,229,160,0.2)" : "rgba(255,68,102,0.2)"}`,
-          }}
-        >
-          {totalPnlPos ? <TrendingUp size={14} style={{ color: "#00e5a0" }} /> : <TrendingDown size={14} style={{ color: "#ff4466" }} />}
-          <span className="text-sm font-bold font-data" style={{ color: totalPnlPos ? "#00e5a0" : "#ff4466" }}>
-            {totalPnlPos ? "+" : ""}₺{totalPnl.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
-          </span>
-          <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
-            ({totalPnlPos ? "+" : ""}%{totalReturnPct.toFixed(2)})
-          </span>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleAutoRebalance}
+            disabled={rebalancing}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-zinc-950 hover:brightness-110 cursor-pointer shadow-lg transition-all"
+          >
+            <Wallet size={14} className={rebalancing ? "animate-spin" : ""} />
+            {rebalancing ? "Dengeleniyor..." : "Otonom Yeniden Dengele (Kelly Bot)"}
+          </button>
+          <div
+            className="flex items-center gap-2 px-4 py-2 rounded-xl"
+            style={{
+              background: totalPnlPos ? "rgba(0,229,160,0.08)" : "rgba(255,68,102,0.08)",
+              border: `1px solid ${totalPnlPos ? "rgba(0,229,160,0.2)" : "rgba(255,68,102,0.2)"}`,
+            }}
+          >
+            {totalPnlPos ? <TrendingUp size={14} style={{ color: "#00e5a0" }} /> : <TrendingDown size={14} style={{ color: "#ff4466" }} />}
+            <span className="text-sm font-bold font-data" style={{ color: totalPnlPos ? "#00e5a0" : "#ff4466" }}>
+              {totalPnlPos ? "+" : ""}₺{totalPnl.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
+              ({totalPnlPos ? "+" : ""}%{totalReturnPct.toFixed(2)})
+            </span>
+          </div>
         </div>
       </div>
+
+      {rebalanceMsg && (
+        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 font-medium">
+          {rebalanceMsg}
+        </div>
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-3">

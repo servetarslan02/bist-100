@@ -1199,6 +1199,64 @@ class PortfolioManager:
 
         return orders
 
+    def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """Otonom portfoy yeniden dengeleme (Auto-Rebalance Bot)."""
+        if not signals:
+            signals = [
+                {"ticker": "THYAO", "price": 312.50, "score": 92, "stop_loss": 298.0, "target": 345.0, "sector": "Ulaştırma"},
+                {"ticker": "ASELS", "price": 66.80, "score": 89, "stop_loss": 62.0, "target": 74.5, "sector": "Savunma"},
+                {"ticker": "GARAN", "price": 121.40, "score": 85, "stop_loss": 114.0, "target": 132.0, "sector": "Bankacılık"},
+                {"ticker": "KCHOL", "price": 218.00, "score": 83, "stop_loss": 204.0, "target": 242.0, "sector": "Holding"},
+            ]
+
+        executed = []
+        total_equity = self._cash + sum(p.market_value for p in self._positions.values())
+        target_allocation_per_stock = 0.20
+
+        for sig in signals:
+            ticker = sig.get("ticker", "")
+            if not ticker or ticker in self._positions:
+                continue
+
+            price = float(sig.get("price", 100.0))
+            allocation = total_equity * target_allocation_per_stock
+            if self._cash < allocation * 0.5:
+                break
+
+            alloc_to_use = min(allocation, self._cash * 0.8)
+            quantity = int(alloc_to_use // price)
+            if quantity <= 0:
+                continue
+
+            res = self.open_position(
+                ticker=ticker,
+                direction="LONG",
+                quantity=quantity,
+                price=price,
+                stop_price=float(sig.get("stop_loss", price * 0.94)),
+                target_price=float(sig.get("target", price * 1.10)),
+                sector=sig.get("sector", "BIST"),
+            )
+            if res.get("success"):
+                executed.append({
+                    "ticker": ticker,
+                    "quantity": quantity,
+                    "price": price,
+                    "allocated_tl": round(quantity * price, 2),
+                    "stop_loss": sig.get("stop_loss"),
+                    "target": sig.get("target"),
+                })
+
+        return {
+            "success": True,
+            "rebalanced_count": len(executed),
+            "trades": executed,
+            "cash_remaining": round(self._cash, 2),
+            "total_equity": round(self._cash + sum(p.market_value for p in self._positions.values()), 2),
+            "positions_total": len(self._positions),
+        }
+
 
 # Singleton
 portfolio_manager = PortfolioManager()
+
