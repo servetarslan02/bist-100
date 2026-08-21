@@ -142,14 +142,13 @@ async def market_radar(
 ):
     """Piyasa radarı — gerçek zamanlı fiyat, günlük değişim, RSI ve kantitatif skor."""
     import asyncio
-    import math
+    from concurrent.futures import ThreadPoolExecutor
     from ...data.data_source import data_source
     from ...ingestion.bist_universe import BISTUniverse
 
     uni = BISTUniverse()
     bist100 = set(getattr(uni, 'BIST_100_TICKERS', []))
     all_tickers = list(bist100) if bist100_only else getattr(uni, 'BIST_ALL_TICKERS', list(bist100))
-
     tickers_to_fetch = all_tickers[:limit]
 
     def _calc_rsi(closes, period=14):
@@ -168,40 +167,28 @@ async def market_radar(
         rs = avg_gain / avg_loss
         return round(100 - 100 / (1 + rs), 1)
 
-    results = []
-    errors = []
-
-    for ticker in tickers_to_fetch:
+    def _fetch_ticker(ticker):
         try:
             yf_ticker = f"{ticker}.IS"
             data = data_source.get_stock_data(yf_ticker, period="3mo", interval="1d")
             if data is None or data.empty or len(data) < 2:
-                errors.append(ticker)
-                continue
-
+                return None
             closes = data["Close"].dropna().tolist()
             if len(closes) < 2:
-                errors.append(ticker)
-                continue
-
+                return None
             last_close = closes[-1]
             prev_close = closes[-2]
             change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0
-
             volume = float(data["Volume"].iloc[-1]) if "Volume" in data.columns else 0
             high = float(data["High"].iloc[-1]) if "High" in data.columns else last_close
             low = float(data["Low"].iloc[-1]) if "Low" in data.columns else last_close
-
             rsi = _calc_rsi(closes)
-
-            # Kantitatif skor (0-100): volatilite, trend, momentum birleşimi
             ma20 = sum(closes[-20:]) / min(20, len(closes))
             trend_score = 60 if last_close > ma20 else 40
             rsi_score = 80 if (rsi and 40 < rsi < 65) else (50 if rsi and rsi <= 40 else 35)
             mom_score = min(100, max(0, 50 + change_pct * 5))
             score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
-
-            results.append({
+            return {
                 "symbol": ticker,
                 "price": round(last_close, 2),
                 "change": change_pct,
@@ -211,19 +198,27 @@ async def market_radar(
                 "rsi": rsi,
                 "score": score,
                 "isBist100": ticker in bist100,
-            })
-        except Exception as ex:
-            errors.append(ticker)
-            continue
+            }
+        except Exception:
+            return None
 
+    loop = asyncio.get_event_loop()
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        raw = await asyncio.gather(
+            *[loop.run_in_executor(executor, _fetch_ticker, t) for t in tickers_to_fetch]
+        )
+
+    results = [r for r in raw if r is not None]
+    errors_count = len(tickers_to_fetch) - len(results)
     results.sort(key=lambda x: x["score"], reverse=True)
 
     return {
         "data": results,
         "count": len(results),
-        "errors": len(errors),
+        "errors": errors_count,
         "status": "ok",
     }
+
 
 
 @router.get("/regime")
