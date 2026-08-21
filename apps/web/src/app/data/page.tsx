@@ -77,23 +77,112 @@ const FALLBACK_DATABASES: DatabaseInfo[] = [
 ];
 
 export default function DataCenterPage() {
-  const { data: dbData } = usePolling<any>("/system/databases", 5000);
+  const { data: dbData, refetch } = usePolling<any>("/system/databases", 5000);
   const databases: DatabaseInfo[] = useMemo(() => dbData?.databases ?? FALLBACK_DATABASES, [dbData]);
+  const [optimizing, setOptimizing] = useState(false);
+  const [optResult, setOptResult] = useState<any>(null);
+
+  const handleOptimize = async () => {
+    setOptimizing(true);
+    setOptResult(null);
+    try {
+      const res = await fetch("/api/v1/system/optimize_storage", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      setOptResult(data);
+      refetch();
+    } catch (e: any) {
+      console.error(e);
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Veri Merkezi & Veritabanı Deposu</h1>
+          <h1 className="text-xl font-bold gradient-text">Veri Merkezi & Disk Sıkıştırma Deposu</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            ClickHouse OLAP · PostgreSQL OLTP · Redis Cache · Redpanda Event Stream Dağıtık Altyapısı
+            ZSTD Sütunsal Sıkıştırma · Kademeli Yaşam Döngüsü (Downsampling) · Otomatik Disk Koruma
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-            <CheckCircle2 size={13} />
-            4/4 Veritabanı Aktif
-          </span>
+          <button
+            onClick={handleOptimize}
+            disabled={optimizing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer disabled:opacity-50"
+          >
+            <RefreshCw size={13} className={optimizing ? "animate-spin" : ""} />
+            {optimizing ? "Disk Optimize Ediliyor..." : "⚡ Sıkıştırma & Temizliği Çalıştır"}
+          </button>
+        </div>
+      </div>
+
+      {/* Optimization Result Notification */}
+      {optResult && (
+        <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200 space-y-1">
+          <div className="flex items-center gap-2 font-bold text-emerald-400">
+            <CheckCircle2 size={15} />
+            {optResult.message}
+          </div>
+          <div className="flex items-center gap-4 font-mono text-[11px] text-zinc-300 pt-1">
+            <span>Ham Veri: <strong>{optResult.raw_data_size}</strong></span>
+            <span>Sıkıştırılmış: <strong>{optResult.compressed_size}</strong></span>
+            <span>Kazanılan Alan: <strong className="text-emerald-400">{optResult.space_saved}</strong></span>
+            <span>Oran: <strong className="text-cyan-400">{optResult.compression_ratio}</strong></span>
+          </div>
+        </div>
+      )}
+
+      {/* Tiered Data Retention Cards (Kişisel PC Disk Tasarruf Mimarisi) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/40 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+              🔥 Sıcak Katman (0 - 7 Gün)
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-400">1-Saniye Tick</span>
+          </div>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            En yüksek çözünürlüklü anlık emir kademeleri ve 1-saniyelik tick verileri. Gün içi canlı modeller ve mikroyapı analizi için kullanılır.
+          </p>
+          <div className="text-[10px] font-mono text-zinc-500 pt-1 border-t border-zinc-800/40">
+            Sıkıştırma: <strong className="text-zinc-300">ZSTD-3 + Gorilla Codec</strong> (5x Oran)
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/40 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+              ⛅ Ilık Katman (8 - 90 Gün)
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400">1dk / 5dk Mum</span>
+          </div>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            7 günden eski 1-saniye tick'ler otomatik olarak 1 ve 5 dakikalık OHLCV mumlarına indirgenir (Downsampling). Ham tick'ler silinerek <strong>%85 disk tasarrufu</strong> sağlanır.
+          </p>
+          <div className="text-[10px] font-mono text-zinc-500 pt-1 border-t border-zinc-800/40">
+            Sıkıştırma: <strong className="text-zinc-300">ZSTD-6 + DoubleDelta</strong> (10x Oran)
+          </div>
+        </div>
+
+        <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/40 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+              ❄️ Soğuk Katman (90+ Gün / Yıllık)
+            </span>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400">Günlük & Öznitelik</span>
+          </div>
+          <p className="text-[11px] text-zinc-400 leading-relaxed">
+            Tüm 800+ BİST hissesinin 10 yıllık günlük geçmişi ve yapay zeka öznitelikleri saklanır. 10 yıllık devasa geçmiş sadece <strong>~250 MB</strong> yer kaplar.
+          </p>
+          <div className="text-[10px] font-mono text-zinc-500 pt-1 border-t border-zinc-800/40">
+            Sıkıştırma: <strong className="text-zinc-300">ZSTD-12 Ultra Sütunsal</strong> (15x Oran)
+          </div>
         </div>
       </div>
 
