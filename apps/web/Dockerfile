@@ -10,8 +10,10 @@ COPY . .
 RUN npm run build
 
 # Standalone mode requires copying static files explicitly
-RUN cp -r .next/static .next/standalone/.next/ && \
-    (cp -r public .next/standalone/ 2>/dev/null || true)
+RUN rm -rf .next/standalone/.next/static && \
+    mkdir -p .next/standalone/.next && \
+    cp -r .next/static .next/standalone/.next/static && \
+    (cp -r public .next/standalone/public 2>/dev/null || true)
 
 EXPOSE 3000
 
