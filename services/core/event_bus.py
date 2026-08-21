@@ -217,7 +217,11 @@ def get_producer():
 
 
 def publish_event(event: CanonicalEvent, key: Optional[str] = None):
-    """Publish to Kafka (if available) + Redis Pub/Sub (always) + Event Ledger.
+    """Publish to Redis Stream (primary) + Redis Pub/Sub (push) + Kafka (optional).
+
+    F-023: Redis Streams as primary transport.
+    Mevcut event volume Kafka/Redpanda gerektirmiyor.
+    Kafka sadece REDPANDA_BROKERS env var tanımlıysa kullanılır.
 
     v2.0 düzeltmeleri:
     - Schema validation — yanlış payload publish edilemez
@@ -231,20 +235,21 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
                       event_type=event.event_type, missing=missing)
         return
 
-    # Kafka
-    producer = get_producer()
-    if producer:
-        try:
-            producer.produce(
-                topic=event.event_type,
-                key=key or event.event_id,
-                value=event.to_json().encode("utf-8"),
-            )
-            producer.poll(0)
-        except Exception as e:
-            logger.error("Kafka produce failed", event_type=event.event_type, error=str(e))
+    # F-023: Kafka sadece REDPANDA_BROKERS tanımlıysa kullanılır
+    if settings.redpanda_brokers and settings.redpanda_brokers != "localhost:9092":
+        producer = get_producer()
+        if producer:
+            try:
+                producer.produce(
+                    topic=event.event_type,
+                    key=key or event.event_id,
+                    value=event.to_json().encode("utf-8"),
+                )
+                producer.poll(0)
+            except Exception as e:
+                logger.error("Kafka produce failed", event_type=event.event_type, error=str(e))
 
-    # Redis Pub/Sub (push-based) + Stream (durable ledger)
+    # Redis Pub/Sub (push-based) + Stream (durable ledger) — PRIMARY
     try:
         asyncio.create_task(_publish_with_idempotency(event))
     except Exception as e:

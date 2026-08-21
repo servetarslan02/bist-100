@@ -91,7 +91,7 @@ class AgentPipelineOrchestrator:
         enable_debate: bool = True,
         enable_memory: bool = True,
         enable_self_eval: bool = True,
-        memory_path: Optional[str] = None,
+        memory_path: Optional[str] = None,  # F-028: None yerine varsayılan yol kullan
     ):
         self.llm_client = llm_client
         self.max_concurrent = max_concurrent
@@ -115,10 +115,14 @@ class AgentPipelineOrchestrator:
         self.multi_evaluator = MultiAgentEvaluator()
 
         # Agent hafızası
+        # F-028: Varsayılan memory path — restart sonrası kaybolmayı önler
         self._memories: Dict[str, AgentMemory] = {}
         if enable_memory:
+            _default_path = memory_path or "data/agent_memory"
+            import os
+            os.makedirs(_default_path, exist_ok=True)
             for role in ["TECHNICAL", "FUNDAMENTAL", "NEWS", "MACRO", "RISK", "SYNTHESIS"]:
-                path = f"{memory_path}/{role}_memory.json" if memory_path else None
+                path = f"{_default_path}/{role}_memory.json"
                 self._memories[role] = AgentMemory(
                     agent_role=role,
                     persistence_path=path,

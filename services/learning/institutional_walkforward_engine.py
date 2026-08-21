@@ -54,7 +54,7 @@ def load_all_market_data() -> Tuple[Dict[str, pd.DataFrame], pd.Series]:
                 clean_tk = ticker.replace(".IS", "")
                 stock_data[clean_tk] = df.dropna()
         except Exception as e:
-            logger.info(f"  ⚠️ {ticker} indirilemedi: {e}")
+            logger.error(f"  ⚠️ {ticker} indirilemedi", error=str(e))
 
     # XU100 Benchmark
     xu100_df = yf.download("XU100.IS", period="2y", progress=False, interval="1d")

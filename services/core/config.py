@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     redis_port: int = Field(default=6379, alias="REDIS_PORT")
     redis_password: str = Field(default="", alias="REDIS_PASSWORD")
 
+    # F-027: Connection Pool Settings (PgBouncer compatible)
+    pg_pool_size: int = Field(default=20, alias="PG_POOL_SIZE")
+    pg_max_overflow: int = Field(default=10, alias="PG_MAX_OVERFLOW")
+    pg_pool_timeout: int = Field(default=30, alias="PG_POOL_TIMEOUT")
+    pg_pool_recycle: int = Field(default=1800, alias="PG_POOL_RECYCLE")  # 30 dk
+
     # Redpanda (Kafka-compatible)
     redpanda_brokers: str = Field(default="localhost:9092", alias="REDPANDA_BROKERS")
 

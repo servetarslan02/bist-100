@@ -25,6 +25,17 @@ import structlog
 
 logger = structlog.get_logger()
 
+# F-025: OpenTelemetry integration (optional)
+try:
+    from opentelemetry import trace as otel_trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    _OTEL_AVAILABLE = True
+except ImportError:
+    _OTEL_AVAILABLE = False
+    otel_trace = None
+
 # Context variable for correlation ID propagation
 correlation_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "correlation_id", default=None
@@ -127,6 +138,19 @@ class DistributedTracer:
         self._active_spans: Dict[str, Span] = {}
         self._max_traces = 1000
         self._slow_threshold_ms = 1000  # 1 saniye
+
+        # F-025: OpenTelemetry tracer (optional)
+        self._otel_tracer = None
+        if _OTEL_AVAILABLE:
+            try:
+                provider = TracerProvider()
+                processor = BatchSpanProcessor(OTLPSpanExporter())
+                provider.add_span_processor(processor)
+                otel_trace.set_tracer_provider(provider)
+                self._otel_tracer = otel_trace.get_tracer(service_name)
+                logger.info("OpenTelemetry tracing enabled")
+            except Exception as e:
+                logger.debug("OpenTelemetry not configured", error=str(e))
 
     def generate_correlation_id(self) -> str:
         """Yeni correlation ID üret."""

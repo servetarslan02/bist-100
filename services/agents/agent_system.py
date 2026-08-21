@@ -209,6 +209,38 @@ class AIOutputValidator:
                 if not re.match(r'https?://', source):
                     errors.append(f"Suspicious source URL: {source}")
 
+        # 6. F-030: Price/Date hallucination validation
+        if "price" in parsed:
+            price = parsed["price"]
+            if isinstance(price, (int, float)):
+                if price <= 0:
+                    errors.append(f"Invalid price (<=0): {price}")
+                elif price > 1000000:  # 1M TL üzeri mantıksız
+                    errors.append(f"Suspiciously high price: {price}")
+
+        if "target_price" in parsed:
+            tp = parsed["target_price"]
+            if isinstance(tp, (int, float)):
+                if tp <= 0:
+                    errors.append(f"Invalid target_price (<=0): {tp}")
+
+        if "stop_loss" in parsed:
+            sl = parsed["stop_loss"]
+            if isinstance(sl, (int, float)):
+                if sl <= 0:
+                    errors.append(f"Invalid stop_loss (<=0): {sl}")
+
+        if "date" in parsed:
+            date_str = str(parsed["date"])
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                # Gelecek tarih kontrolü (1 yıldan fazla ileri)
+                if dt.year > datetime.now().year + 1:
+                    errors.append(f"Future date too far: {date_str}")
+            except (ValueError, TypeError):
+                pass  # Tarih parse edilemiyorsa diğer validasyonlar yakalar
+
         valid = len(errors) == 0
         return {"valid": valid, "parsed": parsed, "errors": errors}
 
@@ -413,7 +445,13 @@ Kurallar: Sadece verilen verilere dayan. JSON formatında yanıt ver. Confidence
         )
 
         if not response.success:
-            logger.warning("LLM call failed, using fallback", error=response.error)
+            # F-029: LLM fallback detaylı logging
+            logger.warning("LLM call failed, using rule-based fallback",
+                         error=response.error,
+                         ticker=task.ticker,
+                         agent_role=task.agent_role,
+                         model=getattr(client, '_model', 'unknown'),
+                         fallback_type="rule_based_analysis")
             return AIFallback.rule_based_analysis(
                 task.context.get("features", {}), task.ticker
             )
@@ -421,7 +459,12 @@ Kurallar: Sadece verilen verilere dayan. JSON formatında yanıt ver. Confidence
         # JSON parse
         parsed = parse_llm_json(response.content)
         if parsed is None:
-            logger.warning("Failed to parse LLM output, using text extraction")
+            # F-029: Parse hatası detaylı logging
+            logger.warning("Failed to parse LLM output, using rule-based fallback",
+                         ticker=task.ticker,
+                         agent_role=task.agent_role,
+                         content_preview=response.content[:200] if response.content else "empty",
+                         fallback_type="rule_based_analysis")
             return AIFallback.rule_based_analysis(
                 task.context.get("features", {}), task.ticker
             )

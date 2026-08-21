@@ -1,0 +1,84 @@
+{
+  "alert_rules": [
+    {
+      "name": "High Error Rate",
+      "condition": "error_rate > 5%",
+      "duration": "5m",
+      "severity": "critical",
+      "notification": "slack:#alerts",
+      "description": "API hata oranı %5'i aştı"
+    },
+    {
+      "name": "High Latency",
+      "condition": "p95_latency > 2000ms",
+      "duration": "5m",
+      "severity": "warning",
+      "notification": "slack:#alerts",
+      "description": "P95 gecikme 2 saniyeyi aştı"
+    },
+    {
+      "name": "Database Connection Pool Exhausted",
+      "condition": "db_pool_usage > 90%",
+      "duration": "2m",
+      "severity": "critical",
+      "notification": "slack:#alerts",
+      "description": "Veritabanı bağlantı havuzunun %90'ı kullanımda"
+    },
+    {
+      "name": "Redis Connection Lost",
+      "condition": "redis_connected == 0",
+      "duration": "1m",
+      "severity": "critical",
+      "notification": "slack:#alerts",
+      "description": "Redis bağlantısı kesildi"
+    },
+    {
+      "name": "Model Prediction Drift",
+      "condition": "prediction_accuracy_7d < 45%",
+      "duration": "1h",
+      "severity": "warning",
+      "notification": "slack:#ml-alerts",
+      "description": "Son 7 gün model doğruluğu %45 altına düştü"
+    },
+    {
+      "name": "Portfolio Drawdown > 10%",
+      "condition": "max_drawdown > 10%",
+      "duration": "0m",
+      "severity": "critical",
+      "notification": "slack:#risk-alerts",
+      "description": "Portföy drawdown %10'u aştı — acil müdahale"
+    },
+    {
+      "name": "Kill Switch Triggered",
+      "condition": "kill_switch_active == 1",
+      "duration": "0m",
+      "severity": "critical",
+      "notification": "slack:#risk-alerts",
+      "description": "Kill switch aktive edildi — tüm işlemler durduruldu"
+    },
+    {
+      "name": "Data Stale > 1 hour",
+      "condition": "data_age_seconds > 3600",
+      "duration": "5m",
+      "severity": "warning",
+      "notification": "slack:#data-alerts",
+      "description": "Veri 1 saatten eski — veri kaynağı kontrol et"
+    },
+    {
+      "name": "Memory Usage > 80%",
+      "condition": "memory_usage_pct > 80",
+      "duration": "10m",
+      "severity": "warning",
+      "notification": "slack:#infra-alerts",
+      "description": "Bellek kullanımı %80'i aştı"
+    },
+    {
+      "name": "Disk Usage > 90%",
+      "condition": "disk_usage_pct > 90",
+      "duration": "5m",
+      "severity": "critical",
+      "notification": "slack:#infra-alerts",
+      "description": "Disk kullanımı %90'ı aştı"
+    }
+  ]
+}

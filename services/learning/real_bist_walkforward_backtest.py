@@ -39,7 +39,7 @@ BIST_TICKERS = [
 
 def download_real_bist_data(tickers: List[str], period: str = "2y") -> Dict[str, pd.DataFrame]:
     """Gerçek BIST hisse verilerini indirir."""
-    logger.info("📥 Gerçek BIST Verisi İndiriliyor ({len(tickers)} hisse, {period} periyot)...")
+    logger.info(f"📥 Gerçek BIST Verisi İndiriliyor ({len(tickers)} hisse, {period} periyot)...")
     data = {}
     for ticker in tickers:
         try:
@@ -49,9 +49,9 @@ def download_real_bist_data(tickers: List[str], period: str = "2y") -> Dict[str,
             if len(df) >= 100:
                 clean_ticker = ticker.replace(".IS", "")
                 data[clean_ticker] = df.dropna()
-                logger.info("  • {clean_ticker}: {len(df)} işlem günü yüklendi ({df.index[0].strftime('%Y-%m-%d')} - {df.index[-1].strftime('%Y-%m-%d')})")
+                logger.info(f"  • {clean_ticker}: {len(df)} işlem günü yüklendi ({df.index[0].strftime('%Y-%m-%d')} - {df.index[-1].strftime('%Y-%m-%d')})")
         except Exception as e:
-            logger.info("  ⚠️ {ticker} indirilemedi: {e}")
+            logger.error(f"  ⚠️ {ticker} indirilemedi", error=str(e))
     return data
 
 
@@ -152,7 +152,7 @@ def run_real_bist_walkforward_backtest():
         "price_vs_sma50", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"
     ]
 
-    logger.info("\n⚙️ {len(features_by_ticker)} hisse için {len(feature_cols)} teknik gösterge hesaplandı.")
+    logger.info(f"\n⚙️ {len(features_by_ticker)} hisse için {len(feature_cols)} teknik gösterge hesaplandı.")
 
     # 3. Model Memory Store'u Sıfırdan Gerçek Verilerle Başlat
     store = ModelMemoryStore(db_path="data/model_memory.db")
@@ -186,8 +186,8 @@ def run_real_bist_walkforward_backtest():
     min_train_bars = 60
     eval_dates = all_dates[min_train_bars:-5]  # Son 5 günün henüz future_ret_5d'si bilinmediğinden çıkarılır
 
-    logger.info("  • Toplam Değerlendirilecek Tarih Sayısı: {len(eval_dates)} işlem günü")
-    logger.info("  • Tarih Aralığı: {eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')}")
+    logger.info(f"  • Toplam Değerlendirilecek Tarih Sayısı: {len(eval_dates)} işlem günü")
+    logger.info(f"  • Tarih Aralığı: {eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')}")
 
     real_batch_records = []
     walk_forward_train_interval = 20  # Her 20 günde bir yeniden eğit
@@ -373,7 +373,7 @@ def run_real_bist_walkforward_backtest():
                 "evaluated_at": (eval_date + timedelta(days=7)).isoformat(),
             })
 
-    logger.info("\n💾 {len(real_batch_records)} adet GERÇEK BIST işlemi SQLite Model Memory Store'a kaydediliyor...")
+    logger.info(f"\n💾 {len(real_batch_records)} adet GERÇEK BIST işlemi SQLite Model Memory Store'a kaydediliyor...")
     store.save_batch_records(real_batch_records)
 
     logger.info("\n🧠 Gerçek BIST Verileri Üzerinde Öğrenme Döngüsü Çalıştırılıyor...")
