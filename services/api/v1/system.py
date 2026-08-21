@@ -213,7 +213,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             "category": "VOLATILITY",
             "timestamp": now_str,
             "ticker": "THYAO",
-            "read": false,
+            "read": False,
         },
         {
             "id": "alt-2",
@@ -223,7 +223,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             "category": "SIGNAL",
             "timestamp": now_str,
             "ticker": "ASELS",
-            "read": false,
+            "read": False,
         },
         {
             "id": "alt-3",
@@ -232,7 +232,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             "severity": "WARNING",
             "category": "RISK",
             "timestamp": now_str,
-            "read": false,
+            "read": False,
         },
         {
             "id": "alt-4",
@@ -242,7 +242,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             "category": "SIGNAL",
             "timestamp": now_str,
             "ticker": "GARAN",
-            "read": true,
+            "read": True,
         },
         {
             "id": "alt-5",
@@ -251,7 +251,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
             "severity": "INFO",
             "category": "SYSTEM",
             "timestamp": now_str,
-            "read": true,
+            "read": True,
         },
     ]
 

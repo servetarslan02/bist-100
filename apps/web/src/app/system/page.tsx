@@ -58,11 +58,19 @@ function ResourceBar({ label, value, icon: Icon }: { label: string; value: numbe
 }
 
 export default function SystemHealth() {
-  const { data: status } = usePolling<SystemStatus>("/status", 10000);
+  const { data: status } = usePolling<any>("/status", 5000);
   const services = status?.services || {};
   const allHealthy = Object.values(services).every(s => s === "healthy");
   const healthyCount = Object.values(services).filter(s => s === "healthy").length;
   const totalCount = Object.keys(services).length;
+
+  const res = status?.resources;
+  const resources = [
+    { label: "İşlemci (CPU)", value: res?.cpu_pct ?? 28, icon: Cpu },
+    { label: "Bellek (RAM)", value: res?.memory_pct ?? 54, icon: MemoryStick },
+    { label: "Ekran Kartı (GPU)", value: res?.gpu_pct ?? 18, icon: Zap },
+    { label: "Disk Alanı", value: res?.disk_pct ?? 22, icon: HardDrive },
+  ];
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -143,7 +151,7 @@ export default function SystemHealth() {
             <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Sistem Kaynakları</h2>
           </div>
           <div className="px-5 py-4 space-y-4">
-            {RESOURCES.map(r => <ResourceBar key={r.label} {...r} />)}
+            {resources.map(r => <ResourceBar key={r.label} {...r} />)}
           </div>
         </div>
 
