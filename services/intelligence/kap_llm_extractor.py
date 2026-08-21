@@ -333,7 +333,21 @@ class KAPLLMExtractor:
         return impact
 
     def _generate_summary(self, documents: List[KAPDocument], sentiment: float) -> str:
-        """Özet oluştur."""
+        """Özet oluştur — Canlı Gemini AI veya kural tabanlı fallback."""
+        if not documents:
+            return "Analiz edilecek KAP dokümanı bulunamadı."
+
+        try:
+            from services.intelligence.gemini_service import call_gemini
+            doc_snippets = "\n".join([f"- [{d.category}] {d.title}: {d.content[:150]}" for d in documents[:5]])
+            prompt = f"Aşağıdaki KAP şirket açıklamalarını BİST yatırımcısı perspektifiyle 2-3 cümlede özetle ve kilit etkiyi belirt:\n{doc_snippets}"
+            ai_summary = call_gemini(prompt)
+            if ai_summary and len(ai_summary.strip()) > 10:
+                return ai_summary.strip()
+        except Exception as e:
+            logger.debug("Gemini summary fallback activated", error=str(e))
+
+        # Fallback kural tabanlı özet
         if sentiment > 0.3:
             tone = "pozitif"
         elif sentiment < -0.3:
