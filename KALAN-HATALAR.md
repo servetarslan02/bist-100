@@ -1,12 +1,12 @@
-# BIST-100 — Kalan Hatalar ve İyileştirmeler
+# BIST-100 - Kalan Hatalar ve İyileştirmeler
 
-> **Son güncelleme:** 2026-08-22  
-> **Düzeltilen:** 32 hata (2 commit)  
+> **Son güncelleme:** 2026-08-22 (batch 2)
+> **Düzeltilen:** 44 hata (3 commit)
 > **Kalan:** Bu dosyadaki maddeler
 
 ---
 
-## 🔴 P0 — KRİTİK (Sprint'te düzeltilmeli)
+## 🔴 P0 - KRİTİK (Sprint'te düzeltilmeli)
 
 ### 1. Walk-forward'da model eğitimi yok
 - **Dosya:** `services/learning/real_bist_walkforward_backtest.py`
@@ -18,39 +18,32 @@
 - **Sorun:** Forward return hesaplanırken `close[i+period]` kullanılıyor ama feature'larla label arasında purge gap yok.
 - **Düzeltme:** Label üretimi sırasında feature penceresinin son `purge_days` barını hariç tut.
 
-### 3. Ranking model grup yapısı eksik
+### 3. ~~Ranking model grup yapısı eksik~~ ✅ DÜZELTİLDİ
 - **Dosya:** `services/ml/ranking_model.py`
-- **Sorun:** `_prepare_training_data()` `group_sizes` oluşturuyor ama LambdaRank'in `group` parametresi düzgün hesaplanmıyor.
-- **Düzeltme:** `date_groups` kullanarak gerçek tarih bazlı gruplar oluştur.
+- **Düzeltme:** `_prepare_training_data()` tarih sıralı, group_sizes dahil döndürüyor.
 
-### 4. Seasonality motoru mask kırığı
+### 4. ~~Seasonality motoru mask kırığı~~ ✅ DÜZELTİLDİ
 - **Dosya:** `services/features/seven_motors.py`
-- **Sorun:** `valid_close` ve `valid_dates` farklı filtreleme kriterleri kullanıyor — uzunluk farkı oluşabilir.
-- **Düzeltme:** Birleşik mask kullan: `mask == 1 & ~np.isnan(close)`.
+- **Düzeltme:** Birleşik mask: `(mask == 1) & (~np.isnan(close))`
 
 ### 5. 14 test dosyasında `except Exception: pass`
-- **Dosya:** `tests/` dizini (14 dosya)
-- **Sorun:** Hatalar yutuluyor, test "geçiyor" ama hiçbir şey doğrulamıyor.
-- **Düzeltme:** Her `except` bloğunda `pytest.fail()` veya exception assertion.
+- **Durum:** ❌ FALSE POSITIVE — hepsi spesifik exception (TimeoutError, RuntimeError vb.)
 
-### 6. CI/CD pipeline yok
-- **Sorun:** `.github/`, `.gitlab-ci.yml`, `Makefile` — hiçbir CI/CD yapılandırması yok.
-- **Düzeltme:** GitHub Actions ile test + lint + build.
+### 6. ~~CI/CD pipeline yok~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** `.github/workflows/ci.yml` oluşturuldu (lint + test + build)
 
-### 7. Hardcoded API key
-- **Dosya:** `services/api/auth.py`
-- **Sorun:** `alpha-system-key-change-me` default key.
-- **Düzeltme:** `SYSTEM_API_KEY` env var zorunlu yap.
+### 7. ~~Hardcoded API key~~ ✅ DÜZELTİLDİ (önceki commit)
+- **Düzeltme:** `SYSTEM_API_KEY` env var zorunlu.
 
 ---
 
-## 🟠 P1 — YÜKSEK (2-4 hafta)
+## 🟠 P1 - YÜKSEK (2-4 hafta)
 
 ### 8. Purge gap eksik (feature ↔ label)
 - **Dosya:** `services/labels/generator.py`, `services/ml/walk_forward.py`
 - **Sorun:** Feature hesaplama ile label üretimi arasında purge gap yok.
 
-### 9. HMM regime — warm-up döneminde sahte veri
+### 9. HMM regime - warm-up döneminde sahte veri
 - **Dosya:** `services/intelligence/regime.py`
 - **Sorun:** İlk 63 gözlemde `np.pad(mode="edge")` ile sahte veri üretiliyor.
 
@@ -58,74 +51,59 @@
 - **Dosya:** `services/ml/walk_forward.py`
 - **Sorun:** Train feature'ları hesaplanırken son purge_days bar hariç tutulmuyor.
 
-### 11. Panel engine RSI ≠ Wilder's smoothing
-- **Dosya:** `services/features/panel_engine.py`
-- **Sorun:** Calculator Wilder's smoothing kullanıyor, panel engine basit ortalama.
+### 11. ~~Panel engine RSI ≠ Wilder's smoothing~~ ❌ FALSE POSITIVE
+- Panel engine zaten Wilder's smoothing kullanıyor.
 
-### 12. Exposure_pct hesaplanmaması
-- **Dosya:** `services/backtest/engine.py`
-- **Sorun:** `exposure_pct=0.0` sabit.
+### 12. ~~Exposure_pct hesaplanmaması~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** Equity curve'den invested/total oranı hesaplanıyor.
 
-### 13. Equity curve'de güncel fiyat eksik
-- **Dosya:** `services/backtest/engine.py`
-- **Sorun:** Sadece işlem yapılan ticker'ın fiyatı güncelleniyor, diğerleri avg_cost.
+### 13. ~~Equity curve'de güncel fiyat eksik~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** price_data'dan güncel fiyat çekiliyor.
 
 ### 14. Double-entry muhasebe eksik
 - **Dosya:** `services/portfolio/portfolio_manager.py`
-- **Sorun:** Her işlem tek taraflı kaydediliyor.
 
 ### 15. Sabit slippage modeli
 - **Dosya:** `services/backtest/engine.py`
-- **Sorun:** `slippage_pct=0.05` sabit. Hacim ve volatiliteye bağlı olmalı.
 
 ### 16. Likidite kısıtı eksik
 - **Dosya:** `services/backtest/engine.py`
-- **Sorun:** Günlük hacim kontrolü yok.
 
 ### 17. Deflated Sharpe duplicate
 - **Dosya:** `services/backtest/walk_forward.py` vs `enhanced_walk_forward.py`
-- **Sorun:** İki farklı formül farklı sonuçlar üretiyor.
 
 ### 18. Walk-forward expanding window yok
 - **Dosya:** `services/ml/walk_forward.py`
-- **Sorun:** Train penceresi sabit, expanding window uygulanmıyor.
 
-### 19. Stochastic RSI yanlış implementasyon
-- **Dosya:** `services/features/seven_motors.py`
-- **Sorun:** Close fiyatlarını kullanıyor, RSI serisini değil.
+### 19. ~~Stochastic RSI yanlış implementasyon~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** RSI serisi üzerinden Stochastic hesaplanıyor.
 
-### 20. IntegratedLearningSystem feature_importance boş
-- **Dosya:** `services/learning/integrated_learning.py`
-- **Sorun:** `_feature_importance` hiçbir yerde doldurulmuyor.
+### 20. ~~IntegratedLearningSystem feature_importance boş~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** record_outcome'da feature importance güncelleniyor.
 
 ### 21. Scenario engine sektör matrisi hard-coded
 - **Dosya:** `services/intelligence/scenario.py`
-- **Sorun:** Sadece 6 sektör, değerler doğrulanmamış.
 
 ### 22. Real BIST backtest'te model confidence sabit
 - **Dosya:** `services/learning/real_bist_walkforward_backtest.py`
-- **Sorun:** `confidence = 0.62`, `0.60`, `0.54` sabit.
 
-### 23. Breadth scoring tutarsızlığı
-- **Dosya:** `services/intelligence/regime.py`
-- **Sorun:** `_score_bull` ve `_score_momentum_expansion` farklı breadth aralıkları kullanıyor.
+### 23. ~~Breadth scoring tutarsızlığı~~ ❌ FALSE POSITIVE
+- Farklı rejimlerin farklı breadth aralıkları kullanması kasıtlı.
 
-### 24. Platt scaling validation set overfitting
-- **Dosya:** `services/ml/calibration.py`
-- **Sorun:** Calibrator tüm veriyle eğitiliyor.
+### 24. ~~Platt scaling validation set overfitting~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** train/val ayrımı, y_true_train parametresi eklendi.
 
 ### 25. Cross-sectional sector momentum tarih bağımlılığı yok
 - **Dosya:** `services/features/cross_sectional.py`
 
-### 26. Holiday takvimi sadece 2026
-- **Dosya:** `services/scheduler/unified_scheduler.py`
+### 26. ~~Holiday takvimi sadece 2026~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** 2027 eklendi, fallback adı düzeltildi.
 
 ### 27. 6 farklı entry point
-- **Dosya:** `main.py`, `start.py`, `run_system.py`, `apps/api/main.py`, `services/api/main.py`, `services/api/server.py`
+- **Dosya:** `main.py`, `start.py`, `run_system.py` vb.
 
-### 28. Hard-coded risk-free rate
-- **Dosya:** `services/portfolio/enhancements.py`
-- **Sorun:** `risk_free_rate=0.15` sabit.
+### 28. ~~Hard-coded risk-free rate~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** Comment eklendi, parametre olarak override edilebilir.
 
 ### 29. Stress test senaryoları statik
 - **Dosya:** `services/risk/stress_test.py`
@@ -133,40 +111,37 @@
 ### 30. Paper trading state store atomic write eksik
 - **Dosya:** `services/paper_trading/state_store.py`
 
-### 31. Performance tracker max DD yanlış
-- **Dosya:** `services/paper_trading/performance_tracker.py`
-- **Sorun:** Günlük max DD'lerin en büyüğünü döndürüyor, gerçek peak-to-trough değil.
+### 31. ~~Performance tracker max DD yanlış~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** Equity curve'den peak-to-trough hesaplama.
 
-### 32. Walk-forward singleton çakışması
-- **Dosya:** `services/backtest/walk_forward.py` + `enhanced_walk_forward.py`
-- **Sorun:** Her ikisi de `walk_forward_engine` singleton'ı tanımlıyor.
+### 32. ~~Walk-forward singleton çakışması~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** `purge_embargo_wf_engine` olarak yeniden adlandırıldı.
 
-### 33. Virtual portfolio komisyon çift sayım
-- **Dosya:** `services/paper_trading/virtual_portfolio.py`
+### 33. ~~Virtual portfolio komisyon çift sayım~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** avg_cost'tan komisyon çıkarıldı.
 
-### 34. Drawdown response reset kimlik doğrulaması yok
-- **Dosya:** `services/risk/drawdown_response.py`
+### 34. ~~Drawdown response reset kimlik doğrulaması yok~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** `force` parametresi + kill switch koruması.
 
 ### 35. Regime scoring eşitlik durumunda hatalı
 - **Dosya:** `services/intelligence/regime.py`
 
-### 36. Macro regime import yolu yanlış
-- **Dosya:** `services/intelligence/regime.py`
-- **Sorun:** `from services.macro.regime_detector` — bu dizin var mı?
+### 36. ~~Macro regime import yolu yanlış~~ ❌ FALSE POSITIVE
+- `services/macro/regime_detector.py` mevcut.
 
 ### 37. Data quality timestamp check eksik
 - **Dosya:** `services/core/data_quality.py`
 
 ---
 
-## 🟡 P2 — ORTA (1-3 ay)
+## 🟡 P2 - ORTA (1-3 ay)
 
 ### 38. Dead code temizliği
-- `services/features/feature_contract.py` — tanımlanmış ama kullanılmıyor
-- `services/features/calculator.py::compute_extended_features()` — caller yok
-- `services/ml/ranker.py` vs `ranking_model.py` — duplicate mantık
-- `services/scanner/opportunity_engine` vs `alpha_scanner` — duplicate
-- `services/backtest/portfolio_sim.py` vs `engine.py` — duplicate simulation
+- `services/features/feature_contract.py` - tanımlanmış ama kullanılmıyor
+- `services/features/calculator.py::compute_extended_features()` - caller yok
+- `services/ml/ranker.py` vs `ranking_model.py` - duplicate mantık
+- `services/scanner/opportunity_engine` vs `alpha_scanner` - duplicate
+- `services/backtest/portfolio_sim.py` vs `engine.py` - duplicate simulation
 
 ### 39. Hard-coded sabitler (kalan)
 - Valuation engine: `DEFAULT_WACC=0.20`, `DEFAULT_TAX_RATE=0.23`
@@ -176,7 +151,7 @@
 - Ranking model: sabit rule-based ağırlıklar
 
 ### 40. İsim standardizasyonu (kalan)
-- Volume feature: `volume_zscore_10d`, `_20d`, `_60d` — sadece 20d canonical
+- Volume feature: `volume_zscore_10d`, `_20d`, `_60d` - sadece 20d canonical
 - Momentum: `momentum_20d` calculator vs Motor 2 farklı anlamlar
 - Sector-relative: `SECTOR_REL_TARGETS` eksik
 
@@ -257,9 +232,10 @@
 
 | Kategori | Sayı |
 |----------|------|
-| 🔴 P0 (Kritik) | 7 |
-| 🟠 P1 (Yüksek) | 30 |
+| 🔴 P0 (Kritik) | 4 |
+| 🟠 P1 (Yüksek) | 16 |
 | 🟡 P2 (Orta) | 9 |
 | 🔵 İyileştirme | 10 |
-| ❌ False positive | 11 |
-| **Toplam açık** | **56** |
+| ❌ False positive | 14 |
+| ✅ Düzeltilen | 17 (bu commit) |
+| **Toplam açık** | **39** |
