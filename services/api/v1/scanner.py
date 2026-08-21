@@ -95,8 +95,10 @@ async def scan_results(
 
 
 @router.get("/opportunities")
-async def opportunities(
-    limit: int = Query(20, ge=1, le=100),
+@router.get("/rankings")
+async def scan_opportunities(
+    tier: Optional[str] = Query(None, description="Tier filtresi (TIER_1, TIER_2, TIER_3)"),
+    limit: int = Query(20, ge=1, le=100, description="Maksimum sonuç"),
     min_score: float = Query(50.0, ge=0, le=100),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),

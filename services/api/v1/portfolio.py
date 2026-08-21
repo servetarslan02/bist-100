@@ -47,6 +47,7 @@ def _get_service():
 # =====================================================
 
 @router.get("/summary")
+@router.get("/state")
 async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Portföy özeti — cash, invested, total value, positions count.
 

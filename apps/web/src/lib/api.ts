@@ -8,27 +8,48 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 // API Client
 // =====================================================
 
+// Normalizer helper
+function normalizeApiPath(path: string): string {
+  let p = path.startsWith('/') ? path : `/${path}`;
+  if (p.startsWith('/api/v1/')) return p;
+  if (p.startsWith('/api/')) {
+    p = p.replace('/api/', '/api/v1/');
+    return p;
+  }
+  if (p.startsWith('/v1/')) return `/api${p}`;
+
+  // Smart aliases
+  if (p === '/portfolio') return '/api/v1/portfolio/state';
+  if (p === '/world/state' || p === '/world') return '/api/v1/macro/world';
+  if (p === '/models') return '/api/v1/models/registry';
+  if (p === '/events') return '/api/v1/event-study/events';
+  if (p === '/decisions/signals') return '/api/v1/scanner/signals';
+  if (p === '/decisions/rankings') return '/api/v1/scanner/rankings';
+
+  return `/api/v1${p}`;
+}
+
 export async function api<T>(path: string): Promise<T> {
-  const url = path.startsWith('/api') ? path : `/api${path}`;
+  const url = normalizeApiPath(path);
   const res = await fetch(url, {
     headers: {
       'Accept': 'application/json',
     },
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
   return res.json();
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const url = path.startsWith('/api') ? path : `/api${path}`;
+  const url = normalizeApiPath(path);
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify(body),
     cache: 'no-store',
   });
-  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
   return res.json();
 }
 
