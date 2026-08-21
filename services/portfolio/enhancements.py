@@ -217,7 +217,7 @@ class BenchmarkEngine:
         self,
         portfolio_returns: List[float],
         benchmark_returns: List[float],
-        risk_free_rate: float = 0.15,  # %15 yıllık (Türkiye)
+        risk_free_rate: float = 0.15,  # %15 yıllık — TCMB faizinden güncellenmeli
     ) -> Dict[str, float]:
         """Portföy vs benchmark karşılaştır."""
         if len(portfolio_returns) != len(benchmark_returns) or len(portfolio_returns) < 2:

@@ -87,9 +87,10 @@ class VirtualPortfolio:
         commission: float = 0.0,
     ) -> Dict[str, Any]:
         """Yeni pozisyon ac veya mevcut pozisyonu artir."""
-        cost = quantity * price + commission
+        cost = quantity * price
+        total_cost = cost + commission  # Toplam nakit çıkışı
 
-        if cost > self.cash:
+        if total_cost > self.cash:
             logger.warning("Insufficient cash for position",
                          ticker=ticker, required=cost, available=self.cash)
             return {"success": False, "error": "INSUFFICIENT_CASH", "required": cost, "available": self.cash}
@@ -108,7 +109,7 @@ class VirtualPortfolio:
             logger.info("Position increased", ticker=ticker, new_qty=total_qty, avg_cost=pos["avg_cost"])
         else:
             # Yeni pozisyon
-            avg_with_commission = (quantity * price + commission) / quantity if quantity > 0 else price
+            avg_with_commission = price  # Komisyon maliyete dahil edilmez (close_position'da düşülür)
             self._positions[ticker] = {
                 "ticker": ticker,
                 "quantity": quantity,

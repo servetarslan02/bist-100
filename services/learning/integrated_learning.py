@@ -159,6 +159,13 @@ class IntegratedLearningSystem:
         }
         self._outcomes.append(outcome_record)
 
+        # Feature importance güncelle — doğru tahmin eden feature'ları ağırlıklandır
+        if pred.feature_snapshot:
+            weight = 1.0 if correct else -0.5
+            for feat_name, feat_val in pred.feature_snapshot.items():
+                if isinstance(feat_val, (int, float)) and not (feat_val != feat_val):  # NaN check
+                    self._feature_importance[feat_name] = self._feature_importance.get(feat_name, 0) + weight
+
         logger.info("Outcome recorded",
             ticker=ticker,
             predicted=pred.predicted_direction,

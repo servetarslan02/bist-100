@@ -276,8 +276,18 @@ class DrawdownResponseSystem:
         """Son drawdown olaylarını al."""
         return self._events[-limit:]
 
-    def reset(self):
-        """Drawdown sistemini sıfırla."""
+    def reset(self, *, force: bool = False, reason: str = ""):
+        """Drawdown sistemini sıfırla.
+        
+        Args:
+            force: True ise kill switch aktif olsa bile sıfırlar
+            reason: Sıfırlama nedeni (audit trail için)
+        """
+        if self._current_action == DrawdownAction.KILL_SWITCH and not force:
+            logger.warning("Drawdown reset blocked — kill switch active. Use force=True to override.")
+            return
+        logger.warning("Drawdown system reset", reason=reason, force=force,
+                       peak=self._peak_equity, max_dd=self._max_drawdown_pct)
         self._peak_equity = 0.0
         self._current_equity = 0.0
         self._current_action = DrawdownAction.NONE

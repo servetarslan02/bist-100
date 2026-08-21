@@ -236,9 +236,21 @@ class PerformanceTracker:
         return max_dd
 
     def _compute_max_drawdown_from_history(self) -> float:
+        """Equity curve'den gerçek peak-to-trough max drawdown hesapla."""
         if not self._daily_perf_cache:
             return 0.0
-        return max((p["max_drawdown_pct"] for p in self._daily_perf_cache), default=0.0)
+        equities = [p.get("equity", 0) for p in self._daily_perf_cache if p.get("equity", 0) > 0]
+        if len(equities) < 2:
+            return 0.0
+        peak = equities[0]
+        max_dd = 0.0
+        for eq in equities:
+            if eq > peak:
+                peak = eq
+            dd = (peak - eq) / peak * 100 if peak > 0 else 0
+            if dd > max_dd:
+                max_dd = dd
+        return max_dd
 
     def _compute_daily_turnover(self, orders: List[Dict[str, Any]], portfolio_value: float) -> float:
         if portfolio_value <= 0:

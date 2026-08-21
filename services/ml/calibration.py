@@ -150,12 +150,24 @@ class ModelCalibration:
         y_true: np.ndarray,
         y_prob: np.ndarray,
         y_prob_val: Optional[np.ndarray] = None,
+        y_true_train: Optional[np.ndarray] = None,
     ) -> Tuple[Any, np.ndarray]:
-        """Platt scaling (sigmoid calibration)."""
+        """Platt scaling (sigmoid calibration).
+        
+        Args:
+            y_true: Tüm gerçek etiketler (veya train etiketleri)
+            y_prob: Tüm olasılıklar (veya train olasılıkları)
+            y_prob_val: Validation olasılıkları (None ise train üzerinde predict)
+            y_true_train: Train etiketleri (y_prob_val varsa, calibrator train üzerinde eğitilir)
+        """
         from sklearn.linear_model import LogisticRegression
 
+        # Validation varsa, sadece train üzerinde eğit
+        train_y = y_true_train if y_true_train is not None and y_prob_val is not None else y_true
+        train_prob = y_prob if y_prob_val is not None else y_prob
+
         calibrator = LogisticRegression(max_iter=1000)
-        calibrator.fit(y_prob.reshape(-1, 1), y_true)
+        calibrator.fit(train_prob.reshape(-1, 1), train_y)
 
         if y_prob_val is not None:
             calibrated = calibrator.predict_proba(y_prob_val.reshape(-1, 1))[:, 1]

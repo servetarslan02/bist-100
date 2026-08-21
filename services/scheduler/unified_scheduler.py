@@ -69,21 +69,17 @@ class HolidayProvider:
     """
 
     # Hardcoded fallback — sadece dinamik kaynak yoksa kullanılır
-    _FALLBACK_2026: set = frozenset({
-        date(2026, 1, 1),    # Yılbaşı
-        date(2026, 4, 23),   # Ulusal Egemenlik
-        date(2026, 5, 1),    # İşçi Bayramı
-        date(2026, 5, 19),   # Gençlik Bayramı
-        date(2026, 7, 15),   # Demokrasi Bayramı
-        date(2026, 8, 30),   # Zafer Bayramı
-        date(2026, 10, 29),  # Cumhuriyet Bayramı
-        date(2026, 3, 29),   # Ramazan Bayramı (1)
-        date(2026, 3, 30),   # Ramazan Bayramı (2)
-        date(2026, 3, 31),   # Ramazan Bayramı (3)
-        date(2026, 6, 6),    # Kurban Bayramı (1)
-        date(2026, 6, 7),    # Kurban Bayramı (2)
-        date(2026, 6, 8),    # Kurban Bayramı (3)
-        date(2026, 6, 9),    # Kurban Bayramı (4)
+    _FALLBACK_HOLIDAYS: set = frozenset({
+        # 2026
+        date(2026, 1, 1), date(2026, 4, 23), date(2026, 5, 1), date(2026, 5, 19),
+        date(2026, 7, 15), date(2026, 8, 30), date(2026, 10, 29),
+        date(2026, 3, 29), date(2026, 3, 30), date(2026, 3, 31),  # Ramazan
+        date(2026, 6, 6), date(2026, 6, 7), date(2026, 6, 8), date(2026, 6, 9),  # Kurban
+        # 2027
+        date(2027, 1, 1), date(2027, 4, 23), date(2027, 5, 1), date(2027, 5, 19),
+        date(2027, 7, 15), date(2027, 8, 30), date(2027, 10, 29),
+        date(2027, 3, 19), date(2027, 3, 20), date(2027, 3, 21),  # Ramazan (tahmini)
+        date(2027, 5, 26), date(2027, 5, 27), date(2027, 5, 28), date(2027, 5, 29),  # Kurban (tahmini)
     })
 
     def __init__(self):
@@ -100,7 +96,7 @@ class HolidayProvider:
             self._refresh()
 
         # Dinamik + fallback birleşimi
-        return self._dynamic_holidays | self._FALLBACK_2026
+        return self._dynamic_holidays | self._FALLBACK_HOLIDAYS
 
     def is_holiday(self, dt: datetime) -> bool:
         """Belirli bir gün tatil mi?"""
@@ -140,8 +136,7 @@ class HolidayProvider:
                     for h in data.get("holidays", []):
                         holidays.add(date.fromisoformat(h))
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="unified_scheduler.py:142")
-            pass
+            logger.warning("Holiday config load failed", error=str(e))
 
         # 2. DB'den çek (varsa)
         try:
@@ -149,8 +144,7 @@ class HolidayProvider:
             # Bu kısım async değil, sync — startup'ta yüklenir
             pass
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="unified_scheduler.py:150")
-            pass
+            logger.debug("Holiday DB fetch skipped", error=str(e))
 
         self._dynamic_holidays = holidays
         self._last_fetch = time.time()

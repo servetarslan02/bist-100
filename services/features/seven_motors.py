@@ -1046,27 +1046,35 @@ class MeanReversionMotor:
                 williams_r = (highest_high - valid_close[-1]) / (highest_high - lowest_low) * -100
                 features["williams_r_14d"] = round(float(williams_r), 4)
 
-        # Stochastic RSI
-        if "rsi_14d" in features and n >= 14:
-            rsi_values = []
-            for i in range(min(14, n-14)):
-                subset = valid_close[-(14+i):-i] if i > 0 else valid_close[-14:]
-                if len(subset) >= 14:
+        # Stochastic RSI — RSI serisi üzerinden hesaplanmalı
+        if n >= 28:  # en az 28 gün gerekli (14 RSI + 14 Stochastic)
+            rsi_series = []
+            for i in range(14, n):
+                subset = valid_close[i-14:i+1]
+                if len(subset) >= 15:
                     deltas = np.diff(subset)
                     gains = np.where(deltas > 0, deltas, 0)
                     losses = np.where(deltas < 0, -deltas, 0)
-                    avg_gain = np.mean(gains)
-                    avg_loss = np.mean(losses)
+                    avg_gain = np.mean(gains[:14])
+                    avg_loss = np.mean(losses[:14])
+                    for j in range(14, len(gains)):
+                        avg_gain = (avg_gain * 13 + gains[j]) / 14
+                        avg_loss = (avg_loss * 13 + losses[j]) / 14
                     if avg_loss > 0:
-                        rs = avg_gain / avg_loss
-                        rsi_values.append(100 - (100 / (1 + rs)))
+                        rsi_series.append(100 - (100 / (1 + avg_gain / avg_loss)))
+                    else:
+                        rsi_series.append(100)
 
-            if rsi_values:
-                min_rsi = min(rsi_values)
-                max_rsi = max(rsi_values)
+            if len(rsi_series) >= 14:
+                # Son 14 RSI değeri üzerinden Stochastic
+                rsi_window = rsi_series[-14:]
+                min_rsi = min(rsi_window)
+                max_rsi = max(rsi_window)
                 if max_rsi != min_rsi:
-                    stoch_rsi = (rsi_values[-1] - min_rsi) / (max_rsi - min_rsi)
+                    stoch_rsi = (rsi_series[-1] - min_rsi) / (max_rsi - min_rsi)
                     features["stoch_rsi"] = round(float(stoch_rsi), 4)
+                else:
+                    features["stoch_rsi"] = 0.5
 
         # CCI (Commodity Channel Index)
         if n >= 20:
@@ -1109,21 +1117,15 @@ class SeasonalityMotor:
         """Mevsimsel feature'ları hesapla."""
         features = {}
 
+        # M-001 düzeltmesi: Birleşik mask — close ve dates aynı filtreyle
         if mask is not None:
-            close = np.where(mask == 1, close, np.nan)
-
-        valid_close = close[~np.isnan(close)]
-
-        # M-001 düzeltmesi: valid_close ve valid_dates birleşik filtreleme
-        # close mask-aware filtrelendi, dates de aynı maskeyle filtrelenmeli
-        if mask is not None:
-            valid_dates = [d for d, m in zip(dates, mask) if m == 1]
+            # Hem mask=1 hem close NaN olmayan günleri filtrele
+            combined_mask = (mask == 1) & (~np.isnan(close))
+            valid_close = close[combined_mask]
+            valid_dates = [d for d, m in zip(dates, combined_mask) if m]
         else:
+            valid_close = close[~np.isnan(close)]
             valid_dates = list(dates)
-        # Uzunlukları eşitle
-        min_len = min(len(valid_close), len(valid_dates))
-        valid_close = valid_close[:min_len]
-        valid_dates = valid_dates[:min_len]
 
         if len(valid_close) < 252 or len(valid_dates) < 252:
             return features

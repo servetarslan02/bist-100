@@ -366,4 +366,4 @@ class PurgeEmbargoWalkForward:
 
 
 # Singleton
-walk_forward_engine = PurgeEmbargoWalkForward()
+purge_embargo_wf_engine = PurgeEmbargoWalkForward()

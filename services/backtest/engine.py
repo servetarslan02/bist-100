@@ -101,6 +101,7 @@ class BacktestEngine:
         positions: Dict[str, Dict] = {}  # ticker -> {qty, avg_cost, entry_date}
         trades: List[BacktestTrade] = []
         equity_curve = [initial_capital]
+        exposure_history = [0.0]  # Her gün için invested/total oranı
         trade_id = 0
 
         for signal in signals:
@@ -172,16 +173,30 @@ class BacktestEngine:
 
                 del positions[ticker]
 
-            # Equity güncelle
+            # Equity güncelle — tüm pozisyonlar için güncel fiyat
             total_value = capital
+            invested_value = 0
             for t, p in positions.items():
-                # Güncel fiyat (signal'dan veya price_data'dan)
-                current_price = price if t == ticker else p["avg_cost"]
-                total_value += p["qty"] * current_price
+                if price_data and t in price_data:
+                    # price_data'dan güncel fiyat bul
+                    pd_entries = price_data[t]
+                    if isinstance(pd_entries, list) and pd_entries:
+                        # Son entry'nin close'u
+                        current_price = pd_entries[-1].get("close", p["avg_cost"])
+                    else:
+                        current_price = p["avg_cost"]
+                elif t == ticker:
+                    current_price = price
+                else:
+                    current_price = p["avg_cost"]
+                pos_value = p["qty"] * current_price
+                total_value += pos_value
+                invested_value += pos_value
             equity_curve.append(total_value)
+            exposure_history.append(invested_value / total_value if total_value > 0 else 0)
 
         # Metrikler hesapla
-        metrics = self._compute_metrics(trades, equity_curve, initial_capital)
+        metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
 
         return BacktestResult(
             strategy_name=strategy_name,
@@ -195,7 +210,7 @@ class BacktestEngine:
             drawdown_curve=self._compute_drawdown_curve(equity_curve),
         )
 
-    def _compute_metrics(self, trades: List[BacktestTrade], equity_curve: List[float], initial_capital: float) -> BacktestMetrics:
+    def _compute_metrics(self, trades: List[BacktestTrade], equity_curve: List[float], initial_capital: float, exposure_history: Optional[List[float]] = None) -> BacktestMetrics:
         """Performans metrikleri hesapla."""
         if not trades:
             return BacktestMetrics(
@@ -277,7 +292,7 @@ class BacktestEngine:
             total_trades=len(trades),
             total_fees=round(total_fees, 2),
             avg_holding_days=float(np.mean([t.holding_days for t in trades])),
-            exposure_pct=0.0,
+            exposure_pct=round(float(np.mean(exposure_history)) * 100, 2) if exposure_history else 0.0,
         )
 
     def _compute_drawdown_curve(self, equity_curve: List[float]) -> List[float]:

@@ -131,7 +131,7 @@ class RankingModel:
             self._is_trained = False
             return {"success": False, "error": "LightGBM not installed"}
 
-        # Eğitim verisi hazırla
+        # Eğitim verisi hazırla (tarih sıralı, group_sizes dahil)
         X, y, groups = self._prepare_training_data(features_map, returns, date_groups)
 
         if len(X) < 100:
@@ -146,20 +146,7 @@ class RankingModel:
         # Getirileri rank'e çevir (yüksek getiri = düşük rank numarası)
         y_rank = -y  # Negatif getiri (yüksek getiri = düşük rank = daha iyi)
 
-        # Group sizes
-        group_sizes = []
-        current_group = 0
-        current_date = None
-        for ticker, date in sorted(date_groups.items(), key=lambda x: x[1]):
-            if date != current_date:
-                if current_group > 0:
-                    group_sizes.append(current_group)
-                current_date = date
-                current_group = 1
-            else:
-                current_group += 1
-        if current_group > 0:
-            group_sizes.append(current_group)
+        group_sizes = groups.tolist()
 
         # LightGBM Dataset
         train_data = lgb.Dataset(X_weighted, label=y_rank, group=group_sizes,
@@ -323,18 +310,37 @@ class RankingModel:
         returns: Dict[str, float],
         date_groups: Dict[str, str],
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Eğitim verisi hazırla."""
+        """Eğitim verisi hazırla — tarih sırasına göre."""
         X = []
         y = []
+        groups = []
 
-        for ticker in features_map:
-            if ticker not in returns:
-                continue
+        # Tarih sırasına göre sırala (group_sizes ile uyumlu)
+        sorted_tickers = sorted(
+            [t for t in features_map if t in returns and t in date_groups],
+            key=lambda t: date_groups[t]
+        )
+
+        current_date = None
+        current_group = 0
+        for ticker in sorted_tickers:
             vec = self._feature_vector(features_map[ticker])
             X.append(vec)
             y.append(returns[ticker])
 
-        return np.array(X), np.array(y), np.array([])
+            date = date_groups[ticker]
+            if date != current_date:
+                if current_group > 0:
+                    groups.append(current_group)
+                current_date = date
+                current_group = 1
+            else:
+                current_group += 1
+
+        if current_group > 0:
+            groups.append(current_group)
+
+        return np.array(X), np.array(y), np.array(groups)
 
     def _feature_vector(self, features: Dict) -> List[float]:
         """Feature dict'ten vektör oluştur.
