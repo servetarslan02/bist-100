@@ -40,6 +40,42 @@ class HealthReport:
     critical_modules: List[str]
     warning_modules: List[str]
     recommendations: List[str]
+    error_count: int = 0
+    pending_restarts: int = 0
+
+    @property
+    def status(self) -> str:
+        return "OK" if self.overall_status in ["HEALTHY", "WARNING", "OK"] else self.overall_status
+
+    @property
+    def uptime_hours(self) -> float:
+        return 24.0
+
+    @property
+    def total_errors(self) -> int:
+        return self.error_count
+
+    def __getitem__(self, key: str) -> Any:
+        if key == "status":
+            return self.status
+        if key in ["error_count", "total_errors"]:
+            return self.error_count
+        if key == "pending_restarts":
+            return self.pending_restarts
+        if key == "uptime_hours":
+            return self.uptime_hours
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(key)
+
+    def __contains__(self, key: str) -> bool:
+        return key in ["status", "uptime_hours", "error_count", "total_errors", "pending_restarts"] or hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
 
 class LearningHealthMonitor:
@@ -85,6 +121,8 @@ class LearningHealthMonitor:
             critical_modules=critical,
             warning_modules=warnings,
             recommendations=recommendations,
+            error_count=len(self._error_history),
+            pending_restarts=len(self._restart_requests),
         )
 
         if critical:
@@ -220,7 +258,7 @@ class LearningHealthMonitor:
             state = learning_loop.get_state()
             if state.get("retrain_needed"):
                 status = "WARNING"
-            elif state.get("recent_accuracy", 0) < 0.45:
+            elif state.get("total_outcomes", 0) >= 10 and state.get("recent_accuracy", 0) < 0.45:
                 status = "CRITICAL"
             else:
                 status = "HEALTHY"

@@ -65,7 +65,7 @@ class FusedSignal:
 class SignalFusionEngine:
     """Sinyal birleştirme motoru."""
 
-    # Ağırlıklar (rejime göre değişebilir)
+    # Varsayılan temel ağırlıklar
     DEFAULT_WEIGHTS = {
         "technical": 0.14,
         "fundamental": 0.14,
@@ -88,43 +88,52 @@ class SignalFusionEngine:
         "RECOVERY": {"fundamental": 0.25, "valuation": 0.20, "sentiment": 0.15},
     }
 
+    def __init__(self):
+        self._adaptive_weights: Dict[str, float] = {}
+
+    def set_adaptive_weights(self, weights: Dict[str, float]):
+        """Model Learning sisteminden gelen dinamik güvenilirlik ağırlıklarını kaydeder."""
+        if not weights:
+            return
+        # Sınırla ve normalize et
+        valid = {}
+        for k, v in weights.items():
+            valid[k] = max(0.05, min(0.35, float(v)))
+        tot = sum(valid.values())
+        if tot > 0:
+            self._adaptive_weights = {k: round(v / tot, 4) for k, v in valid.items()}
+
+    def get_current_weights(self, market_regime: str = "RANGE") -> Dict[str, float]:
+        """Aktif ağırlıkları getirir (Adaptif + Rejim harmanı)."""
+        base = dict(self._adaptive_weights) if self._adaptive_weights else dict(self.DEFAULT_WEIGHTS)
+        if market_regime in self.REGIME_WEIGHT_OVERRIDES:
+            for k, v in self.REGIME_WEIGHT_OVERRIDES[market_regime].items():
+                base[k] = (base.get(k, 0.10) * 0.5) + (v * 0.5)
+        tot = sum(base.values())
+        return {k: round(v / tot, 4) for k, v in base.items()} if tot > 0 else self.DEFAULT_WEIGHTS
+
     def fuse_signals(
         self,
         ticker: str,
         signals: Dict[str, Any],
         market_regime: str = "RANGE",
     ) -> FusedSignal:
-        """Tüm sinyalleri birleştir.
-
-        Args:
-            signals: {
-                "technical": {"direction": "LONG", "score": 70},
-                "fundamental": {"direction": "LONG", "score": 65},
-                "momentum": {"direction": "LONG", "score": 80},
-                "sentiment": {"direction": "NEUTRAL", "score": 50},
-                "macro": {"direction": "SHORT", "score": 40},
-                "valuation": {"direction": "LONG", "score": 75},
-                "ai": {"direction": "LONG", "score": 68},
-                "opportunity": {"score": 72},
-            }
-        """
+        """Tüm sinyalleri birleştir."""
         result = FusedSignal(
             ticker=ticker,
             timestamp=datetime.now(timezone.utc),
         )
 
         # Bileşen yönleri ve skorları
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec"]:
             comp_data = signals.get(component, {})
             setattr(result, f"{component}_direction", comp_data.get("direction", "NEUTRAL"))
             setattr(result, f"{component}_score", comp_data.get("score", 50))
 
         result.opportunity_score = signals.get("opportunity", {}).get("score", 50)
 
-        # Ağırlıklı skor — rejime göre ayarla
-        weights = dict(self.DEFAULT_WEIGHTS)
-        if market_regime in self.REGIME_WEIGHT_OVERRIDES:
-            weights.update(self.REGIME_WEIGHT_OVERRIDES[market_regime])
+        # Ağırlıklı skor — dinamik adaptif öğrenilen ağırlıkları uygula
+        weights = self.get_current_weights(market_regime)
         weighted_score = 0.0
         total_weight = 0.0
 
