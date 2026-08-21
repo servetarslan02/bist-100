@@ -29,9 +29,14 @@ function MetricCard({ label, value, prefix = "", suffix = "", color }: {
 
 export default function PortfolioPage() {
   const { data, loading } = usePolling<PortfolioData>("/portfolio", 15000);
-  const p = data?.portfolio;
-  const positions = data?.positions ?? [];
-  const totalPnlPos = (p?.total_pnl ?? 0) >= 0;
+  const rawP = (data as any)?.portfolio ?? data ?? {};
+  const currentCapital = rawP.current_capital ?? rawP.total_value ?? 100000;
+  const investedValue = rawP.invested_value ?? 0;
+  const cashBalance = rawP.cash_balance ?? rawP.cash ?? 100000;
+  const totalPnl = rawP.total_pnl ?? rawP.unrealized_pnl ?? 0;
+  const totalReturnPct = rawP.total_return_pct ?? rawP.unrealized_pnl_pct ?? 0;
+  const positions = data?.positions ?? rawP.positions ?? [];
+  const totalPnlPos = totalPnl >= 0;
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -53,21 +58,21 @@ export default function PortfolioPage() {
         >
           {totalPnlPos ? <TrendingUp size={14} style={{ color: "#00e5a0" }} /> : <TrendingDown size={14} style={{ color: "#ff4466" }} />}
           <span className="text-sm font-bold font-data" style={{ color: totalPnlPos ? "#00e5a0" : "#ff4466" }}>
-            {totalPnlPos ? "+" : ""}₺{(p?.total_pnl ?? 0).toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
+            {totalPnlPos ? "+" : ""}₺{totalPnl.toLocaleString("tr-TR", { maximumFractionDigits: 0 })}
           </span>
           <span className="text-xs font-data" style={{ color: "var(--color-text-secondary)" }}>
-            ({totalPnlPos ? "+" : ""}%{(p?.total_return_pct ?? 0).toFixed(2)})
+            ({totalPnlPos ? "+" : ""}%{totalReturnPct.toFixed(2)})
           </span>
         </div>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-5 gap-3">
-        <MetricCard label="Toplam Sermaye" value={p?.current_capital} prefix="₺" accent="#00c8ff" />
-        <MetricCard label="Yatırımdaki Tutar" value={p?.invested_value} prefix="₺" accent="#9966ff" />
-        <MetricCard label="Nakit Bakiye" value={p?.cash_balance} prefix="₺" accent="#ffaa00" />
-        <MetricCard label="Toplam K/Z" value={p?.total_pnl} prefix="₺" color="auto" />
-        <MetricCard label="Toplam Getiri" value={p?.total_return_pct} suffix="%" color="auto" />
+        <MetricCard label="Toplam Sermaye" value={currentCapital} prefix="₺" accent="#00c8ff" />
+        <MetricCard label="Yatırımdaki Tutar" value={investedValue} prefix="₺" accent="#9966ff" />
+        <MetricCard label="Nakit Bakiye" value={cashBalance} prefix="₺" accent="#ffaa00" />
+        <MetricCard label="Toplam K/Z" value={totalPnl} prefix="₺" color="auto" />
+        <MetricCard label="Toplam Getiri" value={totalReturnPct} suffix="%" color="auto" />
       </div>
 
       {/* Positions Table */}

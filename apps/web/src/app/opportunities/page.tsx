@@ -31,22 +31,33 @@ export default function Opportunities() {
   const { data: signals, loading } = usePolling<Signal[]>("/signals?limit=100", 15000);
   const [filter, setFilter] = useState<string>("ALL");
 
-  const filtered = useMemo(() => {
+  const normalizedSignals = useMemo(() => {
     if (!signals) return [];
-    if (filter === "ALL") return signals;
-    return signals.filter(s => s.spec_category === filter);
-  }, [signals, filter]);
+    const list = Array.isArray(signals) ? signals : ((signals as any).signals || []);
+    return list.map((s: any) => {
+      const score = s.score ?? 75;
+      const autoCat = s.spec_category || (score >= 88 ? "HIGH_CONVICTION" : score >= 80 ? "CANDIDATE" : score >= 70 ? "WATCH" : "NORMAL");
+      return {
+        ...s,
+        spec_category: autoCat,
+      };
+    });
+  }, [signals]);
+
+  const filtered = useMemo(() => {
+    if (filter === "ALL") return normalizedSignals;
+    return normalizedSignals.filter(s => s.spec_category === filter);
+  }, [normalizedSignals, filter]);
 
   const counts = useMemo(() => {
-    if (!signals) return {} as Record<string, number>;
     return {
-      ALL: signals.length,
-      HIGH_CONVICTION: signals.filter(s => s.spec_category === "HIGH_CONVICTION").length,
-      CANDIDATE: signals.filter(s => s.spec_category === "CANDIDATE").length,
-      WATCH: signals.filter(s => s.spec_category === "WATCH").length,
-      NORMAL: signals.filter(s => s.spec_category === "NORMAL").length,
+      ALL: normalizedSignals.length,
+      HIGH_CONVICTION: normalizedSignals.filter(s => s.spec_category === "HIGH_CONVICTION").length,
+      CANDIDATE: normalizedSignals.filter(s => s.spec_category === "CANDIDATE").length,
+      WATCH: normalizedSignals.filter(s => s.spec_category === "WATCH").length,
+      NORMAL: normalizedSignals.filter(s => s.spec_category === "NORMAL").length,
     };
-  }, [signals]);
+  }, [normalizedSignals]);
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
