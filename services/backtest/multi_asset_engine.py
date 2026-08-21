@@ -168,6 +168,22 @@ class MultiAssetBacktestEngine:
         Returns:
             MultiAssetResult
         """
+        # universe_tickers verildiyse, market/signal verisini bu evrenle
+        # sınırla. Bu, SurvivorshipBiasHandler.get_universe_at_date() ile
+        # üretilen tarihe-özgü (delisted hisseleri de içeren) evrenin
+        # backtest motoruna gerçekten ulaşmasını sağlayan bağlantı
+        # noktasıdır. (Önceden bu parametre tanımlıydı ama hiç
+        # kullanılmıyordu - survivorship bias düzeltmesi çağırılsa bile
+        # motora hiç ulaşmıyordu; bkz. documentation/14.)
+        if universe_tickers is not None:
+            market_data = market_data[market_data["ticker"].isin(universe_tickers)]
+            if signal_data is not None and not signal_data.empty:
+                signal_data = signal_data[signal_data["ticker"].isin(universe_tickers)]
+            logger.info(
+                "Universe filtresi uygulandı (survivorship-aware)",
+                universe_size=len(universe_tickers),
+            )
+
         import hashlib
         run_id = hashlib.md5(
             f"multi_{datetime.now().isoformat()}".encode()
@@ -194,6 +210,19 @@ class MultiAssetBacktestEngine:
 
         # Get unique dates
         dates = sorted(market_data["date"].unique())
+
+        # T+1 EXECUTION: Sinyal D gününün verisiyle üretilir, ama işlem
+        # D gününün KAPANIŞINDA değil, D+1'in AÇILIŞINDA gerçekleşir.
+        # Aynı günün kapanışıyla hem sinyal üretip hem işlem yapmak,
+        # gerçek hayatta imkansız bir öngörü (look-ahead bias) varsayar
+        # (bkz. documentation/14 — kod incelemesiyle tespit edilen bug).
+        next_date_map: Dict[Any, Any] = {
+            dates[i]: dates[i + 1] for i in range(len(dates) - 1)
+        }
+        open_price_map: Dict[Tuple[Any, str], float] = {}
+        if "open" in market_data.columns:
+            for row in market_data[["date", "ticker", "open"]].itertuples(index=False):
+                open_price_map[(row.date, row.ticker)] = row.open
 
         # Bias check
         bias_report = None
@@ -279,13 +308,20 @@ class MultiAssetBacktestEngine:
             position_count_per_day.append(len(positions))
 
             # SELL signals (exit positions)
-            if not day_signals.empty:
+            # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
+            next_date = next_date_map.get(date)
+            if not day_signals.empty and next_date is not None:
                 sell_signals = day_signals[day_signals["score"] < 40]  # Düşük skor = sat
                 for _, sig in sell_signals.iterrows():
                     ticker = sig["ticker"]
                     if ticker in positions:
                         pos = positions[ticker]
-                        sell_price = prices.get(ticker, pos["entry_price"])
+                        next_open = open_price_map.get((next_date, ticker))
+                        if next_open is None or next_open <= 0:
+                            # D+1'de fiyat verisi yok (delisting/eksik veri) -
+                            # T+1 için gerçekçi execution imkansız, işlemi atla
+                            continue
+                        sell_price = next_open
 
                         # Transaction cost
                         if cfg.use_realistic_costs:
@@ -317,7 +353,8 @@ class MultiAssetBacktestEngine:
                         )
 
                         trade_log.append({
-                            "date": str(date),
+                            "date": str(next_date),
+                            "signal_date": str(date),
                             "ticker": ticker,
                             "side": "SELL",
                             "quantity": pos["quantity"],
@@ -330,7 +367,8 @@ class MultiAssetBacktestEngine:
                         del positions[ticker]
 
             # BUY signals (enter positions)
-            if not day_signals.empty and len(positions) < cfg.max_positions:
+            # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
+            if not day_signals.empty and len(positions) < cfg.max_positions and next_date is not None:
                 buy_signals = day_signals[
                     (day_signals["score"] >= 70) &  # Yüksek skor = al
                     (~day_signals["ticker"].isin(positions.keys()))
@@ -341,10 +379,14 @@ class MultiAssetBacktestEngine:
                         break
 
                     ticker = sig["ticker"]
-                    if ticker not in prices:
+                    next_open = open_price_map.get((next_date, ticker))
+                    if next_open is None or next_open <= 0:
+                        # D+1'de fiyat verisi yok - gerçekçi execution
+                        # imkansız, işlemi atla (aynı gün kapanışına
+                        # dönüp look-ahead bias yaratmıyoruz)
                         continue
 
-                    buy_price = prices[ticker]
+                    buy_price = next_open
                     sector = sector_mapping.get(ticker, "unknown")
 
                     # Position sizing (equal weight with limits)
@@ -391,7 +433,7 @@ class MultiAssetBacktestEngine:
                     positions[ticker] = {
                         "quantity": quantity,
                         "entry_price": exec_price,
-                        "entry_date": str(date),
+                        "entry_date": str(next_date),
                         "sector": sector,
                         "signal_score": sig["score"],
                     }
@@ -402,7 +444,8 @@ class MultiAssetBacktestEngine:
                     )
 
                     trade_log.append({
-                        "date": str(date),
+                        "date": str(next_date),
+                        "signal_date": str(date),
                         "ticker": ticker,
                         "side": "BUY",
                         "quantity": quantity,

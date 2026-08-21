@@ -282,22 +282,25 @@ class BISTSurvivorshipDataLoader:
         """
         Bilinen BIST delisting'lerini oluştur.
 
-        Not: Bu liste periyodik olarak güncellenmelidir.
-        Gerçek üretimde bu veri bir veritabanından gelmelidir.
-        """
-        # Örnek delisting'ler (gerçek verilerle doldurulmalı)
-        known_delistings = [
-            # 2020-2024 arası bilinen delisting'ler
-            DelistingEvent(
-                ticker="EXAMPLE1",
-                delisting_date=datetime(2022, 6, 15),
-                reason="bankruptcy",
-                final_price=0.0,
-                recovery_rate=0.05,
-            ),
-        ]
+        ÖNEMLİ: Bu fonksiyon şu an GERÇEK VERİ İÇERMEZ. Önceden burada
+        "EXAMPLE1" adlı, gerçek bir BIST hissesi olmayan sahte bir
+        placeholder kayıt vardı — bu, yanlışlıkla "survivorship
+        düzeltmesi uygulandı" izlenimi verebilirdi (bkz. documentation/09
+        — sahte veri kırmızı çizgisi). Gerçek delisting verisi (tarih,
+        neden, recovery_rate) uydurulamaz; bu veri resmi bir kaynaktan
+        (KAP, BIST resmi delisting duyuruları) elle veya bir veritabanı
+        entegrasyonuyla doldurulmalıdır.
 
-        return known_delistings
+        Bu haliyle boş liste döner ve yüksek sesle uyarır — böylece bu
+        fonksiyonu çağıran hiçbir kod "delisting yok" ile "delisting
+        verisi henüz yüklenmedi" durumlarını karıştırmaz.
+        """
+        logger.warning(
+            "create_known_bist_delistings() HENÜZ GERÇEK VERİ İÇERMİYOR — "
+            "survivorship bias düzeltmesi bu kaynakla ETKİSİZ kalır. "
+            "Gerçek BIST delisting verisi resmi kaynaklardan doldurulmalı."
+        )
+        return []
 
 
 # Singleton
