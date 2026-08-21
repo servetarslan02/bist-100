@@ -24,7 +24,7 @@ start() {
     mkdir -p "$SCRIPT_DIR/data"
 
     cd "$SCRIPT_DIR"
-    nohup python3 start.py >> "$LOG_FILE" 2>&1 &
+    nohup python3 main.py --mode daily >> "$LOG_FILE" 2>&1 &
     echo $! > "$PID_FILE"
 
     sleep 2
@@ -134,7 +134,7 @@ logs() {
 scan() {
     echo "🔍 Tek tarama yapılıyor..."
     cd "$SCRIPT_DIR"
-    python3 start.py --scan-once
+    python3 main.py --mode daily --scan-once
 }
 
 dashboard() {

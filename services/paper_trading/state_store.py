@@ -137,6 +137,8 @@ class PaperStateStore:
     def _connect(self):
         conn = sqlite3.connect(str(self.db_path), timeout=30.0)
         conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")  # Atomic write + crash safety
+        conn.execute("PRAGMA synchronous=NORMAL")  # WAL ile birlikte güvenli
         try:
             yield conn
         finally:

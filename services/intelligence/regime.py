@@ -122,8 +122,11 @@ class RegimeEngine:
                 vol = np.array(self._vol_history[-window:])
                 # Yeterli veri yoksa mevcut veriyi tekrarla (warm-up)
                 if len(returns) < window:
-                    returns = np.pad(returns, (0, window - len(returns)), mode="edge")
-                    vol = np.pad(vol, (0, window - len(vol)), mode="edge")
+                    # Edge padding yerine, mevcut verinin ortalamasıyla doldur
+                    mean_ret = np.mean(returns) if len(returns) > 0 else 0
+                    mean_vol = np.mean(vol) if len(vol) > 0 else 0.2
+                    returns = np.concatenate([np.full(window - len(returns), mean_ret), returns])
+                    vol = np.concatenate([np.full(window - len(vol), mean_vol), vol])
                 hmm_result = self._hmm_detector.predict_regime(returns, vol)
 
                 # HMM skorlarını rule-based skorlarla birleştir (ağırlıklı)
@@ -168,9 +171,12 @@ class RegimeEngine:
         sorted_scores = sorted(scores.values(), reverse=True)
         if len(sorted_scores) >= 2:
             gap = sorted_scores[0] - sorted_scores[1]
-            if gap < 0.01 and sorted_scores[0] > 0.5:
-                # İki rejim eşit → belirsizlik yüksek ama skor yüksek → orta confidence
-                confidence = 0.3
+            if gap < 0.01:
+                # İki rejim eşit → belirsizlik yüksek
+                if sorted_scores[0] > 0.5:
+                    confidence = 0.3  # Yüksek skor, düşük güven
+                else:
+                    confidence = 0.1  # Düşük skor, çok düşük güven
             else:
                 confidence = min(1.0, max(0.0, gap))
         else:
