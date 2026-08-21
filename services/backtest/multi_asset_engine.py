@@ -58,6 +58,18 @@ class MultiAssetConfig:
     max_drawdown_pct: float = 15.0          # Max drawdown %15
     drawdown_reduction_trigger: float = 10.0 # %10 drawdown'da risk azalt
 
+    # Likidite kısıtı: bir günlük hacmin bu yüzdesinden fazlası tek emirde
+    # alınamaz/satılamaz (gerçek piyasada büyük emir günü aşan market impact
+    # yaratır). 0 = kısıt yok (hacim verisi olmayan senaryolar için).
+    max_volume_participation_pct: float = 10.0
+
+    # Gap risk: BIST'te günlük fiyat marjı (tavan/taban) vardır - bu bandın
+    # dışında fiyat oluşamaz ve o yönde işlem gerçekleşmeyebilir (limit kilidi).
+    # Burada, önceki kapanışa göre |açılış getirisi| bu eşiği aşarsa emrin o
+    # gün gerçekleşemediği varsayılır (muhafazakâr yaklaşım). BIST bandı
+    # zamanla/enstrümana göre değişmiştir (~%10 tipik) - gerekirse ayarla.
+    gap_limit_pct: float = 10.0
+
     # Transaction cost
     use_realistic_costs: bool = True
 
@@ -224,6 +236,23 @@ class MultiAssetBacktestEngine:
             for row in market_data[["date", "ticker", "open"]].itertuples(index=False):
                 open_price_map[(row.date, row.ticker)] = row.open
 
+        # Gap risk kontrolü için önceki kapanış fiyatı haritası
+        close_price_map: Dict[Tuple[Any, str], float] = {}
+        if "close" in market_data.columns:
+            for row in market_data[["date", "ticker", "close"]].itertuples(index=False):
+                close_price_map[(row.date, row.ticker)] = row.close
+
+        def _gap_locked(ticker: str, signal_date: Any, next_open: float) -> bool:
+            """Açılış, önceki kapanışa göre izin verilen bandın dışındaysa
+            (tavan/taban kilidi varsayımı) True döner - emir o gün gerçekleşemez."""
+            if cfg.gap_limit_pct <= 0:
+                return False
+            prev_close = close_price_map.get((signal_date, ticker))
+            if prev_close is None or prev_close <= 0:
+                return False
+            gap_pct = abs(next_open - prev_close) / prev_close * 100
+            return gap_pct > cfg.gap_limit_pct
+
         # Bias check
         bias_report = None
         if cfg.enable_bias_detection:
@@ -323,23 +352,39 @@ class MultiAssetBacktestEngine:
                             continue
                         sell_price = next_open
 
+                        if _gap_locked(ticker, date, next_open):
+                            # Tavan/taban kilidi varsayımı: bu yönde emir
+                            # gerçekleşemez, pozisyon açık kalır
+                            continue
+
+                        # Likidite kısıtı: günlük hacmin max_volume_participation_pct'ini
+                        # aşan kısım o gün satılamaz (market impact / gerçekçi execution).
+                        day_volume = volumes.get(ticker, 0)
+                        sell_qty = pos["quantity"]
+                        if cfg.max_volume_participation_pct > 0 and day_volume > 0:
+                            liquidity_cap = int(day_volume * cfg.max_volume_participation_pct / 100)
+                            sell_qty = min(sell_qty, liquidity_cap)
+                        if sell_qty < 1:
+                            # Hacim o kadar düşük ki tek pay bile satılamıyor - bu güne atla
+                            continue
+
                         # Transaction cost
                         if cfg.use_realistic_costs:
                             cost = self.cost_engine.calculate_total_cost(
-                                "SELL", sell_price, pos["quantity"], ticker,
-                                volumes.get(ticker, 0)
+                                "SELL", sell_price, sell_qty, ticker,
+                                day_volume
                             )
                             commission = cost["costs"]["commission"]
                             slippage = cost["costs"]["slippage"]
                             exec_price = cost["execution_price"]
                         else:
                             # Basit komisyon: sadece broker ücreti (realistic modelden düşük olmalı)
-                            commission = sell_price * pos["quantity"] * 0.0003
+                            commission = sell_price * sell_qty * 0.0003
                             slippage = 0
                             exec_price = sell_price
 
-                        proceeds = pos["quantity"] * exec_price - commission
-                        pnl = proceeds - pos["quantity"] * pos["entry_price"]
+                        proceeds = sell_qty * exec_price - commission
+                        pnl = proceeds - sell_qty * pos["entry_price"]
 
                         cash += proceeds
                         total_commission += commission
@@ -349,7 +394,7 @@ class MultiAssetBacktestEngine:
                         # Sector update
                         sector = pos.get("sector", "unknown")
                         sector_exposure[sector] = sector_exposure.get(sector, 0) - (
-                            pos["quantity"] * sell_price / portfolio_value * 100
+                            sell_qty * sell_price / portfolio_value * 100
                         )
 
                         trade_log.append({
@@ -357,14 +402,18 @@ class MultiAssetBacktestEngine:
                             "signal_date": str(date),
                             "ticker": ticker,
                             "side": "SELL",
-                            "quantity": pos["quantity"],
+                            "quantity": sell_qty,
                             "price": round(exec_price, 4),
                             "pnl": round(pnl, 2),
                             "commission": round(commission, 2),
-                            "reason": "signal",
+                            "reason": "signal" if sell_qty == pos["quantity"] else "signal_partial_liquidity",
                         })
 
-                        del positions[ticker]
+                        if sell_qty >= pos["quantity"]:
+                            del positions[ticker]
+                        else:
+                            # Kısmi satış: kalan miktarı pozisyonda tut (entry_price sabit kalır)
+                            pos["quantity"] -= sell_qty
 
             # BUY signals (enter positions)
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
@@ -387,6 +436,12 @@ class MultiAssetBacktestEngine:
                         continue
 
                     buy_price = next_open
+
+                    if _gap_locked(ticker, date, next_open):
+                        # Tavan/taban kilidi varsayımı: bu yönde emir
+                        # gerçekleşemez, işlemi atla
+                        continue
+
                     sector = sector_mapping.get(ticker, "unknown")
 
                     # Position sizing (equal weight with limits)
@@ -406,11 +461,23 @@ class MultiAssetBacktestEngine:
                     if quantity < 1:
                         continue
 
+                    # Likidite kısıtı: günlük hacmin max_volume_participation_pct'ini
+                    # aşan miktar tek günde alınamaz (market impact / gerçekçi execution).
+                    day_volume = volumes.get(ticker, 0)
+                    if cfg.max_volume_participation_pct > 0:
+                        if day_volume <= 0:
+                            # Hacim verisi yok - güvenli taraf: işlem yapma
+                            continue
+                        liquidity_cap = int(day_volume * cfg.max_volume_participation_pct / 100)
+                        quantity = min(quantity, liquidity_cap)
+                        if quantity < 1:
+                            continue
+
                     # Transaction cost
                     if cfg.use_realistic_costs:
                         cost = self.cost_engine.calculate_total_cost(
                             "BUY", buy_price, quantity, ticker,
-                            volumes.get(ticker, 0)
+                            day_volume
                         )
                         commission = cost["costs"]["commission"]
                         slippage = cost["costs"]["slippage"]
