@@ -43,7 +43,7 @@ BIST_TICKERS = [
 
 def load_all_market_data() -> Tuple[Dict[str, pd.DataFrame], pd.Series]:
     """Tüm BIST hisse ve XU100 benchmark verilerini indirir."""
-    print("📥 Gerçek BIST Verileri İndiriliyor...")
+    logger.info("📥 Gerçek BIST Verileri İndiriliyor...")
     stock_data = {}
     for ticker in BIST_TICKERS:
         try:
@@ -54,7 +54,7 @@ def load_all_market_data() -> Tuple[Dict[str, pd.DataFrame], pd.Series]:
                 clean_tk = ticker.replace(".IS", "")
                 stock_data[clean_tk] = df.dropna()
         except Exception as e:
-            print(f"  ⚠️ {ticker} indirilemedi: {e}")
+            logger.info(f"  ⚠️ {ticker} indirilemedi: {e}")
 
     # XU100 Benchmark
     xu100_df = yf.download("XU100.IS", period="2y", progress=False, interval="1d")
@@ -187,6 +187,9 @@ class ModelTrainer:
 
     def predict_batch_day(self, tickers: List[str], features_list: List[pd.Series]) -> Dict[str, Dict[str, float]]:
         """Tüm hisseler için tek seferde vectorized batch tahmin üretir (O(1) hızlandırma)."""
+import structlog
+logger = structlog.get_logger()
+
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
@@ -234,9 +237,9 @@ class ModelTrainer:
 
 
 def run_institutional_walkforward_backtest():
-    print("=================================================================")
-    print("ALPHA BIST — INSTITUTIONAL WALK-FORWARD END-TO-END BACKTEST")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — INSTITUTIONAL WALK-FORWARD END-TO-END BACKTEST")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -256,8 +259,8 @@ def run_institutional_walkforward_backtest():
     warmup_days = 120
     eval_dates = common_dates[warmup_days:-5]  # Son 5 gün kapanmamış trade'ler hariç
 
-    print(f"📊 Toplam Değerlendirme Günü: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})")
-    print(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)} hisse")
+    logger.info(f"📊 Toplam Değerlendirme Günü: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})")
+    logger.info(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)} hisse")
 
     # Modeller ve Performans Takibi
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
@@ -302,7 +305,7 @@ def run_institutional_walkforward_backtest():
     completed_wins = {m: 0 for m in models}
     completed_totals = {m: 0 for m in models}
 
-    print(f"\n🚀 Walk-Forward Simülasyonu Başlıyor (19 Fold, {len(eval_dates)} işlem günü, Tam Bağımsız Out-of-Sample)...", flush=True)
+    logger.info(f"\n🚀 Walk-Forward Simülasyonu Başlıyor (19 Fold, {len(eval_dates)} işlem günü, Tam Bağımsız Out-of-Sample)...", flush=True)
 
     for step_i, current_date in enumerate(eval_dates):
         date_str = current_date.strftime("%Y-%m-%d")
@@ -328,7 +331,7 @@ def run_institutional_walkforward_backtest():
                 train_rows.append(hist_df)
             combined_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(combined_train)
-            print(f"  • [Fold {current_fold:02d}/18] Modeller Retrain Edildi ({date_str}, {len(combined_train)} satır eğitim verisi)", flush=True)
+            logger.info(f"  • [Fold {current_fold:02d}/18] Modeller Retrain Edildi ({date_str}, {len(combined_train)} satır eğitim verisi)", flush=True)
 
         # 2. PİYASA REJİMİ TESPİTİ
         current_regime = detect_market_regime(xu100_close, current_date)
@@ -531,37 +534,37 @@ def run_institutional_walkforward_backtest():
     net_pnl_strat = final_strat_equity - INITIAL_CAPITAL
     annual_turnover = (total_trades_count * 2 / n_years)
 
-    print("\n=================================================================")
-    print("🏆 TAM SİSTEM INSTITUTIONAL BACKTEST RAPORU (2 YIL BIST OUT-OF-SAMPLE)")
-    print("=================================================================")
-    print(f"📊 Başlangıç Sermayesi: ₺{INITIAL_CAPITAL:,.2f}")
-    print(f"💰 Bitiş Sermayesi:      ₺{final_strat_equity:,.2f} (Net Kâr: ₺{net_pnl_strat:+,.2f})")
-    print(f"📈 Toplam Getiri:        %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})")
-    print(f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})")
-    print(f"⚡ Sharpe Oranı (Rf=%40): {sharpe_strat:.2f} (XU100: {sharpe_bench:.2f})")
-    print(f"🛡️ Max Drawdown:         %{max_dd_strat:.2f} (XU100: %{max_dd_bench:.2f})")
-    print(f"💎 Sortino Oranı:        {sortino_strat:.2f}")
-    print(f"⚖️ Calmar Oranı:         {calmar_strat:.2f}")
-    print(f"🎯 Kazanma Oranı (Win Rate): %{win_rate:.1f} ({winning_trades}/{total_trades_count} İşlem)")
-    print(f"📊 Kâr Faktörü (Profit Factor): {profit_factor:.2f}")
-    print(f"🔄 Yıllık Devir Hızı (Turnover): {annual_turnover:.1f} işlem/yıl")
-    print(f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f}")
+    logger.info("\n=================================================================")
+    logger.info("🏆 TAM SİSTEM INSTITUTIONAL BACKTEST RAPORU (2 YIL BIST OUT-OF-SAMPLE)")
+    logger.info("=================================================================")
+    logger.info(f"📊 Başlangıç Sermayesi: ₺{INITIAL_CAPITAL:,.2f}")
+    logger.info(f"💰 Bitiş Sermayesi:      ₺{final_strat_equity:,.2f} (Net Kâr: ₺{net_pnl_strat:+,.2f})")
+    logger.info(f"📈 Toplam Getiri:        %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})")
+    logger.info(f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})")
+    logger.info(f"⚡ Sharpe Oranı (Rf=%40): {sharpe_strat:.2f} (XU100: {sharpe_bench:.2f})")
+    logger.info(f"🛡️ Max Drawdown:         %{max_dd_strat:.2f} (XU100: %{max_dd_bench:.2f})")
+    logger.info(f"💎 Sortino Oranı:        {sortino_strat:.2f}")
+    logger.info(f"⚖️ Calmar Oranı:         {calmar_strat:.2f}")
+    logger.info(f"🎯 Kazanma Oranı (Win Rate): %{win_rate:.1f} ({winning_trades}/{total_trades_count} İşlem)")
+    logger.info(f"📊 Kâr Faktörü (Profit Factor): {profit_factor:.2f}")
+    logger.info(f"🔄 Yıllık Devir Hızı (Turnover): {annual_turnover:.1f} işlem/yıl")
+    logger.info(f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f}")
 
-    print("\n📅 AYLIK PERFORMANS KARŞILAŞTIRMASI (Strateji vs XU100):")
-    print("| Ay | ALPHA BIST Getiri | XU100 Getiri | Aylık Alfa |")
-    print("|---|---|---|---|")
+    logger.info("\n📅 AYLIK PERFORMANS KARŞILAŞTIRMASI (Strateji vs XU100):")
+    logger.info("| Ay | ALPHA BIST Getiri | XU100 Getiri | Aylık Alfa |")
+    logger.info("|---|---|---|---|")
     for m_k, m_v in monthly_performance.items():
         s_ret = (m_v["strat_end"] / m_v["strat_start"] - 1.0) * 100.0
         x_ret = (m_v["xu100_end"] / m_v["xu100_start"] - 1.0) * 100.0
         alpha = s_ret - x_ret
-        print(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
+        logger.info(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
 
-    print("\n🌐 PİYASA REJİMİNE GÖRE PORTFÖY PERFORMANSI:")
-    print("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 PİYASA REJİMİNE GÖRE PORTFÖY PERFORMANSI:")
+    logger.info("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
+    logger.info("|---|---|---|---|")
     for reg_name, reg_data in regime_pnl.items():
         reg_wr = (reg_data["wins"] / reg_data["trades"] * 100.0) if reg_data["trades"] > 0 else 0.0
-        print(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
+        logger.info(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
 
     return {
         "cagr_strat": cagr_strat,

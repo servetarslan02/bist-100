@@ -18,6 +18,9 @@ from services.learning.upside_capture_validator import detect_market_regime_v2
 
 class CrossSectionalRanker:
     """Production-grade Alpha Model using LambdaRank for Cross-Sectional Stock Selection."""
+import structlog
+logger = structlog.get_logger()
+
     
     def __init__(self, feature_cols):
         self.feature_cols = feature_cols
@@ -86,7 +89,7 @@ class CrossSectionalRanker:
 
 
 def run_tests():
-    print("🚀 FAZ 12: PRODUCTION-GRADE ALPHA MODEL REBUILD TESTS\n")
+    logger.info("🚀 FAZ 12: PRODUCTION-GRADE ALPHA MODEL REBUILD TESTS\n")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", 
@@ -106,9 +109,9 @@ def run_tests():
         train_rows.append(df_sub)
     full_df = pd.concat(train_rows).dropna(subset=['target_5d_ret'])
     
-    print("==================================================")
-    print("1. LABEL CORRECTNESS & AUDIT TESTS")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("1. LABEL CORRECTNESS & AUDIT TESTS")
+    logger.info("==================================================")
     # Test A vs Test B
     test_date = val_dates[10]
     daily_df = full_df[full_df['date'] == test_date].copy()
@@ -120,25 +123,25 @@ def run_tests():
     rank_excess = daily_df['excess_ret'].rank(pct=True)
     
     corr = spearmanr(rank_raw, rank_excess)[0]
-    print(f"Rank(Raw Return) vs Rank(Excess Return) Correlation: {corr:.4f}")
+    logger.info(f"Rank(Raw Return) vs Rank(Excess Return) Correlation: {corr:.4f}")
     if corr > 0.99:
-        print("-> Doğrulandı: Raw return ranking'i cross-sectional olarak %100 Excess return ranking'ine eşittir. Matematiksel mükemmellik sağlandı.")
+        logger.info("-> Doğrulandı: Raw return ranking'i cross-sectional olarak %100 Excess return ranking'ine eşittir. Matematiksel mükemmellik sağlandı.")
 
-    print("\n==================================================")
-    print("2. GROUP INTEGRITY TESTS")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("2. GROUP INTEGRITY TESTS")
+    logger.info("==================================================")
     ranker = CrossSectionalRanker(feature_cols)
     train_slice = full_df[full_df['date'] <= val_dates[5]].copy()
     df_sorted, groups = ranker._prepare_labels(train_slice)
     
-    print(f"Total Rows in Dataset: {len(df_sorted)}")
-    print(f"Sum of Group Sizes   : {groups.sum()}")
+    logger.info(f"Total Rows in Dataset: {len(df_sorted)}")
+    logger.info(f"Sum of Group Sizes   : {groups.sum()}")
     if len(df_sorted) == groups.sum():
-        print("-> Doğrulandı: Group integrity bozulmamıştır.")
+        logger.info("-> Doğrulandı: Group integrity bozulmamıştır.")
 
-    print("\n==================================================")
-    print("3. SCORE SEMANTICS & BACKWARD COMPATIBILITY TEST")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("3. SCORE SEMANTICS & BACKWARD COMPATIBILITY TEST")
+    logger.info("==================================================")
     ranker.retrain_fold(train_slice)
     
     t_day = val_dates[6]
@@ -148,33 +151,33 @@ def run_tests():
     preds = ranker.predict_batch_day(day_tickers, day_rows)
     pred_values = list(preds.values())
     
-    print(f"Score Scale Min  : {min(pred_values):.4f} (Beklenen: ~-1.0)")
-    print(f"Score Scale Max  : {max(pred_values):.4f} (Beklenen: ~1.0)")
-    print(f"Score Scale Mean : {np.mean(pred_values):.4f} (Beklenen: ~0.0)")
+    logger.info(f"Score Scale Min  : {min(pred_values):.4f} (Beklenen: ~-1.0)")
+    logger.info(f"Score Scale Max  : {max(pred_values):.4f} (Beklenen: ~1.0)")
+    logger.info(f"Score Scale Mean : {np.mean(pred_values):.4f} (Beklenen: ~0.0)")
     
     if abs(np.mean(pred_values)) < 0.05 and max(pred_values) > 0.9:
-        print("-> Doğrulandı: Score adapter eski modelin np.tanh sınırlarıyla tamamen uyumlu. Threshold'lar kırılmayacak.")
+        logger.info("-> Doğrulandı: Score adapter eski modelin np.tanh sınırlarıyla tamamen uyumlu. Threshold'lar kırılmayacak.")
 
-    print("\n==================================================")
-    print("4. NO-LOOKAHEAD & FRESHNESS TESTS")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("4. NO-LOOKAHEAD & FRESHNESS TESTS")
+    logger.info("==================================================")
     # Ensure current day features do not contain future leakage
     feat = features_by_ticker[day_tickers[0]]
     # Check if target_5d_ret is used anywhere in input features
     intersection = set(feature_cols).intersection({'target_5d_ret', 'target_5d_bin'})
-    print(f"Leakage Feature Intersection: {intersection}")
+    logger.info(f"Leakage Feature Intersection: {intersection}")
     if len(intersection) == 0:
-        print("-> Doğrulandı: Model inference anında gelecek bilgisi (target) kullanmıyor.")
+        logger.info("-> Doğrulandı: Model inference anında gelecek bilgisi (target) kullanmıyor.")
 
-    print("\n==================================================")
-    print("5. RANKING DIRECTION TEST")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("5. RANKING DIRECTION TEST")
+    logger.info("==================================================")
     actual_fwd = [features_by_ticker[tk].loc[t_day].get("target_5d_ret", 0) for tk in day_tickers]
     direction_corr = spearmanr(pred_values, actual_fwd)[0]
-    print(f"Out-of-sample Prediction vs Actual Forward Return Rank IC: {direction_corr:.4f}")
+    logger.info(f"Out-of-sample Prediction vs Actual Forward Return Rank IC: {direction_corr:.4f}")
     
-    print("\n" + "="*50)
-    print("ÇIKIŞ RAPORU HAZIR.")
+    logger.info("\n" + "="*50)
+    logger.info("ÇIKIŞ RAPORU HAZIR.")
 
 if __name__ == "__main__":
     run_tests()

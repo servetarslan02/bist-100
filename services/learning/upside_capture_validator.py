@@ -28,6 +28,9 @@ from services.learning.institutional_walkforward_engine import (
 
 def detect_market_regime_v2(xu100_series: pd.Series, current_date: pd.Timestamp) -> str:
     """T anına kadar olan XU100 verisiyle rejim ve V-Dip dönüşlerini tespit eder."""
+import structlog
+logger = structlog.get_logger()
+
     hist = xu100_series.loc[:current_date]
     if len(hist) < 20:
         return "SIDEWAYS_RANGE"
@@ -53,9 +56,9 @@ def detect_market_regime_v2(xu100_series: pd.Series, current_date: pd.Timestamp)
 
 
 def run_upside_capture_validation():
-    print("=================================================================")
-    print("ALPHA BIST — UPSIDE CAPTURE & HOLDOUT VALIDATION")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — UPSIDE CAPTURE & HOLDOUT VALIDATION")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -80,9 +83,9 @@ def run_upside_capture_validation():
     val_dates = common_dates[split_train_idx:split_val_idx]
     holdout_dates = common_dates[split_val_idx:-5]
 
-    print(f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)")
-    print(f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
-    print(f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n")
+    logger.info(f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)")
+    logger.info(f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
+    logger.info(f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n")
 
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
 
@@ -142,7 +145,7 @@ def run_upside_capture_validation():
     retrain_freq = 20
     current_fold = 0
 
-    print("🚀 Yeni Upside-Capture Sistemi Final Holdout'ta Koşuluyor...", flush=True)
+    logger.info("🚀 Yeni Upside-Capture Sistemi Final Holdout'ta Koşuluyor...", flush=True)
 
     for step_i, current_date in enumerate(holdout_dates):
         date_str = current_date.strftime("%Y-%m-%d")
@@ -364,54 +367,54 @@ def run_upside_capture_validation():
     avg_exp = np.mean(daily_exposures_v2)
     avg_cash = np.mean(daily_cash_pct_v2)
 
-    print("\n=================================================================")
-    print("🏆 YENİ UPSIDE-AWARE FINAL HOLDOUT SONUÇLARI")
-    print("=================================================================")
-    print(f"| Metrik | ALPHA BIST (Yeni Upside-Aware) | ALPHA BIST (Eski Holdout) | XU100 Buy & Hold | Equal-Weight BIST |")
-    print(f"|---|---|---|---|---|")
-    print(f"| **Bitiş Sermayesi** | **₺{eq_s.iloc[-1]:,.2f}** | ₺11,162,950.72 | ₺12,917,376.66 | ₺13,264,048.86 |")
-    print(f"| **Toplam Net Getiri** | **%{tot_ret:+.2f}** | %+11.63 | %+29.17 | %+32.64 |")
-    print(f"| **CAGR (Yıllık Getiri)** | **%{cagr:+.2f}** | %+14.87 | %+38.06 | %+42.75 |")
-    print(f"| **Maksimum Drawdown** | **%{max_dd:.2f}** | %13.96 | %27.50 | %12.76 |")
-    print(f"| **Sharpe Oranı (Rf=%40)** | **{sharpe:.2f}** | -1.61 | 0.03 | -0.05 |")
-    print(f"| **Calmar Oranı** | **{calmar:.2f}** | 1.07 | 1.38 | 3.35 |")
-    print(f"| **Kâr Faktörü (Profit Factor)** | **{profit_factor:.2f}** | 1.44 | - | - |")
-    print(f"| **Kazanma Oranı (Win Rate)** | **%{win_rate:.1f}** | %51.6 | - | - |")
-    print(f"| **Upside Capture Ratio** | **%{upside_capture:.1f}** | %38.2 | %100.0 | %108.5 |")
-    print(f"| **Downside Capture Ratio**| **%{downside_capture:.1f}** | %14.8 | %100.0 | %62.1 |")
-    print(f"| **İşlem Sayısı (Trades)** | **{trades_v2}** | 31 | 1 | 20 |")
-    print(f"| **Yıllık Devir Hızı (Turnover)** | **{turnover:.1f}/yıl** | 78.1/yıl | 0.0 | 0.0 |")
-    print(f"| **Toplam Ödenen Komisyon** | **₺{total_costs_v2:,.2f}** | ₺171,605.85 | ₺0.00 | ₺0.00 |")
+    logger.info("\n=================================================================")
+    logger.info("🏆 YENİ UPSIDE-AWARE FINAL HOLDOUT SONUÇLARI")
+    logger.info("=================================================================")
+    logger.info(f"| Metrik | ALPHA BIST (Yeni Upside-Aware) | ALPHA BIST (Eski Holdout) | XU100 Buy & Hold | Equal-Weight BIST |")
+    logger.info(f"|---|---|---|---|---|")
+    logger.info(f"| **Bitiş Sermayesi** | **₺{eq_s.iloc[-1]:,.2f}** | ₺11,162,950.72 | ₺12,917,376.66 | ₺13,264,048.86 |")
+    logger.info(f"| **Toplam Net Getiri** | **%{tot_ret:+.2f}** | %+11.63 | %+29.17 | %+32.64 |")
+    logger.info(f"| **CAGR (Yıllık Getiri)** | **%{cagr:+.2f}** | %+14.87 | %+38.06 | %+42.75 |")
+    logger.info(f"| **Maksimum Drawdown** | **%{max_dd:.2f}** | %13.96 | %27.50 | %12.76 |")
+    logger.info(f"| **Sharpe Oranı (Rf=%40)** | **{sharpe:.2f}** | -1.61 | 0.03 | -0.05 |")
+    logger.info(f"| **Calmar Oranı** | **{calmar:.2f}** | 1.07 | 1.38 | 3.35 |")
+    logger.info(f"| **Kâr Faktörü (Profit Factor)** | **{profit_factor:.2f}** | 1.44 | - | - |")
+    logger.info(f"| **Kazanma Oranı (Win Rate)** | **%{win_rate:.1f}** | %51.6 | - | - |")
+    logger.info(f"| **Upside Capture Ratio** | **%{upside_capture:.1f}** | %38.2 | %100.0 | %108.5 |")
+    logger.info(f"| **Downside Capture Ratio**| **%{downside_capture:.1f}** | %14.8 | %100.0 | %62.1 |")
+    logger.info(f"| **İşlem Sayısı (Trades)** | **{trades_v2}** | 31 | 1 | 20 |")
+    logger.info(f"| **Yıllık Devir Hızı (Turnover)** | **{turnover:.1f}/yıl** | 78.1/yıl | 0.0 | 0.0 |")
+    logger.info(f"| **Toplam Ödenen Komisyon** | **₺{total_costs_v2:,.2f}** | ₺171,605.85 | ₺0.00 | ₺0.00 |")
 
-    print("\n🔍 EK RİSK VE ALFA METRİKLERİ:")
-    print(f"  • Portföy Betası (vs XU100):                   {beta:.2f}")
-    print(f"  • Jensen's Yıllık Alfa (vs XU100):             %{alpha_annual:+.2f}")
-    print(f"  • Ortalama Tutma Süresi (Avg Holding Period): {avg_holding:.1f} gün")
-    print(f"  • Ortalama Piyasa Maruziyeti (Exposure):       %{avg_exp:.1f}")
-    print(f"  • Ortalama Nakit Oranı (Cash %):               %{avg_cash:.1f}")
+    logger.info("\n🔍 EK RİSK VE ALFA METRİKLERİ:")
+    logger.info(f"  • Portföy Betası (vs XU100):                   {beta:.2f}")
+    logger.info(f"  • Jensen's Yıllık Alfa (vs XU100):             %{alpha_annual:+.2f}")
+    logger.info(f"  • Ortalama Tutma Süresi (Avg Holding Period): {avg_holding:.1f} gün")
+    logger.info(f"  • Ortalama Piyasa Maruziyeti (Exposure):       %{avg_exp:.1f}")
+    logger.info(f"  • Ortalama Nakit Oranı (Cash %):               %{avg_cash:.1f}")
 
-    print("\n📅 AYLIK GETİRİ KARŞILAŞTIRMASI (YENİ SİSTEM vs XU100):")
-    print("| Ay | ALPHA BIST Yeni | XU100 Getiri | Aylık Alfa |")
-    print("|---|---|---|---|")
+    logger.info("\n📅 AYLIK GETİRİ KARŞILAŞTIRMASI (YENİ SİSTEM vs XU100):")
+    logger.info("| Ay | ALPHA BIST Yeni | XU100 Getiri | Aylık Alfa |")
+    logger.info("|---|---|---|---|")
     for m_k, m_v in monthly_perf_v2.items():
         s_ret = (m_v["strat_end"] / m_v["strat_start"] - 1.0) * 100.0
         x_ret = (m_v["xu_end"] / m_v["xu_start"] - 1.0) * 100.0
         alpha = s_ret - x_ret
-        print(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
+        logger.info(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
 
-    print("\n🌐 REJİM BAZLI KÂR/ZARAR DAĞILIMI:")
-    print("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 REJİM BAZLI KÂR/ZARAR DAĞILIMI:")
+    logger.info("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
+    logger.info("|---|---|---|---|")
     for reg_name, reg_data in regime_pnl_v2.items():
         reg_wr = (reg_data["wins"] / reg_data["trades"] * 100.0) if reg_data["trades"] > 0 else 0.0
-        print(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
+        logger.info(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
 
     # =========================================================================
     # 9. NİHAİ KARAR
     # =========================================================================
-    print("\n=================================================================")
-    print("🎯 BİLİMSEL NİHAİ KARAR:")
-    print("=================================================================")
+    logger.info("\n=================================================================")
+    logger.info("🎯 BİLİMSEL NİHAİ KARAR:")
+    logger.info("=================================================================")
     if tot_ret > 11.63 and upside_capture > 50.0 and max_dd < max_dd_xu:
         verdict = "IMPROVED / ROBUST"
         desc = f"Upside Capture %38.2'den %{upside_capture:.1f}'e yükseltildi, Net Getiri %+11.63'ten %{tot_ret:+.2f}'e çıktı ve Maksimum Drawdown (%{max_dd:.2f}) XU100'ün (%{max_dd_xu:.2f}) yarısı seviyesinde korunarak güçlü downside koruması sağlandı."
@@ -422,9 +425,9 @@ def run_upside_capture_validation():
         verdict = "FAILED"
         desc = "Strateji test döneminde negatif getiri üretti."
 
-    print(f"KARAR: {verdict}")
-    print(f"AÇIKLAMA: {desc}")
-    print("=================================================================")
+    logger.info(f"KARAR: {verdict}")
+    logger.info(f"AÇIKLAMA: {desc}")
+    logger.info("=================================================================")
 
     return {
         "verdict": verdict,

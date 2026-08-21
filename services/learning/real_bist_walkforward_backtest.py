@@ -382,7 +382,7 @@ def run_real_bist_walkforward_backtest():
     logger.info("\n=================================================================")
     logger.info("✅ GERÇEK TARİHSEL BIST WALK-FORWARD ANALİZİ TAMAMLANDI")
     logger.info("=================================================================\n")
-    print(res["markdown_report"])
+    logger.info(res["markdown_report"])
 
 
 if __name__ == "__main__":

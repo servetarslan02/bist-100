@@ -14,6 +14,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_structural_discovery(eval_dates, features_by_ticker, stock_data, xu100_close, trainer):
     daily_ic = []
@@ -169,24 +172,24 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print("🚀 PHASE 8: STRUCTURAL ALPHA DISCOVERY")
+    logger.info("🚀 PHASE 8: STRUCTURAL ALPHA DISCOVERY")
     
     df_ic, df_buckets, df_oracle, upside_loss_cats = run_structural_discovery(val_dates, features_by_ticker, stock_data, xu100_close, trainer)
     
-    print("\n" + "="*50)
-    print("D) RANK IC / INFORMATION COEFFICIENT")
-    print("="*50)
-    print(f"Mean IC: {df_ic['ic'].mean():.4f}")
-    print(f"Median IC: {df_ic['ic'].median():.4f}")
+    logger.info("\n" + "="*50)
+    logger.info("D) RANK IC / INFORMATION COEFFICIENT")
+    logger.info("="*50)
+    logger.info(f"Mean IC: {df_ic['ic'].mean():.4f}")
+    logger.info(f"Median IC: {df_ic['ic'].median():.4f}")
     icir = df_ic['ic'].mean() / df_ic['ic'].std() if df_ic['ic'].std() > 0 else 0
-    print(f"ICIR: {icir:.4f}")
-    print(f"Positive IC Ratio: {(df_ic['ic'] > 0).mean()*100:.1f}%")
-    print("\nIC by Regime:")
-    print(df_ic.groupby('regime')['ic'].mean().apply(lambda x: f"{x:.4f}"))
+    logger.info(f"ICIR: {icir:.4f}")
+    logger.info(f"Positive IC Ratio: {(df_ic['ic'] > 0).mean()*100:.1f}%")
+    logger.info("\nIC by Regime:")
+    logger.info(df_ic.groupby('regime')['ic'].mean().apply(lambda x: f"{x:.4f}"))
 
-    print("\n" + "="*50)
-    print("C) SCORE -> FUTURE RETURN RELATIONSHIP (CONVICTION)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("C) SCORE -> FUTURE RETURN RELATIONSHIP (CONVICTION)")
+    logger.info("="*50)
     # Define score buckets
     bins = [0, 0.10, 0.15, 0.20, 0.25, 0.30, 1.0]
     df_buckets['bucket'] = pd.cut(df_buckets['score'], bins)
@@ -196,19 +199,19 @@ if __name__ == "__main__":
         Fwd_5d_Median=('fwd_5d', lambda x: x.median() * 100),
         Hit_Rate=('fwd_5d', lambda x: (x > 0).mean() * 100)
     )
-    print(res)
+    logger.info(res)
 
-    print("\n" + "="*50)
-    print("E) ORACLE ANALYSIS")
-    print("="*50)
-    print(f"Avg Fwd5d of Oracle's Top 4   : %{df_oracle['oracle_fwd5'].mean()*100:.2f}")
-    print(f"Avg Fwd5d of V3's Picked      : %{df_oracle['v3_fwd5'].mean()*100:.2f}")
-    print(f"Avg Score of Oracle's best pick: {df_oracle['best_oracle_score'].mean():.3f}")
+    logger.info("\n" + "="*50)
+    logger.info("E) ORACLE ANALYSIS")
+    logger.info("="*50)
+    logger.info(f"Avg Fwd5d of Oracle's Top 4   : %{df_oracle['oracle_fwd5'].mean()*100:.2f}")
+    logger.info(f"Avg Fwd5d of V3's Picked      : %{df_oracle['v3_fwd5'].mean()*100:.2f}")
+    logger.info(f"Avg Score of Oracle's best pick: {df_oracle['best_oracle_score'].mean():.3f}")
 
-    print("\n" + "="*50)
-    print("B) UPSIDE LOSS DECOMPOSITION (COUNT)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("B) UPSIDE LOSS DECOMPOSITION (COUNT)")
+    logger.info("="*50)
     total_opps = sum(upside_loss_cats.values())
     for k, v in upside_loss_cats.items():
         pct = (v / total_opps * 100) if total_opps > 0 else 0
-        print(f"{k.ljust(30)}: {v} instances ({pct:.1f}%)")
+        logger.info(f"{k.ljust(30)}: {v} instances ({pct:.1f}%)")

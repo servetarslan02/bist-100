@@ -14,6 +14,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_fact_check_audit(eval_dates, features_by_ticker, xu100_close, trainer):
     portfolio_cash = 10_000_000.0
@@ -141,33 +144,33 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print("FACT-CHECK RUNNING ON TRAIN/VAL (2025-03 to 2025-10)...")
+    logger.info("FACT-CHECK RUNNING ON TRAIN/VAL (2025-03 to 2025-10)...")
     trades_df, breadth_df = run_fact_check_audit(val_dates, features_by_ticker, xu100_close, trainer)
 
-    print("\n" + "="*50)
-    print("FACT 1 & 2: BULL_TREND MFE/MAE & GIVEBACK ANALYSIS")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("FACT 1 & 2: BULL_TREND MFE/MAE & GIVEBACK ANALYSIS")
+    logger.info("="*50)
     if not trades_df.empty:
         bull_trades = trades_df[trades_df["entry_regime"] == "BULL_TREND"]
         if not bull_trades.empty:
-            print(bull_trades[["ticker", "exit_reason", "days_held", "mfe", "mae", "realized_pnl", "giveback"]].to_string())
-            print(f"\nAvg MFE: {bull_trades['mfe'].mean():.2f}%")
-            print(f"Avg Realized: {bull_trades['realized_pnl'].mean():.2f}%")
-            print(f"Avg Giveback: {bull_trades['giveback'].mean():.2f}%")
+            logger.info(bull_trades[["ticker", "exit_reason", "days_held", "mfe", "mae", "realized_pnl", "giveback"]].to_string())
+            logger.info(f"\nAvg MFE: {bull_trades['mfe'].mean():.2f}%")
+            logger.info(f"Avg Realized: {bull_trades['realized_pnl'].mean():.2f}%")
+            logger.info(f"Avg Giveback: {bull_trades['giveback'].mean():.2f}%")
         else:
-            print("No BULL_TREND trades in this period.")
+            logger.info("No BULL_TREND trades in this period.")
     
-    print("\n" + "="*50)
-    print("FACT 3 & 4: V-DIP BREADTH VS LAG ANALYSIS")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("FACT 3 & 4: V-DIP BREADTH VS LAG ANALYSIS")
+    logger.info("="*50)
     # Ralli başlangıç günlerini bul (XU100 3 günde > %3 yapmış, ama rejim hala BULL değil)
     missed_rally_days = breadth_df[(breadth_df["ret_3d"] > 3.0) & (breadth_df["regime"] != "BULL_TREND") & (breadth_df["regime"] != "V_DIP_RECOVERY")]
     if not missed_rally_days.empty:
-        print("Days where market rallied hard but regime lagged:")
-        print(missed_rally_days[["date", "regime", "breadth_pct", "ret_3d", "ret_20d", "vol_20d"]].head(10).to_string())
+        logger.info("Days where market rallied hard but regime lagged:")
+        logger.info(missed_rally_days[["date", "regime", "breadth_pct", "ret_3d", "ret_20d", "vol_20d"]].head(10).to_string())
         
         # Test Breadth Threshold logic
-        print("\nCan Breadth predict these lags?")
+        logger.info("\nCan Breadth predict these lags?")
         high_breadth = missed_rally_days[missed_rally_days["breadth_pct"] >= 65.0]
-        print(f"Total missed rally days: {len(missed_rally_days)}")
-        print(f"Days caught if Breadth > 65% triggers V-Dip: {len(high_breadth)}")
+        logger.info(f"Total missed rally days: {len(missed_rally_days)}")
+        logger.info(f"Days caught if Breadth > 65% triggers V-Dip: {len(high_breadth)}")

@@ -19,12 +19,15 @@ from services.learning.institutional_walkforward_engine import (
     ModelTrainer,
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 
 def audit_june_2026():
-    print("=================================================================")
-    print("ALPHA BIST — JUNE 2026 V-DIP AUDIT (READ-ONLY INSPECTION)")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — JUNE 2026 V-DIP AUDIT (READ-ONLY INSPECTION)")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -44,14 +47,14 @@ def audit_june_2026():
     # 2026 Mayıs ve Haziran Tarihleri
     target_dates = [d for d in common_dates if d.strftime('%Y-%m') in ['2026-05', '2026-06']]
 
-    print(f"Audit Edilen Gün Sayısı: {len(target_dates)} gün (2026-05-01 ile 2026-06-30 arası)")
+    logger.info(f"Audit Edilen Gün Sayısı: {len(target_dates)} gün (2026-05-01 ile 2026-06-30 arası)")
 
     # 1. Hisselerin Haziran 2026 Getirileri
     june_start = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06'][0]
     june_end = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06'][-1]
 
     xu_june_ret = (float(xu100_close.loc[june_end]) / float(xu100_close.loc[june_start]) - 1.0) * 100.0
-    print(f"\n📈 XU100 Haziran 2026 Getirisi: +%{xu_june_ret:.2f}")
+    logger.info(f"\n📈 XU100 Haziran 2026 Getirisi: +%{xu_june_ret:.2f}")
 
     stock_june_rets = {}
     for tk, fdf in features_by_ticker.items():
@@ -60,14 +63,14 @@ def audit_june_2026():
             stock_june_rets[tk] = r
 
     sorted_stocks = sorted(stock_june_rets.items(), key=lambda x: x[1], reverse=True)
-    print("\n🏆 HİSSE BAZINDA HAZİRAN 2026 GETİRİLERİ (Top 10):")
+    logger.info("\n🏆 HİSSE BAZINDA HAZİRAN 2026 GETİRİLERİ (Top 10):")
     for tk, r in sorted_stocks[:10]:
-        print(f"  • {tk}: +%{r:.2f}")
+        logger.info(f"  • {tk}: +%{r:.2f}")
 
     # 2. Haziran 2026 Günlük Rejim, Sinyal ve Fiyat Hareketleri
-    print("\n📅 GÜNLÜK AKIŞ VE SİNYAL DENETİMİ (HAZİRAN 2026):")
-    print("| Tarih | XU100 Kapanış | Günlük Değ. (%) | Rejim | 5G Ret (%) | 20G Vol (%) | Yorum |")
-    print("|---|---|---|---|---|---|---|")
+    logger.info("\n📅 GÜNLÜK AKIŞ VE SİNYAL DENETİMİ (HAZİRAN 2026):")
+    logger.info("| Tarih | XU100 Kapanış | Günlük Değ. (%) | Rejim | 5G Ret (%) | 20G Vol (%) | Yorum |")
+    logger.info("|---|---|---|---|---|---|---|")
     
     june_dates = [d for d in target_dates if d.strftime('%Y-%m') == '2026-06']
     valid_xu_dates = [d for d in target_dates if d in xu100_close.index]
@@ -93,7 +96,7 @@ def audit_june_2026():
         elif daily_chg < -4.0:
             comment = "🔴 Sert Satış"
 
-        print(f"| {d.strftime('%Y-%m-%d')} | {cur_p:,.1f} | %{daily_chg:+.2f} | {reg} | %{ret_5d:+.1f} | %{vol_20d:.1f} | {comment} |")
+        logger.info(f"| {d.strftime('%Y-%m-%d')} | {cur_p:,.1f} | %{daily_chg:+.2f} | {reg} | %{ret_5d:+.1f} | %{vol_20d:.1f} | {comment} |")
 
 
 if __name__ == "__main__":

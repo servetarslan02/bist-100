@@ -8,6 +8,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -37,8 +40,8 @@ def get_resid(y, x):
     return y - b * x
 
 def run_residual_discovery():
-    print("🚀 FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY")
-    print("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
+    logger.info("🚀 FAZ 20: RESIDUAL & REGIME-AWARE ALPHA DISCOVERY")
+    logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
     
     stock_data, xu100_close = load_all_market_data()
     features_by_ticker = {tk: extract_forensic_features(df) for tk, df in stock_data.items() if len(df) >= 120}
@@ -124,63 +127,63 @@ def run_residual_discovery():
         
     df_res = pd.DataFrame(records).fillna(0)
 
-    print("\n==================================================")
-    print("A & B) RESIDUAL MOMENTUM vs RAW MOMENTUM")
-    print("==================================================")
-    print(f"Mean IC (Raw roc_20d)                  : {df_res['ic_raw_mom'].mean():.4f}")
-    print(f"Mean IC (Residual roc_20d vs Volatility): {df_res['ic_resid_mom'].mean():.4f}")
-    print("-> Teşhis: Momentum'un Volatilite'den arındırılmış (residual) hali bile IC kazanamamıştır. Çöküş doğrudan volatilite ile açıklanamaz, momentumun kendi doğasındaki mean-reversion etkilidir.")
+    logger.info("\n==================================================")
+    logger.info("A & B) RESIDUAL MOMENTUM vs RAW MOMENTUM")
+    logger.info("==================================================")
+    logger.info(f"Mean IC (Raw roc_20d)                  : {df_res['ic_raw_mom'].mean():.4f}")
+    logger.info(f"Mean IC (Residual roc_20d vs Volatility): {df_res['ic_resid_mom'].mean():.4f}")
+    logger.info("-> Teşhis: Momentum'un Volatilite'den arındırılmış (residual) hali bile IC kazanamamıştır. Çöküş doğrudan volatilite ile açıklanamaz, momentumun kendi doğasındaki mean-reversion etkilidir.")
 
-    print("\n==================================================")
-    print("D) NON-LINEARITY (Residual Momentum Q1-Q5)")
-    print("==================================================")
-    print(f"Q1 (Low Resid Mom) : %{df_res['resid_mom_Q1_5d'].mean():.2f}")
-    print(f"Q2                 : %{df_res['resid_mom_Q2_5d'].mean():.2f}")
-    print(f"Q3                 : %{df_res['resid_mom_Q3_5d'].mean():.2f}")
-    print(f"Q4                 : %{df_res['resid_mom_Q4_5d'].mean():.2f}")
-    print(f"Q5 (High Resid Mom): %{df_res['resid_mom_Q5_5d'].mean():.2f}")
-    print("-> Teşhis: Eğri U-shaped veya Inverted-U. Monotonik bir Alpha (doğrusal getiri) kesinlikle YOKTUR.")
+    logger.info("\n==================================================")
+    logger.info("D) NON-LINEARITY (Residual Momentum Q1-Q5)")
+    logger.info("==================================================")
+    logger.info(f"Q1 (Low Resid Mom) : %{df_res['resid_mom_Q1_5d'].mean():.2f}")
+    logger.info(f"Q2                 : %{df_res['resid_mom_Q2_5d'].mean():.2f}")
+    logger.info(f"Q3                 : %{df_res['resid_mom_Q3_5d'].mean():.2f}")
+    logger.info(f"Q4                 : %{df_res['resid_mom_Q4_5d'].mean():.2f}")
+    logger.info(f"Q5 (High Resid Mom): %{df_res['resid_mom_Q5_5d'].mean():.2f}")
+    logger.info("-> Teşhis: Eğri U-shaped veya Inverted-U. Monotonik bir Alpha (doğrusal getiri) kesinlikle YOKTUR.")
 
-    print("\n==================================================")
-    print("E) VOLATILITY × MOMENTUM INTERACTION (5D Excess Return)")
-    print("==================================================")
-    print(f"LOW-Vol  + LOW-Mom  : %{df_res['low_vol_low_mom'].mean():.3f}")
-    print(f"LOW-Vol  + HIGH-Mom : %{df_res['low_vol_high_mom'].mean():.3f} (<- Güvenli Liman Momentum)")
-    print(f"HIGH-Vol + LOW-Mom  : %{df_res['high_vol_low_mom'].mean():.3f}")
-    print(f"HIGH-Vol + HIGH-Mom : %{df_res['high_vol_high_mom'].mean():.3f} (<- Toksik Kesişim - Çöküş Alanı)")
-    print("-> Teşhis: Düşük Volatilite ile desteklenen Momentum para kazandırıyor. Ancak Yüksek Volatiliteli (Aşırı spekülatif) Momentum hisseleri portföyü havaya uçuruyor. Çözüm, momentumu tek başına değil conditional (Volatilite Filtreli) kullanmaktır.")
+    logger.info("\n==================================================")
+    logger.info("E) VOLATILITY × MOMENTUM INTERACTION (5D Excess Return)")
+    logger.info("==================================================")
+    logger.info(f"LOW-Vol  + LOW-Mom  : %{df_res['low_vol_low_mom'].mean():.3f}")
+    logger.info(f"LOW-Vol  + HIGH-Mom : %{df_res['low_vol_high_mom'].mean():.3f} (<- Güvenli Liman Momentum)")
+    logger.info(f"HIGH-Vol + LOW-Mom  : %{df_res['high_vol_low_mom'].mean():.3f}")
+    logger.info(f"HIGH-Vol + HIGH-Mom : %{df_res['high_vol_high_mom'].mean():.3f} (<- Toksik Kesişim - Çöküş Alanı)")
+    logger.info("-> Teşhis: Düşük Volatilite ile desteklenen Momentum para kazandırıyor. Ancak Yüksek Volatiliteli (Aşırı spekülatif) Momentum hisseleri portföyü havaya uçuruyor. Çözüm, momentumu tek başına değil conditional (Volatilite Filtreli) kullanmaktır.")
 
-    print("\n==================================================")
-    print("F) PRICE_VS_SMA200 FORENSICS")
-    print("==================================================")
-    print(f"Raw IC            : {df_res['ic_sma200'].mean():.4f}")
-    print(f"Partial IC (vs Vol) : {df_res['partial_ic_sma200_vs_vol'].mean():.4f}")
+    logger.info("\n==================================================")
+    logger.info("F) PRICE_VS_SMA200 FORENSICS")
+    logger.info("==================================================")
+    logger.info(f"Raw IC            : {df_res['ic_sma200'].mean():.4f}")
+    logger.info(f"Partial IC (vs Vol) : {df_res['partial_ic_sma200_vs_vol'].mean():.4f}")
     for r in ["EARLY_BULL", "LATE_BULL", "SIDEWAYS_RANGE", "BEAR_MARKET"]:
         sub = df_res[df_res["regime"] == r]
         ic = sub['ic_sma200'].mean() if len(sub)>0 else 0
-        print(f"{r:15} | Raw IC: {ic:.4f}")
+        logger.info(f"{r:15} | Raw IC: {ic:.4f}")
 
-    print("\n==================================================")
-    print("H & I) TEMPORAL STABILITY & NULL TESTS (Residual Mom)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("H & I) TEMPORAL STABILITY & NULL TESTS (Residual Mom)")
+    logger.info("==================================================")
     blocks = [df_res.iloc[idx] for idx in np.array_split(range(len(df_res)), 5)]
     for i, b in enumerate(blocks):
-        print(f"Block {i+1} | Resid Mom Mean IC: {b['ic_resid_mom'].mean():.4f}")
-    print(f"\nResid Mom Null IC: {df_res['null_ic_resid_mom'].mean():.4f}")
+        logger.info(f"Block {i+1} | Resid Mom Mean IC: {b['ic_resid_mom'].mean():.4f}")
+    logger.info(f"\nResid Mom Null IC: {df_res['null_ic_resid_mom'].mean():.4f}")
 
-    print("\n==================================================")
-    print("K) FINAL DECISION & FEATURE CONTRACT")
-    print("==================================================")
-    print("Karar: B) LOW-VOL ONLY — MOMENTUM REJECTED (AS DIRECT FEATURE)")
-    print("\nFEATURE CONTRACT (Gelecek Model İçin):")
-    print("CORE (Kesin Kullanılacaklar):")
-    print("  - volatility_20d (Güçlü Low-Vol Alpha)")
-    print("OPTIONAL / CONDITIONAL (Sadece Filtre ile veya Interaction ile):")
-    print("  - roc_5d, roc_20d (SADECE volatility_20d DÜŞÜK ise çalışır. Lineer modelde kullanılamazlar. Ağaç modellerinde volatilite ile etkileşime girecekleri garanti edilmelidir).")
-    print("REMOVE / DO NOT USE (Redundant veya Toksik):")
-    print("  - momentum_20d (Tam kopya)")
-    print("  - atr_pct (Volatilitenin gölgesinde kalıyor)")
-    print("  - price_vs_sma200 (Çok uzun vade, istikrarsız, mean-reversiona maruz)")
+    logger.info("\n==================================================")
+    logger.info("K) FINAL DECISION & FEATURE CONTRACT")
+    logger.info("==================================================")
+    logger.info("Karar: B) LOW-VOL ONLY — MOMENTUM REJECTED (AS DIRECT FEATURE)")
+    logger.info("\nFEATURE CONTRACT (Gelecek Model İçin):")
+    logger.info("CORE (Kesin Kullanılacaklar):")
+    logger.info("  - volatility_20d (Güçlü Low-Vol Alpha)")
+    logger.info("OPTIONAL / CONDITIONAL (Sadece Filtre ile veya Interaction ile):")
+    logger.info("  - roc_5d, roc_20d (SADECE volatility_20d DÜŞÜK ise çalışır. Lineer modelde kullanılamazlar. Ağaç modellerinde volatilite ile etkileşime girecekleri garanti edilmelidir).")
+    logger.info("REMOVE / DO NOT USE (Redundant veya Toksik):")
+    logger.info("  - momentum_20d (Tam kopya)")
+    logger.info("  - atr_pct (Volatilitenin gölgesinde kalıyor)")
+    logger.info("  - price_vs_sma200 (Çok uzun vade, istikrarsız, mean-reversiona maruz)")
 
 if __name__ == "__main__":
     run_residual_discovery()

@@ -20,6 +20,9 @@ from catboost import CatBoostClassifier
 import xgboost as xgb
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data,
     extract_point_in_time_features,
     detect_market_regime,
@@ -28,9 +31,9 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_institutional_portfolio_optimization():
-    print("=================================================================")
-    print("ALPHA BIST — INSTITUTIONAL NOISE FILTER & TURNOVER OPTIMIZER")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — INSTITUTIONAL NOISE FILTER & TURNOVER OPTIMIZER")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -49,8 +52,8 @@ def run_institutional_portfolio_optimization():
     warmup_days = 120
     eval_dates = common_dates[warmup_days:-5]
 
-    print(f"📊 Değerlendirme Aralığı: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})")
-    print(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)} hisse")
+    logger.info(f"📊 Değerlendirme Aralığı: {len(eval_dates)} işlem günü ({eval_dates[0].strftime('%Y-%m-%d')} - {eval_dates[-1].strftime('%Y-%m-%d')})")
+    logger.info(f"🏢 Portföydeki Hisse Sayısı: {len(features_by_ticker)} hisse")
 
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
 
@@ -113,7 +116,7 @@ def run_institutional_portfolio_optimization():
         "HIGH_VOLATILITY": 0.40,  # Panik ortamında seçicilik maksimum
     }
 
-    print(f"\n🚀 Optimize Edilmiş Walk-Forward Simülasyonu Başlıyor (Histerezis + Trailing Stop + Rejim Kalkanı)...", flush=True)
+    logger.info(f"\n🚀 Optimize Edilmiş Walk-Forward Simülasyonu Başlıyor (Histerezis + Trailing Stop + Rejim Kalkanı)...", flush=True)
 
     for step_i, current_date in enumerate(eval_dates):
         date_str = current_date.strftime("%Y-%m-%d")
@@ -139,7 +142,7 @@ def run_institutional_portfolio_optimization():
                 train_rows.append(hist_df)
             combined_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(combined_train)
-            print(f"  • [Fold {current_fold:02d}/18] Modeller Retrain Edildi ({date_str})", flush=True)
+            logger.info(f"  • [Fold {current_fold:02d}/18] Modeller Retrain Edildi ({date_str})", flush=True)
 
         # 2. PİYASA REJİMİ TESPİTİ
         current_regime = detect_market_regime(xu100_close, current_date)
@@ -351,37 +354,37 @@ def run_institutional_portfolio_optimization():
     net_pnl_strat = final_strat_equity - INITIAL_CAPITAL
     annual_turnover = (total_trades_count * 2 / n_years)
 
-    print("\n=================================================================")
-    print("🏆 OPTİMİZE EDİLMİŞ INSTITUTIONAL BACKTEST RAPORU (TAM SİSTEM)")
-    print("=================================================================")
-    print(f"📊 Başlangıç Sermayesi: ₺{INITIAL_CAPITAL:,.2f}")
-    print(f"💰 Bitiş Sermayesi:      ₺{final_strat_equity:,.2f} (Net Kâr: ₺{net_pnl_strat:+,.2f})")
-    print(f"📈 Toplam Net Getiri:    %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})")
-    print(f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})")
-    print(f"⚡ Sharpe Oranı (Rf=%40): {sharpe_strat:.2f} (XU100: {sharpe_bench:.2f})")
-    print(f"🛡️ Max Drawdown:         %{max_dd_strat:.2f} (XU100: %{max_dd_bench:.2f})")
-    print(f"💎 Sortino Oranı:        {sortino_strat:.2f}")
-    print(f"⚖️ Calmar Oranı:         {calmar_strat:.2f}")
-    print(f"🎯 Kazanma Oranı (Win Rate): %{win_rate:.1f} ({winning_trades}/{total_trades_count} İşlem)")
-    print(f"📊 Kâr Faktörü (Profit Factor): {profit_factor:.2f}")
-    print(f"🔄 Yıllık Devir Hızı (Turnover): {annual_turnover:.1f} işlem/yıl (📉 Churn %85 Azaldı!)")
-    print(f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f} (📉 Maliyet ₺1.76M'den ₺264K'ya indi!)")
+    logger.info("\n=================================================================")
+    logger.info("🏆 OPTİMİZE EDİLMİŞ INSTITUTIONAL BACKTEST RAPORU (TAM SİSTEM)")
+    logger.info("=================================================================")
+    logger.info(f"📊 Başlangıç Sermayesi: ₺{INITIAL_CAPITAL:,.2f}")
+    logger.info(f"💰 Bitiş Sermayesi:      ₺{final_strat_equity:,.2f} (Net Kâr: ₺{net_pnl_strat:+,.2f})")
+    logger.info(f"📈 Toplam Net Getiri:    %{total_return_strat:.2f} (Benchmark XU100: %{total_return_bench:.2f}, Alpha: %{total_return_strat - total_return_bench:+.2f})")
+    logger.info(f"🎯 Yıllıklandırılmış (CAGR): %{cagr_strat:.2f} (XU100: %{cagr_bench:.2f}, Eşit Ağırlık: %{cagr_ew:.2f})")
+    logger.info(f"⚡ Sharpe Oranı (Rf=%40): {sharpe_strat:.2f} (XU100: {sharpe_bench:.2f})")
+    logger.info(f"🛡️ Max Drawdown:         %{max_dd_strat:.2f} (XU100: %{max_dd_bench:.2f})")
+    logger.info(f"💎 Sortino Oranı:        {sortino_strat:.2f}")
+    logger.info(f"⚖️ Calmar Oranı:         {calmar_strat:.2f}")
+    logger.info(f"🎯 Kazanma Oranı (Win Rate): %{win_rate:.1f} ({winning_trades}/{total_trades_count} İşlem)")
+    logger.info(f"📊 Kâr Faktörü (Profit Factor): {profit_factor:.2f}")
+    logger.info(f"🔄 Yıllık Devir Hızı (Turnover): {annual_turnover:.1f} işlem/yıl (📉 Churn %85 Azaldı!)")
+    logger.info(f"💸 Ödenen Toplam Komisyon + Slippage: ₺{total_transaction_costs:,.2f} (📉 Maliyet ₺1.76M'den ₺264K'ya indi!)")
 
-    print("\n📅 AYLIK PERFORMANS KARŞILAŞTIRMASI (Strateji vs XU100):")
-    print("| Ay | ALPHA BIST Getiri | XU100 Getiri | Aylık Alfa |")
-    print("|---|---|---|---|")
+    logger.info("\n📅 AYLIK PERFORMANS KARŞILAŞTIRMASI (Strateji vs XU100):")
+    logger.info("| Ay | ALPHA BIST Getiri | XU100 Getiri | Aylık Alfa |")
+    logger.info("|---|---|---|---|")
     for m_k, m_v in monthly_performance.items():
         s_ret = (m_v["strat_end"] / m_v["strat_start"] - 1.0) * 100.0
         x_ret = (m_v["xu100_end"] / m_v["xu100_start"] - 1.0) * 100.0
         alpha = s_ret - x_ret
-        print(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
+        logger.info(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
 
-    print("\n🌐 PİYASA REJİMİNE GÖRE PORTFÖY PERFORMANSI:")
-    print("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 PİYASA REJİMİNE GÖRE PORTFÖY PERFORMANSI:")
+    logger.info("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
+    logger.info("|---|---|---|---|")
     for reg_name, reg_data in regime_pnl.items():
         reg_wr = (reg_data["wins"] / reg_data["trades"] * 100.0) if reg_data["trades"] > 0 else 0.0
-        print(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
+        logger.info(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
 
     return {
         "cagr_strat": cagr_strat,

@@ -13,6 +13,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_loss_decomposition(eval_dates, features_by_ticker, xu100_close, trainer):
     portfolio_cash = 10_000_000.0
@@ -138,11 +141,11 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print("V3 UPSIDE LOSS DECOMPOSITION (Train/Val)...")
+    logger.info("V3 UPSIDE LOSS DECOMPOSITION (Train/Val)...")
     res = run_loss_decomposition(val_dates, features_by_ticker, xu100_close, trainer)
     
-    print("\n" + "="*50)
-    print("V3 UPSIDE LOSS DECOMPOSITION RESULTS")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("V3 UPSIDE LOSS DECOMPOSITION RESULTS")
+    logger.info("="*50)
     for k, v in res.items():
-        print(f"{k}: ₺{v:,.2f}")
+        logger.info(f"{k}: ₺{v:,.2f}")

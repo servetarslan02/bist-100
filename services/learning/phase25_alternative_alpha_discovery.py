@@ -8,6 +8,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -78,8 +81,8 @@ def evaluate_signal(df_liquid, signal_col):
     return metrics
 
 def run_phase_25():
-    print("🚀 FAZ 25: ALTERNATIVE ECONOMIC ALPHA DISCOVERY")
-    print("Kurallar: Holdout Kilitli. ML Yok. Sadece Likit Evren.\n")
+    logger.info("🚀 FAZ 25: ALTERNATIVE ECONOMIC ALPHA DISCOVERY")
+    logger.info("Kurallar: Holdout Kilitli. ML Yok. Sadece Likit Evren.\n")
     
     stock_data, xu100_close = load_all_market_data()
     xu100_ret3 = xu100_close.pct_change(3)
@@ -156,47 +159,47 @@ def run_phase_25():
     any_robust = False
     
     for sig in signals:
-        print(f"\n==================================================")
-        print(f"EVALUATING SIGNAL: {sig.upper()}")
-        print(f"==================================================")
+        logger.info(f"\n==================================================")
+        logger.info(f"EVALUATING SIGNAL: {sig.upper()}")
+        logger.info(f"==================================================")
         
         m = evaluate_signal(df_liquid, sig)
         if not m:
-            print("Yeterli veri yok.")
+            logger.info("Yeterli veri yok.")
             continue
             
-        print(f"1. IC (Rank Correlation)")
-        print(f"   1D: {m['ic_1d']:7.4f} | 5D: {m['ic_5d']:7.4f} (ICIR: {m['icir_5d']:5.2f}) | 10D: {m['ic_10d']:7.4f}")
+        logger.info(f"1. IC (Rank Correlation)")
+        logger.info(f"   1D: {m['ic_1d']:7.4f} | 5D: {m['ic_5d']:7.4f} (ICIR: {m['icir_5d']:5.2f}) | 10D: {m['ic_10d']:7.4f}")
         
-        print(f"2. Q1-Q5 MONOTONICITY (5D Spread)")
-        print(f"   Q1:%{m['Q1']:6.3f} | Q2:%{m['Q2']:6.3f} | Q3:%{m['Q3']:6.3f} | Q4:%{m['Q4']:6.3f} | Q5:%{m['Q5']:6.3f}")
+        logger.info(f"2. Q1-Q5 MONOTONICITY (5D Spread)")
+        logger.info(f"   Q1:%{m['Q1']:6.3f} | Q2:%{m['Q2']:6.3f} | Q3:%{m['Q3']:6.3f} | Q4:%{m['Q4']:6.3f} | Q5:%{m['Q5']:6.3f}")
         
-        print(f"3. NULL & STATISTICAL SIGNIFICANCE")
-        print(f"   Actual Spread : %{m['t5_spr']:6.3f}")
-        print(f"   Null Spread   : %{m['null_spr']:6.3f}")
-        print(f"   95% CI        : [%{m['ci_L']:.3f}, %{m['ci_U']:.3f}]")
-        print(f"   P-Value       : {m['pval']:.4f}")
+        logger.info(f"3. NULL & STATISTICAL SIGNIFICANCE")
+        logger.info(f"   Actual Spread : %{m['t5_spr']:6.3f}")
+        logger.info(f"   Null Spread   : %{m['null_spr']:6.3f}")
+        logger.info(f"   95% CI        : [%{m['ci_L']:.3f}, %{m['ci_U']:.3f}]")
+        logger.info(f"   P-Value       : {m['pval']:.4f}")
         
-        print(f"4. STABILITY")
-        print(f"   Time Blocks   : {[round(x,3) for x in m['blocks_spr']]}")
-        print(f"   Regimes       : ER_BULL:%{m['regimes'].get('EARLY_BULL',0):.3f} | LT_BULL:%{m['regimes'].get('LATE_BULL',0):.3f} | BEAR:%{m['regimes'].get('BEAR_MARKET',0):.3f}")
+        logger.info(f"4. STABILITY")
+        logger.info(f"   Time Blocks   : {[round(x,3) for x in m['blocks_spr']]}")
+        logger.info(f"   Regimes       : ER_BULL:%{m['regimes'].get('EARLY_BULL',0):.3f} | LT_BULL:%{m['regimes'].get('LATE_BULL',0):.3f} | BEAR:%{m['regimes'].get('BEAR_MARKET',0):.3f}")
         
-        print(f"5. CONCENTRATION")
-        print(f"   Best %5 drop  : %{m['best_5pct_removed']:6.3f}")
+        logger.info(f"5. CONCENTRATION")
+        logger.info(f"   Best %5 drop  : %{m['best_5pct_removed']:6.3f}")
         
         robust = (m['pval'] < 0.05 and m['ci_L'] > 0 and m['best_5pct_removed'] > 0 and m['t5_spr'] > m['null_spr'])
         if robust:
-            print("=> KARAR: PROMISING (ROBUST ALPHA CANDIDATE)")
+            logger.info("=> KARAR: PROMISING (ROBUST ALPHA CANDIDATE)")
             any_robust = True
         else:
-            print("=> KARAR: REJECT (FAILS ROBUSTNESS CRITERIA)")
+            logger.info("=> KARAR: REJECT (FAILS ROBUSTNESS CRITERIA)")
 
-    print("\n==================================================")
-    print("FINAL PHASE 25 DECISION")
+    logger.info("\n==================================================")
+    logger.info("FINAL PHASE 25 DECISION")
     if any_robust:
-        print("B) PROMISING — FURTHER TEST (En az bir adet potansiyel robust sinyal bulundu)")
+        logger.info("B) PROMISING — FURTHER TEST (En az bir adet potansiyel robust sinyal bulundu)")
     else:
-        print("C) NO ROBUST ALPHA (Tüm adaylar likit evrende Null/Shuffle'a veya konsantrasyon testine yenildi)")
+        logger.info("C) NO ROBUST ALPHA (Tüm adaylar likit evrende Null/Shuffle'a veya konsantrasyon testine yenildi)")
 
 if __name__ == "__main__":
     run_phase_25()

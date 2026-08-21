@@ -1,4 +1,7 @@
 ﻿"""
+import structlog
+logger = structlog.get_logger()
+
 ALPHA HUNT - Tum stratejileri dene, basarili olana kadar dur.
 Holdout: 2025-10-31 sonrasi DOKUNULMUYOR.
 """
@@ -9,11 +12,11 @@ warnings.filterwarnings("ignore")
 HOLDOUT = "2025-10-31"
 BH_CAGR = 76.4  # referans
 
-print("="*70)
-print("ALPHA HUNT - Basarili strateji bulunana kadar dur")
-print(f"Hedef: OOS CAGR > %100, Sharpe > 1.0")
-print(f"B&H referans: %{BH_CAGR}")
-print("="*70)
+logger.info("="*70)
+logger.info("ALPHA HUNT - Basarili strateji bulunana kadar dur")
+logger.info(f"Hedef: OOS CAGR > %100, Sharpe > 1.0")
+logger.info(f"B&H referans: %{BH_CAGR}")
+logger.info("="*70)
 
 # ── VERİ ────────────────────────────────────────────────────────────
 import yfinance as yf
@@ -42,7 +45,7 @@ ALL_TICKERS = [
 ]
 ALL_TICKERS = list(dict.fromkeys(ALL_TICKERS))  # deduplicate
 
-print(f"\nVeri indiriliyor ({len(ALL_TICKERS)} hisse)...")
+logger.info(f"\nVeri indiriliyor ({len(ALL_TICKERS)} hisse)...")
 t0 = time.time()
 raw = yf.download(
     [f"{t}.IS" for t in ALL_TICKERS],
@@ -55,7 +58,7 @@ prices = prices.sort_index().ffill().dropna(how="all")
 valid = [c for c in prices.columns if prices[c].notna().sum() >= 400]
 prices = prices[valid]
 returns = prices.pct_change()
-print(f"   {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()} ({time.time()-t0:.1f}s)")
+logger.info(f"   {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()} ({time.time()-t0:.1f}s)")
 
 # Donemler
 full_start = "2021-01-01"
@@ -90,7 +93,7 @@ def evaluate(name, daily_ret_full, daily_ret_oos):
     if c_oos > 100 and s_oos > 1.0:   tag = " *** HEDEF TUTTU ***"
     elif c_oos > 50 and s_oos > 0.5:  tag = " ** UMUT VERICI"
     elif c_oos > 0:                    tag = " * POZITIF"
-    print(f"   {name:<40} Full:%{c_full:>6.1f} Sh:{s_full:>5.2f} | OOS:%{c_oos:>7.1f} Sh:{s_oos:>5.2f} DD:%{dd_oos:>6.1f}{tag}")
+    logger.info(f"   {name:<40} Full:%{c_full:>6.1f} Sh:{s_full:>5.2f} | OOS:%{c_oos:>7.1f} Sh:{s_oos:>5.2f} DD:%{dd_oos:>6.1f}{tag}")
     results.append({"name":name,"full_cagr":c_full,"full_sh":s_full,"oos_cagr":c_oos,"oos_sh":s_oos,"oos_dd":dd_oos,
                     "daily_oos":daily_ret_oos})
     return c_oos, s_oos
@@ -98,7 +101,7 @@ def evaluate(name, daily_ret_full, daily_ret_oos):
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 1: BUY & HOLD EŞİT AĞIRLIK (referans)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S1: B&H Esit Agirlik ───")
+logger.info("\n─── S1: B&H Esit Agirlik ───")
 s1_full = rf.mean(axis=1)
 s1_oos  = ro.mean(axis=1)
 evaluate("B&H Esit Agirlik (Tum BIST)", s1_full, s1_oos)
@@ -106,7 +109,7 @@ evaluate("B&H Esit Agirlik (Tum BIST)", s1_full, s1_oos)
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 2: 12-1 MOMENTUM (klasik)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S2: 12-1 Momentum ───")
+logger.info("\n─── S2: 12-1 Momentum ───")
 def momentum_strategy(prices, returns, lookback=252, skip=21, top_n=10, rebal="ME"):
     monthly_idx = prices.resample(rebal).last().index
     port_rets = []
@@ -145,7 +148,7 @@ for top_n in [5, 10, 20]:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 3: 52 HAFTA YÜKSEĞİ KIRISI (Breakout)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S3: 52-Hafta Yuksegi Kirisi ───")
+logger.info("\n─── S3: 52-Hafta Yuksegi Kirisi ───")
 def breakout_strategy(prices, returns, window=252, top_n=10):
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
@@ -180,7 +183,7 @@ for top_n in [5, 10]:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 4: KISA DONEM MOMENTUM (1-3 ay)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S4: Kisa Donem Momentum ───")
+logger.info("\n─── S4: Kisa Donem Momentum ───")
 for lb in [21, 42, 63]:
     s = momentum_strategy(pf, rf, lookback=lb, skip=0, top_n=10)
     s_oos = momentum_strategy(po, ro, lookback=lb, skip=0, top_n=10)
@@ -190,7 +193,7 @@ for lb in [21, 42, 63]:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 5: VOLATILITE KIRISI (Vol Breakout)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S5: Volatilite Kirisi ───")
+logger.info("\n─── S5: Volatilite Kirisi ───")
 def vol_breakout(prices, returns, vol_window=20, mom_window=5, top_n=10):
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
@@ -222,7 +225,7 @@ if len(s) > 20 and len(s_oos) > 5:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 6: TREND FILTRELEMELI MOMENTUM
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S6: Trend Filtreli Momentum (200 SMA) ───")
+logger.info("\n─── S6: Trend Filtreli Momentum (200 SMA) ───")
 def trend_filtered_momentum(prices, returns, top_n=10, lb=126):
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
@@ -257,7 +260,7 @@ for top_n in [5, 10]:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 7: AYLIK GERI DONUS (Short-term Reversal)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S7: Aylik Geri Donus ───")
+logger.info("\n─── S7: Aylik Geri Donus ───")
 def reversal_strategy(prices, returns, lb=21, top_n=10):
     monthly_idx = prices.resample("ME").last().index
     port_rets = []
@@ -286,7 +289,7 @@ for lb in [21, 42]:
 # ════════════════════════════════════════════════════════════════════
 # STRATEJİ 8: KONSANTRE MOMENTUM (TOP 3)
 # ════════════════════════════════════════════════════════════════════
-print("\n─── S8: Konsantre Momentum (Top 3-5) ───")
+logger.info("\n─── S8: Konsantre Momentum (Top 3-5) ───")
 for top_n in [3, 5]:
     for lb in [63, 126, 252]:
         s = momentum_strategy(pf, rf, lookback=lb, skip=0, top_n=top_n)
@@ -297,36 +300,36 @@ for top_n in [3, 5]:
 # ════════════════════════════════════════════════════════════════════
 # SONUÇLAR
 # ════════════════════════════════════════════════════════════════════
-print("\n" + "="*70)
-print("NIHAI SONUCLAR - OOS CAGR sirasina gore")
-print("="*70)
+logger.info("\n" + "="*70)
+logger.info("NIHAI SONUCLAR - OOS CAGR sirasina gore")
+logger.info("="*70)
 results.sort(key=lambda x: x["oos_cagr"], reverse=True)
-print(f"\n{'Strateji':<42} {'OOS CAGR':>9} {'OOS Sh':>8} {'OOS DD':>8} {'Full':>8}")
-print("-"*78)
+logger.info(f"\n{'Strateji':<42} {'OOS CAGR':>9} {'OOS Sh':>8} {'OOS DD':>8} {'Full':>8}")
+logger.info("-"*78)
 for r in results[:20]:
     tag = "✓" if r["oos_cagr"] > 100 and r["oos_sh"] > 1.0 else ""
-    print(f"{r['name']:<42} {r['oos_cagr']:>8.1f}% {r['oos_sh']:>7.2f} {r['oos_dd']:>7.1f}% {r['full_cagr']:>7.1f}% {tag}")
+    logger.info(f"{r['name']:<42} {r['oos_cagr']:>8.1f}% {r['oos_sh']:>7.2f} {r['oos_dd']:>7.1f}% {r['full_cagr']:>7.1f}% {tag}")
 
 winners = [r for r in results if r["oos_cagr"] > 100 and r["oos_sh"] > 1.0]
 decent  = [r for r in results if r["oos_cagr"] > 50]
 above_bh = [r for r in results if r["oos_cagr"] > BH_CAGR]
 
-print(f"\n> %100 OOS + Sharpe>1.0: {len(winners)} strateji")
-print(f"> %50 OOS:               {len(decent)} strateji")
-print(f"> B&H (%{BH_CAGR}):          {len(above_bh)} strateji")
+logger.info(f"\n> %100 OOS + Sharpe>1.0: {len(winners)} strateji")
+logger.info(f"> %50 OOS:               {len(decent)} strateji")
+logger.info(f"> B&H (%{BH_CAGR}):          {len(above_bh)} strateji")
 if winners:
     best = winners[0]
-    print(f"\nEN IYI STRATEJI: {best['name']}")
-    print(f"  OOS CAGR: %{best['oos_cagr']:.1f} | Sharpe: {best['oos_sh']:.2f} | MaxDD: %{best['oos_dd']:.1f}")
-    print("  KARAR: PRODUCTION'A ALINABILIR -> FAZ 30")
+    logger.info(f"\nEN IYI STRATEJI: {best['name']}")
+    logger.info(f"  OOS CAGR: %{best['oos_cagr']:.1f} | Sharpe: {best['oos_sh']:.2f} | MaxDD: %{best['oos_dd']:.1f}")
+    logger.info("  KARAR: PRODUCTION'A ALINABILIR -> FAZ 30")
 elif above_bh:
     best = above_bh[0]
-    print(f"\nB&H'I GECEN: {best['name']}")
-    print(f"  OOS CAGR: %{best['oos_cagr']:.1f} | Hedef: %100")
-    print("  KARAR: OPTIMIZE ET")
+    logger.info(f"\nB&H'I GECEN: {best['name']}")
+    logger.info(f"  OOS CAGR: %{best['oos_cagr']:.1f} | Hedef: %100")
+    logger.info("  KARAR: OPTIMIZE ET")
 else:
-    print("\nHICBIR STRATEJI B&H'i GECEMEDI")
-    print(f"  B&H CAGR: %{BH_CAGR} | Hedef: %100")
-    print("  KARAR: Daha agresif parametreler / farkli veri seti dene")
-print("="*70)
+    logger.info("\nHICBIR STRATEJI B&H'i GECEMEDI")
+    logger.info(f"  B&H CAGR: %{BH_CAGR} | Hedef: %100")
+    logger.info("  KARAR: Daha agresif parametreler / farkli veri seti dene")
+logger.info("="*70)
 

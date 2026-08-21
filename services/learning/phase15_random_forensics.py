@@ -15,6 +15,9 @@ from services.learning.institutional_walkforward_engine import (
 
 class FastPortfolioEngine:
     """Optimized portfolio simulator using pre-calculated scores."""
+import structlog
+logger = structlog.get_logger()
+
     def __init__(self, features_by_ticker, xu100_close):
         self.features = features_by_ticker
         self.xu100 = xu100_close
@@ -96,7 +99,7 @@ class FastPortfolioEngine:
         return portfolio_equity_curve, trade_log
 
 def precalculate_ranker_scores(eval_dates, features_by_ticker):
-    print("⏳ Model Puanları (M1 Ranker) Ön Belleğe Alınıyor (Tüm simülasyonlar için kullanılacak)...")
+    logger.info("⏳ Model Puanları (M1 Ranker) Ön Belleğe Alınıyor (Tüm simülasyonlar için kullanılacak)...")
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
     cached_scores = {}
     rank_model = None
@@ -151,7 +154,7 @@ def calculate_metrics(eq_curve, trade_log):
     return {"cagr": cagr, "mdd": mdd, "pf": pf, "trades": len(trade_log), "trade_log": trade_log}
 
 if __name__ == "__main__":
-    print("🚀 FAZ 15: RANDOM FILTER FORENSICS & TRADE TIMING AUDIT")
+    logger.info("🚀 FAZ 15: RANDOM FILTER FORENSICS & TRADE TIMING AUDIT")
     stock_data, xu100_close = load_all_market_data()
     features_by_ticker = {tk: extract_point_in_time_features(df) for tk, df in stock_data.items() if len(df) >= 120}
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
@@ -161,18 +164,18 @@ if __name__ == "__main__":
     cached_scores = precalculate_ranker_scores(val_dates, features_by_ticker)
     engine = FastPortfolioEngine(features_by_ticker, xu100_close)
     
-    print("\n==================================================")
-    print("FAZ 15.6 — IMPLEMENTATION AUDIT")
-    print("==================================================")
-    print("Random decision timestamp : PASS (Evaluated ONCE per day, before stock loop)")
-    print("Signal timestamp          : PASS (Cached strictly without lookahead)")
-    print("Execution price           : PASS (Always uses features_by_ticker[t].loc[current_date]['close'])")
-    print("Stop execution            : PASS (Validated in engine loop)")
-    print("Daily return calculation  : PASS")
+    logger.info("\n==================================================")
+    logger.info("FAZ 15.6 — IMPLEMENTATION AUDIT")
+    logger.info("==================================================")
+    logger.info("Random decision timestamp : PASS (Evaluated ONCE per day, before stock loop)")
+    logger.info("Signal timestamp          : PASS (Cached strictly without lookahead)")
+    logger.info("Execution price           : PASS (Always uses features_by_ticker[t].loc[current_date]['close'])")
+    logger.info("Stop execution            : PASS (Validated in engine loop)")
+    logger.info("Daily return calculation  : PASS")
     
-    print("\n==================================================")
-    print("FAZ 15.1 & 15.2 — RANDOM FILTER REPLICATION (20 SEEDS)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 15.1 & 15.2 — RANDOM FILTER REPLICATION (20 SEEDS)")
+    logger.info("==================================================")
     results = []
     best_log = []
     best_cagr = -999.0
@@ -186,34 +189,34 @@ if __name__ == "__main__":
             best_log = m["trade_log"]
             
     res = np.array(results)
-    print(f"Test Edilen Seed Sayısı: 20")
-    print(f"Mean CAGR  : %{res.mean():.2f}")
-    print(f"Median CAGR: %{np.median(res):.2f}")
-    print(f"Min CAGR   : %{res.min():.2f}")
-    print(f"Max CAGR   : %{res.max():.2f} (Önceki +%43.90 tamamen bir şanstı!)")
-    print(f"Std Dev    : %{res.std():.2f}")
+    logger.info(f"Test Edilen Seed Sayısı: 20")
+    logger.info(f"Mean CAGR  : %{res.mean():.2f}")
+    logger.info(f"Median CAGR: %{np.median(res):.2f}")
+    logger.info(f"Min CAGR   : %{res.min():.2f}")
+    logger.info(f"Max CAGR   : %{res.max():.2f} (Önceki +%43.90 tamamen bir şanstı!)")
+    logger.info(f"Std Dev    : %{res.std():.2f}")
     
     prob_better = np.mean(res > -6.41) * 100 # -6.41 was M1 (Always On Ranker)
-    print(f"P(Random > M1 (Always ON)): %{prob_better:.1f}")
+    logger.info(f"P(Random > M1 (Always ON)): %{prob_better:.1f}")
 
-    print("\n==================================================")
-    print("FAZ 15.7 — TRADE CONTRIBUTION (ON THE BEST RANDOM SEED)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 15.7 — TRADE CONTRIBUTION (ON THE BEST RANDOM SEED)")
+    logger.info("==================================================")
     best_log.sort(key=lambda x: x["pnl"], reverse=True)
     total_gross = sum(t["pnl"] for t in best_log if t["pnl"] > 0)
     top1 = best_log[0]["pnl"] / total_gross * 100 if total_gross > 0 else 0
     top5 = sum(t["pnl"] for t in best_log[:5]) / total_gross * 100 if total_gross > 0 else 0
     top10 = sum(t["pnl"] for t in best_log[:10]) / total_gross * 100 if total_gross > 0 else 0
     
-    print(f"Top 1 Trade Contribution : %{top1:.1f}")
-    print(f"Top 5 Trade Contribution : %{top5:.1f}")
-    print(f"Top 10 Trade Contribution: %{top10:.1f}")
+    logger.info(f"Top 1 Trade Contribution : %{top1:.1f}")
+    logger.info(f"Top 5 Trade Contribution : %{top5:.1f}")
+    logger.info(f"Top 10 Trade Contribution: %{top10:.1f}")
     if top10 > 50.0:
-        print("-> Ciddi Yığılma (Concentration): Getirinin büyük kısmı sadece birkaç tesadüfi işleme bağlı.")
+        logger.info("-> Ciddi Yığılma (Concentration): Getirinin büyük kısmı sadece birkaç tesadüfi işleme bağlı.")
 
-    print("\n==================================================")
-    print("FAZ 15.8 — SHUFFLE / PLACEBO CONTROL (OVER 10 SEEDS)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 15.8 — SHUFFLE / PLACEBO CONTROL (OVER 10 SEEDS)")
+    logger.info("==================================================")
     cagr_m1_rand = []
     cagr_shuf = []
     cagr_pure = []
@@ -225,11 +228,11 @@ if __name__ == "__main__":
         cagr_shuf.append(calculate_metrics(eq2, [])["cagr"])
         cagr_pure.append(calculate_metrics(eq3, [])["cagr"])
         
-    print(f"Ranker + Random Filter          | Mean CAGR: %{np.mean(cagr_m1_rand):.2f}")
-    print(f"Shuffled Ranker + Random Filter | Mean CAGR: %{np.mean(cagr_shuf):.2f}")
-    print(f"Pure Random Stock + Random Filter| Mean CAGR: %{np.mean(cagr_pure):.2f}")
+    logger.info(f"Ranker + Random Filter          | Mean CAGR: %{np.mean(cagr_m1_rand):.2f}")
+    logger.info(f"Shuffled Ranker + Random Filter | Mean CAGR: %{np.mean(cagr_shuf):.2f}")
+    logger.info(f"Pure Random Stock + Random Filter| Mean CAGR: %{np.mean(cagr_pure):.2f}")
 
-    print("\n==================================================")
-    print("FAZ 15.10 — NİHAİ KARAR")
-    print("==================================================")
-    print("Karar: B) RANDOM EFFECT / TIMING ARTEFACT")
+    logger.info("\n==================================================")
+    logger.info("FAZ 15.10 — NİHAİ KARAR")
+    logger.info("==================================================")
+    logger.info("Karar: B) RANDOM EFFECT / TIMING ARTEFACT")

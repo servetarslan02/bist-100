@@ -17,6 +17,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_audit_simulation(eval_dates, features_by_ticker, xu100_close, trainer, initial_capital=10_000_000.0):
     portfolio_cash = initial_capital
@@ -200,7 +203,7 @@ def run_audit_simulation(eval_dates, features_by_ticker, xu100_close, trainer, i
     return pd.DataFrame(trade_history), pd.DataFrame(daily_stats)
 
 if __name__ == "__main__":
-    print("🔄 PHASE 1 & 2: Loading Data for Train/Validation Audit...")
+    logger.info("🔄 PHASE 1 & 2: Loading Data for Train/Validation Audit...")
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
         "roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20",
@@ -217,17 +220,17 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]  # Exact Train/Val period used before
 
     trainer = ModelTrainer(feature_cols)
-    print(f"🕵️ Running Deep Audit Simulation from {val_dates[0].date()} to {val_dates[-1].date()}...")
+    logger.info(f"🕵️ Running Deep Audit Simulation from {val_dates[0].date()} to {val_dates[-1].date()}...")
     
     trades_df, daily_df = run_audit_simulation(val_dates, features_by_ticker, xu100_close, trainer)
     
     # --- PHASE 2: AUDIT ANALYSIS ---
-    print("\n=========================================================")
-    print("PHASE 2: UPSIDE LOSS & BULL_TREND ROOT-CAUSE AUDIT")
-    print("=========================================================")
+    logger.info("\n=========================================================")
+    logger.info("PHASE 2: UPSIDE LOSS & BULL_TREND ROOT-CAUSE AUDIT")
+    logger.info("=========================================================")
     
     # 1. Trade Analysis by Regime
-    print("\n📊 1. TRADE PERFORMANCE BY REGIME (TRAIN/VAL)")
+    logger.info("\n📊 1. TRADE PERFORMANCE BY REGIME (TRAIN/VAL)")
     regime_perf = trades_df.groupby('entry_regime').agg(
         trades=('ticker', 'count'),
         win_rate=('pnl_pct', lambda x: (x > 0).mean() * 100),
@@ -236,44 +239,44 @@ if __name__ == "__main__":
         avg_mae=('mae_pct', 'mean'),  # Ne kadar terste kaldı?
         avg_days=('days_held', 'mean')
     ).round(2)
-    print(regime_perf.to_string())
+    logger.info(regime_perf.to_string())
 
     # 2. Deep Dive into BULL_TREND failures
     bull_trades = trades_df[trades_df['entry_regime'] == 'BULL_TREND']
-    print(f"\n🔍 2. BULL_TREND DEEP DIVE (Total Trades: {len(bull_trades)})")
+    logger.info(f"\n🔍 2. BULL_TREND DEEP DIVE (Total Trades: {len(bull_trades)})")
     if len(bull_trades) > 0:
         exit_reasons = bull_trades['exit_reason'].value_counts()
-        print("Exit Reasons in BULL_TREND:")
-        print(exit_reasons.to_string())
+        logger.info("Exit Reasons in BULL_TREND:")
+        logger.info(exit_reasons.to_string())
         
         # Did they ever have profit? (MFE analysis)
         had_profit = bull_trades[bull_trades['mfe_pct'] > 3.0]
-        print(f"Trades that went >+3% in profit before closing: {len(had_profit)} / {len(bull_trades)}")
+        logger.info(f"Trades that went >+3% in profit before closing: {len(had_profit)} / {len(bull_trades)}")
         if len(had_profit) > 0:
             avg_lost_profit = (had_profit['mfe_pct'] - had_profit['pnl_pct']).mean()
-            print(f"Average profit given back from peak: {avg_lost_profit:.2f}%")
+            logger.info(f"Average profit given back from peak: {avg_lost_profit:.2f}%")
 
     # 3. Missed Upside Days (XU100 > 1.5% but Portfolio < 0.5%)
     daily_df['strat_ret'] = daily_df['equity'].pct_change() * 100
     daily_df['xu_ret'] = daily_df['xu100'].pct_change() * 100
     
     missed_rallies = daily_df[(daily_df['xu_ret'] > 1.5) & (daily_df['strat_ret'] < 0.5)]
-    print(f"\n🚀 3. MISSED RALLIES AUDIT")
-    print(f"Days XU100 rallied >1.5%: {len(daily_df[daily_df['xu_ret'] > 1.5])}")
-    print(f"Days we missed it (Strat < 0.5%): {len(missed_rallies)}")
+    logger.info(f"\n🚀 3. MISSED RALLIES AUDIT")
+    logger.info(f"Days XU100 rallied >1.5%: {len(daily_df[daily_df['xu_ret'] > 1.5])}")
+    logger.info(f"Days we missed it (Strat < 0.5%): {len(missed_rallies)}")
     
     if len(missed_rallies) > 0:
         avg_cash_on_miss = missed_rallies['cash_ratio'].mean() * 100
-        print(f"Average Cash Ratio on missed days: {avg_cash_on_miss:.1f}%")
-        print("Regimes during missed rallies:")
-        print(missed_rallies['regime'].value_counts().to_string())
+        logger.info(f"Average Cash Ratio on missed days: {avg_cash_on_miss:.1f}%")
+        logger.info("Regimes during missed rallies:")
+        logger.info(missed_rallies['regime'].value_counts().to_string())
         
         # Neden nakitteydik? Sinyaller mi zayıftı, kısıtlamalar mı vurdu?
         missed_high_cash = missed_rallies[missed_rallies['cash_ratio'] > 0.4]
         avg_top_score = missed_high_cash['top_cand_score'].mean()
         avg_top_raw = missed_high_cash['top_cand_raw'].mean()
-        print(f"\nWhy were we in cash? (When cash > 40% on missed rally days)")
-        print(f"Average Top Smoothed Score: {avg_top_score:.3f} (Raw: {avg_top_raw:.3f})")
-        print(f"Note: Bulls need >0.08, Bears need >0.28 to enter.")
+        logger.info(f"\nWhy were we in cash? (When cash > 40% on missed rally days)")
+        logger.info(f"Average Top Smoothed Score: {avg_top_score:.3f} (Raw: {avg_top_raw:.3f})")
+        logger.info(f"Note: Bulls need >0.08, Bears need >0.28 to enter.")
 
-    print("\n📝 NEXT STEPS: Use this diagnostic to design Phase 3 Alternatives.")
+    logger.info("\n📝 NEXT STEPS: Use this diagnostic to design Phase 3 Alternatives.")

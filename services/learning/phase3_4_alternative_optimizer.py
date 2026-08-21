@@ -17,6 +17,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
 from services.learning.frozen_strategy_engine import MODELS, TOTAL_FRICTION
+import structlog
+logger = structlog.get_logger()
+
 
 BASE_PARAMS = {
     "max_pos": {"BULL_TREND": 4, "LOW_VOLATILITY": 4, "SIDEWAYS_RANGE": 2, "BEAR_MARKET": 2, "HIGH_VOLATILITY": 2},
@@ -192,7 +195,7 @@ def run_candidate(eval_dates, features_by_ticker, xu100_close, trainer, candidat
     return {"Return": ret, "MaxDD": max_dd, "WinRate": win_rate, "Trades": trades, "Costs": total_costs}
 
 if __name__ == "__main__":
-    print("🚀 PHASE 3: ALTERNATIVE STRATEGIES OPTIMIZER (TRAIN/VAL)")
+    logger.info("🚀 PHASE 3: ALTERNATIVE STRATEGIES OPTIMIZER (TRAIN/VAL)")
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
     features_by_ticker = {tk: extract_point_in_time_features(df) for tk, df in stock_data.items() if len(df) >= 120}
@@ -204,13 +207,13 @@ if __name__ == "__main__":
     
     results = {}
     for c in candidates:
-        print(f"🔄 Simulating {c}...")
+        logger.info(f"🔄 Simulating {c}...")
         res = run_candidate(val_dates, features_by_ticker, xu100_close, trainer, c)
         results[c] = res
-        print(f"   [{c}] Return: {res['Return']:+.2f}% | MaxDD: {res['MaxDD']:.2f}% | WR: {res['WinRate']:.1f}% | Trades: {res['Trades']}")
+        logger.info(f"   [{c}] Return: {res['Return']:+.2f}% | MaxDD: {res['MaxDD']:.2f}% | WR: {res['WinRate']:.1f}% | Trades: {res['Trades']}")
         
-    print("\n=========================================================")
-    print("PHASE 4: MULTI-OBJECTIVE SELECTION")
-    print("=========================================================")
+    logger.info("\n=========================================================")
+    logger.info("PHASE 4: MULTI-OBJECTIVE SELECTION")
+    logger.info("=========================================================")
     for c, r in results.items():
-        print(f"{c.ljust(22)} | Net: %{r['Return']:>6.2f} | Max DD: %{r['MaxDD']:>5.2f} | WinRate: %{r['WinRate']:>4.1f} | Trades: {r['Trades']}")
+        logger.info(f"{c.ljust(22)} | Net: %{r['Return']:>6.2f} | Max DD: %{r['MaxDD']:>5.2f} | WinRate: %{r['WinRate']:>4.1f} | Trades: {r['Trades']}")

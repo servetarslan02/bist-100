@@ -7,6 +7,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import load_all_market_data
+import structlog
+logger = structlog.get_logger()
+
 
 def calc_metrics(ret_series, exposure_series, name, tc_per_trade=0.002):
     # Apply TC
@@ -57,8 +60,8 @@ def calc_metrics(ret_series, exposure_series, name, tc_per_trade=0.002):
     }
 
 def run_phase_27():
-    print("🚀 FAZ 27: VOLATILITY REGIME PORTFOLIO INTEGRATION TEST")
-    print("Kurallar: Holdout Kilitli. ML Yok. Realistic TC/Slippage.\n")
+    logger.info("🚀 FAZ 27: VOLATILITY REGIME PORTFOLIO INTEGRATION TEST")
+    logger.info("Kurallar: Holdout Kilitli. ML Yok. Realistic TC/Slippage.\n")
     
     stock_data, xu100_close = load_all_market_data()
     
@@ -102,9 +105,9 @@ def run_phase_27():
     # Align and Filter Holdout
     df = df[df.index <= pd.Timestamp("2025-10-31")].dropna()
     
-    print("==================================================")
-    print("PERFORMANCE METRICS (Transaction Costs: 0.2% per flip)")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("PERFORMANCE METRICS (Transaction Costs: 0.2% per flip)")
+    logger.info("==================================================")
     
     # M4: Buy & Hold
     m4 = calc_metrics(df["ret_1d"], pd.Series(1, index=df.index), "M4: Buy & Hold BIST100", 0)
@@ -123,35 +126,35 @@ def run_phase_27():
     models = [m4, m1, m2, m3]
     for m in models:
         if m is None: continue
-        print(f"\n{m['Name']}")
-        print(f"  CAGR: %{m['CAGR']*100:6.1f} | TotRet: %{m['TotRet']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Sortino: {m['Sortino']:5.2f}")
-        print(f"  MaxDD: %{m['MaxDD']*100:6.1f} | WinRate: %{m['WinRate']*100:4.1f} | ProfitFactor: {m['ProfitFactor']:4.2f}")
-        print(f"  Exposure: %{m['Exposure']*100:4.1f} | Block Sharpes: {[round(x,2) for x in m['Blocks']]}")
+        logger.info(f"\n{m['Name']}")
+        logger.info(f"  CAGR: %{m['CAGR']*100:6.1f} | TotRet: %{m['TotRet']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Sortino: {m['Sortino']:5.2f}")
+        logger.info(f"  MaxDD: %{m['MaxDD']*100:6.1f} | WinRate: %{m['WinRate']*100:4.1f} | ProfitFactor: {m['ProfitFactor']:4.2f}")
+        logger.info(f"  Exposure: %{m['Exposure']*100:4.1f} | Block Sharpes: {[round(x,2) for x in m['Blocks']]}")
         
-    print("\n==================================================")
-    print("ROBUSTNESS & DOWNSIDE CAPTURE (M3 vs B&H)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("ROBUSTNESS & DOWNSIDE CAPTURE (M3 vs B&H)")
+    logger.info("==================================================")
     
     down_days = m4["Series"] < 0
     m3_down_cap = (m3["Series"][down_days].sum() / m4["Series"][down_days].sum()) * 100
-    print(f"M3 Downside Capture: %{m3_down_cap:.1f} of Market Losses")
-    print(f"Risk OFF (Cash) Süresi: %{(1 - m3['Exposure'])*100:.1f}")
+    logger.info(f"M3 Downside Capture: %{m3_down_cap:.1f} of Market Losses")
+    logger.info(f"Risk OFF (Cash) Süresi: %{(1 - m3['Exposure'])*100:.1f}")
     
     # Bootstrap CI for M3 Sharpe
     np.random.seed(42)
     s_ret = m3["Series"].values
     boot = [np.mean(np.random.choice(s_ret, size=len(s_ret), replace=True)) / np.std(np.random.choice(s_ret, size=len(s_ret), replace=True)) * np.sqrt(252) for _ in range(1000)]
-    print(f"M3 Sharpe 95% CI: [{np.percentile(boot, 2.5):.2f}, {np.percentile(boot, 97.5):.2f}]")
+    logger.info(f"M3 Sharpe 95% CI: [{np.percentile(boot, 2.5):.2f}, {np.percentile(boot, 97.5):.2f}]")
     
-    print("\nÖZEL TEST: Tek Bir Kriz Mi?")
+    logger.info("\nÖZEL TEST: Tek Bir Kriz Mi?")
     pos_blocks = sum(1 for x in m3['Blocks'] if x > 0)
     zero_blocks = sum(1 for x in m3['Blocks'] if x == 0)
-    print(f"{len(m3['Blocks'])} zaman bloğunun {pos_blocks}'i pozitif kâr, {zero_blocks}'i %100 nakit (korunma) olarak geçildi.")
+    logger.info(f"{len(m3['Blocks'])} zaman bloğunun {pos_blocks}'i pozitif kâr, {zero_blocks}'i %100 nakit (korunma) olarak geçildi.")
     
     if m3['CAGR'] > m4['CAGR'] and m3['MaxDD'] > m4['MaxDD'] and m3['Sharpe'] > 1.0:
-        print("\nFINAL DECISION: A) PRODUCTION READY")
+        logger.info("\nFINAL DECISION: A) PRODUCTION READY")
     else:
-        print("\nFINAL DECISION: C) REJECT")
+        logger.info("\nFINAL DECISION: C) REJECT")
 
 if __name__ == "__main__":
     run_phase_27()

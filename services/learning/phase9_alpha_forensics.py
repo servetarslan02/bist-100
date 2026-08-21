@@ -15,6 +15,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_forensics(eval_dates, features_by_ticker, stock_data, xu100_close, trainer):
     daily_records = []
@@ -62,9 +65,9 @@ def run_forensics(eval_dates, features_by_ticker, stock_data, xu100_close, train
     return df, feature_cols
 
 def analyze_forensics(df, feature_cols):
-    print("\n" + "="*50)
-    print("2. BULL vs NON-BULL FEATURE IC")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("2. BULL vs NON-BULL FEATURE IC")
+    logger.info("="*50)
     
     def calc_ic(grp, col):
         # Calculate daily IC then average
@@ -85,11 +88,11 @@ def analyze_forensics(df, feature_cols):
     for index, row in df_ic.iterrows():
         alert = " ⚠️ TERSINE DONUS" if ((row['Bull'] < -0.02 and row['Overall'] > 0) or (row['Overall'] < 0 and row['Bull'] > 0.02)) else ""
         if row['Feature'] == 'score': alert = " 🎯 MODEL SCORE"
-        print(f"{row['Feature']:<16} | Overall: {row['Overall']:>6.3f} | Bull: {row['Bull']:>6.3f} | Bear: {row['Bear']:>6.3f} | Side: {row['Sideways']:>6.3f}{alert}")
+        logger.info(f"{row['Feature']:<16} | Overall: {row['Overall']:>6.3f} | Bull: {row['Bull']:>6.3f} | Bear: {row['Bear']:>6.3f} | Side: {row['Sideways']:>6.3f}{alert}")
 
-    print("\n" + "="*50)
-    print("3. SCORE CALIBRATION / MONOTONICITY (IN BULL_TREND)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("3. SCORE CALIBRATION / MONOTONICITY (IN BULL_TREND)")
+    logger.info("="*50)
     bull_df = df[df['regime'] == 'BULL_TREND'].copy()
     if not bull_df.empty:
         bull_df['decile'] = pd.qcut(bull_df['score'], 10, labels=False, duplicates='drop')
@@ -99,48 +102,48 @@ def analyze_forensics(df, feature_cols):
             Min_Score=('score', 'min'),
             Max_Score=('score', 'max')
         ).sort_index()
-        print(decile_res)
+        logger.info(decile_res)
         
         # Check monotonicity
         corr, _ = spearmanr(decile_res.index, decile_res['Mean_Fwd5d'])
-        print(f"\nBull Trend Decile Monotonicity (Spearman Rank): {corr:.2f}")
+        logger.info(f"\nBull Trend Decile Monotonicity (Spearman Rank): {corr:.2f}")
         if corr < -0.5:
-            print("Teşhis: INVERSE MONOTONIC (Açıkça ters çalışıyor)")
+            logger.info("Teşhis: INVERSE MONOTONIC (Açıkça ters çalışıyor)")
         elif corr > 0.5:
-            print("Teşhis: MONOTONIC (Doğru çalışıyor)")
+            logger.info("Teşhis: MONOTONIC (Doğru çalışıyor)")
         else:
-            print("Teşhis: NON-MONOTONIC (Gürültülü/Rastgele)")
+            logger.info("Teşhis: NON-MONOTONIC (Gürültülü/Rastgele)")
 
-    print("\n" + "="*50)
-    print("4. OVEREXTENSION HİPOTEZİ TESTİ")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("4. OVEREXTENSION HİPOTEZİ TESTİ")
+    logger.info("="*50)
     if not bull_df.empty:
         high_score = bull_df[bull_df['score'] > 0.25]
         optimal_score = bull_df[(bull_df['score'] >= 0.10) & (bull_df['score'] <= 0.15)]
         
-        print("Feature Averages in BULL_TREND:")
-        print(f"{'Metric':<20} | {'Score > 0.25 (Toxic)':<20} | {'Score 0.10-0.15 (Optimal)':<20}")
-        print("-" * 65)
+        logger.info("Feature Averages in BULL_TREND:")
+        logger.info(f"{'Metric':<20} | {'Score > 0.25 (Toxic)':<20} | {'Score 0.10-0.15 (Optimal)':<20}")
+        logger.info("-" * 65)
         for f in ['price_vs_sma20', 'roc_20d', 'volume_zscore', 'fwd_5d']:
             val_high = high_score[f].mean() if not high_score.empty else 0
             val_opt = optimal_score[f].mean() if not optimal_score.empty else 0
             if f == 'fwd_5d':
-                print(f"{f:<20} | {val_high*100:>19.2f}% | {val_opt*100:>19.2f}%")
+                logger.info(f"{f:<20} | {val_high*100:>19.2f}% | {val_opt*100:>19.2f}%")
             else:
-                print(f"{f:<20} | {val_high:>20.4f} | {val_opt:>20.4f}")
+                logger.info(f"{f:<20} | {val_high:>20.4f} | {val_opt:>20.4f}")
 
-    print("\n" + "="*50)
-    print("5. TERSİNE DÖNÜŞ TESTİ (AYLIK/YAPISAL KONTROL)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("5. TERSİNE DÖNÜŞ TESTİ (AYLIK/YAPISAL KONTROL)")
+    logger.info("="*50)
     if not bull_df.empty:
         bull_df['month'] = bull_df['date'].dt.to_period('M')
         monthly_ic = bull_df.groupby('month').apply(lambda x: spearmanr(x['score'], x['fwd_5d'])[0] if len(x)>20 else np.nan)
-        print("BULL_TREND Monthly IC (Score vs Fwd5d):")
-        print(monthly_ic.dropna().apply(lambda x: f"{x:.3f}"))
+        logger.info("BULL_TREND Monthly IC (Score vs Fwd5d):")
+        logger.info(monthly_ic.dropna().apply(lambda x: f"{x:.3f}"))
         if (monthly_ic < 0).mean() > 0.7:
-            print("Teşhis: YAPISAL PROBLEM (Tüm boğa aylarında kronik negatif)")
+            logger.info("Teşhis: YAPISAL PROBLEM (Tüm boğa aylarında kronik negatif)")
         else:
-            print("Teşhis: DÖNEMSEL PROBLEM (Sadece belirli aylarda negatif)")
+            logger.info("Teşhis: DÖNEMSEL PROBLEM (Sadece belirli aylarda negatif)")
 
 if __name__ == "__main__":
     stock_data, xu100_close = load_all_market_data()
@@ -150,22 +153,22 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print("🚀 PHASE 9: ALPHA MODEL FORENSICS")
+    logger.info("🚀 PHASE 9: ALPHA MODEL FORENSICS")
     
     df_records, f_cols = run_forensics(val_dates, features_by_ticker, stock_data, xu100_close, trainer)
     analyze_forensics(df_records, f_cols)
     
-    print("\n" + "="*50)
-    print("6. MODEL TYPE / LABEL AUDIT")
-    print("="*50)
-    print("Label            : 'target_5d_ret' (Forward 5-day return)")
-    print("Model Objective  : Regression (XGBRegressor, LGBMRegressor, etc.)")
-    print("Output           : Raw predicted 5-day return (Not a probability!)")
-    print("Interpretation   : Score 0.30 means the model literally predicts +30% return in 5 days. It is NOT a confidence probability.")
+    logger.info("\n" + "="*50)
+    logger.info("6. MODEL TYPE / LABEL AUDIT")
+    logger.info("="*50)
+    logger.info("Label            : 'target_5d_ret' (Forward 5-day return)")
+    logger.info("Model Objective  : Regression (XGBRegressor, LGBMRegressor, etc.)")
+    logger.info("Output           : Raw predicted 5-day return (Not a probability!)")
+    logger.info("Interpretation   : Score 0.30 means the model literally predicts +30% return in 5 days. It is NOT a confidence probability.")
     
-    print("\n" + "="*50)
-    print("10. LEAKAGE AUDIT")
-    print("="*50)
-    print("Training Cutoff  : T-7 days (Strict isolation verified in V3)")
-    print("Features         : Point-in-time calculation (Verified)")
-    print("Leakage Status   : CLEAN (No future data leaked into predictions)")
+    logger.info("\n" + "="*50)
+    logger.info("10. LEAKAGE AUDIT")
+    logger.info("="*50)
+    logger.info("Training Cutoff  : T-7 days (Strict isolation verified in V3)")
+    logger.info("Features         : Point-in-time calculation (Verified)")
+    logger.info("Leakage Status   : CLEAN (No future data leaked into predictions)")

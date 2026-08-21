@@ -10,6 +10,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -45,20 +48,20 @@ def get_resid(y, x):
     return y - b * x
 
 def run_phase_22():
-    print("🚀 FAZ 22: PRODUCTION-GRADE ALPHA MODEL REBUILD")
-    print("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Walk-Forward Audit.\n")
+    logger.info("🚀 FAZ 22: PRODUCTION-GRADE ALPHA MODEL REBUILD")
+    logger.info("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Walk-Forward Audit.\n")
     
     stock_data, xu100_close = load_all_market_data()
     features_by_ticker = {tk: extract_forensic_features(df) for tk, df in stock_data.items() if len(df) >= 120}
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print(f"1-5. ZORUNLU AUDIT (Leakage & Integrity):")
+    logger.info(f"1-5. ZORUNLU AUDIT (Leakage & Integrity):")
     # Verify no lookahead: features at T use close up to T. target uses close T to T+5.
-    print("[OK] Point-in-time feature integrity (rolling metrics only use past data).")
-    print("[OK] No-lookahead (features correctly aligned).")
-    print("[OK] Group/Date integrity (Cross-sectional prediction guarantees date independence).")
-    print("[OK] Label correctness (Future return properly mapped).")
+    logger.info("[OK] Point-in-time feature integrity (rolling metrics only use past data).")
+    logger.info("[OK] No-lookahead (features correctly aligned).")
+    logger.info("[OK] Group/Date integrity (Cross-sectional prediction guarantees date independence).")
+    logger.info("[OK] Label correctness (Future return properly mapped).")
     
     # Compile dataset
     records = []
@@ -84,7 +87,7 @@ def run_phase_22():
     # 7. Incremental IC for candidate features
     candidates = ["price_vs_sma20", "price_vs_sma50", "bb_position", "volume_zscore"]
     selected_features = ["volatility_20d"]
-    print("\n7. FEATURE SELECTION (Partial IC vs volatility_20d):")
+    logger.info("\n7. FEATURE SELECTION (Partial IC vs volatility_20d):")
     for f in candidates:
         # Cross-sectional residual correlation across all days
         p_ic_list = []
@@ -95,12 +98,12 @@ def run_phase_22():
                 p_ic_list.append(pearsonr(res_f, res_y)[0])
         avg_p_ic = np.nanmean(p_ic_list)
         status = "KEEP" if abs(avg_p_ic) > 0.015 else "REMOVE"
-        print(f" - {f:15} | Partial IC: {avg_p_ic:7.4f} -> {status}")
+        logger.info(f" - {f:15} | Partial IC: {avg_p_ic:7.4f} -> {status}")
         if status == "KEEP": selected_features.append(f)
         
-    print(f"\nFeature Contract: {selected_features}")
+    logger.info(f"\nFeature Contract: {selected_features}")
     
-    print("\n[OK] Embargo/Purge (Walk-Forward Train/Test between folds incorporates a 10-day gap to prevent label overlap leakage).")
+    logger.info("\n[OK] Embargo/Purge (Walk-Forward Train/Test between folds incorporates a 10-day gap to prevent label overlap leakage).")
     
     # Walk-Forward OOS Predictions
     unique_dates = sorted(df_all["date"].unique())
@@ -146,7 +149,7 @@ def run_phase_22():
         df_all.loc[test_mask, "oos_score"] = ranker.predict(X_test)
         
     res_df = df_all.dropna(subset=["oos_score"])
-    print(f"\nOOS Evaluation Sample: {len(res_df)} rows over {res_df['date'].nunique()} days")
+    logger.info(f"\nOOS Evaluation Sample: {len(res_df)} rows over {res_df['date'].nunique()} days")
     
     # Audits on OOS
     # 8. Rank IC
@@ -177,45 +180,45 @@ def run_phase_22():
         
     res_metrics = pd.DataFrame(metrics).fillna(0)
     
-    print("\n8. RANK IC (Model vs Pure Volatility Benchmark)")
-    print(f"LGBMRanker IC : {res_metrics['ic_mod'].mean():7.4f}")
-    print(f"Pure Vol IC   : {res_metrics['ic_vol'].mean():7.4f}")
+    logger.info("\n8. RANK IC (Model vs Pure Volatility Benchmark)")
+    logger.info(f"LGBMRanker IC : {res_metrics['ic_mod'].mean():7.4f}")
+    logger.info(f"Pure Vol IC   : {res_metrics['ic_vol'].mean():7.4f}")
     
-    print("\n9 & 10. TOP-K SPREAD & MONOTONICITY (Model Quintiles)")
-    print(f"Q1 (Bot) : %{res_metrics.get('Q1', pd.Series([0])).mean():.3f}")
-    print(f"Q2       : %{res_metrics.get('Q2', pd.Series([0])).mean():.3f}")
-    print(f"Q3       : %{res_metrics.get('Q3', pd.Series([0])).mean():.3f}")
-    print(f"Q4       : %{res_metrics.get('Q4', pd.Series([0])).mean():.3f}")
-    print(f"Q5 (Top) : %{res_metrics.get('Q5', pd.Series([0])).mean():.3f}")
-    print(f"Spread   : %{res_metrics['spread'].mean():.3f}")
+    logger.info("\n9 & 10. TOP-K SPREAD & MONOTONICITY (Model Quintiles)")
+    logger.info(f"Q1 (Bot) : %{res_metrics.get('Q1', pd.Series([0])).mean():.3f}")
+    logger.info(f"Q2       : %{res_metrics.get('Q2', pd.Series([0])).mean():.3f}")
+    logger.info(f"Q3       : %{res_metrics.get('Q3', pd.Series([0])).mean():.3f}")
+    logger.info(f"Q4       : %{res_metrics.get('Q4', pd.Series([0])).mean():.3f}")
+    logger.info(f"Q5 (Top) : %{res_metrics.get('Q5', pd.Series([0])).mean():.3f}")
+    logger.info(f"Spread   : %{res_metrics['spread'].mean():.3f}")
     
-    print("\n11 & 12. NULL TEST & BOOTSTRAP CI")
+    logger.info("\n11 & 12. NULL TEST & BOOTSTRAP CI")
     spreads = res_metrics['spread'].values
     np.random.seed(42)
     boot_means = [np.mean(np.random.choice(spreads, size=len(spreads), replace=True)) for _ in range(1000)]
-    print(f"Actual Model Spread : %{np.mean(spreads):.3f}")
-    print(f"Null Shuffled Spread: %0.000 (By definition, random Q5-Q1 = 0)")
-    print(f"95% CI              : [%{np.percentile(boot_means, 2.5):.3f}, %{np.percentile(boot_means, 97.5):.3f}]")
+    logger.info(f"Actual Model Spread : %{np.mean(spreads):.3f}")
+    logger.info(f"Null Shuffled Spread: %0.000 (By definition, random Q5-Q1 = 0)")
+    logger.info(f"95% CI              : [%{np.percentile(boot_means, 2.5):.3f}, %{np.percentile(boot_means, 97.5):.3f}]")
     
-    print("\n14. TIME-BLOCK STABILITY")
+    logger.info("\n14. TIME-BLOCK STABILITY")
     blocks = np.array_split(res_metrics, 5)
     for i, b in enumerate(blocks):
-        print(f"Block {i+1} | Mean IC: {b['ic_mod'].mean():7.4f} | Spread: %{b['spread'].mean():6.3f}")
+        logger.info(f"Block {i+1} | Mean IC: {b['ic_mod'].mean():7.4f} | Spread: %{b['spread'].mean():6.3f}")
         
-    print("\n16. BEST-DAYS CONCENTRATION")
+    logger.info("\n16. BEST-DAYS CONCENTRATION")
     sorted_spr = np.sort(spreads)[::-1]
     n = len(sorted_spr)
-    print(f"Tüm Günler       : %{sorted_spr.mean():.3f}")
-    print(f"En İyi %5 Çıkar  : %{sorted_spr[int(n*0.05):].mean():.3f}")
-    print(f"En İyi %20 Çıkar : %{sorted_spr[int(n*0.20):].mean():.3f}")
+    logger.info(f"Tüm Günler       : %{sorted_spr.mean():.3f}")
+    logger.info(f"En İyi %5 Çıkar  : %{sorted_spr[int(n*0.05):].mean():.3f}")
+    logger.info(f"En İyi %20 Çıkar : %{sorted_spr[int(n*0.20):].mean():.3f}")
     
-    print("\n==================================================")
+    logger.info("\n==================================================")
     if res_metrics['ic_mod'].mean() > res_metrics['ic_vol'].mean() and np.percentile(boot_means, 2.5) > 0:
-        print("FINAL DECISION: ACCEPT")
-        print("Yeni model, saf Volatility benchmark'ından daha fazla bilgi taşıyor ve %95 CI pozitif. Production entegrasyonu için ONAYLANDI.")
+        logger.info("FINAL DECISION: ACCEPT")
+        logger.info("Yeni model, saf Volatility benchmark'ından daha fazla bilgi taşıyor ve %95 CI pozitif. Production entegrasyonu için ONAYLANDI.")
     else:
-        print("FINAL DECISION: REJECT")
-        print("Yeni LambdaRank modeli saf Volatilite'yi yenemedi veya stabil değil. Fazladan ML katmanı değer yaratmıyor. Sadece 'volatility_20d' thresholding kullanılmalıdır.")
+        logger.info("FINAL DECISION: REJECT")
+        logger.info("Yeni LambdaRank modeli saf Volatilite'yi yenemedi veya stabil değil. Fazladan ML katmanı değer yaratmıyor. Sadece 'volatility_20d' thresholding kullanılmalıdır.")
 
 if __name__ == "__main__":
     run_phase_22()

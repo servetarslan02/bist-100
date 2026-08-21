@@ -17,6 +17,9 @@ from services.learning.institutional_walkforward_engine import (
     detect_market_regime
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 # =====================================================================
 # M0: OLD TRAINER (REGRESSOR)
@@ -297,7 +300,7 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close):
     return portfolio_equity_curve, total_trades_count, gross_profits, gross_losses
 
 if __name__ == "__main__":
-    print("🚀 FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION")
+    logger.info("🚀 FAZ 13: PRODUCTION INTEGRATION + WALK-FORWARD VALIDATION")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", 
@@ -311,24 +314,24 @@ if __name__ == "__main__":
     # Val_dates 120'den başlayıp en fazla 2025-10-31'e kadar gidebilir.
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print("==================================================")
-    print("FAZ 13.7 — PRODUCTION SAFETY AUDIT")
-    print("==================================================")
-    print("No lookahead        : PASS (Embargo gap enforced at T-7)")
-    print("Correct group/date  : PASS (LambdaRank date groupby strictly validated)")
-    print("Score bounds [-1,1] : PASS (Percentile adapter applied)")
-    print("Final Holdout Lock  : PASS (Max validation date is 2025-10-31. Strict Isolation!)")
+    logger.info("==================================================")
+    logger.info("FAZ 13.7 — PRODUCTION SAFETY AUDIT")
+    logger.info("==================================================")
+    logger.info("No lookahead        : PASS (Embargo gap enforced at T-7)")
+    logger.info("Correct group/date  : PASS (LambdaRank date groupby strictly validated)")
+    logger.info("Score bounds [-1,1] : PASS (Percentile adapter applied)")
+    logger.info("Final Holdout Lock  : PASS (Max validation date is 2025-10-31. Strict Isolation!)")
 
-    print("\n==================================================")
-    print("GERÇEK WALK-FORWARD SİMÜLASYONU (M0 vs M1)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("GERÇEK WALK-FORWARD SİMÜLASYONU (M0 vs M1)")
+    logger.info("==================================================")
     
     trainer_m0 = ModelTrainerM0(feature_cols)
-    print("Koşuluyor: M0 = V3 Baseline (Regression + Raw Return)...")
+    logger.info("Koşuluyor: M0 = V3 Baseline (Regression + Raw Return)...")
     eq_m0, tr_m0, gp_m0, gl_m0 = run_simulation(trainer_m0, val_dates, features_by_ticker, xu100_close)
     
     trainer_m1 = ModelTrainerM1(feature_cols)
-    print("Koşuluyor: M1 = V3 Rebuild (LambdaRank + Rank Label)...")
+    logger.info("Koşuluyor: M1 = V3 Rebuild (LambdaRank + Rank Label)...")
     eq_m1, tr_m1, gp_m1, gl_m1 = run_simulation(trainer_m1, val_dates, features_by_ticker, xu100_close)
 
     def print_metrics(name, eq_curve, trades, gp, gl):
@@ -340,21 +343,21 @@ if __name__ == "__main__":
         mdd = abs(((s - cummax) / cummax).min()) * 100.0
         pf = (gp / gl) if gl > 0 else 99.0
         
-        print(f"\n{name} SONUÇLARI:")
-        print(f"Bitiş Sermayesi : ₺{final:,.2f}")
-        print(f"Net CAGR        : %{cagr:.2f}")
-        print(f"Max Drawdown    : %{mdd:.2f}")
-        print(f"Profit Factor   : {pf:.2f}")
-        print(f"Toplam İşlem    : {trades}")
+        logger.info(f"\n{name} SONUÇLARI:")
+        logger.info(f"Bitiş Sermayesi : ₺{final:,.2f}")
+        logger.info(f"Net CAGR        : %{cagr:.2f}")
+        logger.info(f"Max Drawdown    : %{mdd:.2f}")
+        logger.info(f"Profit Factor   : {pf:.2f}")
+        logger.info(f"Toplam İşlem    : {trades}")
         
     print_metrics("M0 (ESKİ MODEL - REGRESSION)", eq_m0, tr_m0, gp_m0, gl_m0)
     print_metrics("M1 (YENİ MODEL - RANKER)", eq_m1, tr_m1, gp_m1, gl_m1)
     
-    print("\n==================================================")
-    print("FAZ 13.8 — KARAR KURALI DEĞERLENDİRMESİ")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 13.8 — KARAR KURALI DEĞERLENDİRMESİ")
+    logger.info("==================================================")
     if eq_m1[-1] > eq_m0[-1] and (gp_m1/gl_m1) > (gp_m0/gl_m0):
-        print("Karar: A) PRODUCTION CANDIDATE")
-        print("Ranker mimarisi, hiçbir portföy/kural değişikliği yapılmaksızın yalnızca Alpha sinyal kalitesiyle V3 Baseline'ı yenmiştir.")
+        logger.info("Karar: A) PRODUCTION CANDIDATE")
+        logger.info("Ranker mimarisi, hiçbir portföy/kural değişikliği yapılmaksızın yalnızca Alpha sinyal kalitesiyle V3 Baseline'ı yenmiştir.")
     else:
-        print("Karar: C) REJECT (M0'ı net şekilde yenemedi)")
+        logger.info("Karar: C) REJECT (M0'ı net şekilde yenemedi)")

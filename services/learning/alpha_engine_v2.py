@@ -1,4 +1,7 @@
 ﻿"""
+import structlog
+logger = structlog.get_logger()
+
 ALPHA ENGINE v2 (Vectorized Ultra-Fast)
 =======================================
 BIST Gercekleri:
@@ -15,10 +18,10 @@ warnings.filterwarnings("ignore")
 
 HOLDOUT = "2025-10-31"
 
-print("="*75)
-print("ALPHA ENGINE v2 — BIST PROFESYONEL SISTEM TARAMASI (Vectorized)")
-print(f"Veri Araligi: 2020 -> {HOLDOUT}")
-print("="*75)
+logger.info("="*75)
+logger.info("ALPHA ENGINE v2 — BIST PROFESYONEL SISTEM TARAMASI (Vectorized)")
+logger.info(f"Veri Araligi: 2020 -> {HOLDOUT}")
+logger.info("="*75)
 
 import yfinance as yf
 
@@ -33,7 +36,7 @@ TICKERS = [
 ]
 TICKERS = list(dict.fromkeys(TICKERS))
 
-print(f"\n[1/4] {len(TICKERS)} hisse yukleniyor...")
+logger.info(f"\n[1/4] {len(TICKERS)} hisse yukleniyor...")
 t0 = time.time()
 raw = yf.download(
     [f"{t}.IS" for t in TICKERS],
@@ -64,7 +67,7 @@ low = low[valid]
 volume = volume[valid]
 returns = close.pct_change().fillna(0)
 
-print(f"   ✓ {len(valid)} hisse hazir ({time.time()-t0:.1f}s)")
+logger.info(f"   ✓ {len(valid)} hisse hazir ({time.time()-t0:.1f}s)")
 
 # Faiz / Repo orani
 rf_series = pd.Series(0.0, index=close.index)
@@ -221,7 +224,7 @@ def metrics(s):
     dd = (cum / cum.cummax() - 1).min() * 100
     return round(cagr, 1), round(sharpe, 2), round(dd, 1)
 
-print("\n[2/4] Sistemler simule ediliyor...")
+logger.info("\n[2/4] Sistemler simule ediliyor...")
 bh = returns.mean(axis=1).iloc[200:]
 
 s1_top3 = sim_dual_momentum(top_n=3, mom_type="126")
@@ -248,22 +251,22 @@ models = {
     "9. SUPER ENSEMBLE (Mom3+Break+Swing)": ens_super,
 }
 
-print("\n[3/4] GENEL PERFORMANS (2020 - 2025 Full Period)")
-print(f"{'Sistem':<40} {'CAGR':>8} {'Sharpe':>8} {'MaxDD':>9}")
-print("-" * 67)
+logger.info("\n[3/4] GENEL PERFORMANS (2020 - 2025 Full Period)")
+logger.info(f"{'Sistem':<40} {'CAGR':>8} {'Sharpe':>8} {'MaxDD':>9}")
+logger.info("-" * 67)
 
 for name, s in models.items():
     c, sh, dd = metrics(s)
     tag = " ★★★" if c >= 100 else (" ★★" if c >= 70 else "")
-    print(f"{name:<40} %{c:>7.1f} {sh:>8.2f} %{dd:>8.1f}{tag}")
+    logger.info(f"{name:<40} %{c:>7.1f} {sh:>8.2f} %{dd:>8.1f}{tag}")
 
 # ═════════════════════════════════════════════════════════════════════════
 # YIL YIL KARSILASTIRMA (WALK-FORWARD)
 # ═════════════════════════════════════════════════════════════════════════
-print("\n[4/4] YIL YIL WALK-FORWARD PERFORMANSI (% Getiri)")
+logger.info("\n[4/4] YIL YIL WALK-FORWARD PERFORMANSI (% Getiri)")
 header = f"{'Yil':<6}" + "".join([f"{name[:12]:>14}" for name in ["B&H", "DualMom-3", "DualMom-5", "Breakout", "RSI-Swing", "SUPER-ENS"]])
-print(header)
-print("-" * len(header))
+logger.info(header)
+logger.info("-" * len(header))
 
 years = [2021, 2022, 2023, 2024, 2025]
 for yr in years:
@@ -279,27 +282,27 @@ for yr in years:
             row += f"%{ret:>13.1f}"
         else:
             row += f"{'N/A':>14}"
-    print(row)
+    logger.info(row)
 
 # 2025 OOS Rakamlari
-print("\n" + "="*75)
-print("OOS (2025 YILI) SONUCLARI:")
+logger.info("\n" + "="*75)
+logger.info("OOS (2025 YILI) SONUCLARI:")
 for name in ["2. Dual Momentum Top 3 + PPF", "3. Dual Momentum Top 5 + PPF", "6. Donchian 20d Breakout + Hacim", "9. SUPER ENSEMBLE (Mom3+Break+Swing)"]:
     s_2025 = models[name].loc["2025-01-01":HOLDOUT]
     c_2025 = ((1 + s_2025).cumprod().iloc[-1] - 1) * 100
-    print(f"  {name:<38} 2025 OOS Getiri: %{c_2025:.1f}")
+    logger.info(f"  {name:<38} 2025 OOS Getiri: %{c_2025:.1f}")
 
 # Simdiki Portfoy Onerisi
 latest_dt = close.index[-1]
-print(f"\nCANLI SINYALLER (En son veri tarihi: {latest_dt.date()}):")
+logger.info(f"\nCANLI SINYALLER (En son veri tarihi: {latest_dt.date()}):")
 scores_latest = (mom126.loc[latest_dt] / (vol20.loc[latest_dt] + 1e-6)).dropna()
 scores_latest = scores_latest[close.loc[latest_dt] > sma50.loc[latest_dt]]
 top_now = scores_latest.nlargest(5)
-print(f"Piyasa Trendi: {'BULL (Pozitif)' if market_trend.loc[latest_dt] else 'BEAR / CAUTION (Temkinli)'}")
-print(f"Piyasa Genisligi: %{market_breadth.loc[latest_dt]*100:.1f} hisse 50-SMA uzerinde")
-print("Top 5 Lider Hisse:")
+logger.info(f"Piyasa Trendi: {'BULL (Pozitif)' if market_trend.loc[latest_dt] else 'BEAR / CAUTION (Temkinli)'}")
+logger.info(f"Piyasa Genisligi: %{market_breadth.loc[latest_dt]*100:.1f} hisse 50-SMA uzerinde")
+logger.info("Top 5 Lider Hisse:")
 for rank, (sym, sc) in enumerate(top_now.items(), 1):
     p = close.loc[latest_dt, sym]
     r_6m = mom126.loc[latest_dt, sym] * 100
-    print(f"  {rank}. {sym:<8} Fiyat: ₺{p:<8.2f} (6-Aylik Getiri: +%{r_6m:.1f}, Risk-Ayarlı Skor: {sc:.2f})")
-print("="*75)
+    logger.info(f"  {rank}. {sym:<8} Fiyat: ₺{p:<8.2f} (6-Aylik Getiri: +%{r_6m:.1f}, Risk-Ayarlı Skor: {sc:.2f})")
+logger.info("="*75)

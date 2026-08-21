@@ -17,6 +17,9 @@ from catboost import CatBoostClassifier
 import xgboost as xgb
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data,
     extract_point_in_time_features,
     ModelTrainer,
@@ -24,11 +27,11 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_train_val_research():
-    print("=================================================================")
-    print("ALPHA BIST — PHASE 1 & 2: TRAIN/VALIDATION RESEARCH ENGINE")
-    print("=================================================================")
-    print("🔒 GÜVENLİK: Final Holdout (2025-10-30 sonrası) KESİNLİKLE KARANTİNADA.")
-    print("📊 VERİ ARALIĞI: 2024-09-19 - 2025-10-30 (Train + Validation)\n")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — PHASE 1 & 2: TRAIN/VALIDATION RESEARCH ENGINE")
+    logger.info("=================================================================")
+    logger.info("🔒 GÜVENLİK: Final Holdout (2025-10-30 sonrası) KESİNLİKLE KARANTİNADA.")
+    logger.info("📊 VERİ ARALIĞI: 2024-09-19 - 2025-10-30 (Train + Validation)\n")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -50,14 +53,14 @@ def run_train_val_research():
     split_val_idx = 280
     research_dates = common_dates[split_train_idx:split_val_idx]
 
-    print(f"Araştırma Aralığı: {research_dates[0].strftime('%Y-%m-%d')} - {research_dates[-1].strftime('%Y-%m-%d')} ({len(research_dates)} işlem günü)")
-    print(f"Hisse Sayısı: {len(features_by_ticker)} hisse\n")
+    logger.info(f"Araştırma Aralığı: {research_dates[0].strftime('%Y-%m-%d')} - {research_dates[-1].strftime('%Y-%m-%d')} ({len(research_dates)} işlem günü)")
+    logger.info(f"Hisse Sayısı: {len(features_by_ticker)} hisse\n")
 
     # 1. Validation Döneminde XU100 ve Hisselerin Performansı
     start_xu = float(xu100_close.loc[research_dates[0]])
     end_xu = float(xu100_close.loc[research_dates[-1]])
     xu_ret = (end_xu / start_xu - 1.0) * 100.0
-    print(f"📈 VALIDATION DÖNEMİ XU100 GETİRİSİ: %{xu_ret:+.2f}")
+    logger.info(f"📈 VALIDATION DÖNEMİ XU100 GETİRİSİ: %{xu_ret:+.2f}")
 
     # 2. Rejim Analizi ve Fırsat Maliyeti Ölçümü
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
@@ -68,7 +71,7 @@ def run_train_val_research():
     comb_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
     trainer.retrain_fold(comb_train)
 
-    print("\n🔍 TRAIN/VALIDATION ÜZERİNDE MEKANİZMA BAZLI KAYIP ANALİZİ:")
+    logger.info("\n🔍 TRAIN/VALIDATION ÜZERİNDE MEKANİZMA BAZLI KAYIP ANALİZİ:")
     
     # 3. Kısıtların Getiri Üzerindeki Etkilerini Ölçme
     # Hipotez A: Katı 5-hisse / %20 tavanı yerine en yüksek skorlu lider hisseye %30 pay vermek
@@ -111,9 +114,9 @@ def run_train_val_research():
         trend_ret = np.mean([s["fwd_20d"] for s in scores[:3]])
         returns_atr_exit.append(trend_ret)
 
-    print(f"  • Baseline 5G Eşit Ağırlık Ortalama Getiri:       %{np.mean(returns_baseline):.2f}")
-    print(f"  • Conviction Sizing (Lidere %30) Ortalama Getiri: %{np.mean(returns_conviction):.2f} (🚀 +%{np.mean(returns_conviction) - np.mean(returns_baseline):.2f} Alfa Katkısı)")
-    print(f"  • Trend Sürüşü (20G Lider Tutma) Ortalama Getiri: %{np.mean(returns_atr_exit):.2f} (🚀🚀 +%{np.mean(returns_atr_exit) - np.mean(returns_baseline):.2f} Trend Gücü)")
+    logger.info(f"  • Baseline 5G Eşit Ağırlık Ortalama Getiri:       %{np.mean(returns_baseline):.2f}")
+    logger.info(f"  • Conviction Sizing (Lidere %30) Ortalama Getiri: %{np.mean(returns_conviction):.2f} (🚀 +%{np.mean(returns_conviction) - np.mean(returns_baseline):.2f} Alfa Katkısı)")
+    logger.info(f"  • Trend Sürüşü (20G Lider Tutma) Ortalama Getiri: %{np.mean(returns_atr_exit):.2f} (🚀🚀 +%{np.mean(returns_atr_exit) - np.mean(returns_baseline):.2f} Trend Gücü)")
 
     return {
         "xu_ret": xu_ret,

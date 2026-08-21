@@ -13,6 +13,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_phase4_candidate(eval_dates, features_by_ticker, xu100_close, trainer, candidate_name):
     portfolio_cash = 10_000_000.0
@@ -173,14 +176,14 @@ if __name__ == "__main__":
     candidates = ["Baseline_V3", "A_Breadth_Thrust", "B_Vol_Targeting", "C_Adaptive_Stop", "D_Full_Deployment"]
     
     results = {}
-    print("🚀 PHASE 4: INDEPENDENT CANDIDATE TESTING (TRAIN/VAL)")
+    logger.info("🚀 PHASE 4: INDEPENDENT CANDIDATE TESTING (TRAIN/VAL)")
     for c in candidates:
         res = run_phase4_candidate(val_dates, features_by_ticker, xu100_close, trainer, c)
         results[c] = res
-        print(f"[{c.ljust(20)}] Net: %{res['Return']:>6.2f} | MaxDD: %{res['MaxDD']:>5.2f} | PF: {res['PF']:>4.2f} | WR: %{res['WinRate']:>4.1f} | Trades: {res['Trades']}")
+        logger.info(f"[{c.ljust(20)}] Net: %{res['Return']:>6.2f} | MaxDD: %{res['MaxDD']:>5.2f} | PF: {res['PF']:>4.2f} | WR: %{res['WinRate']:>4.1f} | Trades: {res['Trades']}")
         
-    print("\n📊 DELTA VS BASELINE:")
+    logger.info("\n📊 DELTA VS BASELINE:")
     base = results["Baseline_V3"]
     for c in candidates[1:]:
         r = results[c]
-        print(f"{c.ljust(20)} | Δ Ret: {r['Return'] - base['Return']:>+6.2f}% | Δ DD: {r['MaxDD'] - base['MaxDD']:>+5.2f}% | Δ PF: {r['PF'] - base['PF']:>+4.2f}")
+        logger.info(f"{c.ljust(20)} | Δ Ret: {r['Return'] - base['Return']:>+6.2f}% | Δ DD: {r['MaxDD'] - base['MaxDD']:>+5.2f}% | Δ PF: {r['PF'] - base['PF']:>+4.2f}")

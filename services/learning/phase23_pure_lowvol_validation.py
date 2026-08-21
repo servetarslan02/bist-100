@@ -8,18 +8,21 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
 def run_phase_23():
-    print("🚀 FAZ 23: PURE LOW-VOL ALPHA VALIDATION (No ML)")
-    print("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Audit.\n")
+    logger.info("🚀 FAZ 23: PURE LOW-VOL ALPHA VALIDATION (No ML)")
+    logger.info("Kurallar: PnL YOK. Final Holdout KİLİTLİ. Offline Audit.\n")
     
     stock_data, xu100_close = load_all_market_data()
     
     records = []
     # 1. Point-in-time integrity & 2. No-lookahead
-    print("[OK] Test 1 & 2: Point-in-time integrity ve No-lookahead onaylandı.")
+    logger.info("[OK] Test 1 & 2: Point-in-time integrity ve No-lookahead onaylandı.")
     
     for tk, df in stock_data.items():
         if len(df) < 120: continue
@@ -48,7 +51,7 @@ def run_phase_23():
     # 14. Signal direction test
     df_all["signal"] = -df_all["volatility_20d"] # Low vol = High Signal
     
-    print("[OK] Test 3 & 14: Label alignment and Signal direction (-vol) onaylandı.")
+    logger.info("[OK] Test 3 & 14: Label alignment and Signal direction (-vol) onaylandı.")
     
     # Restrict to Val Dates
     df_all = df_all[df_all["date"] <= pd.Timestamp("2025-10-31")]
@@ -115,45 +118,45 @@ def run_phase_23():
         
     res_df = pd.DataFrame(daily_res).dropna()
     
-    print("\n==================================================")
-    print("6 & 13. CROSS-SECTIONAL RANK IC & HORIZON STABILITY")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("6 & 13. CROSS-SECTIONAL RANK IC & HORIZON STABILITY")
+    logger.info("==================================================")
     for h in ["1d", "5d", "10d", "20d"]:
         mean_ic = res_df[f"ic_{h}"].mean()
         ic_ir = (mean_ic / res_df[f"ic_{h}"].std()) * np.sqrt(252)
-        print(f"{h.upper():>3} Horizon | Mean Rank IC: {mean_ic:7.4f} | ICIR: {ic_ir:7.2f}")
+        logger.info(f"{h.upper():>3} Horizon | Mean Rank IC: {mean_ic:7.4f} | ICIR: {ic_ir:7.2f}")
         
-    print("\n==================================================")
-    print("4 & 5 & 15. TOP-K SPREAD, MONOTONICITY & OUTLIER SENSITIVITY (5D)")
-    print("==================================================")
-    print(f"Top-3  Spread: %{res_df['t3_spr'].mean():6.3f} (Outlier Sensitivity High)")
-    print(f"Top-5  Spread: %{res_df['t5_spr'].mean():6.3f}")
-    print(f"Top-10 Spread: %{res_df['t10_spr'].mean():6.3f} (Outlier Sensitivity Low)")
+    logger.info("\n==================================================")
+    logger.info("4 & 5 & 15. TOP-K SPREAD, MONOTONICITY & OUTLIER SENSITIVITY (5D)")
+    logger.info("==================================================")
+    logger.info(f"Top-3  Spread: %{res_df['t3_spr'].mean():6.3f} (Outlier Sensitivity High)")
+    logger.info(f"Top-5  Spread: %{res_df['t5_spr'].mean():6.3f}")
+    logger.info(f"Top-10 Spread: %{res_df['t10_spr'].mean():6.3f} (Outlier Sensitivity Low)")
     
-    print("\nQuantile Monotonicity (Q5 = Safest/Lowest Vol, Q1 = Riskiest/Highest Vol)")
-    for i in range(5): print(f"Q{i+1}: %{res_df[f'Q{i+1}'].mean():6.3f}")
+    logger.info("\nQuantile Monotonicity (Q5 = Safest/Lowest Vol, Q1 = Riskiest/Highest Vol)")
+    for i in range(5): logger.info(f"Q{i+1}: %{res_df[f'Q{i+1}'].mean():6.3f}")
     
-    print("\n==================================================")
-    print("7. TEMPORAL STABILITY (5 TIME BLOCKS)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("7. TEMPORAL STABILITY (5 TIME BLOCKS)")
+    logger.info("==================================================")
     blocks = [res_df.iloc[idx] for idx in np.array_split(range(len(res_df)), 5)]
     for i, b in enumerate(blocks):
-        print(f"Block {i+1} | Mean 5D Rank IC: {b['ic_5d'].mean():7.4f} | Top-5 Spread: %{b['t5_spr'].mean():6.3f}")
+        logger.info(f"Block {i+1} | Mean 5D Rank IC: {b['ic_5d'].mean():7.4f} | Top-5 Spread: %{b['t5_spr'].mean():6.3f}")
         
-    print("\n==================================================")
-    print("8. REGIME STABILITY (Top-5 Spread 5D)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("8. REGIME STABILITY (Top-5 Spread 5D)")
+    logger.info("==================================================")
     for reg in ["EARLY_BULL", "LATE_BULL", "BEAR_MARKET", "SIDEWAYS_RANGE"]:
         val = res_df[res_df['regime'] == reg]['t5_spr'].mean()
-        print(f"{reg:15} | Top-5 Spread: %{val:6.3f}")
+        logger.info(f"{reg:15} | Top-5 Spread: %{val:6.3f}")
     for hv in [True, False]:
         reg_name = "HIGH_VOL" if hv else "LOW_VOL"
         val = res_df[res_df['is_high_vol'] == hv]['t5_spr'].mean()
-        print(f"MARKET_{reg_name:8} | Top-5 Spread: %{val:6.3f}")
+        logger.info(f"MARKET_{reg_name:8} | Top-5 Spread: %{val:6.3f}")
         
-    print("\n==================================================")
-    print("9 & 10 & 11. NULL SHUFFLE, BOOTSTRAP CI & EMPIRICAL P-VAL")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("9 & 10 & 11. NULL SHUFFLE, BOOTSTRAP CI & EMPIRICAL P-VAL")
+    logger.info("==================================================")
     act_spr = res_df['t5_spr'].values
     null_spr = res_df['null_spr'].values
     diff = act_spr - null_spr
@@ -163,27 +166,27 @@ def run_phase_23():
     ci_L, ci_U = np.percentile(boot, 2.5), np.percentile(boot, 97.5)
     pval = np.mean(np.array(boot) <= 0)
     
-    print(f"Actual Top-5 Spread : %{act_spr.mean():6.3f}")
-    print(f"Null Shuffled Spread: %{null_spr.mean():6.3f}")
-    print(f"Mean Difference     : %{diff.mean():6.3f}")
-    print(f"95% Confidence Int  : [%{ci_L:.3f}, %{ci_U:.3f}]")
-    print(f"Empirical P-Value   : {pval:.4f}")
+    logger.info(f"Actual Top-5 Spread : %{act_spr.mean():6.3f}")
+    logger.info(f"Null Shuffled Spread: %{null_spr.mean():6.3f}")
+    logger.info(f"Mean Difference     : %{diff.mean():6.3f}")
+    logger.info(f"95% Confidence Int  : [%{ci_L:.3f}, %{ci_U:.3f}]")
+    logger.info(f"Empirical P-Value   : {pval:.4f}")
     
-    print("\n==================================================")
-    print("12. BEST-DAYS CONCENTRATION")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("12. BEST-DAYS CONCENTRATION")
+    logger.info("==================================================")
     sorted_act = np.sort(act_spr)[::-1]
     n = len(sorted_act)
-    print(f"Tüm Günler       : %{sorted_act.mean():.3f}")
-    print(f"En İyi %1 Çıkar  : %{sorted_act[int(n*0.01):].mean():.3f}")
-    print(f"En İyi %5 Çıkar  : %{sorted_act[int(n*0.05):].mean():.3f}")
-    print(f"En İyi %20 Çıkar : %{sorted_act[int(n*0.20):].mean():.3f}")
+    logger.info(f"Tüm Günler       : %{sorted_act.mean():.3f}")
+    logger.info(f"En İyi %1 Çıkar  : %{sorted_act[int(n*0.01):].mean():.3f}")
+    logger.info(f"En İyi %5 Çıkar  : %{sorted_act[int(n*0.05):].mean():.3f}")
+    logger.info(f"En İyi %20 Çıkar : %{sorted_act[int(n*0.20):].mean():.3f}")
     
-    print("\nFINAL DECISION:")
+    logger.info("\nFINAL DECISION:")
     if pval < 0.05 and ci_L > 0 and sorted_act[int(n*0.05):].mean() > 0:
-        print("A) ROBUST CORE ALPHA")
+        logger.info("A) ROBUST CORE ALPHA")
     else:
-        print("C) NO ROBUST ALPHA")
+        logger.info("C) NO ROBUST ALPHA")
 
 if __name__ == "__main__":
     run_phase_23()

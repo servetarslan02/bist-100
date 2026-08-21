@@ -73,10 +73,21 @@ class ValuationSummary:
 class ValuationEngine:
     """Değerleme motoru."""
 
-    # Türkiye için varsayılan değerler
+    # F-021: Sabitler sınıf değişkeni olarak tanımlanmış, override edilebilir
     DEFAULT_WACC = 0.20        # %20 (yüksek risk primi)
     DEFAULT_TERMINAL_GROWTH = 0.03  # %3 (enflasyon + reel büyüme)
     DEFAULT_TAX_RATE = 0.23    # %23 kurumlar vergisi
+
+    def __init__(
+        self,
+        wacc: Optional[float] = None,
+        tax_rate: Optional[float] = None,
+        terminal_growth: Optional[float] = None,
+    ):
+        """F-021: Sabitler constructor'dan override edilebilir."""
+        self._wacc = wacc if wacc is not None else self.DEFAULT_WACC
+        self._tax_rate = tax_rate if tax_rate is not None else self.DEFAULT_TAX_RATE
+        self._terminal_growth = terminal_growth if terminal_growth is not None else self.DEFAULT_TERMINAL_GROWTH
 
     def compute_multiples_valuation(
         self,
@@ -152,11 +163,11 @@ class ValuationEngine:
             wc_change_forecast: [1M, 2M, 1M, 2M, 1M]
         """
         if not wacc:
-            wacc = self.DEFAULT_WACC
+            wacc = self._wacc
         if not terminal_growth:
-            terminal_growth = self.DEFAULT_TERMINAL_GROWTH
+            terminal_growth = self._terminal_growth
         if not tax_rate:
-            tax_rate = self.DEFAULT_TAX_RATE
+            tax_rate = self._tax_rate
 
         # Free Cash Flow projeksiyonları
         fcfs = []

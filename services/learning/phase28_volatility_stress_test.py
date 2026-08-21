@@ -7,6 +7,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -37,8 +40,8 @@ def eval_signal(df, signal_series, ret_col="ret_1d", tc=0.002):
     }
 
 def run_phase_28():
-    print("🚀 FAZ 28: VOLATILITY REGIME ROBUSTNESS STRESS TEST")
-    print("Kurallar: Holdout Kilitli. ML Yok. Stres Testleri.\n")
+    logger.info("🚀 FAZ 28: VOLATILITY REGIME ROBUSTNESS STRESS TEST")
+    logger.info("Kurallar: Holdout Kilitli. ML Yok. Stres Testleri.\n")
     
     stock_data, xu100_close = load_all_market_data()
     
@@ -53,9 +56,9 @@ def run_phase_28():
     df_eval = df[df.index <= pd.Timestamp("2025-10-31")].copy()
     df_eval = df_eval.dropna(subset=["vol_20d"])
     
-    print("==================================================")
-    print("1. THRESHOLD ROBUSTNESS (252-day Rolling Percentile)")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("1. THRESHOLD ROBUSTNESS (252-day Rolling Percentile)")
+    logger.info("==================================================")
     thresholds = [0.70, 0.75, 0.80, 0.85]
     robustness_passed = True
     
@@ -67,15 +70,15 @@ def run_phase_28():
         signal = risk_on.shift(1).loc[df_eval.index] 
         m = eval_signal(df_eval, signal)
         
-        print(f"Threshold P{int(q*100)}:")
-        print(f"  CAGR: %{m['CAGR']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Max DD: %{m['MaxDD']*100:6.1f}")
-        print(f"  Exposure: %{m['Exposure']*100:4.1f} | Ann. Turnover: {m['Turnover']:4.1f} trades/yr")
+        logger.info(f"Threshold P{int(q*100)}:")
+        logger.info(f"  CAGR: %{m['CAGR']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Max DD: %{m['MaxDD']*100:6.1f}")
+        logger.info(f"  Exposure: %{m['Exposure']*100:4.1f} | Ann. Turnover: {m['Turnover']:4.1f} trades/yr")
         
         if m['Sharpe'] < 0.5: robustness_passed = False
         
-    print("\n==================================================")
-    print("2. EXECUTION DELAY TEST (Using P75 threshold)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("2. EXECUTION DELAY TEST (Using P75 threshold)")
+    logger.info("==================================================")
     vol_thresh = df["vol_20d"].rolling(252).quantile(0.75)
     risk_on = (df["vol_20d"] < vol_thresh).astype(int)
     
@@ -83,11 +86,11 @@ def run_phase_28():
     for name, shift_val in delays.items():
         signal = risk_on.shift(shift_val).loc[df_eval.index]
         m = eval_signal(df_eval, signal)
-        print(f"Gecikme {name}: CAGR: %{m['CAGR']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Max DD: %{m['MaxDD']*100:6.1f}")
+        logger.info(f"Gecikme {name}: CAGR: %{m['CAGR']*100:6.1f} | Sharpe: {m['Sharpe']:5.2f} | Max DD: %{m['MaxDD']*100:6.1f}")
         
-    print("\n==================================================")
-    print("4 & 5. REGIME & NULL TEST (P75 Standard T+0)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("4 & 5. REGIME & NULL TEST (P75 Standard T+0)")
+    logger.info("==================================================")
     signal = risk_on.shift(1).loc[df_eval.index]
     m_std = eval_signal(df_eval, signal)
     
@@ -107,14 +110,14 @@ def run_phase_28():
     ci_L, ci_U = np.percentile(null_sharpes, 2.5), np.percentile(null_sharpes, 97.5)
     pval = np.mean(np.array(null_sharpes) >= m_std["Sharpe"])
     
-    print(f"Buy & Hold CAGR  : %{bh['CAGR']*100:6.1f} | Sharpe: {bh['Sharpe']:5.2f}")
-    print(f"Strategy CAGR    : %{m_std['CAGR']*100:6.1f} | Sharpe: {m_std['Sharpe']:5.2f}")
-    print(f"Null Sharpe 95% CI: [{ci_L:.2f}, {ci_U:.2f}]")
-    print(f"Empirical P-Value : {pval:.4f}")
+    logger.info(f"Buy & Hold CAGR  : %{bh['CAGR']*100:6.1f} | Sharpe: {bh['Sharpe']:5.2f}")
+    logger.info(f"Strategy CAGR    : %{m_std['CAGR']*100:6.1f} | Sharpe: {m_std['Sharpe']:5.2f}")
+    logger.info(f"Null Sharpe 95% CI: [{ci_L:.2f}, {ci_U:.2f}]")
+    logger.info(f"Empirical P-Value : {pval:.4f}")
     
-    print("\n==================================================")
-    print("6. CONCENTRATION TEST (Best Days Removed)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("6. CONCENTRATION TEST (Best Days Removed)")
+    logger.info("==================================================")
     net_ret = m_std["net_ret"]
     sorted_ret = np.sort(net_ret)[::-1]
     n = len(sorted_ret)
@@ -123,19 +126,19 @@ def run_phase_28():
     mean_drop1 = sorted_ret[int(n*0.01):].mean() * 252 * 100
     mean_drop5 = sorted_ret[int(n*0.05):].mean() * 252 * 100
     
-    print(f"Tüm Günler Yıllık Kâr       : %{mean_all:.1f}")
-    print(f"En İyi %1 Gün Çıkarıldığında: %{mean_drop1:.1f}")
-    print(f"En İyi %5 Gün Çıkarıldığında: %{mean_drop5:.1f}")
+    logger.info(f"Tüm Günler Yıllık Kâr       : %{mean_all:.1f}")
+    logger.info(f"En İyi %1 Gün Çıkarıldığında: %{mean_drop1:.1f}")
+    logger.info(f"En İyi %5 Gün Çıkarıldığında: %{mean_drop5:.1f}")
     
-    print("\n==================================================")
-    print("FINAL DECISION")
+    logger.info("\n==================================================")
+    logger.info("FINAL DECISION")
     
     if robustness_passed and pval < 0.05 and mean_drop5 > bh['CAGR']*100:
-        print("A) ROBUST PRODUCTION CORE")
-        print("Sinyal eşiklere, gecikmelere ve aşırı şoklara karşı dayanıklı. Overfit değil.")
+        logger.info("A) ROBUST PRODUCTION CORE")
+        logger.info("Sinyal eşiklere, gecikmelere ve aşırı şoklara karşı dayanıklı. Overfit değil.")
     else:
-        print("C) REJECT")
-        print("Model threshold overfit veya gecikme hassasiyeti yaşıyor.")
+        logger.info("C) REJECT")
+        logger.info("Model threshold overfit veya gecikme hassasiyeti yaşıyor.")
 
 if __name__ == "__main__":
     run_phase_28()

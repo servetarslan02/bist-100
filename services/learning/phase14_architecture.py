@@ -12,6 +12,9 @@ import random
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, extract_point_in_time_features, detect_market_regime
 )
 
@@ -187,7 +190,7 @@ def run_simulation(trainer, eval_dates, features_by_ticker, xu100_close, filter_
     return portfolio_equity_curve, total_trades_count, gross_profits, gross_losses, np.mean(exposure_history)
 
 if __name__ == "__main__":
-    print("🚀 FAZ 14: ABSOLUTE + RELATIVE ALPHA ARCHITECTURE")
+    logger.info("🚀 FAZ 14: ABSOLUTE + RELATIVE ALPHA ARCHITECTURE")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", 
@@ -198,9 +201,9 @@ if __name__ == "__main__":
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print("\n==================================================")
-    print("M0 (REGRESSION) vs M1 (RANKER) vs M2 (RANKER + FILTER)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("M0 (REGRESSION) vs M1 (RANKER) vs M2 (RANKER + FILTER)")
+    logger.info("==================================================")
     
     # 1. M0
     trainer_m0 = ModelTrainerM0(feature_cols)
@@ -221,26 +224,26 @@ if __name__ == "__main__":
         cummax = s.cummax()
         mdd = abs(((s - cummax) / cummax).min()) * 100.0
         pf = (gp / gl) if gl > 0 else 99.0
-        print(f"{name:30} | CAGR: %{cagr:>6.2f} | MaxDD: %{mdd:>5.2f} | PF: {pf:>4.2f} | Trades: {trades:>4} | Avg Exposure: %{exp*100:>4.1f}")
+        logger.info(f"{name:30} | CAGR: %{cagr:>6.2f} | MaxDD: %{mdd:>5.2f} | PF: {pf:>4.2f} | Trades: {trades:>4} | Avg Exposure: %{exp*100:>4.1f}")
         return cagr
 
     print_metrics("M0: Regression (V3 Baseline)", eq_m0, tr_m0, gp_m0, gl_m0, exp_m0)
     print_metrics("M1: Ranker Only (Always ON)", eq_m1, tr_m1, gp_m1, gl_m1, exp_m1)
     cagr_m2 = print_metrics("M2: Ranker + Absolute Filter", eq_m2, tr_m2, gp_m2, gl_m2, exp_m2)
 
-    print("\n==================================================")
-    print("FAZ 14.5 — PLACEBO FILTER TESTS (ON RANKER)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 14.5 — PLACEBO FILTER TESTS (ON RANKER)")
+    logger.info("==================================================")
     eq_lag, tr_lag, gp_lag, gl_lag, exp_lag = run_simulation(trainer_ranker, val_dates, features_by_ticker, xu100_close, filter_mode="LAGGED")
     eq_rnd, tr_rnd, gp_rnd, gl_rnd, exp_rnd = run_simulation(trainer_ranker, val_dates, features_by_ticker, xu100_close, filter_mode="RANDOM")
     
     print_metrics("Placebo 1: Lagged Filter", eq_lag, tr_lag, gp_lag, gl_lag, exp_lag)
     print_metrics("Placebo 2: Random Filter", eq_rnd, tr_rnd, gp_rnd, gl_rnd, exp_rnd)
 
-    print("\n==================================================")
-    print("FAZ 14.8 — KARAR KURALI")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("FAZ 14.8 — KARAR KURALI")
+    logger.info("==================================================")
     if cagr_m2 > 10.0 and (gp_m2/gl_m2) > 1.10:
-        print("Karar: A) PRODUCTION CANDIDATE")
+        logger.info("Karar: A) PRODUCTION CANDIDATE")
     else:
-        print("Karar: C) REJECT (M2 yetersiz kaldı)")
+        logger.info("Karar: C) REJECT (M2 yetersiz kaldı)")

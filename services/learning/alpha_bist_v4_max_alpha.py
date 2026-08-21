@@ -15,6 +15,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
 from services.learning.frozen_strategy_engine import MODELS
+import structlog
+logger = structlog.get_logger()
+
 
 # BIST Commission + Slippage
 TOTAL_FRICTION = 0.00074 + 0.00050
@@ -245,29 +248,29 @@ def run_v4_strategy(eval_dates, features_by_ticker, xu100_close, trainer, initia
     }
 
 def print_final_report(m):
-    print(f"\n{'='*60}")
-    print(f"🏆 NİHAİ HOLDOUT RAPORU — {m['label']}")
-    print(f"{'='*60}")
-    print(f"| Metrik | {m['label']} | XU100 |")
-    print("|---|---|---|")
-    print(f"| Net Getiri | %{m['tot_ret']:+.2f} | %{m['tot_ret_xu']:+.2f} |")
-    print(f"| CAGR | %{m['cagr']:+.2f} | - |")
-    print(f"| Max DD | %{m['max_dd']:.2f} | %{m['max_dd_xu']:.2f} |")
-    print(f"| Profit Factor | {m['profit_factor']:.2f} | - |")
-    print(f"| Win Rate | %{m['win_rate']:.1f} | - |")
-    print(f"| Sortino | {m['sortino']:.2f} | - |")
-    print(f"| Calmar | {m['calmar']:.2f} | - |")
-    print(f"| Upside Capture | %{m['upside_cap']:.1f} | %100.0 |")
-    print(f"| Turnover | {m['turnover']:.1f}/yıl | - |")
-    print(f"| Total Cost | ₺{m['costs']:,.2f} | ₺0 |")
-    print(f"| Toplam İşlem | {m['trades']} | - |")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"🏆 NİHAİ HOLDOUT RAPORU — {m['label']}")
+    logger.info(f"{'='*60}")
+    logger.info(f"| Metrik | {m['label']} | XU100 |")
+    logger.info("|---|---|---|")
+    logger.info(f"| Net Getiri | %{m['tot_ret']:+.2f} | %{m['tot_ret_xu']:+.2f} |")
+    logger.info(f"| CAGR | %{m['cagr']:+.2f} | - |")
+    logger.info(f"| Max DD | %{m['max_dd']:.2f} | %{m['max_dd_xu']:.2f} |")
+    logger.info(f"| Profit Factor | {m['profit_factor']:.2f} | - |")
+    logger.info(f"| Win Rate | %{m['win_rate']:.1f} | - |")
+    logger.info(f"| Sortino | {m['sortino']:.2f} | - |")
+    logger.info(f"| Calmar | {m['calmar']:.2f} | - |")
+    logger.info(f"| Upside Capture | %{m['upside_cap']:.1f} | %100.0 |")
+    logger.info(f"| Turnover | {m['turnover']:.1f}/yıl | - |")
+    logger.info(f"| Total Cost | ₺{m['costs']:,.2f} | ₺0 |")
+    logger.info(f"| Toplam İşlem | {m['trades']} | - |")
     
-    print("\n🌐 REJİM BAZLI PERFORMANS:")
-    print("| Rejim | PnL | İşlem | Win Rate |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 REJİM BAZLI PERFORMANS:")
+    logger.info("| Rejim | PnL | İşlem | Win Rate |")
+    logger.info("|---|---|---|---|")
     for rn, rd in m["regime_pnl"].items():
         wr = (rd["wins"] / rd["trades"] * 100.0) if rd["trades"] > 0 else 0.0
-        print(f"| {rn} | ₺{rd['pnl']:+,.2f} | {rd['trades']} | %{wr:.1f} |")
+        logger.info(f"| {rn} | ₺{rd['pnl']:+,.2f} | {rd['trades']} | %{wr:.1f} |")
 
 
 if __name__ == "__main__":
@@ -278,8 +281,8 @@ if __name__ == "__main__":
     
     # EXACT FINAL HOLDOUT DATES USED BEFORE (2025-10-31 to 2026-08-14)
     holdout_dates = common_dates[280:-5]
-    print(f"🚀 PHASE 8: FINAL HOLDOUT RUN (TEK SEFERLİK ÇALIŞTIRMA)")
-    print(f"Holdout Dates: {holdout_dates[0].date()} to {holdout_dates[-1].date()}")
+    logger.info(f"🚀 PHASE 8: FINAL HOLDOUT RUN (TEK SEFERLİK ÇALIŞTIRMA)")
+    logger.info(f"Holdout Dates: {holdout_dates[0].date()} to {holdout_dates[-1].date()}")
     
     trainer_h = ModelTrainer(feature_cols)
     res_v4 = run_v4_strategy(holdout_dates, features_by_ticker, xu100_close, trainer_h)

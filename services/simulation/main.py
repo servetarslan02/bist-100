@@ -129,7 +129,9 @@ class SimulationEngine:
         from scipy import stats
         t_dist = stats.t(df=5)
 
-        np.random.seed(42)
+        # F-020: Seed artık parametre olarak alınabilir (reproducibility)
+        _seed = params.get("seed")
+        rng = np.random.default_rng(_seed)
         simulations = np.zeros((num_simulations, horizon_days + 1))
         simulations[:, 0] = current_price
 
@@ -148,8 +150,8 @@ class SimulationEngine:
             random_returns = adjusted_return + current_vol * z
 
             # Event shock injection (%2 ihtimalle)
-            shock_mask = np.random.random(num_simulations) < 0.02
-            shock_size = np.random.choice([-0.05, -0.03, 0.03, 0.05], size=num_simulations)
+            shock_mask = rng.random(num_simulations) < 0.02
+            shock_size = rng.choice([-0.05, -0.03, 0.03, 0.05], size=num_simulations)
             random_returns = np.where(shock_mask, random_returns + shock_size, random_returns)
 
             simulations[:, day] = simulations[:, day-1] * (1 + random_returns)

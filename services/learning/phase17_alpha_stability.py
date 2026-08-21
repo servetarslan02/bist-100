@@ -10,6 +10,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -54,8 +57,8 @@ def extract_forensic_features(df):
 
 
 def run_alpha_stability_audit():
-    print("🚀 FAZ 17: ALPHA STABILITY & INDEPENDENCE AUDIT\n")
-    print("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Sadece Alpha Stabilitesi.")
+    logger.info("🚀 FAZ 17: ALPHA STABILITY & INDEPENDENCE AUDIT\n")
+    logger.info("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Sadece Alpha Stabilitesi.")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
@@ -64,12 +67,12 @@ def run_alpha_stability_audit():
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print(f"Veri Seti Hazır: {len(val_dates)} gün (Sample Size).")
+    logger.info(f"Veri Seti Hazır: {len(val_dates)} gün (Sample Size).")
     
     cached_scores = {}
     rank_model = None
     
-    print("⏳ Model Eğitimi & Scoring Başlıyor (Purged Walk-Forward)...")
+    logger.info("⏳ Model Eğitimi & Scoring Başlıyor (Purged Walk-Forward)...")
     for step_i, current_date in enumerate(val_dates):
         if step_i % 20 == 0:
             train_rows = []
@@ -164,9 +167,9 @@ def run_alpha_stability_audit():
 
     df_m = pd.DataFrame(daily_metrics).dropna(subset=["top5_5d"])
     
-    print("\n==================================================")
-    print("1. WALK-FORWARD TIME BLOCKS STABILITY")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("1. WALK-FORWARD TIME BLOCKS STABILITY")
+    logger.info("==================================================")
     blocks = [df_m.iloc[idx] for idx in np.array_split(range(len(df_m)), 5)]
     pos_blocks = 0
     for i, b in enumerate(blocks):
@@ -176,13 +179,13 @@ def run_alpha_stability_audit():
         b5 = b['bot5_5d'].mean()
         spr = b['spread_5d'].mean()
         if spr > 0: pos_blocks += 1
-        print(f"Block {i+1} | N={len(b):<2} | Top3: %{t3:>5.2f} | Top5: %{t5:>5.2f} | Bot5: %{b5:>5.2f} | Spread (Top5-Rand): %{spr:>5.2f}")
+        logger.info(f"Block {i+1} | N={len(b):<2} | Top3: %{t3:>5.2f} | Top5: %{t5:>5.2f} | Bot5: %{b5:>5.2f} | Spread (Top5-Rand): %{spr:>5.2f}")
         
-    print(f"\nPositive Spread Block Rate: %{pos_blocks/5*100:.1f} ({pos_blocks}/5 blocks)")
+    logger.info(f"\nPositive Spread Block Rate: %{pos_blocks/5*100:.1f} ({pos_blocks}/5 blocks)")
 
-    print("\n==================================================")
-    print("2. REGIME STABILITY")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("2. REGIME STABILITY")
+    logger.info("==================================================")
     for reg in ["BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE"]:
         d_sub = df_m[df_m['regime'] == reg]
         if len(d_sub) > 0:
@@ -190,11 +193,11 @@ def run_alpha_stability_audit():
             rnd = d_sub['rand_dist_mean'].mean()
             spr = d_sub['spread_5d'].mean()
             pos_days = (d_sub['spread_5d'] > 0).mean() * 100
-            print(f"{reg:15} | N={len(d_sub):<3} | Ranker: %{act:>5.2f} | Random: %{rnd:>5.2f} | Spread: %{spr:>5.2f} | Pos Days: %{pos_days:.1f}")
+            logger.info(f"{reg:15} | N={len(d_sub):<3} | Ranker: %{act:>5.2f} | Random: %{rnd:>5.2f} | Spread: %{spr:>5.2f} | Pos Days: %{pos_days:.1f}")
 
-    print("\n==================================================")
-    print("3. TOP-5 ALPHA CONCENTRATION (DAY RELIANCE)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("3. TOP-5 ALPHA CONCENTRATION (DAY RELIANCE)")
+    logger.info("==================================================")
     sorted_spreads = df_m['spread_5d'].sort_values(ascending=False).values
     total_mean = sorted_spreads.mean()
     
@@ -209,15 +212,15 @@ def run_alpha_stability_audit():
     mean_no_10 = sorted_spreads[drop_10pct:].mean() if drop_10pct < n else 0
     mean_no_20 = sorted_spreads[drop_20pct:].mean() if drop_20pct < n else 0
     
-    print(f"Bütün Günler (All Data) Spread: %{total_mean:.3f}")
-    print(f"En iyi %1 Gün Çıkarıldığında : %{mean_no_1:.3f}")
-    print(f"En iyi %5 Gün Çıkarıldığında : %{mean_no_5:.3f}")
-    print(f"En iyi %10 Gün Çıkarıldığında: %{mean_no_10:.3f}")
-    print(f"En iyi %20 Gün Çıkarıldığında: %{mean_no_20:.3f} (DİKKAT: Eğer bu eksiye düşüyorsa Alpha sadece birkaç güne bağlıdır!)")
+    logger.info(f"Bütün Günler (All Data) Spread: %{total_mean:.3f}")
+    logger.info(f"En iyi %1 Gün Çıkarıldığında : %{mean_no_1:.3f}")
+    logger.info(f"En iyi %5 Gün Çıkarıldığında : %{mean_no_5:.3f}")
+    logger.info(f"En iyi %10 Gün Çıkarıldığında: %{mean_no_10:.3f}")
+    logger.info(f"En iyi %20 Gün Çıkarıldığında: %{mean_no_20:.3f} (DİKKAT: Eğer bu eksiye düşüyorsa Alpha sadece birkaç güne bağlıdır!)")
 
-    print("\n==================================================")
-    print("4. HORIZON ROBUSTNESS")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("4. HORIZON ROBUSTNESS")
+    logger.info("==================================================")
     horizons = [(1, "top5_1d", "shuf5_1d"), (5, "top5_5d", "shuf5_5d"), (10, "top5_10d", "shuf5_10d"), (20, "top5_20d", "shuf5_20d")]
     for h, top_col, shuf_col in horizons:
         # Check if the target exists
@@ -225,11 +228,11 @@ def run_alpha_stability_audit():
         mean_top = df_m[top_col].mean()
         mean_shuf = df_m[shuf_col].mean()
         spread = mean_top - mean_shuf
-        print(f"{h:>2}D Horizon | Top-5: %{mean_top:>5.2f} | Shuffled-5: %{mean_shuf:>5.2f} | Spread: %{spread:>5.2f}")
+        logger.info(f"{h:>2}D Horizon | Top-5: %{mean_top:>5.2f} | Shuffled-5: %{mean_shuf:>5.2f} | Spread: %{spread:>5.2f}")
 
-    print("\n==================================================")
-    print("5. EMPIRICAL P-VALUE (1000 RANDOM SEEDS PER DAY)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("5. EMPIRICAL P-VALUE (1000 RANDOM SEEDS PER DAY)")
+    logger.info("==================================================")
     # Average across all days for each of the 1000 samples
     all_rand_samples = np.array(df_m['rand_samples'].tolist()) # Shape: (N_days, 1000)
     avg_portfolio_returns = all_rand_samples.mean(axis=0) # Shape: (1000,)
@@ -239,22 +242,22 @@ def run_alpha_stability_audit():
     ci_95_lower = np.percentile(avg_portfolio_returns, 2.5)
     ci_95_upper = np.percentile(avg_portfolio_returns, 97.5)
     
-    print(f"Actual Ranker Top-5 Mean: %{actual_mean:.3f}")
-    print(f"Random Distributions 95% CI: [%{ci_95_lower:.3f}, %{ci_95_upper:.3f}]")
-    print(f"Empirical P-Value (H0: Actual <= Random): {p_value:.4f}")
+    logger.info(f"Actual Ranker Top-5 Mean: %{actual_mean:.3f}")
+    logger.info(f"Random Distributions 95% CI: [%{ci_95_lower:.3f}, %{ci_95_upper:.3f}]")
+    logger.info(f"Empirical P-Value (H0: Actual <= Random): {p_value:.4f}")
     if p_value > 0.05:
-        print("-> DİKKAT: Top-5 Alpha 1000 rastgele teste karşı istatistiksel anlamlılığını (p < 0.05) KORUYAMADI.")
+        logger.info("-> DİKKAT: Top-5 Alpha 1000 rastgele teste karşı istatistiksel anlamlılığını (p < 0.05) KORUYAMADI.")
 
-    print("\n==================================================")
-    print("6. NİHAİ KARAR")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("6. NİHAİ KARAR")
+    logger.info("==================================================")
     # Decision logic
     if p_value < 0.05 and pos_blocks >= 4 and mean_no_20 > 0:
-        print("Sonuç: A) ROBUST ALPHA")
+        logger.info("Sonuç: A) ROBUST ALPHA")
     elif p_value < 0.10 or (pos_blocks >= 3 and mean_no_10 > 0):
-        print("Sonuç: B) PROMISING BUT NOT YET ROBUST")
+        logger.info("Sonuç: B) PROMISING BUT NOT YET ROBUST")
     else:
-        print("Sonuç: C) NO ROBUST ALPHA")
+        logger.info("Sonuç: C) NO ROBUST ALPHA")
         
 if __name__ == "__main__":
     run_alpha_stability_audit()

@@ -21,18 +21,21 @@ from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
 from services.ml.catboost_model import CatBoostModel, CatBoostConfig
 from services.ml.xgboost_model import XGBoostModel, XGBoostConfig
 from services.ml.ranking_model import RankingModel
+import structlog
+logger = structlog.get_logger()
+
 
 
 def train_all_models():
-    print("=================================================================")
-    print("ALPHA BIST — TÜM MAKİNE ÖĞRENİMİ MODELLERİNİ EĞİTME HATTI")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — TÜM MAKİNE ÖĞRENİMİ MODELLERİNİ EĞİTME HATTI")
+    logger.info("=================================================================")
 
     os.makedirs("models", exist_ok=True)
     np.random.seed(42)
 
     # 1. Sentetik & Tarihsel BIST Feature Matrisi Hazırlığı (252 işlem günü x 50 hisse = 12,600 örneklem)
-    print("\n[1] 148 Teknik & Temel Feature ve Çoklu Vade Hedefleri (Labels) Üretiliyor...")
+    logger.info("\n[1] 148 Teknik & Temel Feature ve Çoklu Vade Hedefleri (Labels) Üretiliyor...")
     tickers = ["THYAO", "ASELS", "GARAN", "KCHOL", "TUPRS", "PGSUS", "FROTO", "BIMAS", "AKBNK", "SISE", "POLTK", "SDTTR", "KONYA", "REEDR", "FORTE"]
     n_samples = 1200
     
@@ -74,24 +77,24 @@ def train_all_models():
         date_groups[t_key] = dt_str
         dates.append(dt)
 
-    print(f"  • Toplam Eğitim Örneklemi: {len(features_map)} veri satırı")
-    print(f"  • Kullanılan Feature Sayısı: {len(feature_names)}")
+    logger.info(f"  • Toplam Eğitim Örneklemi: {len(features_map)} veri satırı")
+    logger.info(f"  • Kullanılan Feature Sayısı: {len(feature_names)}")
 
     # 2. LightGBM Eğitimi
-    print("\n[2] LightGBM LambdaRank & Multi-Horizon Eğitiliyor...")
+    logger.info("\n[2] LightGBM LambdaRank & Multi-Horizon Eğitiliyor...")
     lgb_trainer = LightGBMTrainer(MLModelConfig(num_boost_round=150, learning_rate=0.03, early_stopping_rounds=15))
     trained_lgb = lgb_trainer.train(features_map, returns, date_groups, feature_names)
     if trained_lgb:
-        print(f"  ✅ LightGBM Eğitimi Başarılı!")
-        print(f"  • Validasyon Skoru (RMSE): {trained_lgb.validation_score:.4f}")
-        print(f"  • Yön Doğruluğu: %{trained_lgb.validation_metrics.get('directional_accuracy', 0.68) * 100:.1f}")
-        print(f"  • Information Coefficient (IC): {trained_lgb.validation_metrics.get('ic', 0.14):.4f}")
+        logger.info(f"  ✅ LightGBM Eğitimi Başarılı!")
+        logger.info(f"  • Validasyon Skoru (RMSE): {trained_lgb.validation_score:.4f}")
+        logger.info(f"  • Yön Doğruluğu: %{trained_lgb.validation_metrics.get('directional_accuracy', 0.68) * 100:.1f}")
+        logger.info(f"  • Information Coefficient (IC): {trained_lgb.validation_metrics.get('ic', 0.14):.4f}")
         with open("models/lightgbm_lambdarank.pkl", "wb") as f:
             pickle.dump(trained_lgb, f)
-        print("  • Model Kaydedildi: models/lightgbm_lambdarank.pkl")
+        logger.info("  • Model Kaydedildi: models/lightgbm_lambdarank.pkl")
 
     # 3. CatBoost Eğitimi
-    print("\n[3] CatBoost Classifier & Adjusted Loss Eğitiliyor...")
+    logger.info("\n[3] CatBoost Classifier & Adjusted Loss Eğitiliyor...")
     X_mat = np.array([[features_map[k][f] for f in feature_names] for k in features_map])
     y_cat = np.array([1 if returns[k] > 0 else 0 for k in features_map])
     
@@ -101,33 +104,33 @@ def train_all_models():
 
     cat_model = CatBoostModel(CatBoostConfig(iterations=100, depth=5, learning_rate=0.05))
     cat_metrics = cat_model.train(X_train, y_train, X_val, y_val, feature_names=feature_names)
-    print(f"  ✅ CatBoost Eğitimi Başarılı!")
-    print(f"  • ROC-AUC Skoru: {cat_metrics.get('val_auc', 0.74):.4f}")
-    print(f"  • Direction Accuracy: %{cat_metrics.get('val_accuracy', 0.67) * 100:.1f}")
+    logger.info(f"  ✅ CatBoost Eğitimi Başarılı!")
+    logger.info(f"  • ROC-AUC Skoru: {cat_metrics.get('val_auc', 0.74):.4f}")
+    logger.info(f"  • Direction Accuracy: %{cat_metrics.get('val_accuracy', 0.67) * 100:.1f}")
     with open("models/catboost_classifier.pkl", "wb") as f:
         pickle.dump(cat_model, f)
-    print("  • Model Kaydedildi: models/catboost_classifier.pkl")
+    logger.info("  • Model Kaydedildi: models/catboost_classifier.pkl")
 
     # 4. XGBoost Eğitimi
-    print("\n[4] XGBoost Model Eğitiliyor...")
+    logger.info("\n[4] XGBoost Model Eğitiliyor...")
     xgb_model = XGBoostModel(XGBoostConfig(n_estimators=100, max_depth=5, learning_rate=0.04))
     xgb_metrics = xgb_model.train(X_train, y_train, X_val, y_val, feature_names=feature_names)
-    print(f"  ✅ XGBoost Eğitimi Başarılı!")
-    print(f"  • ROC-AUC Skoru: {xgb_metrics.get('val_auc', 0.72):.4f}")
-    print(f"  • Direction Accuracy: %{xgb_metrics.get('val_accuracy', 0.65) * 100:.1f}")
+    logger.info(f"  ✅ XGBoost Eğitimi Başarılı!")
+    logger.info(f"  • ROC-AUC Skoru: {xgb_metrics.get('val_auc', 0.72):.4f}")
+    logger.info(f"  • Direction Accuracy: %{xgb_metrics.get('val_accuracy', 0.65) * 100:.1f}")
     with open("models/xgboost_model.pkl", "wb") as f:
         pickle.dump(xgb_model, f)
-    print("  • Model Kaydedildi: models/xgboost_model.pkl")
+    logger.info("  • Model Kaydedildi: models/xgboost_model.pkl")
 
     # 5. Ranking Model (Ensemble LambdaRank + Adjusted-MSE)
-    print("\n[5] Rejim-Uyumlu Sıralama (Ranking Model) Başlatılıyor...")
+    logger.info("\n[5] Rejim-Uyumlu Sıralama (Ranking Model) Başlatılıyor...")
     rank_model = RankingModel()
-    print("  ✅ Ranking Model Rejim Ağırlıkları ve Ensemble Mimarisi Kilitlendi!")
-    print(f"  • Dahili Feature Listesi: {len(rank_model._feature_names)} Feature")
+    logger.info("  ✅ Ranking Model Rejim Ağırlıkları ve Ensemble Mimarisi Kilitlendi!")
+    logger.info(f"  • Dahili Feature Listesi: {len(rank_model._feature_names)} Feature")
 
-    print("\n=================================================================")
-    print("TÜM MAKİNE ÖĞRENİMİ MODELLERİ GERÇEK VERİ ÜZERİNDE EĞİTİLDİ VE SERİALİZE EDİLDİ!")
-    print("=================================================================")
+    logger.info("\n=================================================================")
+    logger.info("TÜM MAKİNE ÖĞRENİMİ MODELLERİ GERÇEK VERİ ÜZERİNDE EĞİTİLDİ VE SERİALİZE EDİLDİ!")
+    logger.info("=================================================================")
 
 
 if __name__ == "__main__":

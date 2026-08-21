@@ -12,6 +12,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_robustness_test(eval_dates, features_by_ticker, xu100_close, trainer, breadth_mode="ACTUAL"):
     portfolio_cash = 10_000_000.0
@@ -140,49 +143,49 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print("🚀 PHASE 7: CAUSAL VALIDATION & ROBUSTNESS AUDIT FOR CANDIDATE C")
+    logger.info("🚀 PHASE 7: CAUSAL VALIDATION & ROBUSTNESS AUDIT FOR CANDIDATE C")
     
     # 1. Placebo Tests
-    print("\n" + "="*50)
-    print("E) PLACEBO / NULL TESTİ")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("E) PLACEBO / NULL TESTİ")
+    logger.info("="*50)
     
     eq_act, ret_act, dd_act, tr_act, rpnl_act = run_robustness_test(val_dates, features_by_ticker, xu100_close, trainer, "ACTUAL")
-    print(f"[C_ACTUAL]  Net: %{ret_act:>6.2f} | Max DD: %{dd_act:>5.2f} | PnL: ₺{sum(rpnl_act.values()):,.0f}")
+    logger.info(f"[C_ACTUAL]  Net: %{ret_act:>6.2f} | Max DD: %{dd_act:>5.2f} | PnL: ₺{sum(rpnl_act.values()):,.0f}")
     
     eq_lag, ret_lag, dd_lag, tr_lag, rpnl_lag = run_robustness_test(val_dates, features_by_ticker, xu100_close, trainer, "LAGGED_5D")
-    print(f"[C_LAGGED]  Net: %{ret_lag:>6.2f} | Max DD: %{dd_lag:>5.2f} | PnL: ₺{sum(rpnl_lag.values()):,.0f} (Breadth delayed 5 days)")
+    logger.info(f"[C_LAGGED]  Net: %{ret_lag:>6.2f} | Max DD: %{dd_lag:>5.2f} | PnL: ₺{sum(rpnl_lag.values()):,.0f} (Breadth delayed 5 days)")
     
     eq_con, ret_con, dd_con, tr_con, rpnl_con = run_robustness_test(val_dates, features_by_ticker, xu100_close, trainer, "CONSTANT")
-    print(f"[C_CONST]   Net: %{ret_con:>6.2f} | Max DD: %{dd_con:>5.2f} | PnL: ₺{sum(rpnl_con.values()):,.0f} (Breadth fixed at 50%)")
+    logger.info(f"[C_CONST]   Net: %{ret_con:>6.2f} | Max DD: %{dd_con:>5.2f} | PnL: ₺{sum(rpnl_con.values()):,.0f} (Breadth fixed at 50%)")
 
     # 2. Market Regime Results
-    print("\n" + "="*50)
-    print("C) MARKET REGIME RESULTS (C_ACTUAL)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("C) MARKET REGIME RESULTS (C_ACTUAL)")
+    logger.info("="*50)
     for k, v in rpnl_act.items():
-        if v != 0: print(f"{k.ljust(15)}: ₺{v:>10,.0f}")
+        if v != 0: logger.info(f"{k.ljust(15)}: ₺{v:>10,.0f}")
 
     # 3. Best/Worst Trade Concentration
-    print("\n" + "="*50)
-    print("D) BEST/WORST TRADE CONCENTRATION")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("D) BEST/WORST TRADE CONCENTRATION")
+    logger.info("="*50)
     tr_act = tr_act.sort_values(by="net_pnl", ascending=False)
     top_5_pnl = tr_act.head(5)['net_pnl'].sum()
     total_gross_profit = tr_act[tr_act['net_pnl'] > 0]['net_pnl'].sum()
-    print(f"Top 5 trades total profit: ₺{top_5_pnl:,.0f}")
-    print(f"Total Gross Profit       : ₺{total_gross_profit:,.0f}")
-    print(f"Top 5 Reliance           : {(top_5_pnl / total_gross_profit) * 100:.1f}%")
+    logger.info(f"Top 5 trades total profit: ₺{top_5_pnl:,.0f}")
+    logger.info(f"Total Gross Profit       : ₺{total_gross_profit:,.0f}")
+    logger.info(f"Top 5 Reliance           : {(top_5_pnl / total_gross_profit) * 100:.1f}%")
     
     # 4. Window-by-Window Results
-    print("\n" + "="*50)
-    print("B) WINDOW-BY-WINDOW ROBUSTNESS")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("B) WINDOW-BY-WINDOW ROBUSTNESS")
+    logger.info("="*50)
     # Split evaluation dates into 3 chunks
     chunks = np.array_split(val_dates, 3)
     for i, chunk in enumerate(chunks):
         eq_chunk = eq_act.loc[chunk[0]:chunk[-1]]
         chunk_ret = (eq_chunk.iloc[-1] / eq_chunk.iloc[0] - 1.0) * 100.0
-        print(f"Window {i+1} ({chunk[0].strftime('%Y-%m')} to {chunk[-1].strftime('%Y-%m')}): Net Return %{chunk_ret:.2f}")
+        logger.info(f"Window {i+1} ({chunk[0].strftime('%Y-%m')} to {chunk[-1].strftime('%Y-%m')}): Net Return %{chunk_ret:.2f}")
 
-    print("\nF) LEAKAGE AUDIT: PASSED (Asserts checked during runtime)")
+    logger.info("\nF) LEAKAGE AUDIT: PASSED (Asserts checked during runtime)")

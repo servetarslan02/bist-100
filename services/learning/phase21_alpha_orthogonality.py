@@ -9,6 +9,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -32,8 +35,8 @@ def get_resid(y, x):
     return y - b * x
 
 def run_alpha_orthogonality():
-    print("🚀 FAZ 21: ALPHA ORTHOGONALITY & STABILITY AUDIT")
-    print("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
+    logger.info("🚀 FAZ 21: ALPHA ORTHOGONALITY & STABILITY AUDIT")
+    logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
     
     stock_data, xu100_close = load_all_market_data()
     features_by_ticker = {tk: extract_forensic_features(df) for tk, df in stock_data.items() if len(df) >= 120}
@@ -131,46 +134,46 @@ def run_alpha_orthogonality():
         
     df_res = pd.DataFrame(records).fillna(0)
 
-    print("\n==================================================")
-    print("A) BASELINE ICs")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("A) BASELINE ICs")
+    logger.info("==================================================")
     for f in ["volatility_20d", "roc_5d", "roc_20d"]:
         name_map = {"volatility_20d": "ic_vol", "roc_5d": "ic_m5", "roc_20d": "ic_m20"}
         ic_col = name_map[f]
         ic = df_res[ic_col].mean()
         ic_std = df_res[ic_col].std()
         icir = (ic / ic_std) * np.sqrt(252) if ic_std != 0 else 0
-        print(f"{f:15} | Mean IC: {ic:7.4f} | ICIR: {icir:7.2f}")
+        logger.info(f"{f:15} | Mean IC: {ic:7.4f} | ICIR: {icir:7.2f}")
 
-    print("\n==================================================")
-    print("C) INCREMENTAL ALPHA / PARTIAL IC")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("C) INCREMENTAL ALPHA / PARTIAL IC")
+    logger.info("==================================================")
     p_ic_mom = df_res['partial_ic_m20'].mean()
     p_ic_vol = df_res['partial_ic_vol'].mean()
-    print(f"roc_20d Partial IC (kontrol: vol) : {p_ic_mom:7.4f}")
-    print(f"volatility_20d Partial IC (kontrol: mom) : {p_ic_vol:7.4f}")
+    logger.info(f"roc_20d Partial IC (kontrol: vol) : {p_ic_mom:7.4f}")
+    logger.info(f"volatility_20d Partial IC (kontrol: mom) : {p_ic_vol:7.4f}")
     if abs(p_ic_mom) < 0.015:
-        print("-> Sınıf: REDUNDANT / EXPLAINED BY LOW-VOL. Momentum, volatiliteden bağımsız yeni bir bilgi (incremental alpha) TAŞIMIYOR.")
+        logger.info("-> Sınıf: REDUNDANT / EXPLAINED BY LOW-VOL. Momentum, volatiliteden bağımsız yeni bir bilgi (incremental alpha) TAŞIMIYOR.")
     else:
-        print("-> Sınıf: INDEPENDENT ALPHA. İki faktör de ortogonal bilgi taşıyor.")
+        logger.info("-> Sınıf: INDEPENDENT ALPHA. İki faktör de ortogonal bilgi taşıyor.")
 
-    print("\n==================================================")
-    print("B & D) LOW-VOL + LOW-MOM HORIZONS & 2x2")
-    print("==================================================")
-    print(f"LOW-VOL + LOW-MOM (Avg Count: {df_res['LVLM_count'].mean():.1f})")
-    print(f"  1D Horizon: %{df_res['LVLM_1d'].mean():.3f}")
-    print(f"  5D Horizon: %{df_res['LVLM_5d'].mean():.3f}")
-    print(f" 10D Horizon: %{df_res['LVLM_10d'].mean():.3f}")
-    print(f" 20D Horizon: %{df_res['LVLM_20d'].mean():.3f}")
-    print(f"\nDiğer Gruplar (5D):")
-    print(f"LOW-VOL + HIGH-MOM : %{df_res['LVHM_5d'].mean():.3f}")
-    print(f"HIGH-VOL + LOW-MOM : %{df_res['HVLM_5d'].mean():.3f}")
-    print(f"HIGH-VOL + HIGH-MOM: %{df_res['HVHM_5d'].mean():.3f}")
+    logger.info("\n==================================================")
+    logger.info("B & D) LOW-VOL + LOW-MOM HORIZONS & 2x2")
+    logger.info("==================================================")
+    logger.info(f"LOW-VOL + LOW-MOM (Avg Count: {df_res['LVLM_count'].mean():.1f})")
+    logger.info(f"  1D Horizon: %{df_res['LVLM_1d'].mean():.3f}")
+    logger.info(f"  5D Horizon: %{df_res['LVLM_5d'].mean():.3f}")
+    logger.info(f" 10D Horizon: %{df_res['LVLM_10d'].mean():.3f}")
+    logger.info(f" 20D Horizon: %{df_res['LVLM_20d'].mean():.3f}")
+    logger.info(f"\nDiğer Gruplar (5D):")
+    logger.info(f"LOW-VOL + HIGH-MOM : %{df_res['LVHM_5d'].mean():.3f}")
+    logger.info(f"HIGH-VOL + LOW-MOM : %{df_res['HVLM_5d'].mean():.3f}")
+    logger.info(f"HIGH-VOL + HIGH-MOM: %{df_res['HVHM_5d'].mean():.3f}")
 
-    print("\n==================================================")
-    print("J) MONOTONICITY 5x5 MATRIX (Volatility x Momentum)")
-    print("==================================================")
-    print("Satırlar (0=Low Vol -> 4=High Vol) | Sütunlar (0=Low Mom -> 4=High Mom) | 5D Excess Return")
+    logger.info("\n==================================================")
+    logger.info("J) MONOTONICITY 5x5 MATRIX (Volatility x Momentum)")
+    logger.info("==================================================")
+    logger.info("Satırlar (0=Low Vol -> 4=High Vol) | Sütunlar (0=Low Mom -> 4=High Mom) | 5D Excess Return")
     matrix = np.zeros((5, 5))
     for i in range(5):
         row_str = f"Vol Q{i+1}: "
@@ -178,75 +181,75 @@ def run_alpha_orthogonality():
             val = df_res[f"M_{i}_{j}"].replace(0, np.nan).mean()
             matrix[i, j] = val
             row_str += f"| {val:6.2f}% "
-        print(row_str)
-    print("-> Teşhis: Matrix'te belirgin bir 'Low Vol + Low/Mid Mom' tepesi var. Ancak High-Vol sütunlarında tamamen eksi (toksik) getiriler var.")
+        logger.info(row_str)
+    logger.info("-> Teşhis: Matrix'te belirgin bir 'Low Vol + Low/Mid Mom' tepesi var. Ancak High-Vol sütunlarında tamamen eksi (toksik) getiriler var.")
 
-    print("\n==================================================")
-    print("E) REGIME STABILITY (LOW-VOL + LOW-MOM)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("E) REGIME STABILITY (LOW-VOL + LOW-MOM)")
+    logger.info("==================================================")
     for reg in ["EARLY_BULL", "LATE_BULL", "BEAR_MARKET", "SIDEWAYS_RANGE"]:
         sub = df_res[df_res["reg_trend"] == reg]
         spr = sub["LVLM_5d"].mean()
-        print(f"{reg:15} | 5D Excess Return: %{spr:6.3f}")
+        logger.info(f"{reg:15} | 5D Excess Return: %{spr:6.3f}")
     for reg in ["HIGH_VOL", "LOW_VOL"]:
         sub = df_res[df_res["reg_vol"] == reg]
         spr = sub["LVLM_5d"].mean()
-        print(f"MARKET {reg:8} | 5D Excess Return: %{spr:6.3f}")
+        logger.info(f"MARKET {reg:8} | 5D Excess Return: %{spr:6.3f}")
 
-    print("\n==================================================")
-    print("F) TEMPORAL STABILITY (5 BLOCKS)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("F) TEMPORAL STABILITY (5 BLOCKS)")
+    logger.info("==================================================")
     blocks = [df_res.iloc[idx] for idx in np.array_split(range(len(df_res)), 5)]
     pos_blocks = 0
     for i, b in enumerate(blocks):
         spr = b['LVLM_5d'].mean()
         if spr > 0: pos_blocks += 1
-        print(f"Block {i+1} | LVLM 5D Spread: %{spr:6.3f}")
-    print(f"Pozitif Blok Sayısı: {pos_blocks}/5")
+        logger.info(f"Block {i+1} | LVLM 5D Spread: %{spr:6.3f}")
+    logger.info(f"Pozitif Blok Sayısı: {pos_blocks}/5")
 
-    print("\n==================================================")
-    print("H) BEST-DAYS CONCENTRATION")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("H) BEST-DAYS CONCENTRATION")
+    logger.info("==================================================")
     sorted_spr = df_res['LVLM_5d'].sort_values(ascending=False).values
     n = len(sorted_spr)
-    print(f"Tüm Günler       : %{sorted_spr.mean():.3f}")
-    print(f"En İyi %1 Çıkar  : %{sorted_spr[int(n*0.01):].mean():.3f}")
-    print(f"En İyi %5 Çıkar  : %{sorted_spr[int(n*0.05):].mean():.3f}")
-    print(f"En İyi %10 Çıkar : %{sorted_spr[int(n*0.10):].mean():.3f}")
-    print(f"En İyi %20 Çıkar : %{sorted_spr[int(n*0.20):].mean():.3f}")
+    logger.info(f"Tüm Günler       : %{sorted_spr.mean():.3f}")
+    logger.info(f"En İyi %1 Çıkar  : %{sorted_spr[int(n*0.01):].mean():.3f}")
+    logger.info(f"En İyi %5 Çıkar  : %{sorted_spr[int(n*0.05):].mean():.3f}")
+    logger.info(f"En İyi %10 Çıkar : %{sorted_spr[int(n*0.10):].mean():.3f}")
+    logger.info(f"En İyi %20 Çıkar : %{sorted_spr[int(n*0.20):].mean():.3f}")
     if sorted_spr[int(n*0.05):].mean() <= 0:
-        print("-> Sınıf: CONCENTRATED / NON-ROBUST. (Alpha tamamen birkaç güne bağlı!)")
+        logger.info("-> Sınıf: CONCENTRATED / NON-ROBUST. (Alpha tamamen birkaç güne bağlı!)")
     else:
-        print("-> Sınıf: ROBUST / BROAD-BASED. (Ekstrem günler çıkınca da alpha korunuyor).")
+        logger.info("-> Sınıf: ROBUST / BROAD-BASED. (Ekstrem günler çıkınca da alpha korunuyor).")
 
-    print("\n==================================================")
-    print("G & I) BOOTSTRAP CI & NULL TEST")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("G & I) BOOTSTRAP CI & NULL TEST")
+    logger.info("==================================================")
     diffs = df_res['LVLM_5d'] - df_res['null_5d']
     np.random.seed(42)
     boot_means = [np.mean(np.random.choice(diffs, size=len(diffs), replace=True)) for _ in range(1000)]
     ci_L = np.percentile(boot_means, 2.5)
     ci_U = np.percentile(boot_means, 97.5)
     pval = np.mean(np.array(boot_means) <= 0)
-    print(f"Mean Difference (LVLM - Random) : %{diffs.mean():.3f}")
-    print(f"95% CI                          : [%{ci_L:.3f}, %{ci_U:.3f}]")
-    print(f"Empirical P-Value               : {pval:.4f}")
+    logger.info(f"Mean Difference (LVLM - Random) : %{diffs.mean():.3f}")
+    logger.info(f"95% CI                          : [%{ci_L:.3f}, %{ci_U:.3f}]")
+    logger.info(f"Empirical P-Value               : {pval:.4f}")
 
-    print("\n==================================================")
-    print("K) FEATURE ORTHOGONALITY")
-    print("==================================================")
-    print("CORE ALPHA: volatility_20d")
-    print("INCREMENTAL ALPHA: Yok.")
-    print("REDUNDANT: roc_20d (Volatilite faktörü kontrol edildiğinde IC'si sıfırlanıyor)")
-    print("REGIME-CONDITIONAL: Low-Vol yalnızca Late Bull ve High Market Vol dönemlerinde üstün getiri üretiyor.")
-    print("Cevap: LOW-MOM, LOW-VOL'dan bağımsız yeni bir bilgi TAŞIMIYOR. Low-Mom hisseleri halihazırda Low-Vol hisseleridir (faktör kesişimi/multicollinearity).")
+    logger.info("\n==================================================")
+    logger.info("K) FEATURE ORTHOGONALITY")
+    logger.info("==================================================")
+    logger.info("CORE ALPHA: volatility_20d")
+    logger.info("INCREMENTAL ALPHA: Yok.")
+    logger.info("REDUNDANT: roc_20d (Volatilite faktörü kontrol edildiğinde IC'si sıfırlanıyor)")
+    logger.info("REGIME-CONDITIONAL: Low-Vol yalnızca Late Bull ve High Market Vol dönemlerinde üstün getiri üretiyor.")
+    logger.info("Cevap: LOW-MOM, LOW-VOL'dan bağımsız yeni bir bilgi TAŞIMIYOR. Low-Mom hisseleri halihazırda Low-Vol hisseleridir (faktör kesişimi/multicollinearity).")
 
-    print("\n==================================================")
-    print("L) FINAL DECISION")
-    print("==================================================")
-    print("Karar: B) LOW-VOL = ROBUST CORE, LOW-MOM = REDUNDANT")
-    print("\nSoru: 'FAZ 22'de production-grade alpha model rebuild'e geçmek bilimsel olarak haklı mı?'")
-    print("Cevap: EVET. Elimizde piyasanın şans faktörünü yenen, null hipotezini %99 güvenle kıran ve konsantrasyon testine dayanan gerçek bir 'Low-Volatility' çekirdeği (Economic Core) olduğu kanıtlanmıştır. Toksik feature'lardan (Momentum) arındırılmış yeni bir Ranker mimarisi ile Phase 22 inşası başlatılabilir.")
+    logger.info("\n==================================================")
+    logger.info("L) FINAL DECISION")
+    logger.info("==================================================")
+    logger.info("Karar: B) LOW-VOL = ROBUST CORE, LOW-MOM = REDUNDANT")
+    logger.info("\nSoru: 'FAZ 22'de production-grade alpha model rebuild'e geçmek bilimsel olarak haklı mı?'")
+    logger.info("Cevap: EVET. Elimizde piyasanın şans faktörünü yenen, null hipotezini %99 güvenle kıran ve konsantrasyon testine dayanan gerçek bir 'Low-Volatility' çekirdeği (Economic Core) olduğu kanıtlanmıştır. Toksik feature'lardan (Momentum) arındırılmış yeni bir Ranker mimarisi ile Phase 22 inşası başlatılabilir.")
 
 if __name__ == "__main__":
     run_alpha_orthogonality()

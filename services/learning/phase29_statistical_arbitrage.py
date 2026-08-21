@@ -9,9 +9,9 @@ Z_ENTRY = 2.0
 Z_EXIT  = 0.5
 TC      = 0.002
 
-print("="*65)
-print("FAZ 29 v2 - PAIRS TRADING (Duzeltilmis)")
-print("="*65)
+logger.info("="*65)
+logger.info("FAZ 29 v2 - PAIRS TRADING (Duzeltilmis)")
+logger.info("="*65)
 
 def adf_pvalue(series):
     s = np.array(series.dropna()); n = len(s)
@@ -31,7 +31,7 @@ def half_life(spread):
     slope, *_ = stats.linregress(lag, diff)
     return -np.log(2) / slope if slope < 0 else np.inf
 
-print("\n[1/4] Veri yukleniyor...")
+logger.info("\n[1/4] Veri yukleniyor...")
 import yfinance as yf
 TICKERS = ["GARAN","AKBNK","ISCTR","YKBNK","HALKB","VAKBN",
            "KCHOL","SAHOL","GLYHO","TUPRS","AKSEN","ENJSA",
@@ -46,9 +46,9 @@ prices = prices.dropna(how="all")
 valid = [c for c in prices.columns if prices[c].notna().sum() >= 500]
 prices = prices[valid].ffill()
 returns = prices.pct_change()
-print(f"   {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
+logger.info(f"   {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
 
-print("\n[2/4] Koentegrasyon taramasi...")
+logger.info("\n[2/4] Koentegrasyon taramasi...")
 PAIRS = [
     ("GARAN","AKBNK","Banka"), ("GARAN","ISCTR","Banka"), ("GARAN","YKBNK","Banka"),
     ("AKBNK","ISCTR","Banka"), ("AKBNK","YKBNK","Banka"), ("ISCTR","YKBNK","Banka"),
@@ -74,11 +74,11 @@ for t1, t2, sec in PAIRS:
         hl = half_life(spread)
         if 5 <= hl <= 60:
             found.append({"t1":t1,"t2":t2,"sec":sec,"pv":pv,"hr":round(slope,4),"hl":round(hl,1)})
-            print(f"   ✓ {t1}/{t2} [{sec}] p={pv:.2f} hedge={slope:.3f} yari-omur={hl:.0f}gun")
+            logger.info(f"   ✓ {t1}/{t2} [{sec}] p={pv:.2f} hedge={slope:.3f} yari-omur={hl:.0f}gun")
 
-print(f"   Koentegre cift: {len(found)}")
+logger.info(f"   Koentegre cift: {len(found)}")
 
-print("\n[3/4] Backtest (getiri bazli PnL)...")
+logger.info("\n[3/4] Backtest (getiri bazli PnL)...")
 
 def backtest(t1, t2, hr, pdata, rdata, lookback=60):
     """
@@ -88,6 +88,9 @@ def backtest(t1, t2, hr, pdata, rdata, lookback=60):
     Short spread = short t1 / long t2
       gunluk PnL = -(r1 - hr*r2)
     """
+import structlog
+logger = structlog.get_logger()
+
     if t1 not in pdata.columns or t2 not in pdata.columns: return None
     p1 = pdata[t1].dropna(); p2 = pdata[t2].dropna()
     r1 = rdata[t1]; r2 = rdata[t2]
@@ -143,7 +146,7 @@ returns_full = returns[returns.index >= "2021-01-01"]
 bh = returns_full[bh_tks].mean(axis=1)
 bh_cum = (1+bh).cumprod(); bh_ny = len(bh)/252
 bh_cagr = (bh_cum.iloc[-1])**(1/bh_ny) - 1
-print(f"   BIST Sepet B&H CAGR: %{bh_cagr*100:.1f}")
+logger.info(f"   BIST Sepet B&H CAGR: %{bh_cagr*100:.1f}")
 
 prices_oos  = prices[(prices.index >= "2025-01-01") & (prices.index <= HOLDOUT)]
 returns_oos = returns[(returns.index >= "2025-01-01") & (returns.index <= HOLDOUT)]
@@ -159,14 +162,14 @@ for p in found:
 
 results.sort(key=lambda x: x["oos_sh"], reverse=True)
 
-print(f"\n   {'Cift':<16} {'OOS CAGR':>9} {'OOS Sh':>7} {'OOS DD':>8} {'Full%':>7} {'Full Sh':>8} {'Islem':>6} {'WinR':>6}")
-print(f"   {'-'*72}")
+logger.info(f"\n   {'Cift':<16} {'OOS CAGR':>9} {'OOS Sh':>7} {'OOS DD':>8} {'Full%':>7} {'Full Sh':>8} {'Islem':>6} {'WinR':>6}")
+logger.info(f"   {'-'*72}")
 for r in results:
     tag = " ***" if r["oos_cagr"]>80 else (" **" if r["oos_cagr"]>30 else (" *" if r["oos_cagr"]>0 else ""))
-    print(f"   {r['pair']:<16} {r['oos_cagr']:>8}% {r['oos_sh']:>6} {r['oos_dd']:>7}% {r['full_cagr']:>6}% {r['full_sh']:>7} {r['oos_n']:>6} %{r['oos_wr']:>4}{tag}")
+    logger.info(f"   {r['pair']:<16} {r['oos_cagr']:>8}% {r['oos_sh']:>6} {r['oos_dd']:>7}% {r['full_cagr']:>6}% {r['full_sh']:>7} {r['oos_n']:>6} %{r['oos_wr']:>4}{tag}")
 
 # Portfoy kombinasyonu
-print("\n[4/4] PORTFOY KOMBINASYONU...")
+logger.info("\n[4/4] PORTFOY KOMBINASYONU...")
 top = [r for r in results if r["full_sh"] > 0][:5]
 port_daily = []
 for r in top:
@@ -201,29 +204,29 @@ if port_daily and top:
     p_cagr   = (cum.iloc[-1])**(1/ny)-1 if cum.iloc[-1]>0 else -1
     p_sharpe = (port.mean()*252)/(port.std()*np.sqrt(252)+1e-9)
     p_dd     = (cum/cum.cummax()-1).min()
-    print(f"\n   ╔═══════════════════════════════════════╗")
-    print(f"   ║  PORTFOY (Pozitif Sharpe'li ciftler) ║")
-    print(f"   ║  CAGR:      %{p_cagr*100:>6.1f}                 ║")
-    print(f"   ║  Sharpe:     {p_sharpe:>6.2f}                 ║")
-    print(f"   ║  Max DD:    %{p_dd*100:>6.1f}                 ║")
-    print(f"   ║  B&H CAGR:  %{bh_cagr*100:>6.1f}                 ║")
-    print(f"   ║  Alpha:     %{(p_cagr-bh_cagr)*100:>+6.1f}                 ║")
-    print(f"   ╚═══════════════════════════════════════╝")
+    logger.info(f"\n   ╔═══════════════════════════════════════╗")
+    logger.info(f"   ║  PORTFOY (Pozitif Sharpe'li ciftler) ║")
+    logger.info(f"   ║  CAGR:      %{p_cagr*100:>6.1f}                 ║")
+    logger.info(f"   ║  Sharpe:     {p_sharpe:>6.2f}                 ║")
+    logger.info(f"   ║  Max DD:    %{p_dd*100:>6.1f}                 ║")
+    logger.info(f"   ║  B&H CAGR:  %{bh_cagr*100:>6.1f}                 ║")
+    logger.info(f"   ║  Alpha:     %{(p_cagr-bh_cagr)*100:>+6.1f}                 ║")
+    logger.info(f"   ╚═══════════════════════════════════════╝")
 else:
-    print("   Pozitif Sharpe'li cift yok - portfoy olusturulamadi")
+    logger.info("   Pozitif Sharpe'li cift yok - portfoy olusturulamadi")
 
-print("\n"+"="*65)
+logger.info("\n"+"="*65)
 pos_oos = [r for r in results if r["oos_cagr"] > 0]
 strong  = [r for r in results if r["oos_cagr"] > 50]
 if strong:
-    print(f"KARAR: GUCLU ALPHA ({len(strong)} cift >%50 OOS)")
+    logger.info(f"KARAR: GUCLU ALPHA ({len(strong)} cift >%50 OOS)")
 elif pos_oos:
-    print(f"KARAR: ORTA ALPHA ({len(pos_oos)} cift pozitif OOS)")
-    print(f"       B&H: %{bh_cagr*100:.1f} - hedef: %100")
+    logger.info(f"KARAR: ORTA ALPHA ({len(pos_oos)} cift pozitif OOS)")
+    logger.info(f"       B&H: %{bh_cagr*100:.1f} - hedef: %100")
 else:
-    print("KARAR: REJECT - Pairs trading bu formda BIST'te calismiyor")
-    print("       Neden: Yuksek enflasyon doneminde koentegrasyon bozuluyor")
-    print("       Alternatif: Sektör rotasyonu veya momentum")
+    logger.info("KARAR: REJECT - Pairs trading bu formda BIST'te calismiyor")
+    logger.info("       Neden: Yuksek enflasyon doneminde koentegrasyon bozuluyor")
+    logger.info("       Alternatif: Sektör rotasyonu veya momentum")
 for r in results[:3]:
-    print(f"  {r['pair']}: OOS %{r['oos_cagr']} CAGR / Sharpe {r['oos_sh']}")
-print("="*65)
+    logger.info(f"  {r['pair']}: OOS %{r['oos_cagr']} CAGR / Sharpe {r['oos_sh']}")
+logger.info("="*65)

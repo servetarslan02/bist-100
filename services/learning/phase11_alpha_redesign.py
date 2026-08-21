@@ -14,6 +14,9 @@ from services.learning.institutional_walkforward_engine import (
     extract_point_in_time_features
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def build_offline_dataset():
     stock_data, xu100_close = load_all_market_data()
@@ -94,7 +97,7 @@ def walk_forward_offline(df, val_dates, feature_cols):
         if step % 20 != 0 and step > 0:
             continue # Retrain every 20 days
             
-        print(f"Training models for validation date: {val_d.date()}")
+        logger.info(f"Training models for validation date: {val_d.date()}")
         # PURGED EMBARGO: Train ends 7 calendar days before val_d
         cutoff = val_d - timedelta(days=7)
         train_df = df[df['date'] <= cutoff].copy()
@@ -145,35 +148,35 @@ def walk_forward_offline(df, val_dates, feature_cols):
 def analyze_models(res_df):
     models = ['M0_pred', 'M1_pred', 'M2_pred', 'M3_pred', 'M4_pred']
     
-    print("\n" + "="*50)
-    print("7. MODEL QUALITY METRICS")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("7. MODEL QUALITY METRICS")
+    logger.info("="*50)
     
     def calc_ic(df_sub, pred_col):
         return df_sub.groupby('date').apply(lambda x: spearmanr(x[pred_col], x['fwd_5d'])[0] if len(x)>5 else np.nan).mean()
         
-    print(f"{'Metric':<15} | {'M0 (Reg-Raw)':<12} | {'M1 (Rank-Raw)':<13} | {'M2 (Reg-Exc)':<12} | {'M3 (Rank-Exc)':<13} | {'M4 (Rank-Risk)':<14}")
-    print("-" * 85)
+    logger.info(f"{'Metric':<15} | {'M0 (Reg-Raw)':<12} | {'M1 (Rank-Raw)':<13} | {'M2 (Reg-Exc)':<12} | {'M3 (Rank-Exc)':<13} | {'M4 (Rank-Risk)':<14}")
+    logger.info("-" * 85)
     
     # Overall IC
     ic_overall = [calc_ic(res_df, m) for m in models]
-    print(f"{'Overall IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_overall]))
+    logger.info(f"{'Overall IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_overall]))
     
     # Early Bull IC
     ic_early = [calc_ic(res_df[res_df['bull_phase']=='EARLY_BULL'], m) for m in models]
-    print(f"{'Early Bull IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_early]))
+    logger.info(f"{'Early Bull IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_early]))
     
     # Late Bull IC
     ic_late = [calc_ic(res_df[res_df['bull_phase']=='LATE_BULL'], m) for m in models]
-    print(f"{'Late Bull IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_late]))
+    logger.info(f"{'Late Bull IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_late]))
     
     # Bear IC
     ic_bear = [calc_ic(res_df[res_df['regime']=='BEAR_MARKET'], m) for m in models]
-    print(f"{'Bear IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_bear]))
+    logger.info(f"{'Bear IC':<15} | " + " | ".join([f"{x:>12.4f}" for x in ic_bear]))
     
-    print("\n" + "="*50)
-    print("TOP-BOTTOM SPREAD (BULL TREND)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("TOP-BOTTOM SPREAD (BULL TREND)")
+    logger.info("="*50)
     bull_df = res_df[res_df['regime']=='BULL_TREND']
     for m in models:
         bull_df[f'{m}_decile'] = bull_df.groupby('date')[m].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates='drop'))
@@ -184,26 +187,26 @@ def analyze_models(res_df):
             top_ret = decile_ret.iloc[-1]
             bot_ret = decile_ret.iloc[0]
             spread = top_ret - bot_ret
-            print(f"{m:<15}: Top={top_ret:>5.2f}% | Bot={bot_ret:>5.2f}% | Spread={spread:>6.2f}%")
+            logger.info(f"{m:<15}: Top={top_ret:>5.2f}% | Bot={bot_ret:>5.2f}% | Spread={spread:>6.2f}%")
         except:
             pass
 
 if __name__ == "__main__":
-    print("🚀 PHASE 11: OFFLINE MODEL REDESIGN")
+    logger.info("🚀 PHASE 11: OFFLINE MODEL REDESIGN")
     df, val_dates, f_cols = build_offline_dataset()
     
-    print("\n" + "="*50)
-    print("3. LABEL CANDIDATES ANALYSIS (Overall Correlation w/ Fwd5d)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("3. LABEL CANDIDATES ANALYSIS (Overall Correlation w/ Fwd5d)")
+    logger.info("="*50)
     for label in ['L0_raw', 'L1_excess', 'L2_cs_rank', 'L3_excess_rank', 'L4_vol_adj_excess']:
         ic = df.groupby('date').apply(lambda x: spearmanr(x[label], x['fwd_5d'])[0] if len(x)>5 else np.nan).mean()
-        print(f"{label:<20} -> True Fwd5d Spearman IC: {ic:.4f}")
+        logger.info(f"{label:<20} -> True Fwd5d Spearman IC: {ic:.4f}")
         
     res_df = walk_forward_offline(df, val_dates, f_cols)
     analyze_models(res_df)
     
-    print("\n" + "="*50)
-    print("8. PURGED WALK-FORWARD AUDIT")
-    print("="*50)
-    print("Temporal Separation : Embargo implemented (Train ends at T-7 for Val at T)")
-    print("Overlap Issue       : Mitigated cleanly via physical temporal gap.")
+    logger.info("\n" + "="*50)
+    logger.info("8. PURGED WALK-FORWARD AUDIT")
+    logger.info("="*50)
+    logger.info("Temporal Separation : Embargo implemented (Train ends at T-7 for Val at T)")
+    logger.info("Overlap Issue       : Mitigated cleanly via physical temporal gap.")

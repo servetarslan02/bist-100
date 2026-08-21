@@ -15,6 +15,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def run_label_forensics():
     stock_data, xu100_close = load_all_market_data()
@@ -80,30 +83,30 @@ def run_label_forensics():
     
     df = df.merge(regime_df[['bull_phase']], left_on='date', right_index=True, how='left')
 
-    print("\n" + "="*50)
-    print("5. OBJECTIVE & LABEL AUDIT (CODE INSPECTION)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("5. OBJECTIVE & LABEL AUDIT (CODE INSPECTION)")
+    logger.info("="*50)
     # Check the actual ModelTrainer logic via its classes
     is_regression = True
-    print(f"Model Objective: {'REGRESSION' if is_regression else 'RANKING/CLASSIFICATION'}")
-    print("Label Variable : target_5d_ret (Raw (t+5 - t)/t )")
-    print("Cross-Sectional: NO (Model predicts absolute raw returns, not relative rank or groups)")
+    logger.info(f"Model Objective: {'REGRESSION' if is_regression else 'RANKING/CLASSIFICATION'}")
+    logger.info("Label Variable : target_5d_ret (Raw (t+5 - t)/t )")
+    logger.info("Cross-Sectional: NO (Model predicts absolute raw returns, not relative rank or groups)")
     
-    print("\n" + "="*50)
-    print("1. ALTERNATIVE LABEL FORENSICS (IC BY LABEL TYPE)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("1. ALTERNATIVE LABEL FORENSICS (IC BY LABEL TYPE)")
+    logger.info("="*50)
     def calc_ic(label):
         return df.groupby('date').apply(lambda x: spearmanr(x['roc_20d'], x[label])[0] if len(x)>5 else np.nan).mean()
     
-    print("ROC_20D Feature IC against different theoretically superior labels:")
-    print(f"A) Raw 5D Return        : {calc_ic('fwd_5d_raw'):.4f}")
-    print(f"B) Excess vs XU100      : {calc_ic('fwd_5d_excess'):.4f}")
-    print(f"C) Cross-Sectional Rank : {calc_ic('cs_rank'):.4f}")
-    print(f"D) Risk-Adjusted Ret    : {calc_ic('risk_adj_ret'):.4f}")
+    logger.info("ROC_20D Feature IC against different theoretically superior labels:")
+    logger.info(f"A) Raw 5D Return        : {calc_ic('fwd_5d_raw'):.4f}")
+    logger.info(f"B) Excess vs XU100      : {calc_ic('fwd_5d_excess'):.4f}")
+    logger.info(f"C) Cross-Sectional Rank : {calc_ic('cs_rank'):.4f}")
+    logger.info(f"D) Risk-Adjusted Ret    : {calc_ic('risk_adj_ret'):.4f}")
 
-    print("\n" + "="*50)
-    print("2. FEATURE FORENSICS (BULL_TREND EARLY vs LATE)")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("2. FEATURE FORENSICS (BULL_TREND EARLY vs LATE)")
+    logger.info("="*50)
     
     bull_df = df[df['regime'] == 'BULL_TREND']
     
@@ -111,26 +114,26 @@ def run_label_forensics():
         return grp.groupby('date').apply(lambda x: spearmanr(x[feature], x[target])[0] if len(x)>5 else np.nan).mean()
     
     features_to_check = ['roc_20d', 'price_vs_sma20', 'price_vs_sma200', 'volume_zscore', 'volatility_20d']
-    print(f"{'Feature':<16} | {'Overall Bull':<12} | {'Early Bull':<12} | {'Late Bull':<12}")
+    logger.info(f"{'Feature':<16} | {'Overall Bull':<12} | {'Early Bull':<12} | {'Late Bull':<12}")
     for f in features_to_check:
         o_ic = calc_ic_feature(bull_df, f)
         e_ic = calc_ic_feature(bull_df[bull_df['bull_phase'] == 'EARLY_BULL'], f)
         l_ic = calc_ic_feature(bull_df[bull_df['bull_phase'] == 'LATE_BULL'], f)
-        print(f"{f:<16} | {o_ic:>12.4f} | {e_ic:>12.4f} | {l_ic:>12.4f}")
+        logger.info(f"{f:<16} | {o_ic:>12.4f} | {e_ic:>12.4f} | {l_ic:>12.4f}")
         
-    print("\n" + "="*50)
-    print("4. CROSS-SECTIONAL vs ABSOLUTE TARGET DECOMPOSITION")
-    print("="*50)
+    logger.info("\n" + "="*50)
+    logger.info("4. CROSS-SECTIONAL vs ABSOLUTE TARGET DECOMPOSITION")
+    logger.info("="*50)
     # Does predicting absolute returns cause us to chase volatile outliers?
     # Let's look at the correlation between Volatility and the Labels
     corr_vol_raw = calc_ic_feature(df, 'volatility_20d', 'fwd_5d_raw')
     corr_vol_rank = calc_ic_feature(df, 'volatility_20d', 'cs_rank')
     
-    print(f"Volatility vs Raw Return IC: {corr_vol_raw:.4f}")
-    print(f"Volatility vs CS Rank IC   : {corr_vol_rank:.4f}")
+    logger.info(f"Volatility vs Raw Return IC: {corr_vol_raw:.4f}")
+    logger.info(f"Volatility vs CS Rank IC   : {corr_vol_rank:.4f}")
     if abs(corr_vol_raw) > abs(corr_vol_rank):
-         print("-> Raw Return target is heavily biased by high-volatility stocks (Outlier bias).")
+         logger.info("-> Raw Return target is heavily biased by high-volatility stocks (Outlier bias).")
 
 if __name__ == "__main__":
-    print("🚀 PHASE 10: ALPHA MODEL ROOT-CAUSE & LABEL/OBJECTIVE AUDIT")
+    logger.info("🚀 PHASE 10: ALPHA MODEL ROOT-CAUSE & LABEL/OBJECTIVE AUDIT")
     run_label_forensics()

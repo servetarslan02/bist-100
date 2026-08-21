@@ -26,6 +26,9 @@ from catboost import CatBoostClassifier
 import xgboost as xgb
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data,
     extract_point_in_time_features,
     detect_market_regime,
@@ -34,9 +37,9 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_final_holdout_validation():
-    print("=================================================================")
-    print("ALPHA BIST — FINAL HOLDOUT VALIDATION (3-WAY SPLIT)")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — FINAL HOLDOUT VALIDATION (3-WAY SPLIT)")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -64,11 +67,11 @@ def run_final_holdout_validation():
     val_dates = common_dates[split_train_idx:split_val_idx]
     holdout_dates = common_dates[split_val_idx:-5]  # Son 5 gün kapanmamış trade'ler hariç
 
-    print(f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)")
-    print(f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
-    print(f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)")
-    print("-----------------------------------------------------------------")
-    print("⚠️ UYARI: Final Holdout verisi hiçbir parametre seçiminde veya optimizasyonda kullanılmamıştır.\n")
+    logger.info(f"🔒 1. TRAIN Dönemi:         {train_dates[0].strftime('%Y-%m-%d')} - {train_dates[-1].strftime('%Y-%m-%d')} ({len(train_dates)} gün)")
+    logger.info(f"🔒 2. VALIDATION Dönemi:    {val_dates[0].strftime('%Y-%m-%d')} - {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
+    logger.info(f"🎯 3. FINAL HOLDOUT Dönemi: {holdout_dates[0].strftime('%Y-%m-%d')} - {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)")
+    logger.info("-----------------------------------------------------------------")
+    logger.info("⚠️ UYARI: Final Holdout verisi hiçbir parametre seçiminde veya optimizasyonda kullanılmamıştır.\n")
 
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "XGBoost_Model", "Cross_Sectional_Momentum", "SPEC_Anomaly_Detector", "LSTM_Sequential"]
 
@@ -103,7 +106,7 @@ def run_final_holdout_validation():
     # 4. Equal-Weight 20 Hisse
 
     # 1. OPTIMIZED ENGINE RUN
-    print("🚀 [1/4] Alpha BIST Optimized (Dondurulmuş Parametreler) Final Holdout'ta Koşuluyor...", flush=True)
+    logger.info("🚀 [1/4] Alpha BIST Optimized (Dondurulmuş Parametreler) Final Holdout'ta Koşuluyor...", flush=True)
     trainer_opt = ModelTrainer(feature_cols)
     portfolio_cash_opt = INITIAL_CAPITAL
     positions_opt: Dict[str, Dict[str, Any]] = {}
@@ -127,7 +130,7 @@ def run_final_holdout_validation():
     completed_totals_opt = {m: 0 for m in models}
 
     # 2. ORIGINAL ENGINE RUN (Naive 5-Day)
-    print("🚀 [2/4] Alpha BIST Original (Naive 5-Day Churn) Final Holdout'ta Koşuluyor...", flush=True)
+    logger.info("🚀 [2/4] Alpha BIST Original (Naive 5-Day Churn) Final Holdout'ta Koşuluyor...", flush=True)
     trainer_orig = ModelTrainer(feature_cols)
     portfolio_cash_orig = INITIAL_CAPITAL
     positions_orig: Dict[str, Dict[str, Any]] = {}
@@ -440,52 +443,52 @@ def run_final_holdout_validation():
     avg_exp = np.mean(daily_exposures_opt)
     avg_cash = np.mean(daily_cash_pct_opt)
 
-    print("\n=================================================================")
-    print("📊 FINAL HOLDOUT KARŞILAŞTIRMA MATRİSİ (TAMAMEN GÖRÜLMEMİŞ DÖNEM)")
-    print("=================================================================")
-    print(f"| Metrik | ALPHA BIST (Optimized) | ALPHA BIST (Original) | XU100 Buy & Hold | Equal-Weight BIST |")
-    print(f"|---|---|---|---|---|")
-    print(f"| **Bitiş Sermayesi** | **₺{m_opt['final_equity']:,.2f}** | ₺{m_orig['final_equity']:,.2f} | ₺{m_xu['final_equity']:,.2f} | ₺{m_ew['final_equity']:,.2f} |")
-    print(f"| **Toplam Net Getiri** | **%{m_opt['total_return']:+.2f}** | %{m_orig['total_return']:+.2f} | %{m_xu['total_return']:+.2f} | %{m_ew['total_return']:+.2f} |")
-    print(f"| **CAGR (Yıllık Getiri)** | **%{m_opt['cagr']:+.2f}** | %{m_orig['cagr']:+.2f} | %{m_xu['cagr']:+.2f} | %{m_ew['cagr']:+.2f} |")
-    print(f"| **Maksimum Drawdown** | **%{m_opt['max_dd']:.2f}** | %{m_orig['max_dd']:.2f} | %{m_xu['max_dd']:.2f} | %{m_ew['max_dd']:.2f} |")
-    print(f"| **Sharpe Oranı (Rf=%40)** | **{m_opt['sharpe']:.2f}** | {m_orig['sharpe']:.2f} | {m_xu['sharpe']:.2f} | {m_ew['sharpe']:.2f} |")
-    print(f"| **Calmar Oranı** | **{m_opt['calmar']:.2f}** | {m_orig['calmar']:.2f} | {m_xu['calmar']:.2f} | {m_ew['calmar']:.2f} |")
-    print(f"| **Kâr Faktörü (Profit Factor)** | **{m_opt['profit_factor']:.2f}** | {m_orig['profit_factor']:.2f} | - | - |")
-    print(f"| **Kazanma Oranı (Win Rate)** | **%{m_opt['win_rate']:.1f}** | %{m_orig['win_rate']:.1f} | - | - |")
-    print(f"| **İşlem Sayısı (Trades)** | **{m_opt['trades']}** | {m_orig['trades']} | 1 | 20 |")
-    print(f"| **Yıllık Devir Hızı (Turnover)** | **{m_opt['turnover']:.1f}/yıl** | {m_orig['turnover']:.1f}/yıl | 0.0 | 0.0 |")
-    print(f"| **Toplam Ödenen Komisyon** | **₺{m_opt['costs']:,.2f}** | ₺{m_orig['costs']:,.2f} | ₺0.00 | ₺0.00 |")
+    logger.info("\n=================================================================")
+    logger.info("📊 FINAL HOLDOUT KARŞILAŞTIRMA MATRİSİ (TAMAMEN GÖRÜLMEMİŞ DÖNEM)")
+    logger.info("=================================================================")
+    logger.info(f"| Metrik | ALPHA BIST (Optimized) | ALPHA BIST (Original) | XU100 Buy & Hold | Equal-Weight BIST |")
+    logger.info(f"|---|---|---|---|---|")
+    logger.info(f"| **Bitiş Sermayesi** | **₺{m_opt['final_equity']:,.2f}** | ₺{m_orig['final_equity']:,.2f} | ₺{m_xu['final_equity']:,.2f} | ₺{m_ew['final_equity']:,.2f} |")
+    logger.info(f"| **Toplam Net Getiri** | **%{m_opt['total_return']:+.2f}** | %{m_orig['total_return']:+.2f} | %{m_xu['total_return']:+.2f} | %{m_ew['total_return']:+.2f} |")
+    logger.info(f"| **CAGR (Yıllık Getiri)** | **%{m_opt['cagr']:+.2f}** | %{m_orig['cagr']:+.2f} | %{m_xu['cagr']:+.2f} | %{m_ew['cagr']:+.2f} |")
+    logger.info(f"| **Maksimum Drawdown** | **%{m_opt['max_dd']:.2f}** | %{m_orig['max_dd']:.2f} | %{m_xu['max_dd']:.2f} | %{m_ew['max_dd']:.2f} |")
+    logger.info(f"| **Sharpe Oranı (Rf=%40)** | **{m_opt['sharpe']:.2f}** | {m_orig['sharpe']:.2f} | {m_xu['sharpe']:.2f} | {m_ew['sharpe']:.2f} |")
+    logger.info(f"| **Calmar Oranı** | **{m_opt['calmar']:.2f}** | {m_orig['calmar']:.2f} | {m_xu['calmar']:.2f} | {m_ew['calmar']:.2f} |")
+    logger.info(f"| **Kâr Faktörü (Profit Factor)** | **{m_opt['profit_factor']:.2f}** | {m_orig['profit_factor']:.2f} | - | - |")
+    logger.info(f"| **Kazanma Oranı (Win Rate)** | **%{m_opt['win_rate']:.1f}** | %{m_orig['win_rate']:.1f} | - | - |")
+    logger.info(f"| **İşlem Sayısı (Trades)** | **{m_opt['trades']}** | {m_orig['trades']} | 1 | 20 |")
+    logger.info(f"| **Yıllık Devir Hızı (Turnover)** | **{m_opt['turnover']:.1f}/yıl** | {m_orig['turnover']:.1f}/yıl | 0.0 | 0.0 |")
+    logger.info(f"| **Toplam Ödenen Komisyon** | **₺{m_opt['costs']:,.2f}** | ₺{m_orig['costs']:,.2f} | ₺0.00 | ₺0.00 |")
 
-    print("\n🔍 EK KURUMSAL RİSK VE POZİSYON METRİKLERİ:")
-    print(f"  • Ortalama Tutma Süresi (Avg Holding Period): {avg_holding:.1f} gün")
-    print(f"  • Portföy Betası (vs XU100):                   {beta:.2f}")
-    print(f"  • Jensen's Yıllık Alfa (vs XU100):             %{alpha_annual:+.2f}")
-    print(f"  • Ortalama Piyasa Maruziyeti (Exposure):       %{avg_exp:.1f}")
-    print(f"  • Ortalama Nakit Oranı (Cash %):               %{avg_cash:.1f}")
+    logger.info("\n🔍 EK KURUMSAL RİSK VE POZİSYON METRİKLERİ:")
+    logger.info(f"  • Ortalama Tutma Süresi (Avg Holding Period): {avg_holding:.1f} gün")
+    logger.info(f"  • Portföy Betası (vs XU100):                   {beta:.2f}")
+    logger.info(f"  • Jensen's Yıllık Alfa (vs XU100):             %{alpha_annual:+.2f}")
+    logger.info(f"  • Ortalama Piyasa Maruziyeti (Exposure):       %{avg_exp:.1f}")
+    logger.info(f"  • Ortalama Nakit Oranı (Cash %):               %{avg_cash:.1f}")
 
-    print("\n📅 FINAL HOLDOUT AYLIK GETİRİ DAĞILIMI (Strateji vs XU100):")
-    print("| Ay | ALPHA BIST Optimized | XU100 Getiri | Aylık Alfa |")
-    print("|---|---|---|---|")
+    logger.info("\n📅 FINAL HOLDOUT AYLIK GETİRİ DAĞILIMI (Strateji vs XU100):")
+    logger.info("| Ay | ALPHA BIST Optimized | XU100 Getiri | Aylık Alfa |")
+    logger.info("|---|---|---|---|")
     for m_k, m_v in monthly_perf_opt.items():
         s_ret = (m_v["strat_end"] / m_v["strat_start"] - 1.0) * 100.0
         x_ret = (m_v["xu_end"] / m_v["xu_start"] - 1.0) * 100.0
         alpha = s_ret - x_ret
-        print(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
+        logger.info(f"| {m_k} | %{s_ret:+.2f} | %{x_ret:+.2f} | %{alpha:+.2f} |")
 
-    print("\n🌐 FINAL HOLDOUT REJİM BAZLI KÂR/ZARAR:")
-    print("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 FINAL HOLDOUT REJİM BAZLI KÂR/ZARAR:")
+    logger.info("| Rejim | Kümülatif Net PnL | İşlem Sayısı | Kazanma Oranı |")
+    logger.info("|---|---|---|---|")
     for reg_name, reg_data in regime_pnl_opt.items():
         reg_wr = (reg_data["wins"] / reg_data["trades"] * 100.0) if reg_data["trades"] > 0 else 0.0
-        print(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
+        logger.info(f"| {reg_name} | ₺{reg_data['pnl']:+,.2f} | {reg_data['trades']} | %{reg_wr:.1f} |")
 
     # =========================================================================
     # 9. KESİN VE TAVİZSİZ SONUÇ DEĞERLENDİRMESİ
     # =========================================================================
-    print("\n=================================================================")
-    print("🎯 BİLİMSEL VE TAVİZSİZ NİHAİ KARAR:")
-    print("=================================================================")
+    logger.info("\n=================================================================")
+    logger.info("🎯 BİLİMSEL VE TAVİZSİZ NİHAİ KARAR:")
+    logger.info("=================================================================")
     
     if m_opt["total_return"] > 0 and m_opt["profit_factor"] >= 1.3 and m_opt["max_dd"] < m_xu["max_dd"]:
         verdict = "A) ROBUST"
@@ -497,9 +500,9 @@ def run_final_holdout_validation():
         verdict = "C) OVERFIT"
         desc = "Final holdout döneminde pozitif edge kayboldu ve strateji net zarar yazdı."
 
-    print(f"KARAR: {verdict}")
-    print(f"AÇIKLAMA: {desc}")
-    print("=================================================================")
+    logger.info(f"KARAR: {verdict}")
+    logger.info(f"AÇIKLAMA: {desc}")
+    logger.info("=================================================================")
 
     return {
         "verdict": verdict,

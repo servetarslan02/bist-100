@@ -7,6 +7,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -86,8 +89,8 @@ def evaluate_timing(xu100_df, signal_col, tc=0.001):
     }
 
 def run_phase_26():
-    print("🚀 FAZ 26: MARKET REGIME & TIMING ALPHA DISCOVERY")
-    print("Kurallar: Holdout Kilitli. ML Yok. Market Timing & Downside Protection.\n")
+    logger.info("🚀 FAZ 26: MARKET REGIME & TIMING ALPHA DISCOVERY")
+    logger.info("Kurallar: Holdout Kilitli. ML Yok. Market Timing & Downside Protection.\n")
     
     stock_data, xu100_close = load_all_market_data()
     
@@ -139,50 +142,50 @@ def run_phase_26():
     
     any_robust = False
     
-    print("==================================================")
-    print("BASELINE: BUY & HOLD BIST100")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("BASELINE: BUY & HOLD BIST100")
+    logger.info("==================================================")
     bh_ret = df["ret_1d"].mean() * 252 * 100
     bh_vol = df["ret_1d"].std() * np.sqrt(252) * 100
     bh_shp = bh_ret / bh_vol
     bh_dd = calc_max_dd(df["ret_1d"]) * 100
-    print(f"Ann Return: %{bh_ret:.1f} | Sharpe: {bh_shp:.2f} | Max DD: %{bh_dd:.1f}\n")
+    logger.info(f"Ann Return: %{bh_ret:.1f} | Sharpe: {bh_shp:.2f} | Max DD: %{bh_dd:.1f}\n")
     
     for name, col in signals.items():
-        print("==================================================")
-        print(f"STRATEGY: {name}")
-        print("==================================================")
+        logger.info("==================================================")
+        logger.info(f"STRATEGY: {name}")
+        logger.info("==================================================")
         
         m = evaluate_timing(df, col, tc=0.001) # 10 bps flip cost
         if not m:
-            print("Data error.")
+            logger.info("Data error.")
             continue
             
-        print(f"Exposure   : %{m['exposure']:.1f} time invested")
-        print(f"Ann Return : %{m['ann_ret']:.1f} (vs B&H %{m['bh_ret']:.1f})")
-        print(f"Sharpe     : {m['sharpe']:.2f} (vs B&H {m['bh_sharpe']:.2f})")
-        print(f"Max DD     : %{m['max_dd']:.1f} (vs B&H %{m['bh_max_dd']:.1f})")
-        print(f"Down Capture:%{m['down_cap']:.1f} of market losses")
+        logger.info(f"Exposure   : %{m['exposure']:.1f} time invested")
+        logger.info(f"Ann Return : %{m['ann_ret']:.1f} (vs B&H %{m['bh_ret']:.1f})")
+        logger.info(f"Sharpe     : {m['sharpe']:.2f} (vs B&H {m['bh_sharpe']:.2f})")
+        logger.info(f"Max DD     : %{m['max_dd']:.1f} (vs B&H %{m['bh_max_dd']:.1f})")
+        logger.info(f"Down Capture:%{m['down_cap']:.1f} of market losses")
         
-        print("\nNULL / RANDOM TIMING SHUFFLE (Same exposure)")
-        print(f"95% CI Sharpe: [{m['ci_L']:.2f}, {m['ci_U']:.2f}]")
-        print(f"Empirical P-Value: {m['pval']:.4f}")
+        logger.info("\nNULL / RANDOM TIMING SHUFFLE (Same exposure)")
+        logger.info(f"95% CI Sharpe: [{m['ci_L']:.2f}, {m['ci_U']:.2f}]")
+        logger.info(f"Empirical P-Value: {m['pval']:.4f}")
         
-        print(f"\nTIME BLOCKS SHARPE: {[round(x,2) for x in m['block_sharpes']]}")
+        logger.info(f"\nTIME BLOCKS SHARPE: {[round(x,2) for x in m['block_sharpes']]}")
         
         robust = (m['pval'] < 0.05 and m['sharpe'] > m['bh_sharpe'] and m['max_dd'] > m['bh_max_dd'] and all(x > 0 for x in m['block_sharpes']))
         if m['pval'] < 0.05 and m['sharpe'] > m['bh_sharpe']:
-            print("=> KARAR: PROMISING (Beats Buy&Hold and Random)")
+            logger.info("=> KARAR: PROMISING (Beats Buy&Hold and Random)")
             any_robust = True
         else:
-            print("=> KARAR: REJECT (Fails statistical/performance tests)")
+            logger.info("=> KARAR: REJECT (Fails statistical/performance tests)")
             
-    print("\n==================================================")
-    print("FINAL PHASE 26 DECISION")
+    logger.info("\n==================================================")
+    logger.info("FINAL PHASE 26 DECISION")
     if any_robust:
-        print("B) PROMISING — FURTHER TEST (En az bir adet Market Timing stratejisi B&H ve şans faktörünü yendi)")
+        logger.info("B) PROMISING — FURTHER TEST (En az bir adet Market Timing stratejisi B&H ve şans faktörünü yendi)")
     else:
-        print("C) NO ROBUST EDGE (Tüm timing sinyalleri işlem maliyeti veya şans testine yenildi)")
+        logger.info("C) NO ROBUST EDGE (Tüm timing sinyalleri işlem maliyeti veya şans testine yenildi)")
 
 if __name__ == "__main__":
     run_phase_26()

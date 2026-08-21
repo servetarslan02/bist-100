@@ -22,13 +22,16 @@ from services.learning.institutional_walkforward_engine import (
     ModelTrainer,
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 
 def run_multi_fold_optimization():
-    print("=================================================================")
-    print("ALPHA BIST — PHASE 3 & 4: MULTI-FOLD CANDIDATE OPTIMIZER")
-    print("=================================================================")
-    print("🔒 GÜVENLİK PROTOKOLÜ: Sadece TRAIN/VALIDATION (2024-09 -> 2025-10) kullanılıyor.")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — PHASE 3 & 4: MULTI-FOLD CANDIDATE OPTIMIZER")
+    logger.info("=================================================================")
+    logger.info("🔒 GÜVENLİK PROTOKOLÜ: Sadece TRAIN/VALIDATION (2024-09 -> 2025-10) kullanılıyor.")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -83,10 +86,10 @@ def run_multi_fold_optimization():
 
     trainer = ModelTrainer(feature_cols)
 
-    print(f"\n🚀 4 Aday Mimari 4 Ayrı Fold Üzerinde Test Ediliyor...\n")
+    logger.info(f"\n🚀 4 Aday Mimari 4 Ayrı Fold Üzerinde Test Ediliyor...\n")
 
     for f_name, f_dates in folds:
-        print(f"--- {f_name} ({f_dates[0].strftime('%Y-%m-%d')} - {f_dates[-1].strftime('%Y-%m-%d')}) ---")
+        logger.info(f"--- {f_name} ({f_dates[0].strftime('%Y-%m-%d')} - {f_dates[-1].strftime('%Y-%m-%d')}) ---")
         # Fold öncesi retraining
         train_rows = [fdf.loc[:f_dates[0] - timedelta(days=7)] for fdf in features_by_ticker.values()]
         comb_train = pd.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
@@ -95,7 +98,7 @@ def run_multi_fold_optimization():
         # XU100 Getirisi
         xu_f_ret = (float(xu100_close.loc[f_dates[-1]]) / float(xu100_close.loc[f_dates[0]]) - 1.0) * 100.0
         xu_returns.append(xu_f_ret)
-        print(f"  • XU100 Fold Getirisi: %{xu_f_ret:+.2f}")
+        logger.info(f"  • XU100 Fold Getirisi: %{xu_f_ret:+.2f}")
 
         for c_name, c_cfg in candidates.items():
             port_cash = INITIAL_CAPITAL
@@ -182,15 +185,15 @@ def run_multi_fold_optimization():
             results_by_candidate[c_name]["fold_dds"].append(f_dd)
             results_by_candidate[c_name]["trades"] += trades
             results_by_candidate[c_name]["costs"] += costs
-            print(f"  • {c_name:28s}: Net Getiri: %{f_ret:+.2f} | Max DD: %{f_dd:.2f} | İşlem: {trades}")
+            logger.info(f"  • {c_name:28s}: Net Getiri: %{f_ret:+.2f} | Max DD: %{f_dd:.2f} | İşlem: {trades}")
 
-        print()
+        logger.info()
 
-    print("=================================================================")
-    print("🏆 TRAIN/VALIDATION MULTI-FOLD KARŞILAŞTIRMA MATRİSİ")
-    print("=================================================================")
-    print("| Aday Mimari | Kümülatif Net Getiri | Ort. Fold Getirisi | En Kötü Fold | Ort. Max DD | Toplam İşlem | Karar |")
-    print("|---|---|---|---|---|---|---|")
+    logger.info("=================================================================")
+    logger.info("🏆 TRAIN/VALIDATION MULTI-FOLD KARŞILAŞTIRMA MATRİSİ")
+    logger.info("=================================================================")
+    logger.info("| Aday Mimari | Kümülatif Net Getiri | Ort. Fold Getirisi | En Kötü Fold | Ort. Max DD | Toplam İşlem | Karar |")
+    logger.info("|---|---|---|---|---|---|---|")
 
     for c_name, data in results_by_candidate.items():
         cum_ret = np.sum(data["fold_returns"])
@@ -198,7 +201,7 @@ def run_multi_fold_optimization():
         worst_f = np.min(data["fold_returns"])
         mean_dd = np.mean(data["fold_dds"])
         status = "🟢 EN İYİ DENGELİ" if c_name == "C_Max_Sustainable_Alpha" else ("🔴 Aşırı Riskli / DD Yüksek" if c_name == "D_Aggressive_Unhedged" else "🟡 Yetersiz Upside")
-        print(f"| **{c_name}** | **%{cum_ret:+.2f}** | %{mean_ret:+.2f} | %{worst_f:+.2f} | %{mean_dd:.2f} | {data['trades']} | {status} |")
+        logger.info(f"| **{c_name}** | **%{cum_ret:+.2f}** | %{mean_ret:+.2f} | %{worst_f:+.2f} | %{mean_dd:.2f} | {data['trades']} | {status} |")
 
     return results_by_candidate
 

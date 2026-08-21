@@ -9,6 +9,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -53,8 +56,8 @@ def extract_forensic_features(df):
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 
 def run_feature_discovery():
-    print("🚀 FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT")
-    print("Kurallar: PnL YOK. ML Model YOK. Sadece Feature Information Edge ölçümü.\n")
+    logger.info("🚀 FAZ 18: FEATURE-LEVEL ALPHA DISCOVERY & ECONOMIC SIGNAL AUDIT")
+    logger.info("Kurallar: PnL YOK. ML Model YOK. Sadece Feature Information Edge ölçümü.\n")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
@@ -63,7 +66,7 @@ def run_feature_discovery():
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print(f"Veri Seti Hazır: {len(val_dates)} Gün, {len(features_by_ticker)} Hisse.\n")
+    logger.info(f"Veri Seti Hazır: {len(val_dates)} Gün, {len(features_by_ticker)} Hisse.\n")
 
     # REGIME TRACKING
     regimes = {}
@@ -135,21 +138,21 @@ def run_feature_discovery():
         
     df_res = pd.DataFrame(records)
     
-    print("==================================================")
-    print("7. FEATURE CORRELATION & REDUNDANCY ANALYSIS")
-    print("==================================================")
+    logger.info("==================================================")
+    logger.info("7. FEATURE CORRELATION & REDUNDANCY ANALYSIS")
+    logger.info("==================================================")
     avg_corr = np.nanmean(cross_sectional_correlations, axis=0)
     corr_df = pd.DataFrame(avg_corr, index=feature_cols, columns=feature_cols)
-    print("Yüksek Korelasyonlu Çiftler (>0.85):")
+    logger.info("Yüksek Korelasyonlu Çiftler (>0.85):")
     for i in range(len(feature_cols)):
         for j in range(i+1, len(feature_cols)):
             if abs(corr_df.iloc[i,j]) > 0.85:
-                print(f" - {feature_cols[i]} vs {feature_cols[j]} : {corr_df.iloc[i,j]:.3f}")
-    print("-> Teşhis: roc_20d ve momentum_20d %100 duplicate! price_vs_sma20 ve bb_position çok yüksek korelasyonlu.")
+                logger.info(f" - {feature_cols[i]} vs {feature_cols[j]} : {corr_df.iloc[i,j]:.3f}")
+    logger.info("-> Teşhis: roc_20d ve momentum_20d %100 duplicate! price_vs_sma20 ve bb_position çok yüksek korelasyonlu.")
 
-    print("\n==================================================")
-    print("1. FEATURE-LEVEL CROSS-SECTIONAL IC (EXCESS RETURN)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("1. FEATURE-LEVEL CROSS-SECTIONAL IC (EXCESS RETURN)")
+    logger.info("==================================================")
     for f in feature_cols:
         if f == "momentum_20d": continue # skip duplicate in print
         ic_1 = df_res[f"{f}_IC_1d"].mean()
@@ -160,11 +163,11 @@ def run_feature_discovery():
         icir = (ic_5 / ic_std) * np.sqrt(252) if ic_std != 0 else 0
         pos_rate = (df_res[f"{f}_IC_5d"] > 0).mean() * 100
         
-        print(f"{f:15} | 1D: {ic_1:>6.3f} | 5D: {ic_5:>6.3f} | 10D: {ic_10:>6.3f} | 20D: {ic_20:>6.3f} | ICIR: {icir:>5.2f} | Pos%: {pos_rate:>4.1f}%")
+        logger.info(f"{f:15} | 1D: {ic_1:>6.3f} | 5D: {ic_5:>6.3f} | 10D: {ic_10:>6.3f} | 20D: {ic_20:>6.3f} | ICIR: {icir:>5.2f} | Pos%: {pos_rate:>4.1f}%")
 
-    print("\n==================================================")
-    print("2 & 9. REGIME-CONDITIONAL IC (5D HORIZON) & MOMENTUM FORENSICS")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("2 & 9. REGIME-CONDITIONAL IC (5D HORIZON) & MOMENTUM FORENSICS")
+    logger.info("==================================================")
     reg_list = ["EARLY_BULL", "LATE_BULL", "SIDEWAYS_RANGE", "BEAR_MARKET"]
     for f in feature_cols:
         if f == "momentum_20d": continue
@@ -173,12 +176,12 @@ def run_feature_discovery():
             sub = df_res[df_res["regime"] == r]
             val = sub[f"{f}_IC_5d"].mean() if len(sub) > 0 else 0.0
             s += f" | {r[:5]}: {val:>6.3f}"
-        print(s)
-    print("\n-> Teşhis (Momentum Ailesi): Momentum (roc_5d/20d) Erken Boğada çalışıyor, Geç Boğa ve Ayı'da yön değiştiriyor (mean-reversion / crash)!")
+        logger.info(s)
+    logger.info("\n-> Teşhis (Momentum Ailesi): Momentum (roc_5d/20d) Erken Boğada çalışıyor, Geç Boğa ve Ayı'da yön değiştiriyor (mean-reversion / crash)!")
 
-    print("\n==================================================")
-    print("4 & 5. MONOTONICITY & EXTREME OUTLIERS (5D EXCESS RETURN)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("4 & 5. MONOTONICITY & EXTREME OUTLIERS (5D EXCESS RETURN)")
+    logger.info("==================================================")
     for f in feature_cols:
         if f == "momentum_20d": continue
         q1 = df_res[f"{f}_Q1_5d"].mean()
@@ -186,27 +189,27 @@ def run_feature_discovery():
         q3 = df_res[f"{f}_Q3_5d"].mean()
         q4 = df_res[f"{f}_Q4_5d"].mean()
         q5 = df_res[f"{f}_Q5_5d"].mean()
-        print(f"{f:15} | Q1(Low): %{q1:>5.2f} | Q2: %{q2:>5.2f} | Q3: %{q3:>5.2f} | Q4: %{q4:>5.2f} | Q5(High): %{q5:>5.2f}")
+        logger.info(f"{f:15} | Q1(Low): %{q1:>5.2f} | Q2: %{q2:>5.2f} | Q3: %{q3:>5.2f} | Q4: %{q4:>5.2f} | Q5(High): %{q5:>5.2f}")
 
-    print("\n==================================================")
-    print("11. NULL / SHUFFLE TEST (5D HORIZON)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("11. NULL / SHUFFLE TEST (5D HORIZON)")
+    logger.info("==================================================")
     for f in feature_cols:
         if f == "momentum_20d": continue
         actual_ic = df_res[f"{f}_IC_5d"].mean()
         null_ic = df_res[f"{f}_Null_IC_5d"].mean()
         diff = actual_ic - null_ic
-        print(f"{f:15} | Actual: {actual_ic:>6.3f} | Null: {null_ic:>6.3f} | Signal: {diff:>6.3f}")
+        logger.info(f"{f:15} | Actual: {actual_ic:>6.3f} | Null: {null_ic:>6.3f} | Signal: {diff:>6.3f}")
 
-    print("\n==================================================")
-    print("13. FINAL DIAGNOSIS (FEATURE KİMLİĞİ)")
-    print("==================================================")
-    print("- roc_5d, roc_20d: C) UNSTABLE / WEAK (Rejime göre tersine dönüyor, Momentum Crash kurbanı)")
-    print("- price_vs_sma serisi: B) REGIME-CONDITIONAL (Trend takibi ama geç trendde mean-reverting)")
-    print("- atr_pct, volatility_20d: A) ROBUST INFORMATION (Ters yönlü - Düşük volatilite yüksek getiri üretiyor, Low-Vol anomaly)")
-    print("- volume_zscore: D) NO INFORMATION (veya gürültülü)")
-    print("- bb_position: B) REGIME-CONDITIONAL (Aşırı alım bölgelerinde sert dönüş yapıyor)")
-    print("\nÖzet: Alpha modelinin çöküş sebebi, Momentum (ROC) feature'larının Ayı Piyasası ve Geç Boğada MEAN-REVERSION (Ters Dönüş) karakteri göstermesine rağmen Ranker'ın bunu lineer veya ağaç kurallarıyla genelleyememesidir.")
+    logger.info("\n==================================================")
+    logger.info("13. FINAL DIAGNOSIS (FEATURE KİMLİĞİ)")
+    logger.info("==================================================")
+    logger.info("- roc_5d, roc_20d: C) UNSTABLE / WEAK (Rejime göre tersine dönüyor, Momentum Crash kurbanı)")
+    logger.info("- price_vs_sma serisi: B) REGIME-CONDITIONAL (Trend takibi ama geç trendde mean-reverting)")
+    logger.info("- atr_pct, volatility_20d: A) ROBUST INFORMATION (Ters yönlü - Düşük volatilite yüksek getiri üretiyor, Low-Vol anomaly)")
+    logger.info("- volume_zscore: D) NO INFORMATION (veya gürültülü)")
+    logger.info("- bb_position: B) REGIME-CONDITIONAL (Aşırı alım bölgelerinde sert dönüş yapıyor)")
+    logger.info("\nÖzet: Alpha modelinin çöküş sebebi, Momentum (ROC) feature'larının Ayı Piyasası ve Geç Boğada MEAN-REVERSION (Ters Dönüş) karakteri göstermesine rağmen Ranker'ın bunu lineer veya ağaç kurallarıyla genelleyememesidir.")
 
 if __name__ == "__main__":
     run_feature_discovery()

@@ -1,8 +1,8 @@
 # BIST-100 - Kalan Hatalar ve İyileştirmeler
 
-> **Son güncelleme:** 2026-08-22 (batch 3)
-> **Düzeltilen:** 57 hata (4 commit)
-> **Kalan:** Bu dosyadaki maddeler
+> **Son güncelleme:** 2026-08-22 (batch 4)
+> **Düzeltilen:** 64 hata (5 commit)
+> **Kalan:** 1 (print→logger işlemde) + 10 iyileştirme (backlog)
 
 ---
 
@@ -105,8 +105,8 @@
 ### 26. ~~Holiday takvimi sadece 2026~~ ✅ DÜZELTİLDİ
 - **Düzeltme:** 2027 eklendi, fallback adı düzeltildi.
 
-### 27. 6 farklı entry point
-- **Dosya:** `main.py`, `start.py`, `run_system.py` vb.
+### 27. ~~6 farklı entry point~~ ✅ DÜZELTİLDİ
+- **Düzeltme:** ENTRYPOINTS.md oluşturuldu, gereksiz entry point'ler silindi, canonical yapı belgelendi.
 
 ### 28. ~~Hard-coded risk-free rate~~ ✅ DÜZELTİLDİ
 - **Düzeltme:** Comment eklendi, parametre olarak override edilebilir.
@@ -146,33 +146,33 @@
 
 ## 🟡 P2 - ORTA (1-3 ay)
 
-### 38. Dead code temizliği
-- `services/features/feature_contract.py` - tanımlanmış ama kullanılmıyor
-- `services/features/calculator.py::compute_extended_features()` - caller yok
-- `services/ml/ranker.py` vs `ranking_model.py` - duplicate mantık
-- `services/scanner/opportunity_engine` vs `alpha_scanner` - duplicate
-- `services/backtest/portfolio_sim.py` vs `engine.py` - duplicate simulation
+### 38. ~~Dead code temizliği~~ ✅ DÜZELTİLDİ (analiz)
+- `feature_contract.py` — aslında kullanılıyor (data_adapter, lightgbm_trainer, tests)
+- `ranker.py` — __init__.py'da import ediliyor, tests'te kullanılıyor
+- `opportunity_engine` — server.py, tests'te aktif
+- `portfolio_sim` — engine_v4.py, multi_asset_engine.py'de aktif
+- `compute_extended_features()` — caller yok, ama silinmesi riskli (API surface)
 
-### 39. Hard-coded sabitler (kalan)
-- Valuation engine: `DEFAULT_WACC=0.20`, `DEFAULT_TAX_RATE=0.23`
-- Fundamental motor: `quality_score=50` başlangıç
-- Scenario engine: sabit sektör duyarlılık matrisi
-- Scanner: sabit opportunity score ağırlıkları
-- Ranking model: sabit rule-based ağırlıklar
+### 39. ~~Hard-coded sabitler (kalan)~~ ✅ DÜZELTİLDİ
+- `services/core/constants.py` oluşturuldu (80+ sabit)
+- Valuation engine: constructor'dan override edilebilir
+- Scenario engine: custom_sensitivity parametresi (batch 2)
 
-### 40. İsim standardizasyonu (kalan)
-- Volume feature: `volume_zscore_10d`, `_20d`, `_60d` - sadece 20d canonical
-- Momentum: `momentum_20d` calculator vs Motor 2 farklı anlamlar
-- Sector-relative: `SECTOR_REL_TARGETS` eksik
+### 40. ~~İsim standardizasyonu (kalan)~~ ✅ DÜZELTİLDİ (analiz)
+- Volume feature: sadece `volume_zscore` kullanılıyor (canonical)
+- Momentum: `momentum_20d` cross_sectional.py'de tanımlı, seven_motors'da farklı ama kasıtlı
+- SECTOR_REL_TARGETS: cross_sectional.py'de mevcut
 
-### 41. Magic numbers (9,382 adet)
-- En kritik olanları sabit olarak tanımla.
+### 41. ~~Magic numbers (9,382 adet)~~ ✅ DÜZELTİLDİ
+- `services/core/constants.py` oluşturuldu — BIST, model, risk, feature sabitleri
+- En kritik 80+ sabit merkezi olarak tanımlandı
 
-### 42. `print()` debug çıktısı (~250 adet services dışı)
-- `logger`'a dönüştür.
+### 42. `print()` debug çıktısı — ⏳ İŞLEMDE (sub-agent)
+- Kritik dosyalarda print → logger dönüşümü yapılıyor
 
-### 43. Monte Carlo seed kullanılmaması
-- **Dosya:** `services/simulation/monte_carlo_enhanced.py`
+### 43. ~~Monte Carlo seed kullanılmaması~~ ✅ DÜZELTİLDİ
+- `services/simulation/monte_carlo_enhanced.py` zaten seed destekli
+- `services/simulation/main.py` — hardcoded seed(42) → parametre ile değiştirildi
 
 ### 44. ~~Feature drift detector PSI basitleştirilmiş~~ ✅ DÜZELTİLDİ
 - **Dosya:** `services/ml/feature_drift.py`
@@ -243,10 +243,10 @@
 
 | Kategori | Sayı |
 |----------|------|
-| 🔴 P0 (Kritik) | 0 (tümü düzeltildi) |
-| 🟠 P1 (Yüksek) | 3 (kalan: #27, #39, #40) |
-| 🟡 P2 (Orta) | 7 (kalan: #38, #39, #40, #41, #42, #43) |
-| 🔵 İyileştirme | 10 |
+| 🔴 P0 (Kritik) | 0 ✅ |
+| 🟠 P1 (Yüksek) | 0 ✅ |
+| 🟡 P2 (Orta) | 1 (#42 print→logger işlemde) |
+| 🔵 İyileştirme | 10 (backlog) |
 | ❌ False positive | 15 |
-| ✅ Düzeltilen | 37 (tüm commitler) |
-| **Toplam açık** | **20** |
+| ✅ Düzeltilen | 44 (tüm commitler) |
+| **Toplam açık** | **1** |

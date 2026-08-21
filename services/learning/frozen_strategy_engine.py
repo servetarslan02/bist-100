@@ -88,6 +88,9 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     Tamamen dondurulmuş C_Max_Sustainable_Alpha stratejisini çalıştırır.
     Final Holdout veya Train/Validation fark etmeksizin aynı parametrelerle çalışır.
     """
+import structlog
+logger = structlog.get_logger()
+
     portfolio_cash = initial_capital
     positions: Dict[str, Dict[str, Any]] = {}
     equity_curve = []
@@ -369,63 +372,63 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
 
 def print_full_report(m: Dict[str, Any]):
-    print(f"\n{'='*65}")
-    print(f"🏆 {m['label']} — SONUÇ RAPORU")
-    print(f"{'='*65}")
-    print(f"| Metrik | {m['label']} | XU100 Buy&Hold | Equal-Weight BIST |")
-    print("|---|---|---|---|")
-    print(f"| **Bitiş Sermayesi** | **₺{m['final_equity']:,.2f}** | - | - |")
-    print(f"| **Toplam Net Getiri** | **%{m['tot_ret']:+.2f}** | %{m['tot_ret_xu']:+.2f} | %{m['tot_ret_ew']:+.2f} |")
-    print(f"| **CAGR** | **%{m['cagr']:+.2f}** | %{m['cagr_xu']:+.2f} | - |")
-    print(f"| **Max DD** | **%{m['max_dd']:.2f}** | %{m['max_dd_xu']:.2f} | - |")
-    print(f"| **Sharpe (Rf=%40)** | **{m['sharpe']:.2f}** | - | - |")
-    print(f"| **Sortino** | **{m['sortino']:.2f}** | - | - |")
-    print(f"| **Calmar** | **{m['calmar']:.2f}** | - | - |")
-    print(f"| **Profit Factor** | **{m['profit_factor']:.2f}** | - | - |")
-    print(f"| **Win Rate** | **%{m['win_rate']:.1f}** ({m['trades']} İşlem) | - | - |")
-    print(f"| **Upside Capture** | **%{m['upside_cap']:.1f}** | %100.0 | - |")
-    print(f"| **Downside Capture** | **%{m['downside_cap']:.1f}** | %100.0 | - |")
-    print(f"| **Turnover** | **{m['turnover']:.1f}/yıl** | 0.0 | - |")
-    print(f"| **Toplam Komisyon** | **₺{m['costs']:,.2f}** | ₺0.00 | - |")
-    print(f"  • Beta: {m['beta']:.2f}  |  Jensen Alfa: %{m['alpha_annual']:+.2f}")
-    print(f"  • Ort. Exposure: %{m['avg_exposure']:.1f}  |  Ort. Tutma: {m['avg_holding']:.1f} gün")
+    logger.info(f"\n{'='*65}")
+    logger.info(f"🏆 {m['label']} — SONUÇ RAPORU")
+    logger.info(f"{'='*65}")
+    logger.info(f"| Metrik | {m['label']} | XU100 Buy&Hold | Equal-Weight BIST |")
+    logger.info("|---|---|---|---|")
+    logger.info(f"| **Bitiş Sermayesi** | **₺{m['final_equity']:,.2f}** | - | - |")
+    logger.info(f"| **Toplam Net Getiri** | **%{m['tot_ret']:+.2f}** | %{m['tot_ret_xu']:+.2f} | %{m['tot_ret_ew']:+.2f} |")
+    logger.info(f"| **CAGR** | **%{m['cagr']:+.2f}** | %{m['cagr_xu']:+.2f} | - |")
+    logger.info(f"| **Max DD** | **%{m['max_dd']:.2f}** | %{m['max_dd_xu']:.2f} | - |")
+    logger.info(f"| **Sharpe (Rf=%40)** | **{m['sharpe']:.2f}** | - | - |")
+    logger.info(f"| **Sortino** | **{m['sortino']:.2f}** | - | - |")
+    logger.info(f"| **Calmar** | **{m['calmar']:.2f}** | - | - |")
+    logger.info(f"| **Profit Factor** | **{m['profit_factor']:.2f}** | - | - |")
+    logger.info(f"| **Win Rate** | **%{m['win_rate']:.1f}** ({m['trades']} İşlem) | - | - |")
+    logger.info(f"| **Upside Capture** | **%{m['upside_cap']:.1f}** | %100.0 | - |")
+    logger.info(f"| **Downside Capture** | **%{m['downside_cap']:.1f}** | %100.0 | - |")
+    logger.info(f"| **Turnover** | **{m['turnover']:.1f}/yıl** | 0.0 | - |")
+    logger.info(f"| **Toplam Komisyon** | **₺{m['costs']:,.2f}** | ₺0.00 | - |")
+    logger.info(f"  • Beta: {m['beta']:.2f}  |  Jensen Alfa: %{m['alpha_annual']:+.2f}")
+    logger.info(f"  • Ort. Exposure: %{m['avg_exposure']:.1f}  |  Ort. Tutma: {m['avg_holding']:.1f} gün")
 
-    print("\n📅 AYLIK PERFORMANS:")
-    print("| Ay | Strateji | XU100 | Alfa |")
-    print("|---|---|---|---|")
+    logger.info("\n📅 AYLIK PERFORMANS:")
+    logger.info("| Ay | Strateji | XU100 | Alfa |")
+    logger.info("|---|---|---|---|")
     for mk, mv in m["monthly_perf"].items():
         s_r = (mv["strat_end"] / mv["strat_start"] - 1.0) * 100.0
         x_r = (mv["xu_end"] / mv["xu_start"] - 1.0) * 100.0
-        print(f"| {mk} | %{s_r:+.2f} | %{x_r:+.2f} | %{s_r - x_r:+.2f} |")
+        logger.info(f"| {mk} | %{s_r:+.2f} | %{x_r:+.2f} | %{s_r - x_r:+.2f} |")
 
-    print("\n🌐 REJİM BAZLI PERFORMANS:")
-    print("| Rejim | PnL | İşlem | Win Rate |")
-    print("|---|---|---|---|")
+    logger.info("\n🌐 REJİM BAZLI PERFORMANS:")
+    logger.info("| Rejim | PnL | İşlem | Win Rate |")
+    logger.info("|---|---|---|---|")
     for rn, rd in m["regime_pnl"].items():
         wr = (rd["wins"] / rd["trades"] * 100.0) if rd["trades"] > 0 else 0.0
-        print(f"| {rn} | ₺{rd['pnl']:+,.2f} | {rd['trades']} | %{wr:.1f} |")
+        logger.info(f"| {rn} | ₺{rd['pnl']:+,.2f} | {rd['trades']} | %{wr:.1f} |")
 
 
 if __name__ == "__main__":
     # Phase 6 — LEAKAGE & CAUSALITY AUDIT
-    print("=================================================================")
-    print("PHASE 6 — LEAKAGE, CAUSALITY & COST AUDIT")
-    print("=================================================================")
-    print("✅ Her feature T anında hesaplanıyor (OHLCV T kapanışından): GEÇER")
-    print("✅ target_5d_ret = (close[T+5] / close[T] - 1): GELECEK BİLGİSİ — yalnızca EĞİTİM ETİKETİ olarak kullanılıyor, tahmin zamanında erişilmiyor: GEÇER")
-    print("✅ 5 gün Purge/Embargo: Eğitim seti T-7'de kesiliyor, T+5 outcome T+7'de hesaplanıyor: GEÇER")
-    print("✅ Trust Queue: Yalnızca tamamlanmış geçmiş sonuçlar kullanılıyor (eval_date <= current_date): GEÇER")
-    print("✅ V-Dip Override: ret_5d_xu 5 günlük geçmiş veriden hesaplanıyor, hiçbir gelecek bar kullanılmıyor: GEÇER")
-    print("✅ BIST Komisyon (%0.074) + Slippage (%0.050) = %0.124 her alış ve satışta uygulanıyor: GEÇER")
-    print("✅ Survivorship Bias: Tüm 20 hisse baştan sona sabit tutulmuş (sektör değişimi yok): GEÇER")
-    print("✅ Conviction Sizing: %30 payı T anındaki skor sırasına göre belirleniyor, T+1 fiyatına bakılmıyor: GEÇER")
-    print("✅ Final Holdout (2025-10 sonrası) bu modülde HİÇ KULLANILMADI: GEÇER")
-    print("\n🔒 PHASE 6 AUDIT: TÜM KONTROLLER BAŞARILI — Leakage / Look-ahead bias YOK.\n")
+    logger.info("=================================================================")
+    logger.info("PHASE 6 — LEAKAGE, CAUSALITY & COST AUDIT")
+    logger.info("=================================================================")
+    logger.info("✅ Her feature T anında hesaplanıyor (OHLCV T kapanışından): GEÇER")
+    logger.info("✅ target_5d_ret = (close[T+5] / close[T] - 1): GELECEK BİLGİSİ — yalnızca EĞİTİM ETİKETİ olarak kullanılıyor, tahmin zamanında erişilmiyor: GEÇER")
+    logger.info("✅ 5 gün Purge/Embargo: Eğitim seti T-7'de kesiliyor, T+5 outcome T+7'de hesaplanıyor: GEÇER")
+    logger.info("✅ Trust Queue: Yalnızca tamamlanmış geçmiş sonuçlar kullanılıyor (eval_date <= current_date): GEÇER")
+    logger.info("✅ V-Dip Override: ret_5d_xu 5 günlük geçmiş veriden hesaplanıyor, hiçbir gelecek bar kullanılmıyor: GEÇER")
+    logger.info("✅ BIST Komisyon (%0.074) + Slippage (%0.050) = %0.124 her alış ve satışta uygulanıyor: GEÇER")
+    logger.info("✅ Survivorship Bias: Tüm 20 hisse baştan sona sabit tutulmuş (sektör değişimi yok): GEÇER")
+    logger.info("✅ Conviction Sizing: %30 payı T anındaki skor sırasına göre belirleniyor, T+1 fiyatına bakılmıyor: GEÇER")
+    logger.info("✅ Final Holdout (2025-10 sonrası) bu modülde HİÇ KULLANILMADI: GEÇER")
+    logger.info("\n🔒 PHASE 6 AUDIT: TÜM KONTROLLER BAŞARILI — Leakage / Look-ahead bias YOK.\n")
 
     # Phase 7 — FROZEN STRATEGY DOĞRULAMA (TRAIN/VAL üzerinde)
-    print("=================================================================")
-    print("PHASE 7 — FROZEN STRATEGY TRAIN/VALIDATION DOĞRULAMASI")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("PHASE 7 — FROZEN STRATEGY TRAIN/VALIDATION DOĞRULAMASI")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -443,20 +446,20 @@ if __name__ == "__main__":
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)
-    print(f"Validation Aralığı: {val_dates[0].strftime('%Y-%m-%d')} → {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
+    logger.info(f"Validation Aralığı: {val_dates[0].strftime('%Y-%m-%d')} → {val_dates[-1].strftime('%Y-%m-%d')} ({len(val_dates)} gün)")
 
     val_result = run_frozen_strategy(val_dates, features_by_ticker, xu100_close,
                                      trainer, label="Frozen_C_TRAIN_VALIDATION")
     print_full_report(val_result)
 
-    print("\n=================================================================")
-    print("PHASE 8 — FINAL CONFIRMATION HOLDOUT (TEK SEFER — YASAK ZON)")
-    print("=================================================================")
-    print("⚠️ Bu bölüm YALNIZCA tüm geliştirme bittikten sonra çalıştırılır.")
-    print("   Parametreler dondurulmuştur. Sonuç ne olursa olsun değiştirme YASAKTIR.")
+    logger.info("\n=================================================================")
+    logger.info("PHASE 8 — FINAL CONFIRMATION HOLDOUT (TEK SEFER — YASAK ZON)")
+    logger.info("=================================================================")
+    logger.info("⚠️ Bu bölüm YALNIZCA tüm geliştirme bittikten sonra çalıştırılır.")
+    logger.info("   Parametreler dondurulmuştur. Sonuç ne olursa olsun değiştirme YASAKTIR.")
 
     holdout_dates = common_dates[280:-5]
-    print(f"Holdout Aralığı: {holdout_dates[0].strftime('%Y-%m-%d')} → {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n")
+    logger.info(f"Holdout Aralığı: {holdout_dates[0].strftime('%Y-%m-%d')} → {holdout_dates[-1].strftime('%Y-%m-%d')} ({len(holdout_dates)} gün)\n")
 
     trainer_h = ModelTrainer(feature_cols)
     holdout_result = run_frozen_strategy(holdout_dates, features_by_ticker, xu100_close,
@@ -465,9 +468,9 @@ if __name__ == "__main__":
 
     # Phase 9 — NİHAİ KARAR
     m = holdout_result
-    print("\n=================================================================")
-    print("PHASE 9 — NİHAİ KANIT BAZLI KARAR (Final Holdout Sonucuna Göre)")
-    print("=================================================================")
+    logger.info("\n=================================================================")
+    logger.info("PHASE 9 — NİHAİ KANIT BAZLI KARAR (Final Holdout Sonucuna Göre)")
+    logger.info("=================================================================")
 
     beats_xu = m["tot_ret"] > m["tot_ret_xu"]
     dd_protected = m["max_dd"] < m["max_dd_xu"] * 0.70
@@ -484,11 +487,11 @@ if __name__ == "__main__":
     else:
         verdict = "FAILED — Net getiri negatif ya da Profit Factor < 1.2."
 
-    print(f"XU100'ü Geçti mi?          : {'EVET ✅' if beats_xu else 'HAYIR ❌'}")
-    print(f"Max DD < XU100 x0.70?       : {'EVET ✅' if dd_protected else 'HAYIR ❌'}")
-    print(f"Profit Factor ≥ 1.2?        : {'EVET ✅' if pf_ok else 'HAYIR ❌'}")
-    print(f"Turnover ≤ 150/yıl?         : {'EVET ✅' if turnover_ok else 'HAYIR ❌'}")
-    print(f"Upside Capture > %45?       : {'EVET ✅' if upside_improved else 'HAYIR ❌'}")
-    print(f"\n{'='*65}")
-    print(f"NİHAİ KARAR: {verdict}")
-    print(f"{'='*65}")
+    logger.info(f"XU100'ü Geçti mi?          : {'EVET ✅' if beats_xu else 'HAYIR ❌'}")
+    logger.info(f"Max DD < XU100 x0.70?       : {'EVET ✅' if dd_protected else 'HAYIR ❌'}")
+    logger.info(f"Profit Factor ≥ 1.2?        : {'EVET ✅' if pf_ok else 'HAYIR ❌'}")
+    logger.info(f"Turnover ≤ 150/yıl?         : {'EVET ✅' if turnover_ok else 'HAYIR ❌'}")
+    logger.info(f"Upside Capture > %45?       : {'EVET ✅' if upside_improved else 'HAYIR ❌'}")
+    logger.info(f"\n{'='*65}")
+    logger.info(f"NİHAİ KARAR: {verdict}")
+    logger.info(f"{'='*65}")

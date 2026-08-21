@@ -12,6 +12,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -63,8 +66,8 @@ def get_bottom_k(scores_dict, k):
     return sorted(scores_dict.keys(), key=lambda x: scores_dict[x])[:k]
 
 def run_forensics():
-    print("🚀 FAZ 16: PORTFOLIO-RELEVANT ALPHA FORENSICS\n")
-    print("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Hyperparameter Tuning YOK.")
+    logger.info("🚀 FAZ 16: PORTFOLIO-RELEVANT ALPHA FORENSICS\n")
+    logger.info("Kurallar İşletiliyor: Final Holdout Kilitli. PnL Backtest YOK. Hyperparameter Tuning YOK.")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
@@ -73,13 +76,13 @@ def run_forensics():
     common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = [d for d in common_dates[120:] if d <= pd.Timestamp("2025-10-31")]
     
-    print(f"Veri Seti Hazır: {len(val_dates)} gün (Sample Size).")
+    logger.info(f"Veri Seti Hazır: {len(val_dates)} gün (Sample Size).")
     
     cached_scores = {}
     rank_model = None
     
     # 1. Walk-Forward Prediction Loop
-    print("⏳ Model Eğitimi & Scoring Başlıyor (Purged Walk-Forward)...")
+    logger.info("⏳ Model Eğitimi & Scoring Başlıyor (Purged Walk-Forward)...")
     for step_i, current_date in enumerate(val_dates):
         if step_i % 20 == 0:
             train_rows = []
@@ -190,46 +193,46 @@ def run_forensics():
         
     df_m = pd.DataFrame(metrics).dropna(subset=["model_top_5_ret"])
     
-    print("\n==================================================")
-    print("1. TOP-K ALPHA SPREADS (5D HORIZON)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("1. TOP-K ALPHA SPREADS (5D HORIZON)")
+    logger.info("==================================================")
     for k in [3, 5, 10]:
         t_ret = df_m[f"model_top_{k}_ret"].mean()
         b_ret = df_m[f"model_bot_{k}_ret"].mean()
         s_ret = df_m[f"shuf_top_{k}_ret"].mean()
-        print(f"K={k:<2} | Top-K: %{t_ret:>5.2f} | Bot-K: %{b_ret:>5.2f} | Spread: %{t_ret - b_ret:>5.2f} | Shuffled: %{s_ret:>5.2f}")
+        logger.info(f"K={k:<2} | Top-K: %{t_ret:>5.2f} | Bot-K: %{b_ret:>5.2f} | Spread: %{t_ret - b_ret:>5.2f} | Shuffled: %{s_ret:>5.2f}")
 
-    print("\n==================================================")
-    print("2. PRECISION & NDCG")
-    print("==================================================")
-    print(f"Precision@3 : %{df_m['precision@3'].mean()*100:.1f} (Gerçek Top-3'ün kaçı Model Top-3'te)")
-    print(f"Precision@5 : %{df_m['precision@5'].mean()*100:.1f}")
-    print(f"Precision@10: %{df_m['precision@10'].mean()*100:.1f}")
-    print(f"Top 10% Winners in Model Top-5: %{df_m['top_10pct_in_top5'].mean()*100:.1f}")
-    print(f"NDCG@5      : {df_m['ndcg@5'].mean():.3f}")
+    logger.info("\n==================================================")
+    logger.info("2. PRECISION & NDCG")
+    logger.info("==================================================")
+    logger.info(f"Precision@3 : %{df_m['precision@3'].mean()*100:.1f} (Gerçek Top-3'ün kaçı Model Top-3'te)")
+    logger.info(f"Precision@5 : %{df_m['precision@5'].mean()*100:.1f}")
+    logger.info(f"Precision@10: %{df_m['precision@10'].mean()*100:.1f}")
+    logger.info(f"Top 10% Winners in Model Top-5: %{df_m['top_10pct_in_top5'].mean()*100:.1f}")
+    logger.info(f"NDCG@5      : {df_m['ndcg@5'].mean():.3f}")
 
-    print("\n==================================================")
-    print("3. RANK IC VS PORTFOLIO-RELEVANT RANK IC")
-    print("==================================================")
-    print(f"Portföyün Top 5 Hissesi İçi Rank IC: {df_m['rank_ic_top5'].mean():.4f}")
+    logger.info("\n==================================================")
+    logger.info("3. RANK IC VS PORTFOLIO-RELEVANT RANK IC")
+    logger.info("==================================================")
+    logger.info(f"Portföyün Top 5 Hissesi İçi Rank IC: {df_m['rank_ic_top5'].mean():.4f}")
     if df_m['rank_ic_top5'].mean() < 0.10:
-        print("-> DİKKAT: Model ilk 5'i kendi içinde doğru sıralayamıyor. (Gürültü)")
+        logger.info("-> DİKKAT: Model ilk 5'i kendi içinde doğru sıralayamıyor. (Gürültü)")
 
-    print("\n==================================================")
-    print("4. SCORE SEPARATION (TIERS)")
-    print("==================================================")
-    print(f"Rank 1-5  Return: %{df_m['decile_1_5'].mean():.2f}")
-    print(f"Rank 6-10 Return: %{df_m['decile_6_10'].mean():.2f}")
-    print(f"Rank 11-20 Return: %{df_m['decile_11_20'].mean():.2f}")
+    logger.info("\n==================================================")
+    logger.info("4. SCORE SEPARATION (TIERS)")
+    logger.info("==================================================")
+    logger.info(f"Rank 1-5  Return: %{df_m['decile_1_5'].mean():.2f}")
+    logger.info(f"Rank 6-10 Return: %{df_m['decile_6_10'].mean():.2f}")
+    logger.info(f"Rank 11-20 Return: %{df_m['decile_11_20'].mean():.2f}")
 
-    print("\n==================================================")
-    print("5. RANK STABILITY")
-    print("==================================================")
-    print(f"Top-5 Jaccard Similarity (T vs T+1): {df_m['jaccard_top5'].mean():.3f}")
+    logger.info("\n==================================================")
+    logger.info("5. RANK STABILITY")
+    logger.info("==================================================")
+    logger.info(f"Top-5 Jaccard Similarity (T vs T+1): {df_m['jaccard_top5'].mean():.3f}")
 
-    print("\n==================================================")
-    print("6. BOOTSTRAP 95% CI (ACTUAL TOP-5 VS SHUFFLED TOP-5)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("6. BOOTSTRAP 95% CI (ACTUAL TOP-5 VS SHUFFLED TOP-5)")
+    logger.info("==================================================")
     np.random.seed(42)
     diffs = df_m['model_top_5_ret'] - df_m['shuf_top_5_ret']
     boot_means = [np.mean(np.random.choice(diffs, size=len(diffs), replace=True)) for _ in range(1000)]
@@ -237,32 +240,32 @@ def run_forensics():
     ci_upper = np.percentile(boot_means, 97.5)
     p_value = np.mean(np.array(boot_means) <= 0)
     
-    print(f"Mean Difference: %{np.mean(diffs):.2f}")
-    print(f"95% CI         : [%{ci_lower:.2f}, %{ci_upper:.2f}]")
-    print(f"P-value (H0: Diff<=0): {p_value:.4f}")
+    logger.info(f"Mean Difference: %{np.mean(diffs):.2f}")
+    logger.info(f"95% CI         : [%{ci_lower:.2f}, %{ci_upper:.2f}]")
+    logger.info(f"P-value (H0: Diff<=0): {p_value:.4f}")
 
-    print("\n==================================================")
-    print("7. REJİM BAZLI TOP-5 SPREAD ANALİZİ")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("7. REJİM BAZLI TOP-5 SPREAD ANALİZİ")
+    logger.info("==================================================")
     for reg in ["BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE"]:
         d_sub = df_m[df_m['regime'] == reg]
         if len(d_sub) > 0:
             act = d_sub['model_top_5_ret'].mean()
             shuf = d_sub['shuf_top_5_ret'].mean()
-            print(f"{reg:15} | N={len(d_sub):<3} | Ranker: %{act:>5.2f} | Shuf: %{shuf:>5.2f} | Fark: %{act-shuf:>5.2f}")
+            logger.info(f"{reg:15} | N={len(d_sub):<3} | Ranker: %{act:>5.2f} | Shuf: %{shuf:>5.2f} | Fark: %{act-shuf:>5.2f}")
 
-    print("\n==================================================")
-    print("8. KRİTİK NULL TESTİ & NİHAİ KARAR")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("8. KRİTİK NULL TESTİ & NİHAİ KARAR")
+    logger.info("==================================================")
     if ci_lower > 0 and p_value < 0.05:
-        print("H0 REDDEDİLDİ: PORTFOLIO-RELEVANT ALPHA İÇİN İSTATİSTİKSEL KANIT VAR")
-        print("\nSonuç: A) STRONG PORTFOLIO-RELEVANT ALPHA")
+        logger.info("H0 REDDEDİLDİ: PORTFOLIO-RELEVANT ALPHA İÇİN İSTATİSTİKSEL KANIT VAR")
+        logger.info("\nSonuç: A) STRONG PORTFOLIO-RELEVANT ALPHA")
     elif np.mean(diffs) > 0:
-        print("H0 REDDEDİLEMEDİ: PORTFOLIO-RELEVANT ALPHA İSTATİSTİKSEL OLARAK ZAYIF")
-        print("\nSonuç: B) WEAK / INCONCLUSIVE ALPHA")
+        logger.info("H0 REDDEDİLEMEDİ: PORTFOLIO-RELEVANT ALPHA İSTATİSTİKSEL OLARAK ZAYIF")
+        logger.info("\nSonuç: B) WEAK / INCONCLUSIVE ALPHA")
     else:
-        print("H0 REDDEDİLEMEDİ: RANKER, RASTGELE SEÇİMDEN DAHA İYİ DEĞİL.")
-        print("\nSonuç: C) NO PORTFOLIO-RELEVANT ALPHA")
+        logger.info("H0 REDDEDİLEMEDİ: RANKER, RASTGELE SEÇİMDEN DAHA İYİ DEĞİL.")
+        logger.info("\nSonuç: C) NO PORTFOLIO-RELEVANT ALPHA")
         
 if __name__ == "__main__":
     run_forensics()

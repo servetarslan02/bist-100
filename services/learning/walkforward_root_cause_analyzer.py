@@ -14,6 +14,9 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Tuple
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data,
     extract_point_in_time_features,
     detect_market_regime,
@@ -22,9 +25,9 @@ from services.learning.institutional_walkforward_engine import (
 
 
 def run_root_cause_analysis():
-    print("=================================================================")
-    print("ALPHA BIST — ROOT CAUSE & TURNOVER CHURN ANALYZER")
-    print("=================================================================")
+    logger.info("=================================================================")
+    logger.info("ALPHA BIST — ROOT CAUSE & TURNOVER CHURN ANALYZER")
+    logger.info("=================================================================")
 
     stock_data, xu100_close = load_all_market_data()
     feature_cols = [
@@ -47,7 +50,7 @@ def run_root_cause_analysis():
     trainer = ModelTrainer(feature_cols)
 
     # 1. Model Bazlı Sinyal Oynaklığı (Signal Noise / Autocorrelation)
-    print("\n[1] MODEL BAZLI SİNYAL OYNAKLIĞI VE NOISE ANALİZİ:")
+    logger.info("\n[1] MODEL BAZLI SİNYAL OYNAKLIĞI VE NOISE ANALİZİ:")
     all_signals_by_model = {m: [] for m in models}
     
     # Train once on first warmup fold to get baseline models
@@ -62,8 +65,8 @@ def run_root_cause_analysis():
             for m in models:
                 all_signals_by_model[m].append(batch_sigs[tk][m])
 
-    print("| Model | Sinyal Oynaklığı (Std) | Günlük Sinyal Değişim Hızı (|Δs|) | 1-Günlük Otokorelasyon | Değerlendirme |")
-    print("|---|---|---|---|---|")
+    logger.info("| Model | Sinyal Oynaklığı (Std) | Günlük Sinyal Değişim Hızı (|Δs|) | 1-Günlük Otokorelasyon | Değerlendirme |")
+    logger.info("|---|---|---|---|---|")
     for m in models:
         sig_arr = np.array(all_signals_by_model[m])
         std = np.std(sig_arr)
@@ -71,11 +74,11 @@ def run_root_cause_analysis():
         autocorr = np.corrcoef(sig_arr[:-1], sig_arr[1:])[0, 1] if len(sig_arr) > 1 else 1.0
         
         status = "🔴 Çok Oynak (Churn Kaynağı)" if daily_diff > 0.25 else ("🟡 Orta" if daily_diff > 0.12 else "🟢 Stabil Trend")
-        print(f"| **{m}** | {std:.3f} | {daily_diff:.3f} | {autocorr:.3f} | {status} |")
+        logger.info(f"| **{m}** | {std:.3f} | {daily_diff:.3f} | {autocorr:.3f} | {status} |")
 
     # 2. 5-Günlük Çıkış Kuralının Getiri Üzerindeki Erken Kesme Etkisi
-    print("\n[2] 5-GÜNLÜK ZORUNLU ÇIKIŞIN ERKEN KÂR KESME (TRUNCATION) ANALİZİ:")
-    print("5 gün sonra zorla kapatılan kârlı pozisyonların 10, 20 ve 40 gün sonraki gerçek getirileri inceleniyor...")
+    logger.info("\n[2] 5-GÜNLÜK ZORUNLU ÇIKIŞIN ERKEN KÂR KESME (TRUNCATION) ANALİZİ:")
+    logger.info("5 gün sonra zorla kapatılan kârlı pozisyonların 10, 20 ve 40 gün sonraki gerçek getirileri inceleniyor...")
     
     post_5d_gains = []
     post_10d_gains = []
@@ -92,17 +95,17 @@ def run_root_cause_analysis():
                 post_20d_gains.append((close.iloc[i+20] / close.iloc[i] - 1.0) * 100.0)
                 post_40d_gains.append((close.iloc[i+40] / close.iloc[i] - 1.0) * 100.0)
 
-    print(f"  • Ortalama Getiri (5. Gün Çıkış):  +%{np.mean(post_5d_gains):.2f}")
-    print(f"  • Ortalama Getiri (10. Gün Tutma): +%{np.mean(post_10d_gains):.2f}")
-    print(f"  • Ortalama Getiri (20. Gün Tutma): +%{np.mean(post_20d_gains):.2f} (🚀 Kâr %200+ Artıyor!)")
-    print(f"  • Ortalama Getiri (40. Gün Tutma): +%{np.mean(post_40d_gains):.2f}")
-    print(f"  💡 TESPİT: 5. günde zorla pozisyon kapatmak, BIST'teki büyük trend dalgalarını (20-40 günlük rallileri) %70 oranında kaçırıyor!")
+    logger.info(f"  • Ortalama Getiri (5. Gün Çıkış):  +%{np.mean(post_5d_gains):.2f}")
+    logger.info(f"  • Ortalama Getiri (10. Gün Tutma): +%{np.mean(post_10d_gains):.2f}")
+    logger.info(f"  • Ortalama Getiri (20. Gün Tutma): +%{np.mean(post_20d_gains):.2f} (🚀 Kâr %200+ Artıyor!)")
+    logger.info(f"  • Ortalama Getiri (40. Gün Tutma): +%{np.mean(post_40d_gains):.2f}")
+    logger.info(f"  💡 TESPİT: 5. günde zorla pozisyon kapatmak, BIST'teki büyük trend dalgalarını (20-40 günlük rallileri) %70 oranında kaçırıyor!")
 
     # 3. SIDEWAYS ve HIGH_VOLATILITY Kaybının Temel Sebebi
-    print("\n[3] SIDEWAYS VE HIGH_VOLATILITY KANAMA ANALİZİ:")
-    print("  • SIDEWAYS (Yatay): Hisse Bollinger üst bandına çarpıp geri döndüğünde model 5 günde 2 kez yön değiştiriyor.")
-    print("  • HIGH_VOLATILITY: Geniş spread ve gap açılışları %0.05 slippage ve %5 stop-loss tetiklenmesiyle sermayeyi eritiyor.")
-    print("  • Gereksiz Histeresis Yokluğu: Model skoru 0.12'den 0.14'e çıktığında portföy mevcut hisseyi satıp yeni hisse alıyor ve her seferinde %0.124 sürtünme ödüyor.")
+    logger.info("\n[3] SIDEWAYS VE HIGH_VOLATILITY KANAMA ANALİZİ:")
+    logger.info("  • SIDEWAYS (Yatay): Hisse Bollinger üst bandına çarpıp geri döndüğünde model 5 günde 2 kez yön değiştiriyor.")
+    logger.info("  • HIGH_VOLATILITY: Geniş spread ve gap açılışları %0.05 slippage ve %5 stop-loss tetiklenmesiyle sermayeyi eritiyor.")
+    logger.info("  • Gereksiz Histeresis Yokluğu: Model skoru 0.12'den 0.14'e çıktığında portföy mevcut hisseyi satıp yeni hisse alıyor ve her seferinde %0.124 sürtünme ödüyor.")
 
 
 if __name__ == "__main__":

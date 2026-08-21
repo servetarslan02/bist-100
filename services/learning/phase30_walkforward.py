@@ -1,4 +1,7 @@
 ﻿"""
+import structlog
+logger = structlog.get_logger()
+
 FAZ 30 - WALK-FORWARD VALIDASYON + ENSEMBLE
 3 kazanan strateji: Momentum-252-top5, Momentum-126-top10, VolKirisi
 Yil yil performans + kombinasyon analizi
@@ -8,10 +11,10 @@ from scipy import stats
 warnings.filterwarnings("ignore")
 
 HOLDOUT = "2025-10-31"
-print("="*70)
-print("FAZ 30 - WALK-FORWARD + ENSEMBLE")
-print("Kazanan: Momentum-252-top5 (%249 OOS), Momentum-126-top10 (%116), VolKirisi (%102)")
-print("="*70)
+logger.info("="*70)
+logger.info("FAZ 30 - WALK-FORWARD + ENSEMBLE")
+logger.info("Kazanan: Momentum-252-top5 (%249 OOS), Momentum-126-top10 (%116), VolKirisi (%102)")
+logger.info("="*70)
 
 import yfinance as yf
 TICKERS = [
@@ -36,7 +39,7 @@ prices = prices.sort_index().ffill().dropna(how="all")
 valid = [c for c in prices.columns if prices[c].notna().sum() >= 400]
 prices = prices[valid]
 returns = prices.pct_change()
-print(f"Veri: {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
+logger.info(f"Veri: {len(valid)} hisse, {prices.index[0].date()} -> {prices.index[-1].date()}")
 
 def cagr(s): c=(1+s).cumprod(); ny=len(s)/252; return ((c.iloc[-1])**(1/ny)-1)*100 if c.iloc[-1]>0 and ny>0 else -100
 def sharpe(s): return (s.mean()*252)/(s.std()*np.sqrt(252)+1e-9)
@@ -92,9 +95,9 @@ def vol_breakout(prices, returns, vol_window=20, mom_window=5, top_n=10):
     return pd.concat(rets).sort_index(), selected
 
 # ─── WALK-FORWARD: YIL YIL ─────────────────────────────────────────
-print("\n[1] WALK-FORWARD - Yil yil performans")
-print(f"{'Yil':<6} {'B&H':>8} {'Mom252/5':>10} {'Mom126/10':>11} {'VolKirisi':>10} {'Ensemble':>10}")
-print("-"*58)
+logger.info("\n[1] WALK-FORWARD - Yil yil performans")
+logger.info(f"{'Yil':<6} {'B&H':>8} {'Mom252/5':>10} {'Mom126/10':>11} {'VolKirisi':>10} {'Ensemble':>10}")
+logger.info("-"*58)
 
 years = [2021,2022,2023,2024,2025]
 ensemble_all = []
@@ -127,28 +130,28 @@ for yr in years:
     else: ens_c = "N/A"
     bh_all.append(bh_r)
 
-    print(f"{yr:<6} {sc(bh_r):>8} {sc(m1y):>10} {sc(m2y):>11} {sc(v1y):>10} {ens_c:>10}")
+    logger.info(f"{yr:<6} {sc(bh_r):>8} {sc(m1y):>10} {sc(m2y):>11} {sc(v1y):>10} {ens_c:>10}")
 
 # Full ensemble
 if ensemble_all:
     ens_full = pd.concat(ensemble_all).sort_index()
     bh_full = pd.concat(bh_all).sort_index()
-    print(f"\n{'TOPLAM':<6} {cagr(bh_full):>7.1f}% {'-':>10} {'-':>11} {'-':>10} {cagr(ens_full):>9.1f}%")
-    print(f"{'Sharpe':<6} {sharpe(bh_full):>7.2f}  {'-':>10} {'-':>11} {'-':>10} {sharpe(ens_full):>9.2f}")
+    logger.info(f"\n{'TOPLAM':<6} {cagr(bh_full):>7.1f}% {'-':>10} {'-':>11} {'-':>10} {cagr(ens_full):>9.1f}%")
+    logger.info(f"{'Sharpe':<6} {sharpe(bh_full):>7.2f}  {'-':>10} {'-':>11} {'-':>10} {sharpe(ens_full):>9.2f}")
 
 # ─── EN IYI: MOMENTUM 252/5 DETAYLI ANALİZ ────────────────────────
-print("\n[2] EN IYI STRATEJI DETAYI: Momentum-252-top5")
+logger.info("\n[2] EN IYI STRATEJI DETAYI: Momentum-252-top5")
 m_full, m_selected = momentum_top(prices, returns, 252, 5)
-print(f"Full period CAGR: %{cagr(m_full):.1f} | Sharpe: {sharpe(m_full):.2f} | MaxDD: %{maxdd(m_full):.1f}")
+logger.info(f"Full period CAGR: %{cagr(m_full):.1f} | Sharpe: {sharpe(m_full):.2f} | MaxDD: %{maxdd(m_full):.1f}")
 
 # OOS donemi secilen hisseler
-print(f"\nOOS doneminde secilen hisseler (2025):")
+logger.info(f"\nOOS doneminde secilen hisseler (2025):")
 for ym, stocks in sorted(m_selected.items()):
     if ym >= "2025-01":
-        print(f"  {ym}: {', '.join(stocks)}")
+        logger.info(f"  {ym}: {', '.join(stocks)}")
 
 # ─── ENSEMBLE DETAYI ─────────────────────────────────────────────
-print("\n[3] ENSEMBLE (3 strateji ortalama) - OOS 2025")
+logger.info("\n[3] ENSEMBLE (3 strateji ortalama) - OOS 2025")
 m1_oos,_ = momentum_top(prices, returns, 252, 5)
 m2_oos,_ = momentum_top(prices, returns, 126, 10)
 v_oos,_  = vol_breakout(prices, returns)
@@ -156,10 +159,10 @@ m1_oos = m1_oos[m1_oos.index >= "2025-01-01"]
 m2_oos = m2_oos[m2_oos.index >= "2025-01-01"]
 v_oos  = v_oos[v_oos.index >= "2025-01-01"]
 ens_oos = pd.concat([m1_oos,m2_oos,v_oos], axis=1).mean(axis=1).dropna()
-print(f"Ensemble OOS CAGR: %{cagr(ens_oos):.1f} | Sharpe: {sharpe(ens_oos):.2f} | MaxDD: %{maxdd(ens_oos):.1f}")
+logger.info(f"Ensemble OOS CAGR: %{cagr(ens_oos):.1f} | Sharpe: {sharpe(ens_oos):.2f} | MaxDD: %{maxdd(ens_oos):.1f}")
 
 # ─── BU AY SINYALLERI ─────────────────────────────────────────────
-print("\n[4] SIMDI SINYALLER (Kasim 2025 portfoy onerisi)")
+logger.info("\n[4] SIMDI SINYALLER (Kasim 2025 portfoy onerisi)")
 # Son mevcut veriyi kullanarak momentum hesapla
 now_scores = {}
 for t in prices.columns:
@@ -169,11 +172,11 @@ for t in prices.columns:
 
 top5_now = sorted(now_scores, key=lambda x: now_scores[x], reverse=True)[:5]
 top10_now= sorted(now_scores, key=lambda x: now_scores[x], reverse=True)[:10]
-print(f"\nMomentum-252 TOP 5 (portfoy onerisi):")
+logger.info(f"\nMomentum-252 TOP 5 (portfoy onerisi):")
 for i,t in enumerate(top5_now,1):
-    print(f"  {i}. {t:<8} 12ay getiri: %{now_scores[t]*100:.1f}")
+    logger.info(f"  {i}. {t:<8} 12ay getiri: %{now_scores[t]*100:.1f}")
 
-print(f"\nMomentum-126 TOP 10:")
+logger.info(f"\nMomentum-126 TOP 10:")
 scores126={}
 for t in prices.columns:
     p=prices[t].dropna()
@@ -181,17 +184,17 @@ for t in prices.columns:
     scores126[t]=(p.iloc[-1]/p.iloc[-126])-1
 top10_126=sorted(scores126,key=lambda x:scores126[x],reverse=True)[:10]
 for i,t in enumerate(top10_126,1):
-    print(f"  {i}. {t:<8} 6ay getiri: %{scores126[t]*100:.1f}")
+    logger.info(f"  {i}. {t:<8} 6ay getiri: %{scores126[t]*100:.1f}")
 
-print("\n[5] KARAR")
-print("="*70)
+logger.info("\n[5] KARAR")
+logger.info("="*70)
 oos_best = 249.0
 if oos_best > 100:
-    print(f"KARAR: PRODUCTION -> FAZ 31")
-    print(f"Strateji: Momentum-252-top5")
-    print(f"OOS CAGR: %{oos_best} | Sharpe: 4.61 | MaxDD: %-6.6")
-    print(f"Ensemble OOS CAGR: %{cagr(ens_oos):.1f} | Sharpe: {sharpe(ens_oos):.2f}")
-    print(f"\nUYARI: OOS donemi sadece 10 ay (Jan-Oct 2025)")
-    print(f"       Walk-forward yil yil dogrulanmasi yukaridadir")
-    print(f"       Production'a almadan once 2021-2024 yillarini inceleyin")
-print("="*70)
+    logger.info(f"KARAR: PRODUCTION -> FAZ 31")
+    logger.info(f"Strateji: Momentum-252-top5")
+    logger.info(f"OOS CAGR: %{oos_best} | Sharpe: 4.61 | MaxDD: %-6.6")
+    logger.info(f"Ensemble OOS CAGR: %{cagr(ens_oos):.1f} | Sharpe: {sharpe(ens_oos):.2f}")
+    logger.info(f"\nUYARI: OOS donemi sadece 10 ay (Jan-Oct 2025)")
+    logger.info(f"       Walk-forward yil yil dogrulanmasi yukaridadir")
+    logger.info(f"       Production'a almadan once 2021-2024 yillarini inceleyin")
+logger.info("="*70)

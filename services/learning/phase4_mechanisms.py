@@ -13,6 +13,9 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.frozen_strategy_engine import FROZEN_PARAMS, MODELS, TOTAL_FRICTION
 from services.learning.upside_capture_validator import detect_market_regime_v2
+import structlog
+logger = structlog.get_logger()
+
 
 def calculate_capture_ratios(port_rets, bench_rets):
     if len(port_rets) == 0 or len(bench_rets) == 0: return 0.0, 0.0
@@ -216,20 +219,20 @@ if __name__ == "__main__":
     candidates = ["Baseline_V3", "A_Conviction_Alloc", "B_Signal_Decay", "C_Breadth_Signal", "D_Drawdown_Aware"]
     
     results = {}
-    print("🚀 PHASE 4: MECHANISM EVALUATION (TRAIN/VAL 2025-03 -> 2025-10)")
+    logger.info("🚀 PHASE 4: MECHANISM EVALUATION (TRAIN/VAL 2025-03 -> 2025-10)")
     for c in candidates:
         r = run_mechanism_candidate(val_dates, features_by_ticker, xu100_close, trainer, c)
         results[c] = r
-        print(f"\n[{c}]")
-        print(f"Net: %{r['Ret']:.2f} | CAGR: %{r['CAGR']:.2f} | MaxDD: %{r['MaxDD']:.2f} | PF: {r['PF']:.2f} | WR: %{r['WR']:.1f}")
-        print(f"UpCap: %{r['UpCap']:.1f} | DnCap: %{r['DnCap']:.1f} | Trades: {r['Trades']} | Cost: ₺{r['Cost']:,.0f} | AvgExp: %{r['AvgExp']:.1f}")
-        print(f"Sharpe: {r['Sharpe']:.2f} | Sortino: {r['Sortino']:.2f} | Calmar: {r['Calmar']:.2f}")
-        print(f"Worst Trade: %{r['WorstTrade']:.2f} | Worst Month: %{r['WorstMonth']:.2f}")
+        logger.info(f"\n[{c}]")
+        logger.info(f"Net: %{r['Ret']:.2f} | CAGR: %{r['CAGR']:.2f} | MaxDD: %{r['MaxDD']:.2f} | PF: {r['PF']:.2f} | WR: %{r['WR']:.1f}")
+        logger.info(f"UpCap: %{r['UpCap']:.1f} | DnCap: %{r['DnCap']:.1f} | Trades: {r['Trades']} | Cost: ₺{r['Cost']:,.0f} | AvgExp: %{r['AvgExp']:.1f}")
+        logger.info(f"Sharpe: {r['Sharpe']:.2f} | Sortino: {r['Sortino']:.2f} | Calmar: {r['Calmar']:.2f}")
+        logger.info(f"Worst Trade: %{r['WorstTrade']:.2f} | Worst Month: %{r['WorstMonth']:.2f}")
         
-    print("\n📊 INCREMENTAL CONTRIBUTION VS BASELINE:")
+    logger.info("\n📊 INCREMENTAL CONTRIBUTION VS BASELINE:")
     base = results["Baseline_V3"]
     for c in candidates[1:]:
         r = results[c]
-        print(f"\n{c}:")
-        print(f"Δ CAGR: {r['CAGR'] - base['CAGR']:>+6.2f}% | Δ UpCap: {r['UpCap'] - base['UpCap']:>+6.2f}% | Δ DnCap: {r['DnCap'] - base['DnCap']:>+6.2f}%")
-        print(f"Δ MaxDD: {r['MaxDD'] - base['MaxDD']:>+6.2f}% | Δ PF: {r['PF'] - base['PF']:>+6.2f} | Δ Trades: {r['Trades'] - base['Trades']:>+4}")
+        logger.info(f"\n{c}:")
+        logger.info(f"Δ CAGR: {r['CAGR'] - base['CAGR']:>+6.2f}% | Δ UpCap: {r['UpCap'] - base['UpCap']:>+6.2f}% | Δ DnCap: {r['DnCap'] - base['DnCap']:>+6.2f}%")
+        logger.info(f"Δ MaxDD: {r['MaxDD'] - base['MaxDD']:>+6.2f}% | Δ PF: {r['PF'] - base['PF']:>+6.2f} | Δ Trades: {r['Trades'] - base['Trades']:>+4}")

@@ -9,6 +9,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 from services.learning.institutional_walkforward_engine import (
+import structlog
+logger = structlog.get_logger()
+
     load_all_market_data, detect_market_regime
 )
 
@@ -56,8 +59,8 @@ def get_resid(y, x):
     return y - b * x
 
 def run_economic_alpha_validation():
-    print("🚀 FAZ 19: ECONOMIC ALPHA VALIDATION")
-    print("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
+    logger.info("🚀 FAZ 19: ECONOMIC ALPHA VALIDATION")
+    logger.info("Kurallar: Model Eğitimi YOK. Sadece Feature-Level İstatistik. Final Holdout KİLİTLİ.\n")
     
     stock_data, xu100_close = load_all_market_data()
     feature_cols = ["roc_5d", "roc_20d", "momentum_20d", "price_vs_sma20", "price_vs_sma50", "price_vs_sma200", "atr_pct", "volatility_20d", "volume_zscore", "bb_position"]
@@ -140,59 +143,59 @@ def run_economic_alpha_validation():
         
     df_res = pd.DataFrame(records)
 
-    print("\n==================================================")
-    print("A) LOW-VOL INDEPENDENCE (volatility_20d vs atr_pct)")
-    print("==================================================")
-    print(f"Mean IC (volatility_20d) : {df_res['ic_vol'].mean():.4f}")
-    print(f"Mean IC (atr_pct)        : {df_res['ic_atr'].mean():.4f}")
-    print(f"Partial IC (Vol | ATR)   : {df_res['partial_ic_vol'].mean():.4f}")
-    print(f"Partial IC (ATR | Vol)   : {df_res['partial_ic_atr'].mean():.4f}")
-    print("-> Teşhis: volatility_20d kontrol edildiğinde atr_pct'nin kısmi (partial) IC'si sıfıra yaklaşıyor. ATR tek başına bağımsız bilgi taşımıyor. Volatilite asıl faktördür.")
+    logger.info("\n==================================================")
+    logger.info("A) LOW-VOL INDEPENDENCE (volatility_20d vs atr_pct)")
+    logger.info("==================================================")
+    logger.info(f"Mean IC (volatility_20d) : {df_res['ic_vol'].mean():.4f}")
+    logger.info(f"Mean IC (atr_pct)        : {df_res['ic_atr'].mean():.4f}")
+    logger.info(f"Partial IC (Vol | ATR)   : {df_res['partial_ic_vol'].mean():.4f}")
+    logger.info(f"Partial IC (ATR | Vol)   : {df_res['partial_ic_atr'].mean():.4f}")
+    logger.info("-> Teşhis: volatility_20d kontrol edildiğinde atr_pct'nin kısmi (partial) IC'si sıfıra yaklaşıyor. ATR tek başına bağımsız bilgi taşımıyor. Volatilite asıl faktördür.")
 
-    print("\n==================================================")
-    print("C) CONDITIONAL ALPHA (Low-Vol Regime Breakdown)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("C) CONDITIONAL ALPHA (Low-Vol Regime Breakdown)")
+    logger.info("==================================================")
     for r in ["EARLY_BULL", "LATE_BULL", "SIDEWAYS_RANGE", "BEAR_MARKET"]:
         sub = df_res[df_res["regime"] == r]
         ic = sub['ic_vol'].mean()
         spr = sub['volatility_20d_spread_5d'].mean()
-        print(f"{r:15} | Volatility IC: {ic:>6.3f} | Q1(Low)-Q5(High) Spread: %{spr:>5.2f}")
-    print("-> Teşhis: Low-Vol alpha özellikle Geç Boğa (Late Bull) ve Ayı piyasalarında Yüksek Volatiliteli (Riskli) hisselerin çöküşünden besleniyor. Erken boğada çalışmıyor.")
+        logger.info(f"{r:15} | Volatility IC: {ic:>6.3f} | Q1(Low)-Q5(High) Spread: %{spr:>5.2f}")
+    logger.info("-> Teşhis: Low-Vol alpha özellikle Geç Boğa (Late Bull) ve Ayı piyasalarında Yüksek Volatiliteli (Riskli) hisselerin çöküşünden besleniyor. Erken boğada çalışmıyor.")
 
-    print("\n==================================================")
-    print("D) TEMPORAL STABILITY (5 TIME BLOCKS for Low-Vol)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("D) TEMPORAL STABILITY (5 TIME BLOCKS for Low-Vol)")
+    logger.info("==================================================")
     blocks = [df_res.iloc[idx] for idx in np.array_split(range(len(df_res)), 5)]
     for i, b in enumerate(blocks):
         ic = b['ic_vol'].mean()
         ic_std = b['ic_vol'].std()
         icir = (ic / ic_std) * np.sqrt(252) if ic_std != 0 else 0
         spr = b['volatility_20d_spread_5d'].mean()
-        print(f"Block {i+1} | Mean IC: {ic:>6.3f} | ICIR: {icir:>5.2f} | Low-High Spread: %{spr:>5.2f}")
+        logger.info(f"Block {i+1} | Mean IC: {ic:>6.3f} | ICIR: {icir:>5.2f} | Low-High Spread: %{spr:>5.2f}")
 
-    print("\n==================================================")
-    print("E & H) TOP/BOTTOM RELEVANCE & NULL SHUFFLE TEST")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("E & H) TOP/BOTTOM RELEVANCE & NULL SHUFFLE TEST")
+    logger.info("==================================================")
     act_spr = df_res['volatility_20d_spread_5d'].mean()
     nul_spr = df_res['volatility_20d_null_spread_5d'].mean()
-    print(f"volatility_20d Actual Spread (Q1-Q5): %{act_spr:.3f}")
-    print(f"volatility_20d Null Shuffled Spread : %{nul_spr:.3f}")
-    print("-> Teşhis: Gerçek Low-Vol anomalisi Null dağılımın dışındadır, portföyde Top/Bottom ayrıştırma gücü yüksektir.")
+    logger.info(f"volatility_20d Actual Spread (Q1-Q5): %{act_spr:.3f}")
+    logger.info(f"volatility_20d Null Shuffled Spread : %{nul_spr:.3f}")
+    logger.info("-> Teşhis: Gerçek Low-Vol anomalisi Null dağılımın dışındadır, portföyde Top/Bottom ayrıştırma gücü yüksektir.")
 
-    print("\n==================================================")
-    print("F) MOMENTUM CRASH FORENSICS (roc_20d)")
-    print("==================================================")
+    logger.info("\n==================================================")
+    logger.info("F) MOMENTUM CRASH FORENSICS (roc_20d)")
+    logger.info("==================================================")
     for r in ["EARLY_BULL", "LATE_BULL", "SIDEWAYS_RANGE", "BEAR_MARKET"]:
         sub = df_res[df_res["regime"] == r]
         q1 = sub['roc_20d_Q1_5d'].mean()
         q5 = sub['roc_20d_Q5_5d'].mean()
-        print(f"{r:15} | Q1(Low Mom): %{q1:>5.2f} | Q5(High Mom): %{q5:>5.2f} | Hata/Kaza (Q5 < Q1): {q5 < q1}")
-    print("-> Teşhis (Kritik): Geç Boğa (Late Bull) ve Ayı Piyasasında en çok yükselen (Q5) hisseler, en az yükselen (Q1) hisselerin gerisinde kalmaktadır. Momentum Crash hipotezi DOĞRULANDI.")
+        logger.info(f"{r:15} | Q1(Low Mom): %{q1:>5.2f} | Q5(High Mom): %{q5:>5.2f} | Hata/Kaza (Q5 < Q1): {q5 < q1}")
+    logger.info("-> Teşhis (Kritik): Geç Boğa (Late Bull) ve Ayı Piyasasında en çok yükselen (Q5) hisseler, en az yükselen (Q1) hisselerin gerisinde kalmaktadır. Momentum Crash hipotezi DOĞRULANDI.")
 
-    print("\n==================================================")
-    print("J) FINAL DECISION")
-    print("==================================================")
-    print("Sonuç: A) ROBUST LOW-VOL ALPHA CONFIRMED")
+    logger.info("\n==================================================")
+    logger.info("J) FINAL DECISION")
+    logger.info("==================================================")
+    logger.info("Sonuç: A) ROBUST LOW-VOL ALPHA CONFIRMED")
 
 if __name__ == "__main__":
     run_economic_alpha_validation()
