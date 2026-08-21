@@ -140,10 +140,13 @@ class RiskParityOptimizer:
             options={"maxiter": self.max_iterations, "ftol": self.tolerance},
         )
 
-        # Normalize
+        # Negatif değerleri temizle, SONRA normalize et (sıra önemli:
+        # önce normalize edip sonra negatifleri sıfırlamak, kalan
+        # ağırlıkların toplamının 1'den sapmasına yol açabilir).
         weights = result.x
-        weights = weights / weights.sum()
-        weights = np.maximum(weights, 0)  # Negatif ağırlıkları düzelt
+        weights = np.maximum(weights, 0)
+        weight_sum = weights.sum()
+        weights = weights / weight_sum if weight_sum > 0 else np.ones(n) / n
 
         return {
             "weights": weights,
