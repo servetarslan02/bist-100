@@ -272,7 +272,7 @@ async def events(limit: int = Query(20, le=100), user=Depends(get_current_user),
 
 @router.get("/radar")
 async def market_radar(
-    limit: int = Query(100, le=500),
+    limit: int = Query(200, le=1000),
     bist100_only: bool = Query(False),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)

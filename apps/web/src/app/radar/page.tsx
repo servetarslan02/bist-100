@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import { usePolling } from "@/lib/api";
 import {
-  Search, ArrowUpRight, ArrowDownRight, RefreshCw, Loader2
+  Search, ArrowUpRight, ArrowDownRight, Loader2
 } from "lucide-react";
 
 interface RadarRow {
@@ -26,11 +26,17 @@ interface RadarResponse {
 }
 
 export default function MarketRadar() {
-  const { data: rawData, loading } = usePolling<RadarResponse>("/market/radar?limit=100&bist100_only=true", 120000);
   const [search, setSearch] = useState("");
   const [sortField, setSortField] = useState<keyof RadarRow>("score");
   const [sortAsc, setSortAsc] = useState(false);
   const [bist100Only, setBist100Only] = useState(true);
+
+  // API URL changes when toggle changes — fetches correct set from backend
+  const apiUrl = bist100Only
+    ? "/market/radar?limit=200&bist100_only=true"
+    : "/market/radar?limit=200&bist100_only=false";
+
+  const { data: rawData, loading } = usePolling<RadarResponse>(apiUrl, 120000);
 
   const allRows: RadarRow[] = useMemo(() => {
     if (!rawData?.data) return [];
