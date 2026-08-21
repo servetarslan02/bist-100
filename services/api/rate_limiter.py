@@ -119,6 +119,18 @@ class InMemoryRateLimiter:
         if key in self._buckets:
             del self._buckets[key]
 
+    def cleanup_stale(self, max_age_seconds: float = 3600):
+        """Son 1 saatten eski bucket'ları temizle (memory leak önleme)."""
+        now = time.monotonic()
+        stale_keys = [
+            k for k, v in self._buckets.items()
+            if now - v.get("last_refill", 0) > max_age_seconds
+        ]
+        for k in stale_keys:
+            del self._buckets[k]
+        if stale_keys:
+            logger.info("Rate limiter cleanup", removed=len(stale_keys))
+
 
 # Singleton
 rate_limiter = InMemoryRateLimiter()

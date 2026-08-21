@@ -158,6 +158,8 @@ class WalkForwardValidation:
 
         # Korelasyon
         corr = np.corrcoef(pred_values, actuals)[0, 1] if len(pred_values) > 1 else 0
+        if np.isnan(corr):
+            corr = 0
 
         # Yön doğruluğu
         pred_dir = np.sign(pred_values)

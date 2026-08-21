@@ -14,6 +14,7 @@ ALPHA BIST — BIST Universe Auto-Discovery Provider v1.0
 - Cache + periyodik refresh
 """
 
+import os
 import requests
 import yfinance as yf
 import json
@@ -535,7 +536,9 @@ class BISTWebProvider:
 class UniverseAutoUpdater:
     """BIST Universe otomatik güncelleme motoru."""
 
-    CACHE_FILE = Path("/mnt/agents/output/bist-100/data/universe_cache.json")
+    # Cache dosya yolu — config veya environment'dan okunabilir
+    _DEFAULT_CACHE = Path("data/universe_cache.json")
+    CACHE_FILE = Path(os.environ.get("UNIVERSE_CACHE_PATH", str(_DEFAULT_CACHE)))
     CACHE_TTL_HOURS = 24  # Cache geçerlilik süresi
 
     def __init__(self):

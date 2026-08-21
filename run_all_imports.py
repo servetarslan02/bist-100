@@ -60,7 +60,7 @@ ALL_MODULES = [
     "services.agents.agent_system",
     "services.scanner.alpha_engine","services.scanner.alpha_scanner","services.scanner.event_queue",
     "services.scanner.event_scanner","services.scanner.live_scanner","services.scanner.opportunity_engine","services.scanner.tiered_scanner",
-    "services.scheduler.daily_report","services.scheduler.main",
+    "services.scheduler.daily_report","services.scheduler.unified_scheduler",
     "services.simulation.execution_simulator","services.simulation.main",
     "services.api.main","services.api.server","services.api.websocket","services.market_state.main",
     # Alternative Data (5)

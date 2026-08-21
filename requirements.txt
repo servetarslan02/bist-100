@@ -24,7 +24,6 @@ httpx>=0.28.0                     # Modern HTTP client
 
 # === DATABASE ===
 asyncpg>=0.31.0                   # PostgreSQL async driver
-aiosqlite>=0.22.0                 # SQLite async driver
 clickhouse-connect>=0.8.0         # ClickHouse driver
 redis>=8.1.0                      # Cache + event bus
 sqlalchemy[asyncio]>=2.0.0        # ORM (Alembic ile uyumlu)
@@ -53,11 +52,9 @@ opentelemetry-sdk>=1.44.0         # Tracing SDK
 
 # === SECURITY ===
 python-jose[crypto]>=3.5.0        # JWT token
-passlib[bcrypt]>=1.7.4            # Password hashing
 cryptography>=44.0.0              # Encryption utilities
 
 # === DATABASE MIGRATION ===
-alembic>=1.19.0                   # Schema migration
 
 # === WEB SCRAPING ===
 lxml>=6.1.0                       # XML/HTML parsing
@@ -67,7 +64,6 @@ feedparser>=6.0.14                # RSS feed
 # === UTILITIES ===
 python-dateutil>=2.9.0            # Tarih işlemleri
 pytz>=2026.2                      # Zaman dilimi
-nest_asyncio>=1.6.0               # Nested async desteği
 
 # === DEV & TEST ===
 pytest>=9.1.0                     # Test framework

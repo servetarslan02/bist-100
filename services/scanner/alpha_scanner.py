@@ -176,7 +176,7 @@ class AlphaScanner(ScannerInterface):
         r.relative_strength = f.get("price_vs_sma20", 0)
         r.volume_zscore = f.get("volume_zscore", 0)
         r.volatility = f.get("realized_vol_20d", 0)
-        r.atr_pct = f.get("atr_14_pct", 0)
+        r.atr_pct = f.get("atr_pct", f.get("atr_14_pct", 0))
         r.bb_position = f.get("bb_position", 0.5)
         r.sector_strength = f.get("sector_momentum", 0) or f.get("relative_strength_vs_sector", 0)
 

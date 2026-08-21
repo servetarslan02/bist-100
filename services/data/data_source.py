@@ -138,7 +138,8 @@ class DataSourceManager:
                 return [f"{t}.IS" for t in tickers]
         except Exception:
             pass
-        # Fallback
+        # Fallback — cache yoksa BIST-30 alt kümesi (geçici, cache yüklenene kadar)
+        # Gerçek liste UniverseAutoUpdater tarafından güncellenir
         return [
             "THYAO.IS", "GARAN.IS", "ISCTR.IS", "AKBNK.IS", "YKBNK.IS",
             "BIMAS.IS", "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS",

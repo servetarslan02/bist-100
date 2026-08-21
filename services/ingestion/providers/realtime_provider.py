@@ -37,7 +37,7 @@ class DataEvent:
     def __post_init__(self):
         if not self.content_hash:
             raw = json.dumps(self.data, sort_keys=True, default=str)
-            self.content_hash = hashlib.md5(raw.encode()).hexdigest()
+            self.content_hash = hashlib.sha256(raw.encode()).hexdigest()
 
 
 class RealTimeDataEngine:

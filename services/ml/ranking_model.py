@@ -285,7 +285,7 @@ class RankingModel:
             # Confidence: percentile bazli, en iyi %10 = ~0.9, en iyi %1 = ~0.99
             n = len(sorted_scores)
             percentile = (n - rank + 1) / n  # 1.0 = en iyi, 0.0 = en kotu
-            confidence = max(0, min(0.99, 0.5 + percentile * 0.5))  # 0.5 - 0.99 arasi
+            confidence = max(0.10, min(0.99, 0.5 + percentile * 0.5))  # 0.10 - 0.99 arasi
 
             lgbm_norm, rule_norm = normalized_scores.get(ticker, (0, 0))
             opp = OpportunityScore(

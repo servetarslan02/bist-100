@@ -83,6 +83,9 @@ class Decision:
 class DecisionEngine:
     """Karar motoru."""
 
+    # ATR olmadığında kullanılacak varsayılan stop yüzdesi
+    DEFAULT_STOP_FALLBACK = 6.5  # %6.5 — BIST ortalaması için makul
+
     def __init__(self):
         self._min_confidence = 0.65
         self._min_score = 60.0
@@ -362,7 +365,7 @@ class DecisionEngine:
         elif atr_pct > 0:
             stop_pct = atr_pct * 1.5
         else:
-            stop_pct = 6.5  # Canonical Hard Stop Fallback: %6.5 (hard_stop_pct = -6.5%)
+            stop_pct = self.DEFAULT_STOP_FALLBACK  # Config'den okunabilir
 
         # Sınırla: min %4.0 (min_atr_pct), max %10.0
         stop_pct = max(4.0, min(10.0, stop_pct))

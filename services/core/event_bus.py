@@ -321,10 +321,9 @@ async def _publish_to_stream(event: CanonicalEvent):
     """Durable event ledger'a yaz.
     Öncelik: Redis Stream > PostgreSQL > Log
     """
-    # 1. Redis Stream dene
+    # 1. Redis Stream dene (reuse connection)
     try:
-        import redis.asyncio as aioredis
-        r = aioredis.from_url(settings.redis_url, decode_responses=True)
+        r = await _get_redis()
         stream_key = f"alpha:events:{event.event_type}"
         await r.xadd(stream_key, {
             "event_id": event.event_id,
@@ -332,7 +331,6 @@ async def _publish_to_stream(event: CanonicalEvent):
             "data": event.to_json(),
             "timestamp": event.timestamp.isoformat(),
         }, maxlen=10000)
-        await r.close()
         return
     except Exception as e:
         logger.warning("Redis Stream write failed", error=str(e), context="event_bus.py:311")

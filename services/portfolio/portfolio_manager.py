@@ -663,6 +663,9 @@ class PortfolioManager:
 
         del self._positions[ticker]
 
+        # Equity snapshot güncelle
+        self._record_equity()
+
         logger.info("Position closed",
             ticker=ticker, pnl=round(trade.pnl, 2),
             pnl_pct=round(trade.pnl_pct, 2),

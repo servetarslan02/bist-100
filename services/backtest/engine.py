@@ -147,6 +147,14 @@ class BacktestEngine:
                 pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
 
                 trade_id += 1
+                # Holding days hesapla
+                try:
+                    _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
+                    _d2 = datetime.strptime(date, "%Y-%m-%d")
+                    _holding = max(1, (_d2 - _d1).days)
+                except Exception:
+                    _holding = 1
+
                 trades.append(BacktestTrade(
                     trade_id=trade_id,
                     ticker=ticker,
@@ -158,7 +166,7 @@ class BacktestEngine:
                     quantity=pos["qty"],
                     pnl=round(pnl, 2),
                     pnl_pct=round(pnl_pct, 2),
-                    holding_days=1,  # Basitleştirilmiş
+                    holding_days=_holding,
                     commission=round(pos["commission"] + commission, 2),
                 ))
 
@@ -229,14 +237,38 @@ class BacktestEngine:
         # Fees
         total_fees = sum(t.commission for t in trades)
 
+        # CAGR — gerçek tarih aralığı kullanarak
+        try:
+            _start = datetime.strptime(trades[0].entry_date, "%Y-%m-%d")
+            _end = datetime.strptime(trades[-1].exit_date, "%Y-%m-%d")
+            _years = max((_end - _start).days / 365.25, 0.01)
+            _cagr = round(((final / initial_capital) ** (1 / _years) - 1) * 100, 2) if final > 0 else 0
+        except Exception:
+            _cagr = round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0
+
+        # Max drawdown duration hesapla
+        _max_dd_dur = 0
+        if dd_curve:
+            _in_dd = False
+            _dd_start = 0
+            for _i, _dd in enumerate(dd_curve):
+                if _dd > 0 and not _in_dd:
+                    _in_dd = True
+                    _dd_start = _i
+                elif _dd == 0 and _in_dd:
+                    _in_dd = False
+                    _max_dd_dur = max(_max_dd_dur, _i - _dd_start)
+            if _in_dd:
+                _max_dd_dur = max(_max_dd_dur, len(dd_curve) - _dd_start)
+
         return BacktestMetrics(
             total_return_pct=round(total_return, 2),
-            cagr_pct=round(((final / initial_capital) ** (1 / max((len(equity_curve) - 1) / 252, 0.01)) - 1) * 100, 2) if final > 0 else 0,
+            cagr_pct=_cagr,
             sharpe_ratio=round(sharpe, 2),
             sortino_ratio=round(sortino, 2),
             calmar_ratio=round(total_return / max_dd, 2) if max_dd > 0 else 0,
             max_drawdown_pct=round(max_dd, 2),
-            max_drawdown_duration_days=0,
+            max_drawdown_duration_days=_max_dd_dur,
             win_rate=round(win_rate, 4),
             profit_factor=round(profit_factor, 2),
             avg_win=round(float(avg_win), 2),

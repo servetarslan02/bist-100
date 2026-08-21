@@ -1196,7 +1196,7 @@ class SeasonalityMotor:
 # ANA MOTOR — TÜM MOTORLARI BİRLEŞTİR
 # =====================================================
 
-class SevenMotorEngine:
+class NineMotorEngine:
     """7 motoru birleştiren ana motor (artık 9 motor)."""
 
     def __init__(self):
@@ -1329,6 +1329,12 @@ class SevenMotorEngine:
             # Motor 7
             ("fall_market_selloff_5d",     "fall_market_selloff",     "motor7"),
             ("fall_sector_selloff_5d",     "fall_sector_selloff",     "motor7"),
+            # Motor 8 (Mean Reversion) — isim tutarsızlığı düzeltmesi
+            ("rsi_14d",                    "rsi_14",                  "motor8"),
+            ("rsi_5d",                     "rsi_5",                   "motor8"),
+            ("rsi_21d",                    "rsi_21",                  "motor8"),
+            ("williams_r_14d",             "williams_r",              "motor8"),
+            ("cci_20d",                    "cci",                     "motor8"),
         ]
 
         for src, dst, motor in _ALIAS_MAP:
@@ -1357,5 +1363,8 @@ class SevenMotorEngine:
         return cleaned
 
 
+# Backward-compatible alias
+SevenMotorEngine = NineMotorEngine
+
 # Singleton
-seven_motor_engine = SevenMotorEngine()
+seven_motor_engine = NineMotorEngine()

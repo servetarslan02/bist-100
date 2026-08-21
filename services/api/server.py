@@ -40,10 +40,9 @@ import asyncio
 import json
 import os
 import sys
-import uuid
 import warnings
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, Request
@@ -69,14 +68,11 @@ from services.core.observability import (
 from services.core.infrastructure import (
     notification_system, snapshot_system, cache_system, job_queue
 )
-from services.ingestion.bist_universe import BISTUniverse
 from services.features.store import feature_store
-from services.intelligence.regime import regime_engine
 from services.intelligence.signal_fusion import signal_fusion
 from services.scanner.opportunity_engine import opportunity_engine
 from services.ml.ranking_model import ranking_model
 from services.core.decision_engine import decision_engine
-from services.risk.position_sizing import position_sizer
 from services.simulation.execution_simulator import execution_simulator
 from services.portfolio.portfolio_manager import portfolio_manager
 from services.core.monitoring import portfolio_monitor
@@ -305,8 +301,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
         from services.core.monitoring_security import monitoring_auth
         if monitoring_auth.verify_admin_token(token) or monitoring_auth.verify_metrics_token(token):
             authenticated = True
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("WS auth: monitoring token check failed", error=str(e))
 
     if not authenticated:
         try:
@@ -314,8 +310,8 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
             payload = jwt_handler.verify_token(token)
             if payload:
                 authenticated = True
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("WS auth: JWT check failed", error=str(e))
 
     if not authenticated:
         await websocket.close(code=4003, reason="Invalid or expired token")

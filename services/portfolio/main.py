@@ -88,8 +88,7 @@ class PortfolioService:
             try:
                 await self._save_equity_snapshot()
             except Exception as e:
-                logger.debug("Handled exception", error=str(e), context="main.py:90")
-                pass
+                logger.warning("Equity snapshot save failed during stop", error=str(e))
         logger.info("Portfolio Service v2.0 stopped")
 
     def _on_config_change(self, new_config: Dict[str, Any]):
@@ -431,22 +430,19 @@ class PortfolioService:
                         price, self._position_cache[ticker]["id"]
                     )
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="main.py:432")
-            pass
+            logger.warning("Position price update failed", error=str(e))
 
         # Portfolio totals güncelle
         try:
             await self._update_portfolio_totals()
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="main.py:438")
-            pass
+            logger.warning("Portfolio totals update failed", error=str(e))
 
         # Günlük snapshot
         try:
             await self._save_equity_snapshot()
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="main.py:444")
-            pass
+            logger.warning("Equity snapshot save failed", error=str(e))
 
     # =====================================================
     # DB PERSISTENCE

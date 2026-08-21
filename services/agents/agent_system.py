@@ -11,6 +11,7 @@ Refactored:
 FAZ 0: Temel altyapı refactor
 """
 
+import asyncio
 import json
 import hashlib
 import re
@@ -459,23 +460,21 @@ class AgentOrchestrator:
         client = llm_client or self.llm_client
         results = {}
 
-        # Sırasıyla çalıştır (paralel Faz 1'de eklenecek)
+        # Paralel çalıştır (asyncio.gather ile)
         research_roles = [
             AgentRole.TECHNICAL, AgentRole.FUNDAMENTAL,
             AgentRole.NEWS, AgentRole.MACRO,
         ]
 
-        for role in research_roles:
+        template_map = {
+            AgentRole.TECHNICAL: "technical",
+            AgentRole.FUNDAMENTAL: "fundamental",
+            AgentRole.NEWS: "news",
+            AgentRole.MACRO: "macro",
+        }
+
+        async def _run_agent(role):
             agent = self._agents.get(role) or BaseAgent(role, llm_client=client)
-
-            # Template adını belirle
-            template_map = {
-                AgentRole.TECHNICAL: "technical",
-                AgentRole.FUNDAMENTAL: "fundamental",
-                AgentRole.NEWS: "news",
-                AgentRole.MACRO: "macro",
-            }
-
             task = AgentTask(
                 task_id=f"{ticker}-{role.value}-{datetime.now(timezone.utc).strftime('%H%M%S')}",
                 agent_role=role,
@@ -484,9 +483,17 @@ class AgentOrchestrator:
                 context=context,
                 template_name=template_map.get(role),
             )
+            return role.value, await agent.execute(task, client)
 
-            result = await agent.execute(task, client)
-            results[role.value] = result
+        gather_results = await asyncio.gather(*[_run_agent(r) for r in research_roles], return_exceptions=True)
+
+        results = {}
+        for item in gather_results:
+            if isinstance(item, Exception):
+                logger.warning("Agent execution failed", error=str(item))
+                continue
+            role_val, result = item
+            results[role_val] = result
             self._results.append(result)
 
         # Synthesis

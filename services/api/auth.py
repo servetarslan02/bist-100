@@ -13,6 +13,8 @@ Roller:
 
 import os
 import time
+import json
+import base64
 import hashlib
 import hmac
 from typing import Dict, Any, Optional, List
@@ -83,8 +85,6 @@ class JWTHandler:
         expires_hours: int = 24,
     ) -> str:
         """JWT token oluştur."""
-        import json
-        import base64
 
         now = time.time()
         payload = {
@@ -119,8 +119,6 @@ class JWTHandler:
 
     def verify_token(self, token: str) -> Optional[TokenPayload]:
         """JWT token doğrula."""
-        import json
-        import base64
 
         try:
             parts = token.split(".")

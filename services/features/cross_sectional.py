@@ -108,8 +108,10 @@ class CrossSectionalEngine:
             if len(all_vals) < 5:
                 continue
 
-            # Percentile rank (0-1)
-            rank = sum(1 for v in all_vals if v <= my_val) / len(all_vals)
+            # Percentile rank (0-1) — tied values için ortalama rank kullan
+            n_below = sum(1 for v in all_vals if v < my_val)
+            n_equal = sum(1 for v in all_vals if v == my_val)
+            rank = (n_below + 0.5 * n_equal) / len(all_vals)
             rank_features[f"rank_{feat_name}"] = round(rank, 4)
 
             # Cross-sectional z-score (tüm evrene göre)

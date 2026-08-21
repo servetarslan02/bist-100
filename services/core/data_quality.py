@@ -124,10 +124,18 @@ class DataQualityEngine:
 
         return mask
 
-    def apply_mask(self, raw_data: Dict[str, Any], mask: TradabilityMask) -> Dict[str, Any]:
-        """Ham veriye mask uygula. 
+    def apply_mask(self, raw_data: Dict[str, Any], mask: TradabilityMask, *, copy: bool = False) -> Dict[str, Any]:
+        """Ham veriye mask uygula.
         KURAL: Mask=0 olan fiyat, hiçbir feature hesaplamasına girmemeli (Mask-First Design).
+
+        Args:
+            raw_data: Ham veri dict'i (varsayılan: in-place modifiye edilir)
+            mask: Tradability mask
+            copy: True ise kopya üzerinde çalışır (orijinal dict değişmez)
         """
+        if copy:
+            import copy as _copy
+            raw_data = _copy.deepcopy(raw_data)
         if mask.price_mask == 0.0:
             # Mask-first: Ham fiyatı null yap ki feature motorları bunu kullanmasın
             price_cols = ["open", "high", "low", "close"]

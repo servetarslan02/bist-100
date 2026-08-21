@@ -179,8 +179,7 @@ class NewsProvider:
             if feeds:
                 return feeds
         except Exception as e:
-            logger.debug("Handled exception", error=str(e), context="news_provider.py:187")
-            pass
+            logger.warning("RSS feed load failed", error=str(e))
 
         # Fallback: güvenilir ve hızlı finansal RSS beslemeleri
         return [

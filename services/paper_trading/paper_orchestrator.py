@@ -328,10 +328,13 @@ class PaperTradingOrchestrator:
             return {}
 
         # === EXECUTION ===
+        # Volatilite ve spread'i hesapla (sabit değerler yerine)
+        _vol = self._estimate_volatility(ticker) if hasattr(self, '_estimate_volatility') else 0.25
+        _spread = self._estimate_spread(ticker, volume) if hasattr(self, '_estimate_spread') else 0.1
         order = self.execution.execute_signal(
             date=date, ticker=ticker, side=side, quantity=quantity,
             signal_price=price, market_price=price,
-            avg_volume=volume, volatility=0.25, spread_pct=0.1,
+            avg_volume=volume, volatility=_vol, spread_pct=_spread,
             sector=sector,
         )
 
