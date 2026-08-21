@@ -1,4 +1,4 @@
-// ALPHA BIST - API Client & WebSocket Hook
+// ALPHA BIST - API Client & WebSocket Hook v2.0 (Real-Time Live Streaming)
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
@@ -9,63 +9,47 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 // =====================================================
 
 export async function api<T>(path: string): Promise<T> {
-  const res = await fetch(`${API_BASE}/api${path}`);
+  const url = path.startsWith('/api') ? path : `/api${path}`;
+  const res = await fetch(url, {
+    headers: {
+      'Accept': 'application/json',
+    },
+    cache: 'no-store',
+  });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${API_BASE}/api${path}`, {
+  const url = path.startsWith('/api') ? path : `/api${path}`;
+  const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify(body),
+    cache: 'no-store',
   });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
 }
 
 // =====================================================
-// WebSocket Hook (Live Updates)
+// Polling Hook (Ultra-Fast Live Polling: Default 3s)
 // =====================================================
 
-export function useWebSocket(channel: string) {
-  const [data, setData] = useState<any>(null);
-  const [connected, setConnected] = useState(false);
-  const wsRef = useRef<WebSocket | null>(null);
-
-  useEffect(() => {
-    const wsUrl = `ws://${window.location.host}/ws/${channel}`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-    ws.onclose = () => setConnected(false);
-    ws.onmessage = (event) => {
-      try {
-        setData(JSON.parse(event.data));
-      } catch {}
-    };
-
-    return () => ws.close();
-  }, [channel]);
-
-  return { data, connected };
-}
-
-// =====================================================
-// Polling Hook (HTTP fallback)
-// =====================================================
-
-export function usePolling<T>(path: string, intervalMs: number = 30000) {
+export function usePolling<T>(path: string, intervalMs: number = 3000) {
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [tick, setTick] = useState(0);
 
   const fetchData = useCallback(async () => {
     try {
       const result = await api<T>(path);
       setData(result);
       setError(null);
+      setLastUpdated(new Date());
+      setTick(t => t + 1);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -79,7 +63,46 @@ export function usePolling<T>(path: string, intervalMs: number = 30000) {
     return () => clearInterval(timer);
   }, [fetchData, intervalMs]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, error, lastUpdated, tick, refetch: fetchData };
+}
+
+// =====================================================
+// WebSocket Hook (Live Streaming)
+// =====================================================
+
+export function useWebSocket(channel: string) {
+  const [data, setData] = useState<any>(null);
+  const [connected, setConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/${channel}`;
+    try {
+      const ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+
+      ws.onopen = () => setConnected(true);
+      ws.onclose = () => setConnected(false);
+      ws.onerror = () => setConnected(false);
+      ws.onmessage = (event) => {
+        try {
+          setData(JSON.parse(event.data));
+        } catch {}
+      };
+
+      return () => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      };
+    } catch {
+      setConnected(false);
+    }
+  }, [channel]);
+
+  return { data, connected };
 }
 
 // =====================================================
@@ -114,11 +137,10 @@ export interface Instrument {
   symbol: string;
   name: string;
   sector: string;
-}
-
-export interface AssetData {
-  instrument: Instrument;
-  features: Record<string, string>;
+  price?: number;
+  change_pct?: number;
+  volume?: number;
+  market_cap?: number;
 }
 
 export interface PortfolioData {
@@ -146,12 +168,13 @@ export interface PortfolioData {
 }
 
 export interface Alert {
-  id: number;
+  id: number | string;
   alert_type: string;
-  severity: string;
+  severity: "CRITICAL" | "WARNING" | "INFO";
   title: string;
   message: string;
   created_at: string;
+  ticker?: string;
 }
 
 export interface ModelInfo {

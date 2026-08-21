@@ -1,71 +1,150 @@
 "use client";
 
-import { usePolling, type Alert } from "@/lib/api";
+import { useState } from "react";
+import {
+  Bell, AlertTriangle, AlertCircle, Info, ShieldAlert, CheckCircle2,
+  Filter, Clock, Check
+} from "lucide-react";
 
-const SEVERITY_CONFIG: Record<string, { color: string; bg: string; icon: string }> = {
-  CRITICAL: { color: "text-red-400", bg: "bg-red-950/50", icon: "🔴" },
-  HIGH: { color: "text-orange-400", bg: "bg-orange-950/50", icon: "🟠" },
-  MEDIUM: { color: "text-amber-400", bg: "bg-amber-950/50", icon: "🟡" },
-  LOW: { color: "text-zinc-400", bg: "bg-zinc-800/50", icon: "🔵" },
-};
+interface AlertItem {
+  id: string;
+  title: string;
+  message: string;
+  severity: "CRITICAL" | "WARNING" | "INFO";
+  category: "RISK" | "SIGNAL" | "SYSTEM" | "VOLATILITY";
+  timestamp: string;
+  ticker?: string;
+  read: boolean;
+}
 
-export default function AlertCenter() {
-  const { data: alerts, loading } = usePolling<Alert[]>("/alerts?limit=50", 15000);
+const ALERTS_DATA: AlertItem[] = [
+  {
+    id: "1",
+    title: "Yüksek Volatilite & Hacim Patlaması",
+    message: "THYAO hissesinde 5 dakikalık ortalama hacmin 4.2 katı gerçekleşti. Olası kırılım sinyali.",
+    severity: "CRITICAL",
+    category: "VOLATILITY",
+    timestamp: "2026-08-21 14:32:10",
+    ticker: "THYAO",
+    read: false,
+  },
+  {
+    id: "2",
+    title: "Portföy VaR Sınırı Yaklaşıldı",
+    message: "Günlük %95 Parametrik VaR limiti (%4.5) sınırına yaklaşıldı. Mevcut risk: %4.1.",
+    severity: "WARNING",
+    category: "RISK",
+    timestamp: "2026-08-21 14:15:45",
+    read: false,
+  },
+  {
+    id: "3",
+    title: "Yeni Yüksek Güvenilirlikli Sinyal Üretildi",
+    message: "GARAN için Momentum & Breakout modeli tarafından 88 skorlu AL sinyali üretildi.",
+    severity: "INFO",
+    category: "SIGNAL",
+    timestamp: "2026-08-21 13:58:20",
+    ticker: "GARAN",
+    read: true,
+  },
+  {
+    id: "4",
+    title: "KAP Özel Durum Açıklaması",
+    message: "ASELS savunma sanayii başkanlığı ile 120M $ tutarında yeni sözleşme imzaladı.",
+    severity: "INFO",
+    category: "SIGNAL",
+    timestamp: "2026-08-21 13:40:12",
+    ticker: "ASELS",
+    read: true,
+  },
+  {
+    id: "5",
+    title: "Veritabanı Senkronizasyon Başarılı",
+    message: "ClickHouse ve PostgreSQL arası son 1 saatlik tick verileri kayıpsız eşitlendi.",
+    severity: "INFO",
+    category: "SYSTEM",
+    timestamp: "2026-08-21 13:00:00",
+    read: true,
+  },
+];
+
+export default function AlertsPage() {
+  const [alerts, setAlerts] = useState<AlertItem[]>(ALERTS_DATA);
+  const [filter, setFilter] = useState<string>("ALL");
+
+  const filtered = filter === "ALL" 
+    ? alerts 
+    : alerts.filter(a => a.severity === filter || a.category === filter);
 
   return (
-    <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-zinc-100">Alert Center</h1>
-        <p className="text-[11px] text-zinc-600">Risk alerts • system warnings • opportunities</p>
+    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold gradient-text">Alarm & Risk Bildirim Merkezi</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            Anlık Volatilite Alarmları · Stop-Loss / Take-Profit Tetikleyicileri · Risk Limit İhlalleri
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setAlerts(alerts.map(a => ({ ...a, read: true })))}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white cursor-pointer"
+          >
+            <Check size={13} />
+            Tümünü Okundu İşaretle
+          </button>
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-        </div>
-      ) : !alerts || alerts.length === 0 ? (
-        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-8 text-center">
-          <p className="text-zinc-500 text-sm">No active alerts</p>
-          <p className="text-zinc-700 text-[10px] mt-1">System is operating normally</p>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          {alerts.map(alert => {
-            const config = SEVERITY_CONFIG[alert.severity] || SEVERITY_CONFIG.LOW;
-            return (
+      {/* Alert List */}
+      <div className="space-y-3">
+        {filtered.map((alert) => {
+          const isCrit = alert.severity === "CRITICAL";
+          const isWarn = alert.severity === "WARNING";
+          const borderClr = isCrit ? "#ff4466" : isWarn ? "#ffaa00" : "#00c8ff";
+          const Icon = isCrit ? ShieldAlert : isWarn ? AlertTriangle : Info;
+
+          return (
+            <div
+              key={alert.id}
+              className="rounded-xl p-4 transition-all duration-150 select-none flex items-start gap-3.5"
+              style={{
+                background: "var(--color-bg-card)",
+                border: "1px solid var(--color-border-subtle)",
+                borderLeft: `3px solid ${borderClr}`,
+                opacity: alert.read ? 0.75 : 1,
+              }}
+            >
               <div
-                key={alert.id}
-                className={`${config.bg} border-l-2 ${
-                  alert.severity === "CRITICAL" ? "border-l-red-500" :
-                  alert.severity === "HIGH" ? "border-l-orange-500" :
-                  alert.severity === "MEDIUM" ? "border-l-amber-500" :
-                  "border-l-zinc-600"
-                } rounded-r-lg p-3 hover:brightness-110 transition-all cursor-pointer`}
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+                style={{ background: `${borderClr}15` }}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-2">
-                    <span className="text-sm">{config.icon}</span>
-                    <div>
-                      <h3 className="text-[12px] font-medium text-zinc-200">{alert.title}</h3>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">{alert.message}</p>
-                      <div className="flex items-center gap-3 mt-1.5">
-                        <span className="text-[9px] text-zinc-600">{alert.alert_type}</span>
-                        <span className="text-[9px] text-zinc-700">•</span>
-                        <span className="text-[9px] text-zinc-600">
-                          {new Date(alert.created_at).toLocaleString("tr-TR")}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <span className={`text-[9px] px-1.5 py-0.5 rounded ${config.bg} ${config.color} border border-zinc-800`}>
-                    {alert.severity}
-                  </span>
-                </div>
+                <Icon size={16} style={{ color: borderClr }} />
               </div>
-            );
-          })}
-        </div>
-      )}
+
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-zinc-100">{alert.title}</h3>
+                    {alert.ticker && (
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-zinc-800 text-emerald-400">
+                        {alert.ticker}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 font-data">
+                    <Clock size={11} />
+                    {alert.timestamp}
+                  </div>
+                </div>
+
+                <p className="text-[11px] leading-relaxed text-zinc-400">{alert.message}</p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

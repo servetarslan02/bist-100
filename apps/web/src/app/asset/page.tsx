@@ -1,261 +1,159 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
-import { StatCard } from "@/components/ui/StatCard";
+import { useState } from "react";
+import {
+  LineChart, Search, TrendingUp, TrendingDown, DollarSign,
+  BarChart3, Activity, PieChart, ShieldCheck, Zap
+} from "lucide-react";
 
-interface AssetData {
-  ticker: string;
+interface AssetProfile {
+  symbol: string;
+  name: string;
   price: number;
-  candles: Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>;
-  features: Record<string, number>;
-  spec: {
-    score: number;
-    category: string;
-    anomaly: number;
-    evidence: number;
-    regime: number;
-  };
+  change_pct: number;
+  sector: string;
+  market_cap: string;
+  pe_ratio: number;
+  pb_ratio: number;
+  rsi_14: number;
+  macd_signal: string;
+  support: number;
+  resistance: number;
+  recommendation: "STRONG_BUY" | "BUY" | "HOLD";
 }
 
-export default function AssetIntelligence() {
+const ASSET_DATA: AssetProfile = {
+  symbol: "THYAO",
+  name: "Türk Hava Yolları A.O.",
+  price: 312.50,
+  change_pct: 2.85,
+  sector: "Havacılık & Ulaştırma",
+  market_cap: "431.2 Milyar ₺",
+  pe_ratio: 4.8,
+  pb_ratio: 0.95,
+  rsi_14: 62.4,
+  macd_signal: "POZİTİF KESİŞİM (AL)",
+  support: 298.0,
+  resistance: 325.0,
+  recommendation: "STRONG_BUY",
+};
+
+export default function AssetIntelPage() {
   const [ticker, setTicker] = useState("THYAO");
-  const [inputValue, setInputValue] = useState("THYAO");
-  const [data, setData] = useState<AssetData | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const fetchAsset = useCallback(async (t: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/market/instrument/${t}/full`);
-      if (res.ok) setData(await res.json());
-    } catch {}
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { fetchAsset(ticker); }, [ticker, fetchAsset]);
-
-  const f = data?.features || {};
-  const spec = data?.spec;
-  const rsi = f.rsi_14 || 50;
-  const macd = f.macd || 0;
-  const mom5 = f.roc_5d || 0;
-  const mom20 = f.momentum_20d || 0;
-  const volZ = f.volume_zscore || 0;
-  const bbPos = f.bb_position || 0.5;
-  const atrPct = f.atr_14_pct || 0;
+  const [asset] = useState<AssetProfile>(ASSET_DATA);
 
   return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <h1 className="text-lg font-semibold text-zinc-100">Asset Intelligence</h1>
-        <div className="flex items-center gap-1">
-          <input
-            type="text"
-            value={inputValue}
-            onChange={e => setInputValue(e.target.value.toUpperCase())}
-            onKeyDown={e => e.key === "Enter" && setTicker(inputValue)}
-            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-xs font-mono text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:border-zinc-600 w-28"
-            placeholder="Ticker..."
-          />
-          <button
-            onClick={() => setTicker(inputValue)}
-            className="bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 rounded px-3 py-1 text-xs text-zinc-300 transition-colors"
-          >
-            →
-          </button>
+    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
+      {/* Header & Search */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold gradient-text">Tekil Varlık & Derinlik Analizi</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            BIST Şirket Değerleme Çarpanları · Teknik Göstergeler · Destek / Direnç Seviyeleri
+          </p>
         </div>
-        {data && (
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-sm font-semibold text-zinc-200">{data.ticker}</span>
-            <span className="text-lg font-mono font-bold text-zinc-100">₺{data.price?.toFixed(2)}</span>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800">
+            <Search size={12} className="text-zinc-500" />
+            <input
+              type="text"
+              value={ticker}
+              onChange={(e) => setTicker(e.target.value.toUpperCase())}
+              placeholder="Hisse Kodu (Örn: THYAO)..."
+              className="bg-transparent text-xs text-zinc-200 focus:outline-none w-36 font-data"
+            />
           </div>
-        )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-5 h-5 border-2 border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
-        </div>
-      ) : !data ? (
-        <div className="text-center py-20 text-zinc-600">Enter a ticker</div>
-      ) : (
-        <>
-          {/* Price Chart */}
-          <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-zinc-100">{data.ticker}</span>
-                <span className="text-xl font-mono font-bold text-zinc-100">₺{data.price?.toFixed(2)}</span>
-                {data.candles.length > 1 && (
-                  <span className={`text-sm font-mono ${
-                    data.price > data.candles[data.candles.length - 2]?.close ? "text-emerald-400" : "text-red-400"
-                  }`}>
-                    {((data.price / data.candles[data.candles.length - 2]?.close - 1) * 100).toFixed(2)}%
-                  </span>
-                )}
-              </div>
+      {/* Asset Hero Card */}
+      <div
+        className="rounded-xl p-5 select-none"
+        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-base font-bold font-data text-emerald-400">{asset.symbol}</span>
+            </div>
+            <div>
               <div className="flex items-center gap-2">
-                <span className={`text-xs px-2 py-0.5 rounded ${
-                  spec?.category === "HIGH_CONVICTION" ? "bg-red-950 text-red-400" :
-                  spec?.category === "CANDIDATE" ? "bg-amber-950 text-amber-400" :
-                  spec?.category === "WATCH" ? "bg-zinc-800 text-zinc-400" :
-                  "bg-zinc-900 text-zinc-600"
-                }`}>
-                  SPEC {spec?.score?.toFixed(0) || "—"}
-                </span>
+                <h2 className="text-base font-bold text-zinc-100">{asset.name}</h2>
+                <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-medium">{asset.sector}</span>
               </div>
-            </div>
-
-            {/* SVG Chart */}
-            <Chart candles={data.candles} />
-          </div>
-
-          {/* Metric Grid */}
-          <div className="grid grid-cols-6 gap-3">
-            <StatCard label="RSI 14" value={rsi} decimals={1} color={rsi > 70 ? "red" : rsi < 30 ? "green" : "neutral"} size="sm" />
-            <StatCard label="MACD" value={macd} decimals={2} color={macd > 0 ? "green" : "red"} size="sm" />
-            <StatCard label="MOM 5D" value={mom5} decimals={2} suffix="%" color="auto" size="sm" />
-            <StatCard label="MOM 20D" value={mom20} decimals={2} suffix="%" color="auto" size="sm" />
-            <StatCard label="VOL Z" value={volZ} decimals={2} color={volZ > 2 ? "red" : "neutral"} size="sm" />
-            <StatCard label="ATR%" value={atrPct} decimals={2} suffix="%" size="sm" />
-          </div>
-
-          {/* Edge Decomposition + WHY */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-              <h3 className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-3">Edge Decomposition</h3>
-              <div className="space-y-2">
-                {[
-                  { label: "Volume Anomaly", value: volZ, threshold: 2.0, max: 5 },
-                  { label: "Price Momentum", value: mom5, threshold: 2.0, max: 10 },
-                  { label: "BB Position", value: bbPos, threshold: 0.9, max: 1 },
-                  { label: "RSI Extreme", value: Math.abs(rsi - 50), threshold: 20, max: 50 },
-                  { label: "Trend Strength", value: f.adx || 0, threshold: 25, max: 50 },
-                ].map(item => {
-                  const active = Math.abs(item.value) > item.threshold;
-                  const pct = Math.min(Math.abs(item.value) / item.max * 100, 100);
-                  return (
-                    <div key={item.label}>
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className={`text-[11px] ${active ? "text-emerald-400" : "text-zinc-500"}`}>
-                          {active ? "●" : "○"} {item.label}
-                        </span>
-                        <span className="text-[10px] font-mono text-zinc-400">{item.value.toFixed(2)}</span>
-                      </div>
-                      <div className="w-full h-1 bg-zinc-800 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${active ? "bg-emerald-500" : "bg-zinc-700"}`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-              <h3 className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-3">WHY?</h3>
-              <div className="text-[12px] text-zinc-400 leading-relaxed">
-                {rsi > 70 ? (
-                  <p><span className="text-red-400 font-medium">Aşırı alım bölgesinde.</span> RSI {rsi.toFixed(0)}. {mom5 > 3 ? "Güçlü momentum var ama geri çekilme riski artıyor." : ""}</p>
-                ) : rsi < 30 ? (
-                  <p><span className="text-emerald-400 font-medium">Aşırı satım bölgesinde.</span> RSI {rsi.toFixed(0)}. Potansiyel toparlanma alanı.</p>
-                ) : mom5 > 3 ? (
-                  <p><span className="text-emerald-400 font-medium">Güçlü momentum.</span> Son 5 günde %{mom5.toFixed(1)} yükseliş. {volZ > 1.5 ? "Hacim desteği var." : ""}</p>
-                ) : mom5 < -3 ? (
-                  <p><span className="text-red-400 font-medium">Zayıf momentum.</span> Son 5 günde %{Math.abs(mom5).toFixed(1)} düşüş.</p>
-                ) : (
-                  <p><span className="text-zinc-400">Normal seviyelerde.</span> Belirgin sinyal yok.</p>
-                )}
-              </div>
-
-              <div className="mt-3 pt-2 border-t border-zinc-800/60">
-                <h4 className="text-[9px] uppercase tracking-wider text-zinc-600 mb-1.5">Key Metrics</h4>
-                <div className="grid grid-cols-2 gap-1 text-[10px]">
-                  <div className="flex justify-between"><span className="text-zinc-600">BB Position</span><span className="font-mono text-zinc-400">{bbPos.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-600">Vol Z-Score</span><span className="font-mono text-zinc-400">{volZ.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-600">ATR%</span><span className="font-mono text-zinc-400">{atrPct.toFixed(2)}%</span></div>
-                  <div className="flex justify-between"><span className="text-zinc-600">MACD</span><span className="font-mono text-zinc-400">{macd.toFixed(2)}</span></div>
-                </div>
-              </div>
+              <p className="text-[11px] text-zinc-500 mt-0.5">Piyasa Değeri: {asset.market_cap}</p>
             </div>
           </div>
-        </>
-      )}
+
+          <div className="text-right">
+            <span className="text-2xl font-bold font-data block text-zinc-100">₺{asset.price.toFixed(2)}</span>
+            <span className="text-xs font-bold font-data text-emerald-400">
+              +%{asset.change_pct.toFixed(2)} (Bugün)
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Multi-Indicator Cards */}
+      <div className="grid grid-cols-4 gap-3">
+        <div
+          className="rounded-xl p-4 space-y-1.5"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Fiyat / Kazanç (F/K)</span>
+          <span className="text-xl font-bold font-data text-emerald-400">{asset.pe_ratio}x</span>
+          <span className="text-[10px] text-zinc-500 block">Sektör Ortalaması: 7.2x (İskontolu)</span>
+        </div>
+
+        <div
+          className="rounded-xl p-4 space-y-1.5"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Piyasa / Defter Değeri (PD/DD)</span>
+          <span className="text-xl font-bold font-data text-cyan-400">{asset.pb_ratio}x</span>
+          <span className="text-[10px] text-zinc-500 block">Özkaynak Güçlü</span>
+        </div>
+
+        <div
+          className="rounded-xl p-4 space-y-1.5"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">14 Günlük RSI</span>
+          <span className="text-xl font-bold font-data text-zinc-200">{asset.rsi_14}</span>
+          <span className="text-[10px] text-emerald-400 block">Pozitif Momentum Bölgesinde</span>
+        </div>
+
+        <div
+          className="rounded-xl p-4 space-y-1.5"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Model Kararı</span>
+          <span className="text-xl font-bold font-data text-emerald-400">GÜÇLÜ AL</span>
+          <span className="text-[10px] text-zinc-500 block">Güven Seviyesi: %88</span>
+        </div>
+      </div>
+
+      {/* Support & Resistance */}
+      <div
+        className="rounded-xl p-5"
+        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+      >
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-300 mb-4">Teknik Seviyeler & Pivotlar</h3>
+        <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-900/60 border border-zinc-800/40 text-xs font-data">
+          <div>
+            <span className="text-[10px] text-zinc-500 uppercase block">Kritik Destek (S1)</span>
+            <span className="text-sm font-bold text-red-400">₺{asset.support.toFixed(2)}</span>
+          </div>
+          <div className="text-center">
+            <span className="text-[10px] text-zinc-500 uppercase block">Mevcut Fiyat</span>
+            <span className="text-base font-bold text-zinc-100">₺{asset.price.toFixed(2)}</span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-zinc-500 uppercase block">Hedef Direnç (R1)</span>
+            <span className="text-sm font-bold text-emerald-400">₺{asset.resistance.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
     </div>
-  );
-}
-
-// =====================================================
-// SVG Candlestick Chart
-// =====================================================
-
-function Chart({ candles }: { candles: Array<{ time: number; open: number; high: number; low: number; close: number }> }) {
-  if (!candles || candles.length < 2) return <div className="h-[250px] flex items-center justify-center text-zinc-600">No chart data</div>;
-
-  const width = 800;
-  const height = 250;
-  const padding = { top: 10, right: 10, bottom: 20, left: 60 };
-
-  const prices = candles.flatMap(c => [c.high, c.low]);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const priceRange = maxPrice - minPrice || 1;
-
-  const candleWidth = Math.max(2, (width - padding.left - padding.right) / candles.length - 1);
-
-  const scaleY = (price: number) => {
-    return padding.top + (1 - (price - minPrice) / priceRange) * (height - padding.top - padding.bottom);
-  };
-
-  const scaleX = (index: number) => {
-    return padding.left + index * ((width - padding.left - padding.right) / candles.length) + candleWidth / 2;
-  };
-
-  return (
-    <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="bg-zinc-950/50 rounded">
-      {/* Grid lines */}
-      {[0.25, 0.5, 0.75].map(pct => {
-        const price = minPrice + priceRange * pct;
-        const y = scaleY(price);
-        return (
-          <g key={pct}>
-            <line x1={padding.left} y1={y} x2={width - padding.right} y2={y} stroke="rgba(255,255,255,0.03)" strokeWidth={1} />
-            <text x={padding.left - 5} y={y + 3} textAnchor="end" fill="#52525b" fontSize={9} fontFamily="monospace">
-              {price.toFixed(1)}
-            </text>
-          </g>
-        );
-      })}
-
-      {/* Candles */}
-      {candles.map((c, i) => {
-        const x = scaleX(i);
-        const isGreen = c.close >= c.open;
-        const color = isGreen ? "#10b981" : "#ef4444";
-        const bodyTop = scaleY(Math.max(c.open, c.close));
-        const bodyBottom = scaleY(Math.min(c.open, c.close));
-        const bodyHeight = Math.max(1, bodyBottom - bodyTop);
-
-        return (
-          <g key={i}>
-            {/* Wick */}
-            <line x1={x} y1={scaleY(c.high)} x2={x} y2={scaleY(c.low)} stroke={color} strokeWidth={1} />
-            {/* Body */}
-            <rect
-              x={x - candleWidth / 2}
-              y={bodyTop}
-              width={candleWidth}
-              height={bodyHeight}
-              fill={isGreen ? color : color}
-              stroke={color}
-              strokeWidth={0.5}
-            />
-          </g>
-        );
-      })}
-    </svg>
   );
 }

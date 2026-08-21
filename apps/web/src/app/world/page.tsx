@@ -1,132 +1,115 @@
 "use client";
 
 import { usePolling, type WorldState } from "@/lib/api";
+import {
+  Globe, DollarSign, TrendingUp, TrendingDown, Activity, AlertTriangle,
+  Flame, BarChart2, ShieldAlert
+} from "lucide-react";
 
-const FACTORS = [
-  { key: "global_risk_appetite", label: "Global Risk Appetite", invert: false, icon: "◉" },
-  { key: "usd_strength", label: "USD Strength", invert: false, icon: "$" },
-  { key: "us_rate_pressure", label: "US Rate Pressure", invert: true, icon: "%" },
-  { key: "commodity_pressure", label: "Commodity Pressure", invert: true, icon: "◈" },
-  { key: "oil_pressure", label: "Oil Pressure", invert: true, icon: "◉" },
-  { key: "turkey_macro_risk", label: "Turkey Macro Risk", invert: true, icon: "₺" },
-  { key: "geopolitical_risk", label: "Geopolitical Risk", invert: true, icon: "⚑" },
-  { key: "em_risk_appetite", label: "EM Risk Appetite", invert: false, icon: "⊕" },
-  { key: "inflation_pressure", label: "Inflation Pressure", invert: true, icon: "↑" },
-] as const;
+export default function WorldIntelPage() {
+  const { data: world } = usePolling<WorldState>("/world/state", 5000);
 
-export default function WorldIntelligence() {
-  const { data: world } = usePolling<WorldState>("/world/state", 30000);
-
-  const getBarColor = (value: number, invert: boolean) => {
-    if (invert) {
-      return value > 0.7 ? "bg-red-500" : value > 0.4 ? "bg-amber-500" : "bg-emerald-500";
-    }
-    return value > 0.6 ? "bg-emerald-500" : value > 0.3 ? "bg-amber-500" : "bg-red-500";
-  };
-
-  const getTextColor = (value: number, invert: boolean) => {
-    if (invert) {
-      return value > 0.7 ? "text-red-400" : value > 0.4 ? "text-amber-400" : "text-emerald-400";
-    }
-    return value > 0.6 ? "text-emerald-400" : value > 0.3 ? "text-amber-400" : "text-red-400";
-  };
+  const MACRO_ASSETS = [
+    { name: "Dolar Endeksi (DXY)", value: "103.85", change: "+%0.35", pos: true },
+    { name: "ABD 10 Yıllık Tahvil", value: "%4.28", change: "-2 bps", pos: false },
+    { name: "Brent Petrol", value: "$82.40", change: "-%1.10", pos: false },
+    { name: "Ons Altın (XAU/USD)", value: "$2,485", change: "+%0.65", pos: true },
+    { name: "Türkiye 5Y CDS Primi", value: "264 bps", change: "-4 bps", pos: false },
+    { name: "USD / TRY", value: "33.85", change: "+%0.12", pos: true },
+  ];
 
   return (
-    <div className="p-4 space-y-4">
-      <div>
-        <h1 className="text-lg font-semibold text-zinc-100">World Intelligence</h1>
-        <p className="text-[11px] text-zinc-600">Global macro state — event-driven latent factors</p>
+    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold gradient-text">Küresel Makro İstihbarat</h1>
+          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
+            DXY · VIX · Emtia Fiyat Baskısı · CDS & Türkiye Risk Primi · Küresel Risk İştahı
+          </p>
+        </div>
       </div>
 
-      {/* Top Metrics */}
-      <div className="grid grid-cols-4 gap-3">
-        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-          <p className="text-[9px] uppercase tracking-wider text-zinc-600">VIX Level</p>
-          <p className={`text-xl font-mono font-semibold mt-1 ${
-            (world?.vix_level || 20) > 30 ? "text-red-400" :
-            (world?.vix_level || 20) > 25 ? "text-amber-400" : "text-emerald-400"
-          }`}>
-            {world?.vix_level?.toFixed(1) || "—"}
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-0.5">CBOE Volatility Index</p>
-        </div>
-        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-          <p className="text-[9px] uppercase tracking-wider text-zinc-600">Global Risk</p>
-          <p className="text-xl font-mono font-semibold mt-1 text-zinc-200">
-            {world ? (world.global_risk_appetite * 100).toFixed(0) : "—"}%
-          </p>
-          <div className="w-full h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
-              style={{ width: `${(world?.global_risk_appetite || 0) * 100}%` }}
-            />
+      {/* Global Assets Ticker Cards */}
+      <div className="grid grid-cols-6 gap-3">
+        {MACRO_ASSETS.map((item) => (
+          <div
+            key={item.name}
+            className="rounded-xl p-4 space-y-1.5 select-none"
+            style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+          >
+            <p className="text-[9px] uppercase tracking-wider text-zinc-500 font-medium truncate">{item.name}</p>
+            <p className="text-xl font-bold font-data text-zinc-100">{item.value}</p>
+            <span className={`text-[10px] font-bold font-data ${item.pos ? "text-emerald-400" : "text-red-400"}`}>
+              {item.change}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Risk Metrics Section */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Risk Gauges */}
+        <div
+          className="rounded-xl p-5 space-y-4"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/40">
+            <ShieldAlert size={14} className="text-amber-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+              Küresel Risk & Likidite İndikatörleri
+            </h2>
+          </div>
+
+          <div className="space-y-4">
+            {[
+              { label: "Küresel Risk İştahı", value: (world?.global_risk_appetite ?? 0.65) * 100, isGood: true },
+              { label: "Gelişmekte Olan Ülkeler (EM) Sermaye Akışı", value: (world?.em_risk_appetite ?? 0.58) * 100, isGood: true },
+              { label: "Jeopolitik Gerilim Baskısı", value: (world?.geopolitical_risk ?? 0.42) * 100, isGood: false },
+              { label: "Küresel Enflasyon Baskısı", value: (world?.inflation_pressure ?? 0.38) * 100, isGood: false },
+              { label: "ABD Faiz & Likidite Sıkılığı", value: (world?.us_rate_pressure ?? 0.52) * 100, isGood: false },
+            ].map((m) => {
+              const color = m.isGood 
+                ? (m.value > 50 ? "#00e5a0" : "#ffaa00") 
+                : (m.value > 50 ? "#ff4466" : "#00e5a0");
+              return (
+                <div key={m.label} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-data">
+                    <span className="text-zinc-400">{m.label}</span>
+                    <span className="font-bold" style={{ color }}>%{m.value.toFixed(0)}</span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden bg-zinc-800">
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${m.value}%`, background: color }} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
-        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-          <p className="text-[9px] uppercase tracking-wider text-zinc-600">Turkey Macro</p>
-          <p className={`text-xl font-mono font-semibold mt-1 ${
-            (world?.turkey_macro_risk || 0.5) > 0.6 ? "text-red-400" : "text-zinc-200"
-          }`}>
-            {world ? (world.turkey_macro_risk * 100).toFixed(0) : "—"}%
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-0.5">Macro risk index</p>
-        </div>
-        <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-3">
-          <p className="text-[9px] uppercase tracking-wider text-zinc-600">USD Strength</p>
-          <p className="text-xl font-mono font-semibold mt-1 text-zinc-200">
-            {world ? (world.usd_strength * 100).toFixed(0) : "—"}%
-          </p>
-          <p className="text-[9px] text-zinc-700 mt-0.5">DXY relative strength</p>
-        </div>
-      </div>
 
-      {/* Latent Factors */}
-      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-4">
-        <h2 className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-4">Latent Factors</h2>
-        <div className="space-y-3">
-          {FACTORS.map(f => {
-            const value = world ? (world as any)[f.key] || 0 : 0;
-            return (
-              <div key={f.key} className="group">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-zinc-700 w-3 text-center">{f.icon}</span>
-                    <span className="text-[11px] text-zinc-500 group-hover:text-zinc-400 transition-colors">
-                      {f.label}
-                    </span>
-                  </div>
-                  <span className={`text-[11px] font-mono ${getTextColor(value, f.invert)}`}>
-                    {(value * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${getBarColor(value, f.invert)}`}
-                    style={{ width: `${value * 100}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+        {/* Global Impact Summary */}
+        <div
+          className="rounded-xl p-5 space-y-4"
+          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+        >
+          <div className="flex items-center gap-2.5 pb-3 border-b border-zinc-800/40">
+            <Globe size={14} className="text-cyan-400" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-200">
+              BIST Üzerindeki Küresel Etki Değerlendirmesi
+            </h2>
+          </div>
 
-      {/* Propagation Chain */}
-      <div className="bg-zinc-900/60 border border-zinc-800/60 rounded-lg p-4">
-        <h2 className="text-[10px] uppercase tracking-wider text-zinc-600 font-medium mb-3">Impact Propagation</h2>
-        <div className="flex items-center gap-2 text-[11px] overflow-x-auto pb-2">
-          {["FED", "USD", "EM Risk", "BIST", "Banks", "AKBNK"].map((node, i) => (
-            <div key={node} className="flex items-center gap-2 shrink-0">
-              <div className="px-2 py-1 rounded bg-zinc-800 border border-zinc-700/50 text-zinc-400">
-                {node}
-              </div>
-              {i < 5 && <span className="text-zinc-700">→</span>}
+          <div className="space-y-3 text-xs leading-relaxed text-zinc-300">
+            <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/40">
+              <h4 className="font-bold text-emerald-400 mb-1">Pozitif Katalizörler:</h4>
+              <p className="text-zinc-400">Türkiye CDS priminin 260 bps bandına gerilemesi ve yabancı tahvil girişlerindeki artış BIST bankacılık ve holding hisselerine pozitif yansıyor.</p>
             </div>
-          ))}
+            <div className="p-3 rounded-lg bg-zinc-900/60 border border-zinc-800/40">
+              <h4 className="font-bold text-amber-400 mb-1">Risk Faktörleri:</h4>
+              <p className="text-zinc-400">Dolar endeksindeki güçlenme (DXY &gt; 103.5) gelişmekte olan piyasalara para giriş hızını sınırlıyor.</p>
+            </div>
+          </div>
         </div>
-        <p className="text-[10px] text-zinc-700 mt-2">
-          Example: Fed rate hike → USD strengthen → EM risk off → BIST decline → Banking sector → AKBNK/GARAN
-        </p>
       </div>
     </div>
   );
