@@ -242,11 +242,18 @@ class MLTrainer:
                     verbose=-1,
                 )
 
-            # Early stopping
+            # Early stopping — validation set'i train'den ayır (data leakage önleme)
             try:
+                val_size = max(10, len(X_train) // 5)
+                if len(X_train) > val_size + 10:
+                    X_tr, X_val = X_train[:-val_size], X_train[-val_size:]
+                    y_tr, y_val = y_train[:-val_size], y_train[-val_size:]
+                else:
+                    X_tr, X_val = X_train, X_test
+                    y_tr, y_val = y_train, y_test
                 model.fit(
-                    X_train, y_train,
-                    eval_set=[(X_test, y_test)],
+                    X_tr, y_tr,
+                    eval_set=[(X_val, y_val)],
                     callbacks=[lgb.early_stopping(config.early_stopping_rounds, verbose=False)],
                 )
             except Exception:

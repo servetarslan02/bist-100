@@ -67,12 +67,13 @@ class SignalFusionEngine:
 
     # Ağırlıklar (rejime göre değişebilir)
     DEFAULT_WEIGHTS = {
-        "technical": 0.15,
-        "fundamental": 0.15,
-        "momentum": 0.20,
+        "technical": 0.14,
+        "fundamental": 0.14,
+        "momentum": 0.18,
         "sentiment": 0.10,
+        "news": 0.05,
         "macro": 0.10,
-        "valuation": 0.15,
+        "valuation": 0.14,
         "ai": 0.10,
         "spec": 0.05,  # SPEC engine entegrasyonu
     }

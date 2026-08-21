@@ -218,8 +218,9 @@ class BacktestEngine:
             returns = np.diff(equity_curve) / equity_curve[:-1]
             sharpe = (np.mean(returns) / np.std(returns) * np.sqrt(252)) if np.std(returns) > 0 else 0
 
-            downside_returns = np.minimum(returns, 0)
-            downside_std = np.sqrt(np.mean(downside_returns ** 2))
+            # Sortino: downside deviation sadece negatif getirilerden hesaplanır
+            negative_returns = returns[returns < 0]
+            downside_std = np.sqrt(np.mean(negative_returns ** 2)) if len(negative_returns) > 0 else 0
             sortino = (np.mean(returns) / downside_std * np.sqrt(252)) if downside_std > 0 else 0
         else:
             sharpe = 0

@@ -234,7 +234,7 @@ class FeatureDriftDetector:
         """Remediation önerisi."""
         if severity == "CRITICAL":
             return f"Model retrain önerilir — '{feature}' feature'ında ciddi drift"
-        elif severity == HIGH:
+        elif severity == "HIGH":
             return f"'{feature}' feature'ını izle — drift artarsa retrain gerekebilir"
         elif trend in ("increasing", "decreasing"):
             return f"'{feature}' importance yön değiştiriyor — feature engineering gözden geçirin"

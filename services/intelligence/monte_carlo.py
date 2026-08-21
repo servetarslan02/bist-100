@@ -231,7 +231,7 @@ class MonteCarloEngine:
 
         # Simülasyon
         Z = np.random.standard_normal((num_simulations, horizon_days, n))
-        correlated_Z = np.einsum('ijk,lk->ijl', Z, L)  # Bu hatalı, düzelt
+        correlated_Z = Z @ L.T  # (n_sims, horizon_days, n_assets) @ (n_assets, n_assets)
 
         # Her gün için portföy getirisi
         daily_returns = np.zeros((num_simulations, horizon_days))

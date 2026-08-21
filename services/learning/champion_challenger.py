@@ -39,6 +39,14 @@ class ChampionChallengerEngine:
         self._current_champion: Optional[ChampionRecord] = None
         self._champion_history: List[ChampionRecord] = []
         self._rejected_challengers: List[Dict] = []
+        # Canary deployment attribute'ları
+        self._canary_active: bool = False
+        self._canary_model: Optional[str] = None
+        self._canary_version: Optional[str] = None
+        self._canary_allocation: float = 0.0
+        self._canary_start: Optional[datetime] = None
+        self._canary_metrics: Dict = {}
+        self._canary_regime: str = "UNKNOWN"
 
     def promote(self, challenger_id: str, version: str, metrics: Dict, regime: str = "UNKNOWN"):
         """Challenger'ı yeni champion yap."""

@@ -160,14 +160,17 @@ class ExtendedIndicators:
             "ha_body_size": round(float(abs(ha_close - ha_open)), 2),
         }
 
-    def compute_elder_ray(self, close: np.ndarray, period: int = 13) -> Dict[str, float]:
-        """Elder Ray (Bull/Bear Power)."""
+    def compute_elder_ray(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 13) -> Dict[str, float]:
+        """Elder Ray (Bull/Bear Power).
+        Bull Power = High - EMA (yüksek fiyatın EMA'dan uzaklığı)
+        Bear Power = Low - EMA (düşük fiyatın EMA'dan uzaklığı)
+        """
         if len(close) < period:
             return {}
 
         ema = self._ema(close, period)
-        bull_power = close[-1] - ema
-        bear_power = close[-1] - ema  # Same calculation, interpretation differs
+        bull_power = high[-1] - ema
+        bear_power = low[-1] - ema
 
         return {
             "elder_bull_power": round(float(bull_power), 4),
@@ -260,7 +263,7 @@ class ExtendedIndicators:
         features.update(self.compute_vwap(high, low, close, volume))
         features.update(self.compute_pivot_points(high, low, close))
         features.update(self.compute_heikin_ashi(open_, high, low, close))
-        features.update(self.compute_elder_ray(close))
+        features.update(self.compute_elder_ray(high, low, close))
         features.update(self.compute_keltner(high, low, close))
         features.update(self.compute_donchian(high, low, close))
         features.update(self.compute_roc_multi(close))

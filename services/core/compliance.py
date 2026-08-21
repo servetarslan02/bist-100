@@ -77,7 +77,7 @@ class ComplianceChecker:
         if action == "BUY":
             new_position_pct = current_position_pct + (amount / portfolio_value)
         else:
-            new_position_pct = current_position_pct
+            new_position_pct = max(0, current_position_pct - (amount / portfolio_value))
 
         # %10 zorunlu teklif (önce kontrol et — daha kritik)
         if new_position_pct >= self.MANDATORY_BID_THRESHOLD and current_position_pct < self.MANDATORY_BID_THRESHOLD:

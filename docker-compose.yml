@@ -19,7 +19,7 @@ services:
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     mem_limit: 1g
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha"]
@@ -29,7 +29,7 @@ services:
 
   clickhouse:
     <<: *common
-    image: clickhouse/clickhouse-server:26.3-alpine
+    image: clickhouse/clickhouse-server:24.3-alpine
     container_name: alpha-clickhouse
     ports:
       - "8123:8123"
@@ -327,7 +327,7 @@ services:
       - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
     environment:
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-changeme}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
     mem_limit: 256m
 
   mlflow:

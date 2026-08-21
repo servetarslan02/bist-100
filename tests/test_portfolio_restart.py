@@ -30,12 +30,12 @@ async def reset_db():
 
 
 async def seed_instruments():
-    await dev_db.pg_execute("INSERT OR IGNORE INTO sectors (code, name) VALUES ('AVIATION', 'H')")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO sectors (code, name) VALUES ('BANK', 'B')")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'AVIATION'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'BANK'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN'")
+    await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('AVIATION', 'H') ON CONFLICT (code) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('BANK', 'B') ON CONFLICT (code) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'AVIATION' ON CONFLICT (ticker) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'BANK' ON CONFLICT (ticker) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN' ON CONFLICT (symbol) DO NOTHING")
 
 
 async def get_iid(symbol: str) -> int:

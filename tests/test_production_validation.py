@@ -462,7 +462,7 @@ async def benchmark_scanner(n_stocks: int):
             features = calc.compute_all_features(df, mask=mask.mask, ticker=ticker)
             if features:
                 results += 1
-        except:
+        except Exception:
             pass
     elapsed = time.time() - start
 

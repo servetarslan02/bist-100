@@ -35,11 +35,11 @@ async def setup_portfolio():
     for t in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
         try:
             await dev_db.pg_execute(f"DELETE FROM {t}")
-        except:
+        except Exception:
             pass
-    await dev_db.pg_execute("INSERT OR IGNORE INTO sectors (code, name) VALUES ('T', 'T')")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X'")
+    await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'X', 'X', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'X' FROM companies WHERE ticker = 'X' ON CONFLICT (symbol) DO NOTHING")
 
     svc = PortfolioService(initial_capital=100000)
     await svc.start()

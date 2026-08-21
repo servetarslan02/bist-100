@@ -75,7 +75,9 @@ def compute_inflation_features(inflation_data: Dict[str, Any]) -> Dict[str, floa
         if cpi_monthly is not None:
             features["inf_cpi_monthly"] = round(float(cpi_monthly), 2)
             # Yıllıklandırılmış aylık
-            features["inf_cpi_annualized"] = round(float(cpi_monthly) * 12, 2)
+            # Bileşik formül: (1 + aylık_oran)^12 - 1
+            monthly_rate = float(cpi_monthly) / 100
+            features["inf_cpi_annualized"] = round(((1 + monthly_rate) ** 12 - 1) * 100, 2)
 
         # Enflasyon sürprizi
         cpi_expected = inflation_data.get("cpi_expected")

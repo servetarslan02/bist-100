@@ -256,6 +256,12 @@ class DailyWorkflow:
         self._jobs_run_today = 0
         self._jobs_failed_today = 0
         self._daily_report_generated = False
+        # Risk gate günlük P&L sayacını sıfırla
+        try:
+            from services.core.risk_gate import risk_gate
+            risk_gate.reset_daily()
+        except Exception:
+            pass
 
 
 # Singleton

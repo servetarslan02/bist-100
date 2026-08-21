@@ -22,14 +22,14 @@ async def setup_db():
     for t in ['daily_pnl', 'equity_snapshots', 'position_history', 'cash_ledger', 'positions', 'portfolios']:
         try:
             await dev_db.pg_execute(f"DELETE FROM {t}")
-        except:
+        except Exception:
             pass
     # Instruments
-    await dev_db.pg_execute("INSERT OR IGNORE INTO sectors (code, name) VALUES ('T', 'T')")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'T'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'T'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO'")
-    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN'")
+    await dev_db.pg_execute("INSERT INTO sectors (code, name) VALUES ('T', 'T') ON CONFLICT (code) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'THYAO', 'T', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO companies (ticker, name, sector_id) SELECT 'GARAN', 'G', id FROM sectors WHERE code = 'T' ON CONFLICT (ticker) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'THYAO' FROM companies WHERE ticker = 'THYAO' ON CONFLICT (symbol) DO NOTHING")
+    await dev_db.pg_execute("INSERT INTO instruments (company_id, symbol) SELECT id, 'GARAN' FROM companies WHERE ticker = 'GARAN' ON CONFLICT (symbol) DO NOTHING")
 
 
 async def get_iid(symbol: str) -> int:

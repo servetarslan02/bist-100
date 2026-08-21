@@ -154,8 +154,8 @@ class PositionSizer:
                 logger.info("debug_output", message=f"    base_weight={base_weight:.4f}")
 
             # === SCORE WEIGHT ===
-            # Score semantigi: dusuk = iyi. Ters cevir.
-            score_weight = max(0.1, 1.0 - score / 20.0)  # score=0 -> 1.0, score=10 -> 0.5
+            # Score semantigi: yuksek = iyi (ranking_model ile tutarli)
+            score_weight = max(0.1, score / 100.0)  # score=100 -> 1.0, score=0 -> 0.1
             logger.info("debug_output", message=f"    score_weight={score_weight:.4f}")
 
             # === VOLATILITY ADJUSTMENT ===

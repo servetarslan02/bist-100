@@ -615,7 +615,8 @@ class PortfolioManager:
         if pos.direction == "LONG":
             self._cash += net_revenue
         else:
-            self._cash += pos.cost_basis + realized_pnl
+            # SHORT kapatma: geri alış maliyeti + komisyon
+            self._cash -= (pos.quantity * price + commission)
 
         # Sayaçlar
         self._realized_pnl_total += realized_pnl
@@ -731,7 +732,8 @@ class PortfolioManager:
         if pos.direction == "LONG":
             self._cash += net_revenue
         else:
-            self._cash += close_qty * (2 * pos.entry_price - price) - commission
+            # SHORT kısmi kapatma: geri alış maliyeti + komisyon
+            self._cash -= (close_qty * price + commission)
 
         # Sayaçlar
         self._realized_pnl_total += realized_pnl
@@ -838,9 +840,10 @@ class PortfolioManager:
             std = np.std(dr)
             if std > 0:
                 sharpe = (np.mean(dr) / std) * np.sqrt(252)
-            downside = dr[dr < 0]
-            if len(downside) > 0 and np.std(downside) > 0:
-                sortino = (np.mean(dr) / np.std(downside)) * np.sqrt(252)
+            # Sortino: downside deviation = sqrt(mean(min(r, 0)^2))
+            downside_dev = np.sqrt(np.mean(np.minimum(dr, 0) ** 2))
+            if downside_dev > 0:
+                sortino = (np.mean(dr) / downside_dev) * np.sqrt(252)
 
         # Win rate
         winning_trades = [t for t in self._trades if t.pnl > 0]

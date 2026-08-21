@@ -88,14 +88,14 @@ class StackingEnsemble:
         Returns:
             Training metrics
         """
-        from sklearn.model_selection import KFold
+        from sklearn.model_selection import TimeSeriesSplit
         from sklearn.linear_model import Ridge, LogisticRegression, LinearRegression, ElasticNet
 
         if len(self._base_models) < 2:
             return {"error": "Need at least 2 base models"}
 
-        # Cross-validated stacking
-        kf = KFold(n_splits=self._config.cv_folds, shuffle=True, random_state=42)
+        # Cross-validated stacking (TimeSeriesSplit — zaman serisi verisi için)
+        kf = TimeSeriesSplit(n_splits=self._config.cv_folds)
         meta_features_train = np.zeros((len(X_train), len(self._base_models)))
 
         for fold_idx, (train_idx, val_idx) in enumerate(kf.split(X_train)):

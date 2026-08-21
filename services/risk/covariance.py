@@ -77,7 +77,7 @@ class CovarianceEstimator:
 
         # Condition number (numerical stability)
         eigvals = np.linalg.eigvalsh(shrunk_cov)
-        condition_number = np.max(eigvals) / np.max(np.min(eigvals), 1e-10)
+        condition_number = np.max(eigvals) / max(float(np.min(eigvals)), 1e-10)
 
         # Correlation matrix
         shrunk_std = np.sqrt(np.diag(shrunk_cov))

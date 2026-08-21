@@ -742,7 +742,7 @@ async def test_scanner_performance():
             result = scanner._scan_single(ticker, features)
             if result:
                 results.append(result)
-        except:
+        except Exception:
             pass
     elapsed = time.time() - start
 

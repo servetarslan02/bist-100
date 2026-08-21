@@ -173,6 +173,7 @@ class RegimeDetector:
         bear_score = 0
         sideways_score = 0
         high_vol_score = 0
+        low_vol_score = 0
 
         # Trend
         if trend_score > 60:
@@ -193,6 +194,7 @@ class RegimeDetector:
             high_vol_score += 50
         elif vol_score < -30:
             sideways_score += 20
+            low_vol_score += 40
 
         # Breadth
         if factors["breadth_score"] > 30:
@@ -215,6 +217,7 @@ class RegimeDetector:
             "BEAR": bear_score,
             "SIDEWAYS": sideways_score,
             "HIGH_VOL": high_vol_score,
+            "LOW_VOL": low_vol_score,
         }
 
         regime = max(scores, key=scores.get)

@@ -229,15 +229,20 @@ class FeatureCalculator:
         return (valid[-1] - valid[-period - 1]) / valid[-period - 1] * 100
 
     def _rsi_masked(self, data: np.ndarray, period: int = 14) -> float:
-        """Mask-aware RSI."""
+        """Mask-aware RSI — Wilder's Smoothing (endüstri standardı)."""
         valid = data[~np.isnan(data)]
         if len(valid) < period + 1:
             return 50
         deltas = np.diff(valid)
         gains = np.where(deltas > 0, deltas, 0)
         losses = np.where(deltas < 0, -deltas, 0)
-        avg_gain = np.mean(gains[-period:])
-        avg_loss = np.mean(losses[-period:])
+        # İlk ortalama: basit ortalama
+        avg_gain = np.mean(gains[:period])
+        avg_loss = np.mean(losses[:period])
+        # Wilder's smoothing
+        for i in range(period, len(gains)):
+            avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+            avg_loss = (avg_loss * (period - 1) + losses[i]) / period
         if avg_loss == 0:
             return 100
         rs = avg_gain / avg_loss

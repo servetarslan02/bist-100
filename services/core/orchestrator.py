@@ -332,6 +332,9 @@ class MasterOrchestrator:
         """
         result = {"ticker": ticker, "timestamp": datetime.now(timezone.utc).isoformat()}
 
+        # sector_map: market_data'dan veya varsayılan olarak
+        sector_map = market_data.get("sector_map", {})
+
         prices = market_data.get("prices", [])
         if len(prices) < 20:
             result["error"] = "Insufficient data"
@@ -833,6 +836,24 @@ class MasterOrchestrator:
             "services": list(self._services.keys()),
         }
 
+    def export_daily_report_json(self, date: str) -> str:
+        """Günlük pipeline raporunu JSON olarak dışa aktar."""
+        import json as _json
+        report = {
+            "date": date,
+            "status": self.get_status(),
+            "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
+        }
+        return _json.dumps(report, indent=2, ensure_ascii=False)
+
+    def get_pipeline_stats(self) -> Dict[str, Any]:
+        """Pipeline istatistiklerini döndür."""
+        return {
+            "services_count": len(self._services),
+            "initialized": self._initialized,
+            "services": list(self._services.keys()),
+        }
+
 
 # Singleton
 master_orchestrator = MasterOrchestrator()
@@ -840,3 +861,6 @@ master_orchestrator = MasterOrchestrator()
 # Geriye dönük/alternatif isimlendirme uyumluluğu — testlerde ve bazı
 # çağıranlarda "SystemOrchestrator" adı kullanılıyor; gerçek sınıf budur.
 SystemOrchestrator = MasterOrchestrator
+
+# main.py ve diğer çağıranlar için alias
+orchestrator = master_orchestrator

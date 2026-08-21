@@ -4,7 +4,6 @@ import structlog
 from ...core.async_http import get_client
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-import structlog
 
 logger = structlog.get_logger()
 
@@ -81,7 +80,7 @@ class TCMBProvider:
             try:
                 end_date = datetime.now().strftime("%d-%m-%Y")
                 start_date = (datetime.now() - timedelta(days=30)).strftime("%d-%m-%Y")
-                data = self._make_request(series, start_date, end_date)
+                data = await self._make_request(series, start_date, end_date)
 
                 if data and len(data) > 0:
                     latest = data[-1]

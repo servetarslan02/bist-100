@@ -148,7 +148,8 @@ class CatBoostModel:
         if self._config.use_adjusted_loss and not self._is_classifier:
             try:
                 custom_loss = CatBoostAdjustedLoss(self._config.wrong_direction_penalty)
-                fit_params["eval_metric"] = "RMSE"  # Custom metric
+                fit_params["loss_function"] = custom_loss
+                fit_params["eval_metric"] = "RMSE"
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="catboost_model.py:152")
                 pass

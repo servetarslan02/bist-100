@@ -127,8 +127,18 @@ class DataSourceManager:
 
     def get_bist100_universe(self) -> List[str]:
         """BIST 100 hisse listesini getir."""
-        # TODO: Gerçek BIST 100 listesi
-        # Şimdilik örnek liste
+        import json
+        import os
+        cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "bist_universe_cache.json")
+        try:
+            with open(cache_path, "r") as f:
+                cache = json.load(f)
+            tickers = cache.get("tickers", [])
+            if tickers:
+                return [f"{t}.IS" for t in tickers]
+        except Exception:
+            pass
+        # Fallback
         return [
             "THYAO.IS", "GARAN.IS", "ISCTR.IS", "AKBNK.IS", "YKBNK.IS",
             "BIMAS.IS", "KCHOL.IS", "SAHOL.IS", "TUPRS.IS", "EREGL.IS",

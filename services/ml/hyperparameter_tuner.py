@@ -302,9 +302,9 @@ class HyperparameterTuner:
         sample_weight: Optional[np.ndarray] = None,
     ) -> float:
         """Cross-validation within trial."""
-        from sklearn.model_selection import KFold
+        from sklearn.model_selection import TimeSeriesSplit
 
-        kf = KFold(n_splits=self.cv_folds, shuffle=True, random_state=42)
+        kf = TimeSeriesSplit(n_splits=self.cv_folds)
         scores = []
 
         for train_idx, val_idx in kf.split(X):
