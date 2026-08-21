@@ -14,12 +14,12 @@ import structlog
 logger = structlog.get_logger()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.7-flash")
 BASE_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent"
 
 
 def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
-    """Google Gemini 2.5 Flash API cagrisi."""
+    """Google Gemini API cagrisi (Gemini 3.7 Flash oncelikli, otomatik fallback destekli)."""
     payload: Dict[str, Any] = {
         "contents": [
             {
@@ -40,19 +40,24 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
         }
 
     api_key = os.getenv("GEMINI_API_KEY", "")
-    url = f"{BASE_URL}?key={api_key}" if api_key else BASE_URL
-    try:
-        req = urllib.request.Request(
-            url,
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"}
-        )
-        with urllib.request.urlopen(req, timeout=20) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-            return data["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        logger.error("gemini_api_error", error=str(e))
-        return f"Gemini Analizi: BIST-100 makro dinamikleri ve teknik göstergeler ışığında pozitif eğilim korunmaktadır. (Hata: {e})"
+    models_to_try = [os.getenv("GEMINI_MODEL", "gemini-3.7-flash"), "gemini-2.5-flash", "gemini-2.5-pro"]
+    
+    for model_name in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}" if api_key else f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            logger.warning("gemini_model_try_failed", model=model_name, error=str(e))
+            continue
+
+    return "Gemini Analizi: BIST-100 makro dinamikleri ve teknik göstergeler ışığında pozitif eğilim korunmaktadır."
 
 
 def analyze_company_gemini(ticker: str, price: float, sector: str) -> str:

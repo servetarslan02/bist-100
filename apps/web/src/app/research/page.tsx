@@ -88,7 +88,7 @@ export default function AIResearchPage() {
         id: `rep-custom-${Date.now()}`,
         ticker: query.toUpperCase().slice(0, 5).trim() || "BIST",
         title: query,
-        model: "Google Gemini 2.5 Flash (Canlı API Bağlı)",
+        model: "Google Gemini 3.7 Flash (Canlı API Bağlı)",
         date: new Date().toLocaleTimeString("tr-TR"),
         sentiment: "BULLISH",
         confidence: 94,
