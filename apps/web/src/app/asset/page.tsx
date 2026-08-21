@@ -74,8 +74,41 @@ export default function AssetIntelPage() {
     };
   }, [activeTicker]);
 
-  // Generate 60 days of candlestick data
-  const candleData = useMemo(() => {
+  const [liveCandles, setLiveCandles] = useState<any[] | null>(null);
+
+  // Fetch real OHLCV candlestick data from backend
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchLiveCandles() {
+      try {
+        const res = await fetch(`/api/v1/market/instruments/${activeTicker}/ohlcv?period=3mo`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && json.data.length > 0) {
+            const formatted = json.data.map((c: any, idx: number) => {
+              const d = c.Date ? new Date(c.Date) : new Date(Date.now() - (json.data.length - idx) * 86400000);
+              const dateStr = d.toISOString().split("T")[0];
+              return {
+                time: dateStr,
+                open: Number((c.Open ?? c.open ?? 100).toFixed(2)),
+                high: Number((c.High ?? c.high ?? 100).toFixed(2)),
+                low: Number((c.Low ?? c.low ?? 100).toFixed(2)),
+                close: Number((c.Close ?? c.close ?? 100).toFixed(2)),
+              };
+            });
+            if (isMounted) setLiveCandles(formatted);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch live candles, using simulated data", err);
+      }
+    }
+    fetchLiveCandles();
+    return () => { isMounted = false; };
+  }, [activeTicker]);
+
+  // Fallback candlestick generator if live data is not available
+  const fallbackCandleData = useMemo(() => {
     const data = [];
     const base = asset.price * 0.85;
     let current = base;
@@ -102,11 +135,14 @@ export default function AssetIntelPage() {
     return data;
   }, [asset.price]);
 
+  const candleData = liveCandles && liveCandles.length > 0 ? liveCandles : fallbackCandleData;
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (tickerInput.trim()) {
       setActiveTicker(tickerInput.trim().toUpperCase());
       setAiReport(null);
+      setLiveCandles(null);
     }
   };
 
