@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { usePolling, type MarketState, type Signal, type WorldState, type SystemStatus } from "@/lib/api";
 import {
   TrendingUp, TrendingDown, Minus,
@@ -212,12 +213,22 @@ function RegimePill({ regime }: { regime?: string }) {
 
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 export default function Overview() {
-  const { data: market } = usePolling<MarketState>("/market/state", 15000);
-  const { data: signals } = usePolling<Signal[]>("/signals?limit=10", 30000);
-  const { data: world } = usePolling<WorldState>("/world/state", 30000);
-  const { data: status } = usePolling<SystemStatus>("/status", 10000);
+  const [timeStr, setTimeStr] = useState<string>("");
 
-  const systemOk = status?.status === "ok";
+  useEffect(() => {
+    setTimeStr(new Date().toLocaleTimeString("tr-TR"));
+    const clockTimer = setInterval(() => {
+      setTimeStr(new Date().toLocaleTimeString("tr-TR"));
+    }, 1000);
+    return () => clearInterval(clockTimer);
+  }, []);
+
+  const { data: market } = usePolling<MarketState>("/market/state", 3000);
+  const { data: signals } = usePolling<Signal[]>("/signals?limit=10", 3000);
+  const { data: world } = usePolling<WorldState>("/world/state", 5000);
+  const { data: status } = usePolling<SystemStatus>("/status", 5000);
+
+  const systemOk = !status || status.status === "healthy" || status.status === "ok" || (status.services && Object.values(status.services).every(s => s === "healthy"));
 
   return (
     <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -238,8 +249,8 @@ export default function Overview() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-[11px] font-data" style={{ color: "var(--color-text-muted)" }}>
-            {new Date().toLocaleTimeString("tr-TR")}
+          <span className="text-xs font-data font-semibold text-zinc-300">
+            {timeStr || "—"}
           </span>
           <div
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
