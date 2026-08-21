@@ -196,7 +196,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
     }
 
     api_key = os.getenv("GEMINI_API_KEY", "")
-    models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), "gemini-2.5-pro", "gemini-3.7-flash"]
+    models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), "gemini-2.5-flash", "gemini-3.7-flash"]
     
     for model_name in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}" if api_key else f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
@@ -206,7 +206,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json"}
             )
-            with urllib.request.urlopen(req, timeout=25) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:

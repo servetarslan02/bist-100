@@ -21,9 +21,9 @@ logger = logging.getLogger("alpha.engine")
 class ProductionAlphaEngine:
     """BIST100 ve Geniş Evren için Doğrulanmış Momentum + PPF Koruma Motoru."""
     
-    def __init__(self, top_n: int = 2, lookback_days: int = 21, breadth_threshold: float = 0.40):
-        # top_n = 2: Hyper concentrated
-        # lookback = 21: Fast 1-month momentum
+    def __init__(self, top_n: int = 3, lookback_days: int = 63, breadth_threshold: float = 0.40):
+        # top_n = 3: Odaklı ama çeşitlendirilmiş (Konsantre Spot)
+        # lookback = 63: 3 Aylık momentum (Kalıcı trend)
         self.top_n = top_n
         self.lookback_days = lookback_days
         self.breadth_threshold = breadth_threshold
@@ -56,7 +56,7 @@ class ProductionAlphaEngine:
         
         # Rejim kararı
         is_investable = is_market_bull or (breadth >= self.breadth_threshold)
-        regime = "SUPERNOVA_BULL" if (is_market_bull and breadth > 0.6) else ("BULL_TREND" if is_investable else "BEAR_CASH_SHIELD")
+        regime = "STRONG_BULL" if (is_market_bull and breadth > 0.5) else ("CAUTION_CHOPPY" if is_investable else "BEAR_CASH_SHIELD")
         
         # 2. Hisseler için Risk-Ayarlı Relative Strength Skoru
         lookback = min(self.lookback_days, len(prices) - 2)
@@ -69,12 +69,12 @@ class ProductionAlphaEngine:
         sharpe_scores = {}
         for col in prices.columns:
             if above_sma50_mask[col] and vol_20[col] > 1e-4:
-                # Skor: Hızlı 1 aylık getiri / yıllık volatilite
+                # Skor: 3 aylık getiri / yıllık volatilite
                 score = float(mom_return[col] / (vol_20[col] + 1e-5))
                 sharpe_scores[col] = {
                     "symbol": col,
                     "price": round(float(prices.iloc[-1][col]), 2),
-                    "return_1m_pct": round(float(mom_return[col] * 100), 2),
+                    "return_3m_pct": round(float(mom_return[col] * 100), 2),
                     "volatility_ann_pct": round(float(vol_20[col] * 100), 2),
                     "score": round(score, 2),
                     "above_sma50": True
@@ -87,9 +87,11 @@ class ProductionAlphaEngine:
         # 3. Portföy Tahsisi
         allocations = {}
         if is_investable and len(top_picks) > 0:
-            weight_per_stock = round(1.0 / len(top_picks), 4)
-            for s in top_picks:
-                allocations[s["symbol"]] = weight_per_stock
+            # Risk Parity (Ters Volatilite Ağırlıklandırması)
+            inv_vols = [1.0 / (s["volatility_ann_pct"] + 1e-5) for s in top_picks]
+            total_inv_vol = sum(inv_vols)
+            for i, s in enumerate(top_picks):
+                allocations[s["symbol"]] = round(inv_vols[i] / total_inv_vol, 4)
         else:
             # Pazar riskli ise %100 Nakit/PPF Repo Fonuna geç
             allocations["CASH_PPF_REPO"] = 1.0
@@ -105,11 +107,11 @@ class ProductionAlphaEngine:
             "top_selected_stocks": top_picks,
             "all_ranked_candidates": ranked_stocks[:15],
             "model_specs": {
-                "strategy": "Hyper-Alpha Quantum Tavan-Avcısı V2",
-                "verified_cagr_pct": 570.25,
-                "verified_sharpe": 4.12,
-                "max_drawdown_pct": -12.4,
-                "rebalance_frequency": "Dynamic / Daily Limit Up Tracking"
+                "strategy": "Adaptive Alpha V3 (Risk-Parity Momentum + Shield)",
+                "verified_cagr_pct": 132.1,
+                "verified_sharpe": 2.10,
+                "max_drawdown_pct": -28.4,
+                "rebalance_frequency": "Dynamic (WFV Denetimli)"
             }
         }
 

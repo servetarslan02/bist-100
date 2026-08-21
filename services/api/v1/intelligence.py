@@ -112,10 +112,12 @@ async def ask_gemini_endpoint(
     _=Depends(check_rate_limit),
 ):
     """Google Gemini 3.7 Flash canlı araştırma ve analiz endpoint'i."""
+    import asyncio
     prompt = body.get("prompt", "Borsa İstanbul piyasa durumu hakkında özet ver.")
     try:
         from ...intelligence.gemini_service import call_gemini
-        response = call_gemini(prompt)
+        loop = asyncio.get_event_loop()
+        response = await loop.run_in_executor(None, call_gemini, prompt)
         return {"response": response, "model": "gemini-3.7-flash", "status": "ok"}
     except Exception as e:
         return {"response": f"Hata: {e}", "model": "gemini-3.7-flash", "status": "error"}
@@ -135,17 +137,22 @@ async def gemini_report(
     _=Depends(check_rate_limit),
 ):
     """Belirli bir hisse için canlı Gemini 3.7 araştırma raporu."""
+    import asyncio
     try:
         from ...intelligence.gemini_service import analyze_company_gemini
-        report = analyze_company_gemini(
-            ticker=ticker,
-            price=price,
-            sector=sector,
-            rsi=rsi,
-            pe=pe,
-            pb=pb,
-            support=support,
-            resistance=resistance,
+        loop = asyncio.get_event_loop()
+        report = await loop.run_in_executor(
+            None,
+            lambda: analyze_company_gemini(
+                ticker=ticker,
+                price=price,
+                sector=sector,
+                rsi=rsi,
+                pe=pe,
+                pb=pb,
+                support=support,
+                resistance=resistance,
+            )
         )
         return {"ticker": ticker, "report": report, "model": "gemini-3.7-flash", "status": "ok"}
     except Exception as e:
