@@ -13,6 +13,7 @@ Kaynaklar:
 """
 
 import numpy as np
+import math
 from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
 from enum import Enum
@@ -80,6 +81,25 @@ class VaRCalculator:
 
     def __init__(self, trading_days_per_year: int = 252):
         self.trading_days_per_year = trading_days_per_year
+
+    @staticmethod
+    def _historical_percentile_index(confidence: float, n: int) -> int:
+        """Tarihsel VaR/CVaR için sıralı dizideki eşik indeksini hesaplar.
+
+        'Nearest-rank' yöntemi kullanılır: seçilen eşiğin altında/eşit
+        kalan veri oranı HER ZAMAN hedef (1-confidence) oranına eşit
+        veya üstünde olur — yani risk hiçbir zaman olduğundan az
+        gösterilmez (documentation/06 — 'hayatta kalma birincil' ilkesi).
+
+        Kayan nokta hassasiyeti (örn. (1-0.95)*20 tam 1.0 değil,
+        1.0000000000000009 çıkabilir) yüzünden yanlış yuvarlamayı
+        önlemek için küçük bir epsilon toleransı kullanılır.
+        """
+        if n <= 0:
+            return 0
+        x = (1 - confidence) * n
+        idx = math.ceil(x - 1e-9) - 1
+        return max(0, min(idx, n - 1))
 
     # =====================================================
     # 1. PARAMETRİK VaR/CVaR
@@ -182,8 +202,7 @@ class VaRCalculator:
             return 0.0
 
         sorted_returns = np.sort(returns)
-        index = max(0, int((1 - confidence) * len(sorted_returns)) - 1)
-        index = max(0, min(index, len(sorted_returns) - 1))
+        index = self._historical_percentile_index(confidence, len(sorted_returns))
 
         var_pct = abs(sorted_returns[index])
         var_amount = var_pct * portfolio_value * np.sqrt(holding_period_days)
@@ -214,8 +233,7 @@ class VaRCalculator:
             return 0.0
 
         sorted_returns = np.sort(returns)
-        index = max(0, int((1 - confidence) * len(sorted_returns)) - 1)
-        index = max(0, min(index, len(sorted_returns) - 1))
+        index = self._historical_percentile_index(confidence, len(sorted_returns))
 
         var_threshold = sorted_returns[index]
         tail_returns = sorted_returns[sorted_returns <= var_threshold]
