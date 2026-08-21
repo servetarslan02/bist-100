@@ -229,14 +229,24 @@ export default function AIResearchPage() {
           </div>
 
           <div>
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Yapay Zeka Yönetici Özeti</h4>
-            <p className="text-xs leading-relaxed text-zinc-300 bg-zinc-900/60 p-4 rounded-xl border border-zinc-800/40">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Yapay Zeka Yönetici Özeti & Sayısal İstihbarat</h4>
+              {selectedReport.ticker && selectedReport.ticker !== "BIST" && (
+                <a
+                  href={`/asset?ticker=${selectedReport.ticker}`}
+                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+                >
+                  {selectedReport.ticker} Detaylı Varlık Analizine Git <ArrowRight size={12} />
+                </a>
+              )}
+            </div>
+            <div className="text-xs leading-relaxed text-zinc-200 bg-zinc-900/80 p-5 rounded-xl border border-zinc-800/60 whitespace-pre-wrap font-sans space-y-2">
               {selectedReport.summary}
-            </p>
+            </div>
           </div>
 
           <div>
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Temel Dinamikler & Katalizörler</h4>
+            <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Temel Dinamikler & Sayısal Dayanaklar</h4>
             <div className="space-y-2">
               {selectedReport.key_drivers.map((drv, i) => (
                 <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/30 text-xs text-zinc-300">
