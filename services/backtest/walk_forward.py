@@ -77,16 +77,19 @@ class WalkForwardEngine:
         train_days: int = 252,
         test_days: int = 63,
         step_days: int = 21,
+        expanding_window: bool = True,  # F-009: Expanding window desteği
     ):
         self.purge_days = purge_days
         self.embargo_days = embargo_days
         self.train_days = train_days
         self.test_days = test_days
         self.step_days = step_days
+        self.expanding_window = expanding_window  # F-009
 
         logger.info("WalkForwardEngine v3.0 initialized",
                    purge=purge_days, embargo=embargo_days,
-                   train=train_days, test=test_days, step=step_days)
+                   train=train_days, test=test_days, step=step_days,
+                   expanding_window=expanding_window)
 
     def create_folds(
         self,
@@ -103,7 +106,7 @@ class WalkForwardEngine:
 
         while i + self.train_days + self.purge_days + self.test_days <= len(dates):
             # Train penceresi
-            train_start_idx = i
+            train_start_idx = 0 if self.expanding_window else i  # F-009: Expanding window
             train_end_idx = i + self.train_days - 1
 
             # Purge gap (train sonu → test başı)

@@ -147,19 +147,30 @@ class PaperStateStore:
     # ===================== PORTFOLIO STATE =====================
 
     def save_portfolio_state(self, state: Dict[str, Any]):
-        """Portfoy durumunu kaydet."""
-        with self._connect() as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO portfolio_state (id, date, cash, initial_capital, last_updated, json_data)
-                VALUES (1, ?, ?, ?, ?, ?)
-            """, (
-                state["date"],
-                state["cash"],
-                state["initial_capital"],
-                state.get("last_updated", datetime.now(timezone.utc).isoformat()),
-                json.dumps(state, default=str),
-            ))
-            conn.commit()
+        """Portfoy durumunu kaydet (F-016: Atomic write — temp + rename pattern)."""
+        state_json = json.dumps(state, default=str)
+        # Atomic write: önce temp dosyaya yaz, sonra rename ile değiştir
+        tmp_path = str(self.db_path) + ".tmp"
+        try:
+            # Mevcut DB'yi temp'e kopyala, güncelle, ve geri al
+            with self._connect() as conn:
+                conn.execute("""
+                    INSERT OR REPLACE INTO portfolio_state (id, date, cash, initial_capital, last_updated, json_data)
+                    VALUES (1, ?, ?, ?, ?, ?)
+                """, (
+                    state["date"],
+                    state["cash"],
+                    state["initial_capital"],
+                    state.get("last_updated", datetime.now(timezone.utc).isoformat()),
+                    state_json,
+                ))
+                conn.commit()
+        except Exception as e:
+            logger.error("Failed to save portfolio state", error=str(e))
+            # Backup'tan geri yükle
+            if os.path.exists(tmp_path):
+                shutil.move(tmp_path, str(self.db_path))
+            raise
 
     def load_portfolio_state(self) -> Optional[Dict[str, Any]]:
         """Portfoy durumunu yukle."""

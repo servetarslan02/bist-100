@@ -118,6 +118,17 @@ class WalkForwardValidation:
             train_features = feature_fn(train_data)
             test_features = feature_fn(test_data)
 
+            # F-008 düzeltmesi: Train feature'larının son purge_days barını hariç tut.
+            # Bu, train feature'ları ile test label'ları arasındaki look-ahead bias'ı önler.
+            if self._purge_size > 0:
+                if isinstance(train_features, dict):
+                    for key in train_features:
+                        val = train_features[key]
+                        if isinstance(val, np.ndarray) and len(val) > self._purge_size:
+                            train_features[key] = val[:-self._purge_size]
+                elif isinstance(train_features, np.ndarray) and len(train_features) > self._purge_size:
+                    train_features = train_features[:-self._purge_size]
+
             # Model eğit
             model = model_fn()
             model.train(train_features)

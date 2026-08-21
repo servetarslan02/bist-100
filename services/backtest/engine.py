@@ -13,7 +13,7 @@ FAZ 12: Backtest Engine
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
 import structlog
@@ -77,6 +77,55 @@ class BacktestResult:
 class BacktestEngine:
     """Backtest motoru."""
 
+    def _compute_dynamic_slippage(
+        self,
+        price: float,
+        volume: float,
+        quantity: int,
+        base_slippage_pct: float = 0.05,
+    ) -> float:
+        """F-010: Dinamik slippage modeli.
+
+        Sabit slippage yerine hacim ve pozisyon büyüklüğüne göre slippage hesaplar.
+        Likidite düşükse slippage artar.
+        """
+        if volume <= 0:
+            return base_slippage_pct * 3  # Hacim yoksa yüksek slippage
+
+        # Participation rate: pozisyon hacme oranı
+        trade_value = quantity * price
+        avg_daily_value = volume * price
+        participation = trade_value / max(avg_daily_value, 1)
+
+        # Square-root impact model: slippage ~ sqrt(participation)
+        impact = base_slippage_pct * (1 + np.sqrt(participation) * 10)
+
+        # Minimum slippage
+        return max(impact, base_slippage_pct * 0.5)
+
+    def _check_liquidity_constraint(
+        self,
+        price: float,
+        volume: float,
+        quantity: int,
+        max_participation: float = 0.10,
+    ) -> Tuple[bool, int]:
+        """F-011: Likidite kısıtı kontrolü.
+
+        Günlük hacmin %10'undan fazlasını almamaya çalış.
+        Gerekirse miktarı azalt.
+
+        Returns:
+            (is_feasible, adjusted_quantity)
+        """
+        if volume <= 0:
+            return False, 0
+
+        max_shares = int(volume * max_participation)
+        if quantity > max_shares:
+            return True, max_shares  # Kısmi execution
+        return True, quantity
+
     def run_backtest(
         self,
         strategy_name: str,
@@ -114,17 +163,31 @@ class BacktestEngine:
             if action == "HOLD" or price <= 0:
                 continue
 
+            # Hacim bilgisi (price_data'dan)
+            signal_volume = 0
+            if price_data and ticker in price_data:
+                pd_entries = price_data[ticker]
+                if isinstance(pd_entries, list) and pd_entries:
+                    signal_volume = pd_entries[-1].get("volume", 0)
+
+            # F-010: Dinamik slippage
+            effective_slippage = self._compute_dynamic_slippage(price, signal_volume, 100, slippage_pct)
+
             # Slippage
             if action == "BUY":
-                fill_price = price * (1 + slippage_pct / 100)
+                fill_price = price * (1 + effective_slippage / 100)
             else:
-                fill_price = price * (1 - slippage_pct / 100)
+                fill_price = price * (1 - effective_slippage / 100)
 
             if action == "BUY" and ticker not in positions:
                 # Pozisyon büyüklüğü (basitleştirilmiş)
                 risk_pct = 2.0 * confidence
                 position_value = capital * (risk_pct / 100)
                 shares = int(position_value / fill_price)
+
+                # F-011: Likidite kısıtı
+                if signal_volume > 0:
+                    shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
 
                 if shares > 0 and capital >= shares * fill_price:
                     cost = shares * fill_price

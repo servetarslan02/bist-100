@@ -225,20 +225,29 @@ class ScenarioEngine:
             },
         )
 
-    def _simplified_impact(self, sector: str, shocks: Dict[str, float]) -> float:
-        """Basitleştirilmiş sektör etkisi (sensitivity engine yokken)."""
-        # Sektör bazlı duyarlılık matrisi (basitleştirilmiş)
-        sensitivity = {
-            "BANK": {"usdtry_change": -0.3, "interest_rate_change": 0.5, "bist_change": 0.8},
-            "AVIATION": {"usdtry_change": -0.7, "oil_change": -0.8, "bist_change": 0.6},
-            "ENERGY": {"oil_change": 0.7, "usdtry_change": 0.3, "bist_change": 0.7},
-            "TECH": {"global_change": 0.7, "usdtry_change": 0.3, "bist_change": 0.8},
-            "RETAIL": {"usdtry_change": -0.5, "inflation_change": -0.6, "bist_change": 0.6},
-            "METAL": {"global_change": 0.6, "gold_change": 0.5, "bist_change": 0.7},
-            "OTHER": {"bist_change": 0.7, "usdtry_change": -0.3},
-        }
+    # F-012: Sektör duyarlılık matrisi — dışarıdan override edilebilir
+    DEFAULT_SECTOR_SENSITIVITY = {
+        "BANK": {"usdtry_change": -0.3, "interest_rate_change": 0.5, "bist_change": 0.8},
+        "AVIATION": {"usdtry_change": -0.7, "oil_change": -0.8, "bist_change": 0.6},
+        "ENERGY": {"oil_change": 0.7, "usdtry_change": 0.3, "bist_change": 0.7},
+        "TECH": {"global_change": 0.7, "usdtry_change": 0.3, "bist_change": 0.8},
+        "RETAIL": {"usdtry_change": -0.5, "inflation_change": -0.6, "bist_change": 0.6},
+        "METAL": {"global_change": 0.6, "gold_change": 0.5, "bist_change": 0.7},
+        "OTHER": {"bist_change": 0.7, "usdtry_change": -0.3},
+    }
 
-        sector_sens = sensitivity.get(sector, sensitivity["OTHER"])
+    def _simplified_impact(
+        self,
+        sector: str,
+        shocks: Dict[str, float],
+        custom_sensitivity: Optional[Dict[str, Dict[str, float]]] = None,
+    ) -> float:
+        """Basitleştirilmiş sektör etkisi (sensitivity engine yokken).
+
+        F-012: custom_sensitivity parametresi ile dışarıdan matris override edilebilir.
+        """
+        sensitivity = custom_sensitivity or self.DEFAULT_SECTOR_SENSITIVITY
+        sector_sens = sensitivity.get(sector, sensitivity.get("OTHER", {}))
         total = 0.0
         for shock_key, shock_value in shocks.items():
             sens = sector_sens.get(shock_key, 0)
@@ -280,13 +289,19 @@ class ScenarioEngine:
         max_change: float = 1.0,
         loss_threshold_pct: float = 20.0,
         sector_sensitivity: Optional[Any] = None,
+        support_negative: bool = True,  # F-019: Negatif şok desteği
     ) -> BreakingPoint:
         """Kırılma noktası bul.
 
         Portföyün ne kadar şoka dayanabileceğini bulur.
+        F-019: Negatif şok desteği (bist_change=-0.50 gibi).
         """
-        # Binary search
-        low, high = 0.0, max_change
+        # Binary search — negatif şok desteği
+        if support_negative:
+            low, high = -max_change, max_change
+        else:
+            low, high = 0.0, max_change
+
         breaking_value = max_change
 
         for _ in range(20):  # 20 iterasyon

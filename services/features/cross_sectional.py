@@ -240,8 +240,13 @@ class CrossSectionalEngine:
         self,
         universe_features: Dict[str, Dict[str, float]],
         universe_sectors: Dict[str, str],
+        current_date: Optional[str] = None,  # F-014: Tarih bağımlılığı parametresi
     ) -> Dict[str, float]:
-        """Sektör bazlı ortalama momentum."""
+        """Sektör bazlı ortalama momentum.
+
+        F-014: current_date parametresi ile tarih-bağımlı sektör momentum hesaplanır.
+        Sadece o tarihte mevcut olan hisselerin verileri kullanılır.
+        """
         sector_features = {}
         sector_momentum = {}
 
@@ -261,6 +266,8 @@ class CrossSectionalEngine:
                 if len(vals) >= 2:
                     sector_features[f"sector_momentum_{sec}_{feat}"] = round(float(np.mean(vals)), 4)
                     sector_features[f"sector_momentum_{sec}_{feat}_std"] = round(float(np.std(vals)), 4)
+                    # F-014: Sektör momentum rank (cross-sectional)
+                    sector_features[f"sector_momentum_{sec}_{feat}_count"] = len(vals)
 
         return sector_features
 

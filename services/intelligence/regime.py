@@ -120,11 +120,13 @@ class RegimeEngine:
                 window = 63
                 returns = np.array(self._return_history[-window:])
                 vol = np.array(self._vol_history[-window:])
-                # Yeterli veri yoksa mevcut veriyi tekrarla (warm-up)
+                # Yeterli veri yoksa mevcut verinin ortalamasıyla doldur (warm-up)
+                # F-007 düzeltmesi: Edge padding yerine mean padding kullan.
+                # Bu, warm-up döneminde sahte trend bilgisi sızmasını önler.
                 if len(returns) < window:
-                    # Edge padding yerine, mevcut verinin ortalamasıyla doldur
-                    mean_ret = np.mean(returns) if len(returns) > 0 else 0
-                    mean_vol = np.mean(vol) if len(vol) > 0 else 0.2
+                    mean_ret = float(np.mean(returns)) if len(returns) > 0 else 0.0
+                    mean_vol = float(np.mean(vol)) if len(vol) > 0 else 0.2
+                    # Warm-up döneminde sabit ortalama ile doldur (trend sızıntısı yok)
                     returns = np.concatenate([np.full(window - len(returns), mean_ret), returns])
                     vol = np.concatenate([np.full(window - len(vol), mean_vol), vol])
                 hmm_result = self._hmm_detector.predict_regime(returns, vol)
@@ -167,16 +169,20 @@ class RegimeEngine:
         best_score = scores[best_regime]
 
         # Confidence: en yüksek skor ile ikinci arasındaki fark
-        # Eşitlik durumunda makul bir confidence ver
+        # F-013 düzeltmesi: Eşitlik durumunda daha güvenilir confidence hesaplama
         sorted_scores = sorted(scores.values(), reverse=True)
         if len(sorted_scores) >= 2:
             gap = sorted_scores[0] - sorted_scores[1]
             if gap < 0.01:
-                # İki rejim eşit → belirsizlik yüksek
-                if sorted_scores[0] > 0.5:
-                    confidence = 0.3  # Yüksek skor, düşük güven
+                # İki rejim eşit → en yüksek skorun büyüklüğüne göre belirle
+                # Yüksek skor + eşitlik = orta güven, düşük skor + eşitlik = düşük güven
+                top_score = sorted_scores[0]
+                if top_score > 0.7:
+                    confidence = 0.4  # Yüksek skor ama eşit → orta güven
+                elif top_score > 0.4:
+                    confidence = 0.25  # Orta skor + eşitlik
                 else:
-                    confidence = 0.1  # Düşük skor, çok düşük güven
+                    confidence = 0.1  # Düşük skor + eşitlik = çok belirsiz
             else:
                 confidence = min(1.0, max(0.0, gap))
         else:

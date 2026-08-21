@@ -125,10 +125,15 @@ class LabelGenerator:
 
         # Purge gap: Feature hesaplama penceresinin son purge_days barını label'dan hariç tut
         # Bu, label ile feature arasında sızıntıyı (look-ahead bias) önler.
+        # F-006 düzeltmesi: purge_days > 0 ise, her label'ın son purge_days barını NaN yap.
+        # Ayrıca feature penceresi ile label arasında purge gap uygula.
         if purge_days > 0:
             for label_name, label_values in labels.items():
+                # Son purge_days barını NaN yap (gelecek bilgi sızıntısını önle)
                 label_values[-purge_days:] = np.nan
                 labels[label_name] = label_values
+            # Feature penceresinin son purge_days barını da valid_mask'dan hariç tut
+            valid_mask[-purge_days:] = False
 
         # Valid mask (en az bir label hesaplanabilir mi?)
         for label_name, label_values in labels.items():

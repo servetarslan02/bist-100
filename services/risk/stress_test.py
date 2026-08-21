@@ -331,6 +331,22 @@ class StressTestEngine:
             recommendations=recommendations,
         )
 
+    def add_custom_scenario(
+        self,
+        key: str,
+        scenario: Dict[str, Any],
+        scenario_type: str = "hypothetical",
+    ):
+        """F-015: Dinamik senaryo ekleme.
+
+        Statik senaryolar yerine runtime'da yeni senaryo eklenebilir.
+        """
+        if scenario_type == "historical":
+            self.HISTORICAL_SCENARIOS[key] = scenario
+        else:
+            self.HYPOTHETICAL_SCENARIOS[key] = scenario
+        logger.info("Custom scenario added", key=key, type=scenario_type)
+
     def run_monte_carlo_stress(
         self,
         portfolio: Dict[str, Any],

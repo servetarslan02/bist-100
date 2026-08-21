@@ -261,20 +261,39 @@ class FeatureDriftDetector:
                         existing.severity = "CRITICAL"
 
     def _calculate_psi(self, reference: np.ndarray, current: np.ndarray) -> float:
-        """PSI (Population Stability Index) hesapla."""
+        """PSI (Population Stability Index) hesapla.
+
+        F-018 düzeltmesi: Gerçek PSI formülü.
+        PSI = Σ (P_current - P_reference) * ln(P_current / P_reference)
+
+        PSI < 0.1: Stabil
+        PSI 0.1-0.25: Orta değişim
+        PSI > 0.25: Significant drift
+        """
         try:
-            min_val = min(reference.min(), current.min())
-            max_val = max(reference.max(), current.max())
-            bins = np.linspace(min_val, max_val, self.n_bins + 1)
+            # Quantile-based bins (eşit dağılmış)
+            ref_sorted = np.sort(reference)
+            n = len(ref_sorted)
+            if n < 10:
+                return 0.0
 
-            ref_hist, _ = np.histogram(reference, bins=bins)
-            cur_hist, _ = np.histogram(current, bins=bins)
+            # Quantile sınırları (10 eşit parçaya böl)
+            quantile_boundaries = [
+                ref_sorted[int(n * i / self.n_bins)] for i in range(1, self.n_bins)
+            ]
+            quantile_boundaries = [-np.inf] + list(quantile_boundaries) + [np.inf]
 
-            eps = 1e-6
+            # Her iki dağılımı bu sınırlara göre histogram'la
+            ref_hist, _ = np.histogram(reference, bins=quantile_boundaries)
+            cur_hist, _ = np.histogram(current, bins=quantile_boundaries)
+
+            # Yüzdelere çevir (sıfır bölme koruması)
+            eps = 1e-4
             ref_pct = ref_hist / max(len(reference), 1) + eps
             cur_pct = cur_hist / max(len(current), 1) + eps
 
+            # PSI formülü
             psi = float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
-            return psi
-        except Exception as e:
+            return max(0.0, psi)  # Negatif PSI hatalı, sıfırla
+        except Exception:
             return 0.0

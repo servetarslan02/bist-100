@@ -214,6 +214,32 @@ class DataQualityChecker:
         total_rows = len(df)
         if total_rows == 0:
             return QualityReport(ticker, 0, [], 0, False)
+
+        # F-017: Timestamp index kontrolü
+        if isinstance(df.index, pd.DatetimeIndex):
+            # Duplicate timestamp kontrolü
+            dup_count = df.index.duplicated().sum()
+            if dup_count > 0:
+                issues.append(QualityIssue("duplicate_timestamps", "CRITICAL",
+                                           f"{dup_count} duplike timestamp", affected_rows=int(dup_count)))
+            # Sıralama kontrolü
+            if not df.index.is_monotonic_increasing:
+                issues.append(QualityIssue("unsorted_timestamps", "WARNING",
+                                           "Timestamp sıralı değil"))
+            # Gap kontrolü (iş günleri arası > 5 gün)
+            if len(df.index) > 1:
+                date_diffs = df.index.to_series().diff().dt.days
+                large_gaps = (date_diffs > 5).sum()
+                if large_gaps > 0:
+                    issues.append(QualityIssue("large_gaps", "WARNING",
+                                               f"{large_gaps} büyük zaman aralığı (>5 gün)"))
+        elif 'date' in df.columns or 'Date' in df.columns:
+            date_col = 'date' if 'date' in df.columns else 'Date'
+            dup_count = df[date_col].duplicated().sum()
+            if dup_count > 0:
+                issues.append(QualityIssue("duplicate_dates", "CRITICAL",
+                                           f"{dup_count} duplike tarih", affected_rows=int(dup_count)))
+
         for col in ["close", "open", "high", "low", "volume"]:
             if col in df.columns:
                 missing = df[col].isna().sum()
