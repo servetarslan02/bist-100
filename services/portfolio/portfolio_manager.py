@@ -1209,9 +1209,15 @@ class PortfolioManager:
         return orders
 
     def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-        """Otonom portfoy yeniden dengeleme (Sinirsiz Yapay Zeka Al-Sat Motoru)."""
+        """Otonom portfoy yeniden dengeleme (SPEC Anomalileri + Kurumsal Liderler)."""
         if not signals:
             signals = [
+                {"ticker": "POLTK", "price": 14600.0, "score": 96, "stop_loss": 14200.0, "target": 18400.0, "sector": "Metal & SPEC Anomali"},
+                {"ticker": "SDTTR", "price": 284.00, "score": 93, "stop_loss": 268.0, "target": 340.0, "sector": "Savunma & Uzay SPEC"},
+                {"ticker": "KONYA", "price": 10400.0, "score": 91, "stop_loss": 9950.0, "target": 12800.0, "sector": "Çimento & Bedelsiz SPEC"},
+                {"ticker": "REEDR", "price": 48.60, "score": 88, "stop_loss": 46.2, "target": 58.5, "sector": "Teknoloji & EV SPEC"},
+                {"ticker": "FORTE", "price": 72.50, "score": 87, "stop_loss": 69.5, "target": 88.0, "sector": "Yazılım & İhale SPEC"},
+                {"ticker": "ALFAS", "price": 82.30, "score": 86, "stop_loss": 78.5, "target": 96.0, "sector": "Solar Enerji SPEC"},
                 {"ticker": "THYAO", "price": 312.50, "score": 94, "stop_loss": 298.0, "target": 345.0, "sector": "Havacılık & Ulaştırma"},
                 {"ticker": "ASELS", "price": 66.80, "score": 92, "stop_loss": 62.0, "target": 74.5, "sector": "Savunma Sanayi"},
                 {"ticker": "GARAN", "price": 121.40, "score": 89, "stop_loss": 114.0, "target": 132.0, "sector": "Bankacılık"},
@@ -1224,10 +1230,6 @@ class PortfolioManager:
                 {"ticker": "SISE",  "price": 46.90, "score": 82, "stop_loss": 43.8, "target": 51.5, "sector": "Cam & Sanayi"},
                 {"ticker": "ENJSA", "price": 68.40, "score": 81, "stop_loss": 64.0, "target": 75.0, "sector": "Enerji"},
                 {"ticker": "ASTOR", "price": 104.20, "score": 80, "stop_loss": 96.5, "target": 116.0, "sector": "Elektrik & Sanayi"},
-                {"ticker": "SAHOL", "price": 98.60, "score": 79, "stop_loss": 92.0, "target": 108.0, "sector": "Holding"},
-                {"ticker": "CCOLA", "price": 680.00, "score": 78, "stop_loss": 635.0, "target": 740.0, "sector": "Gıda & İçecek"},
-                {"ticker": "TCELL", "price": 102.50, "score": 77, "stop_loss": 95.0, "target": 112.0, "sector": "Telekomünikasyon"},
-                {"ticker": "MGROS", "price": 515.00, "score": 76, "stop_loss": 480.0, "target": 560.0, "sector": "Perakende Ticaret"},
             ]
 
         executed = []
