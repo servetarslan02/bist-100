@@ -75,67 +75,72 @@ class TradabilityMask:
 
         limit_pct = self.LIMIT_UP_SMALL_PCT if is_small_cap else self.LIMIT_UP_PCT
 
-        for i in range(n):
-            # 1. Sıfır veya negatif fiyat
-            if close[i] <= 0:
-                mask[i] = 0
-                reasons[i] = "zero_negative_price"
-                continue
+        # Vektörize temel kontroller
+        # 1. Sıfır veya negatif fiyat
+        zero_price = close <= 0
+        mask[zero_price] = 0
+        for i in np.where(zero_price)[0]:
+            reasons[i] = "zero_negative_price"
 
-            # 2. Sıfır hacim (işlem gerçekleşmemiş)
-            if volume[i] <= 0:
-                mask[i] = 0
+        # 2. Sıfır hacim
+        zero_vol = volume <= 0
+        mask[zero_vol & (mask == 1)] = 0
+        for i in np.where(zero_vol & (mask == 0))[0]:
+            if i not in reasons:
                 reasons[i] = "zero_volume"
-                continue
 
-            # 3. OHLC tutarlılığı
-            if high[i] < low[i]:
-                mask[i] = 0
+        # 3. OHLC tutarlılığı
+        h_lt_l = high < low
+        mask[h_lt_l & (mask == 1)] = 0
+        for i in np.where(h_lt_l & (mask == 0))[0]:
+            if i not in reasons:
                 reasons[i] = "high_less_than_low"
-                continue
 
-            if high[i] < close[i] or low[i] > close[i]:
-                mask[i] = 0
+        ohlc_incon = (high < close) | (low > close)
+        mask[ohlc_incon & (mask == 1)] = 0
+        for i in np.where(ohlc_incon & (mask == 0))[0]:
+            if i not in reasons:
                 reasons[i] = "ohlc_inconsistent"
+
+        # Sıralı kontroller (limit-up/down, gap) — bağımlı olduğu için loop
+        for i in range(n):
+            if mask[i] == 0:
                 continue
 
-            # 4. Limit-up kontrolü (tavan fiyat)
+            # 4. Limit-up kontrolü
             if prev_close is not None and i > 0:
                 prev = prev_close[i - 1] if i < len(prev_close) else prev_close[-1]
                 if prev > 0:
                     daily_change = (close[i] - prev) / prev
 
-                    # Limit-up: fiyat tavana ulaşmış
-                    if daily_change >= limit_pct - 0.001:  # %0.1 tolerans
+                    if daily_change >= limit_pct - 0.001:
                         mask[i] = 0
                         reasons[i] = f"limit_up_{daily_change:.1%}"
                         continue
 
-                    # Limit-down: fiyat tabana ulaşmış
                     if daily_change <= -limit_pct + 0.001:
                         mask[i] = 0
                         reasons[i] = f"limit_down_{daily_change:.1%}"
                         continue
 
-                    # Devre kesici kontrolü (ani düşüş)
                     for cb_pct in self.CIRCUIT_BREAKER_PCTS:
                         if daily_change <= -cb_pct:
                             mask[i] = 0
                             reasons[i] = f"circuit_breaker_{cb_pct:.0%}"
                             break
 
-            # 5. Ani fiyat sıçraması (veri hatası)
+            # 5. Ani fiyat sıçraması
             if i > 0 and close[i - 1] > 0:
                 change = abs(close[i] / close[i - 1] - 1)
-                if change > 0.30:  # %30+ tek gün hareketi şüpheli
+                if change > 0.30:
                     mask[i] = 0
                     reasons[i] = f"suspicious_jump_{change:.0%}"
                     continue
 
-            # 6. Spread kontrolü (açılış-kapanış aşırı farklı)
+            # 6. Spread kontrolü
             if open_[i] > 0:
                 gap = abs(close[i] / open_[i] - 1)
-                if gap > 0.20:  # %20+ gap şüpheli
+                if gap > 0.20:
                     mask[i] = 0
                     reasons[i] = f"large_gap_{gap:.0%}"
                     continue

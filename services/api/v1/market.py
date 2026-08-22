@@ -329,11 +329,12 @@ async def _fetch_radar_fresh(limit: int = 200):
     def _calc_rsi(closes, period=14):
         if len(closes) < period + 1:
             return None
-        deltas = [closes[i] - closes[i-1] for i in range(1, len(closes))]
-        gains = [d if d > 0 else 0 for d in deltas]
-        losses = [-d if d < 0 else 0 for d in deltas]
-        avg_gain = sum(gains[:period]) / period
-        avg_loss = sum(losses[:period]) / period
+        arr = np.array(closes)
+        deltas = np.diff(arr)
+        gains = np.maximum(deltas, 0)
+        losses = np.maximum(-deltas, 0)
+        avg_gain = float(np.mean(gains[:period]))
+        avg_loss = float(np.mean(losses[:period]))
         for i in range(period, len(deltas)):
             avg_gain = (avg_gain * (period - 1) + gains[i]) / period
             avg_loss = (avg_loss * (period - 1) + losses[i]) / period

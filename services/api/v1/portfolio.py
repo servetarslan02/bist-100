@@ -315,7 +315,8 @@ async def attribution(
             return {"attribution": {}, "message": "Yetersiz veri (en az 20 gün gerekli)"}
 
         equities = [e["equity"] for e in equity_curve]
-        returns = np.array([(equities[i] / equities[i - 1] - 1) for i in range(1, len(equities))])
+        eq_arr = np.array(equities)
+        returns = np.diff(eq_arr) / eq_arr[:-1]
 
         # Gerçek factor returns — market data servisi bağlı değilse 501 döndür
         raise HTTPException(
