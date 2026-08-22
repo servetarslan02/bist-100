@@ -13,6 +13,21 @@ import hashlib
 import hmac
 import secrets
 import re
+
+# passlib for better password hashing (optional, fallback to hashlib)
+try:
+    from passlib.context import CryptContext
+    _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    _USE_PASSLIB = True
+except ImportError:
+    _USE_PASSLIB = False
+
+# cryptography for encryption utilities (optional)
+try:
+    from cryptography.fernet import Fernet
+    _USE_CRYPTO = True
+except ImportError:
+    _USE_CRYPTO = False
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
@@ -129,6 +144,9 @@ class AuthenticationService:
 
     def _hash_password(self, password: str) -> str:
         """Password hashle."""
+        if _USE_PASSLIB:
+            return _pwd_context.hash(password)
+        # Fallback: hashlib PBKDF2
         salt = secrets.token_hex(16)
         hash_val = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
         return f"{salt}:{hash_val.hex()}"
@@ -136,6 +154,9 @@ class AuthenticationService:
     def _verify_password(self, password: str, stored_hash: str) -> bool:
         """Password doğrula."""
         try:
+            if _USE_PASSLIB and ":" not in stored_hash:
+                return _pwd_context.verify(password, stored_hash)
+            # Fallback: hashlib PBKDF2
             salt, hash_hex = stored_hash.split(":")
             hash_val = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
             return hmac.compare_digest(hash_val.hex(), hash_hex)
@@ -264,3 +285,39 @@ authz_service = AuthorizationService()
 secret_redaction = SecretRedaction()
 system_state = SystemStateMachine()
 safety_governance = SafetyGovernance()
+
+
+# === Encryption Utilities (optional, requires cryptography) ===
+
+def encrypt_data(data: str, key: Optional[bytes] = None) -> bytes:
+    """Encrypt string data using Fernet (AES-128-CBC).
+
+    Args:
+        data: String to encrypt
+        key: Fernet key (32 url-safe base64-encoded bytes). Auto-generated if None.
+
+    Returns:
+        Encrypted bytes + key (if auto-generated, returns tuple)
+    """
+    if not _USE_CRYPTO:
+        raise RuntimeError("cryptography package not installed. Install with: pip install cryptography")
+    if key is None:
+        key = Fernet.generate_key()
+    f = Fernet(key)
+    return f.encrypt(data.encode()), key
+
+
+def decrypt_data(token: bytes, key: bytes) -> str:
+    """Decrypt Fernet-encrypted data.
+
+    Args:
+        token: Encrypted bytes
+        key: Fernet key used for encryption
+
+    Returns:
+        Decrypted string
+    """
+    if not _USE_CRYPTO:
+        raise RuntimeError("cryptography package not installed. Install with: pip install cryptography")
+    f = Fernet(key)
+    return f.decrypt(token).decode()
