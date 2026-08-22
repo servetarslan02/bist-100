@@ -100,6 +100,8 @@ class ScoreCalibrator:
             "ticker": ticker,
             "date": date,
         })
+        if len(self._trade_history) > 5000:
+            self._trade_history = self._trade_history[-5000:]
 
         # Her 50 trade'te bir refit
         if len(self._trade_history) % 50 == 0:

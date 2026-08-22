@@ -275,6 +275,8 @@ class IntegratedLearningSystem:
             "actual_outcome": actual_outcome,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._feedback_buffer) > 1000:
+            self._feedback_buffer = self._feedback_buffer[-1000:]
 
         logger.info("Feedback recorded", ticker=ticker, feedback=feedback)
 

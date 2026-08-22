@@ -351,6 +351,8 @@ class SuperIntelligenceEngine:
                 "affected_tickers": list(drift_results.keys()),
                 "details": drift_results,
             })
+            if len(self._drift_alerts) > 500:
+                self._drift_alerts = self._drift_alerts[-500:]
 
             logger.warning("Drift detected",
                           tickers=len(drift_results),

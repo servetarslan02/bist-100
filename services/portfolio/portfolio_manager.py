@@ -428,6 +428,8 @@ class PortfolioManager:
             "cash": self._cash,
             "invested": total_equity - self._cash,
         })
+        if len(self._equity_curve) > 5000:
+            self._equity_curve = self._equity_curve[-5000:]
 
         if total_equity > self._max_equity:
             self._max_equity = total_equity

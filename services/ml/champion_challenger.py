@@ -295,6 +295,8 @@ class ChampionChallenger:
             "reason": decision.reason,
             "confidence": decision.confidence,
         })
+        if len(self._history) > 1000:
+            self._history = self._history[-1000:]
 
         return decision
 

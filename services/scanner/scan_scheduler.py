@@ -209,6 +209,8 @@ class AdaptiveScanScheduler:
                     "volatility": self._current_volatility,
                     "regime": self._current_regime,
                 })
+                if len(self._interval_history) > 1000:
+                    self._interval_history = self._interval_history[-1000:]
                 # Son 100 kaydı tut
                 self._interval_history = self._interval_history[-100:]
 

@@ -107,6 +107,8 @@ class RegimeTransitionTracker:
             "confidence": confidence,
             "timestamp": timestamp.isoformat(),
         })
+        if len(self._history) > 1000:
+            self._history = self._history[-1000:]
 
         # History boyut kontrolü
         if len(self._history) > self._max_history:

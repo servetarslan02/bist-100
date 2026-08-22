@@ -157,6 +157,8 @@ class StackingEnsemble:
             "n_base_models": len(self._base_models),
             "diversity_scores": self._diversity_scores,
         })
+        if len(self._training_history) > 1000:
+            self._training_history = self._training_history[-1000:]
 
         logger.info("stacking_ensemble_fitted", **metrics)
         return metrics

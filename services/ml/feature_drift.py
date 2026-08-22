@@ -75,6 +75,8 @@ class FeatureDriftDetector:
             **shap_values,
             "_timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._shap_history) > 1000:
+            self._shap_history = self._shap_history[-1000:]
 
     def record_distribution(self, feature_data: Dict[str, np.ndarray]):
         """Feature dağılımı kaydet (PSI hesaplama için)."""
@@ -144,6 +146,8 @@ class FeatureDriftDetector:
             "n_alerts": sum(1 for r in reports if r.alert),
             "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
         })
+        if len(self._drift_history) > 1000:
+            self._drift_history = self._drift_history[-1000:]
 
         return reports
 

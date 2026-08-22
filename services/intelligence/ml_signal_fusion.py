@@ -253,6 +253,8 @@ class MLSignalFusion:
                 "n_samples": len(X),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
+            if len(self._weight_history) > 1000:
+                self._weight_history = self._weight_history[-1000:]
 
             logger.info("SHAP weights optimized",
                        regime=regime,

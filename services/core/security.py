@@ -230,6 +230,8 @@ class SystemStateMachine:
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._history) > 1000:
+            self._history = self._history[-1000:]
         logger.info("System state transition", from_state=old_state, to=new_state, reason=reason)
 
     def set_substate(self, component: str, state: str):

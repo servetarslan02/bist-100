@@ -263,6 +263,8 @@ class ResourceMonitor:
             "disk_mb": disk_mb,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._snapshots) > 1000:
+            self._snapshots = self._snapshots[-1000:]
         self._snapshots = self._snapshots[-1000]
 
     def get_current(self) -> Dict[str, Any]:
@@ -306,6 +308,8 @@ class ConfigManager:
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._versions) > 500:
+            self._versions = self._versions[-500:]
 
         logger.info("Config changed", key=key, old=old_value, new=value, actor=actor)
 

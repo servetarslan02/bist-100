@@ -79,6 +79,8 @@ class ChampionChallengerEngine:
             "reason": reason,
             "metrics": metrics,
         })
+        if len(self._rejected_challengers) > 500:
+            self._rejected_challengers = self._rejected_challengers[-500:]
 
         logger.info("Challenger rejected", challenger=challenger_id, reason=reason)
 

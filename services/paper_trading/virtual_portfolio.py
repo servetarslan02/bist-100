@@ -251,6 +251,8 @@ class VirtualPortfolio:
             "cash": self.cash,
             "invested": total_value - self.cash,
         })
+        if len(self._equity_curve) > 5000:
+            self._equity_curve = self._equity_curve[-5000:]
 
         if self._state_store:
             self._state_store.save_equity_point(date, total_value, self.cash, total_value - self.cash)

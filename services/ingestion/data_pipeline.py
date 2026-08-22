@@ -198,6 +198,8 @@ class DataPipeline:
             "reason": reason,
             "quality_score": round(quality_score, 1),
         })
+        if len(self._audit_log) > 1000:
+            self._audit_log = self._audit_log[-1000:]
 
 
 # Singleton

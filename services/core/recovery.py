@@ -31,6 +31,8 @@ class EventReplay:
             "data": data,
             "timestamp": timestamp or datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._event_log) > 1000:
+            self._event_log = self._event_log[-1000:]
 
     def replay_from(self, from_timestamp: str, handler: Callable) -> int:
         """Belirli timestamp'ten itibaren eventleri yeniden oynat."""

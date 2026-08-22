@@ -216,6 +216,8 @@ class ProviderReliability:
             "latency_ms": latency_ms,
             "timestamp": datetime.now(timezone.utc),
         })
+        if len(self._results) > 1000:
+            self._results = self._results[-1000:]
 
         # Pencere boyutunu aş
         if len(self._results) > self.window_size:

@@ -168,6 +168,8 @@ class PointInTimeValidator:
             "record_date": record_date,
             "details": details,
         })
+        if len(self._corporate_actions) > 500:
+            self._corporate_actions = self._corporate_actions[-500:]
 
     def get_available_data_at(
         self,

@@ -152,6 +152,8 @@ class LearningHealthMonitor:
             "error": error,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._error_history) > 1000:
+            self._error_history = self._error_history[-1000:]
 
         # Modül status güncelle
         if module in self._module_status:

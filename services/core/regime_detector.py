@@ -247,6 +247,8 @@ class RegimeDetector:
             "confidence": confidence,
             "factors": factors,
         })
+        if len(self._regime_history) > 1000:
+            self._regime_history = self._regime_history[-1000:]
 
         logger.info("Regime detected", regime=regime, confidence=round(confidence, 4),
                    duration=self._regime_duration)

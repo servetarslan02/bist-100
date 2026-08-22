@@ -142,6 +142,8 @@ class ModelCalibration:
             "miscalibration": miscalibration,
             "n_samples": len(y_true),
         })
+        if len(self._calibration_history) > 1000:
+            self._calibration_history = self._calibration_history[-1000:]
 
         return result
 

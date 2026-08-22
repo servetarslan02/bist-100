@@ -180,6 +180,8 @@ class RankingModel:
             "regime": regime,
             "importance": dict(self._feature_importance),
         })
+        if len(self._feature_importance_history) > 1000:
+            self._feature_importance_history = self._feature_importance_history[-1000:]
 
         # SHAP values (eğer mümkünse)
         shap_importance = self._compute_shap_importance(X_weighted)

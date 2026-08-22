@@ -102,6 +102,8 @@ class ModelMonitor:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "correct": (prediction > 0.5 and actual > 0) or (prediction <= 0.5 and actual <= 0) if actual is not None else None,
         })
+        if len(self._prediction_history) > 5000:
+            self._prediction_history = self._prediction_history[-5000:]
 
         if len(self._prediction_history) > 1000:
             self._prediction_history = self._prediction_history[-500:]

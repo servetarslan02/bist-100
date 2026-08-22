@@ -63,6 +63,8 @@ class LearningLoop:
             "regime": regime,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
+        if len(self._prediction_history) > 5000:
+            self._prediction_history = self._prediction_history[-5000:]
         self._state.total_predictions += 1
 
     def record_outcome(self, ticker: str, actual_return: float,
