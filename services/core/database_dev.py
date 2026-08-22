@@ -10,6 +10,7 @@ Kullanım:
 
 import asyncio
 import json
+import re
 import sqlite3
 from typing import Dict, List, Optional, Any
 from datetime import datetime
