@@ -43,7 +43,7 @@ def run_label_forensics():
             try:
                 xu_curr_idx = xu100_close.index.get_loc(current_date)
                 xu_fwd_5d = (xu100_close.iloc[xu_curr_idx + 5] / xu100_close.iloc[xu_curr_idx] - 1.0) if xu_curr_idx + 5 < len(xu100_close) else np.nan
-            except:
+            except Exception:
                 xu_fwd_5d = np.nan
         else:
             xu_fwd_5d = np.nan

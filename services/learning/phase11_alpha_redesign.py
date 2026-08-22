@@ -38,7 +38,7 @@ def build_offline_dataset():
         try:
             idx = xu100_close.index.get_loc(date)
             xu_fwd_5d = (xu100_close.iloc[idx + 5] / xu100_close.iloc[idx] - 1.0) if idx + 5 < len(xu100_close) else np.nan
-        except:
+        except Exception:
             xu_fwd_5d = np.nan
             
         regime_history.append((date, regime))
@@ -48,7 +48,7 @@ def build_offline_dataset():
             try:
                 curr_idx = df_tk.index.get_loc(date)
                 fwd_5d = (df_tk.iloc[curr_idx + 5]["close"] / df_tk.iloc[curr_idx]["close"] - 1.0) if curr_idx + 5 < len(df_tk) else np.nan
-            except:
+            except Exception:
                 fwd_5d = np.nan
                 
             if not np.isnan(fwd_5d):
@@ -188,7 +188,7 @@ def analyze_models(res_df):
             bot_ret = decile_ret.iloc[0]
             spread = top_ret - bot_ret
             logger.info(f"{m:<15}: Top={top_ret:>5.2f}% | Bot={bot_ret:>5.2f}% | Spread={spread:>6.2f}%")
-        except:
+        except Exception:
             pass
 
 if __name__ == "__main__":

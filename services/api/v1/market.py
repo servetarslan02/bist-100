@@ -291,20 +291,18 @@ async def market_radar(
     _=Depends(check_rate_limit)
 ):
     """Piyasa radarı — Redis cache'den anında döner (<50ms). Cache 2dk'da bir yenilenir."""
-    import json
-    import redis as redis_lib
+    from ...core.redis_helper import get_cached, set_cached
 
     try:
-        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-        cached = r.get("radar:data")
-        cached_at = r.get("radar:updated_at")
+        cached = get_cached("radar:data")
         if cached:
+            cached_at_raw = get_cached("radar:updated_at")
             return {
-                "data": json.loads(cached),
-                "count": len(json.loads(cached)),
+                "data": cached,
+                "count": len(cached),
                 "errors": 0,
                 "status": "ok",
-                "cached_at": cached_at.decode() if cached_at else None,
+                "cached_at": cached_at_raw,
                 "from_cache": True,
             }
     except Exception:
@@ -400,12 +398,10 @@ async def _fetch_radar_fresh(limit: int = 200):
 
     # Cache'e yaz (TTL: 3 dakika güvenlik payı)
     try:
-        import json
-        import redis as redis_lib
+        from ...core.redis_helper import set_cached
         from datetime import datetime, timezone
-        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-        r.setex("radar:data", 180, json.dumps(results))
-        r.setex("radar:updated_at", 180, datetime.now(timezone.utc).isoformat())
+        set_cached("radar:data", results, ttl=180)
+        set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=180)
     except Exception:
         pass
 

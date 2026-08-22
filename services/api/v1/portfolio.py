@@ -528,15 +528,13 @@ async def alpha_signals(
     _=Depends(check_rate_limit),
 ):
     """Doğrulanmış Alpha Stratejisi canlı sinyalleri ve portföy dağılımı."""
-    import json
-    import redis as redis_lib
+    from ...core.redis_helper import get_cached, set_cached
     
     # 1. Redis Cache Kontrolü
     try:
-        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-        cached = r.get("alpha:signals")
+        cached = get_cached("alpha:signals")
         if cached:
-            return json.loads(cached)
+            return cached
     except Exception:
         pass
 
@@ -572,8 +570,7 @@ async def alpha_signals(
         
         # Redis'e 15 dk cache yaz
         try:
-            r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-            r.setex("alpha:signals", 900, json.dumps(res))
+            set_cached("alpha:signals", res, ttl=900)
         except Exception:
             pass
             

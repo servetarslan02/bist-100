@@ -102,16 +102,13 @@ async def scan_opportunities(
     _=Depends(check_rate_limit),
 ):
     """En iyi fırsatlar — Dynamic Algorithmic Opportunity Engine."""
-    import json
-    import redis as redis_lib
+    from ...core.redis_helper import get_cached, set_cached
 
     # Redis Cache Kontrolü
     try:
-        r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-        cached = r.get("scanner:opportunities")
+        cached = get_cached("scanner:opportunities")
         if cached:
-            data = json.loads(cached)
-            return data[:limit]
+            return cached[:limit]
     except Exception:
         pass
 
@@ -121,8 +118,7 @@ async def scan_opportunities(
         
         # Redis'e 5 dakika cache yaz
         try:
-            r = redis_lib.Redis(host="redis", port=6379, db=0, socket_timeout=1)
-            r.setex("scanner:opportunities", 300, json.dumps(results))
+            set_cached("scanner:opportunities", results, ttl=300)
         except Exception:
             pass
 

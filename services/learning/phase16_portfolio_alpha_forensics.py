@@ -178,7 +178,7 @@ def run_forensics():
         pred_scores = np.array([scores[t] for t in tickers])
         try:
             day_m["ndcg@5"] = ndcg_score([rel_scores], [pred_scores], k=5)
-        except:
+        except Exception:
             day_m["ndcg@5"] = 0.0
 
         # Rank stability
