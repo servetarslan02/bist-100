@@ -128,6 +128,24 @@ class PaperExecutionEngine:
                    commission=order["commission"],
                    slippage=order["slippage_pct"])
 
+        # ORDER_FILLED event publish
+        try:
+            from services.core.event_bus import publish_event
+            from services.core.event_schema import CanonicalEvent, EventType
+            order_event = CanonicalEvent(
+                event_type=EventType.ORDER_FILLED,
+                payload={
+                    "ticker": ticker,
+                    "side": side,
+                    "quantity": quantity,
+                    "price": fill_price,
+                    "order_id": order_id,
+                },
+            )
+            publish_event(order_event, key=ticker)
+        except Exception:
+            pass
+
         return order
 
     def _compute_slippage(

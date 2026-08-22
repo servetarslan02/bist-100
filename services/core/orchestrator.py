@@ -337,6 +337,50 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("SIMULATION_COMPLETED handler setup skipped", error=str(e))
 
+        # REGIME_TRANSITION handler (audit #6)
+        try:
+            eb = self._services.get("event_bus")
+            if eb:
+                from services.core.event_schema import EventType
+                async def _on_regime_transition(event):
+                    old_regime = event.data.get("old_regime", "")
+                    new_regime = event.data.get("new_regime", "")
+                    logger.info("Regime transition detected", old=old_regime, new=new_regime)
+                    self._last_regime_transition = event.data
+                try:
+                    await eb.subscribe("market.regime_transition", _on_regime_transition)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # AGENT_ANALYSIS_COMPLETED handler (audit #1)
+        try:
+            eb = self._services.get("event_bus")
+            if eb:
+                from services.core.event_schema import EventType
+                async def _on_agent_analysis(event):
+                    ticker = event.data.get("ticker", "")
+                    direction = event.data.get("direction", "")
+                    confidence = event.data.get("confidence", 0)
+                    try:
+                        ot = self._services.get("outcome_tracker")
+                        if ot:
+                            ot.add_prediction(
+                                ticker=ticker,
+                                prediction_type="agent_direction",
+                                predicted_value=1 if direction == "LONG" else -1,
+                                confidence=confidence,
+                            )
+                    except Exception:
+                        pass
+                try:
+                    await eb.subscribe("agent.analysis", _on_agent_analysis)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
 
@@ -396,6 +440,17 @@ class MasterOrchestrator:
                 features.update(macro_f)
         except Exception as e:
             logger.warning("Pipeline step failed", step="macro_features", error=str(e))
+
+        # Macro surprise model
+        try:
+            from services.macro.surprise_model import MacroSurpriseModel
+            surprise = MacroSurpriseModel()
+            if hasattr(surprise, 'compute_surprise') and market_data.get("macro"):
+                surprise_result = surprise.compute_surprise(market_data["macro"])
+                if surprise_result:
+                    features["macro_surprise"] = surprise_result
+        except Exception:
+            pass
 
         # ━━━ 3. WORLD STATE ━━━
         world_state = {}
@@ -537,6 +592,23 @@ class MasterOrchestrator:
         except Exception as e:
             logger.warning("Pipeline step failed", step="monte_carlo", error=str(e))
         result["monte_carlo"] = monte_carlo
+
+        # ━━━ 7.5. INTELLIGENCE PIPELINE (audit #13) ━━━
+        try:
+            from services.intelligence.pipeline import IntelligencePipeline
+            ip = IntelligencePipeline()
+            ip_result = ip.run(ticker, features, regime=regime)
+            result["intelligence_pipeline"] = {
+                "fused_direction": ip_result.fused_direction,
+                "fused_confidence": ip_result.fused_confidence,
+                "mc_var_95": ip_result.mc_var_95,
+                "mc_cvar_95": ip_result.mc_cvar_95,
+                "modules_used": ip_result.modules_used,
+                "modules_failed": ip_result.modules_failed,
+                "total_elapsed_ms": ip_result.total_elapsed_ms,
+            }
+        except Exception as e:
+            logger.warning("Intelligence pipeline failed", error=str(e))
 
         # ━━━ 8. SPEC ENGINE ━━━
         spec = {}
@@ -764,6 +836,18 @@ class MasterOrchestrator:
             logger.warning("Pipeline step failed", step="decision", error=str(e))
         result["decision"] = decision
 
+        # ━━━ 11.5. LEARNING FEEDBACK — Regime Accuracy (audit #25) ━━━
+        try:
+            ls = self._services.get("learning")
+            if ls and hasattr(ls, 'get_regime_accuracy'):
+                regime_acc = ls.get_regime_accuracy(regime)
+                if regime_acc and regime_acc < 0.4:
+                    if decision.get("confidence", 0) > 0:
+                        decision["confidence"] = decision["confidence"] * 0.8
+                        decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
+        except Exception:
+            pass
+
         # ━━━ 12. TRADE PLAN ━━━
         trade_plan = {}
         try:
@@ -912,6 +996,26 @@ class MasterOrchestrator:
         except Exception as e:
             logger.warning("Macro pipeline failed", error=str(e))
 
+        # Macro factor decomposition (audit #22)
+        try:
+            from services.macro.factor_decomposition import MacroFactorDecomposition
+            mfd = MacroFactorDecomposition()
+            if hasattr(mfd, 'decompose'):
+                factor_result = mfd.decompose(macro_data)
+                macro_analysis["factor_decomposition"] = factor_result
+        except Exception:
+            pass
+
+        # Macro correlation tracker (audit #21)
+        try:
+            from services.macro.correlation_tracker import MacroCorrelationTracker
+            mct = MacroCorrelationTracker()
+            if hasattr(mct, 'get_current_regime'):
+                corr_regime = mct.get_current_regime()
+                macro_analysis["correlation_regime"] = corr_regime
+        except Exception:
+            pass
+
         for ticker, df in market_data.items():
             try:
                 calc = self._services.get("feature_calculator")
@@ -1022,6 +1126,19 @@ class MasterOrchestrator:
         for i, opp in enumerate(top_opportunities[:20], 1):
             opp["rank"] = i
 
+        # Learning status (audit #12)
+        learning_status = {}
+        try:
+            ot = self._services.get("outcome_tracker")
+            ls = self._services.get("learning")
+            learning_status = {
+                "outcome_tracker": "active" if ot else "not_loaded",
+                "learning_system": "active" if ls else "not_loaded",
+                "predictions_recorded": len(getattr(ot, '_predictions', [])) if ot else 0,
+            }
+        except Exception:
+            learning_status = {"status": "unavailable"}
+
         return PipelineReport(
             date=date,
             results=per_ticker_results,
@@ -1030,6 +1147,7 @@ class MasterOrchestrator:
             top_opportunities=top_opportunities[:20],
             macro_analysis=macro_analysis,
             regime=macro_analysis.get("regime", "UNKNOWN"),
+            learning_status=learning_status,
         )
 
     def get_status(self) -> Dict[str, Any]:

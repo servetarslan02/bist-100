@@ -328,6 +328,29 @@ class RiskMonitor:
         """Tüm alert kurallarını al."""
         return self._rules
 
+    def ingest_pipeline_metrics(self, ticker: str, metrics: Dict[str, Any]):
+        """Pipeline'dan gelen risk metriklerini monitoring'e besle."""
+        try:
+            if not hasattr(self, '_latest_metrics'):
+                self._latest_metrics: Dict[str, Dict] = {}
+            self._latest_metrics[ticker] = {
+                "var_95": metrics.get("var_95"),
+                "cvar_95": metrics.get("cvar_95"),
+                "drawdown": metrics.get("drawdown"),
+                "position_size": metrics.get("position_size"),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+            # Alert kontrolü
+            self._check_alerts(ticker, metrics)
+        except Exception as e:
+            logger.warning("Failed to ingest pipeline metrics", ticker=ticker, error=str(e))
+
+    def _check_alerts(self, ticker: str, metrics: Dict[str, Any]):
+        """Basit alert kontrolü."""
+        var_95 = abs(metrics.get("var_95", 0))
+        if var_95 > 15:
+            logger.warning("HIGH VaR ALERT", ticker=ticker, var_95=var_95)
+
     def get_alert_summary(self) -> Dict[str, Any]:
         """Alert özeti."""
         total = len(self._alerts)

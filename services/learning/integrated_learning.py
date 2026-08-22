@@ -83,6 +83,23 @@ class IntegratedLearningSystem:
             ticker=ticker, direction=predicted_direction,
             confidence=confidence, regime=regime)
 
+        # PREDICTION_CREATED event
+        try:
+            from services.core.event_bus import publish_event
+            from services.core.event_schema import CanonicalEvent, EventType
+            pred_event = CanonicalEvent(
+                event_type=EventType.PREDICTION_CREATED,
+                payload={
+                    "ticker": ticker,
+                    "prediction_type": predicted_direction,
+                    "predicted_value": confidence,
+                    "confidence": confidence,
+                },
+            )
+            publish_event(pred_event, key=ticker)
+        except Exception:
+            pass
+
         return pred_id
 
     # ===================== OUTCOME (YENİ EKLENEN) =====================
@@ -172,6 +189,22 @@ class IntegratedLearningSystem:
             actual=actual_direction,
             correct=correct,
             return_pct=round(actual_return, 2))
+
+        # OUTCOME_CREATED event
+        try:
+            from services.core.event_bus import publish_event
+            from services.core.event_schema import CanonicalEvent, EventType
+            out_event = CanonicalEvent(
+                event_type=EventType.OUTCOME_CREATED,
+                payload={
+                    "ticker": ticker,
+                    "actual_value": actual_return,
+                    "prediction_id": pred.prediction_id,
+                },
+            )
+            publish_event(out_event, key=ticker)
+        except Exception:
+            pass
 
         return {
             "success": True,

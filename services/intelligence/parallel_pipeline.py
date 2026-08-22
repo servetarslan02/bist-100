@@ -416,6 +416,8 @@ class ParallelIntelligencePipeline:
             return {}
         sf = mod.SignalFusionEngine()
         regime = p1.modules.get("regime", {}).get("regime", "UNKNOWN")
+
+        # Phase 1-3 sonuçlarından gerçek sinyaller oluştur
         signals = {
             "technical": {"direction": "NEUTRAL", "score": 50},
             "fundamental": {"direction": "NEUTRAL", "score": 50},
@@ -424,6 +426,37 @@ class ParallelIntelligencePipeline:
             "valuation": {"direction": "NEUTRAL", "score": 50},
             "ai": {"direction": "NEUTRAL", "score": 50},
         }
+
+        # Phase 2 (forecast) sonuçlarını kullan — forecasting
+        if "forecasting" in p2.modules:
+            fc = p2.modules["forecasting"]
+            if isinstance(fc, dict) and "predicted_return" in fc:
+                ret = fc["predicted_return"]
+                signals["technical"]["direction"] = "LONG" if ret > 0 else "SHORT"
+                signals["technical"]["score"] = min(max(50 + ret * 10, 0), 100)
+
+        # Phase 3 (monte_carlo) sonuçlarını kullan
+        if "monte_carlo" in p3.modules:
+            mc = p3.modules["monte_carlo"]
+            if isinstance(mc, dict) and "prob_positive" in mc:
+                prob_pos = mc["prob_positive"]
+                signals["momentum"]["direction"] = "LONG" if prob_pos > 0.55 else "SHORT"
+                signals["momentum"]["score"] = prob_pos * 100
+
+        # Phase 3 (probability) sonuçlarını kullan
+        if "probability" in p3.modules:
+            prob = p3.modules["probability"]
+            if isinstance(prob, dict) and "direction" in prob:
+                signals["valuation"]["direction"] = prob["direction"]
+
+        # Phase 1 (factor_engine) sonuçlarını kullan
+        if "factor_engine" in p1.modules:
+            factor = p1.modules["factor_engine"]
+            if isinstance(factor, dict) and "composite_score" in factor:
+                score = factor["composite_score"]
+                signals["fundamental"]["direction"] = "LONG" if score > 55 else "SHORT"
+                signals["fundamental"]["score"] = score
+
         result = sf.fuse_signals(ticker, signals, regime)
         return result.__dict__ if hasattr(result, "__dict__") else {}
 
