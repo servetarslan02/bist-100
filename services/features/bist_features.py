@@ -577,31 +577,25 @@ class BISTFeatureEngine:
 
     @staticmethod
     def _returns(prices: List[float]) -> List[float]:
-        """Günlük getiri serisi."""
-        return [
-            (prices[i] / prices[i - 1] - 1) if prices[i - 1] != 0 else 0
-            for i in range(1, len(prices))
-        ]
+        """Günlük getiri serisi (vektörize)."""
+        arr = np.array(prices)
+        if len(arr) < 2:
+            return []
+        rets = np.diff(arr) / arr[:-1]
+        rets = np.where(arr[:-1] != 0, rets, 0.0)
+        return rets.tolist()
 
     @staticmethod
     def _correlation(x: List[float], y: List[float]) -> float:
-        """Pearson korelasyonu."""
+        """Pearson korelasyonu (vektörize)."""
         n = min(len(x), len(y))
         if n < 3:
             return 0.0
-
-        x, y = x[:n], y[:n]
-        mean_x = sum(x) / n
-        mean_y = sum(y) / n
-
-        cov = sum((x[i] - mean_x) * (y[i] - mean_y) for i in range(n))
-        std_x = math.sqrt(sum((xi - mean_x) ** 2 for xi in x))
-        std_y = math.sqrt(sum((yi - mean_y) ** 2 for yi in y))
-
-        if std_x == 0 or std_y == 0:
+        xa = np.array(x[:n])
+        ya = np.array(y[:n])
+        if np.std(xa) == 0 or np.std(ya) == 0:
             return 0.0
-
-        return cov / (std_x * std_y)
+        return float(np.corrcoef(xa, ya)[0, 1])
 
     @staticmethod
     def _parse_date(date_str: str) -> Optional[datetime]:
