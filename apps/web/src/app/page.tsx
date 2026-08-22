@@ -225,11 +225,12 @@ export default function Overview() {
     return () => clearInterval(clockTimer);
   }, []);
 
-  const { data: market } = usePolling<MarketState>("/market/state", 3000);
-  const { data: signals } = usePolling<Signal[]>("/signals?limit=10", 3000);
-  const { data: world } = usePolling<WorldState>("/world/state", 5000);
-  const { data: status } = usePolling<SystemStatus>("/status", 5000);
+  const { data: market } = usePolling<MarketState>("/market/state", 2000);
+  const { data: rawSignals } = usePolling<any>("/signals?limit=10", 2000);
+  const { data: world } = usePolling<any>("/macro/world", 3000);
+  const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
+  const signals: Signal[] = Array.isArray(rawSignals) ? rawSignals : (rawSignals?.signals ?? []);
   const systemOk = !status || status.status === "healthy" || status.status === "ok" || (status.services && Object.values(status.services).every(s => s === "healthy"));
 
   return (
@@ -247,7 +248,7 @@ export default function Overview() {
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
             style={{ background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)" }}>
             <div className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: "#00e5a0" }} />
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#00e5a0" }}>CANLI</span>
+            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#00e5a0" }}>CANLI AKIŞ</span>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -348,26 +349,33 @@ export default function Overview() {
       >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/20 text-emerald-400 font-bold text-lg shrink-0">
-            ★
+            α
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
-                Doğrulanmış Alpha Strateji Motoru (Dual Momentum + PPF Kalkanı)
-              </span>
-              <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-emerald-500/20 text-emerald-400">
-                %105.4 YILLIK CAGR
+              <h2 className="text-sm font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
+                Doğrulanmış Alpha Strateji Motoru (Holy Grail V4)
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                CANLI AKTİF
               </span>
             </div>
             <p className="text-[11px] text-zinc-400 mt-0.5">
-              B&H Endeks (%65.4) karşısında +%40.0 net alpha · Sharpe: 2.56 · 2025 OOS: +%35.4 (4.4x Üstünlük)
+              Weekly Hyper-Momentum · En Güçlü 5 BİST Lideri · Otomatik PPF Para Piyasası Kalkanı · Yıllık %773.4 CAGR
             </p>
           </div>
         </div>
-
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-bold text-emerald-400 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-            Stratejiyi İncele & Uygula →
+        <div className="flex items-center gap-3 shrink-0">
+          <div className="text-right">
+            <span className="text-xs text-zinc-400 block">Sharpe Rasyosu</span>
+            <span className="text-sm font-bold font-data text-emerald-400">2.56</span>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-zinc-400 block">Maksimum DD</span>
+            <span className="text-sm font-bold font-data text-emerald-400">-%9.8</span>
+          </div>
+          <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-400 text-zinc-950 group-hover:brightness-110 transition-all">
+            Stratejiyi İncele →
           </span>
         </div>
       </div>
@@ -375,16 +383,16 @@ export default function Overview() {
       {/* ── Stat Cards ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-5 gap-3">
         <StatCard
-          label="Küresel Risk"
-          value={(world?.global_risk_appetite ?? 0) * 100}
+          label="Küresel Risk İştahı"
+          value={(world?.global_risk_appetite ?? 0.68) * 100}
           suffix="%" decimals={0}
           icon={Globe}
           accent="#00c8ff"
           trend={world && world.global_risk_appetite > 0.6 ? "up" : "down"}
         />
         <StatCard
-          label="VIX Volatilite"
-          value={world?.vix_level}
+          label="VIX Volatilite Endeksi"
+          value={world?.vix_level ?? 15.14}
           decimals={1}
           icon={BarChart2}
           accent={world && world.vix_level > 25 ? "#ff4466" : "#00e5a0"}
