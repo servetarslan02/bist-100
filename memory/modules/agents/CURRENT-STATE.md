@@ -9,8 +9,10 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 12 |
-| Toplam satır | ~4,043 |
+| Modül sayısı | 14 |
+| Toplam satır | ~4,742 |
+| Sınıf sayısı | 42 |
+| Fonksiyon sayısı | 129 |
 | Test sayısı | 58 |
 | Spec maddesi | 9 |
 | ✅ TAM | 9 |

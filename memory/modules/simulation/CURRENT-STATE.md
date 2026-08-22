@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 7 |
 | Toplam satır | ~2,006 |
-| Test sayısı | 10 |
+| Sınıf sayısı | 22 |
+| Fonksiyon sayısı | 44 |
+| Test sayısı | 51 |
 | Stres senaryosu | 8+ |
 
 ---

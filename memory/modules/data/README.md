@@ -1,6 +1,6 @@
 # Data
 
-**Modül sayısı:** 7 | **Toplam satır:** ~2,005 | **Test sayısı:** 12
+**Modül sayısı:** 7 | **Toplam satır:** ~2,005 | **Sınıf:** 13 | **Fonksiyon:** 62 | **Test:** 195
 
 ## Modüller
 

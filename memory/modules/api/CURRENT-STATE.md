@@ -11,6 +11,8 @@
 |--------|-------|
 | Modül sayısı | 26 |
 | Toplam satır | ~6,203 |
+| Sınıf sayısı | 12 |
+| Fonksiyon sayısı | 78 |
 | Endpoint sayısı | 92 REST + 10 WebSocket |
 | Router sayısı | 16 (v1 alt router) |
 

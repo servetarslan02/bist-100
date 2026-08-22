@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 7 |
 | Toplam satır | ~2,422 |
-| Test sayısı | 12 |
+| Sınıf sayısı | 19 |
+| Fonksiyon sayısı | 94 |
+| Test sayısı | 95 |
 | Job tipi sayısı | 17 |
 | Market fazı sayısı | 9 |
 

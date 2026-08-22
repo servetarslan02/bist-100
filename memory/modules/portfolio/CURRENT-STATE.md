@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 4 |
 | Toplam satır | ~2,730 |
-| Test sayısı | 12 |
+| Sınıf sayısı | 14 |
+| Fonksiyon sayısı | 93 |
+| Test sayısı | 46 |
 | Invariant | EQUITY = CASH + MARKET_VALUE |
 
 ---

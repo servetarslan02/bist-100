@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 73 |
 | Toplam satır | ~18,975 |
-| Test sayısı | 30 |
+| Sınıf sayısı | 56 |
+| Fonksiyon sayısı | 330 |
+| Test sayısı | 218 |
 | Katman sayısı | 6 |
 
 ---

@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 11 |
 | Toplam satır | ~3,646 |
-| Test sayısı | 15 |
+| Sınıf sayısı | 18 |
+| Fonksiyon sayısı | 97 |
+| Test sayısı | 46 |
 | Breadth göstergesi | 7 |
 | Bileşen state | 8 |
 | Ensemble yöntem | 3 |

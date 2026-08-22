@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 11 |
 | Toplam satır | ~1,606 |
-| Test sayısı | 12 |
+| Sınıf sayısı | 0 (fonksiyon tabanlı) |
+| Fonksiyon sayısı | 28 |
+| Test sayısı | 44 |
 | Faktör sayısı | 8 (Fama-French) + 9 (Piotroski) + 8+ (BIST anomalies) |
 
 ---

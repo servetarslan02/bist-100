@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 17 |
 | Toplam satır | ~3,116 |
-| Test sayısı | 18 |
+| Sınıf sayısı | 19 |
+| Fonksiyon sayısı | 93 |
+| Test sayısı | 68 |
 | Kaynak sayısı | 8+ (Google Trends, BKM, Kariyer.net, Ekşi, Investing, Satellite, LLM, Social) |
 | Feature sayısı | 60+ |
 

@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 14 |
 | Toplam satır | ~4,647 |
-| Test sayısı | 18 |
+| Sınıf sayısı | 44 |
+| Fonksiyon sayısı | 113 |
+| Test sayısı | 104 |
 | Risk check sayısı | 6 (pre-trade) |
 
 ---

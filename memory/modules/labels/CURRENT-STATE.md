@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 2 |
 | Toplam satır | ~242 |
-| Test sayısı | 6 |
+| Sınıf sayısı | 2 |
+| Fonksiyon sayısı | 3 |
+| Test sayısı | 0 |
 | Label sayısı | 14 |
 
 ---

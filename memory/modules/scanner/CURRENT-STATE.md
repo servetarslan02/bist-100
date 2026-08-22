@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 18 |
 | Toplam satır | ~6,038 |
-| Test sayısı | 20 |
+| Sınıf sayısı | 44 |
+| Fonksiyon sayısı | 193 |
+| Test sayısı | 72 |
 | Katmanlı filtreleme | Tier 0→5 |
 
 ---

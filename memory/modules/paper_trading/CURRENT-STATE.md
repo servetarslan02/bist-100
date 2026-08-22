@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 7 |
 | Toplam satır | ~2,068 |
-| Test sayısı | 15 |
+| Sınıf sayısı | 6 |
+| Fonksiyon sayısı | 91 |
+| Test sayısı | 40 |
 | Risk check sayısı | 8 |
 
 ---

@@ -9,9 +9,11 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 27 |
-| Toplam satır | ~9,317 |
-| Test sayısı | 25 |
+| Modül sayısı | 28 |
+| Toplam satır | ~9,544 |
+| Sınıf sayısı | 67 |
+| Fonksiyon sayısı | 287 |
+| Test sayısı | 39 |
 | Model mimarisi | 5 (LightGBM, CatBoost, XGBoost, LSTM, Transformer) |
 
 ---

@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 37 |
 | Toplam satır | ~11,643 |
-| Test sayısı | 45 |
+| Sınıf sayısı | 97 |
+| Fonksiyon sayısı | 331 |
+| Test sayısı | 83 |
 | Pipeline fazı | 5 (Context → Analysis → Forecast → Fusion → Knowledge) |
 
 ---

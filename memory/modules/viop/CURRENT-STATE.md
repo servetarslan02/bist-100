@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 9 (1 ana + 7 wrapper + 1 catalog) |
 | Toplam satır | ~2,213 |
-| Test sayısı | 12 |
+| Sınıf sayısı | 19 |
+| Fonksiyon sayısı | 59 |
+| Test sayısı | 85 |
 | Opsiyon stratejisi | 9 |
 | SPAN senaryosu | 16 |
 

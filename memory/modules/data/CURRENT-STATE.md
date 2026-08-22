@@ -11,7 +11,9 @@
 |--------|-------|
 | Modül sayısı | 7 |
 | Toplam satır | ~2,005 |
-| Test sayısı | 12 |
+| Sınıf sayısı | 13 |
+| Fonksiyon sayısı | 62 |
+| Test sayısı | 195 |
 | Veri kaynakları | yfinance, BIST, LocalParquet |
 
 ---
