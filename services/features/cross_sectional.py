@@ -86,7 +86,7 @@ class CrossSectionalEngine:
         features: Dict[str, float],
         universe_features: Dict[str, Dict[str, float]],
     ) -> Dict[str, float]:
-        """Tüm BIST'te percentile rank hesapla.
+        """Tüm BIST'te percentile rank hesapla (vektörize).
 
         Returns:
             {rank_return_5d: 0.85, ...} — 0=en düşük, 1=en yüksek
@@ -98,23 +98,22 @@ class CrossSectionalEngine:
             if my_val is None or np.isnan(my_val):
                 continue
 
-            # Tüm hisselerin değerlerini topla
-            all_vals = []
-            for t, f in universe_features.items():
-                v = f.get(feat_name)
-                if v is not None and not np.isnan(v):
-                    all_vals.append(v)
+            # Tüm hisselerin değerlerini topla (vektörize)
+            all_vals = np.array([
+                f.get(feat_name) for f in universe_features.values()
+                if f.get(feat_name) is not None and not np.isnan(f.get(feat_name, np.nan))
+            ])
 
             if len(all_vals) < 5:
                 continue
 
-            # Percentile rank (0-1) — tied values için ortalama rank kullan
-            n_below = sum(1 for v in all_vals if v < my_val)
-            n_equal = sum(1 for v in all_vals if v == my_val)
+            # Percentile rank (vektörize)
+            n_below = np.sum(all_vals < my_val)
+            n_equal = np.sum(all_vals == my_val)
             rank = (n_below + 0.5 * n_equal) / len(all_vals)
-            rank_features[f"rank_{feat_name}"] = round(rank, 4)
+            rank_features[f"rank_{feat_name}"] = round(float(rank), 4)
 
-            # Cross-sectional z-score (tüm evrene göre)
+            # Cross-sectional z-score
             mean = np.mean(all_vals)
             std = np.std(all_vals)
             if std > 0:
@@ -186,51 +185,47 @@ class CrossSectionalEngine:
         self,
         universe_features: Dict[str, Dict[str, float]],
     ) -> Dict[str, float]:
-        """Piyasa genişliği feature'ları."""
+        """Piyasa genişliği feature'ları (vektörize)."""
         breadth_features = {}
 
-        advancing = 0
-        declining = 0
-        total = 0
+        # Return values toplu çek (vektörize)
+        ret_1d = np.array([
+            f.get("return_1d", 0) for f in universe_features.values()
+            if f.get("return_1d") is not None and not np.isnan(f.get("return_1d", np.nan))
+        ])
 
-        for ticker, features in universe_features.items():
-            ret = features.get("return_1d", 0)
-            if ret is not None and not np.isnan(ret):
-                total += 1
-                if ret > 0:
-                    advancing += 1
-                elif ret < 0:
-                    declining += 1
-
-        if total > 0:
+        if len(ret_1d) > 0:
+            total = len(ret_1d)
+            advancing = int(np.sum(ret_1d > 0))
+            declining = int(np.sum(ret_1d < 0))
             breadth_features["market_breadth"] = round(advancing / total, 4)
             breadth_features["market_advancing"] = advancing
             breadth_features["market_declining"] = declining
             breadth_features["market_ad_ratio"] = round(advancing / max(declining, 1), 4)
 
-        # Volume anomaly count
-        vol_anomaly_count = sum(
-            1 for f in universe_features.values()
-            if f.get("volume_zscore", 0) and abs(f.get("volume_zscore", 0)) > 2
-        )
-        breadth_features["market_vol_anomalies"] = vol_anomaly_count
+        # Volume anomaly count (vektörize)
+        vol_zscores = np.array([
+            f.get("volume_zscore", 0) for f in universe_features.values()
+            if f.get("volume_zscore") is not None
+        ])
+        if len(vol_zscores) > 0:
+            breadth_features["market_vol_anomalies"] = int(np.sum(np.abs(vol_zscores) > 2))
 
-        # High/Low RSI count
-        high_rsi_count = sum(
-            1 for f in universe_features.values()
-            if f.get("rsi_14", 50) and f.get("rsi_14", 50) > 70
-        )
-        low_rsi_count = sum(
-            1 for f in universe_features.values()
-            if f.get("rsi_14", 50) and f.get("rsi_14", 50) < 30
-        )
-        breadth_features["market_overbought_count"] = high_rsi_count
-        breadth_features["market_oversold_count"] = low_rsi_count
+        # RSI counts (vektörize)
+        rsi_values = np.array([
+            f.get("rsi_14", 50) for f in universe_features.values()
+            if f.get("rsi_14") is not None
+        ])
+        if len(rsi_values) > 0:
+            breadth_features["market_overbought_count"] = int(np.sum(rsi_values > 70))
+            breadth_features["market_oversold_count"] = int(np.sum(rsi_values < 30))
 
-        # Momentum distribution
-        mom_values = [f.get("momentum_20d", 0) for f in universe_features.values()
-                     if f.get("momentum_20d") is not None and not np.isnan(f.get("momentum_20d", np.nan))]
-        if mom_values:
+        # Momentum distribution (vektörize)
+        mom_values = np.array([
+            f.get("momentum_20d", 0) for f in universe_features.values()
+            if f.get("momentum_20d") is not None and not np.isnan(f.get("momentum_20d", np.nan))
+        ])
+        if len(mom_values) > 0:
             breadth_features["market_momentum_median"] = round(float(np.median(mom_values)), 4)
             breadth_features["market_momentum_std"] = round(float(np.std(mom_values)), 4)
 
