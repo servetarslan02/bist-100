@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List
 import numpy as np
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import RegimeInfo, SimulationResult, ErrorResponse
 import structlog
 
 logger = structlog.get_logger()

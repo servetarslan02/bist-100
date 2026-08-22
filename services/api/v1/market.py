@@ -13,12 +13,13 @@ import structlog
 
 from ..dependencies import get_current_user, check_rate_limit, get_service_orchestrator
 from ...core.event_bus import event_bus
+from .schemas import MarketStateResponse, RadarResponse, InstrumentInfo, ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/state")
+@router.get("/state", response_model=MarketStateResponse, responses={500: {"model": ErrorResponse}})
 async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Piyasa durumu."""
     try:

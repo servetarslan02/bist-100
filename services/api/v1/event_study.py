@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from typing import List, Dict, Any
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import ErrorResponse
 
 router = APIRouter()
 

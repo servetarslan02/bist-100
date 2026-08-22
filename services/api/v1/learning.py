@@ -1,6 +1,6 @@
 """Learning API — Uçtan uca Model Training & Performance Learning Servisleri."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timezone
 import structlog
@@ -8,6 +8,7 @@ import structlog
 from ..dependencies import get_current_user, check_rate_limit
 from ...learning.learning_pipeline import LearningPipeline
 from ...learning.model_memory_store import ModelMemoryStore
+from .schemas import LearningStatus, ModelInfo, ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -115,15 +116,27 @@ async def performance_report(user=Depends(get_current_user), _=Depends(check_rat
 @router.post("/cycle")
 async def trigger_learning_cycle(
     regime: str = Query("BULL_MOMENTUM", description="Aktif piyasa rejimi"),
+    background_tasks: BackgroundTasks = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
-    """Manuel veya seans sonu otomatik model öğrenme döngüsünü tetikler."""
+    """Manuel veya seans sonu otomatik model öğrenme döngüsünü tetikler (arka planda)."""
+    if background_tasks:
+        background_tasks.add_task(_run_learning_cycle, regime)
+        return {"status": "started", "regime": regime, "message": "Learning cycle queued to background"}
     try:
         res = _pipeline.run_learning_cycle(current_regime=regime)
         return res
     except Exception as e:
         raise HTTPException(500, f"Learning cycle execution failed: {e}")
+
+
+def _run_learning_cycle(regime: str):
+    """Arka plan learning cycle görevi."""
+    try:
+        _pipeline.run_learning_cycle(current_regime=regime)
+    except Exception as e:
+        logger.error("Background learning cycle failed", regime=regime, error=str(e))
 
 
 @router.post("/record_prediction")

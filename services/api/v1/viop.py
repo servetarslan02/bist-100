@@ -5,6 +5,7 @@ from typing import Optional, List
 from datetime import date
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import OptionPrice, GreeksResult, ErrorResponse
 from ...viop.enhanced_options import (
     black_scholes,
     calculate_greeks,

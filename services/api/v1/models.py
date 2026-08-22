@@ -1,10 +1,11 @@
 """Models API — Gerçek servislere ve Model Kayıt Defterine (MLflow) bağlı."""
 
 import os
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from typing import List, Dict, Any
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import ErrorResponse
 
 router = APIRouter()
 
@@ -77,6 +78,22 @@ async def model_performance(user=Depends(get_current_user), _=Depends(check_rate
 
 
 @router.post("/retrain")
-async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Model yeniden eğitimi tetikle."""
-    return {"status": "started", "model": model_name, "message": "Retraining job queued to event pipeline"}
+async def retrain(
+    model_name: str = Query(...),
+    background_tasks: BackgroundTasks = None,
+    user=Depends(get_current_user),
+    _=Depends(check_rate_limit),
+):
+    """Model yeniden eğitimi tetikle (arka planda çalışır)."""
+    if background_tasks:
+        background_tasks.add_task(_run_retrain, model_name)
+    return {"status": "started", "model": model_name, "message": "Retraining job queued to background"}
+
+
+def _run_retrain(model_name: str):
+    """Arka plan retrain görevi."""
+    try:
+        from ...learning.retrain_engine import retrain_engine
+        retrain_engine.retrain(model_name)
+    except Exception as e:
+        logger.error("Background retrain failed", model=model_name, error=str(e))

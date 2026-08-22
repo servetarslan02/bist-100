@@ -21,6 +21,7 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import ScannerStatus, OpportunityInfo, ErrorResponse
 import structlog
 
 logger = structlog.get_logger()

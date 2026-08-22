@@ -28,6 +28,17 @@ from typing import Optional, Dict, List, Any
 import numpy as np
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
+from fastapi.responses import StreamingResponse
+import structlog
+
+from ..dependencies import get_current_user, check_rate_limit
+from .schemas import (
+    PortfolioSummary, PortfolioMetrics, TradeInfo, PositionInfo,
+    RiskOverview, ErrorResponse, BaseResponse
+)
+
+logger = structlog.get_logger()
+router = APIRouter()
 
 from ..dependencies import get_current_user, check_rate_limit
 import structlog

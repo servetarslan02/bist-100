@@ -24,6 +24,7 @@ from typing import Optional, List, Dict, Any
 import numpy as np
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import RiskOverview, VaRResult, ErrorResponse
 
 router = APIRouter()
 

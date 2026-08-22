@@ -8,6 +8,7 @@ from typing import Dict, Any, List
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit
+from .schemas import ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
