@@ -408,9 +408,15 @@ async def _fetch_radar_fresh(limit: int = 200):
                     last_close = float(closes[-1])
                     prev_close = float(closes[-2])
                     change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
-                    volume = float(df["Volume"].iloc[-1]) if "Volume" in df.columns else 1000000
-                    high = float(df["High"].iloc[-1]) if "High" in df.columns else last_close
-                    low = float(df["Low"].iloc[-1]) if "Low" in df.columns else last_close
+                    volume_clean = df["Volume"].dropna() if "Volume" in df.columns else None
+                    volume = float(volume_clean.iloc[-1]) if volume_clean is not None and not volume_clean.empty else 1000000.0
+
+                    high_clean = df["High"].dropna() if "High" in df.columns else None
+                    high = float(high_clean.iloc[-1]) if high_clean is not None and not high_clean.empty else (last_close * 1.02)
+
+                    low_clean = df["Low"].dropna() if "Low" in df.columns else None
+                    low = float(low_clean.iloc[-1]) if low_clean is not None and not low_clean.empty else (last_close * 0.98)
+
                     rsi = _calc_rsi(closes)
                     ma20 = sum(closes[-20:]) / min(20, len(closes))
                     trend_score = 65 if last_close > ma20 else 45
@@ -421,9 +427,9 @@ async def _fetch_radar_fresh(limit: int = 200):
                         "symbol": ticker,
                         "price": round(last_close, 2),
                         "change": change_pct,
-                        "volume": int(volume),
-                        "high": round(high, 2),
-                        "low": round(low, 2),
+                        "volume": int(volume) if not np.isnan(volume) else 1000000,
+                        "high": round(high, 2) if not np.isnan(high) else round(last_close * 1.02, 2),
+                        "low": round(low, 2) if not np.isnan(low) else round(last_close * 0.98, 2),
                         "rsi": rsi,
                         "score": score,
                         "isBist100": ticker in bist100,

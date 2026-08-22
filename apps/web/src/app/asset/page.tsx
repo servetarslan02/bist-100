@@ -267,11 +267,13 @@ function AssetIntelContent() {
                   {loadingAi ? "Gemini 3.7 Analiz Ediyor..." : "Gemini 3.7 Canlı Raporu"}
                 </button>
                 <div className="text-right">
-                  <span className="text-2xl font-bold font-data block text-zinc-100">₺{asset.price.toFixed(2)}</span>
+                  <span className="text-2xl font-bold font-data block text-zinc-100">
+                    ₺{asset.price != null ? Number(asset.price).toFixed(2) : "—"}
+                  </span>
                   <div className="flex items-center justify-end gap-1">
                     {isPos ? <ArrowUpRight size={12} className="text-emerald-400" /> : <ArrowDownRight size={12} className="text-red-400" />}
                     <span className={`text-xs font-bold font-data ${isPos ? "text-emerald-400" : "text-red-400"}`}>
-                      {isPos ? "+" : ""}%{asset.change_pct.toFixed(2)} (Bugün)
+                      {isPos ? "+" : ""}%{asset.change_pct != null ? Number(asset.change_pct).toFixed(2) : "0.00"} (Bugün)
                     </span>
                   </div>
                 </div>
@@ -323,7 +325,7 @@ function AssetIntelContent() {
               style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
             >
               <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Fiyat / Kazanç (F/K)</span>
-              <span className="text-xl font-bold font-data text-emerald-400">{asset.pe_ratio}x</span>
+              <span className="text-xl font-bold font-data text-emerald-400">{asset.pe_ratio != null ? Number(asset.pe_ratio).toFixed(2) : "—"}x</span>
               <span className="text-[10px] text-zinc-500 block">Sektörel Çarpan</span>
             </div>
 
@@ -332,7 +334,7 @@ function AssetIntelContent() {
               style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
             >
               <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Piyasa / Defter (PD/DD)</span>
-              <span className="text-xl font-bold font-data text-cyan-400">{asset.pb_ratio}x</span>
+              <span className="text-xl font-bold font-data text-cyan-400">{asset.pb_ratio != null ? Number(asset.pb_ratio).toFixed(2) : "—"}x</span>
               <span className="text-[10px] text-zinc-500 block">Özkaynak Çarpanı</span>
             </div>
 
@@ -341,11 +343,11 @@ function AssetIntelContent() {
               style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
             >
               <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">14 Günlük RSI</span>
-              <span className={`text-xl font-bold font-data ${asset.rsi_14 > 70 ? "text-red-400" : asset.rsi_14 < 35 ? "text-emerald-400" : "text-zinc-200"}`}>
-                {asset.rsi_14}
+              <span className={`text-xl font-bold font-data ${(asset.rsi_14 ?? 50) > 70 ? "text-red-400" : (asset.rsi_14 ?? 50) < 35 ? "text-emerald-400" : "text-zinc-200"}`}>
+                {asset.rsi_14 != null ? Number(asset.rsi_14).toFixed(2) : "—"}
               </span>
               <span className="text-[10px] text-zinc-500 block">
-                {asset.rsi_14 > 70 ? "Aşırı Alım Bölgesi" : asset.rsi_14 < 35 ? "Aşırı Satım (Fırsat)" : "Nötr Momentum"}
+                {(asset.rsi_14 ?? 50) > 70 ? "Aşırı Alım Bölgesi" : (asset.rsi_14 ?? 50) < 35 ? "Aşırı Satım (Fırsat)" : "Nötr Momentum"}
               </span>
             </div>
 
@@ -354,8 +356,8 @@ function AssetIntelContent() {
               style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
             >
               <span className="text-[10px] uppercase tracking-widest font-semibold text-zinc-500 block">Karar Motoru</span>
-              <span className="text-xl font-bold font-data text-emerald-400">{asset.recommendation_text}</span>
-              <span className="text-[10px] text-zinc-500 block">Skor: {asset.recommendation_score} / 100</span>
+              <span className="text-xl font-bold font-data text-emerald-400">{asset.recommendation_text || "—"}</span>
+              <span className="text-[10px] text-zinc-500 block">Skor: {asset.recommendation_score ?? 0} / 100</span>
             </div>
           </div>
 
@@ -369,11 +371,11 @@ function AssetIntelContent() {
               <div className="space-y-1 text-xs font-data">
                 <div className="flex justify-between">
                   <span className="text-zinc-400">20 Günlük SMA:</span>
-                  <span className="font-bold text-zinc-200">₺{asset.sma_20.toFixed(2)}</span>
+                  <span className="font-bold text-zinc-200">₺{asset.sma_20 != null ? Number(asset.sma_20).toFixed(2) : "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">50 Günlük SMA:</span>
-                  <span className="font-bold text-zinc-200">₺{asset.sma_50.toFixed(2)}</span>
+                  <span className="font-bold text-zinc-200">₺{asset.sma_50 != null ? Number(asset.sma_50).toFixed(2) : "—"}</span>
                 </div>
               </div>
             </div>
@@ -386,12 +388,12 @@ function AssetIntelContent() {
               <div className="space-y-1 text-xs font-data">
                 <div className="flex justify-between">
                   <span className="text-zinc-400">14 Günlük ATR:</span>
-                  <span className="font-bold text-cyan-400">₺{asset.atr_14.toFixed(2)}</span>
+                  <span className="font-bold text-cyan-400">₺{asset.atr_14 != null ? Number(asset.atr_14).toFixed(2) : "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-zinc-400">MACD Sinyali:</span>
-                  <span className={`font-bold ${asset.macd_signal.includes("AL") ? "text-emerald-400" : "text-amber-400"}`}>
-                    {asset.macd_signal}
+                  <span className={`font-bold ${(asset.macd_signal || "AL").includes("AL") ? "text-emerald-400" : "text-amber-400"}`}>
+                    {asset.macd_signal || "—"}
                   </span>
                 </div>
               </div>
@@ -405,11 +407,11 @@ function AssetIntelContent() {
               <div className="space-y-1 text-xs font-data">
                 <div className="flex justify-between">
                   <span className="text-red-400 font-semibold">Destek (S1):</span>
-                  <span className="font-bold text-red-400">₺{asset.support.toFixed(2)}</span>
+                  <span className="font-bold text-red-400">₺{asset.support != null ? Number(asset.support).toFixed(2) : "—"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-emerald-400 font-semibold">Direnç (R1):</span>
-                  <span className="font-bold text-emerald-400">₺{asset.resistance.toFixed(2)}</span>
+                  <span className="font-bold text-emerald-400">₺{asset.resistance != null ? Number(asset.resistance).toFixed(2) : "—"}</span>
                 </div>
               </div>
             </div>

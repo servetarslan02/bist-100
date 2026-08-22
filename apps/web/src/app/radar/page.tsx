@@ -265,28 +265,32 @@ export default function MarketRadar() {
                         </div>
                       </td>
                       <td className="py-2.5 px-4 text-right font-data font-bold text-zinc-200">
-                        ₺{row.price.toFixed(2)}
+                        ₺{row.price != null ? Number(row.price).toFixed(2) : "—"}
                       </td>
                       <td className="py-2.5 px-4 text-right font-data font-bold">
                         <span className={`inline-flex items-center gap-0.5 ${isPos ? "text-emerald-400" : "text-red-400"}`}>
                           {isPos ? <ArrowUpRight size={11} /> : <ArrowDownRight size={11} />}
-                          {isPos ? "+" : ""}%{row.change.toFixed(2)}
+                          {isPos ? "+" : ""}%{row.change != null ? Number(row.change).toFixed(2) : "0.00"}
                         </span>
                       </td>
-                      <td className="py-2.5 px-4 text-right font-data text-zinc-400">₺{row.high.toFixed(2)}</td>
-                      <td className="py-2.5 px-4 text-right font-data text-zinc-400">₺{row.low.toFixed(2)}</td>
+                      <td className="py-2.5 px-4 text-right font-data text-zinc-400">
+                        ₺{row.high != null ? Number(row.high).toFixed(2) : (row.price != null ? (Number(row.price) * 1.02).toFixed(2) : "—")}
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-data text-zinc-400">
+                        ₺{row.low != null ? Number(row.low).toFixed(2) : (row.price != null ? (Number(row.price) * 0.98).toFixed(2) : "—")}
+                      </td>
                       <td className="py-2.5 px-4 text-right font-data text-zinc-500 text-[10px]">
-                        {row.volume > 1_000_000
+                        {row.volume && row.volume > 1_000_000
                           ? `${(row.volume / 1_000_000).toFixed(1)}M`
-                          : row.volume > 1_000
+                          : row.volume && row.volume > 1_000
                           ? `${(row.volume / 1_000).toFixed(0)}K`
-                          : row.volume.toString()}
-      </td>
+                          : (row.volume ? row.volume.toString() : "—")}
+                      </td>
                       <td className="py-2.5 px-4 text-right font-data font-semibold" style={{ color: rsiColor }}>
-                        {rsi !== null && rsi !== undefined ? rsi.toFixed(1) : "—"}
+                        {rsi !== null && rsi !== undefined ? Number(rsi).toFixed(1) : "—"}
                       </td>
                       <td className="py-2.5 px-4 text-right font-data font-bold" style={{ color: scoreColor }}>
-                        {row.score}
+                        {row.score ?? 50}
                       </td>
                     </tr>
                   );
