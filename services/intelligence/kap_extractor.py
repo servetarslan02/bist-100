@@ -96,36 +96,39 @@ KEYWORD_MAP = {
 }
 
 
-class KAPExtractor:
-    """KAP bildirimlerinden yapılandırılmış veri çıkarma.
+from services.intelligence.llm_client import llm_client
 
-    LLM varsa kullanır, yoksa kural tabanlı çalışır.
-    """
+class KAPExtractor:
+    """KAP bildirimlerinden yapılandırılmış veri çıkarma (LLM Tabanlı)."""
 
     def extract(self, ticker: str, kap_id: str, title: str, summary: str = "") -> KAPExtractedEvent:
-        """KAP bildiriminden yapılandırılmış veri çıkar."""
-        text = f"{title} {summary}".lower()
+        """KAP bildiriminden LLM ile yapılandırılmış veri çıkar."""
+        text = f"{title} {summary}".strip()
+        if not text:
+            return self._build_empty(ticker, kap_id)
 
-        # 1. Olay türü sınıflandırması
-        event_type, event_subtype = self._classify_event(text)
+        # 1. LLM Çağrısı
+        llm_data = llm_client.analyze_financial_text(text, context_type="kap")
 
-        # 2. Finansal etki
+        # 2. Olay türü (fallback to EVENT_IMPACT_MAP structure if recognized)
+        event_subtype = llm_data.get("event_type", "UNKNOWN")
+        event_type = self._classify_event(text) # Still keep simple keyword check for specific subtypes (DIVIDEND, etc.) or just rely on LLM.
+        
         impact_info = EVENT_IMPACT_MAP.get(event_type, {"impact": 0, "magnitude": 0.3, "horizon": "MEDIUM"})
-        financial_impact = impact_info["impact"]
+        base_impact = impact_info["impact"]
         impact_magnitude = impact_info["magnitude"]
         time_horizon = impact_info["horizon"]
 
-        # Metin bazlı düzeltme
-        financial_impact = self._adjust_impact_from_text(text, financial_impact)
+        # 3. LLM'den gelen skorları harmanla
+        sentiment = float(llm_data.get("sentiment", 0.0))
+        financial_impact = base_impact + (sentiment * 0.5)  # sentiment'i base_impact'e ekle
+        financial_impact = max(-1.0, min(1.0, financial_impact))
 
-        # 3. Beklenmediklik skoru
-        surprise_score = self._compute_surprise(text, event_type)
-
-        # 4. Belirsizlik skoru
-        uncertainty = self._compute_uncertainty(text)
-
-        # 5. Sektör zincirleme etkisi
-        affected_sectors = self._identify_affected_sectors(event_type, text)
+        surprise_score = float(llm_data.get("surprise_score", 0.5))
+        uncertainty = float(llm_data.get("uncertainty_score", 0.3))
+        affected_sectors = llm_data.get("affected_sectors", ["ALL"])
+        if not affected_sectors:
+            affected_sectors = ["ALL"]
 
         return KAPExtractedEvent(
             ticker=ticker,
@@ -143,102 +146,20 @@ class KAPExtractor:
             raw_summary=summary[:500] if summary else "",
         )
 
-    def _classify_event(self, text: str) -> tuple:
-        """Olay türü sınıflandırması."""
-        # Anahtar kelime eşleme
+    def _build_empty(self, ticker: str, kap_id: str) -> KAPExtractedEvent:
+        return KAPExtractedEvent(
+            ticker=ticker, kap_id=kap_id, event_type="UNKNOWN", event_subtype="",
+            financial_impact=0.0, impact_magnitude=0.0, surprise_score=0.0, uncertainty=0.0,
+            time_horizon="MEDIUM", affected_sectors=["ALL"], description="", raw_title="", raw_summary=""
+        )
+
+    def _classify_event(self, text: str) -> str:
+        """Fallback specific classification for EVENT_IMPACT_MAP keys."""
+        text = text.lower()
         for keyword, event_type in KEYWORD_MAP.items():
             if keyword in text:
-                return event_type, keyword
-
-        # Belirsiz
-        return "UNKNOWN", ""
-
-    def _adjust_impact_from_text(self, text: str, base_impact: float) -> float:
-        """Metin bazlı etki düzeltmesi."""
-        impact = base_impact
-
-        # Pozitif sinyaller
-        positive_words = ["büyüme", "artış", "kâr", "rekor", "yükseliş", "iyileşme",
-                         "growth", "increase", "profit", "record", "improvement"]
-        for word in positive_words:
-            if word in text:
-                impact += 0.1
-
-        # Negatif sinyaller
-        negative_words = ["düşüş", "azalma", "zarar", "kayıp", "gerileme", "kriz",
-                         "decrease", "loss", "decline", "crisis", "risk"]
-        for word in negative_words:
-            if word in text:
-                impact -= 0.1
-
-        # Sınırla
-        return max(-1.0, min(1.0, impact))
-
-    def _compute_surprise(self, text: str, event_type: str) -> float:
-        """Beklenmediklik skoru."""
-        surprise = 0.5  # Varsayılan
-
-        # Beklenmedik sinyaller
-        surprise_words = ["sürpriz", "beklenmedik", "ani", "şok", "unexpected", "surprise", "shock"]
-        for word in surprise_words:
-            if word in text:
-                surprise += 0.2
-
-        # Beklenen sinyaller
-        expected_words = ["planlanan", "önceden açıklanan", "beklenen", "scheduled", "announced"]
-        for word in expected_words:
-            if word in text:
-                surprise -= 0.2
-
-        return max(0.0, min(1.0, surprise))
-
-    def _compute_uncertainty(self, text: str) -> float:
-        """Belirsizlik skoru."""
-        uncertainty = 0.3  # Varsayılan
-
-        # Belirsizlik sinyalleri
-        uncertain_words = ["belirsiz", "tahmini", "öngörü", "muhtemel", "uncertain", "estimate", "may", "might"]
-        for word in uncertain_words:
-            if word in text:
-                uncertainty += 0.15
-
-        # Kesinlik sinyalleri
-        certain_words = ["kesin", "onaylandı", "tamamlandı", "confirmed", "completed", "final"]
-        for word in certain_words:
-            if word in text:
-                uncertainty -= 0.15
-
-        return max(0.0, min(1.0, uncertainty))
-
-    def _identify_affected_sectors(self, event_type: str, text: str) -> List[str]:
-        """Etkilenen sektörleri belirle."""
-        sectors = []
-
-        # Sektör anahtar kelimeleri
-        sector_keywords = {
-            "BANK": ["banka", "bankacılık", "kredi", "mevduat", "bank"],
-            "ENERGY": ["enerji", "petrol", "doğalgaz", "elektrik", "energy", "oil", "gas"],
-            "TECH": ["teknoloji", "yazılım", "bilişim", "technology", "software"],
-            "AVIATION": ["havayolu", "uçuş", "havalimanı", "airline", "aviation"],
-            "RETAIL": ["perakende", "mağaza", "market", "retail"],
-            "METAL": ["metal", "demir", "çelik", "alüminyum", "steel"],
-            "CONSTR": ["inşaat", "konut", "gayrimenkul", "construction", "real estate"],
-            "FOOD": ["gıda", "yiyecek", "içecek", "food"],
-            "CHEM": ["kimya", "petrokimya", "chemical"],
-            "TELECOM": ["telekomünikasyon", "iletişim", "telecom"],
-        }
-
-        for sector, keywords in sector_keywords.items():
-            for keyword in keywords:
-                if keyword in text:
-                    sectors.append(sector)
-                    break
-
-        # Sektör bulunamadıysa ALL
-        if not sectors:
-            sectors = ["ALL"]
-
-        return sectors
+                return event_type
+        return "UNKNOWN"
 
 
 class SectorChainImpact:

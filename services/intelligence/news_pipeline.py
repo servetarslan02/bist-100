@@ -1,7 +1,8 @@
 """
-ALPHA BIST — News → World → Stock Pipeline v1.0
+ALPHA BIST — News → World → Stock Pipeline v2.0 (LLM Agent Tabanlı)
 
-Haber → NLP → Entity → Event → Importance → World State → Impact → Affected Stocks
+Haber → LLM Agent (RAG + World State + Knowledge Graph) →
+Entity → Event → Importance → World State → Impact → Affected Stocks
 
 Bu zincir eksiksiz olmalı.
 """
@@ -10,6 +11,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
+from services.intelligence.llm_agent import llm_agent
 
 logger = structlog.get_logger()
 
@@ -26,88 +28,64 @@ class ProcessedNews:
     # NLP çıktıları
     language: str = "tr"
     entities: List[Dict] = field(default_factory=list)
-    event_type: str = ""  # MACRO | COMPANY | SECTOR | GEOPOLITICAL
-    sentiment: float = 0.0  # -1 ile +1
-    importance: float = 0.0  # 0-1
-    novelty: float = 0.0  # 0-1
+    event_type: str = ""
+    sentiment: float = 0.0
+    importance: float = 0.0
+    novelty: float = 0.0
     credibility: float = 0.5
 
     # Etki
     affected_tickers: List[str] = field(default_factory=list)
+    affected_sectors: List[str] = field(default_factory=list)
     world_state_delta: Dict[str, float] = field(default_factory=dict)
     propagation_chain: List[Dict] = field(default_factory=list)
 
+    # LLM Ajan çıktıları
+    key_insight: str = ""
+    surprise_score: float = 0.5
+    uncertainty_score: float = 0.3
+    regime_override: Optional[str] = None
+    tool_calls_made: List[str] = field(default_factory=list)
+    is_llm_analyzed: bool = False
+
 
 class NewsPipeline:
-    """Haber işleme pipeline'ı."""
-
-    # Entity patterns (basit regex tabanlı)
-    COMPANY_PATTERNS = {
-        "THYAO": ["thyao", "türk hava yolları", "thy"],
-        "ASELS": ["asels", "aselsan"],
-        "AKBNK": ["akbnk", "akbank"],
-        "GARAN": ["garan", "garanti"],
-        "TUPRS": ["tuprs", "tüpraş"],
-        "EREGL": ["ergl", "ereğli"],
-        "BIMAS": ["bimas", "bim"],
-        "SAHOL": ["sahol", "sabancı"],
-        "KCHOL": ["kchol", "koç"],
-    }
-
-    MACRO_PATTERNS = {
-        "FED": ["fed", "federal reserve", "fomc", "powell"],
-        "TCMB": ["tcmb", "merkez bankası", "faiz kararı"],
-        "CPI": ["enflasyon", "tüfe", "cpi", "tüfe"],
-        "GDP": ["büyüme", "gdp", "gsyh"],
-        "OIL": ["petrol", "brent", "ham petrol", "opec"],
-        "USD": ["dolar", "usd", "döviz", "kur"],
-        "VIX": ["vix", "korku endeksi", "volatilite"],
-    }
-
-    # Event classification patterns
-    EVENT_PATTERNS = {
-        "EARNINGS": ["bilanço", "finansal sonuç", "kar açıklaması", "faaliyet raporu"],
-        "INVESTMENT": ["yatırım", "sözleşme", "ihale", "proje"],
-        "DIVIDEND": ["temettü", "kar payı", "nakit temettü"],
-        "CAPITAL": ["bedelli", "bedelsiz", "sermaye artırımı"],
-        "MERGER": ["birleşme", "satın alma", "devralma"],
-        "REGULATION": ["düzenleme", "mevzuat", "spk", "bdk"],
-        "GEOPOLITICAL": ["savaş", "ambargo", "yaptırım", "seçim", "darbe"],
-    }
+    """Haber işleme pipeline'ı (LLM Agent tabanlı — RAG + WorldState + KnowledgeGraph)."""
 
     def process(self, raw_news: Dict) -> ProcessedNews:
         """
-        Ham haberi işlenmiş haber haline getir.
+        Ham haberi LLM Agent ile işleyerek yapılandırılmış veriye dönüştür.
 
-        Pipeline:
-        raw_news → language detection → entity extraction →
-        event classification → sentiment → importance →
-        novelty → affected tickers → world state delta
+        LLM Agent şunlara erişir:
+        - WorldState (anlık makro tablo)
+        - KnowledgeGraph (sektör-şirket etki ağı)
+        - ResearchMemory (geçmiş analizler — RAG)
+        - Piyasa rejimi
         """
         title = raw_news.get("title", "")
         body = raw_news.get("body", "")
-        text = f"{title} {body}".lower()
+        text = f"{title} {body}".strip()
 
-        # 1. Entity extraction
-        entities = self._extract_entities(text)
+        if not text:
+            return self._build_empty(raw_news)
 
-        # 2. Event classification
-        event_type = self._classify_event(text)
+        # Haberde hisse kodu ve sektör ipuçları var mı?
+        ticker_hint = raw_news.get("ticker")
+        sector_hint = raw_news.get("sector")
 
-        # 3. Sentiment
-        sentiment = self._analyze_sentiment(text)
+        # LLM Agent analizi — RAG + WorldState + KnowledgeGraph bağlamlı
+        analysis = llm_agent.analyze_news(
+            text=text,
+            ticker=ticker_hint,
+            sector=sector_hint,
+        )
 
-        # 4. Importance
-        importance = self._assess_importance(text, entities, event_type)
-
-        # 5. Novelty (basit — aynı başlık daha önce görülmemişse novel)
-        novelty = 0.7  # Varsayılan
-
-        # 6. Affected tickers
-        affected = self._find_affected_tickers(entities, event_type)
-
-        # 7. World state delta
-        world_delta = self._compute_world_delta(event_type, sentiment, importance)
+        # World state delta hesapla
+        world_delta = self._compute_world_delta(
+            analysis.event_type,
+            analysis.sentiment,
+            analysis.importance,
+        )
 
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
@@ -115,120 +93,34 @@ class NewsPipeline:
             source=raw_news.get("source", "unknown"),
             title=title,
             body=body,
-            entities=entities,
-            event_type=event_type,
-            sentiment=sentiment,
-            importance=importance,
-            novelty=novelty,
+            entities=analysis.entities,
+            event_type=analysis.event_type,
+            sentiment=analysis.sentiment,
+            importance=analysis.importance,
+            novelty=0.7,  # Gelecekte duplicate detection ile güncellenecek
             credibility=raw_news.get("credibility", 0.5),
-            affected_tickers=affected,
+            affected_tickers=analysis.affected_tickers,
+            affected_sectors=analysis.affected_sectors,
             world_state_delta=world_delta,
+            key_insight=analysis.key_insight,
+            surprise_score=analysis.surprise_score,
+            uncertainty_score=analysis.uncertainty_score,
+            regime_override=analysis.regime_override,
+            tool_calls_made=analysis.tool_calls_made,
+            is_llm_analyzed=True,
         )
 
-    def _extract_entities(self, text: str) -> List[Dict]:
-        """Entity extraction — şirket, kurum, ülke."""
-        entities = []
+    def _build_empty(self, raw_news: Dict) -> ProcessedNews:
+        return ProcessedNews(
+            news_id=raw_news.get("id", ""),
+            timestamp=datetime.now(timezone.utc),
+            source=raw_news.get("source", "unknown"),
+            title="",
+        )
 
-        # Şirketler
-        for ticker, patterns in self.COMPANY_PATTERNS.items():
-            for pattern in patterns:
-                if pattern in text:
-                    entities.append({"type": "COMPANY", "name": ticker, "confidence": 0.8})
-                    break
-
-        # Makro
-        for name, patterns in self.MACRO_PATTERNS.items():
-            for pattern in patterns:
-                if pattern in text:
-                    entities.append({"type": "MACRO", "name": name, "confidence": 0.7})
-                    break
-
-        return entities
-
-    def _classify_event(self, text: str) -> str:
-        """Olay sınıflandırma."""
-        for event_type, patterns in self.EVENT_PATTERNS.items():
-            for pattern in patterns:
-                if pattern in text:
-                    if event_type in ["GEOPOLITICAL", "REGULATION"]:
-                        return "GEOPOLITICAL"
-                    elif event_type in ["EARNINGS", "INVESTMENT", "DIVIDEND", "CAPITAL", "MERGER"]:
-                        return "COMPANY"
-                    else:
-                        return "MACRO"
-
-        # Varsayılan
-        if any(w in text for words in self.COMPANY_PATTERNS.values() for w in words):
-            return "COMPANY"
-        return "OTHER"
-
-    def _analyze_sentiment(self, text: str) -> float:
-        """Sentiment analizi (-1 ile +1)."""
-        positive = [
-            "yükseliş", "artış", "kazanç", "rekor", "büyüme", "kar",
-            "olumlu", "başarı", "gelişme", "anlaşma", "sözleşme",
-            "pozitif", "güçlü", "iyimser",
-        ]
-        negative = [
-            "düşüş", "kayıp", "zarar", "azalış", "olumsuz", "gerileme",
-            "risk", "uyarı", "iptal", "erteleme", "dava", "ceza",
-            "negatif", "zayıf", "kötümser", "kriz", "çöküş",
-        ]
-
-        pos = sum(1 for w in positive if w in text)
-        neg = sum(1 for w in negative if w in text)
-        total = pos + neg
-
-        if total == 0:
-            return 0.0
-        return (pos - neg) / total
-
-    def _assess_importance(self, text: str, entities: List[Dict], event_type: str) -> float:
-        """Önem değerlendirmesi (0-1)."""
-        importance = 0.3  # Baz
-
-        # Şirket haberi
-        if event_type == "COMPANY":
-            importance += 0.2
-
-        # Makro haberi
-        if event_type == "MACRO":
-            importance += 0.3
-
-        # Jeopolitik
-        if event_type == "GEOPOLITICAL":
-            importance += 0.4
-
-        # Çoklu entity
-        if len(entities) > 3:
-            importance += 0.1
-
-        # Kritik kelimeler
-        critical = ["sürpriz", "beklenmedik", "acil", "olağanüstü", "rekor", "tarihi"]
-        if any(w in text for w in critical):
-            importance += 0.2
-
-        return min(importance, 1.0)
-
-    def _find_affected_tickers(self, entities: List[Dict], event_type: str) -> List[str]:
-        """Etkilenecek hisseleri bul."""
-        tickers = set()
-
-        for entity in entities:
-            if entity["type"] == "COMPANY":
-                tickers.add(entity["name"])
-            elif entity["type"] == "MACRO":
-                # Makro olayları tüm piyasayı etkiler ama bazı sektörleri daha fazla
-                if entity["name"] == "FED":
-                    tickers.update(["AKBNK", "GARAN", "YKBNK"])  # Bankacılık
-                elif entity["name"] == "OIL":
-                    tickers.update(["TUPRS", "PETKM", "THYAO"])
-                elif entity["name"] == "TCMB":
-                    tickers.update(["AKBNK", "GARAN", "YKBNK"])
-
-        return list(tickers)
-
-    def _compute_world_delta(self, event_type: str, sentiment: float, importance: float) -> Dict[str, float]:
+    def _compute_world_delta(
+        self, event_type: str, sentiment: float, importance: float
+    ) -> Dict[str, float]:
         """World state değişimini hesapla."""
         delta = {}
 
@@ -243,12 +135,7 @@ class NewsPipeline:
             delta["geopolitical_risk"] = 0.2 * importance
             delta["global_risk_appetite"] = -0.15 * importance
 
-        elif event_type == "COMPANY":
-            # Şirket haberleri world state'i çok etkilemez
-            pass
-
         return delta
-
 
 # Singleton
 news_pipeline = NewsPipeline()

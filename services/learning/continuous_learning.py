@@ -209,27 +209,23 @@ class ContinuousLearningPipeline:
         if not returns:
             return {"date": date, "sharpe": 0, "ic": 0, "win_rate": 0, "return": 0}
 
+        from services.core.metrics_math import calculate_sharpe_ratio, calculate_ic, calculate_win_rate
+        
         returns_arr = np.array(returns)
-        sharpe = np.mean(returns_arr) / (np.std(returns_arr) + 1e-10) * np.sqrt(252)
+        scores_arr = np.array(scores)
+        actuals_arr = np.array(actuals)
 
-        ic = 0
-        if len(scores) > 5:
-            try:
-                ic = np.corrcoef(scores, actuals)[0, 1]
-                if np.isnan(ic):
-                    ic = 0
-            except Exception as e:
-                ic = 0
-
-        win_rate = wins / len(returns) if returns else 0
-        total_return = np.sum(returns_arr)
+        sharpe = calculate_sharpe_ratio(returns_arr)
+        ic = calculate_ic(scores_arr, actuals_arr)
+        win_rate = calculate_win_rate(returns_arr)
+        total_return = float(np.sum(returns_arr))
 
         metrics = {
             "date": date,
-            "sharpe": round(float(sharpe), 4),
-            "ic": round(float(ic), 4),
-            "win_rate": round(float(win_rate), 4),
-            "return": round(float(total_return), 4),
+            "sharpe": round(sharpe, 4),
+            "ic": round(ic, 4),
+            "win_rate": round(win_rate, 4),
+            "return": round(total_return, 4),
             "n_predictions": len(predictions),
         }
 

@@ -73,10 +73,10 @@ class ValuationSummary:
 class ValuationEngine:
     """Değerleme motoru."""
 
-    # F-021: Sabitler sınıf değişkeni olarak tanımlanmış, override edilebilir
-    DEFAULT_WACC = 0.20        # %20 (yüksek risk primi)
-    DEFAULT_TERMINAL_GROWTH = 0.03  # %3 (enflasyon + reel büyüme)
-    DEFAULT_TAX_RATE = 0.23    # %23 kurumlar vergisi
+    # F-021: Türkiye enflasyon/faiz gerçeğine uygun güncel varsayılanlar
+    DEFAULT_WACC = 0.45        # %45 (yüksek enflasyon ortamı WACC)
+    DEFAULT_TERMINAL_GROWTH = 0.15  # %15 (uzun vadeli enflasyon beklentisi)
+    DEFAULT_TAX_RATE = 0.25    # %25 güncel kurumlar vergisi
 
     def __init__(
         self,

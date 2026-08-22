@@ -143,6 +143,7 @@ class RegimeEngine:
                     hmm_prob = hmm_result.probabilities.get(regime_name, 0.0)
                     scores[regime_key] = scores[regime_key] * (1 - hmm_weight) + hmm_prob * hmm_weight * 100
             except Exception as e:
+                logger.error("HMM prediction failed", error=str(e), exc_info=True)
                 hmm_result = None
 
         # Macro regime entegrasyonu
@@ -430,6 +431,83 @@ class RegimeEngine:
             }
             for s in history
         ]
+
+    def get_regime(self) -> RegimeState:
+        """Mevcut rejim durumunu döndür."""
+        return self._current_state
+
+    def override_regime(
+        self,
+        new_regime: str,
+        reason: str = "",
+        confidence: float = 0.90,
+    ) -> bool:
+        """
+        LLM Kara Kuğu Koruması: Rejimi acil güncelle.
+
+        Yalnızca LLM Agent tarafından çağrılır. Teknik indikatörlerin
+        henüz yakalayamadığı makro şoklar için kritik öneme sahiptir.
+        Örnek: Büyük savaş haberi, merkez bankası sürpriz kararı.
+
+        Args:
+            new_regime: Yeni rejim adı (Regime enum değeri)
+            reason:     Gerekçe (loglanır — zorunlu iz)
+            confidence: LLM'in güven skoru (0.80 altı reddedilir)
+
+        Returns:
+            True = güncelleme başarılı, False = reddedildi
+        """
+        if confidence < 0.80:
+            logger.warning(
+                "Regime override REJECTED — confidence too low",
+                attempted_regime=new_regime,
+                confidence=confidence,
+                reason=reason,
+            )
+            return False
+
+        # Enum doğrulaması
+        regime_map = {r.value: r for r in Regime}
+        # Hem değer hem ad ile eşleştir
+        target = regime_map.get(new_regime) or regime_map.get(
+            new_regime.replace("_", "-").upper()
+        )
+        if not target:
+            # String olarak dene
+            try:
+                target = Regime[new_regime.upper().replace("-", "_")]
+            except KeyError:
+                logger.error(
+                    "Regime override REJECTED — invalid regime name",
+                    new_regime=new_regime,
+                    valid_values=[r.value for r in Regime],
+                )
+                return False
+
+        old_regime = self._current_state.regime.value if self._current_state else "UNKNOWN"
+
+        # Yeni state oluştur
+        override_state = RegimeState(
+            regime=target,
+            confidence=confidence,
+            features_used={"llm_override": 1.0, "reason": reason},
+            timestamp=datetime.now(timezone.utc),
+            duration_hours=0.0,
+        )
+
+        # Geçmiş'e ekle
+        self._regime_history.append(override_state)
+        self._current_state = override_state
+
+        logger.critical(
+            "⚠️  REGIME OVERRIDDEN BY LLM AGENT",
+            old_regime=old_regime,
+            new_regime=target.value,
+            confidence=confidence,
+            reason=reason,
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+        return True
 
 
 # Singleton

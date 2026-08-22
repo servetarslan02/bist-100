@@ -92,28 +92,31 @@ class FactorEngine:
         return score
 
     def _compute_value(self, f: Dict) -> float:
-        """Value factor (düşük çarpan = yüksek skor)."""
+        """Value factor (düşük çarpan = yüksek skor). Sektör/Piyasa medyanına rölatif çalışır."""
         score = 50.0
 
         pe = f.get("pe_ratio", 0)
-        if pe and pe > 0:
-            # Düşük P/E yüksek skor
-            if pe < 8:
+        pe_median = f.get("sector_pe_median", f.get("market_pe_median", 15.0))
+        if pe and pe > 0 and pe_median > 0:
+            pe_relative = pe / pe_median
+            if pe_relative < 0.6:
                 score += 25
-            elif pe < 12:
+            elif pe_relative < 0.8:
                 score += 15
-            elif pe < 20:
+            elif pe_relative < 1.2:
                 score += 5
-            elif pe > 30:
+            elif pe_relative > 1.5:
                 score -= 15
 
         pb = f.get("pb_ratio", 0)
-        if pb and pb > 0:
-            if pb < 1.0:
+        pb_median = f.get("sector_pb_median", f.get("market_pb_median", 2.0))
+        if pb and pb > 0 and pb_median > 0:
+            pb_relative = pb / pb_median
+            if pb_relative < 0.6:
                 score += 20
-            elif pb < 1.5:
+            elif pb_relative < 0.9:
                 score += 10
-            elif pb > 3.0:
+            elif pb_relative > 1.5:
                 score -= 10
 
         fcf_yield = f.get("fcf_yield", 0) or f.get("fcf_yield_pct", 0)
@@ -197,22 +200,26 @@ class FactorEngine:
         return max(0, min(100, score))
 
     def _compute_size(self, f: Dict) -> float:
-        """Size factor (büyük şirket = düşük skor, küçük şirket = yüksek skor)."""
+        """Size factor (büyük şirket = düşük skor, küçük şirket = yüksek skor). Rölatif hesaplar."""
         market_cap = f.get("market_cap", 0)
         if not market_cap or market_cap <= 0:
             return 50.0
 
-        # BIST'te büyük şirketler > 50B TL
-        if market_cap > 100e9:
-            return 30.0  # Çok büyük
-        elif market_cap > 50e9:
-            return 40.0
-        elif market_cap > 10e9:
-            return 55.0
-        elif market_cap > 1e9:
-            return 70.0  # Orta
-        else:
-            return 85.0  # Küçük
+        mc_median = f.get("sector_mc_median", f.get("market_mc_median", 30e9))
+        if mc_median > 0:
+            relative_size = market_cap / mc_median
+            if relative_size > 5.0:
+                return 30.0  # Çok büyük
+            elif relative_size > 2.0:
+                return 40.0
+            elif relative_size > 0.5:
+                return 55.0
+            elif relative_size > 0.1:
+                return 70.0  # Orta
+            else:
+                return 85.0  # Küçük
+
+        return 50.0
 
     def _compute_low_vol(self, f: Dict) -> float:
         """Low Volatility factor (düşük volatilite = yüksek skor)."""

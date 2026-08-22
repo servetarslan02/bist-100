@@ -13,12 +13,70 @@ Kullanım:
 """
 
 import numpy as np
+from numba import jit
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
+
+@jit(nopython=True)
+def _run_jump_diffusion(
+    current_price: float, mu: float, sigma: float, lambda_t: float, compensator: float, 
+    jump_mean: float, jump_std: float, horizon_days: int, n_sims: int, dt: float
+) -> np.ndarray:
+    drift = (mu - 0.5 * sigma**2 - compensator) * dt
+    diffusion = sigma * np.sqrt(dt)
+
+    prices = np.zeros((n_sims, horizon_days + 1))
+    for i in range(n_sims):
+        prices[i, 0] = current_price
+
+    for t in range(1, horizon_days + 1):
+        for i in range(n_sims):
+            Z = np.random.standard_normal()
+            log_return = drift + diffusion * Z
+
+            n_jumps = np.random.poisson(lambda_t)
+            jump_size = 0.0
+            if n_jumps > 0:
+                for _ in range(n_jumps):
+                    jump_size += np.random.normal(jump_mean, jump_std)
+
+            total_return = log_return + jump_size
+            prices[i, t] = prices[i, t-1] * np.exp(total_return)
+            
+    return prices
+
+@jit(nopython=True)
+def _run_heston_lite(
+    current_price: float, mu: float, sigma: float, kappa: float, theta: float, 
+    xi: float, rho: float, dt: float, horizon_days: int, n_sims: int
+) -> np.ndarray:
+    prices = np.zeros((n_sims, horizon_days + 1))
+    vols = np.zeros((n_sims, horizon_days + 1))
+    for i in range(n_sims):
+        prices[i, 0] = current_price
+        vols[i, 0] = sigma
+
+    for t in range(1, horizon_days + 1):
+        for i in range(n_sims):
+            Z1 = np.random.standard_normal()
+            Z2 = np.random.standard_normal()
+            Z2 = rho * Z1 + np.sqrt(1 - rho**2) * Z2
+
+            v_t = vols[i, t-1]**2
+            v_t = max(v_t, 0.0001)
+            dv = kappa * (theta - v_t) * dt + xi * np.sqrt(v_t * dt) * Z2
+            v_new = max(v_t + dv, 0.0001)
+            vols[i, t] = np.sqrt(v_new)
+
+            drift = (mu - 0.5 * v_new) * dt
+            diffusion = np.sqrt(v_new * dt) * Z1
+            prices[i, t] = prices[i, t-1] * np.exp(drift + diffusion)
+
+    return prices
 
 
 @dataclass
@@ -99,54 +157,24 @@ class AdvancedMonteCarloEngine:
         current_price: float,
         mu: float,
         sigma: float,
-        jump_intensity: float = 0.1,    # Yılda ortalama 0.1 atlama
-        jump_mean: float = -0.02,       # Atlama ortalama getirisi
-        jump_std: float = 0.05,         # Atlama standart sapması
+        jump_intensity: float = 0.1,
+        jump_mean: float = -0.02,
+        jump_std: float = 0.05,
         horizon_days: int = 20,
         n_sims: int = 10000,
         seed: Optional[int] = None,
     ) -> AdvancedMCResult:
-        """Merton Jump-Diffusion Model.
-
-        Fiyat sıçramaları (gap) modeller.
-        Ani düşüşler (crash) ve sıçramaları yakalar.
-
-        Args:
-            jump_intensity: Yılda ortalama atlama sayısı
-            jump_mean: Atlama ortalama getirisi (negatif = düşüş)
-            jump_std: Atlama standart sapması
-        """
         if seed is not None:
             np.random.seed(seed)
 
         dt = 1 / 252
-        # Compensator: jump'ların beklenen etkisini düzelt
         lambda_t = jump_intensity * dt
         compensator = jump_intensity * (np.exp(jump_mean + 0.5 * jump_std**2) - 1)
 
-        drift = (mu - 0.5 * sigma**2 - compensator) * dt
-        diffusion = sigma * np.sqrt(dt)
-
-        # Include t=0 so a horizon of N contains exactly N daily moves.
-        prices = np.zeros((n_sims, horizon_days + 1))
-        prices[:, 0] = current_price
-
-        for t in range(1, horizon_days + 1):
-            Z = np.random.standard_normal(n_sims)
-
-            # Diffusion component
-            log_return = drift + diffusion * Z
-
-            # Jump component
-            n_jumps = np.random.poisson(lambda_t, n_sims)
-            jump_sizes = np.zeros(n_sims)
-            for i in range(n_sims):
-                if n_jumps[i] > 0:
-                    jump_sizes[i] = np.sum(np.random.normal(jump_mean, jump_std, n_jumps[i]))
-
-            # Combined return
-            total_return = log_return + jump_sizes
-            prices[:, t] = prices[:, t-1] * np.exp(total_return)
+        prices = _run_jump_diffusion(
+            current_price, mu, sigma, lambda_t, compensator, 
+            jump_mean, jump_std, horizon_days, n_sims, dt
+        )
 
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
@@ -174,18 +202,7 @@ class AdvancedMonteCarloEngine:
         n_sims: int = 10000,
         seed: Optional[int] = None,
     ) -> AdvancedMCResult:
-        """Student-t Distribution (Fat Tails).
-
-        Normal dağılımdan daha kalın kuyruklar.
-        aşırı olayları (crash, spike) daha iyi modeller.
-
-        Args:
-            degrees_of_freedom: Serbestlik derecesi (düşük = daha kalın kuyruk)
-                - 3: Çok kalın kuyruk
-                - 5: Kalın kuyruk (finans için tipik)
-                - 10: Orta
-                - 30+: Normal'e yakın
-        """
+        """Student-t Distribution (Fat Tails)."""
         if seed is not None:
             np.random.seed(seed)
 
@@ -195,12 +212,13 @@ class AdvancedMonteCarloEngine:
 
         # Student-t rastgele sayılar
         Z = np.random.standard_t(degrees_of_freedom, (n_sims, horizon_days))
-        # Normalize et (std = 1 olacak şekilde)
         Z = Z / np.sqrt(degrees_of_freedom / (degrees_of_freedom - 2))
 
         log_returns = drift + diffusion * Z
         log_returns_cum = np.cumsum(log_returns, axis=1)
         prices = current_price * np.exp(log_returns_cum)
+        initial_col = np.full((n_sims, 1), current_price)
+        prices = np.hstack([initial_col, prices])
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100
 
@@ -219,54 +237,24 @@ class AdvancedMonteCarloEngine:
         current_price: float,
         mu: float,
         sigma: float,
-        vol_of_vol: float = 0.3,     # Volatilitenin volatilitesi
-        mean_reversion: float = 2.0,  # Volatility mean reversion hızı
+        vol_of_vol: float = 0.3,
+        mean_reversion: float = 2.0,
         horizon_days: int = 20,
         n_sims: int = 10000,
         seed: Optional[int] = None,
     ) -> AdvancedMCResult:
-        """Heston-lite Stochastic Volatility.
-
-        Volatilite sabit değil, stokastik.
-        Vol clustering (yüksek vol'un yüksek vol takip etmesi) modeller.
-
-        Args:
-            vol_of_vol: Volatilitenin volatilitesi
-            mean_reversion: Volatility mean reversion hızı (kappa)
-        """
         if seed is not None:
             np.random.seed(seed)
 
         dt = 1 / 252
         kappa = mean_reversion
-        theta = sigma**2  # Uzun dönem ortalama variance
-        xi = vol_of_vol   # Vol of vol
+        theta = sigma**2
+        xi = vol_of_vol
+        rho = -0.7
 
-        # Include t=0 for the same reason as the GBM and jump-diffusion
-        # paths; otherwise the requested horizon is shortened by one day.
-        prices = np.zeros((n_sims, horizon_days + 1))
-        vols = np.zeros((n_sims, horizon_days + 1))
-        prices[:, 0] = current_price
-        vols[:, 0] = sigma
-
-        for t in range(1, horizon_days + 1):
-            Z1 = np.random.standard_normal(n_sims)
-            Z2 = np.random.standard_normal(n_sims)
-            # Korelasyon: -0.7 (asimetrik — fiyat düşünce vol artar)
-            rho = -0.7
-            Z2 = rho * Z1 + np.sqrt(1 - rho**2) * Z2
-
-            # Stochastic volatility update (Euler-Maruyama)
-            v_t = vols[:, t-1]**2
-            v_t = np.maximum(v_t, 0.0001)  # Negatif variance önle
-            dv = kappa * (theta - v_t) * dt + xi * np.sqrt(v_t * dt) * Z2
-            v_new = np.maximum(v_t + dv, 0.0001)
-            vols[:, t] = np.sqrt(v_new)
-
-            # Fiyat update (stochastic vol ile)
-            drift = (mu - 0.5 * v_new) * dt
-            diffusion = np.sqrt(v_new * dt) * Z1
-            prices[:, t] = prices[:, t-1] * np.exp(drift + diffusion)
+        prices = _run_heston_lite(
+            current_price, mu, sigma, kappa, theta, xi, rho, dt, horizon_days, n_sims
+        )
 
         final = prices[:, -1]
         returns = (final / current_price - 1) * 100

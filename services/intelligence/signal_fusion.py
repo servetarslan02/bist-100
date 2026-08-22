@@ -63,7 +63,6 @@ class FusedSignal:
     self_check_passed: bool = True
     self_check_warnings: List[str] = field(default_factory=list)
 
-
 class SignalFusionEngine:
     """Sinyal birleştirme motoru."""
 
@@ -82,21 +81,28 @@ class SignalFusionEngine:
     }
 
     REGIME_WEIGHT_OVERRIDES = {
-        "BULL": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
-        "BULL_ACCELERATING": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
-        "BULL_NORMAL": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
-        "TRENDING-UP": {"momentum": 0.25, "technical": 0.20, "sentiment": 0.05},
-        "BEAR": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
-        "BEAR_NORMAL": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
-        "BEAR_CRASH": {"macro": 0.25, "valuation": 0.15},
-        "TRENDING-DOWN": {"momentum": 0.25, "technical": 0.20, "macro": 0.15},
-        "HIGH_VOL": {"macro": 0.20, "valuation": 0.20, "momentum": 0.10},
-        "HIGH-VOLATILITY": {"macro": 0.20, "valuation": 0.20, "momentum": 0.10},
-        "RISK-ON": {"momentum": 0.25, "sentiment": 0.15},
-        "RISK-OFF": {"macro": 0.20, "valuation": 0.20, "fundamental": 0.20},
-        "PANIC": {"macro": 0.25, "valuation": 0.15},
-        "CRISIS": {"macro": 0.25, "valuation": 0.15},
-        "RECOVERY": {"fundamental": 0.25, "valuation": 0.20, "sentiment": 0.15},
+        # Boğa: Momentum ve teknik öne çıkar, AI destekleyici rolde
+        "BULL":             {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "BULL_ACCELERATING":{"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "BULL_NORMAL":      {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        "TRENDING-UP":      {"momentum": 0.22, "technical": 0.18, "sentiment": 0.05, "ai": 0.12},
+        # Ayı: Makro ve teknik öne çıkar, AI negatif sinyalleri ayırt eder
+        "BEAR":             {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        "BEAR_NORMAL":      {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        "BEAR_CRASH":       {"macro": 0.22, "valuation": 0.14, "ai": 0.18},
+        "TRENDING-DOWN":    {"momentum": 0.20, "technical": 0.18, "macro": 0.14, "ai": 0.14},
+        # Yüksek volatilite: AI bağlamsal analizi kritik
+        "HIGH_VOL":         {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
+        "HIGH-VOLATILITY":  {"macro": 0.18, "valuation": 0.18, "momentum": 0.08, "ai": 0.18},
+        # Risk-On/Off: Makro haberler baskın, LLM haberleri yorumlar
+        "RISK-ON":          {"momentum": 0.22, "sentiment": 0.13, "ai": 0.15},
+        "RISK-OFF":         {"macro": 0.18, "valuation": 0.18, "fundamental": 0.16, "ai": 0.20},
+        # Panik/Kriz: LLM en kritik rolde — teknik göstergeler gecikmeli!
+        "PANIC":            {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
+        "CRISIS":           {"macro": 0.20, "valuation": 0.13, "ai": 0.25},
+        "GEOPOLITICAL_CRISIS": {"macro": 0.15, "valuation": 0.10, "ai": 0.30},
+        # Toparlanma: Temel analiz ve AI birlikte
+        "RECOVERY":         {"fundamental": 0.22, "valuation": 0.18, "sentiment": 0.12, "ai": 0.15},
     }
 
     def __init__(self):

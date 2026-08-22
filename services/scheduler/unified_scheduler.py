@@ -91,11 +91,16 @@ class HolidayProvider:
         """Tatil günlerini al (dinamik + fallback)."""
         now = time.time()
 
-        # Cache süresi dolmuşsa yenile
-        if self._dynamic_holidays is None or (now - self._last_fetch) > self._fetch_interval:
-            self._refresh()
+        if self._dynamic_holidays is None:
+            self._refresh_sync()
+        elif (now - self._last_fetch) > self._fetch_interval:
+            self._last_fetch = now
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self._refresh_async())
+            except RuntimeError:
+                self._refresh_sync()
 
-        # Dinamik + fallback birleşimi
         return self._dynamic_holidays | self._FALLBACK_HOLIDAYS
 
     def is_holiday(self, dt: datetime) -> bool:
@@ -119,8 +124,8 @@ class HolidayProvider:
         if self._dynamic_holidays is not None:
             self._dynamic_holidays.discard(d)
 
-    def _refresh(self):
-        """Dinamik tatil günlerini yenile."""
+    def _refresh_sync(self):
+        """Dinamik tatil günlerini yenile (Senkron, başlangıç için)."""
         holidays = set()
 
         # 1. Config dosyasından oku
@@ -138,16 +143,13 @@ class HolidayProvider:
         except Exception as e:
             logger.warning("Holiday config load failed", error=str(e))
 
-        # 2. DB'den çek (varsa)
-        try:
-            # DB erişimi varsa config_holidays tablosundan çek
-            # Bu kısım async değil, sync — startup'ta yüklenir
-            pass
-        except Exception as e:
-            logger.debug("Holiday DB fetch skipped", error=str(e))
-
         self._dynamic_holidays = holidays
         self._last_fetch = time.time()
+
+    async def _refresh_async(self):
+        """Dinamik tatil günlerini yenile (Asenkron). Loop'u bloklamaz."""
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, self._refresh_sync)
 
 
 # =====================================================

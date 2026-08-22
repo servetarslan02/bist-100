@@ -135,10 +135,10 @@ class MasterOrchestrator:
                 module = __import__(module_path, fromlist=[attr_name])
                 obj = getattr(module, attr_name)
                 self._services[key] = obj() if is_class else obj
-            except ImportError:
-                pass
+            except ImportError as e:
+                logger.error("ImportError loading module", module=module_path, attr=attr_name, error=str(e), exc_info=True)
             except Exception as e:
-                logger.warning("Failed to load module", module=attr_name, error=str(e))
+                logger.error("Failed to load module", module=attr_name, error=str(e), exc_info=True)
 
         # Multi-attribute services
         for module_path, attrs in self._MULTI_SERVICE_REGISTRY:
@@ -146,10 +146,10 @@ class MasterOrchestrator:
                 module = __import__(module_path, fromlist=[a[1] for a in attrs])
                 for key, cls_name in attrs:
                     self._services[key] = getattr(module, cls_name)()
-            except ImportError:
-                pass
+            except ImportError as e:
+                logger.error("ImportError loading module", module=module_path, error=str(e), exc_info=True)
             except Exception as e:
-                logger.warning("Failed to load module", module=module_path, error=str(e))
+                logger.error("Failed to load module", module=module_path, error=str(e), exc_info=True)
 
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:

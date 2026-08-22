@@ -79,6 +79,8 @@ class Decision:
     time_horizon: str = "1-5D"
     expected_return: float = 0.0
     conviction: str = "LOW"  # Geriye uyumlu
+    # LLM Ajan Türkçe Açıklama
+    llm_narrative: str = ""  # LLM Agent tarafından üretilen karar özeti
 
 class DecisionEngine:
     """Karar motoru."""
