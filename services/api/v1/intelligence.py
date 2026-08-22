@@ -1,5 +1,6 @@
 """Intelligence API — Gerçek yapay zeka, rejim ve karar modellerine bağlı."""
 
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, Dict, Any, List
 import numpy as np

@@ -504,12 +504,17 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
 
 @router.post("/auto_rebalance")
 async def trigger_auto_rebalance(
-    signals: Optional[List[Dict[str, Any]]] = Body(None),
+    body: Optional[Any] = Body(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
     """Otonom portföy yeniden dengeleme (Auto-Rebalance Bot)."""
     try:
+        signals = None
+        if isinstance(body, dict):
+            signals = body.get("signals")
+        elif isinstance(body, list):
+            signals = body
         pm = _get_pm()
         res = pm.execute_auto_rebalance(signals=signals)
         return res

@@ -38,10 +38,12 @@ def get_client():
         port = int(os.environ.get("REDIS_PORT", "6379"))
         db = int(os.environ.get("REDIS_DB", "0"))
 
+        password = os.environ.get("REDIS_PASSWORD", "") or None
         _redis_client = redis_lib.Redis(
             host=host,
             port=port,
             db=db,
+            password=password,
             socket_timeout=1,
             socket_connect_timeout=1,
             retry_on_timeout=False,

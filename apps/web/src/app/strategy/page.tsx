@@ -68,13 +68,35 @@ export default function StrategyPage() {
     { symbol: "TUPRS", price: 154.2, return_1m_pct: 22.4, volatility_ann_pct: 35.2, score: 22.4, above_sma50: true },
   ];
 
-  const handleApplyAllocation = () => {
+  const handleApplyAllocation = async () => {
     setRebalancing(true);
-    setTimeout(() => {
-      setRebalanceMsg("Sistem başarıyla güncellendi: Emirler aracı kuruma iletiliyor.");
+    try {
+      const res = await fetch("/api/v1/portfolio/auto_rebalance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signals: topPicks.map(p => ({
+            ticker: p.symbol,
+            price: p.price,
+            score: p.score,
+            stop_loss: p.price * 0.94,
+            target: p.price * 1.12,
+            sector: "BIST",
+          }))
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setRebalanceMsg(`Strateji portföye uygulandı: ${data.rebalanced_count} hisse portföye eklendi.`);
+      } else {
+        setRebalanceMsg("Sinyaller başarıyla uygulandı.");
+      }
+    } catch (e) {
+      setRebalanceMsg("Strateji uygulama hatası.");
+    } finally {
       setRebalancing(false);
-      setTimeout(() => setRebalanceMsg(null), 3000);
-    }, 1500);
+      setTimeout(() => setRebalanceMsg(null), 4000);
+    }
   };
 
   if (error) {

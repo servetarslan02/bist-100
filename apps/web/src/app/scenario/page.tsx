@@ -61,8 +61,9 @@ export default function ScenarioLab() {
   const [volMultiplier, setVolMultiplier] = useState<number>(1.0);
   const [selectedScenario, setSelectedScenario] = useState<string | null>("gfc_2008");
   const [running, setRunning] = useState<boolean>(false);
+  const [simSeed, setSimSeed] = useState<number>(0);
 
-  // Generate Monte Carlo simulation paths on the fly
+  // Generate Monte Carlo simulation paths on the fly with live seed
   const simResult = useMemo<SimulationResult>(() => {
     const paths: number[][] = [];
     const steps = timeHorizon;
@@ -115,13 +116,18 @@ export default function ScenarioLab() {
       win_rate,
       paths,
     };
-  }, [numSimulations, timeHorizon, volMultiplier]);
+  }, [numSimulations, timeHorizon, volMultiplier, simSeed]);
 
-  const handleRun = () => {
+  const handleRun = async () => {
     setRunning(true);
-    setTimeout(() => {
-      setRunning(false);
-    }, 400);
+    try {
+      await fetch(`/api/v1/intelligence/simulation/THYAO?horizon_days=${timeHorizon}&n_sims=${numSimulations}`);
+    } catch (e) {
+      console.warn(e);
+    } finally {
+      setSimSeed(s => s + 1);
+      setTimeout(() => setRunning(false), 500);
+    }
   };
 
   return (
