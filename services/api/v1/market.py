@@ -424,15 +424,15 @@ async def _fetch_radar_fresh(limit: int = 1000):
                     mom_score = min(100, max(0, 50 + change_pct * 5))
                     score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
                     results.append({
-                        "symbol": ticker,
-                        "price": round(last_close, 2),
-                        "change": change_pct,
+                        "symbol": str(ticker),
+                        "price": float(round(last_close, 2)),
+                        "change": float(change_pct),
                         "volume": int(volume) if not np.isnan(volume) else 1000000,
-                        "high": round(high, 2) if not np.isnan(high) else round(last_close * 1.02, 2),
-                        "low": round(low, 2) if not np.isnan(low) else round(last_close * 0.98, 2),
-                        "rsi": rsi,
-                        "score": score,
-                        "isBist100": ticker in bist100,
+                        "high": float(round(high, 2)) if not np.isnan(high) else float(round(last_close * 1.02, 2)),
+                        "low": float(round(low, 2)) if not np.isnan(low) else float(round(last_close * 0.98, 2)),
+                        "rsi": float(rsi),
+                        "score": int(score),
+                        "isBist100": bool(ticker in bist100),
                     })
                 except Exception:
                     continue
@@ -462,14 +462,14 @@ async def _fetch_radar_fresh(limit: int = 1000):
                     score = min(98, max(40, round(50 + chg * 5 + (rsi - 50) * 0.5)))
                     results.append({
                         "symbol": sym,
-                        "price": pr,
-                        "change": chg,
-                        "volume": vol,
-                        "high": round(pr * 1.02, 2),
-                        "low": round(pr * 0.98, 2),
-                        "rsi": rsi,
-                        "score": score,
-                        "isBist100": True,
+                        "price": float(pr),
+                        "change": float(chg),
+                        "volume": float(vol),
+                        "high": float(round(pr * 1.02, 2)),
+                        "low": float(round(pr * 0.98, 2)),
+                        "rsi": float(rsi),
+                        "score": int(score),
+                        "isBist100": bool(True),
                     })
 
         return results
