@@ -48,19 +48,38 @@ class LLMClient:
             self._initialize_gemini()
 
     def _load_api_key(self) -> Optional[str]:
-        """API anahtarını config'den veya env'den yükle."""
-        # 1. Önce environment variable
-        key = os.environ.get("GEMINI_API_KEY", "")
+        """API anahtarını env, .env dosyası veya config'den yükle."""
+        # 1. Environment variable
+        key = os.environ.get("GEMINI_API_KEY", "").strip()
         if key:
             return key
 
-        # 2. Config'den
+        # 2. .env dosyasından doğrudan oku (eğer henüz env'e yüklenmemişse)
+        env_paths = [
+            os.path.join(os.getcwd(), ".env"),
+            os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), ".env"),
+        ]
+        for env_path in env_paths:
+            if os.path.exists(env_path):
+                try:
+                    with open(env_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("GEMINI_API_KEY="):
+                                key = line.split("GEMINI_API_KEY=", 1)[1].strip().strip('"').strip("'")
+                                if key:
+                                    os.environ["GEMINI_API_KEY"] = key
+                                    return key
+                except Exception:
+                    pass
+
+        # 3. Config settings
         try:
             from services.core.config import settings
-            key = getattr(settings, "GEMINI_API_KEY", "") or ""
+            key = getattr(settings, "gemini_api_key", None) or getattr(settings, "GEMINI_API_KEY", None) or ""
             if key:
-                return key
-        except ImportError:
+                return str(key).strip()
+        except Exception:
             pass
 
         logger.info("GEMINI_API_KEY bulunamadı — mock modda çalışılıyor.")

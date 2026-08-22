@@ -261,19 +261,12 @@ class LLMToolExecutor:
             from services.intelligence.world_state import world_state_manager
             state = world_state_manager.get_state_dict()
             return {"status": "ok", "world_state": state}
-        except ImportError:
+        except Exception as exc:
+            logger.warning("world_state_manager erişilemedi", error=str(exc))
             return {
-                "status": "mock",
-                "world_state": {
-                    "global_risk_appetite": 0.55,
-                    "vix_level": 18.5,
-                    "turkey_macro_risk": 0.65,
-                    "geopolitical_risk": 0.40,
-                    "oil_pressure": 0.50,
-                    "usd_strength": 0.60,
-                    "inflation_pressure": 0.70,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                },
+                "status": "unavailable",
+                "world_state": {},
+                "error": str(exc),
             }
 
     # ── Araç 2: Knowledge Graph ──────────────────────────────────────────────
@@ -290,16 +283,13 @@ class LLMToolExecutor:
                     "strength": relation.strength,
                 })
             return {"status": "ok", "entity_id": entity_id, "relations": result}
-        except ImportError:
+        except Exception as exc:
+            logger.warning("knowledge_graph erişilemedi", error=str(exc))
             return {
-                "status": "mock",
+                "status": "unavailable",
                 "entity_id": entity_id,
-                "relations": [
-                    {"entity": "AVIATION", "entity_type": "sector",
-                     "relation": "affects", "strength": -0.9},
-                    {"entity": "ENERGY", "entity_type": "sector",
-                     "relation": "affects", "strength": 0.9},
-                ],
+                "relations": [],
+                "error": str(exc),
             }
 
     # ── Araç 3: Research Memory (RAG) ────────────────────────────────────────
@@ -308,24 +298,17 @@ class LLMToolExecutor:
             from services.intelligence.research_memory import research_memory
             history = research_memory.get_ticker_history(ticker, limit=limit)
             return {"status": "ok", "ticker": ticker, "history": history}
-        except ImportError:
+        except Exception as exc:
+            logger.warning("research_memory erişilemedi", error=str(exc))
             return {
-                "status": "mock",
+                "status": "unavailable",
                 "ticker": ticker,
-                "history": [
-                    {
-                        "date": "2026-08-20",
-                        "thesis": "Güçlü sezon performansı beklentisi",
-                        "prediction": {"direction": "LONG", "confidence": 0.72},
-                        "outcome": {"actual_return": 3.2},
-                        "confidence": 0.72,
-                    }
-                ],
+                "history": [],
+                "error": str(exc),
             }
 
     # ── Araç 4: Ticker Features ──────────────────────────────────────────────
     def _get_ticker_features(self, ticker: str) -> Dict[str, Any]:
-        # Feature store'dan gerçek veri; yoksa boş dön (orchestrator zaten besler)
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -341,14 +324,15 @@ class LLMToolExecutor:
                 "status": "ok",
                 "regime": regime.regime if hasattr(regime, "regime") else str(regime),
                 "confidence": getattr(regime, "confidence", 0.7),
-                "duration_days": getattr(regime, "duration", 0),
+                "duration_days": getattr(regime, "duration_hours", 0) / 24.0 if hasattr(regime, "duration_hours") else 0,
             }
-        except (ImportError, AttributeError):
+        except Exception as exc:
+            logger.warning("regime_engine erişilemedi", error=str(exc))
             return {
-                "status": "mock",
-                "regime": "BULL",
-                "confidence": 0.70,
-                "duration_days": 12,
+                "status": "unavailable",
+                "regime": None,
+                "confidence": 0.0,
+                "error": str(exc),
             }
 
     # ── Araç 6: Ensemble Forecast ────────────────────────────────────────────
@@ -365,21 +349,19 @@ class LLMToolExecutor:
                     "model_agreement": getattr(result, "model_agreement", 0.5),
                     "ensemble_confidence": getattr(result, "ensemble_confidence", 0.5),
                 }
-        except (ImportError, AttributeError):
-            pass
+        except Exception as exc:
+            logger.warning("ensemble_forecaster erişilemedi", error=str(exc))
         return {
-            "status": "mock",
+            "status": "unavailable",
             "ticker": ticker,
-            "expected_return_5d": 2.5,
-            "expected_return_20d": 6.0,
-            "model_agreement": 0.65,
-            "ensemble_confidence": 0.60,
+            "expected_return_5d": None,
+            "expected_return_20d": None,
+            "model_agreement": None,
+            "ensemble_confidence": None,
         }
 
     # ── Araç 7: Signal Conflicts ─────────────────────────────────────────────
     def _get_signal_conflicts(self, ticker: str) -> Dict[str, Any]:
-        # Signal Fusion sonuçları orchestrator tarafından bağlama ekleniyor.
-        # Bu araç son bilinen çatışmaları context'ten okur.
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -399,14 +381,14 @@ class LLMToolExecutor:
                     "category": getattr(result, "category", "WATCH"),
                     "evidence_count": len(getattr(result, "evidence_list", [])),
                 }
-        except (ImportError, AttributeError):
-            pass
+        except Exception as exc:
+            logger.warning("spec_engine erişilemedi", error=str(exc))
         return {
-            "status": "mock",
+            "status": "unavailable",
             "ticker": ticker,
-            "spec_score": 62.0,
-            "category": "WATCH",
-            "evidence_count": 3,
+            "spec_score": None,
+            "category": None,
+            "evidence_count": 0,
         }
 
     # ── Araç 9: Override Regime ──────────────────────────────────────────────
@@ -491,9 +473,9 @@ class LLMToolExecutor:
             research_memory.add_record(record)
             logger.info("LLM analysis stored", ticker=ticker, direction=direction)
             return {"status": "ok", "ticker": ticker, "stored": True}
-        except (ImportError, AttributeError) as exc:
-            logger.warning("store_analysis mock mode", error=str(exc))
-            return {"status": "mock_ok", "ticker": ticker, "stored": False}
+        except Exception as exc:
+            logger.warning("store_analysis başarısız", error=str(exc))
+            return {"status": "error", "ticker": ticker, "stored": False, "error": str(exc)}
 
 
 # Singleton
