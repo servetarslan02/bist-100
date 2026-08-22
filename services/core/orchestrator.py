@@ -9,10 +9,12 @@ INGESTION → FEATURES → INTELLIGENCE → DECISION → RISK → PORTFOLIO → 
 """
 
 import asyncio
+import contextlib
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 # Sync-to-async bridge: background event loop for event publishing
@@ -44,15 +46,15 @@ logger = structlog.get_logger()
 class PipelineReport:
     """run_full_pipeline() çıktısı — çoklu-hisse batch çalıştırma raporu."""
     date: str
-    results: Dict[str, Any] = field(default_factory=dict)
-    system_health: Dict[str, Any] = field(default_factory=dict)
-    agent_results: Dict[str, Any] = field(default_factory=dict)
-    top_opportunities: List[Dict] = field(default_factory=list)
+    results: dict[str, Any] = field(default_factory=dict)
+    system_health: dict[str, Any] = field(default_factory=dict)
+    agent_results: dict[str, Any] = field(default_factory=dict)
+    top_opportunities: list[dict] = field(default_factory=list)
     regime: str = "UNKNOWN"
-    macro_analysis: Dict[str, Any] = field(default_factory=dict)
-    portfolio_recommendation: Dict[str, Any] = field(default_factory=dict)
-    learning_status: Dict[str, Any] = field(default_factory=dict)
-    alerts: List[str] = field(default_factory=list)
+    macro_analysis: dict[str, Any] = field(default_factory=dict)
+    portfolio_recommendation: dict[str, Any] = field(default_factory=dict)
+    learning_status: dict[str, Any] = field(default_factory=dict)
+    alerts: list[str] = field(default_factory=list)
 
 
 class MasterOrchestrator:
@@ -60,8 +62,65 @@ class MasterOrchestrator:
 
     def __init__(self):
         self._initialized = False
-        self._services = {}
-        self._simulation_results: Dict[str, Any] = {}  # MC simulation cache
+        self._services: dict[str, Any] = {}
+        self._simulation_results: dict[str, Any] = {}  # MC simulation cache
+        self._thread_pool = None  # Lazy-initialized shared pool
+
+    # Service loading registry: (service_key, module_path, class_or_attr_name, is_class)
+    # is_class=True → instantiate; is_class=False → import attribute directly
+    _SERVICE_REGISTRY = [
+        # Core
+        ("event_bus",          "services.core.event_bus",                "event_bus",              False),
+        # Features
+        ("feature_calculator", "services.features.calculator",           "feature_calculator",     False),
+        # Intelligence
+        ("world_state",        "services.intelligence.world_state",      "WorldStateManager",      True),
+        ("regime",             "services.intelligence.regime",           "regime_engine",          False),
+        ("forecasting",        "services.intelligence.forecasting",      "ForecastingEngine",      True),
+        ("monte_carlo",        "services.intelligence.monte_carlo",      "MonteCarloEngine",       True),
+        ("probability",        "services.intelligence.probability",      "ProbabilityEngine",      True),
+        ("spec_engine",        "services.intelligence.spec_engine",      "spec_engine",            False),
+        ("signal_fusion",      "services.intelligence.signal_fusion",    "SignalFusionEngine",     True),
+        ("knowledge_graph",    "services.intelligence.knowledge_graph",  "KnowledgeGraph",         True),
+        ("research_memory",    "services.intelligence.research_memory",  "ResearchMemory",         True),
+        ("evidence",           "services.intelligence.evidence_engine",  "EvidenceVerificationEngine", True),
+        ("factor_engine",      "services.intelligence.factor_engine",    "FactorEngine",           True),
+        ("impact_engine",      "services.intelligence.impact_engine",    "ImpactEngine",           True),
+        ("macro_sensitivity",  "services.intelligence.macro_sensitivity","MacroSensitivityEngine", True),
+        ("news_pipeline",      "services.intelligence.news_pipeline",    "NewsPipeline",           True),
+        ("trade_planner",      "services.intelligence.trade_planner",    "TradePlanner",           True),
+        # Decision
+        ("decision_engine",    "services.core.decision_engine",          "DecisionEngine",         True),
+        # Risk
+        ("risk_gate",          "services.core.risk_gate",                "RiskGate",               True),
+        ("position_sizing",    "services.risk.position_sizing",          "PositionSizer",          True),
+        ("compliance",         "services.core.compliance",               "compliance_checker",     False),
+        ("short_selling",      "services.core.short_selling",            "short_selling_monitor",  False),
+        ("halt_monitor",       "services.core.halt_monitor",             "halt_monitor",           False),
+        # Portfolio
+        ("portfolio_manager",  "services.portfolio.portfolio_manager",   "PortfolioManager",       True),
+        ("commission_model",   "services.portfolio.portfolio_manager",   "CommissionModel",        True),
+        # Learning
+        ("outcome_tracker",    "services.learning.outcome_tracker",      "OutcomeTracker",         True),
+        ("learning",           "services.learning.integrated_learning",  "IntegratedLearningSystem", True),
+        # Macro (B28)
+        ("macro_features",     "services.features.macro",                "compute_all_macro_features", False),
+        # Factors (B30)
+        ("financial_scores",   "services.intelligence.factor_engine",    "compute_financial_scores", False),
+        # Event Study (B31)
+        ("event_impact",       "services.intelligence.impact_engine",    "analyze_event_impact",   False),
+    ]
+
+    # Multi-attribute imports: one module → multiple services
+    _MULTI_SERVICE_REGISTRY = [
+        ("services.intelligence.analysis_engines", [
+            ("price_action",       "PriceActionEngine"),
+            ("volume_engine",      "VolumeEngine"),
+            ("sector_engine",      "SectorEngine"),
+            ("relative_strength",  "RelativeStrengthEngine"),
+            ("correlation",        "CorrelationEngine"),
+        ]),
+    ]
 
     async def initialize(self):
         """Tüm servisleri başlat."""
@@ -70,263 +129,27 @@ class MasterOrchestrator:
 
         logger.info("Master Orchestrator initializing...")
 
-        # Core servisler
-        try:
-            from services.core.event_bus import event_bus
-            self._services["event_bus"] = event_bus
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="event_bus", error=str(e))
+        # Single-attribute services (registry-driven)
+        for key, module_path, attr_name, is_class in self._SERVICE_REGISTRY:
+            try:
+                module = __import__(module_path, fromlist=[attr_name])
+                obj = getattr(module, attr_name)
+                self._services[key] = obj() if is_class else obj
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning("Failed to load module", module=attr_name, error=str(e))
 
-        # Feature servisleri
-        try:
-            from services.features.calculator import feature_calculator
-            self._services["feature_calculator"] = feature_calculator
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="feature_calculator", error=str(e))
-
-        # Intelligence servisleri
-        try:
-            from services.intelligence.world_state import WorldStateManager
-            self._services["world_state"] = WorldStateManager()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="world_state", error=str(e))
-
-        try:
-            from services.intelligence.regime import regime_engine
-            self._services["regime"] = regime_engine
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="regime", error=str(e))
-
-        try:
-            from services.intelligence.forecasting import ForecastingEngine
-            self._services["forecasting"] = ForecastingEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="forecasting", error=str(e))
-
-        try:
-            from services.intelligence.monte_carlo import MonteCarloEngine
-            self._services["monte_carlo"] = MonteCarloEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="monte_carlo", error=str(e))
-
-        try:
-            from services.intelligence.probability import ProbabilityEngine
-            self._services["probability"] = ProbabilityEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="probability", error=str(e))
-
-        try:
-            from services.intelligence.spec_engine import spec_engine
-            self._services["spec_engine"] = spec_engine
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="spec_engine", error=str(e))
-
-        try:
-            from services.intelligence.signal_fusion import SignalFusionEngine
-            self._services["signal_fusion"] = SignalFusionEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="signal_fusion", error=str(e))
-
-        try:
-            from services.intelligence.knowledge_graph import KnowledgeGraph
-            self._services["knowledge_graph"] = KnowledgeGraph()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="knowledge_graph", error=str(e))
-
-        try:
-            from services.intelligence.research_memory import ResearchMemory
-            self._services["research_memory"] = ResearchMemory()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="research_memory", error=str(e))
-
-        try:
-            from services.intelligence.evidence_engine import EvidenceVerificationEngine
-            self._services["evidence"] = EvidenceVerificationEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="evidence", error=str(e))
-
-        try:
-            from services.intelligence.factor_engine import FactorEngine
-            self._services["factor_engine"] = FactorEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="factor_engine", error=str(e))
-
-        try:
-            from services.intelligence.impact_engine import ImpactEngine
-            self._services["impact_engine"] = ImpactEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="impact_engine", error=str(e))
-
-        try:
-            from services.intelligence.macro_sensitivity import MacroSensitivityEngine
-            self._services["macro_sensitivity"] = MacroSensitivityEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="macro_sensitivity", error=str(e))
-
-        try:
-            from services.intelligence.news_pipeline import NewsPipeline
-            self._services["news_pipeline"] = NewsPipeline()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="news_pipeline", error=str(e))
-
-        try:
-            from services.intelligence.analysis_engines import (
-                PriceActionEngine, VolumeEngine, SectorEngine,
-                RelativeStrengthEngine, CorrelationEngine
-            )
-            self._services["price_action"] = PriceActionEngine()
-            self._services["volume_engine"] = VolumeEngine()
-            self._services["sector_engine"] = SectorEngine()
-            self._services["relative_strength"] = RelativeStrengthEngine()
-            self._services["correlation"] = CorrelationEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="correlation", error=str(e))
-
-        try:
-            from services.intelligence.trade_planner import TradePlanner
-            self._services["trade_planner"] = TradePlanner()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="trade_planner", error=str(e))
-
-        # Decision servisleri
-        try:
-            from services.core.decision_engine import DecisionEngine
-            self._services["decision_engine"] = DecisionEngine()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="decision_engine", error=str(e))
-
-        # Risk servisleri
-        try:
-            from services.core.risk_gate import RiskGate
-            self._services["risk_gate"] = RiskGate()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="risk_gate", error=str(e))
-
-        try:
-            from services.risk.position_sizing import PositionSizer
-            self._services["position_sizing"] = PositionSizer()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="position_sizing", error=str(e))
-
-        try:
-            from services.core.compliance import compliance_checker
-            self._services["compliance"] = compliance_checker
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="compliance", error=str(e))
-
-        try:
-            from services.core.short_selling import short_selling_monitor
-            self._services["short_selling"] = short_selling_monitor
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="short_selling", error=str(e))
-
-        try:
-            from services.core.halt_monitor import halt_monitor
-            self._services["halt_monitor"] = halt_monitor
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="halt_monitor", error=str(e))
-
-        # Portfolio servisleri
-        try:
-            from services.portfolio.portfolio_manager import PortfolioManager, CommissionModel
-            self._services["portfolio_manager"] = PortfolioManager()
-            self._services["commission_model"] = CommissionModel()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="commission_model", error=str(e))
-
-        # Learning servisleri
-        try:
-            from services.learning.outcome_tracker import OutcomeTracker
-            self._services["outcome_tracker"] = OutcomeTracker()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="outcome_tracker", error=str(e))
-
-        try:
-            from services.learning.integrated_learning import IntegratedLearningSystem
-            self._services["learning"] = IntegratedLearningSystem()
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="learning", error=str(e))
-
-        # Macro servisleri (B28)
-        try:
-            from services.features.macro import compute_all_macro_features
-            self._services["macro_features"] = compute_all_macro_features
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="macro_features", error=str(e))
-
-        # Factors (B30)
-        try:
-            from services.intelligence.factor_engine import compute_financial_scores
-            self._services["financial_scores"] = compute_financial_scores
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="financial_scores", error=str(e))
-
-        # Event Study (B31)
-        try:
-            from services.intelligence.impact_engine import analyze_event_impact
-            self._services["event_impact"] = analyze_event_impact
-        except ImportError:
-            pass
-        except Exception as e:
-            logger.warning("Failed to load module", module="event_impact", error=str(e))
+        # Multi-attribute services
+        for module_path, attrs in self._MULTI_SERVICE_REGISTRY:
+            try:
+                module = __import__(module_path, fromlist=[a[1] for a in attrs])
+                for key, cls_name in attrs:
+                    self._services[key] = getattr(module, cls_name)()
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.warning("Failed to load module", module=module_path, error=str(e))
 
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
@@ -370,10 +193,8 @@ class MasterOrchestrator:
                     new_regime = event.data.get("new_regime", "")
                     logger.info("Regime transition detected", old=old_regime, new=new_regime)
                     self._last_regime_transition = event.data
-                try:
+                with contextlib.suppress(Exception):
                     await eb.subscribe("market.regime_transition", _on_regime_transition)
-                except Exception:
-                    pass
         except Exception:
             pass
 
@@ -397,17 +218,33 @@ class MasterOrchestrator:
                             )
                     except Exception:
                         pass
-                try:
+                with contextlib.suppress(Exception):
                     await eb.subscribe("agent.analysis", _on_agent_analysis)
-                except Exception:
-                    pass
         except Exception:
             pass
 
         self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
 
-    def run_pipeline(self, ticker: str, market_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_thread_pool(self):
+        """Shared thread pool for sync→async bridging (lazy init)."""
+        if self._thread_pool is None:
+            import concurrent.futures
+            self._thread_pool = concurrent.futures.ThreadPoolExecutor(
+                max_workers=4, thread_name_prefix="orch-async"
+            )
+        return self._thread_pool
+
+    def _run_agent_async(self, coro):
+        """Run an async agent coroutine from sync context."""
+        import asyncio as _asyncio
+        try:
+            _asyncio.get_running_loop()
+            return self._get_thread_pool().submit(_asyncio.run, coro).result(timeout=180)
+        except RuntimeError:
+            return _asyncio.run(coro)
+
+    def run_pipeline(self, ticker: str, market_data: dict[str, Any]) -> dict[str, Any]:
         """Tek hisse için tam pipeline çalıştır.
 
         Args:
@@ -418,7 +255,7 @@ class MasterOrchestrator:
                 "fundamentals": dict, "news": list, "macro": dict
             }
         """
-        result = {"ticker": ticker, "timestamp": datetime.now(timezone.utc).isoformat()}
+        result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
 
         # sector_map: market_data'dan veya varsayılan olarak
         sector_map = market_data.get("sector_map", {})
@@ -672,34 +509,15 @@ class MasterOrchestrator:
         try:
             agent_pipe = self._services.get("agent_pipeline")
             if agent_pipe:
-                import asyncio as _asyncio
-                try:
-                    loop = _asyncio.get_running_loop()
-                    # Zaten bir loop içinde — nested çalıştır
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as pool:
-                        future = pool.submit(
-                            _asyncio.run,
-                            agent_pipe.run(
-                                ticker=ticker,
-                                features=features,
-                                sector=sector_map.get(ticker, "UNKNOWN"),
-                                regime=regime,
-                                price=float(prices[-1]) if len(prices) > 0 else 0,
-                            )
-                        )
-                        agent_pipeline_result = future.result(timeout=180)
-                except RuntimeError:
-                    # Loop yok
-                    agent_pipeline_result = _asyncio.run(
-                        agent_pipe.run(
-                            ticker=ticker,
-                            features=features,
-                            sector=sector_map.get(ticker, "UNKNOWN"),
-                            regime=regime,
-                            price=float(prices[-1]) if len(prices) > 0 else 0,
-                        )
+                agent_pipeline_result = self._run_agent_async(
+                    agent_pipe.run(
+                        ticker=ticker,
+                        features=features,
+                        sector=sector_map.get(ticker, "UNKNOWN"),
+                        regime=regime,
+                        price=float(prices[-1]) if len(prices) > 0 else 0,
                     )
+                )
 
                 agent_result = {
                     "direction": agent_pipeline_result.direction,
@@ -738,11 +556,8 @@ class MasterOrchestrator:
                             "debate_occurred": agent_result.get("debate_occurred"),
                         },
                     )
-                    import asyncio as _asyncio
-                    try:
+                    with contextlib.suppress(RuntimeError):
                         _publish_event_async(event, key=ticker)
-                    except RuntimeError:
-                        pass
             except ImportError:
                 pass
             except Exception as e:
@@ -847,7 +662,8 @@ class MasterOrchestrator:
                 try:
                     eb = self._services.get("event_bus")
                     if eb and decision.get("action"):
-                        from services.core.event_schema import CanonicalEvent, EventType as ET
+                        from services.core.event_schema import CanonicalEvent
+                        from services.core.event_schema import EventType as ET
                         dec_event = CanonicalEvent(
                             event_type=ET.DECISION_CREATED,
                             payload={
@@ -858,11 +674,8 @@ class MasterOrchestrator:
                                 "score": decision.get("score"),
                             },
                         )
-                        import asyncio as _asyncio
-                        try:
+                        with contextlib.suppress(RuntimeError):
                             _publish_event_async(dec_event, key=ticker)
-                        except RuntimeError:
-                            pass
                 except Exception:
                     pass
         except ImportError:
@@ -876,10 +689,9 @@ class MasterOrchestrator:
             ls = self._services.get("learning")
             if ls and hasattr(ls, 'get_regime_accuracy'):
                 regime_acc = ls.get_regime_accuracy(regime)
-                if regime_acc and regime_acc < 0.4:
-                    if decision.get("confidence", 0) > 0:
-                        decision["confidence"] = decision["confidence"] * 0.8
-                        decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
+                if regime_acc and regime_acc < 0.4 and decision.get("confidence", 0) > 0:
+                    decision["confidence"] = decision["confidence"] * 0.8
+                    decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
         except Exception:
             pass
 
@@ -964,7 +776,6 @@ class MasterOrchestrator:
                     features=features,
                     model_version="pipeline_v1",
                 )
-                output.modules_used.append("outcome_tracker") if hasattr(output, "modules_used") else None
                 logger.debug("Prediction recorded", ticker=ticker, action=decision.get("action"))
         except Exception as e:
             logger.debug("Learning prediction recording skipped", error=str(e))
@@ -974,8 +785,8 @@ class MasterOrchestrator:
     def run_full_pipeline(
         self,
         date: str,
-        market_data: Dict[str, Any],
-        sector_map: Optional[Dict[str, str]] = None,
+        market_data: dict[str, Any],
+        sector_map: dict[str, str] | None = None,
     ) -> "PipelineReport":
         """Birden fazla hisse için tam pipeline'ı bir tarih için çalıştırır.
 
@@ -998,18 +809,17 @@ class MasterOrchestrator:
                 logger.warning("initialize() senkron çağrılamadı (aktif event loop mevcut)")
 
         sector_map = sector_map or {}
-        per_ticker_results: Dict[str, Any] = {}
-        errors: List[str] = []
+        per_ticker_results: dict[str, Any] = {}
+        errors: list[str] = []
 
         # === MACRO PIPELINE (YENİ) ===
         macro_analysis = {}
         try:
-            from services.macro import (
-                macro_surprise_model, macro_regime_detector,
-                macro_impact_analyzer, macro_stress_test,
-                macro_correlation_tracker, macro_factor_decomposition,
-            )
             from services.features.macro import macro_feature_engine
+            from services.macro import (
+                macro_impact_analyzer,
+                macro_regime_detector,
+            )
 
             # Macro data (market_data'dan çıkar veya servislerden al)
             macro_data = {}
@@ -1074,28 +884,13 @@ class MasterOrchestrator:
                 try:
                     agent_pipe = self._services.get("agent_pipeline")
                     if agent_pipe and features:
-                        import asyncio as _asyncio
-                        try:
-                            loop = _asyncio.get_running_loop()
-                            import concurrent.futures
-                            with concurrent.futures.ThreadPoolExecutor() as pool:
-                                future = pool.submit(
-                                    _asyncio.run,
-                                    agent_pipe.run(
-                                        ticker=ticker,
-                                        features=features,
-                                        sector=sector_map.get(ticker, "UNKNOWN"),
-                                    )
-                                )
-                                agent_res = future.result(timeout=180)
-                        except RuntimeError:
-                            agent_res = _asyncio.run(
-                                agent_pipe.run(
-                                    ticker=ticker,
-                                    features=features,
-                                    sector=sector_map.get(ticker, "UNKNOWN"),
-                                )
+                        agent_res = self._run_agent_async(
+                            agent_pipe.run(
+                                ticker=ticker,
+                                features=features,
+                                sector=sector_map.get(ticker, "UNKNOWN"),
                             )
+                        )
                         agent_info = {
                             "direction": agent_res.direction,
                             "confidence": agent_res.confidence,
@@ -1125,9 +920,7 @@ class MasterOrchestrator:
         failed = sum(1 for r in per_ticker_results.values() if r["error"] is not None)
         # Sağlık durumu gerçek başarısızlık oranına dayanır — uydurulmuş
         # bir "her zaman HEALTHY" değeri değildir.
-        if total == 0:
-            status = "CRITICAL"
-        elif failed == total:
+        if total == 0 or failed == total:
             status = "CRITICAL"
         elif failed > 0:
             status = "DEGRADED"
@@ -1185,7 +978,7 @@ class MasterOrchestrator:
             learning_status=learning_status,
         )
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Sistem durumu."""
         return {
             "initialized": self._initialized,
@@ -1203,7 +996,7 @@ class MasterOrchestrator:
         }
         return _json.dumps(report, indent=2, ensure_ascii=False)
 
-    def get_pipeline_stats(self) -> Dict[str, Any]:
+    def get_pipeline_stats(self) -> dict[str, Any]:
         """Pipeline istatistiklerini döndür."""
         return {
             "services_count": len(self._services),

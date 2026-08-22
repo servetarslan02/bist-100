@@ -11,10 +11,10 @@ Her motor bağımsız çalışır, birbirinin sonucunu etkilemez.
 Motor çıktıları ranking modeline girdi olarak kullanılır.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
 from collections import defaultdict
+from datetime import UTC
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -34,10 +34,10 @@ class RelativeStrengthMotor:
         ticker: str,
         stock_close: np.ndarray,
         benchmark_close: np.ndarray,
-        sector_close: Optional[np.ndarray] = None,
-        peer_closes: Optional[Dict[str, np.ndarray]] = None,
-        mask: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        sector_close: np.ndarray | None = None,
+        peer_closes: dict[str, np.ndarray] | None = None,
+        mask: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Relatif güç feature'ları hesapla."""
         features = {}
 
@@ -93,10 +93,9 @@ class RelativeStrengthMotor:
 
         # Peer relatif gücü
         if peer_closes:
-            peer_returns = {}
             for h in [5, 20]:
                 peer_h_returns = []
-                for peer_ticker, peer_close in peer_closes.items():
+                for _peer_ticker, peer_close in peer_closes.items():
                     if mask is not None:
                         peer_close = np.where(mask == 1, peer_close, np.nan)
                     valid_peer = peer_close[~np.isnan(peer_close)]
@@ -137,8 +136,8 @@ class MomentumTrendMotor:
         high: np.ndarray,
         low: np.ndarray,
         volume: np.ndarray,
-        mask: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        mask: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Momentum + trend feature'ları hesapla."""
         features = {}
 
@@ -151,7 +150,7 @@ class MomentumTrendMotor:
         valid_close = close[~np.isnan(close)]
         valid_high = high[~np.isnan(high)]
         valid_low = low[~np.isnan(low)]
-        valid_vol = volume[~np.isnan(volume)]
+        volume[~np.isnan(volume)]
         n = len(valid_close)
 
         if n < 20:
@@ -290,8 +289,8 @@ class VolumeMicrostructureMotor:
         high: np.ndarray,
         low: np.ndarray,
         volume: np.ndarray,
-        mask: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        mask: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Hacim + mikroyapı feature'ları hesapla."""
         features = {}
 
@@ -441,10 +440,10 @@ class FundamentalMotor:
     def compute(
         self,
         ticker: str,
-        fundamentals: Dict[str, float],
-        sector_medians: Optional[Dict[str, float]] = None,
-        sector: Optional[str] = None,
-    ) -> Dict[str, float]:
+        fundamentals: dict[str, float],
+        sector_medians: dict[str, float] | None = None,
+        sector: str | None = None,
+    ) -> dict[str, float]:
         """Fundamental feature'lar hesapla."""
         features = {}
 
@@ -605,11 +604,11 @@ class KAPNewsMotor:
     def compute(
         self,
         ticker: str,
-        kap_events: List[Dict],
-        news_events: List[Dict],
-        llm_analysis: Optional[Dict] = None,
-        as_of_date: Optional[str] = None,
-    ) -> Dict[str, float]:
+        kap_events: list[dict],
+        news_events: list[dict],
+        llm_analysis: dict | None = None,
+        as_of_date: str | None = None,
+    ) -> dict[str, float]:
         """KAP + haber feature'ları hesapla."""
         features = {}
 
@@ -691,7 +690,7 @@ class KAPNewsMotor:
 
             # Ağırlıklı sentiment
             if importances:
-                weighted = sum(s * i for s, i in zip(sentiments, importances)) / sum(importances)
+                weighted = sum(s * i for s, i in zip(sentiments, importances, strict=False)) / sum(importances)
                 features["news_sentiment_weighted"] = round(float(weighted), 4)
 
             features["news_count_24h"] = len([n for n in news_events if self._is_recent(n.get("date", ""), hours=24)])
@@ -700,9 +699,9 @@ class KAPNewsMotor:
             features["news_sentiment_std"] = round(float(np.std(sentiments)), 4)
 
             # Sentiment momentum
-            recent = [s for s, n in zip(sentiments, news_events)
+            recent = [s for s, n in zip(sentiments, news_events, strict=False)
                      if self._is_recent(n.get("date", ""), hours=72)]
-            older = [s for s, n in zip(sentiments, news_events)
+            older = [s for s, n in zip(sentiments, news_events, strict=False)
                     if not self._is_recent(n.get("date", ""), hours=72)]
 
             if recent and older:
@@ -747,15 +746,15 @@ class KAPNewsMotor:
 
     def _is_recent(self, ts: str, hours: int = 24) -> bool:
         try:
-            from datetime import datetime, timezone, timedelta
+            from datetime import datetime, timedelta
             if isinstance(ts, str) and ts:
                 t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
             else:
                 return False
             if t.tzinfo is None:
-                t = t.replace(tzinfo=timezone.utc)
-            return (datetime.now(timezone.utc) - t) < timedelta(hours=hours)
-        except Exception as e:
+                t = t.replace(tzinfo=UTC)
+            return (datetime.now(UTC) - t) < timedelta(hours=hours)
+        except Exception:
             return False
 
 
@@ -782,9 +781,9 @@ class CatalystMotor:
     def compute(
         self,
         ticker: str,
-        upcoming_events: List[Dict],
-        as_of_date: Optional[str] = None,
-    ) -> Dict[str, float]:
+        upcoming_events: list[dict],
+        as_of_date: str | None = None,
+    ) -> dict[str, float]:
         """Katalizör feature'ları hesapla."""
         features = {}
 
@@ -887,7 +886,7 @@ class WhyFallingMotor:
         kap_sentiment: float,
         rsi: float = 50,
         atr_pct: float = 0,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Düşüş nedeni sınıflandırması."""
         features = {}
 
@@ -998,8 +997,8 @@ class MeanReversionMotor:
         close: np.ndarray,
         high: np.ndarray,
         low: np.ndarray,
-        mask: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        mask: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Mean reversion feature'ları hesapla."""
         features = {}
 
@@ -1111,9 +1110,9 @@ class SeasonalityMotor:
         self,
         ticker: str,
         close: np.ndarray,
-        dates: List[str],
-        mask: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        dates: list[str],
+        mask: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Mevsimsel feature'ları hesapla."""
         features = {}
 
@@ -1122,7 +1121,7 @@ class SeasonalityMotor:
             # Hem mask=1 hem close NaN olmayan günleri filtrele
             combined_mask = (mask == 1) & (~np.isnan(close))
             valid_close = close[combined_mask]
-            valid_dates = [d for d, m in zip(dates, combined_mask) if m]
+            valid_dates = [d for d, m in zip(dates, combined_mask, strict=False) if m]
         else:
             valid_close = close[~np.isnan(close)]
             valid_dates = list(dates)
@@ -1199,7 +1198,10 @@ class SeasonalityMotor:
 # =====================================================
 
 class NineMotorEngine:
-    """7 motoru birleştiren ana motor (artık 9 motor)."""
+    """7 motoru birleştiren ana motor (artık 9 motor).
+
+    Motorlar bağımsızdır — paralel çalıştırılarak Pipeline süresi kısaltılır.
+    """
 
     def __init__(self):
         self.motor1 = RelativeStrengthMotor()
@@ -1211,29 +1213,36 @@ class NineMotorEngine:
         self.motor7 = WhyFallingMotor()
         self.motor8 = MeanReversionMotor()
         self.motor9 = SeasonalityMotor()
+        self._pool = None  # Lazy-initialized thread pool
+
+    def _get_pool(self):
+        if self._pool is None:
+            from concurrent.futures import ThreadPoolExecutor
+            self._pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="motor")
+        return self._pool
 
     def compute_all(
         self,
         ticker: str,
         df,
-        mask: Optional[np.ndarray] = None,
-        benchmark_close: Optional[np.ndarray] = None,
-        sector_close: Optional[np.ndarray] = None,
-        peer_closes: Optional[Dict[str, np.ndarray]] = None,
-        fundamentals: Optional[Dict[str, float]] = None,
-        sector_medians: Optional[Dict[str, float]] = None,
-        kap_events: Optional[List[Dict]] = None,
-        news_events: Optional[List[Dict]] = None,
-        upcoming_events: Optional[List[Dict]] = None,
-        llm_analysis: Optional[Dict] = None,
+        mask: np.ndarray | None = None,
+        benchmark_close: np.ndarray | None = None,
+        sector_close: np.ndarray | None = None,
+        peer_closes: dict[str, np.ndarray] | None = None,
+        fundamentals: dict[str, float] | None = None,
+        sector_medians: dict[str, float] | None = None,
+        kap_events: list[dict] | None = None,
+        news_events: list[dict] | None = None,
+        upcoming_events: list[dict] | None = None,
+        llm_analysis: dict | None = None,
         market_return_5d: float = 0,
         market_return_20d: float = 0,
         sector_return_5d: float = 0,
         sector_return_20d: float = 0,
         market_regime: str = "UNKNOWN",
-        as_of_date: Optional[str] = None,
-    ) -> Dict[str, float]:
-        """Tüm 9 motoru çalıştır ve feature'ları birleştir."""
+        as_of_date: str | None = None,
+    ) -> dict[str, float]:
+        """Tüm 9 motoru paralel çalıştır ve feature'ları birleştir."""
 
         close = df["Close"].values if "Close" in df.columns else np.array([])
         open_ = df["Open"].values if "Open" in df.columns else close.copy()
@@ -1242,42 +1251,53 @@ class NineMotorEngine:
         volume = df["Volume"].values if "Volume" in df.columns else np.ones(len(close))
         dates = df.index.strftime("%Y-%m-%d").tolist() if hasattr(df.index, 'strftime') else []
 
-        all_features = {}
+        # --- Paralel motor hesaplama ---
+        from concurrent.futures import as_completed
+        pool = self._get_pool()
+        futures = {}
 
-        # Motor 1: Relatif Güç
+        # Motor 1: Relatif Güç (benchmark gerektirir)
         if benchmark_close is not None:
-            m1 = self.motor1.compute(ticker, close, benchmark_close, sector_close, peer_closes, mask)
-            all_features.update(m1)
+            futures[pool.submit(self.motor1.compute, ticker, close, benchmark_close, sector_close, peer_closes, mask)] = "m1"
 
         # Motor 2: Momentum + Trend
-        m2 = self.motor2.compute(ticker, close, high, low, volume, mask)
-        all_features.update(m2)
+        futures[pool.submit(self.motor2.compute, ticker, close, high, low, volume, mask)] = "m2"
 
         # Motor 3: Hacim + Mikroyapı
-        m3 = self.motor3.compute(ticker, open_, close, high, low, volume, mask)
-        all_features.update(m3)
+        futures[pool.submit(self.motor3.compute, ticker, open_, close, high, low, volume, mask)] = "m3"
 
         # Motor 4: Fundamental
         if fundamentals:
-            m4 = self.motor4.compute(ticker, fundamentals, sector_medians)
-            all_features.update(m4)
+            futures[pool.submit(self.motor4.compute, ticker, fundamentals, sector_medians)] = "m4"
 
         # Motor 5: KAP + Haber
-        m5 = self.motor5.compute(ticker, kap_events or [], news_events or [], llm_analysis, as_of_date=as_of_date)
-        all_features.update(m5)
+        futures[pool.submit(self.motor5.compute, ticker, kap_events or [], news_events or [], llm_analysis, as_of_date)] = "m5"
 
         # Motor 6: Katalizör
-        m6 = self.motor6.compute(ticker, upcoming_events or [], as_of_date=as_of_date)
-        all_features.update(m6)
+        futures[pool.submit(self.motor6.compute, ticker, upcoming_events or [], as_of_date)] = "m6"
 
-        # Motor 7: Neden Düşüyor?
+        # Motor 8: Mean Reversion
+        futures[pool.submit(self.motor8.compute, ticker, close, high, low, mask)] = "m8"
+
+        # Motor 9: Seasonality
+        if dates:
+            futures[pool.submit(self.motor9.compute, ticker, close, dates, mask)] = "m9"
+
+        # Sonuçları topla
+        all_features: dict[str, float] = {}
+        for future in as_completed(futures):
+            try:
+                all_features.update(future.result())
+            except Exception as e:
+                logger.warning("Motor failed", motor=futures[future], error=str(e))
+
+        # Motor 7: Neden Düşüyor? (diğer motorlardan gelen feature'lara bağlı — sıranlı)
         stock_ret_5d = all_features.get("roc_5d", 0)
         stock_ret_20d = all_features.get("roc_20d", 0)
         vol_change = all_features.get("volume_zscore_20d", 0)
         vol_zscore = all_features.get("volume_zscore_20d", 0)
         news_sent = all_features.get("news_sentiment_weighted", 0)
         kap_sent = all_features.get("kap_sentiment_avg", 0)
-        # rsi_14: calculator'dan (Motor 8 henüz çalışmadı, rsi_14d mevcut değil)
         rsi = all_features.get("rsi_14", 50)
         atr = all_features.get("atr_pct", 0)
 
@@ -1288,15 +1308,6 @@ class NineMotorEngine:
             vol_change, vol_zscore, news_sent, kap_sent, rsi, atr
         )
         all_features.update(m7)
-
-        # Motor 8: Mean Reversion
-        m8 = self.motor8.compute(ticker, close, high, low, mask)
-        all_features.update(m8)
-
-        # Motor 9: Seasonality
-        if dates:
-            m9 = self.motor9.compute(ticker, close, dates, mask)
-            all_features.update(m9)
 
         # NaN/Inf temizle
         cleaned = {}
@@ -1339,10 +1350,9 @@ class NineMotorEngine:
             ("cci_20d",                    "cci",                     "motor8"),
         ]
 
-        for src, dst, motor in _ALIAS_MAP:
-            if src in cleaned:
-                if dst not in cleaned:
-                    cleaned[dst] = cleaned[src]
+        for src, dst, _motor in _ALIAS_MAP:
+            if src in cleaned and dst not in cleaned:
+                cleaned[dst] = cleaned[src]
                 # else: canonical source zaten var, ezme
 
         # return_* → roc_* mapping (cross-sectional RANK_TARGETS için)

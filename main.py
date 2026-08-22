@@ -25,10 +25,10 @@ Modlar:
 import argparse
 import json
 import sys
+from datetime import UTC, datetime, timedelta
+
 import numpy as np
 import pandas as pd
-from datetime import datetime, timezone, timedelta
-from typing import Optional, Dict, List
 import structlog
 
 logger = structlog.get_logger()
@@ -58,35 +58,49 @@ def _get_universe():
     return bist_universe
 
 
+def _fetch_market_data(bist_tickers, start_date=None, end_date=None, period=None, interval="1d"):
+    """Tekrarlayan veri çekme kalıbını tek fonksiyona indirgeme.
+
+    Returns:
+        (market_data_dict, sector_map_dict) veya (None, None) on failure.
+    """
+    data_source = _get_data_source()
+    universe = _get_universe()
+
+    yf_tickers = [f"{t}.IS" for t in bist_tickers if t != "XU100"] + ["XU100.IS"]
+
+    if start_date and end_date:
+        market_data = data_source.get_multiple_stocks(
+            yf_tickers, start_date=start_date, end_date=end_date, interval=interval
+        )
+    else:
+        market_data = data_source.get_multiple_stocks(yf_tickers, period=period or "6mo", interval=interval)
+
+    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+
+    if not market_data:
+        return None, None
+
+    sector_map = {t: universe.get_ticker_sector(t) for t in market_data}
+    return market_data, sector_map
+
+
 def run_daily_pipeline(date: str):
     """Gunluk pipeline calistir — GERCEK VERI."""
     logger.info("Starting daily pipeline", date=date)
 
-    data_source = _get_data_source()
     universe = _get_universe()
-
-    # Dinamik hisse listesi
-    all_tickers = universe.BIST_ALL_TICKERS
     bist_100 = universe.BIST_100_TICKERS
-    logger.info("Universe loaded", total=len(all_tickers), bist_100=len(bist_100))
+    logger.info("Universe loaded", total=len(universe.BIST_ALL_TICKERS), bist_100=len(bist_100))
 
-    # Gercek veri cek — once BIST 100, sonra digerleri
     print(f"📊 Gercek veri cekiliyor: {len(bist_100)} hisse (BIST 100)")
-
-    yf_tickers = [f"{t}.IS" for t in bist_100 if t != "XU100"] + ["XU100.IS"]
-    market_data = data_source.get_multiple_stocks(yf_tickers, period="6mo", interval="1d")
-
-    # Ticker isimlerini duzelt (.IS kaldir)
-    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+    market_data, sector_map = _fetch_market_data(bist_100, period="6mo")
 
     if not market_data:
         print("❌ Veri yuklenemedi! Internet baglantisini kontrol edin.")
         return None
 
     print(f"✅ Veri yuklendi: {len(market_data)} hisse")
-
-    # Sektor haritasi
-    sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
 
     # Pipeline calistir
     from services.core.orchestrator import orchestrator
@@ -168,24 +182,12 @@ def run_backtest(start_date: str, end_date: str):
     """
     logger.info("Starting backtest", start=start_date, end=end_date)
 
-    data_source = _get_data_source()
     universe = _get_universe()
-
-    # BIST 100 hisseleri
     bist_100 = universe.BIST_100_TICKERS
     print(f"📊 Backtest hisseleri: {len(bist_100)} (BIST 100)")
 
-    # Gercek veri cek
     print(f"📈 Veri cekiliyor: {start_date} → {end_date}")
-    yf_tickers = [f"{t}.IS" for t in bist_100 if t != "XU100"] + ["XU100.IS"]
-
-    market_data = data_source.get_multiple_stocks(
-        yf_tickers,
-        start_date=start_date,
-        end_date=end_date,
-        interval="1d"
-    )
-    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+    market_data, sector_map = _fetch_market_data(bist_100, start_date=start_date, end_date=end_date)
 
     if not market_data:
         print("❌ BACKTEST_FAILED: Veri yuklenemedi!")
@@ -203,7 +205,7 @@ def run_backtest(start_date: str, end_date: str):
     # Ortak tarih kesisimi (point-in-time)
     all_dates = [set(d.strftime('%Y-%m-%d') for d in df.index) for df in valid_market_data.values()]
     if not all_dates:
-        print(f"❌ BACKTEST_FAILED: Hic gecerli hisse yok!")
+        print("❌ BACKTEST_FAILED: Hic gecerli hisse yok!")
         return {"status": "BACKTEST_FAILED", "reason": "No valid stocks"}
 
     common_dates = sorted(set.intersection(*all_dates))
@@ -213,7 +215,7 @@ def run_backtest(start_date: str, end_date: str):
     MIN_BACKTEST_DAYS = 325
 
     if len(common_dates) < MIN_BACKTEST_DAYS:
-        print(f"❌ INSUFFICIENT_DATA: Yeterli ortak veri yok")
+        print("❌ INSUFFICIENT_DATA: Yeterli ortak veri yok")
         print(f"   Gereken: {MIN_BACKTEST_DAYS}+ gun")
         print(f"   Bulunan: {len(common_dates)} gun")
         print(f"   Gecerli hisse: {len(valid_market_data)}")
@@ -226,11 +228,11 @@ def run_backtest(start_date: str, end_date: str):
     market_data = valid_market_data
 
     # Sektor haritasi
-    sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
+    sector_map = {t: universe.get_ticker_sector(t) for t in market_data}
 
     # Walk-forward backtest
-    from services.backtest.walk_forward import WalkForwardEngine
     from services.backtest.engine import BacktestEngine
+    from services.backtest.walk_forward import WalkForwardEngine
     from services.core.orchestrator import orchestrator
 
     # SABIT parametreler — metodolojik olarak degistirilmez
@@ -251,7 +253,7 @@ def run_backtest(start_date: str, end_date: str):
         return {"status": "BACKTEST_FAILED", "reason": "No folds created"}
 
     print("\n" + "="*70)
-    print(f"📈 ALPHA BIST — WALK-FORWARD BACKTEST")
+    print("📈 ALPHA BIST — WALK-FORWARD BACKTEST")
     print(f"   {start_date} → {end_date}")
     print(f"   {len(folds)} fold | Train: 252g | Test: 63g | Purge: 5g | Embargo: 5g")
     print(f"   Point-in-time universe: {len(market_data)} hisse")
@@ -284,14 +286,14 @@ def run_backtest(start_date: str, end_date: str):
         test_data = {k: v for k, v in test_data.items() if not v.empty}
 
         if not train_data or not test_data:
-            print(f"   ⚠️ Yetersiz veri, atlaniyor")
+            print("   ⚠️ Yetersiz veri, atlaniyor")
             continue
 
         # === LOOK-AHEAD BIAS KONTROLU ===
         train_end = pd.Timestamp(fold['train_end'])
         test_start = pd.Timestamp(fold['test_start'])
         if train_end >= test_start:
-            print(f"   ❌ FOLD FAILED: Train/Test overlap (look-ahead bias)")
+            print("   ❌ FOLD FAILED: Train/Test overlap (look-ahead bias)")
             continue
 
         # === DATA LEAKAGE KONTROLU ===
@@ -325,7 +327,7 @@ def run_backtest(start_date: str, end_date: str):
         top_picks = train_report.top_opportunities[:10]
 
         if not top_picks:
-            print(f"   ❌ FOLD FAILED: No top opportunities from train")
+            print("   ❌ FOLD FAILED: No top opportunities from train")
             continue
 
         print(f"   Top picks: {[p['ticker'] for p in top_picks]}")
@@ -340,7 +342,7 @@ def run_backtest(start_date: str, end_date: str):
                 print(f"   ⚠️ {ticker} test doneminde mevcut degil (survivorship)")
 
         if not valid_picks:
-            print(f"   ❌ FOLD FAILED: No valid picks in test period")
+            print("   ❌ FOLD FAILED: No valid picks in test period")
             continue
 
         # Backtest engine ile islem simulasyonu
@@ -388,7 +390,7 @@ def run_backtest(start_date: str, end_date: str):
 
         # === 0 TRADE = FAILED ===
         if m.total_trades == 0:
-            print(f"   ❌ FOLD FAILED: 0 trades")
+            print("   ❌ FOLD FAILED: 0 trades")
             continue
 
         fold_result = {
@@ -541,7 +543,7 @@ def run_learning_cycle(auto: bool = False):
 
     if auto:
         print("\n🔄 Otomatik kontrol calistiriliyor...")
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         report = run_daily_pipeline(today)
         if report:
             print(f"  Durum: {report.system_health.get('status', 'UNKNOWN')}")
@@ -553,10 +555,10 @@ def run_health_check():
     """Sistem saglik kontrolu."""
     logger.info("Running health check")
 
-    from services.learning.super_intelligence import super_intelligence
     from services.core.orchestrator import orchestrator
     from services.data.data_source import data_source
     from services.ingestion.bist_universe import bist_universe
+    from services.learning.super_intelligence import super_intelligence
 
     health = super_intelligence.get_health_status()
     stats = orchestrator.get_pipeline_stats()
@@ -571,13 +573,13 @@ def run_health_check():
     print(f"  Bugunku Dogruluk: {health.accuracy_today:.2%}")
     print(f"  Drift Tespiti: {'⚠️ EVET' if health.drift_detected else '✅ Hayir'}")
     print(f"  Retrain Gerekli: {'⚠️ EVET' if health.retrain_needed else '✅ Hayir'}")
-    print(f"\n  Evren:")
+    print("\n  Evren:")
     print(f"    BIST 100: {len(bist_universe.BIST_100_TICKERS)} hisse")
     print(f"    BIST TUM: {len(bist_universe.BIST_ALL_TICKERS)} hisse")
-    print(f"\n  Cache:")
+    print("\n  Cache:")
     print(f"    Dosya: {cache_stats['files']}")
     print(f"    Boyut: {cache_stats['total_size_mb']} MB")
-    print(f"\n  Pipeline Istatistikleri:")
+    print("\n  Pipeline Istatistikleri:")
     print(f"    Toplam Calisma: {stats.get('total_runs', 0)}")
     print(f"    Basari Orani: {stats.get('success_rate', 1.0):.1%}")
     print(f"    Ortalama Sure: {stats.get('avg_duration_ms', 0):.0f}ms")
@@ -600,36 +602,21 @@ def run_paper_trading(start_date: str, end_date: str):
     """
     logger.info("Starting paper trading replay", start=start_date, end=end_date)
 
-    from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
     from services.learning.continuous_learning import continuous_learning
+    from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 
-    data_source = _get_data_source()
     universe = _get_universe()
-
-    # BIST 100 hisseleri
     bist_100 = universe.BIST_100_TICKERS
     print(f"📊 Paper trading hisseleri: {len(bist_100)} (BIST 100)")
 
-    # Gercek veri cek
     print(f"📈 Veri cekiliyor: {start_date} → {end_date}")
-    yf_tickers = [f"{t}.IS" for t in bist_100 if t != "XU100"] + ["XU100.IS"]
-
-    market_data = data_source.get_multiple_stocks(
-        yf_tickers,
-        start_date=start_date,
-        end_date=end_date,
-        interval="1d"
-    )
-    market_data = {k.replace(".IS", ""): v for k, v in market_data.items()}
+    market_data, sector_map = _fetch_market_data(bist_100, start_date=start_date, end_date=end_date)
 
     if not market_data:
         print("❌ PAPER_TRADING_FAILED: Veri yuklenemedi!")
         return {"status": "PAPER_TRADING_FAILED", "reason": "No data loaded"}
 
     print(f"✅ Veri yuklendi: {len(market_data)} hisse")
-
-    # Sektor haritasi
-    sector_map = {t: universe.get_ticker_sector(t) for t in market_data.keys()}
 
     # Champion versiyonu al
     registry = continuous_learning.registry
@@ -712,7 +699,7 @@ def run_paper_trading(start_date: str, end_date: str):
     print("📈 ALPHA BIST — PAPER TRADING REPLAY")
     print(f"   {start_date} → {end_date}")
     print(f"   Champion: {champion_version}")
-    print(f"   Baslangic Sermayesi: 1,000,000 TL")
+    print("   Baslangic Sermayesi: 1,000,000 TL")
     print("="*70)
 
     report = orch.run_backtest_replay(
@@ -729,7 +716,7 @@ def run_paper_trading(start_date: str, end_date: str):
     print("\n" + "="*70)
     print("PAPER TRADING RAPORU")
     print("="*70)
-    print(f"  Baslangic Sermayesi: 1,000,000 TL")
+    print("  Baslangic Sermayesi: 1,000,000 TL")
     print(f"  Son Portfoy Degeri: {summary['total_value']:,.2f} TL")
     print(f"  Toplam Getiri: {summary['total_return_pct']:+.2f}%")
     print(f"  CAGR: {metrics.get('cagr_pct', 0):+.2f}%")
@@ -792,8 +779,9 @@ def run_live_scheduler():
     SIGTERM/SIGINT ile graceful shutdown.
     """
     import asyncio
+
+    from services.core.database import close_databases, init_databases
     from services.scheduler.unified_scheduler import unified_scheduler
-    from services.core.database import init_databases, close_databases
 
     async def _run():
         logger.info("=== ALPHA BIST LIVE MODE ===")
@@ -817,7 +805,7 @@ def main():
         default="daily",
         help="Calistirma modu"
     )
-    parser.add_argument("--date", default=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+    parser.add_argument("--date", default=datetime.now(UTC).strftime("%Y-%m-%d"),
                        help="Islem tarihi (YYYY-MM-DD)")
     parser.add_argument("--start", help="Backtest baslangic tarihi")
     parser.add_argument("--end", help="Backtest bitis tarihi")
