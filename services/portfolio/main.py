@@ -800,7 +800,7 @@ def get_portfolio_enhancements() -> Dict[str, Any]:
         result["multi_currency"] = MultiCurrencyHandler()
     except ImportError:
         pass
-    except Exception:
+    except Exception as e:
         pass
     return result
 

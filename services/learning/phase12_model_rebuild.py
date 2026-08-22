@@ -21,7 +21,8 @@ class CrossSectionalRanker:
 import structlog
 logger = structlog.get_logger()
 
-    
+
+class AlphaModel:
     def __init__(self, feature_cols):
         self.feature_cols = feature_cols
         self.model = None

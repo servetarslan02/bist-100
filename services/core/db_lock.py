@@ -271,7 +271,6 @@ class DatabaseLock:
 
     def _calc_backoff(self, attempt: int) -> float:
         """Exponential backoff hesapla (jitter ile)."""
-        import random
         base = self._base_retry_ms * (2 ** attempt)
         capped = min(base, self._max_retry_ms)
         jitter = random.uniform(0.5, 1.5)

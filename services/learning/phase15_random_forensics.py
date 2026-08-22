@@ -13,11 +13,12 @@ from services.learning.institutional_walkforward_engine import (
     load_all_market_data, extract_point_in_time_features, detect_market_regime
 )
 
-class FastPortfolioEngine:
-    """Optimized portfolio simulator using pre-calculated scores."""
 import structlog
 logger = structlog.get_logger()
 
+
+class FastPortfolioEngine:
+    """Optimized portfolio simulator using pre-calculated scores."""
     def __init__(self, features_by_ticker, xu100_close):
         self.features = features_by_ticker
         self.xu100 = xu100_close

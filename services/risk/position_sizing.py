@@ -393,7 +393,7 @@ class _PositionSizerCompat(PositionSizer):
                     )
                     shares_by_var = int(var_limit / entry_price) if entry_price > 0 else 0
                     shares = min(shares, shares_by_var)
-            except Exception:
+            except Exception as e:
                 pass  # VaR limit hesaplanamazsa mevcut shares kullan
 
         if shares <= 0:

@@ -88,9 +88,6 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     Tamamen dondurulmuş C_Max_Sustainable_Alpha stratejisini çalıştırır.
     Final Holdout veya Train/Validation fark etmeksizin aynı parametrelerle çalışır.
     """
-import structlog
-logger = structlog.get_logger()
-
     portfolio_cash = initial_capital
     positions: Dict[str, Dict[str, Any]] = {}
     equity_curve = []

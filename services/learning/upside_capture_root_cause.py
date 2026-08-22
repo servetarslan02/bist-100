@@ -13,10 +13,10 @@ import yfinance as yf
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Tuple
 
-from services.learning.institutional_walkforward_engine import (
 import structlog
 logger = structlog.get_logger()
 
+from services.learning.institutional_walkforward_engine import (
     load_all_market_data,
     extract_point_in_time_features,
     detect_market_regime,

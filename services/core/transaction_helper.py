@@ -298,7 +298,6 @@ class TransactionConnection:
 
     async def execute(self, query: str, *args) -> Any:
         """Sorgu çalıştır (metrics ile)."""
-        import hashlib
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
@@ -326,7 +325,6 @@ class TransactionConnection:
 
     async def fetch(self, query: str, *args) -> List[Any]:
         """Fetch sorgusu."""
-        import hashlib
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 
@@ -355,7 +353,6 @@ class TransactionConnection:
 
     async def fetchval(self, query: str, *args) -> Any:
         """Tek değer fetch."""
-        import hashlib
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
 

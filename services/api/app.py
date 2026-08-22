@@ -41,7 +41,6 @@ logger = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan — DB lifecycle dahil."""
-    import asyncio
     logger.info("ALPHA BIST API starting (canonical production server)")
 
     # Database connections başlat

@@ -383,7 +383,7 @@ class FeatureSelector:
                 # Singular matris — fallback
                 return [1.0] * n_feats
 
-        except Exception:
+        except Exception as e:
             return [1.0] * len(keep_indices)
 
     @staticmethod

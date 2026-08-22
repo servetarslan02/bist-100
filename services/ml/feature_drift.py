@@ -295,5 +295,5 @@ class FeatureDriftDetector:
             # PSI formülü
             psi = float(np.sum((cur_pct - ref_pct) * np.log(cur_pct / ref_pct)))
             return max(0.0, psi)  # Negatif PSI hatalı, sıfırla
-        except Exception:
+        except Exception as e:
             return 0.0

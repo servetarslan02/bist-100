@@ -600,7 +600,6 @@ def run_agent_analysis(ticker: str, features: Dict, news: list = None) -> Dict[s
         context = {"features": features, "news": news or []}
 
         # Async loop varsa kullan, yoksa yeni oluştur
-        import asyncio
         try:
             loop = asyncio.get_running_loop()
             # Zaten bir loop içindeyiz — task oluştur

@@ -152,7 +152,7 @@ class DataSourceManager:
             tickers = cache.get("tickers", [])
             if tickers:
                 return [f"{t}.IS" for t in tickers]
-        except Exception:
+        except Exception as e:
             pass
         # Fallback — cache yoksa BIST-30 alt kümesi (geçici, cache yüklenene kadar)
         # Gerçek liste UniverseAutoUpdater tarafından güncellenir

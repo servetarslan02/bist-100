@@ -968,7 +968,7 @@ class MasterOrchestrator:
                 "learning_system": "active" if ls else "not_loaded",
                 "predictions_recorded": len(getattr(ot, '_predictions', [])) if ot else 0,
             }
-        except Exception:
+        except Exception as e:
             learning_status = {"status": "unavailable"}
             logger.debug("learning_status_check_failed", error=str(e))
 

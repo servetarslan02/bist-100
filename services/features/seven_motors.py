@@ -753,7 +753,7 @@ class KAPNewsMotor:
             if t.tzinfo is None:
                 t = t.replace(tzinfo=UTC)
             return (datetime.now(UTC) - t) < timedelta(hours=hours)
-        except Exception:
+        except Exception as e:
             return False
 
 

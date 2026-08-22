@@ -269,7 +269,6 @@ class AuditLog:
 
     def _generate_id(self) -> str:
         """Unique audit ID."""
-        import uuid
         return str(uuid.uuid4())[:16]
 
 

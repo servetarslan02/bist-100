@@ -168,7 +168,7 @@ class DynamicOpportunityScanner:
                     "risk_level": "LOW" if stop_pct <= 4.5 else ("MEDIUM" if stop_pct <= 6.0 else "HIGH"),
                 })
 
-            except Exception:
+            except Exception as e:
                 continue
 
         opportunities.sort(key=lambda x: x["score"], reverse=True)

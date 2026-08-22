@@ -60,7 +60,6 @@ async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rat
             "models": [],
             "trust_scores": [],
             "error": str(e),
-        }
             "fusion_weights": {"lightgbm": 0.35, "catboost": 0.30, "momentum": 0.20, "event_driven": 0.15},
         }
 

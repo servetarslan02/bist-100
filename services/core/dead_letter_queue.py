@@ -134,7 +134,6 @@ class DeadLetterQueue:
         if len(self._entries) >= self._max_entries:
             self._evict_oldest()
 
-        import hashlib
         entry_id = hashlib.md5(
             f"dlq_{event_id}_{time.time()}".encode()
         ).hexdigest()[:12]

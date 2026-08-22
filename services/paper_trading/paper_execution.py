@@ -143,7 +143,7 @@ class PaperExecutionEngine:
                 },
             )
             publish_event(order_event, key=ticker)
-        except Exception:
+        except Exception as e:
             pass
 
         return order

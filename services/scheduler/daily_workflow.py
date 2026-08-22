@@ -260,7 +260,7 @@ class DailyWorkflow:
         try:
             from services.core.risk_gate import risk_gate
             risk_gate.reset_daily()
-        except Exception:
+        except Exception as e:
             pass
 
 

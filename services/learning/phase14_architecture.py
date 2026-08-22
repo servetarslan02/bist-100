@@ -11,10 +11,10 @@ import warnings
 import random
 warnings.filterwarnings('ignore')
 
-from services.learning.institutional_walkforward_engine import (
 import structlog
 logger = structlog.get_logger()
 
+from services.learning.institutional_walkforward_engine import (
     load_all_market_data, extract_point_in_time_features, detect_market_regime
 )
 

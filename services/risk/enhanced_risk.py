@@ -358,7 +358,7 @@ def compute_full_risk_metrics(
                 weights_array, cov_matrix, 0.95, portfolio_value, tickers
             )
             component_var = {cvr.ticker: cvr.component_var_95 for cvr in cv}
-        except Exception:
+        except Exception as e:
             pass
 
     # Risk score (0-100)

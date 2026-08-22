@@ -208,7 +208,6 @@ class DevDatabase:
         """PostgreSQL → SQLite syntax translation."""
         q = query
         # $1, $2, ... → ?, ?, ...
-        import re
         q = re.sub(r'\$(\d+)', '?', q)
         # NOW() → CURRENT_TIMESTAMP
         q = q.replace('NOW()', 'CURRENT_TIMESTAMP')

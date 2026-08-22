@@ -63,7 +63,7 @@ def run_structural_discovery(eval_dates, features_by_ticker, stock_data, xu100_c
                 fwd_1d = (tk_feat.iloc[curr_idx + 1]["close"] / tk_feat.iloc[curr_idx]["close"] - 1.0) if curr_idx + 1 < len(tk_feat) else np.nan
                 fwd_5d = (tk_feat.iloc[curr_idx + 5]["close"] / tk_feat.iloc[curr_idx]["close"] - 1.0) if curr_idx + 5 < len(tk_feat) else np.nan
                 fwd_10d = (tk_feat.iloc[curr_idx + 10]["close"] / tk_feat.iloc[curr_idx]["close"] - 1.0) if curr_idx + 10 < len(tk_feat) else np.nan
-            except Exception:
+            except Exception as e:
                 fwd_1d, fwd_5d, fwd_10d = np.nan, np.nan, np.nan
             
             if not np.isnan(fwd_5d):

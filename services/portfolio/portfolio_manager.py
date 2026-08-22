@@ -954,7 +954,7 @@ class PortfolioManager:
                 from ..risk.var_cvar import var_calculator
                 var_95 = var_calculator.calculate_historical_var(returns, 0.95, total_value)
                 cvar_95 = var_calculator.calculate_historical_cvar(returns, 0.95, total_value)
-            except Exception:
+            except Exception as e:
                 # Fallback: basit percentile
                 sorted_returns = np.sort(returns)
                 idx = max(0, int(np.ceil(0.05 * len(sorted_returns))) - 1)

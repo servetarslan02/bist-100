@@ -114,7 +114,7 @@ class RiskEngine:
                 if isinstance(value, str):
                     try:
                         value = json.loads(value)
-                    except Exception:
+                    except Exception as e:
                         pass  # String değer, float olarak kullanılacak
                 self._risk_limits[key] = float(value) if value else 0
 

@@ -8,10 +8,10 @@ import random
 import warnings
 warnings.filterwarnings('ignore')
 
-from services.learning.institutional_walkforward_engine import (
 import structlog
 logger = structlog.get_logger()
 
+from services.learning.institutional_walkforward_engine import (
     load_all_market_data, detect_market_regime
 )
 
@@ -127,7 +127,7 @@ def run_alpha_orthogonality():
                 for j in range(5):
                     mask = (q_vol == i) & (q_mom == j)
                     d_rec[f"M_{i}_{j}"] = df_d[mask]["ex_5d"].mean() if mask.any() else np.nan
-        except Exception:
+        except Exception as e:
             pass
 
         records.append(d_rec)

@@ -167,7 +167,6 @@ class RetryPolicy:
 
     def get_delay(self, attempt: int) -> float:
         """Retry gecikmesi hesapla (exponential backoff + jitter)."""
-        import random
         delay = min(self.base_delay * (2 ** attempt), self.max_delay)
         jitter = delay * 0.1 * (2 * random.random() - 1)  # ±%10
         return max(0, delay + jitter)

@@ -11,10 +11,10 @@ from sklearn.metrics import ndcg_score
 import warnings
 warnings.filterwarnings('ignore')
 
-from services.learning.institutional_walkforward_engine import (
 import structlog
 logger = structlog.get_logger()
 
+from services.learning.institutional_walkforward_engine import (
     load_all_market_data, detect_market_regime
 )
 
@@ -178,7 +178,7 @@ def run_forensics():
         pred_scores = np.array([scores[t] for t in tickers])
         try:
             day_m["ndcg@5"] = ndcg_score([rel_scores], [pred_scores], k=5)
-        except Exception:
+        except Exception as e:
             day_m["ndcg@5"] = 0.0
 
         # Rank stability

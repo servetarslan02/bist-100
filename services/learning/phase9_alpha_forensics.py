@@ -46,7 +46,7 @@ def run_forensics(eval_dates, features_by_ticker, stock_data, xu100_close, train
                 curr_idx = features_by_ticker[tk].index.get_loc(current_date)
                 tk_feat = features_by_ticker[tk]
                 fwd_5d = (tk_feat.iloc[curr_idx + 5]["close"] / tk_feat.iloc[curr_idx]["close"] - 1.0) if curr_idx + 5 < len(tk_feat) else np.nan
-            except Exception:
+            except Exception as e:
                 fwd_5d = np.nan
             
             if not np.isnan(fwd_5d):

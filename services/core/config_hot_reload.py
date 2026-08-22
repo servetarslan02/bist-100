@@ -306,7 +306,6 @@ class ConfigHotReload:
 # Singleton
 def _create_singleton() -> "ConfigHotReload":
     """Singleton oluştur — config.json yolunu akıllıca belirle."""
-    import os
     # Önce çalışma dizininde, sonra proje kökünde ara
     candidates = [
         "config.json",

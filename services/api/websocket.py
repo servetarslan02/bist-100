@@ -86,7 +86,6 @@ class WebSocketServer:
 
     async def _handle_connection(self, ws, path: str):
         """Yeni WebSocket bağlantısını işle."""
-        import uuid
         client_id = str(uuid.uuid4())[:8]
 
         # Path'ten channel'ı belirle

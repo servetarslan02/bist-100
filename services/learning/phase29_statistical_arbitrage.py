@@ -88,9 +88,6 @@ def backtest(t1, t2, hr, pdata, rdata, lookback=60):
     Short spread = short t1 / long t2
       gunluk PnL = -(r1 - hr*r2)
     """
-import structlog
-logger = structlog.get_logger()
-
     if t1 not in pdata.columns or t2 not in pdata.columns: return None
     p1 = pdata[t1].dropna(); p2 = pdata[t2].dropna()
     r1 = rdata[t1]; r2 = rdata[t2]

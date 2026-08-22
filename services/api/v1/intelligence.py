@@ -120,7 +120,6 @@ async def ask_gemini_endpoint(
     _=Depends(check_rate_limit),
 ):
     """Google Gemini 3.7 Flash canlı araştırma ve analiz endpoint'i."""
-    import asyncio
     prompt = body.get("prompt", "Borsa İstanbul piyasa durumu hakkında özet ver.")
     try:
         from ...intelligence.gemini_service import call_gemini
@@ -145,7 +144,6 @@ async def gemini_report(
     _=Depends(check_rate_limit),
 ):
     """Belirli bir hisse için canlı Gemini 3.7 araştırma raporu."""
-    import asyncio
     try:
         from ...intelligence.gemini_service import analyze_company_gemini
         loop = asyncio.get_event_loop()

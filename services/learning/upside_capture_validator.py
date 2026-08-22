@@ -26,11 +26,12 @@ from services.learning.institutional_walkforward_engine import (
 )
 
 
-def detect_market_regime_v2(xu100_series: pd.Series, current_date: pd.Timestamp) -> str:
-    """T anına kadar olan XU100 verisiyle rejim ve V-Dip dönüşlerini tespit eder."""
 import structlog
 logger = structlog.get_logger()
 
+
+def detect_market_regime_v2(xu100_series: pd.Series, current_date: pd.Timestamp) -> str:
+    """T anına kadar olan XU100 verisiyle rejim ve V-Dip dönüşlerini tespit eder."""
     hist = xu100_series.loc[:current_date]
     if len(hist) < 20:
         return "SIDEWAYS_RANGE"

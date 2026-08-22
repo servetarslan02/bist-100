@@ -187,9 +187,6 @@ class ModelTrainer:
 
     def predict_batch_day(self, tickers: List[str], features_list: List[pd.Series]) -> Dict[str, Dict[str, float]]:
         """Tüm hisseler için tek seferde vectorized batch tahmin üretir (O(1) hızlandırma)."""
-import structlog
-logger = structlog.get_logger()
-
         X_mat = np.array([f[self.feature_cols].values for f in features_list])
         n = len(tickers)
 
