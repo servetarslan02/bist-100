@@ -78,7 +78,7 @@ async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_li
 
 @router.get("/results")
 async def scan_results(
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(1000, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -100,7 +100,7 @@ async def scan_results(
 @router.get("/opportunities")
 @router.get("/signals")
 async def scan_opportunities(
-    limit: int = Query(50, ge=1, le=100),
+    limit: int = Query(1000, ge=1, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):

@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     ollama_model: str = Field(default="gemma4:12b-q4_0", alias="OLLAMA_MODEL")
     llm_context_size: int = Field(default=8192, alias="LLM_CONTEXT_SIZE")
     gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
-    gemini_model: str = Field(default="gemini-1.5-pro-latest", alias="GEMINI_MODEL")
+    gemini_model: str = Field(default="gemini-3.7-flash", alias="GEMINI_MODEL")
 
     # Data Sources
     tcmb_evds_api_key: Optional[str] = Field(default=None, alias="TCMB_EVDS_API_KEY")

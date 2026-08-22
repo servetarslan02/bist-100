@@ -329,7 +329,7 @@ async def events(limit: int = Query(20, le=100), user=Depends(get_current_user),
 
 @router.get("/radar")
 async def market_radar(
-    limit: int = Query(200, le=1000),
+    limit: int = Query(1000, le=1000),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
@@ -355,7 +355,7 @@ async def market_radar(
     return await _fetch_radar_fresh(limit)
 
 
-async def _fetch_radar_fresh(limit: int = 200):
+async def _fetch_radar_fresh(limit: int = 1000):
     """yfinance batch download ile tüm BIST hisselerini çek."""
     from ...ingestion.bist_universe import BISTUniverse
     from concurrent.futures import ThreadPoolExecutor
@@ -512,7 +512,7 @@ async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 @router.get("/heatmap")
 async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """BIST gercek canli sektor isi haritasi."""
-    radar_res = await market_radar(limit=500)
+    radar_res = await market_radar(limit=1000)
     stock_map = {item["symbol"]: item for item in radar_res.get("data", [])}
 
     SECTOR_DEFINITIONS = [

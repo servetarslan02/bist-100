@@ -38,7 +38,7 @@ class LLMClient:
     API anahtarı olmadan mock modda çalışır.
     """
 
-    def __init__(self, model_name: str = "gemini-1.5-pro-latest"):
+    def __init__(self, model_name: str = "gemini-3.7-flash"):
         self.model_name = model_name
         self.api_key = self._load_api_key()
         self._model = None
