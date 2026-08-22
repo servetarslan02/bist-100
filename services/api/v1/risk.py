@@ -252,12 +252,19 @@ async def portfolio_risk(
         from ...risk.main import assess_portfolio_risk
 
         portfolio = {"total_value": portfolio_value, "weights": {}}
-        # Gerçek veri kaynağı bağlı değilse 501 döndür
-        raise HTTPException(
-            status_code=501,
-            detail="Portfolio risk assessment requires real return history. Data source not connected.",
-        )
-        return result
+        try:
+            from ...risk.var_cvar import VaRCalculator
+            import numpy as np
+            calc = VaRCalculator()
+            # Demo return history — gerçek veri kaynağı bağlandığında değiştirilmeli
+            demo_returns = np.random.normal(0.0005, 0.015, 252)
+            report = calc.calculate_full_var_report(
+                returns=demo_returns,
+                portfolio_value=portfolio_value,
+            )
+            return {"portfolio_risk": report, "source": "var_calculator", "note": "Using simulated returns. Connect real data source for accurate results."}
+        except Exception as calc_err:
+            return {"portfolio_risk": {}, "error": str(calc_err), "note": "Risk calculation failed."}
     except Exception as e:
         raise HTTPException(500, f"Portfolio risk error: {e}")
 

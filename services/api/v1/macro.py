@@ -106,24 +106,42 @@ async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_li
 @router.get("/impact/{ticker}")
 async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Hisse bazlı makro etki ve duyarlılık analizi."""
+    try:
+        from ...intelligence.macro_sensitivity import MacroSensitivityEngine
+        engine = MacroSensitivityEngine()
+        result = engine.get_company_sensitivity(ticker) if hasattr(engine, 'get_company_sensitivity') else {}
+        if result:
+            return {"ticker": ticker, "macro_available": True, **result}
+    except Exception:
+        pass
     return {
         "ticker": ticker,
-        "macro_available": True,
-        "interest_rate_sensitivity": -0.42,
-        "fx_sensitivity": 0.68,
-        "inflation_beta": 1.15,
-        "oil_beta": 0.85 if ticker in ["THYAO", "PGSUS", "TUPRS"] else 0.05,
+        "macro_available": False,
+        "interest_rate_sensitivity": None,
+        "fx_sensitivity": None,
+        "inflation_beta": None,
+        "note": "Connect MacroSensitivityEngine for real data.",
     }
 
 
 @router.get("/sensitivity/{sector}")
 async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Sektör makro duyarlılık katsayıları."""
+    try:
+        from ...intelligence.macro_sensitivity import MacroSensitivityEngine
+        engine = MacroSensitivityEngine()
+        result = engine.get_sector_sensitivity(sector) if hasattr(engine, 'get_sector_sensitivity') else {}
+        if result:
+            return {"sector": sector, "sensitivity": result, "source": "macro_sensitivity_engine"}
+    except Exception:
+        pass
     return {
         "sector": sector,
         "sensitivity": {
-            "interest_rate": -0.85 if sector.upper() == "BANKING" else -0.30,
-            "fx_usd": 0.75 if sector.upper() in ["INDUSTRY", "AVIATION"] else 0.20,
-            "commodity": 0.80 if sector.upper() in ["ENERGY", "MINING"] else 0.10,
-        }
+            "interest_rate": None,
+            "fx_usd": None,
+            "commodity": None,
+        },
+        "source": "unavailable",
+        "note": "Connect MacroSensitivityEngine for real sector sensitivity data.",
     }

@@ -60,6 +60,8 @@ class RiskGate:
         market_open: bool = True,
         data_valid: bool = True,
         circuit_open: bool = False,
+        mc_var_95: float = 0.0,
+        mc_cvar_95: float = 0.0,
     ) -> RiskDecision:
         """Order risk kontrolü."""
         checks_passed = 0
@@ -178,7 +180,20 @@ class RiskGate:
             if checks_failed == _checks_failed_before_bist:
                 checks_passed += 1
 
-        # 10. Macro stress test kontrolü
+        # 10. Monte Carlo VaR/CVaR kontrolü
+        mc_var_warning_threshold = 15.0  # %15 VaR eşiği
+        if mc_var_95 != 0:
+            var_abs = abs(mc_var_95)
+            if var_abs > mc_var_warning_threshold:
+                reasons.append(f"MC VaR %{var_abs:.1f} > %{mc_var_warning_threshold:.0f} eşik (risk yüksek)")
+                checks_failed += 1
+            else:
+                checks_passed += 1
+            details["mc_var_95"] = round(mc_var_95, 2)
+        if mc_cvar_95 != 0:
+            details["mc_cvar_95"] = round(mc_cvar_95, 2)
+
+        # 11. Macro stress test kontrolü
         if self._macro_stress_result:
             worst_impact = self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0)
             if worst_impact < self.macro_stress_threshold_pct:

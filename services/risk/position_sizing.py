@@ -280,6 +280,48 @@ class PositionSizer:
             return False
         return True
 
+    def calculate_var_based_position_limit(
+        self,
+        returns: np.ndarray,
+        max_var_pct: float = 5.0,
+        portfolio_value: float = 100000.0,
+        confidence: float = 0.95,
+    ) -> float:
+        """VaR bazlı pozisyon limiti.
+
+        Belirli bir VaR hedefine göre maksimum pozisyon boyutu.
+        services/risk/var_cvar.py'deki VaRCalculator.calculate_var_based_position_limit() kullanır.
+
+        Args:
+            returns: Hisse getiri dizisi
+            max_var_pct: Maksimum VaR yüzdesi (portföyün %'si)
+            portfolio_value: Portföy değeri
+            confidence: Güven seviyesi
+
+        Returns:
+            Maksimum pozisyon değeri (TL)
+        """
+        try:
+            from services.risk.var_cvar import VaRCalculator
+            calc = VaRCalculator()
+            return calc.calculate_var_based_position_limit(
+                returns=returns,
+                max_var_pct=max_var_pct,
+                portfolio_value=portfolio_value,
+                confidence=confidence,
+            )
+        except ImportError:
+            # Fallback: basit VaR bazlı limit
+            from scipy.stats import norm
+            sigma = np.std(returns, ddof=1) if len(returns) > 1 else 0.2
+            if sigma <= 0:
+                return portfolio_value * (max_var_pct / 100)
+            z_alpha = norm.ppf(confidence)
+            max_loss_pct = max_var_pct / 100
+            max_position_pct = max_loss_pct / (sigma * z_alpha)
+            max_position_pct = min(max_position_pct, 1.0)
+            return float(max_position_pct * portfolio_value)
+
 
 @dataclass
 class _CalcResult:
@@ -305,6 +347,8 @@ class _PositionSizerCompat(PositionSizer):
         confidence: float = 0.5,
         volatility: float = 0.2,
         correlation_to_portfolio: float = 0.0,
+        var_based_limit: float = 0.0,
+        returns: Optional[np.ndarray] = None,
     ) -> _CalcResult:
         """Tek pozisyon boyutu — risk bütçesi yöntemi.
 
@@ -337,6 +381,20 @@ class _PositionSizerCompat(PositionSizer):
         # Minimum hisse
         shares = max(0, min(shares_by_risk, shares_by_max))
         shares = int(shares * corr_factor * conf_factor)
+
+        # VaR bazlı pozisyon limiti (opsiyonel)
+        if var_based_limit > 0 or returns is not None:
+            try:
+                if returns is not None and len(returns) > 10:
+                    var_limit = self.calculate_var_based_position_limit(
+                        returns=returns,
+                        max_var_pct=var_based_limit if var_based_limit > 0 else 5.0,
+                        portfolio_value=portfolio_value,
+                    )
+                    shares_by_var = int(var_limit / entry_price) if entry_price > 0 else 0
+                    shares = min(shares, shares_by_var)
+            except Exception:
+                pass  # VaR limit hesaplanamazsa mevcut shares kullan
 
         if shares <= 0:
             return _CalcResult(method="RISK_BUDGET")

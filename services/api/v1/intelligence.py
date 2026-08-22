@@ -27,15 +27,24 @@ async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate
             }
         return regime
     except Exception as e:
-        return {
-            "regime": "BULL_MOMENTUM",
-            "volatility": "NORMAL",
-            "confidence": 0.84,
-            "adx_14": 32.4,
-            "trend_direction": "UP",
-            "risk_appetite": 0.72,
-            "description": "BIST-100 genelinde pozitif trend eğilimi ve yüksek işlem hacmi desteği.",
-        }
+        try:
+            from ...intelligence.regime import regime_engine
+            result = regime_engine.detect_regime({})
+            return {
+                "regime": getattr(result, "regime", "UNKNOWN"),
+                "volatility": getattr(result, "volatility_regime", "NORMAL"),
+                "confidence": getattr(result, "confidence", 0.0),
+                "description": getattr(result, "description", ""),
+                "source": "regime_engine",
+            }
+        except Exception:
+            return {
+                "regime": "UNKNOWN",
+                "volatility": "NORMAL",
+                "confidence": 0.0,
+                "description": "Regime detection requires market data. Provide features for analysis.",
+                "source": "fallback",
+            }
 
 
 @router.get("/decisions")
@@ -49,13 +58,9 @@ async def get_decisions(
         from ...scanner.alpha_engine import alpha_engine
         results = alpha_engine.get_latest_results(limit=limit) if hasattr(alpha_engine, 'get_latest_results') else []
         return {
-            "decisions": results if results else [
-                {"ticker": "THYAO", "action": "BUY", "confidence": 0.88, "score": 88.5, "model": "LightGBM + CatBoost", "target": 345.0, "stop_loss": 298.0},
-                {"ticker": "GARAN", "action": "BUY", "confidence": 0.84, "score": 84.2, "model": "Momentum Breakout", "target": 132.0, "stop_loss": 112.5},
-                {"ticker": "ASELS", "action": "BUY", "confidence": 0.82, "score": 82.0, "model": "Event-Driven", "target": 74.0, "stop_loss": 61.2},
-                {"ticker": "EREGL", "action": "HOLD", "confidence": 0.70, "score": 68.0, "model": "Mean Reversion", "target": 56.0, "stop_loss": 49.5},
-            ],
-            "count": len(results) if results else 4,
+            "decisions": results if results else [],
+            "count": len(results) if results else 0,
+            "message": "No decisions available. Run the pipeline to generate decisions." if not results else None,
         }
     except Exception as e:
         return {"decisions": [], "error": str(e)}

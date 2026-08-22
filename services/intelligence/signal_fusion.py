@@ -32,6 +32,7 @@ class FusedSignal:
     macro_direction: str = "NEUTRAL"
     valuation_direction: str = "NEUTRAL"
     ai_direction: str = "NEUTRAL"
+    monte_carlo_direction: str = "NEUTRAL"
 
     # Bileşen skorları
     technical_score: float = 50.0
@@ -41,6 +42,7 @@ class FusedSignal:
     macro_score: float = 50.0
     valuation_score: float = 50.0
     ai_score: float = 50.0
+    monte_carlo_score: float = 50.0
     opportunity_score: float = 50.0
 
     # Birleştirilmiş sonuç
@@ -67,15 +69,16 @@ class SignalFusionEngine:
 
     # Varsayılan temel ağırlıklar
     DEFAULT_WEIGHTS = {
-        "technical": 0.14,
-        "fundamental": 0.14,
-        "momentum": 0.18,
-        "sentiment": 0.10,
-        "news": 0.05,
-        "macro": 0.10,
-        "valuation": 0.14,
-        "ai": 0.10,
+        "technical": 0.13,
+        "fundamental": 0.13,
+        "momentum": 0.16,
+        "sentiment": 0.09,
+        "news": 0.04,
+        "macro": 0.09,
+        "valuation": 0.12,
+        "ai": 0.09,
         "spec": 0.05,  # SPEC engine entegrasyonu
+        "monte_carlo": 0.10,  # Monte Carlo simülasyon sinyali
     }
 
     REGIME_WEIGHT_OVERRIDES = {
@@ -133,7 +136,7 @@ class SignalFusionEngine:
         )
 
         # Bileşen yönleri ve skorları
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec", "monte_carlo"]:
             comp_data = signals.get(component, {})
             setattr(result, f"{component}_direction", comp_data.get("direction", "NEUTRAL"))
             setattr(result, f"{component}_score", comp_data.get("score", 50))
@@ -200,7 +203,7 @@ class SignalFusionEngine:
         conflicts = []
 
         directions = {}
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "monte_carlo"]:
             comp_data = signals.get(component, {})
             direction = comp_data.get("direction", "NEUTRAL")
             if direction != "NEUTRAL":
@@ -229,7 +232,7 @@ class SignalFusionEngine:
         """Gerekçe üret."""
         reasons = []
 
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "monte_carlo"]:
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
             score = getattr(result, f"{component}_score", 50)
 

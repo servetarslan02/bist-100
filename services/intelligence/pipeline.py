@@ -33,6 +33,15 @@ class IntelligenceOutput:
     evidence_count: int = 0
     mc_expected_return: float = 0.0
     mc_positive_probability: float = 0.0
+    mc_var_95: float = 0.0
+    mc_cvar_95: float = 0.0
+    mc_max_drawdown: float = 0.0
+    mc_prob_loss_5pct: float = 0.0
+    mc_p10: float = 0.0
+    mc_p25: float = 0.0
+    mc_p50: float = 0.0
+    mc_p75: float = 0.0
+    mc_p90: float = 0.0
     world_alignment: float = 0.0
     data_quality: float = 0.0
     model_agreement: float = 0.0
@@ -235,7 +244,16 @@ class IntelligencePipeline:
             )
             if result:
                 output.mc_expected_return = getattr(result, "expected_return", 0)
-                output.mc_positive_probability = getattr(result, "probability_positive", 0)
+                output.mc_positive_probability = getattr(result, "prob_positive", 0)
+                output.mc_var_95 = getattr(result, "var_95", 0)
+                output.mc_cvar_95 = getattr(result, "cvar_95", 0)
+                output.mc_max_drawdown = getattr(result, "max_drawdown_sim", 0)
+                output.mc_prob_loss_5pct = getattr(result, "prob_minus_5pct", 0)
+                output.mc_p10 = getattr(result, "p10", 0)
+                output.mc_p25 = getattr(result, "p25", 0)
+                output.mc_p50 = getattr(result, "p50", 0)
+                output.mc_p75 = getattr(result, "p75", 0)
+                output.mc_p90 = getattr(result, "p90", 0)
                 output.modules_used.append("monte_carlo")
         except Exception as e:
             output.modules_failed.append(f"monte_carlo:{str(e)[:80]}")

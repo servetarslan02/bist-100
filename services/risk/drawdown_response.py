@@ -170,6 +170,27 @@ class DrawdownResponseSystem:
                           action=action.value,
                           severity=severity.value)
 
+            # KILL_SWITCH_TRIGGERED event publish (audit #5)
+            if severity.value == "EMERGENCY":
+                try:
+                    from services.core.event_bus import publish_event
+                    from services.core.event_schema import CanonicalEvent, EventType
+                    kill_event = CanonicalEvent(
+                        event_type=EventType.KILL_SWITCH_TRIGGERED,
+                        payload={
+                            "drawdown_pct": round(drawdown_pct, 2),
+                            "action": action.value,
+                            "equity": current_equity,
+                            "peak_equity": self._peak_equity,
+                            "description": description,
+                        },
+                    )
+                    publish_event(kill_event, key="system")
+                    logger.critical("KILL_SWITCH_TRIGGERED event published",
+                                   drawdown_pct=f"{drawdown_pct:.1f}%")
+                except Exception as e:
+                    logger.error("Failed to publish KILL_SWITCH event", error=str(e))
+
         self._current_action = action
 
         return DrawdownState(

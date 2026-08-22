@@ -169,14 +169,15 @@ class DecisionEngine:
         agent_component = inp.agent_score if inp.agent_confidence > 0.5 else 50.0
 
         components = {
-            "ml_score": ml_component * 0.22,
-            "agent": agent_component * 0.13,
-            "technical": self._technical_score(inp) * 0.18,
-            "fundamental": self._fundamental_score(inp) * 0.13,
-            "sentiment": self._sentiment_score(inp) * 0.08,
-            "regime": self._regime_score(inp) * 0.08,
-            "macro": self._macro_score(inp) * 0.10,
-            "risk": self._risk_score(inp) * 0.08,
+            "ml_score": ml_component * 0.20,
+            "agent": agent_component * 0.12,
+            "technical": self._technical_score(inp) * 0.16,
+            "fundamental": self._fundamental_score(inp) * 0.12,
+            "sentiment": self._sentiment_score(inp) * 0.07,
+            "regime": self._regime_score(inp) * 0.07,
+            "macro": self._macro_score(inp) * 0.09,
+            "risk": self._risk_score(inp) * 0.09,
+            "monte_carlo": self._monte_carlo_score(inp) * 0.08,
         }
 
         total = sum(components.values())
@@ -193,7 +194,57 @@ class DecisionEngine:
         elif inp.ml_return_20d < -8:
             total -= 5
 
+        # Monte Carlo bonus/ceza: sim_expected_return ve sim_prob_positive
+        if inp.sim_expected_return > 0 and inp.sim_prob_positive > 0.6:
+            total += 3  # Pozitif MC beklentisi bonus
+        elif inp.sim_expected_return < 0 and inp.sim_prob_positive < 0.4:
+            total -= 3  # Negatif MC beklentisi ceza
+
         return min(100, max(0, total))
+
+    def _monte_carlo_score(self, inp: DecisionInput) -> float:
+        """Monte Carlo simülasyon skoru.
+
+        Düşük VaR (düşük risk) = yüksek skor, yüksek VaR = düşük skor.
+        Pozitif expected return ve yüksek prob_positive bonus.
+        """
+        score = 50.0
+
+        # sim_var_95: negatif getiri yüzdesi (örn -12.5 = %12.5 kayıp riski)
+        # Daha düşük (daha az negatif) VaR = daha iyi
+        if inp.sim_var_95 != 0:
+            # VaR negatif gelir (kayıp); mutlak değeri ne kadar küçükse o kadar iyi
+            var_abs = abs(inp.sim_var_95)
+            if var_abs < 5:
+                score += 15  # Düşük risk
+            elif var_abs < 10:
+                score += 5
+            elif var_abs > 20:
+                score -= 15  # Yüksek risk
+            elif var_abs > 15:
+                score -= 10
+
+        # Expected return
+        if inp.sim_expected_return > 3:
+            score += 10
+        elif inp.sim_expected_return > 0:
+            score += 5
+        elif inp.sim_expected_return < -3:
+            score -= 10
+        elif inp.sim_expected_return < 0:
+            score -= 5
+
+        # Prob positive
+        if inp.sim_prob_positive > 0.7:
+            score += 10
+        elif inp.sim_prob_positive > 0.55:
+            score += 5
+        elif inp.sim_prob_positive < 0.3:
+            score -= 10
+        elif inp.sim_prob_positive < 0.45:
+            score -= 5
+
+        return min(100, max(0, score))
 
     def _technical_score(self, inp: DecisionInput) -> float:
         """Teknik skor."""
@@ -269,6 +320,12 @@ class DecisionEngine:
         # Volume (yüksek hacim = likidite = iyi)
         volume = f.get("volume_zscore", 0)
         score += volume * 0.5
+
+        # Monte Carlo VaR_95 (düşük VaR = düşük risk = yüksek skor)
+        if inp.sim_var_95 != 0:
+            var_abs = abs(inp.sim_var_95)
+            # VaR yüzdesi ne kadar düşükse risk o kadar düşük
+            score += max(-15, min(10, (10 - var_abs) * 0.8))
 
         return min(100, max(0, score))
 
@@ -398,6 +455,16 @@ class DecisionEngine:
 
         if inp.ml_confidence < 0.75:
             risks.append("Düşük model güveni")
+
+        # Monte Carlo risk metrikleri
+        if inp.sim_var_95 != 0 and abs(inp.sim_var_95) > 15:
+            risks.append(f"MC VaR yüksek: %{abs(inp.sim_var_95):.1f}")
+
+        if inp.sim_prob_positive < 0.35:
+            risks.append(f"MC olasılık düşük: %{inp.sim_prob_positive * 100:.0f}")
+
+        if inp.sim_expected_return < -5:
+            risks.append(f"MC beklenen getiri negatif: %{inp.sim_expected_return:.1f}")
 
         if not risks:
             risks.append("Düşük risk profili")

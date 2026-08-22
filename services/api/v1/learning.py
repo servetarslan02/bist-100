@@ -49,35 +49,18 @@ async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rat
         report = _pipeline.get_learning_report() if hasattr(_pipeline, 'get_learning_report') else {}
         return {
             "success": True,
-            "models": report.get("recent_metrics") or [
-                {"model_name": "LightGBM Quant", "ic": 0.082, "hit_rate": 0.584, "sharpe": 2.14, "trust_score": 91.2},
-                {"model_name": "CatBoost Alpha", "ic": 0.076, "hit_rate": 0.569, "sharpe": 1.98, "trust_score": 88.4},
-                {"model_name": "Momentum Breakout", "ic": 0.065, "hit_rate": 0.542, "sharpe": 1.75, "trust_score": 84.1},
-                {"model_name": "Event-Driven Spec", "ic": 0.058, "hit_rate": 0.531, "sharpe": 1.62, "trust_score": 80.5},
-            ],
-            "trust_scores": report.get("trust_scores") or [
-                {"model": "LightGBM Quant", "trust_score": 91.2},
-                {"model": "CatBoost Alpha", "trust_score": 88.4},
-                {"model": "Momentum Breakout", "trust_score": 84.1},
-                {"model": "Event-Driven Spec", "trust_score": 80.5},
-            ],
-            "fusion_weights": report.get("fusion_weights") or {"lightgbm": 0.35, "catboost": 0.30, "momentum": 0.20, "event_driven": 0.15},
+            "models": report.get("recent_metrics") or [],
+            "trust_scores": report.get("trust_scores") or [],
+            "fusion_weights": report.get("fusion_weights") or {},
+            "message": "No model metrics available yet. Train models and run the pipeline to generate metrics." if not report.get("recent_metrics") else None,
         }
     except Exception as e:
         return {
-            "success": True,
-            "models": [
-                {"model_name": "LightGBM Quant", "ic": 0.082, "hit_rate": 0.584, "sharpe": 2.14, "trust_score": 91.2},
-                {"model_name": "CatBoost Alpha", "ic": 0.076, "hit_rate": 0.569, "sharpe": 1.98, "trust_score": 88.4},
-                {"model_name": "Momentum Breakout", "ic": 0.065, "hit_rate": 0.542, "sharpe": 1.75, "trust_score": 84.1},
-                {"model_name": "Event-Driven Spec", "ic": 0.058, "hit_rate": 0.531, "sharpe": 1.62, "trust_score": 80.5},
-            ],
-            "trust_scores": [
-                {"model": "LightGBM Quant", "trust_score": 91.2},
-                {"model": "CatBoost Alpha", "trust_score": 88.4},
-                {"model": "Momentum Breakout", "trust_score": 84.1},
-                {"model": "Event-Driven Spec", "trust_score": 80.5},
-            ],
+            "success": False,
+            "models": [],
+            "trust_scores": [],
+            "error": str(e),
+        }
             "fusion_weights": {"lightgbm": 0.35, "catboost": 0.30, "momentum": 0.20, "event_driven": 0.15},
         }
 
