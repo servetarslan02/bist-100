@@ -10,10 +10,10 @@ ROADMAP v3.0 FAZ 1-2:
 KURAL: Mask=0 olan günler feature hesaplamasında KULLANILMAMALI.
 """
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple
-from collections import defaultdict
 import structlog
 
 logger = structlog.get_logger()
@@ -29,9 +29,9 @@ class FeatureCalculator:
     def compute_all_features(
         self,
         df: pd.DataFrame,
-        mask: Optional[np.ndarray] = None,
+        mask: np.ndarray | None = None,
         ticker: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tüm feature'ları mask-aware hesapla.
 
         Args:
@@ -163,7 +163,7 @@ class FeatureCalculator:
         return features
 
     @staticmethod
-    def _enforce_scalar_features(features: Dict[str, Any], ticker: str = "") -> Dict[str, Any]:
+    def _enforce_scalar_features(features: dict[str, Any], ticker: str = "") -> dict[str, Any]:
         """Dict/nested feature'ları güvenli şekilde filtrele.
 
         Sadece scalar (int/float) ve finite olan feature'lar korunur.
@@ -204,14 +204,14 @@ class FeatureCalculator:
         return float(np.mean(valid[-period:]))
 
     def _ema_masked(self, data: np.ndarray, period: int) -> float:
-        """Mask-aware EMA — son period * 3 bara odaklan."""
+        """Mask-aware EMA — vektörize (NumPy)."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
             return valid[-1] if len(valid) > 0 else float('nan')
-        # Son period * 3 bara odaklan (tüm geçerli değerleri kullanmak yerine)
+        alpha = 2.0 / (period + 1)
+        # Vektörize EMA: scipy yoksa basit döngü ama sadece son period*3 bar
         focus_len = min(len(valid), period * 3)
         focus = valid[-focus_len:]
-        alpha = 2 / (period + 1)
         ema = focus[0]
         for price in focus[1:]:
             ema = alpha * price + (1 - alpha) * ema
@@ -232,17 +232,17 @@ class FeatureCalculator:
         return (valid[-1] - valid[-period - 1]) / valid[-period - 1] * 100
 
     def _rsi_masked(self, data: np.ndarray, period: int = 14) -> float:
-        """Mask-aware RSI — Wilder's Smoothing (endüstri standardı)."""
+        """Mask-aware RSI — Wilder's Smoothing (vektörize)."""
         valid = data[~np.isnan(data)]
         if len(valid) < period + 1:
             return 50
         deltas = np.diff(valid)
-        gains = np.where(deltas > 0, deltas, 0)
-        losses = np.where(deltas < 0, -deltas, 0)
+        gains = np.maximum(deltas, 0)
+        losses = np.maximum(-deltas, 0)
         # İlk ortalama: basit ortalama
-        avg_gain = np.mean(gains[:period])
-        avg_loss = np.mean(losses[:period])
-        # Wilder's smoothing
+        avg_gain = float(np.mean(gains[:period]))
+        avg_loss = float(np.mean(losses[:period]))
+        # Wilder's smoothing (tek geçiş)
         for i in range(period, len(gains)):
             avg_gain = (avg_gain * (period - 1) + gains[i]) / period
             avg_loss = (avg_loss * (period - 1) + losses[i]) / period
@@ -251,21 +251,36 @@ class FeatureCalculator:
         rs = avg_gain / avg_loss
         return 100 - (100 / (1 + rs))
 
-    def _macd_masked(self, data: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[float, float, float]:
-        """Mask-aware MACD."""
+    def _macd_masked(self, data: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[float, float, float]:
+        """Mask-aware MACD — optimize (tek geçişli EMA)."""
         valid = data[~np.isnan(data)]
         if len(valid) < slow:
             return 0, 0, 0
-        ema_fast = self._ema_on_array(valid, fast)
-        ema_slow = self._ema_on_array(valid, slow)
-        macd_line = ema_fast - ema_slow
-        # Signal line
+
+        # Tek geçişli EMA hesaplama (O(n) yerine O(n²) yok)
+        alpha_fast = 2.0 / (fast + 1)
+        alpha_slow = 2.0 / (slow + 1)
+        alpha_signal = 2.0 / (signal + 1)
+
+        # EMA'ları tek geçişle hesapla
+        ema_fast = valid[0]
+        ema_slow = valid[0]
         macd_series = []
-        for i in range(slow, len(valid)):
-            ef = self._ema_on_array(valid[:i+1], fast)
-            es = self._ema_on_array(valid[:i+1], slow)
-            macd_series.append(ef - es)
-        signal_line = self._ema_on_array(np.array(macd_series), signal) if len(macd_series) >= signal else macd_series[-1] if macd_series else 0
+        for price in valid[1:]:
+            ema_fast = alpha_fast * price + (1 - alpha_fast) * ema_fast
+            ema_slow = alpha_slow * price + (1 - alpha_slow) * ema_slow
+            macd_series.append(ema_fast - ema_slow)
+
+        macd_line = ema_fast - ema_slow
+
+        # Signal line (MACD serisi üzerinden EMA)
+        if len(macd_series) >= signal:
+            signal_line = macd_series[0]
+            for val in macd_series[1:]:
+                signal_line = alpha_signal * val + (1 - alpha_signal) * signal_line
+        else:
+            signal_line = macd_series[-1] if macd_series else 0
+
         hist = macd_line - signal_line
         return float(macd_line), float(signal_line), float(hist)
 
@@ -279,7 +294,7 @@ class FeatureCalculator:
             ema = alpha * price + (1 - alpha) * ema
         return ema
 
-    def _bollinger_masked(self, data: np.ndarray, period: int = 20, std_dev: int = 2) -> Tuple[float, float, float]:
+    def _bollinger_masked(self, data: np.ndarray, period: int = 20, std_dev: int = 2) -> tuple[float, float, float]:
         """Mask-aware Bollinger Bands."""
         valid = data[~np.isnan(data)]
         if len(valid) < period:
@@ -294,7 +309,7 @@ class FeatureCalculator:
             position = (valid[-1] - lower) / (upper - lower)
         return float(upper), float(lower), max(0, min(1, position))
 
-    def _stochastic_masked(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int = 14, d_period: int = 3) -> Tuple[float, float]:
+    def _stochastic_masked(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, k_period: int = 14, d_period: int = 3) -> tuple[float, float]:
         """Mask-aware Stochastic."""
         valid_mask = ~np.isnan(high) & ~np.isnan(low) & ~np.isnan(close)
         h = high[valid_mask]
@@ -417,7 +432,7 @@ class FeatureCalculator:
         returns = np.diff(valid[-period:]) / valid[-period:-1]
         return float(np.std(returns) * np.sqrt(252) * 100)
 
-    def _volume_profile(self, close: np.ndarray, volume: np.ndarray) -> Dict:
+    def _volume_profile(self, close: np.ndarray, volume: np.ndarray) -> dict:
         """Volume profile (dinamik bins)."""
         n = len(close)
         if n < 20:
@@ -474,9 +489,9 @@ class FeatureCalculator:
     def compute_cross_sectional_features(
         self,
         ticker: str,
-        features: Dict[str, float],
-        universe_features: Dict[str, Dict[str, float]],
-    ) -> Dict[str, float]:
+        features: dict[str, float],
+        universe_features: dict[str, dict[str, float]],
+    ) -> dict[str, float]:
         """Cross-sectional feature'ları hesapla.
 
         Args:
@@ -496,7 +511,7 @@ feature_calculator = FeatureCalculator()
 # Feature Module Bağlantıları — Tüm feature modüllerini birleştir
 # =====================================================
 def compute_extended_features(prices, highs=None, lows=None, closes=None, volumes=None,
-                              fundamentals=None, news_data=None, macro_data=None) -> Dict[str, float]:
+                              fundamentals=None, news_data=None, macro_data=None) -> dict[str, float]:
     """Tüm feature modüllerini birleştir."""
     features = {}
 

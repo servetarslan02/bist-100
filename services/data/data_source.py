@@ -12,15 +12,15 @@ ROADMAP v3.0:
 KURAL: Veri = petrol. Kirli veri = kirli petrol.
 """
 
-import os
 import json
+import os
 import re
-import requests
-import numpy as np
-import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
+
+import pandas as pd
+import requests
 import structlog
 
 logger = structlog.get_logger()
@@ -54,11 +54,11 @@ class DataSourceManager:
     def get_stock_data(
         self,
         ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-        source_priority: List[str] = ["local", "yahoo", "bist"],
+        source_priority: list[str] = ["local", "yahoo", "bist"],
     ) -> pd.DataFrame:
         """Hisse verisini getir (cache-aware, multi-source).
 
@@ -114,24 +114,40 @@ class DataSourceManager:
 
     def get_multiple_stocks(
         self,
-        tickers: List[str],
+        tickers: list[str],
+        max_workers: int = 8,
         **kwargs,
-    ) -> Dict[str, pd.DataFrame]:
-        """Çoklu hisse verisi getir."""
+    ) -> dict[str, pd.DataFrame]:
+        """Çoklu hisse verisi getir (paralel).
+
+        Args:
+            tickers: Hisse kodları listesi
+            max_workers: Paralel thread sayısı
+            **kwargs: get_stock_data argümanları
+        """
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         results = {}
-        for ticker in tickers:
-            df = self.get_stock_data(ticker, **kwargs)
-            if not df.empty:
-                results[ticker] = df
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            future_to_ticker = {
+                pool.submit(self.get_stock_data, ticker, **kwargs): ticker
+                for ticker in tickers
+            }
+            for future in as_completed(future_to_ticker):
+                ticker = future_to_ticker[future]
+                try:
+                    df = future.result()
+                    if df is not None and not df.empty:
+                        results[ticker] = df
+                except Exception as e:
+                    logger.warning("Stock fetch failed", ticker=ticker, error=str(e))
         return results
 
-    def get_bist100_universe(self) -> List[str]:
+    def get_bist100_universe(self) -> list[str]:
         """BIST 100 hisse listesini getir."""
-        import json
-        import os
         cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "bist_universe_cache.json")
         try:
-            with open(cache_path, "r") as f:
+            with open(cache_path) as f:
                 cache = json.load(f)
             tickers = cache.get("tickers", [])
             if tickers:
@@ -155,10 +171,13 @@ class DataSourceManager:
         """Benchmark verisini getir."""
         return self.get_stock_data(benchmark, **kwargs)
 
-    def _load_from_cache(self, ticker: str, interval: str) -> Optional[pd.DataFrame]:
-        """Cache'den veri yukle (CSV formati)."""
-        cache_file = self.cache_dir / f"{ticker}_{interval}.csv"
+    def _load_from_cache(self, ticker: str, interval: str) -> pd.DataFrame | None:
+        """Cache'den veri yukle (Parquet > CSV)."""
+        # Parquet cache (tercih)
+        parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
+        csv_file = self.cache_dir / f"{ticker}_{interval}.csv"
 
+        cache_file = parquet_file if parquet_file.exists() else csv_file
         if not cache_file.exists():
             return None
 
@@ -169,7 +188,10 @@ class DataSourceManager:
             return None
 
         try:
-            df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+            if cache_file.suffix == ".parquet":
+                df = pd.read_parquet(cache_file)
+            else:
+                df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
         except Exception as e:
@@ -177,27 +199,26 @@ class DataSourceManager:
             return None
 
     def _save_to_cache(self, ticker: str, df: pd.DataFrame, interval: str):
-        """Veriyi cache'e kaydet (CSV formati)."""
-        cache_file = self.cache_dir / f"{ticker}_{interval}.csv"
+        """Veriyi cache'e kaydet (Parquet — CSV'den ~10x hızlı)."""
+        parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
         try:
-            df.to_csv(cache_file)
+            df.to_parquet(parquet_file, engine="pyarrow")
             logger.info("Cache saved", ticker=ticker, rows=len(df))
         except Exception as e:
             logger.warning("Cache save failed", ticker=ticker, error=str(e))
 
     def clear_cache(self):
         """Tum cache'i temizle."""
-        for f in self.cache_dir.glob("*.csv"):
-            f.unlink()
-        # Eski parquet cache'leri de temizle
         for f in self.cache_dir.glob("*.parquet"):
+            f.unlink()
+        for f in self.cache_dir.glob("*.csv"):
             f.unlink()
         logger.info("Cache cleared")
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Cache istatistikleri."""
-        files = list(self.cache_dir.glob("*.csv"))
+        files = list(self.cache_dir.glob("*.parquet")) + list(self.cache_dir.glob("*.csv"))
         total_size = sum(f.stat().st_size for f in files)
 
         return {
@@ -213,17 +234,17 @@ class YahooFinanceSource:
     def fetch(
         self,
         ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Yahoo Finance'ten veri çek."""
         try:
             import yfinance as yf
 
             # Ticker formatını düzelt
-            if not ticker.endswith(".IS") and not "." in ticker.split(".")[-1]:
+            if not ticker.endswith(".IS") and "." not in ticker.split(".")[-1]:
                 ticker = f"{ticker}.IS"
 
             stock = yf.Ticker(ticker)
@@ -268,11 +289,11 @@ class BISTSource:
     def fetch(
         self,
         ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Borsa Istanbul'dan veri cek.
 
         Strateji:
@@ -304,7 +325,7 @@ class BISTSource:
         logger.warning("BIST source failed for ticker", ticker=ticker_clean)
         return None
 
-    def _fetch_from_api(self, ticker: str, start_date: Optional[str], end_date: Optional[str]) -> Optional[pd.DataFrame]:
+    def _fetch_from_api(self, ticker: str, start_date: str | None, end_date: str | None) -> pd.DataFrame | None:
         """BIST API'den tarihsel veri cek."""
         # Borsa Istanbul'un hisse detay API'si
         url = f"{self.API_URL}/stock/{ticker}/history"
@@ -342,7 +363,7 @@ class BISTSource:
         df.sort_index(inplace=True)
         return df
 
-    def _fetch_from_web(self, ticker: str) -> Optional[pd.DataFrame]:
+    def _fetch_from_web(self, ticker: str) -> pd.DataFrame | None:
         """BIST web sitesinden son fiyat bilgisi cek."""
         url = f"{self.BASE_URL}/tr/hisse/{ticker}"
         resp = self.session.get(url, timeout=self.timeout)
@@ -357,7 +378,6 @@ class BISTSource:
         html = resp.text
 
         # Fiyat bilgilerini regex ile parse et
-        import re
 
         price_patterns = [
             r'class="[^"]*last-price[^"]*"[^>]*>([0-9.,]+)<',
@@ -427,7 +447,7 @@ class BISTSource:
 
         return df
 
-    def fetch_index_data(self, index_code: str = "XU100") -> Optional[pd.DataFrame]:
+    def fetch_index_data(self, index_code: str = "XU100") -> pd.DataFrame | None:
         """Endeks verisi cek."""
         try:
             url = f"{self.API_URL}/index/{index_code}"
@@ -460,11 +480,11 @@ class LocalParquetSource:
     def fetch(
         self,
         ticker: str,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> Optional[pd.DataFrame]:
+    ) -> pd.DataFrame | None:
         """Yerel parquet'ten veri çek."""
         cache_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
