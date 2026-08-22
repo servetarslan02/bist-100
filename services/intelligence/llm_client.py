@@ -159,17 +159,23 @@ class LLMClient:
                         "parameters": s.get("parameters", {}),
                     })
                 
-                resp = self._new_client.models.generate_content(
-                    model=self.model_name,
-                    contents=full_prompt,
-                    config=types.GenerateContentConfig(
-                        temperature=0.1,
-                        tools=[{"function_declarations": function_declarations}],
-                    ),
-                )
-                return self._parse_response(resp)
+                models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
+                for mod in dict.fromkeys(models_to_try):
+                    try:
+                        resp = self._new_client.models.generate_content(
+                            model=mod,
+                            contents=full_prompt,
+                            config=types.GenerateContentConfig(
+                                temperature=0.1,
+                                tools=[{"function_declarations": function_declarations}],
+                            ),
+                        )
+                        return self._parse_response(resp)
+                    except Exception as exc:
+                        logger.debug("google-genai tool calling fallback", model=mod, error=str(exc))
+                return self._mock_tool_response(prompt, context)
             except Exception as exc:
-                logger.debug("google-genai tool calling fallback", error=str(exc))
+                logger.debug("google-genai tool schema building failed", error=str(exc))
                 return self._mock_tool_response(prompt, context)
 
         # 2. Legacy fallback
@@ -213,7 +219,7 @@ class LLMClient:
 
         # 1. Yeni google-genai SDK
         if self._new_client is not None:
-            models_to_try = [self.model_name, "gemini-3.7-flash", "gemini-2.5-flash"]
+            models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
             for mod in dict.fromkeys(models_to_try):
                 try:
                     resp = self._new_client.models.generate_content(
@@ -281,19 +287,21 @@ METİN:
             return self._mock_structured_response()
 
         if self._new_client is not None:
-            try:
-                resp = self._new_client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                )
-                raw_text = resp.text if hasattr(resp, "text") else "{}"
-                if "```json" in raw_text:
-                    raw_text = raw_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in raw_text:
-                    raw_text = raw_text.split("```")[1].split("```")[0].strip()
-                return json.loads(raw_text)
-            except Exception as exc:
-                logger.error("google-genai structured analysis failed", error=str(exc))
+            models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
+            for mod in dict.fromkeys(models_to_try):
+                try:
+                    resp = self._new_client.models.generate_content(
+                        model=mod,
+                        contents=prompt,
+                    )
+                    raw_text = resp.text if hasattr(resp, "text") else "{}"
+                    if "```json" in raw_text:
+                        raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                    elif "```" in raw_text:
+                        raw_text = raw_text.split("```")[1].split("```")[0].strip()
+                    return json.loads(raw_text)
+                except Exception as exc:
+                    logger.error("google-genai structured analysis failed", model=mod, error=str(exc))
 
         if self._legacy_model is not None:
             try:
