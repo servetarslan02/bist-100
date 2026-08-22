@@ -36,8 +36,8 @@ def _publish_event_async(event, key="default"):
         from services.core.event_bus import publish_event
         loop = _get_bg_loop()
         asyncio.run_coroutine_threadsafe(publish_event(event, key=key), loop)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("event_publish_failed", error=str(e))
 
 logger = structlog.get_logger()
 
@@ -195,8 +195,8 @@ class MasterOrchestrator:
                     self._last_regime_transition = event.data
                 with contextlib.suppress(Exception):
                     await eb.subscribe("market.regime_transition", _on_regime_transition)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("regime_transition_handler_setup_failed", error=str(e))
 
         # AGENT_ANALYSIS_COMPLETED handler (audit #1)
         try:
@@ -216,12 +216,12 @@ class MasterOrchestrator:
                                 predicted_value=1 if direction == "LONG" else -1,
                                 confidence=confidence,
                             )
-                    except Exception:
-                        pass
+                    except Exception as e:
+                        logger.debug("outcome_tracker_add_prediction_failed", error=str(e))
                 with contextlib.suppress(Exception):
                     await eb.subscribe("agent.analysis", _on_agent_analysis)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("agent_analysis_handler_setup_failed", error=str(e))
 
         self._initialized = True
         logger.info("Master Orchestrator initialized", services=len(self._services))
@@ -309,8 +309,8 @@ class MasterOrchestrator:
                 surprise_result = surprise.compute_surprise(market_data["macro"])
                 if surprise_result:
                     features["macro_surprise"] = surprise_result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("macro_surprise_failed", ticker=ticker, error=str(e))
 
         # ━━━ 3. WORLD STATE ━━━
         world_state = {}
@@ -340,25 +340,29 @@ class MasterOrchestrator:
             if pa:
                 try:
                     analysis["price_action"] = pa.analyze(features) if hasattr(pa, 'analyze') else "available"
-                except Exception:
+                except Exception as e:
+                    logger.debug("price_action_analysis_failed", error=str(e))
                     analysis["price_action"] = "error"
             ve = self._services.get("volume_engine")
             if ve:
                 try:
                     analysis["volume"] = ve.analyze(features) if hasattr(ve, 'analyze') else "available"
-                except Exception:
+                except Exception as e:
+                    logger.debug("volume_analysis_failed", error=str(e))
                     analysis["volume"] = "error"
             se = self._services.get("sector_engine")
             if se:
                 try:
                     analysis["sector"] = se.analyze(features) if hasattr(se, 'analyze') else "available"
-                except Exception:
+                except Exception as e:
+                    logger.debug("sector_analysis_failed", error=str(e))
                     analysis["sector"] = "error"
             rs = self._services.get("relative_strength")
             if rs:
                 try:
                     analysis["relative_strength"] = rs.analyze(features) if hasattr(rs, 'analyze') else "available"
-                except Exception:
+                except Exception as e:
+                    logger.debug("relative_strength_analysis_failed", error=str(e))
                     analysis["relative_strength"] = "error"
         except Exception as e:
             logger.warning("Pipeline step failed", step="analysis_engines", error=str(e))
@@ -375,8 +379,8 @@ class MasterOrchestrator:
             if champion:
                 champion_model = champion.model_id
                 logger.debug("Champion model selected", model=champion_model)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("champion_model_selection_failed", error=str(e))
 
         try:
             fe = self._services.get("forecasting")
@@ -676,8 +680,8 @@ class MasterOrchestrator:
                         )
                         with contextlib.suppress(RuntimeError):
                             _publish_event_async(dec_event, key=ticker)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.debug("decision_event_publish_failed", ticker=ticker, error=str(e))
         except ImportError:
             pass
         except Exception as e:
@@ -692,8 +696,8 @@ class MasterOrchestrator:
                 if regime_acc and regime_acc < 0.4 and decision.get("confidence", 0) > 0:
                     decision["confidence"] = decision["confidence"] * 0.8
                     decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("learning_feedback_failed", error=str(e))
 
         # ━━━ 12. TRADE PLAN ━━━
         trade_plan = {}
@@ -848,8 +852,8 @@ class MasterOrchestrator:
             if hasattr(mfd, 'decompose'):
                 factor_result = mfd.decompose(macro_data)
                 macro_analysis["factor_decomposition"] = factor_result
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("macro_factor_decomposition_failed", error=str(e))
 
         # Macro correlation tracker (audit #21)
         try:
@@ -858,8 +862,8 @@ class MasterOrchestrator:
             if hasattr(mct, 'get_current_regime'):
                 corr_regime = mct.get_current_regime()
                 macro_analysis["correlation_regime"] = corr_regime
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("macro_correlation_tracker_failed", error=str(e))
 
         for ticker, df in market_data.items():
             try:
@@ -966,6 +970,7 @@ class MasterOrchestrator:
             }
         except Exception:
             learning_status = {"status": "unavailable"}
+            logger.debug("learning_status_check_failed", error=str(e))
 
         return PipelineReport(
             date=date,

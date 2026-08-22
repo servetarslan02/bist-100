@@ -11,6 +11,7 @@ ALPHA BIST — Research Memory & Context v1.0
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import json
 import structlog
 
@@ -47,7 +48,7 @@ class ResearchMemory:
     """Araştırma hafızası."""
 
     def __init__(self):
-        self._records: List[ResearchRecord] = []
+        self._records: deque = deque(maxlen=10000)
         self._ticker_index: Dict[str, List[int]] = {}
 
     def add_record(self, record: ResearchRecord):
@@ -107,7 +108,7 @@ class DataLineage:
     """Veri lineage takibi."""
 
     def __init__(self):
-        self._nodes: List[LineageNode] = []
+        self._nodes: deque = deque(maxlen=10000)
         self._index: Dict[str, List[int]] = {}
 
     def add_node(self, node: LineageNode):

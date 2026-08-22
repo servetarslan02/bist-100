@@ -13,6 +13,8 @@ import asyncio
 import time
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timezone
+
+import yfinance as yf
 import structlog
 
 logger = structlog.get_logger()
@@ -55,7 +57,6 @@ class RealtimeDataProvider:
 
     async def _yfinance_polling(self, tickers: List[str]):
         """yfinance ile polling (5 dakika aralıkla)."""
-        import yfinance as yf
 
         while self._running:
             try:

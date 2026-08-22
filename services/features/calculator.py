@@ -19,6 +19,11 @@ import structlog
 logger = structlog.get_logger()
 
 
+def _valid_data(data: np.ndarray) -> np.ndarray:
+    """Extract non-NaN values from array (cached helper)."""
+    return data[~np.isnan(data)]
+
+
 class FeatureCalculator:
     """Mask-aware teknik feature hesaplama."""
 
@@ -104,7 +109,7 @@ class FeatureCalculator:
 
         # === ATR (mask-aware) ===
         features["atr_14"] = self._atr_masked(high, low, close, 14)
-        features["atr_pct"] = (features["atr_14"] / close[~np.isnan(close)][-1] * 100) if np.any(~np.isnan(close)) else 0
+        features["atr_pct"] = (features["atr_14"] / _valid_data(close)[-1] * 100) if len(_valid_data(close)) > 0 else 0
 
         # === ADX (mask-aware) ===
         features["adx"] = self._adx_masked(high, low, close, 14)
@@ -115,7 +120,7 @@ class FeatureCalculator:
         features["obv"] = self._obv_masked(close, volume)
 
         # === PRICE RELATIVES ===
-        valid_close = close[~np.isnan(close)]
+        valid_close = _valid_data(close)
         if len(valid_close) > 0:
             last_close = valid_close[-1]
             features["price_vs_sma20"] = (last_close / features["sma_20"] - 1) * 100 if features["sma_20"] else 0
@@ -127,8 +132,8 @@ class FeatureCalculator:
         features["realized_vol_20d"] = features["volatility_20d"]
 
         # === VOLUME PROFILE (mask-aware) ===
-        valid_close_vol = close[~np.isnan(close)]
-        valid_volume = volume[~np.isnan(volume)]
+        valid_close_vol = _valid_data(close)
+        valid_volume = _valid_data(volume)
         if len(valid_close_vol) >= 20 and len(valid_volume) >= 20:
             vp = self._volume_profile(valid_close_vol, valid_volume)
             # FAZ 4.7: Dict yerine scalar feature'lar (feature contract uyumluluğu)
@@ -198,14 +203,14 @@ class FeatureCalculator:
 
     def _sma_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware SMA."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < period:
             return valid[-1] if len(valid) > 0 else float('nan')
         return float(np.mean(valid[-period:]))
 
     def _ema_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware EMA — vektörize (NumPy)."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < period:
             return valid[-1] if len(valid) > 0 else float('nan')
         alpha = 2.0 / (period + 1)
@@ -219,21 +224,21 @@ class FeatureCalculator:
 
     def _roc_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware ROC."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) <= period:
             return float('nan')
         return (valid[-1] / valid[-period - 1] - 1) * 100
 
     def _momentum_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware momentum."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) <= period:
             return float('nan')
         return (valid[-1] - valid[-period - 1]) / valid[-period - 1] * 100
 
     def _rsi_masked(self, data: np.ndarray, period: int = 14) -> float:
         """Mask-aware RSI — Wilder's Smoothing (vektörize)."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < period + 1:
             return 50
         deltas = np.diff(valid)
@@ -253,7 +258,7 @@ class FeatureCalculator:
 
     def _macd_masked(self, data: np.ndarray, fast: int = 12, slow: int = 26, signal: int = 9) -> tuple[float, float, float]:
         """Mask-aware MACD — optimize (tek geçişli EMA)."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < slow:
             return 0, 0, 0
 
@@ -296,7 +301,7 @@ class FeatureCalculator:
 
     def _bollinger_masked(self, data: np.ndarray, period: int = 20, std_dev: int = 2) -> tuple[float, float, float]:
         """Mask-aware Bollinger Bands."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < period:
             return valid[-1] if len(valid) > 0 else 0, valid[-1] if len(valid) > 0 else 0, 0.5
         sma = np.mean(valid[-period:])
@@ -389,7 +394,7 @@ class FeatureCalculator:
 
     def _volume_zscore_masked(self, volume: np.ndarray) -> float:
         """Mask-aware volume z-score."""
-        valid = volume[~np.isnan(volume)]
+        valid = _valid_data(volume)
         if len(valid) < 20:
             return float('nan')
         mean = np.mean(valid[-20:])
@@ -400,7 +405,7 @@ class FeatureCalculator:
 
     def _volume_trend_masked(self, volume: np.ndarray) -> float:
         """Mask-aware volume trend."""
-        valid = volume[~np.isnan(volume)]
+        valid = _valid_data(volume)
         if len(valid) < 10:
             return float('nan')
         recent = np.mean(valid[-5:])
@@ -426,7 +431,7 @@ class FeatureCalculator:
 
     def _volatility_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware volatility."""
-        valid = data[~np.isnan(data)]
+        valid = _valid_data(data)
         if len(valid) < period:
             return float('nan')
         returns = np.diff(valid[-period:]) / valid[-period:-1]
@@ -457,7 +462,7 @@ class FeatureCalculator:
 
     def _higher_highs_masked(self, high: np.ndarray) -> int:
         """Mask-aware higher highs."""
-        valid = high[~np.isnan(high)]
+        valid = _valid_data(high)
         if len(valid) < 5:
             return 0
         count = 0
@@ -468,7 +473,7 @@ class FeatureCalculator:
 
     def _lower_lows_masked(self, low: np.ndarray) -> int:
         """Mask-aware lower lows."""
-        valid = low[~np.isnan(low)]
+        valid = _valid_data(low)
         if len(valid) < 5:
             return 0
         count = 0

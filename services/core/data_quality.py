@@ -9,7 +9,9 @@ ROADMAP v3.0: Mask-First Design
 KURAL: Execute edilemeyen fiyat kullanma!
 """
 
+import copy as _copy
 import numpy as np
+import pandas as pd
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime
@@ -134,7 +136,6 @@ class DataQualityEngine:
             copy: True ise kopya üzerinde çalışır (orijinal dict değişmez)
         """
         if copy:
-            import copy as _copy
             raw_data = _copy.deepcopy(raw_data)
         if mask.price_mask == 0.0:
             # Mask-first: Ham fiyatı null yap ki feature motorları bunu kullanmasın
@@ -209,7 +210,6 @@ class QualityReport:
 class DataQualityChecker:
     """DataFrame bazlı veri kalitesi kontrolü (duplicate, stale, gap, vb.)."""
     def full_quality_check(self, df, ticker="UNKNOWN"):
-        import pandas as pd
         issues = []
         total_rows = len(df)
         if total_rows == 0:

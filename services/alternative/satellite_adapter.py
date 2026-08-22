@@ -26,6 +26,8 @@ import asyncio
 import math
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone, timedelta
+
+import numpy as np
 import structlog
 
 from .base import BaseAdapter
@@ -338,7 +340,6 @@ class SatelliteAdapter(BaseAdapter):
         all_ndvi = [loc.get("ndvi_mean", 0) for loc in locations.values()]
         all_ndbi = [loc.get("ndbi_mean", 0) for loc in locations.values()]
 
-        import numpy as np
         features["sat_ndvi_avg"] = float(np.mean(all_ndvi)) if all_ndvi else 0.0
         features["sat_ndbi_avg"] = float(np.mean(all_ndbi)) if all_ndbi else 0.0
         features["sat_activity_index"] = float(np.mean(all_ndvi) - np.mean(all_ndbi))

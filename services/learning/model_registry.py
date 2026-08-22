@@ -13,6 +13,7 @@ KURAL: Her model versiyonu izlenebilir olmalı.
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -41,7 +42,7 @@ class ModelRegistry:
     """Model versiyon kayıt defteri."""
 
     def __init__(self):
-        self._records: List[ModelRecord] = []
+        self._records: deque = deque(maxlen=500)
         self._active_versions: Dict[str, str] = {}  # regime → version
 
     def register(

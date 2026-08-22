@@ -93,7 +93,7 @@ class SuperIntelligenceEngine:
         self.ab_test_window_days = ab_test_window_days or cfg.shadow.duration_days
 
         # Model versiyonlama
-        self._model_versions: List[ModelVersion] = []
+        self._model_versions: deque = deque(maxlen=100)
         self._active_model_version: Optional[str] = None
         self._champion_model_version: Optional[str] = None
 
@@ -103,7 +103,7 @@ class SuperIntelligenceEngine:
 
         # Drift detection
         self._baseline_distributions: Dict[str, Dict] = {}
-        self._drift_alerts: List[Dict] = []
+        self._drift_alerts: deque = deque(maxlen=1000)
 
         # A/B test state
         self._ab_test_active: bool = False
@@ -130,7 +130,7 @@ class SuperIntelligenceEngine:
         )
 
         # Self-healing queue
-        self._healing_queue: List[Dict] = []
+        self._healing_queue: deque = deque(maxlen=500)
         self._lock = threading.Lock()
 
         logger.info("SuperIntelligenceEngine v3.0 initialized",
@@ -441,9 +441,10 @@ class SuperIntelligenceEngine:
         metrics: Dict[str, float],
     ):
         """Performans kaydet (meta-learning için)."""
-        self._regime_model_performance[regime][model_version].append(
-            metrics.get("sharpe", 0)
-        )
+        scores = self._regime_model_performance[regime][model_version]
+        scores.append(metrics.get("sharpe", 0))
+        if len(scores) > 100:
+            self._regime_model_performance[regime][model_version] = scores[-100:]
 
     def get_best_model_for_regime(self, regime: str) -> Optional[str]:
         """Rejim için en iyi modeli bul."""

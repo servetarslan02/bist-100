@@ -13,6 +13,7 @@ KURAL: Bir modül çökse diğerleri çalışmaya devam etmeli.
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -83,8 +84,8 @@ class LearningHealthMonitor:
 
     def __init__(self):
         self._module_status: Dict[str, ModuleHealth] = {}
-        self._error_history: List[Dict] = []
-        self._restart_requests: List[str] = []
+        self._error_history: deque = deque(maxlen=1000)
+        self._restart_requests: deque = deque(maxlen=100)
         self._start_time = datetime.now(timezone.utc)
 
     def check_health(self) -> HealthReport:

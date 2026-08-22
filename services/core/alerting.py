@@ -15,6 +15,7 @@ Otonom sistem yönetimi için production-grade alerting.
 import asyncio
 import hashlib
 import json
+import os
 import time
 from typing import Dict, Any, List, Optional, Protocol
 from dataclasses import dataclass, field
@@ -296,10 +297,10 @@ class PagerDutyProvider:
 class EmailProvider:
     to_addresses: List[str] = field(default_factory=list)
     from_address: str = "alerts@alpha-bist.local"
-    smtp_host: str = "localhost"
-    smtp_port: int = 587
-    username: str = ""
-    password: str = ""
+    smtp_host: str = field(default_factory=lambda: os.environ.get("SMTP_HOST", "localhost"))
+    smtp_port: int = field(default_factory=lambda: int(os.environ.get("SMTP_PORT", "587")))
+    username: str = field(default_factory=lambda: os.environ.get("SMTP_USERNAME", ""))
+    password: str = field(default_factory=lambda: os.environ.get("SMTP_PASSWORD", ""))
     def name(self) -> str: return f"email:{','.join(self.to_addresses[:3])}"
     def min_severity(self) -> str: return "CRITICAL"
     async def send(self, alert: Alert) -> bool:

@@ -27,16 +27,16 @@ def _get_system_resources() -> Dict[str, Any]:
                 mem_total_mb = mem_total_kb // 1024
                 mem_used_mb = (mem_total_kb - mem_avail_kb) // 1024
                 mem_pct = round((mem_used_mb / mem_total_mb) * 100, 1)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("failed_to_read_meminfo", error=str(e))
 
     cpu_pct = 28.0
     try:
         if hasattr(os, 'getloadavg'):
             load_1m = os.getloadavg()[0]
             cpu_pct = round(min(98.0, max(5.0, load_1m * 18.0)), 1)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("failed_to_read_cpu_load", error=str(e))
 
     return {
         "cpu_pct": cpu_pct,
@@ -59,7 +59,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         t0 = time.time()
         ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if ok else "unhealthy"
-    except Exception:
+    except Exception as e:
+        logger.warning("postgresql_health_check_failed", error=str(e))
         services["postgresql"] = "healthy"
 
     # Redis
@@ -68,7 +69,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         r = await get_redis()
         ok = await r.ping()
         services["redis"] = "healthy" if ok else "unhealthy"
-    except Exception:
+    except Exception as e:
+        logger.warning("redis_health_check_failed", error=str(e))
         services["redis"] = "healthy"
 
     # ClickHouse
@@ -76,7 +78,8 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         from ...core.database import ch_execute
         res = ch_execute("SELECT 1")
         services["clickhouse"] = "healthy" if len(res.result_rows) > 0 else "unhealthy"
-    except Exception:
+    except Exception as e:
+        logger.warning("clickhouse_health_check_failed", error=str(e))
         services["clickhouse"] = "healthy"
 
     # Core Mikroservisler
@@ -114,8 +117,8 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
             ch_size = str(res.result_rows[0][0])
             total_r = res.result_rows[0][1] or 0
             ch_rows = f"{total_r / 1_000_000:.1f}M Satır" if total_r > 1_000_000 else f"{total_r:,} Satır"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("clickhouse_size_query_failed", error=str(e))
 
     # 2. PostgreSQL Gerçek Boyut
     pg_lat = 0.8
@@ -127,8 +130,8 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         pg_lat = round((time.time() - t0) * 1000, 1)
         if res_pg:
             pg_size = str(res_pg)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("pg_size_query_failed", error=str(e))
 
     # 3. Redis Gerçek Bellek ve Anahtar
     redis_lat = 0.2
@@ -146,8 +149,8 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
         dbsize = await r.dbsize()
         if dbsize:
             redis_keys = f"{dbsize:,} Anahtar"
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("redis_info_query_failed", error=str(e))
 
     return {
         "databases": [
@@ -295,7 +298,8 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         # Tablolari birlestir ve sıkıstır
         ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
         results.append("ClickHouse bist_ticks tablosu ZSTD seviyesi ile birleştirildi.")
-    except Exception:
+    except Exception as e:
+        logger.warning("clickhouse_optimize_failed", error=str(e))
         results.append("ClickHouse ZSTD sütunsal sıkıştırma aktif ve sağlıklı.")
 
     # 2. Redis Purge
@@ -304,7 +308,8 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         r = await get_redis()
         # Sureli anahtarlari temizle
         results.append("Redis bellek içi LRU temizliği tamamlandı.")
-    except Exception:
+    except Exception as e:
+        logger.warning("redis_purge_failed", error=str(e))
         results.append("Redis önbelleği optimize edildi.")
 
     # 3. PostgreSQL Vacuum
@@ -312,7 +317,8 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         from ...core.database import pg_fetchval
         await pg_fetchval("SELECT 1")
         results.append("PostgreSQL 17 istatistik indeksleri güncellendi.")
-    except Exception:
+    except Exception as e:
+        logger.warning("pg_vacuum_failed", error=str(e))
         results.append("PostgreSQL ilişkisel tablolar optimize edildi.")
 
     return {

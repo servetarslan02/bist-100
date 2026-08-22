@@ -13,6 +13,7 @@ Gerçek zamanlı kaynaklar:
 import asyncio
 import hashlib
 import json
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable, List, Set
 from dataclasses import dataclass, field
@@ -20,6 +21,8 @@ try:
     import aiohttp
 except ImportError:
     aiohttp = None
+
+import yfinance as yf
 import structlog
 
 logger = structlog.get_logger()
@@ -175,7 +178,6 @@ class RealTimeDataEngine:
         RSS feed'leri pubsub mantığıyla çalışır — yeni haber eklenir eklenmez görünür.
         Her 15 saniyede bir kontrol.
         """
-        import xml.etree.ElementTree as ET
 
         feeds = [
             ("https://www.dunya.com/rss/ekonomi.xml", "Dünya"),
@@ -237,7 +239,6 @@ class RealTimeDataEngine:
         Ücretsiz kaynaklarla aggressive polling (her 60 saniye).
         Lisanslı feed ile gerçek streaming olur.
         """
-        import yfinance as yf
         from ..bist_universe import BIST_STOCKS
 
         # Sadece aktif hisseleri dinle (ilk 50 — en likit)

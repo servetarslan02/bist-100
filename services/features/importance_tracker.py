@@ -24,6 +24,8 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Tuple, Callable
 from dataclasses import dataclass, field
 from enum import Enum
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -312,8 +314,6 @@ class FeatureImportanceTracker:
         Returns:
             RFEResult
         """
-        import numpy as np
-
         current_features = list(feature_names)
         current_X = X.copy() if hasattr(X, 'copy') else X
         eliminated = []

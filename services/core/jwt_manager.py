@@ -17,6 +17,7 @@ Referanslar:
 
 import hashlib
 import hmac
+import os
 import secrets
 import json
 import base64
@@ -94,12 +95,12 @@ class JWTManager:
 
     def __init__(
         self,
-        secret_key: str = "alpha-bist-default-secret-change-in-production",
+        secret_key: str = None,
         access_token_ttl_hours: int = 24,
         refresh_token_ttl_days: int = 7,
         algorithm: str = "HS256",
     ):
-        self._secret = secret_key
+        self._secret = secret_key or os.environ.get("JWT_SECRET", "")
         self._access_ttl = timedelta(hours=access_token_ttl_hours)
         self._refresh_ttl = timedelta(days=refresh_token_ttl_days)
         self._algorithm = algorithm

@@ -14,7 +14,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -47,7 +47,7 @@ class FeatureImportanceTracker:
     """SHAP-based feature importance tracking."""
 
     def __init__(self):
-        self._history: List[FeatureImportanceRecord] = []
+        self._history: deque = deque(maxlen=10000)
         self._last_importance: Dict[str, float] = {}
         self._regime_importance: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
 
@@ -92,7 +92,10 @@ class FeatureImportanceTracker:
             self._history.append(record)
 
             # Rejim bazlı
-            self._regime_importance[regime][name].append(importance)
+            vals = self._regime_importance[regime][name]
+            vals.append(importance)
+            if len(vals) > 1000:
+                self._regime_importance[regime][name] = vals[-1000:]
 
         # Son importance
         self._last_importance = result.feature_importance

@@ -9,6 +9,7 @@ Regime drift → Model decay → Retrain → OOS → Champion/Reject
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -45,9 +46,9 @@ class LearningLoop:
 
     def __init__(self):
         self._state = LearningState()
-        self._prediction_history: List[Dict] = []
-        self._outcome_history: List[Dict] = []
-        self._accuracy_window: List[bool] = []  # Son 100 tahmin
+        self._prediction_history: deque = deque(maxlen=5000)
+        self._outcome_history: deque = deque(maxlen=5000)
+        self._accuracy_window: deque = deque(maxlen=100)  # Son 100 tahmin
 
     def record_prediction(self, ticker: str, predicted_direction: str,
                          predicted_return: float, confidence: float,
@@ -86,9 +87,7 @@ class LearningLoop:
 
         # Doğruluk kontrolü
         is_correct = matching["predicted_direction"] == actual_direction
-        self._accuracy_window.append(is_correct)
-        if len(self._accuracy_window) > 100:
-            self._accuracy_window.pop(0)
+        self._accuracy_window.append(is_correct)  # deque(maxlen=100) auto-trims
 
         self._state.total_outcomes += 1
         if is_correct:

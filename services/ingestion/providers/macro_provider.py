@@ -8,8 +8,11 @@ v2.0: Async refactor + detaylı EVDS + BIST'e özgü makro göstergeler
 """
 
 import asyncio
+import concurrent.futures
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
+
+import yfinance as yf
 import structlog
 
 from ...core.async_http import get_client
@@ -74,9 +77,8 @@ class MacroProvider:
 
     async def fetch_yahoo_macro(self) -> Dict[str, Any]:
         """Yahoo Finance makro verileri (async)."""
-        import yfinance as yf
-        import concurrent.futures
 
+        # Use thread pool for sync yfinance calls
         loop = asyncio.get_event_loop()
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=6)
 

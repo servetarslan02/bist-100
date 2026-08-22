@@ -12,6 +12,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -177,7 +178,7 @@ class NewsDuplicationEngine:
     """Haber tekrarı tespiti."""
 
     def __init__(self):
-        self._seen_hashes: Dict[str, List[str]] = {}
+        self._seen_hashes: Dict[str, deque] = {}  # hash → deque of sources
 
     def is_duplicate(self, title: str, source: str) -> bool:
         """Aynı haber farklı kaynaktan mı geldi?"""
@@ -189,7 +190,7 @@ class NewsDuplicationEngine:
                 self._seen_hashes[title_hash].append(source)
             return True  # Duplicate
         else:
-            self._seen_hashes[title_hash] = [source]
+            self._seen_hashes[title_hash] = deque([source], maxlen=50)
             return False
 
     def get_source_count(self, title: str) -> int:
@@ -202,21 +203,18 @@ class EventTimelineEngine:
     """Olay zaman çizelgesi."""
 
     def __init__(self):
-        self._timelines: Dict[str, List[Dict]] = {}
+        self._timelines: Dict[str, deque] = {}  # ticker → deque of events
 
     def add_event(self, ticker: str, event_type: str, data: Dict, timestamp: str):
         """Olay ekle."""
         if ticker not in self._timelines:
-            self._timelines[ticker] = []
+            self._timelines[ticker] = deque(maxlen=100)
 
         self._timelines[ticker].append({
             "type": event_type,
             "data": data,
             "timestamp": timestamp,
         })
-
-        # Son 100 olay tut
-        self._timelines[ticker] = self._timelines[ticker][-100:]
 
     def get_timeline(self, ticker: str, limit: int = 20) -> List[Dict]:
         """Ticker olay zaman çizelgesi."""

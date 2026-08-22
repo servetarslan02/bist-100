@@ -112,8 +112,8 @@ async def macro_impact(ticker: str, user=Depends(get_current_user), _=Depends(ch
         result = engine.get_company_sensitivity(ticker) if hasattr(engine, 'get_company_sensitivity') else {}
         if result:
             return {"ticker": ticker, "macro_available": True, **result}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("macro_sensitivity_ticker_failed", ticker=ticker, error=str(e))
     return {
         "ticker": ticker,
         "macro_available": False,
@@ -133,8 +133,8 @@ async def sector_sensitivity(sector: str, user=Depends(get_current_user), _=Depe
         result = engine.get_sector_sensitivity(sector) if hasattr(engine, 'get_sector_sensitivity') else {}
         if result:
             return {"sector": sector, "sensitivity": result, "source": "macro_sensitivity_engine"}
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("macro_sensitivity_sector_failed", sector=sector, error=str(e))
     return {
         "sector": sector,
         "sensitivity": {

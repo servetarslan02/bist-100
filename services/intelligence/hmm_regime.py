@@ -24,6 +24,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -74,7 +75,7 @@ class HMMRegimeDetector:
         self._is_fitted: bool = False
         self._last_train_size: int = 0
         self._last_retrain_index: int = 0
-        self._regime_history: List[HMMRegimeResult] = []
+        self._regime_history: deque = deque(maxlen=500)
         self._transition_matrix: Optional[np.ndarray] = None
 
     def fit(self, returns: np.ndarray, volatility: np.ndarray) -> bool:
@@ -160,7 +161,6 @@ class HMMRegimeDetector:
         if not self._is_fitted or self._model is None:
             result = self._rule_based_fallback(returns, volatility)
             self._regime_history.append(result)
-            self._regime_history = self._regime_history[-500:]
             return result
 
         try:
@@ -186,7 +186,6 @@ class HMMRegimeDetector:
             )
 
             self._regime_history.append(result)
-            self._regime_history = self._regime_history[-500:]
 
             return result
 

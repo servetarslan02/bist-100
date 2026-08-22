@@ -272,12 +272,14 @@ class JobWorker:
             return JobWorker._db_cache_result
         try:
             import socket
+            from .config import settings
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
-            result = s.connect_ex(('127.0.0.1', 5432))
+            result = s.connect_ex((settings.postgres_host, settings.postgres_port))
             s.close()
             available = result == 0
-        except Exception:
+        except Exception as e:
+            logger.debug("db_availability_check_failed", error=str(e))
             available = False
         JobWorker._db_cache_result = available
         JobWorker._db_cache_until = now + 5.0

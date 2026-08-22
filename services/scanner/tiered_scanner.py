@@ -17,6 +17,7 @@ Haber/KAP/makro → herhangi bir hisseyi Tier 0'dan Tier 3'e atlayabilir.
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import structlog
@@ -227,41 +228,61 @@ class TieredScanner:
         """
         800 hisse için quant skorları hesapla.
         Her hisse için sadece feature'lardan skor üret.
+        Paralel ThreadPoolExecutor ile CPU-bound scoring.
         """
         w = self._regime.weights
         w_sum = sum(w.values())
 
-        for ticker, features in features_map.items():
-            if ticker not in self._assets:
-                continue
-
-            asset = self._assets[ticker]
-
-            # Her bileşen için skor (0-100)
-            asset.momentum_score = self._score_momentum(features)
-            asset.volume_anomaly_score = self._score_volume_anomaly(features)
-            asset.breakout_score = self._score_breakout(features)
-            asset.volatility_score = self._score_volatility(features)
-            asset.relative_strength_score = self._score_relative_strength(features)
-            asset.sector_divergence_score = self._score_sector_divergence(features)
-            asset.flow_correlation_score = self._score_flow_correlation(features)
-            asset.liquidity_score = self._score_liquidity(features)
-
-            # Weighted opportunity score (rejime göre ağırlıklı)
-            asset.opportunity_score = (
-                asset.momentum_score * w["momentum"]
-                + asset.volume_anomaly_score * w["volume_anomaly"]
-                + asset.breakout_score * w["breakout"]
-                + asset.volatility_score * w["volatility"]
-                + asset.relative_strength_score * w["relative_strength"]
-                + asset.sector_divergence_score * w["sector_divergence"]
-                + asset.flow_correlation_score * w["flow_correlation"]
-                + asset.liquidity_score * w["liquidity"]
+        def _score_asset(ticker: str, features: dict) -> tuple[str, float, dict]:
+            """Tek hisse için tüm skorları hesapla (paralel worker)."""
+            scores = {
+                "momentum_score": self._score_momentum(features),
+                "volume_anomaly_score": self._score_volume_anomaly(features),
+                "breakout_score": self._score_breakout(features),
+                "volatility_score": self._score_volatility(features),
+                "relative_strength_score": self._score_relative_strength(features),
+                "sector_divergence_score": self._score_sector_divergence(features),
+                "flow_correlation_score": self._score_flow_correlation(features),
+                "liquidity_score": self._score_liquidity(features),
+            }
+            opportunity_score = (
+                scores["momentum_score"] * w["momentum"]
+                + scores["volume_anomaly_score"] * w["volume_anomaly"]
+                + scores["breakout_score"] * w["breakout"]
+                + scores["volatility_score"] * w["volatility"]
+                + scores["relative_strength_score"] * w["relative_strength"]
+                + scores["sector_divergence_score"] * w["sector_divergence"]
+                + scores["flow_correlation_score"] * w["flow_correlation"]
+                + scores["liquidity_score"] * w["liquidity"]
             ) / w_sum
+            return ticker, opportunity_score, scores
 
-            asset.current_tier = Tier.QUANT_SCAN
+        # Parallel scoring — CPU-bound iş parçacıkları
+        max_workers = min(8, max(1, len(features_map) // 50))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {
+                pool.submit(_score_asset, ticker, features): ticker
+                for ticker, features in features_map.items()
+                if ticker in self._assets
+            }
+            for future in as_completed(futures):
+                try:
+                    ticker, opp_score, scores = future.result()
+                    asset = self._assets[ticker]
+                    asset.momentum_score = scores["momentum_score"]
+                    asset.volume_anomaly_score = scores["volume_anomaly_score"]
+                    asset.breakout_score = scores["breakout_score"]
+                    asset.volatility_score = scores["volatility_score"]
+                    asset.relative_strength_score = scores["relative_strength_score"]
+                    asset.sector_divergence_score = scores["sector_divergence_score"]
+                    asset.flow_correlation_score = scores["flow_correlation_score"]
+                    asset.liquidity_score = scores["liquidity_score"]
+                    asset.opportunity_score = opp_score
+                    asset.current_tier = Tier.QUANT_SCAN
+                except Exception as e:
+                    logger.warning("Quant scan asset failed", ticker=futures[future], error=str(e))
 
-        logger.info("Quant scan completed", stocks=len(features_map))
+        logger.info("Quant scan completed", stocks=len(features_map), workers=max_workers)
 
     # =====================================================
     # Tier 2: Opportunity Engine (800 → 50)

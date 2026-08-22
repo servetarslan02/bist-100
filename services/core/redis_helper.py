@@ -67,8 +67,8 @@ def get_cached(key: str) -> Optional[Any]:
         data = r.get(key)
         if data:
             return json.loads(data)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("redis_get_cached_failed", key=key, error=str(e))
     return None
 
 
@@ -80,7 +80,8 @@ def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
     try:
         r.setex(key, ttl, json.dumps(data, default=str))
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("redis_set_cached_failed", key=key, error=str(e))
         return False
 
 
@@ -91,7 +92,8 @@ def get_cached_raw(key: str) -> Optional[bytes]:
         return None
     try:
         return r.get(key)
-    except Exception:
+    except Exception as e:
+        logger.debug("redis_get_cached_raw_failed", key=key, error=str(e))
         return None
 
 
@@ -103,7 +105,8 @@ def set_cached_raw(key: str, data: str, ttl: int = 300) -> bool:
     try:
         r.setex(key, ttl, data)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("redis_set_cached_raw_failed", key=key, error=str(e))
         return False
 
 
@@ -115,7 +118,8 @@ def delete_cached(key: str) -> bool:
     try:
         r.delete(key)
         return True
-    except Exception:
+    except Exception as e:
+        logger.debug("redis_delete_cached_failed", key=key, error=str(e))
         return False
 
 

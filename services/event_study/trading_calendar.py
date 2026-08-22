@@ -18,6 +18,8 @@ from datetime import datetime, date, timedelta
 from typing import List, Tuple, Optional, Set
 import json
 import os
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -266,7 +268,6 @@ class BISTTradingCalendar:
         Returns:
             (aligned_returns, aligned_offsets) — offset'ler trading day cinsinden
         """
-        import numpy as np
 
         # Event günü iş günü değilse kaydır
         if isinstance(event_date, datetime):

@@ -1,5 +1,6 @@
 """Models API — Gerçek servislere ve Model Kayıt Defterine (MLflow) bağlı."""
 
+import os
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Dict, Any
 
@@ -62,7 +63,7 @@ async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit
     return {
         "models": MODELS_REGISTRY,
         "count": len(MODELS_REGISTRY),
-        "mlflow_url": "http://localhost:5000",
+        "mlflow_url": os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5000"),
     }
 
 

@@ -18,6 +18,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -65,7 +66,7 @@ class ConfidenceCalibrator:
     """
 
     def __init__(self, n_bins: int = 10, min_samples: int = 30):
-        self._observations: List[Observation] = []
+        self._observations: deque = deque(maxlen=10000)
         self._n_bins = n_bins
         self._min_samples = min_samples
 

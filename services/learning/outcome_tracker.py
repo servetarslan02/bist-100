@@ -14,6 +14,7 @@ import asyncio
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -31,7 +32,7 @@ class OutcomeTracker:
     }
 
     def __init__(self):
-        self._pending: List[Dict] = []  # Sonuç bekleyen tahminler
+        self._pending: deque = deque(maxlen=5000)  # Sonuç bekleyen tahminler
         self._checked_today: set = set()
 
     def add_prediction(self, prediction: Dict):

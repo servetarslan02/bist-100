@@ -22,10 +22,17 @@ Endpoints:
 - POST /portfolio/rebalance/orders — Rebalance emirleri oluştur
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+import json
 from typing import Optional, Dict, List, Any
 
+import numpy as np
+import yfinance as yf
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
+
 from ..dependencies import get_current_user, check_rate_limit
+import structlog
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -305,7 +312,6 @@ async def attribution(
     """
     try:
         from ...portfolio.enhancements import performance_attribution
-        import numpy as np
 
         pm = _get_pm()
 
@@ -404,7 +410,6 @@ async def rebalance_analysis(
         Rebalance needed, drifts, max drift
     """
     try:
-        import json
         pm = _get_pm()
 
         if not target_weights:
@@ -535,12 +540,11 @@ async def alpha_signals(
         cached = get_cached("alpha:signals")
         if cached:
             return cached
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("alpha_signals_cache_read_failed", error=str(e))
 
     # 2. Canlı Hesaplama
     try:
-        import yfinance as yf
         from ...learning.production_alpha_engine import production_alpha_engine
         
         tickers = [
@@ -571,8 +575,8 @@ async def alpha_signals(
         # Redis'e 15 dk cache yaz
         try:
             set_cached("alpha:signals", res, ttl=900)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("alpha_signals_cache_write_failed", error=str(e))
             
         return res
     except Exception as e:

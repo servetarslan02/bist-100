@@ -5,7 +5,9 @@ from typing import Optional, Dict, Any, List
 import numpy as np
 
 from ..dependencies import get_current_user, check_rate_limit
+import structlog
 
+logger = structlog.get_logger()
 router = APIRouter()
 
 
@@ -37,7 +39,8 @@ async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate
                 "description": getattr(result, "description", ""),
                 "source": "regime_engine",
             }
-        except Exception:
+        except Exception as e:
+            logger.warning("regime_detection_failed", error=str(e))
             return {
                 "regime": "UNKNOWN",
                 "volatility": "NORMAL",

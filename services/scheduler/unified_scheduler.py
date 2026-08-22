@@ -630,9 +630,10 @@ class DBJobTracker:
             return self._db_available
         try:
             import socket
+            from services.core.config import settings
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
-            result = s.connect_ex(('127.0.0.1', 5432))
+            result = s.connect_ex((settings.postgres_host, settings.postgres_port))
             s.close()
             self._db_available = result == 0
             return self._db_available

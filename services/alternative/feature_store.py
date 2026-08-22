@@ -231,8 +231,8 @@ class FeatureStore:
         try:
             if self._store_path and (self._manifests or self._feature_values):
                 self.save()
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("feature_store_autosave_failed", error=str(e))
 
     def shutdown(self):
         """Explicit save and cleanup."""

@@ -236,7 +236,6 @@ class MacroSensitivityEngine:
 
     def _compute_dynamic_sensitivities(self):
         """Rolling korelasyon ile dinamik hassasiyet hesapla."""
-        import numpy as np
 
         for sector, returns in self._sector_returns.items():
             if len(returns) < 20:

@@ -14,7 +14,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from collections import defaultdict
+from collections import defaultdict, deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -38,7 +38,7 @@ class MetaLearner:
 
     def __init__(self):
         self._regime_performance: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
-        self._model_history: List[ModelPerformance] = []
+        self._model_history: deque = deque(maxlen=5000)
         self._current_regime: str = "UNKNOWN"
 
     def record_performance(
@@ -48,7 +48,10 @@ class MetaLearner:
         metrics: Dict[str, float],
     ):
         """Rejim bazlı performans kaydet."""
-        self._regime_performance[regime][model_id].append(metrics.get("sharpe", 0))
+        scores = self._regime_performance[regime][model_id]
+        scores.append(metrics.get("sharpe", 0))
+        if len(scores) > 500:
+            self._regime_performance[regime][model_id] = scores[-500:]
         self._current_regime = regime
 
         self._model_history.append(ModelPerformance(

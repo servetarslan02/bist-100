@@ -11,6 +11,8 @@ Pipeline:
 
 from typing import Dict, Optional, Any
 from datetime import datetime, timezone
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -71,7 +73,6 @@ class LiveScanner:
 
         # Hacim z-score
         if len(state["volumes"]) >= 20:
-            import numpy as np
             vols = np.array(state["volumes"][-20:])
             mean_v = np.mean(vols)
             std_v = np.std(vols)

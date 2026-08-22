@@ -14,6 +14,7 @@ FAZ 10.1: Knowledge Graph
 
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -44,7 +45,7 @@ class KnowledgeGraph:
 
     def __init__(self):
         self._entities: Dict[str, Entity] = {}
-        self._relations: List[Relation] = []
+        self._relations: deque = deque(maxlen=50000)
         self._index: Dict[str, List[str]] = {}  # entity_id -> [relation_id]
 
     def add_entity(self, entity: Entity):

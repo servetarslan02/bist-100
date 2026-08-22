@@ -430,8 +430,6 @@ class MultiCurrencyHandler:
             return amount
 
         if self._rates_stale:
-            import structlog
-            logger = structlog.get_logger()
             logger.warning("FX rates are stale — using default rates. Call update_rate() or load from API.")
 
         from_rate = self._rates.get(from_currency, 1.0)

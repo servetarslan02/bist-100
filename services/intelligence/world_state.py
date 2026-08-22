@@ -235,7 +235,6 @@ class WorldStateManager:
         Macro feature: level, return, rolling volatility, z-score, percentile, trend, regime
         üzerinden normalize edilmeli.
         """
-        import numpy as np
 
         # USD/TRY — z-score ve percentile bazlı
         usd_try = macro_data.get("USD/TRY", {})

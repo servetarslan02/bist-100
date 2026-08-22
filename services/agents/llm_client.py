@@ -13,10 +13,13 @@ Retry, timeout, token counting dahil.
 
 import asyncio
 import json
+import os
 import re
 import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
+
+import aiohttp
 from dataclasses import dataclass, field
 import structlog
 
@@ -42,7 +45,7 @@ class LLMConfig:
     """LLM yapılandırması."""
     provider: str = "ollama"
     model: str = "gemma4:12b-q4_0"
-    base_url: str = "http://localhost:11434"
+    base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
     api_key: Optional[str] = None
     temperature: float = 0.3
     max_tokens: int = 2048
@@ -131,7 +134,6 @@ class OllamaLLMClient(BaseLLMClient):
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> LLMResponse:
-        import aiohttp
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -207,7 +209,6 @@ class OpenAILLMClient(BaseLLMClient):
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> LLMResponse:
-        import aiohttp
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature
@@ -291,7 +292,6 @@ class AnthropicLLMClient(BaseLLMClient):
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
     ) -> LLMResponse:
-        import aiohttp
 
         start = time.monotonic()
         temp = temperature if temperature is not None else self.config.temperature

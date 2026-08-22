@@ -102,7 +102,8 @@ class AsyncHTTPClient:
                         try:
                             import json
                             return json.loads(text)
-                        except Exception:
+                        except Exception as e:
+                            logger.debug("json_parse_failed", url=url, error=str(e))
                             return text
                     else:
                         logger.warning("POST error", url=url, status=resp.status)

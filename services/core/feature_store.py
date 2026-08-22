@@ -20,6 +20,8 @@ from typing import Dict, List, Optional, Any
 from collections import OrderedDict
 import structlog
 
+from . import redis_helper
+
 logger = structlog.get_logger()
 
 
@@ -39,13 +41,12 @@ class FeatureStore:
         self._hits = 0
         self._misses = 0
 
-        if redis_url:
-            try:
-                import redis
-                self._redis = redis.from_url(redis_url, decode_responses=True)
-                logger.info("Feature store Redis connected", url=redis_url)
-            except Exception as e:
-                logger.warning("Feature store Redis unavailable", error=str(e))
+        # Use shared redis_helper connection pool instead of private connection
+        self._redis = redis_helper.get_client()
+        if self._redis:
+            logger.info("Feature store using shared Redis connection pool")
+        else:
+            logger.info("Feature store Redis unavailable, using in-memory only")
 
     def _make_key(self, ticker: str, date: str, features: List[str]) -> str:
         """Cache key oluştur."""
@@ -83,8 +84,8 @@ class FeatureStore:
                     }
                     self._hits += 1
                     return features
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("feature_store_cache_get_failed", key=key, error=str(e))
 
         self._misses += 1
         return None
@@ -118,8 +119,8 @@ class FeatureStore:
         if self._redis:
             try:
                 self._redis.setex(key, ttl, json.dumps(features))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("feature_store_redis_set_failed", key=key, error=str(e))
 
     def invalidate(self, ticker: str, date: Optional[str] = None):
         """Cache'i temizle."""
@@ -133,8 +134,8 @@ class FeatureStore:
                 key = f"feat:{ticker}:{date}:*"
                 for k in self._redis.scan_iter(match=key):
                     self._redis.delete(k)
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug("feature_store_redis_invalidate_failed", ticker=ticker, error=str(e))
 
     def get_stats(self) -> Dict[str, Any]:
         """Cache istatistikleri."""

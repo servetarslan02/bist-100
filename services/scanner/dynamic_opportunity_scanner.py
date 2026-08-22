@@ -1,4 +1,4 @@
-﻿"""
+"""
 DYNAMIC BIST OPPORTUNITY SCANNER (Gerçek Algoritmik Fırsat Motoru)
 ==================================================================
 Tüm BIST hisselerini gerçek piyasa verileriyle tarar ve yüksek güvenli
@@ -16,8 +16,10 @@ import json
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
+
 import numpy as np
 import pandas as pd
+import yfinance as yf
 
 logger = logging.getLogger("alpha.scanner")
 
@@ -26,7 +28,6 @@ class DynamicOpportunityScanner:
         pass
 
     def scan_opportunities(self, limit: int = 50) -> List[Dict[str, Any]]:
-        import yfinance as yf
         from ..ingestion.bist_universe import BISTUniverse
         
         uni = BISTUniverse()

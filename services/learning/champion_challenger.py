@@ -14,6 +14,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -37,8 +38,8 @@ class ChampionChallengerEngine:
 
     def __init__(self):
         self._current_champion: Optional[ChampionRecord] = None
-        self._champion_history: List[ChampionRecord] = []
-        self._rejected_challengers: List[Dict] = []
+        self._champion_history: deque = deque(maxlen=500)
+        self._rejected_challengers: deque = deque(maxlen=500)
         # Canary deployment attribute'ları
         self._canary_active: bool = False
         self._canary_model: Optional[str] = None

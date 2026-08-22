@@ -6,10 +6,13 @@ Her modül için doğru method isimleri ve parametreleri kullanılır.
 v2.1: Async support + phase metrics
 """
 
+import importlib
 import time
 import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -80,7 +83,6 @@ class IntelligencePipeline:
         }
         for name, path in module_map.items():
             try:
-                import importlib
                 self._modules[name] = importlib.import_module(path)
             except Exception as e:
                 logger.debug(f"Module {name} not available: {e}")
@@ -385,7 +387,6 @@ class IntelligencePipeline:
         if "analysis_engines" not in self._modules:
             return
         try:
-            import numpy as np
             mod = self._modules["analysis_engines"]
             # Price action
             pa = mod.PriceActionEngine()

@@ -29,8 +29,8 @@ DASHBOARD_DIR = Path(__file__).parent.parent.parent / "monitoring"
 @dataclass
 class GrafanaConfig:
     """Grafana bağlantı yapılandırması."""
-    url: str = "http://localhost:3000"
-    auth: str = "admin:admin"  # user:password veya API key
+    url: str = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+    auth: str = os.environ.get("GRAFANA_AUTH", "admin:admin")  # user:password veya API key
     timeout: float = 30.0
     verify_ssl: bool = True
 
@@ -212,7 +212,7 @@ class GrafanaProvisioner:
         prom_ds = DatasourceConfig(
             name="Prometheus",
             type="prometheus",
-            url="http://localhost:9090",
+            url=os.environ.get("PROMETHEUS_URL", "http://localhost:9090"),
             is_default=True,
         )
         ds_ok = await self.provision_datasource(prom_ds)

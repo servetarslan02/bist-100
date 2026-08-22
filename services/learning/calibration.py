@@ -16,7 +16,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -63,7 +63,7 @@ class ConfidenceCalibrator:
     """Model confidence kalibrasyon motoru."""
 
     def __init__(self):
-        self._calibration_history: List[CalibrationResult] = []
+        self._calibration_history: deque = deque(maxlen=1000)
         self._platt_params: Dict[str, PlattScalingParams] = {}  # regime → params
         self._last_calibration: Optional[CalibrationResult] = None
 

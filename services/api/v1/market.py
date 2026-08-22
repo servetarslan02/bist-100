@@ -1,7 +1,14 @@
 """Market Data API — 10 endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from typing import Optional
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
+from fastapi import APIRouter, Depends, HTTPException, Query
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit, get_service_orchestrator
@@ -20,7 +27,6 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
         if regime == "UNKNOWN":
             regime = "BULL_TREND"
         
-        from datetime import datetime, timezone
         return {
             "regime": regime,
             "breadth_pct": 68.4,
@@ -134,11 +140,9 @@ async def live_intel_analysis(
     })
 
     try:
-        import pandas as pd
-        import numpy as np
         from ...data.data_source import data_source
 
-        # Fetch timeframe chart data (daily, weekly, monthly)
+        # Fetch timeframe chart data (daily, weekly, months)
         df_chart = data_source.get_stock_data(yf_ticker, period=period, interval=interval)
 
         # Base daily data for technical indicator calculations
@@ -305,8 +309,8 @@ async def market_radar(
                 "cached_at": cached_at_raw,
                 "from_cache": True,
             }
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("radar_cache_read_failed", error=str(e))
 
     # Cache yoksa direkt çek
     return await _fetch_radar_fresh(limit)
@@ -314,10 +318,7 @@ async def market_radar(
 
 async def _fetch_radar_fresh(limit: int = 200):
     """yfinance batch download ile tüm BIST hisselerini çek."""
-    import asyncio
-    from concurrent.futures import ThreadPoolExecutor
     from ...ingestion.bist_universe import BISTUniverse
-    import yfinance as yf
 
     uni = BISTUniverse()
     bist100 = set(getattr(uni, 'BIST_100_TICKERS', []))
@@ -386,7 +387,8 @@ async def _fetch_radar_fresh(limit: int = 200):
                     "score": score,
                     "isBist100": ticker in bist100,
                 })
-            except Exception:
+            except Exception as e:
+                logger.debug("ticker_fetch_failed", ticker=ticker, error=str(e))
                 continue
         return results
 
@@ -399,11 +401,10 @@ async def _fetch_radar_fresh(limit: int = 200):
     # Cache'e yaz (TTL: 3 dakika güvenlik payı)
     try:
         from ...core.redis_helper import set_cached
-        from datetime import datetime, timezone
         set_cached("radar:data", results, ttl=180)
         set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=180)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("radar_cache_write_failed", error=str(e))
 
     return {
         "data": results,

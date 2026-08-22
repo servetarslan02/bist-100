@@ -12,7 +12,7 @@ import hashlib
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from collections import defaultdict
+from collections import defaultdict, deque
 import structlog
 
 logger = structlog.get_logger()
@@ -40,14 +40,14 @@ class IntegratedLearningSystem:
     """Entegre öğrenme sistemi."""
 
     def __init__(self):
-        self._predictions: List[Prediction] = []
-        self._outcomes: List[Dict] = []
+        self._predictions: deque = deque(maxlen=5000)
+        self._outcomes: deque = deque(maxlen=5000)
         self._regime_accuracy: Dict[str, Dict] = defaultdict(
             lambda: {"correct": 0, "total": 0}
         )
         self._feature_importance: Dict[str, float] = {}
         self._model_versions: List[str] = ["v1"]
-        self._feedback_buffer: List[Dict] = []
+        self._feedback_buffer: deque = deque(maxlen=1000)
 
         logger.info("IntegratedLearningSystem initialized")
 
@@ -97,8 +97,8 @@ class IntegratedLearningSystem:
                 },
             )
             publish_event(pred_event, key=ticker)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("prediction_event_publish_failed", ticker=ticker, error=str(e))
 
         return pred_id
 
@@ -203,8 +203,8 @@ class IntegratedLearningSystem:
                 },
             )
             publish_event(out_event, key=ticker)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("outcome_event_publish_failed", ticker=ticker, error=str(e))
 
         return {
             "success": True,

@@ -14,6 +14,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -53,7 +54,7 @@ class RetrainEngine:
     """Walk-forward validated retrain orchestrator."""
 
     def __init__(self):
-        self._retrain_history: List[RetrainResult] = []
+        self._retrain_history: deque = deque(maxlen=500)
         self._last_retrain: Optional[RetrainResult] = None
         self._retrain_count: int = 0
 

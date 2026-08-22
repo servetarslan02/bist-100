@@ -14,6 +14,7 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -54,9 +55,9 @@ class ShadowModeManager:
         self._champion_id: Optional[str] = None
         self._challenger_id: Optional[str] = None
         self._start_date: Optional[datetime] = None
-        self._predictions: List[ShadowPrediction] = []
-        self._champion_returns: List[float] = []
-        self._challenger_returns: List[float] = []
+        self._predictions: deque = deque(maxlen=5000)
+        self._champion_returns: deque = deque(maxlen=5000)
+        self._challenger_returns: deque = deque(maxlen=5000)
 
     def start_shadow(self, champion_id: str, challenger_id: str):
         """Shadow mode başlat."""
@@ -64,9 +65,9 @@ class ShadowModeManager:
         self._champion_id = champion_id
         self._challenger_id = challenger_id
         self._start_date = datetime.now(timezone.utc)
-        self._predictions = []
-        self._champion_returns = []
-        self._challenger_returns = []
+        self._predictions = deque(maxlen=5000)
+        self._champion_returns = deque(maxlen=5000)
+        self._challenger_returns = deque(maxlen=5000)
 
         logger.info("Shadow mode started",
                    champion=champion_id, challenger=challenger_id)

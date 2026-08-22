@@ -238,7 +238,8 @@ class LearningPipeline:
                         if diff_hours >= 6.0:
                             should_run = True
                             reason = f"Son egitim {diff_hours:.1f} saat once yapilmis (Hedef aralik: 6 saat)"
-                    except Exception:
+                    except Exception as e:
+                        logger.debug("date_parse_failed", error=str(e))
                         should_run = True
                         reason = "Tarih ayrıştırma"
             

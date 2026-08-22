@@ -15,6 +15,9 @@ import time
 import numpy as np
 from typing import Dict, List, Optional, Any
 from datetime import datetime
+
+import polars as pl
+import yfinance as yf
 import structlog
 
 logger = structlog.get_logger()
@@ -332,7 +335,6 @@ class AlphaEngine:
     # =====================================================
 
     async def _fetch_all_data(self):
-        import yfinance as yf
         try:
             tickers = [f"{t}.IS" for t in self._universe]
             return yf.download(tickers, period="60d", group_by="ticker", threads=True, progress=False)
@@ -397,8 +399,6 @@ class AlphaEngine:
 
     def _compute_single_feature(self, ticker: str) -> Optional[Dict[str, float]]:
         """Tek hisse için hızlı feature hesaplama (event fallback)."""
-        import yfinance as yf
-        import polars as pl
         from ..features.calculator import feature_calculator
 
         try:

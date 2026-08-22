@@ -40,8 +40,11 @@ BIST'e Özel Düzeltmeler:
 - Likidite filtresi: Düşük hacimli hisseleri hariç tut (Amihud illiquidity)
 - Sektör kontrolü: BIST'te bankacılık/holding ağırlığı yüksek
 """
+import concurrent.futures
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
+
+import yfinance as yf
 from datetime import datetime, date, timedelta
 from dataclasses import dataclass
 import structlog
@@ -479,8 +482,6 @@ class FamaFrenchDataFetcher:
         Returns:
             Günlük FactorReturns listesi
         """
-        import yfinance as yf
-
         builder = FamaFrenchFactorBuilder()
 
         # yfinance ticker'larını hazırla
@@ -596,8 +597,6 @@ class FamaFrenchDataFetcher:
         self, tickers: List[str]
     ) -> Dict[str, Dict[str, float]]:
         """Hisse fundamental verilerini çek."""
-        import yfinance as yf
-        import concurrent.futures
 
         fundamentals = {}
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)

@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
+from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -64,12 +65,12 @@ class RegimeEngine:
 
     def __init__(self, use_hmm: bool = True):
         self._current_regime: Optional[RegimeState] = None
-        self._regime_history: List[RegimeState] = []
+        self._regime_history: deque = deque(maxlen=1000)
         self._transition_counts: Dict[str, Dict[str, int]] = {}
         self._use_hmm = use_hmm
         self._hmm_detector = None
-        self._return_history: List[float] = []  # Gerçek rolling return serisi
-        self._vol_history: List[float] = []      # Gerçek rolling volatilite serisi
+        self._return_history: deque = deque(maxlen=252)  # Gerçek rolling return serisi
+        self._vol_history: deque = deque(maxlen=252)      # Gerçek rolling volatilite serisi
         if use_hmm:
             try:
                 from .hmm_regime import HMMRegimeDetector
@@ -211,9 +212,6 @@ class RegimeEngine:
 
         self._current_regime = new_state
         self._regime_history.append(new_state)
-
-        # Son 1000 gözlem tut
-        self._regime_history = self._regime_history[-1000:]
 
         logger.info("Regime detected", regime=best_regime.value, confidence=confidence, duration=duration)
         return new_state

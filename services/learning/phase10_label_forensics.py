@@ -43,7 +43,8 @@ def run_label_forensics():
             try:
                 xu_curr_idx = xu100_close.index.get_loc(current_date)
                 xu_fwd_5d = (xu100_close.iloc[xu_curr_idx + 5] / xu100_close.iloc[xu_curr_idx] - 1.0) if xu_curr_idx + 5 < len(xu100_close) else np.nan
-            except Exception:
+            except Exception as e:
+                logger.debug("xu100_forward_return_failed", date=str(current_date), error=str(e))
                 xu_fwd_5d = np.nan
         else:
             xu_fwd_5d = np.nan
@@ -55,7 +56,8 @@ def run_label_forensics():
                 curr_idx = features_by_ticker[tk].index.get_loc(current_date)
                 tk_feat = features_by_ticker[tk]
                 fwd_5d = (tk_feat.iloc[curr_idx + 5]["close"] / tk_feat.iloc[curr_idx]["close"] - 1.0) if curr_idx + 5 < len(tk_feat) else np.nan
-            except Exception:
+            except Exception as e:
+                logger.debug("ticker_forward_return_failed", ticker=tk, date=str(current_date), error=str(e))
                 fwd_5d = np.nan
             
             if not np.isnan(fwd_5d):

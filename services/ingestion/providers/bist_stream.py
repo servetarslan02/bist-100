@@ -14,6 +14,8 @@ import json
 from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
+
+import yfinance as yf
 import structlog
 
 logger = structlog.get_logger()
@@ -71,7 +73,6 @@ class BISTStreamProvider:
         yfinance ile aggressive polling.
         Ücretsiz, 15dk gecikmeli, ama sürekli.
         """
-        import yfinance as yf
         from ..bist_universe import bist_universe
 
         tickers = bist_universe.get_tickers()

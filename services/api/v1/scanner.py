@@ -21,7 +21,9 @@ Endpoints:
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from typing import Optional
 from ..dependencies import get_current_user, check_rate_limit
+import structlog
 
+logger = structlog.get_logger()
 router = APIRouter()
 
 
@@ -109,8 +111,8 @@ async def scan_opportunities(
         cached = get_cached("scanner:opportunities")
         if cached:
             return cached[:limit]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("scanner_cache_read_failed", error=str(e))
 
     try:
         from ...scanner.dynamic_opportunity_scanner import dynamic_scanner
@@ -119,8 +121,8 @@ async def scan_opportunities(
         # Redis'e 5 dakika cache yaz
         try:
             set_cached("scanner:opportunities", results, ttl=300)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.debug("scanner_cache_write_failed", error=str(e))
 
         return results
     except Exception as e:
