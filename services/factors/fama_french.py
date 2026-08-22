@@ -86,8 +86,12 @@ def calculate_factor_scores(
             if std > 0:
                 z = (value - median) / std
                 # Percentile'a çevir (0-1)
-                from scipy.stats import norm
-                percentile = norm.cdf(z)
+                try:
+                    from scipy.stats import norm
+                    percentile = float(norm.cdf(z))
+                except (ImportError, Exception):
+                    import math
+                    percentile = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
             else:
                 percentile = 0.5
 

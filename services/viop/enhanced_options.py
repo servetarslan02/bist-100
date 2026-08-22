@@ -18,10 +18,20 @@ Kaynaklar: Black-Scholes (1973), BIST SPAN, TradingBlock (2025), DaystoExpiry (2
 """
 
 import numpy as np
+import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from scipy.stats import norm
+try:
+    from scipy.stats import norm
+    _norm_cdf = norm.cdf
+    _norm_pdf = norm.pdf
+except (ImportError, Exception):
+    def _norm_cdf(x):
+        return 0.5 * (1.0 + math.erf(float(x) / math.sqrt(2.0)))
+    def _norm_pdf(x):
+        return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * float(x) * float(x))
+
 import structlog
 
 logger = structlog.get_logger()
@@ -71,9 +81,9 @@ def black_scholes(S: float, K: float, T: float, r: float, sigma: float,
     d2 = d1 - sigma * np.sqrt(T)
 
     if option_type == "call":
-        return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+        return S * _norm_cdf(d1) - K * np.exp(-r * T) * _norm_cdf(d2)
     else:
-        return K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+        return K * np.exp(-r * T) * _norm_cdf(-d2) - S * _norm_cdf(-d1)
 
 
 # =====================================================
@@ -104,19 +114,19 @@ def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
     d2 = d1 - sigma * np.sqrt(T)
 
     # Gamma ve Vega opsiyon type'dan bağımsız
-    gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
-    vega = S * norm.pdf(d1) * np.sqrt(T) / 100  # %1 vol etkisi
+    gamma = _norm_pdf(d1) / (S * sigma * np.sqrt(T))
+    vega = S * _norm_pdf(d1) * np.sqrt(T) / 100  # %1 vol etkisi
 
     if option_type == "call":
-        delta = norm.cdf(d1)
-        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))
-                 - r * K * np.exp(-r * T) * norm.cdf(d2)) / 365
-        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100  # /100: %1 faiz değişimi etkisi
+        delta = _norm_cdf(d1)
+        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T))
+                 - r * K * np.exp(-r * T) * _norm_cdf(d2)) / 365
+        rho = K * T * np.exp(-r * T) * _norm_cdf(d2) / 100  # /100: %1 faiz değişimi etkisi
     else:
-        delta = norm.cdf(d1) - 1
-        theta = (-S * norm.pdf(d1) * sigma / (2 * np.sqrt(T))
-                 + r * K * np.exp(-r * T) * norm.cdf(-d2)) / 365
-        rho = -K * T * np.exp(-r * T) * norm.cdf(-d2) / 100  # /100: %1 faiz değişimi etkisi
+        delta = _norm_cdf(d1) - 1
+        theta = (-S * _norm_pdf(d1) * sigma / (2 * np.sqrt(T))
+                 + r * K * np.exp(-r * T) * _norm_cdf(-d2)) / 365
+        rho = -K * T * np.exp(-r * T) * _norm_cdf(-d2) / 100  # /100: %1 faiz değişimi etkisi
 
     return {
         "delta": round(delta, 6),
@@ -190,7 +200,7 @@ class ImpliedVolatility:
 
             # Vega (türev)
             d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
-            vega = S * norm.pdf(d1) * np.sqrt(T)
+            vega = S * _norm_pdf(d1) * np.sqrt(T)
 
             if abs(vega) < 1e-12:
                 # Vega çok küçük → bisection'a geç

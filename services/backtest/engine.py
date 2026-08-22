@@ -354,7 +354,7 @@ class BacktestEngine:
             expectancy=round(float(expectancy), 2),
             total_trades=len(trades),
             total_fees=round(total_fees, 2),
-            avg_holding_days=float(np.mean([t.holding_days for t in trades])),
+            avg_holding_days=float(np.mean([t.holding_days for t in trades])) if trades else 0.0,
             exposure_pct=round(float(np.mean(exposure_history)) * 100, 2) if exposure_history else 0.0,
         )
 

@@ -117,8 +117,8 @@ def _calculate_components(current: Dict, previous: Dict) -> Dict[str, float]:
     ca_prev = previous.get("current_assets", 0)
     ppe_prev = previous.get("ppe", 0)
     ta_prev = max(previous.get("total_assets", 1), 1)
-    aqi_curr = 1 - (ca_curr + ppe_curr) / ta_curr
-    aqi_prev = 1 - (ca_prev + ppe_prev) / ta_prev
+    aqi_curr = max(0.0, 1.0 - (ca_curr + ppe_curr) / ta_curr)
+    aqi_prev = max(0.0, 1.0 - (ca_prev + ppe_prev) / ta_prev)
     aqi = aqi_curr / max(aqi_prev, 0.001)
 
     # 4. SGI (Sales Growth Index)
