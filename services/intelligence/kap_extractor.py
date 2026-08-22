@@ -96,52 +96,60 @@ KEYWORD_MAP = {
 }
 
 
-from services.intelligence.llm_client import llm_client
+from services.intelligence.llm_agent import llm_agent
 
 class KAPExtractor:
-    """KAP bildirimlerinden yapılandırılmış veri çıkarma (LLM Tabanlı)."""
+    """KAP bildirimlerinden yapılandırılmış veri çıkarma (LLM Agent & RAG Tabanlı)."""
 
-    def extract(self, ticker: str, kap_id: str, title: str, summary: str = "") -> KAPExtractedEvent:
-        """KAP bildiriminden LLM ile yapılandırılmış veri çıkar."""
+    def extract(
+        self,
+        ticker: str,
+        kap_id: str,
+        title: str,
+        summary: str = "",
+        kap_history: Optional[List[Dict]] = None,
+    ) -> KAPExtractedEvent:
+        """KAP bildiriminden LLM Agent ile yapılandırılmış veri çıkar."""
         text = f"{title} {summary}".strip()
         if not text:
             return self._build_empty(ticker, kap_id)
 
-        # 1. LLM Çağrısı
-        llm_data = llm_client.analyze_financial_text(text, context_type="kap")
+        # 1. LLM Agent Çağrısı (RAG + KAP geçmişi bağlamlı)
+        analysis = llm_agent.analyze_kap(
+            ticker=ticker,
+            title=title,
+            summary=summary,
+            kap_history=kap_history,
+        )
 
-        # 2. Olay türü (fallback to EVENT_IMPACT_MAP structure if recognized)
-        event_subtype = llm_data.get("event_type", "UNKNOWN")
-        event_type = self._classify_event(text) # Still keep simple keyword check for specific subtypes (DIVIDEND, etc.) or just rely on LLM.
-        
+        # 2. Olay türü sınıflandırması
+        event_type = self._classify_event(text)
+        if event_type == "UNKNOWN" and analysis.event_type != "OTHER":
+            event_type = analysis.event_type
+
         impact_info = EVENT_IMPACT_MAP.get(event_type, {"impact": 0, "magnitude": 0.3, "horizon": "MEDIUM"})
         base_impact = impact_info["impact"]
         impact_magnitude = impact_info["magnitude"]
         time_horizon = impact_info["horizon"]
 
-        # 3. LLM'den gelen skorları harmanla
-        sentiment = float(llm_data.get("sentiment", 0.0))
-        financial_impact = base_impact + (sentiment * 0.5)  # sentiment'i base_impact'e ekle
+        # 3. LLM'den gelen sentiment ve etkiyi harmanla
+        financial_impact = base_impact + (analysis.sentiment * 0.5)
         financial_impact = max(-1.0, min(1.0, financial_impact))
 
-        surprise_score = float(llm_data.get("surprise_score", 0.5))
-        uncertainty = float(llm_data.get("uncertainty_score", 0.3))
-        affected_sectors = llm_data.get("affected_sectors", ["ALL"])
-        if not affected_sectors:
-            affected_sectors = ["ALL"]
+        affected_sectors = analysis.affected_sectors or ["ALL"]
 
         return KAPExtractedEvent(
             ticker=ticker,
             kap_id=kap_id,
             event_type=event_type,
-            event_subtype=event_subtype,
+            event_subtype=analysis.event_type,
             financial_impact=round(financial_impact, 4),
             impact_magnitude=round(impact_magnitude, 4),
-            surprise_score=round(surprise_score, 4),
-            uncertainty=round(uncertainty, 4),
+            surprise_score=round(analysis.surprise_score, 4),
+            uncertainty=round(analysis.uncertainty_score, 4),
             time_horizon=time_horizon,
             affected_sectors=affected_sectors,
-            description=title[:200],
+            description=analysis.key_insight or title[:200],
             raw_title=title,
             raw_summary=summary[:500] if summary else "",
         )

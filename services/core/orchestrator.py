@@ -89,6 +89,8 @@ class MasterOrchestrator:
         ("macro_sensitivity",  "services.intelligence.macro_sensitivity","MacroSensitivityEngine", True),
         ("news_pipeline",      "services.intelligence.news_pipeline",    "NewsPipeline",           True),
         ("trade_planner",      "services.intelligence.trade_planner",    "TradePlanner",           True),
+        ("llm_agent",          "services.intelligence.llm_agent",        "llm_agent",              False),
+        ("agent_pipeline",     "services.agents.agent_pipeline",         "AgentPipelineOrchestrator", True),
         # Decision
         ("decision_engine",    "services.core.decision_engine",          "DecisionEngine",         True),
         # Risk
@@ -661,6 +663,19 @@ class MasterOrchestrator:
                 )
                 d = de.decide(inp)
                 decision = d.__dict__ if hasattr(d, "__dict__") else {}
+
+                # LLM Ajan Türkçe Karar Açıklaması
+                if not decision.get("llm_narrative"):
+                    try:
+                        from services.intelligence.llm_agent import llm_agent
+                        decision["llm_narrative"] = llm_agent.generate_decision_narrative(
+                            ticker=ticker,
+                            decision=decision,
+                            features=features,
+                            price=float(prices[-1]) if len(prices) > 0 else 0,
+                        )
+                    except Exception as exc:
+                        logger.debug("LLM narrative skipped", ticker=ticker, error=str(exc))
 
                 # DECISION_CREATED event publish (audit #3)
                 try:
