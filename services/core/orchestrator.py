@@ -9,10 +9,33 @@ INGESTION → FEATURES → INTELLIGENCE → DECISION → RISK → PORTFOLIO → 
 """
 
 import asyncio
+import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 import structlog
+
+# Sync-to-async bridge: background event loop for event publishing
+_bg_loop = None
+_bg_thread = None
+
+def _get_bg_loop():
+    """Get or create a background asyncio event loop for sync→async bridge."""
+    global _bg_loop, _bg_thread
+    if _bg_loop is None or _bg_loop.is_closed():
+        _bg_loop = asyncio.new_event_loop()
+        _bg_thread = threading.Thread(target=_bg_loop.run_forever, daemon=True)
+        _bg_thread.start()
+    return _bg_loop
+
+def _publish_event_async(event, key="default"):
+    """Publish event from sync context via background loop."""
+    try:
+        from services.core.event_bus import publish_event
+        loop = _get_bg_loop()
+        asyncio.run_coroutine_threadsafe(publish_event(event, key=key), loop)
+    except Exception:
+        pass
 
 logger = structlog.get_logger()
 
@@ -506,6 +529,18 @@ class MasterOrchestrator:
 
         # ━━━ 6. FORECASTING + PROBABILITY ━━━
         forecast = {}
+        # Champion/challenger model seçimi (audit #26)
+        champion_model = None
+        try:
+            from services.learning.champion_challenger import ChampionChallengerEngine
+            cc = ChampionChallengerEngine()
+            champion = cc.get_champion()
+            if champion:
+                champion_model = champion.model_id
+                logger.debug("Champion model selected", model=champion_model)
+        except Exception:
+            pass
+
         try:
             fe = self._services.get("forecasting")
             if fe:
@@ -705,7 +740,7 @@ class MasterOrchestrator:
                     )
                     import asyncio as _asyncio
                     try:
-                        _asyncio.get_event_loop().create_task(eb.publish("agent.analysis", event))
+                        _publish_event_async(event, key=ticker)
                     except RuntimeError:
                         pass
             except ImportError:
@@ -825,7 +860,7 @@ class MasterOrchestrator:
                         )
                         import asyncio as _asyncio
                         try:
-                            _asyncio.get_event_loop().create_task(eb.publish("decision.created", dec_event))
+                            _publish_event_async(dec_event, key=ticker)
                         except RuntimeError:
                             pass
                 except Exception:
