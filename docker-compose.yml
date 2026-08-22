@@ -1,3 +1,5 @@
+name: bist-100-main
+
 x-common: &common
   restart: unless-stopped
   env_file:
