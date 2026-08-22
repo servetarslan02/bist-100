@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 6 |
-| Toplam satır | ~1,500 |
+| Modül sayısı | 7 |
+| Toplam satır | ~2,006 |
 | Test sayısı | 10 |
 | Stres senaryosu | 8+ |
 

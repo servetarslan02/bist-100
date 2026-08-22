@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 6 |
-| Toplam satır | ~1,800 |
+| Modül sayısı | 7 |
+| Toplam satır | ~2,005 |
 | Test sayısı | 12 |
 | Veri kaynakları | yfinance, BIST, LocalParquet |
 

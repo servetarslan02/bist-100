@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 14 |
-| Toplam satır | ~3,500 |
+| Modül sayısı | 17 |
+| Toplam satır | ~3,116 |
 | Test sayısı | 18 |
 | Kaynak sayısı | 8+ (Google Trends, BKM, Kariyer.net, Ekşi, Investing, Satellite, LLM, Social) |
 | Feature sayısı | 60+ |

@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 10 |
-| Toplam satır | ~2,500 |
+| Modül sayısı | 11 |
+| Toplam satır | ~1,606 |
 | Test sayısı | 12 |
 | Faktör sayısı | 8 (Fama-French) + 9 (Piotroski) + 8+ (BIST anomalies) |
 

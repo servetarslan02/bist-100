@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 18 |
-| Toplam satır | ~4,500 |
+| Modül sayısı | 19 |
+| Toplam satır | ~3,439 |
 | Test sayısı | 22 |
 | Feature sayısı | 60+ |
 

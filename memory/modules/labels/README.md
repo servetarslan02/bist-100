@@ -1,6 +1,6 @@
 # Labels
 
-**Modül sayısı:** 1 | **Toplam satır:** ~350 | **Test sayısı:** 6
+**Modül sayısı:** 2 | **Toplam satır:** ~242 | **Test sayısı:** 6
 
 ## Modüller
 

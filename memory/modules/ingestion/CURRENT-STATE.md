@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 25+ |
-| Toplam satır | ~6,500 |
+| Modül sayısı | 33 |
+| Toplam satır | ~8,479 |
 | Test sayısı | 20 |
 | Provider sayısı | 10+ |
 

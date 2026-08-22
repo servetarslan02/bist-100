@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 35+ |
-| Toplam satır | ~12,000 |
+| Modül sayısı | 37 |
+| Toplam satır | ~11,643 |
 | Test sayısı | 45 |
 | Pipeline fazı | 5 (Context → Analysis → Forecast → Fusion → Knowledge) |
 

@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 1 |
-| Toplam satır | ~350 |
+| Modül sayısı | 2 |
+| Toplam satır | ~242 |
 | Test sayısı | 6 |
 | Label sayısı | 14 |
 

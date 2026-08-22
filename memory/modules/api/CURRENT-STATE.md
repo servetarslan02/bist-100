@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 12 |
-| Toplam satır | ~3,200 |
+| Modül sayısı | 26 |
+| Toplam satır | ~6,203 |
 | Endpoint sayısı | 92 REST + 10 WebSocket |
 | Router sayısı | 16 (v1 alt router) |
 

@@ -10,7 +10,7 @@
 | Metrik | Değer |
 |--------|-------|
 | Modül sayısı | 14 |
-| Toplam satır | ~3,200 |
+| Toplam satır | ~4,647 |
 | Test sayısı | 18 |
 | Risk check sayısı | 6 (pre-trade) |
 

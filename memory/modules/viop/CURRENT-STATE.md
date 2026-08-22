@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 8 (1 ana + 7 wrapper) |
-| Toplam satır | ~1,800 |
+| Modül sayısı | 9 (1 ana + 7 wrapper + 1 catalog) |
+| Toplam satır | ~2,213 |
 | Test sayısı | 12 |
 | Opsiyon stratejisi | 9 |
 | SPAN senaryosu | 16 |

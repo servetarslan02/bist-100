@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 16 |
-| Toplam satır | ~4,500 |
+| Modül sayısı | 18 |
+| Toplam satır | ~6,038 |
 | Test sayısı | 20 |
 | Katmanlı filtreleme | Tier 0→5 |
 

@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 3 |
-| Toplam satır | ~1,500 |
+| Modül sayısı | 4 |
+| Toplam satır | ~2,730 |
 | Test sayısı | 12 |
 | Invariant | EQUITY = CASH + MARKET_VALUE |
 

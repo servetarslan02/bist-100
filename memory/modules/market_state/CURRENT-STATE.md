@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 10 |
-| Toplam satır | ~2,800 |
+| Modül sayısı | 11 |
+| Toplam satır | ~3,646 |
 | Test sayısı | 15 |
 | Breadth göstergesi | 7 |
 | Bileşen state | 8 |

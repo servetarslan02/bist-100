@@ -9,8 +9,8 @@
 
 | Metrik | Değer |
 |--------|-------|
-| Modül sayısı | 6 |
-| Toplam satır | ~1,800 |
+| Modül sayısı | 7 |
+| Toplam satır | ~2,422 |
 | Test sayısı | 12 |
 | Job tipi sayısı | 17 |
 | Market fazı sayısı | 9 |

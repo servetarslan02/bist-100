@@ -1,6 +1,6 @@
 # Paper Trading
 
-**Modül sayısı:** 7 | **Toplam satır:** ~1,200 | **Test sayısı:** 15
+**Modül sayısı:** 7 | **Toplam satır:** ~2,068 | **Test sayısı:** 15
 
 ## Modüller
 
