@@ -319,38 +319,44 @@ class VolumeMicrostructureMotor:
                 percentile = sum(1 for v in vol_period if v <= current_vol) / len(vol_period)
                 features[f"volume_percentile_{period}d"] = round(float(percentile), 4)
 
-        # Hacim-fiyat yönü ilişkisi
+        # Hacim-fiyat yönü ilişkisi (vektörize)
         for period in [5, 10, 20]:
-            up_vol = []
-            down_vol = []
-            for i in range(max(1, n - period), n):
-                if valid_close[i] > valid_close[i - 1]:
-                    up_vol.append(valid_vol[i])
-                elif valid_close[i] < valid_close[i - 1]:
-                    down_vol.append(valid_vol[i])
+            start_idx = max(1, n - period)
+            close_slice = valid_close[start_idx:n]
+            prev_slice = valid_close[start_idx-1:n-1]
+            vol_slice = valid_vol[start_idx:n]
 
-            if up_vol and down_vol:
-                avg_up = np.mean(up_vol)
-                avg_down = np.mean(down_vol)
+            up_mask = close_slice > prev_slice
+            down_mask = close_slice < prev_slice
+
+            up_vol = vol_slice[up_mask]
+            down_vol = vol_slice[down_mask]
+
+            if len(up_vol) > 0 and len(down_vol) > 0:
+                avg_up = float(np.mean(up_vol))
+                avg_down = float(np.mean(down_vol))
                 if avg_down > 0:
-                    features[f"volume_up_down_ratio_{period}d"] = round(float(avg_up / avg_down), 4)
-                features[f"volume_up_avg_{period}d"] = round(float(avg_up), 0)
-                features[f"volume_down_avg_{period}d"] = round(float(avg_down), 0)
+                    features[f"volume_up_down_ratio_{period}d"] = round(avg_up / avg_down, 4)
+                features[f"volume_up_avg_{period}d"] = round(avg_up, 0)
+                features[f"volume_down_avg_{period}d"] = round(avg_down, 0)
 
-        # Tick rule (alış/satış baskısı)
+        # Tick rule (alış/satış baskısı — vektörize)
         for period in [5, 10, 20]:
-            buy_ticks = 0
-            sell_ticks = 0
-            for i in range(max(0, n - period), n):
-                if valid_close[i] > valid_open[i]:
-                    buy_ticks += valid_vol[i]
-                elif valid_close[i] < valid_open[i]:
-                    sell_ticks += valid_vol[i]
+            start_idx = max(0, n - period)
+            close_slice = valid_close[start_idx:n]
+            open_slice = valid_open[start_idx:n]
+            vol_slice = valid_vol[start_idx:n]
+
+            buy_mask = close_slice > open_slice
+            sell_mask = close_slice < open_slice
+
+            buy_ticks = float(np.sum(vol_slice[buy_mask]))
+            sell_ticks = float(np.sum(vol_slice[sell_mask]))
 
             total_ticks = buy_ticks + sell_ticks
             if total_ticks > 0:
-                features[f"tick_rule_{period}d"] = round(float((buy_ticks - sell_ticks) / total_ticks), 4)
-                features[f"buy_pressure_{period}d"] = round(float(buy_ticks / total_ticks), 4)
+                features[f"tick_rule_{period}d"] = round((buy_ticks - sell_ticks) / total_ticks, 4)
+                features[f"buy_pressure_{period}d"] = round(buy_ticks / total_ticks, 4)
 
         # VWAP sapması çok periyot
         for period in [5, 10, 20]:
