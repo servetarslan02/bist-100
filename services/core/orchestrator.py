@@ -14,6 +14,7 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
+import numpy as np
 
 import structlog
 
@@ -257,12 +258,20 @@ class MasterOrchestrator:
                 "fundamentals": dict, "news": list, "macro": dict
             }
         """
+        if not self._initialized:
+            try:
+                asyncio.run(self.initialize())
+            except RuntimeError:
+                pass
+
         result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
 
         # sector_map: market_data'dan veya varsayılan olarak
         sector_map = market_data.get("sector_map", {})
 
-        prices = market_data.get("prices", [])
+        raw_prices = np.asarray(market_data.get("prices", []), dtype=float)
+        valid_idx = ~np.isnan(raw_prices) & (raw_prices > 0)
+        prices = raw_prices[valid_idx]
         if len(prices) < 20:
             result["error"] = "Insufficient data"
             return result
@@ -272,18 +281,16 @@ class MasterOrchestrator:
         try:
             calc = self._services.get("feature_calculator")
             if calc:
-                # compute_all_features bir OHLCV DataFrame bekler; market_data
-                # burada ayrı numpy dizileri içeren bir sözlük olduğundan
-                # önce uygun şekle dönüştürülür (önceki halde bu adım eksikti
-                # ve çağrı her zaman sessizce başarısız oluyordu).
                 import pandas as _pd
                 ohlcv_df = _pd.DataFrame({
-                    "Open": market_data.get("opens", prices),
-                    "High": market_data.get("highs", prices),
-                    "Low": market_data.get("lows", prices),
-                    "Close": market_data.get("closes", prices),
-                    "Volume": market_data.get("volumes", [1.0] * len(prices)),
+                    "Open": market_data.get("opens", raw_prices),
+                    "High": market_data.get("highs", raw_prices),
+                    "Low": market_data.get("lows", raw_prices),
+                    "Close": market_data.get("closes", raw_prices),
+                    "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
                 })
+                ohlcv_df = ohlcv_df.dropna(subset=["Close"])
+                ohlcv_df = ohlcv_df[ohlcv_df["Close"] > 0]
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))

@@ -512,7 +512,7 @@ async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 @router.get("/heatmap")
 async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """BIST gercek canli sektor isi haritasi."""
-    radar_res = await market_radar(limit=200)
+    radar_res = await market_radar(limit=500)
     stock_map = {item["symbol"]: item for item in radar_res.get("data", [])}
 
     SECTOR_DEFINITIONS = [

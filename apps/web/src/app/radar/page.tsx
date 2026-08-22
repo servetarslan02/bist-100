@@ -50,7 +50,7 @@ export default function MarketRadar() {
   const pollInterval = marketOpen ? 10_000 : 60_000;
 
   const { data: rawData, loading, lastUpdated } = usePolling<RadarResponse>(
-    "/market/radar?limit=200",
+    "/market/radar?limit=500",
     pollInterval
   );
 

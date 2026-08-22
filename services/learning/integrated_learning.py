@@ -337,8 +337,13 @@ class IntegratedLearningSystem:
             for p in reversed(recent)
         ]
 
-    def get_regime_accuracy(self) -> Dict[str, Any]:
+    def get_regime_accuracy(self, regime: Optional[str] = None) -> Any:
         """Regime bazlı doğruluk."""
+        if regime is not None:
+            stats = self._regime_accuracy.get(str(regime), {})
+            if isinstance(stats, dict) and stats.get("total", 0) > 0:
+                return float(stats["correct"] / stats["total"])
+            return 0.5
         return dict(self._regime_accuracy)
 
     def get_feature_importance(self) -> Dict[str, float]:

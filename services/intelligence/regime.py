@@ -112,19 +112,14 @@ class RegimeEngine:
         hmm_result = None
         if self._hmm_detector:
             try:
-                # Gerçek rolling return ve volatility serisi kullan (son 63 gözlem)
                 current_ret = features.get("momentum_avg", 0) / 100
                 current_vol = features.get("volatility_avg", 20) / 100
                 self._return_history.append(current_ret)
-                if len(self._return_history) > 1000:
-                    self._return_history = self._return_history[-1000:]
                 self._vol_history.append(current_vol)
-                if len(self._vol_history) > 1000:
-                    self._vol_history = self._vol_history[-1000:]
                 # Son 63 gözleme odaklan (rolling window)
                 window = 63
-                returns = np.array(self._return_history[-window:])
-                vol = np.array(self._vol_history[-window:])
+                returns = np.array(list(self._return_history)[-window:])
+                vol = np.array(list(self._vol_history)[-window:])
                 # Yeterli veri yoksa mevcut verinin ortalamasıyla doldur (warm-up)
                 # F-007 düzeltmesi: Edge padding yerine mean padding kullan.
                 # Bu, warm-up döneminde sahte trend bilgisi sızmasını önler.
