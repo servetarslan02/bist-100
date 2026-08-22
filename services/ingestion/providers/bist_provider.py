@@ -44,53 +44,18 @@ class BISTProvider:
 
     async def fetch_index_data(self) -> Dict[str, Any]:
         """BIST endeks verilerini çek (async)."""
-        try:
-            url = f"{self.BASE_URL}/api/index"
-            data = await self._client.get_json(url)
-            if data:
-                return self._parse_index_data(data)
-            return {}
-        except Exception as e:
-            logger.warning("BIST index fetch failed", error=str(e))
-            return {}
+        logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
+        return {}
 
     async def fetch_market_summary(self) -> Dict[str, Any]:
         """Piyasa özeti: yükselen/düşen/hacim (async)."""
-        try:
-            url = f"{self.BASE_URL}/api/market-summary"
-            data = await self._client.get_json(url)
-            return data or {}
-        except Exception as e:
-            logger.warning("BIST market summary failed", error=str(e))
-            return {}
+        logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
+        return {}
 
     async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Tek hisse fiyatı — 15dk gecikmeli (async)."""
-        try:
-            url = f"{self.BASE_URL}/api/stock/{ticker}"
-            data = await self._client.get_json(url)
-            if data:
-                return {
-                    "ticker": ticker,
-                    "price": data.get("lastPrice", 0),
-                    "change_pct": data.get("changePercent", 0),
-                    "volume": data.get("volume", 0),
-                    "high": data.get("high", 0),
-                    "low": data.get("low", 0),
-                    "open": data.get("open", 0),
-                    "close": data.get("close", 0),
-                    "bid": data.get("bidPrice", 0),
-                    "ask": data.get("askPrice", 0),
-                    "best_bid_volume": data.get("bidVolume", 0),
-                    "best_ask_volume": data.get("askVolume", 0),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "source": "bist_official",
-                    "delay_minutes": 15,
-                }
-            return None
-        except Exception as e:
-            logger.warning("BIST stock price failed", ticker=ticker, error=str(e))
-            return None
+        logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
+        return None
 
     async def fetch_batch_prices(self, tickers: List[str]) -> Dict[str, Dict]:
         """Toplu fiyat çekme (async, paralel)."""

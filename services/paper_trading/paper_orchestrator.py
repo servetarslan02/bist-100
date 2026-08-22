@@ -333,7 +333,8 @@ class PaperTradingOrchestrator:
         _spread = self._estimate_spread(ticker, volume) if hasattr(self, '_estimate_spread') else 0.1
         order = self.execution.execute_signal(
             date=date, ticker=ticker, side=side, quantity=quantity,
-            signal_price=price, market_price=price,
+            signal_price=price, 
+            market_price=price * (1.002 if side == "BUY" else 0.998), # FIX: Simulate live execution gap/delay
             avg_volume=volume, volatility=_vol, spread_pct=_spread,
             sector=sector,
         )

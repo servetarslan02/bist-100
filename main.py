@@ -208,7 +208,7 @@ def run_backtest(start_date: str, end_date: str):
         print("❌ BACKTEST_FAILED: Hic gecerli hisse yok!")
         return {"status": "BACKTEST_FAILED", "reason": "No valid stocks"}
 
-    common_dates = sorted(set.intersection(*all_dates))
+    common_dates = sorted(set.union(*all_dates))
 
     # Walk-forward icin minimum gun sayisi
     # train=252 + test=63 + purge=5 + embargo=5 = 325 gun

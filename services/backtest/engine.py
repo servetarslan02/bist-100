@@ -129,148 +129,223 @@ class BacktestEngine:
     def run_backtest(
         self,
         strategy_name: str,
-        signals: List[Dict[str, Any]],
-        price_data: Dict[str, List[Dict[str, Any]]],
+        signals: list[dict[str, any]],
+        price_data: dict[str, list[dict[str, any]]],
         initial_capital: float = 100000,
-        commission_rate: Optional[float] = None,
+        commission_rate: float | None = None,
         slippage_pct: float = 0.05,
-    ) -> BacktestResult:
-        """Backtest çalıştır.
-
-        Args:
-            signals: [{"date": "2024-01-15", "ticker": "THYAO", "action": "BUY", "price": 300, "confidence": 0.8}, ...]
-            price_data: {"THYAO": [{"date": "2024-01-15", "close": 300, "volume": 1000000}, ...], ...}
-        """
+        dump_ledger: bool = False,
+    ):
+        import csv
+        import os
+        from collections import defaultdict
+        
+        """Backtest calistir (CANONICAL ENGINE)."""
+        if not signals:
+            return BacktestResult(strategy_name, "", "", initial_capital, initial_capital, self._compute_metrics([], [], initial_capital, []), [], [], [])
+            
         if commission_rate is not None:
             _cm = CommissionModel(broker_rate=commission_rate/2, exchange_rate=commission_rate/2)
         else:
             _cm = CommissionModel()
 
         capital = initial_capital
-        positions: Dict[str, Dict] = {}  # ticker -> {qty, avg_cost, entry_date}
-        trades: List[BacktestTrade] = []
-        equity_curve = [initial_capital]
-        exposure_history = [0.0]  # Her gün için invested/total oranı
+        positions = {}
+        trades = []
+        equity_curve = []
+        exposure_history = []
         trade_id = 0
+        
+        trades_writer = None
+        daily_writer = None
+        trades_file = None
+        daily_file = None
+        
+        if dump_ledger:
+            os.makedirs('data/ledgers', exist_ok=True)
+            trades_csv_path = 'data/ledgers/continuous_oos_trades.csv'
+            daily_csv_path = 'data/ledgers/continuous_oos_daily.csv'
+            
+            # For continuous OOS, we want to overwrite cleanly
+            trades_file = open(trades_csv_path, 'w', newline='', encoding='utf-8')
+            daily_file = open(daily_csv_path, 'w', newline='', encoding='utf-8')
+            
+            trades_writer = csv.writer(trades_file)
+            daily_writer = csv.writer(daily_file)
+            
+            trades_writer.writerow(['trade_id', 'ticker', 'side', 'signal_timestamp', 'execution_timestamp', 'signal_price', 'execution_price', 'quantity', 'gross_value', 'slippage', 'commission', 'other_cost', 'cash_before', 'cash_after', 'equity_before', 'equity_after', 'fold_id', 'reason', 'exit_reason'])
+            daily_writer.writerow(['date', 'cash', 'market_value', 'gross_exposure', 'net_exposure', 'equity', 'daily_return', 'drawdown', 'fold_id'])
+        # Tarihleri normalize et (YYYY-MM-DD string)
+        all_dates = set()
+        price_lookup = {}
+        
+        for ticker, rows in price_data.items():
+            for row in rows:
+                d = str(row["date"])[:10]
+                all_dates.add(d)
+                if d not in price_lookup:
+                    price_lookup[d] = {}
+                price_lookup[d][ticker] = row
+                
+        all_dates = sorted(list(all_dates))
+        if not all_dates:
+            all_dates = sorted(list(set([str(s["date"])[:10] for s in signals])))
+            
+        signals_by_date = defaultdict(list)
+        for sig in signals:
+            sig_d = str(sig["date"])[:10]
+            signals_by_date[sig_d].append(sig)
+            if sig_d not in all_dates:
+                all_dates.append(sig_d)
+        all_dates = sorted(list(set(all_dates)))
+        
+        peak_equity = initial_capital
+        prev_equity = initial_capital
 
-        for signal in signals:
-            date = signal.get("date", "")
-            ticker = signal.get("ticker", "")
-            action = signal.get("action", "HOLD")
-            price = signal.get("price", 0)
-            confidence = signal.get("confidence", 0.5)
-
-            if action == "HOLD" or price <= 0:
-                continue
-
-            # Hacim bilgisi (price_data'dan)
-            signal_volume = 0
-            if price_data and ticker in price_data:
-                pd_entries = price_data[ticker]
-                if isinstance(pd_entries, list) and pd_entries:
-                    signal_volume = pd_entries[-1].get("volume", 0)
-
-            # F-010: Dinamik slippage
-            effective_slippage = self._compute_dynamic_slippage(price, signal_volume, 100, slippage_pct)
-
-            # Slippage
-            if action == "BUY":
-                fill_price = price * (1 + effective_slippage / 100)
-            else:
-                fill_price = price * (1 - effective_slippage / 100)
-
-            if action == "BUY" and ticker not in positions:
-                # Pozisyon büyüklüğü (basitleştirilmiş)
-                risk_pct = 2.0 * confidence
-                position_value = capital * (risk_pct / 100)
-                shares = int(position_value / fill_price)
-
-                # F-011: Likidite kısıtı
-                if signal_volume > 0:
-                    shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
-
-                if shares > 0 and capital >= shares * fill_price:
-                    cost = shares * fill_price
-                    commission = _cm.calculate(cost)
-                    capital -= (cost + commission)
-
-                    positions[ticker] = {
-                        "qty": shares,
-                        "avg_cost": fill_price,
-                        "entry_date": date,
-                        "commission": commission,
-                    }
-
-            elif action == "SELL" and ticker in positions:
-                pos = positions[ticker]
-                revenue = pos["qty"] * fill_price
-                commission = _cm.calculate(revenue)
-                capital += (revenue - commission)
-
-                pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
-                pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
-
-                trade_id += 1
-                # Holding days hesapla
-                try:
-                    _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
-                    _d2 = datetime.strptime(date, "%Y-%m-%d")
-                    _holding = max(1, (_d2 - _d1).days)
-                except Exception:
-                    _holding = 1
-
-                trades.append(BacktestTrade(
-                    trade_id=trade_id,
-                    ticker=ticker,
-                    side="BUY→SELL",
-                    entry_date=pos["entry_date"],
-                    exit_date=date,
-                    entry_price=pos["avg_cost"],
-                    exit_price=fill_price,
-                    quantity=pos["qty"],
-                    pnl=round(pnl, 2),
-                    pnl_pct=round(pnl_pct, 2),
-                    holding_days=_holding,
-                    commission=round(pos["commission"] + commission, 2),
-                ))
-
-                del positions[ticker]
-
-            # Equity güncelle — tüm pozisyonlar için güncel fiyat
-            total_value = capital
-            invested_value = 0
+        for current_date in all_dates:
+            day_prices = price_lookup.get(current_date, {})
+            
+            # 1. Market Value & Equity Before Trades
+            total_market_value = 0.0
             for t, p in positions.items():
-                if price_data and t in price_data:
-                    # price_data'dan güncel fiyat bul
-                    pd_entries = price_data[t]
-                    if isinstance(pd_entries, list) and pd_entries:
-                        # Son entry'nin close'u
-                        current_price = pd_entries[-1].get("close", p["avg_cost"])
+                current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
+                total_market_value += p["qty"] * current_price
+            current_equity = capital + total_market_value
+            
+            if current_date in signals_by_date:
+                day_sigs = sorted(signals_by_date[current_date], key=lambda x: 0 if x.get("action") == "SELL" else 1)
+                
+                for signal in day_sigs:
+                    ticker = signal.get("ticker", "")
+                    action = signal.get("action", "HOLD")
+                    confidence = signal.get("confidence", 0.5)
+                    signal_price = signal.get("price", 0.0)
+                    
+                    if action == "HOLD":
+                        continue
+                        
+                    if ticker in day_prices:
+                        exec_price = day_prices[ticker].get("close", signal_price)
+                        signal_volume = day_prices[ticker].get("volume", 0)
                     else:
-                        current_price = p["avg_cost"]
-                elif t == ticker:
-                    current_price = price
-                else:
-                    current_price = p["avg_cost"]
-                pos_value = p["qty"] * current_price
-                total_value += pos_value
-                invested_value += pos_value
-            equity_curve.append(total_value)
-            exposure_history.append(invested_value / total_value if total_value > 0 else 0)
+                        exec_price = signal_price
+                        signal_volume = 0
+                        
+                    if exec_price <= 0 or signal_volume <= 0:
+                        continue
+                        
+                    effective_slippage = self._compute_dynamic_slippage(exec_price, signal_volume, 100, slippage_pct)
 
-        # Metrikler hesapla
+                    if action == "BUY" and ticker not in positions:
+                        fill_price = exec_price * (1 + effective_slippage / 100)
+                        
+                        risk_pct = min(15.0, 15.0 * confidence)
+                        position_value = current_equity * (risk_pct / 100)
+                        shares = int(position_value / fill_price)
+                        shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
+
+                        if shares > 0:
+                            cost = shares * fill_price
+                            commission = _cm.calculate(cost)
+                            if capital >= (cost + commission):
+                                cash_before = capital
+                                eq_before = current_equity
+                                pos_before = 0
+                                
+                                capital -= (cost + commission)
+                                positions[ticker] = {
+                                    "qty": shares,
+                                    "avg_cost": fill_price,
+                                    "entry_date": current_date,
+                                    "commission": commission,
+                                }
+                                
+                                # Update current equity after fees
+                                total_market_value = sum([p["qty"] * day_prices.get(t, {}).get("close", p["avg_cost"]) for t, p in positions.items()])
+                                current_equity = capital + total_market_value
+                                
+                                if dump_ledger:
+                                    trades_writer.writerow([
+                                        trade_id, ticker, 'BUY', current_date, current_date, signal_price, fill_price,
+                                        shares, cost, effective_slippage, commission, 0.0, cash_before, capital,
+                                        eq_before, current_equity, '0', 'SIGNAL', ''
+                                    ])
+
+                    elif action == "SELL" and ticker in positions:
+                        fill_price = exec_price * (1 - effective_slippage / 100)
+                        pos = positions[ticker]
+                        
+                        cash_before = capital
+                        eq_before = current_equity
+                        pos_before = pos["qty"]
+                        
+                        revenue = pos["qty"] * fill_price
+                        commission = _cm.calculate(revenue)
+                        capital += (revenue - commission)
+
+                        pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
+                        pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
+
+                        trade_id += 1
+                        try:
+                            from datetime import datetime
+                            _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
+                            _d2 = datetime.strptime(current_date, "%Y-%m-%d")
+                            _holding = max(1, (_d2 - _d1).days)
+                        except Exception:
+                            _holding = 1
+
+                        trades.append(BacktestTrade(
+                            trade_id=trade_id, ticker=ticker, side="BUY-SELL", entry_date=pos["entry_date"], exit_date=current_date,
+                            entry_price=pos["avg_cost"], exit_price=fill_price, quantity=pos["qty"], pnl=round(pnl, 2),
+                            pnl_pct=round(pnl_pct, 2), holding_days=_holding, commission=round(pos["commission"] + commission, 2),
+                        ))
+                        
+                        del positions[ticker]
+                        
+                        # Update current equity after fees
+                        total_market_value = sum([p["qty"] * day_prices.get(t, {}).get("close", p["avg_cost"]) for t, p in positions.items()])
+                        current_equity = capital + total_market_value
+                        
+                        if dump_ledger:
+                            trades_writer.writerow([
+                                trade_id, ticker, 'SELL', current_date, current_date, signal_price, fill_price,
+                                pos_before, revenue, effective_slippage, commission, 0.0, cash_before, capital,
+                                eq_before, current_equity, '0', 'SIGNAL', 'EXIT'
+                            ])
+
+            # End of Day Accounting
+            total_market_value = 0.0
+            for t, p in positions.items():
+                current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
+                total_market_value += p["qty"] * current_price
+            
+            end_of_day_equity = capital + total_market_value
+            if end_of_day_equity > peak_equity:
+                peak_equity = end_of_day_equity
+            
+            drawdown = (peak_equity - end_of_day_equity) / peak_equity if peak_equity > 0 else 0.0
+            daily_return = (end_of_day_equity / prev_equity - 1.0) if prev_equity > 0 else 0.0
+            
+            if dump_ledger:
+                daily_writer.writerow([
+                    current_date, capital, total_market_value, total_market_value, total_market_value, end_of_day_equity, daily_return, drawdown, '0'
+                ])
+            
+            equity_curve.append(end_of_day_equity)
+            exposure_history.append(total_market_value / end_of_day_equity if end_of_day_equity > 0 else 0)
+            prev_equity = end_of_day_equity
+
+        if dump_ledger:
+            trades_file.close()
+            daily_file.close()
+        
         metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
 
         return BacktestResult(
-            strategy_name=strategy_name,
-            start_date=signals[0]["date"] if signals else "",
-            end_date=signals[-1]["date"] if signals else "",
-            initial_capital=initial_capital,
-            final_capital=round(equity_curve[-1] if equity_curve else initial_capital, 2),
-            metrics=metrics,
-            trades=trades,
-            equity_curve=equity_curve,
-            drawdown_curve=self._compute_drawdown_curve(equity_curve),
+            strategy_name=strategy_name, start_date=all_dates[0] if all_dates else "", end_date=all_dates[-1] if all_dates else "",
+            initial_capital=initial_capital, final_capital=round(equity_curve[-1] if equity_curve else initial_capital, 2),
+            metrics=metrics, trades=trades, equity_curve=equity_curve, drawdown_curve=self._compute_drawdown_curve(equity_curve),
         )
 
     def _compute_metrics(self, trades: List[BacktestTrade], equity_curve: List[float], initial_capital: float, exposure_history: Optional[List[float]] = None) -> BacktestMetrics:

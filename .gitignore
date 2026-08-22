@@ -54,3 +54,7 @@ docker-compose.override.yml
 data/universe_cache.json
 .alpha_checkpoints/
 catboost_info/
+
+# Generated data / debug scratch (not part of source)
+scratch/
+data/ledgers/

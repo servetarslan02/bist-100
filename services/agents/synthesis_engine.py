@@ -131,10 +131,6 @@ class SynthesisEngine:
             final_direction = "NO_TRADE"
             final_confidence = 0.0
             reasoning = "Risk agent veto etti"
-        elif debate_result and not debate_result.agreement:
-            final_direction = "NO_TRADE"
-            final_confidence = 0.0
-            reasoning = "Debate'te consensus sağlanamadı"
         elif resolution:
             final_direction = resolution.direction
             final_confidence = resolution.confidence

@@ -240,59 +240,55 @@ class RealTimeDataEngine:
         Lisanslı feed ile gerçek streaming olur.
         """
         from ..bist_universe import BIST_STOCKS
-
-        # Sadece aktif hisseleri dinle (ilk 50 — en likit)
-        watchlist = BIST_STOCKS[:50]
+        watchlist = BIST_STOCKS # FULL UNIVERSE
 
         while self._running:
             try:
-                # Batch download — tek seferde 50 hisse
-                tickers_str = " ".join([f"{t}.IS" for t in watchlist])
-                data = yf.download(
-                    tickers_str,
-                    period="1d",
-                    interval="1m",
-                    group_by="ticker",
-                    threads=True,
-                    progress=False,
-                )
-
-                if not data.empty:
-                    for ticker in watchlist:
-                        try:
-                            td = data[f"{ticker}.IS"]
-                            if td.empty:
-                                continue
-
-                            last_row = td.iloc[-1]
-                            prev_row = td.iloc[-2] if len(td) > 1 else last_row
-
-                            event = DataEvent(
-                                source="market",
-                                event_type="market.tick",
-                                data={
-                                    "ticker": ticker,
-                                    "price": float(last_row["Close"]),
-                                    "open": float(last_row["Open"]),
-                                    "high": float(last_row["High"]),
-                                    "low": float(last_row["Low"]),
-                                    "volume": int(last_row["Volume"]),
-                                    "change_pct": float((last_row["Close"] / prev_row["Close"] - 1) * 100) if prev_row["Close"] > 0 else 0,
-                                    "timestamp": str(last_row.name),
-                                },
-                            )
-                            await self._dispatch(event)
-                        except Exception as e:
-                            logger.debug("Market tick parse error", ticker=ticker, error=str(e))
-
-                logger.debug("Market stream tick", stocks=len(watchlist))
-
+                # Batch download in chunks of 50
+                for i in range(0, len(watchlist), 50):
+                    chunk = watchlist[i:i+50]
+                    tickers_str = " ".join([f"{t}.IS" for t in chunk])
+                    data = yf.download(
+                        tickers_str,
+                        period="1d",
+                        interval="1m",
+                        group_by="ticker",
+                        threads=True,
+                        progress=False,
+                    )
+                    
+                    if not data.empty:
+                        for ticker in chunk:
+                            try:
+                                if len(chunk) == 1:
+                                    td = data.dropna()
+                                else:
+                                    td = data[f"{ticker}.IS"].dropna()
+                                    
+                                if not td.empty:
+                                    latest = td.iloc[-1]
+                                    
+                                    event = DataEvent(
+                                        source="yfinance",
+                                        event_type="market.trade",
+                                        data={
+                                            "ticker": ticker,
+                                            "price": float(latest["Close"]),
+                                            "volume": int(latest.get("Volume", 0)),
+                                            "vwap": float(latest["Close"]), 
+                                            "timestamp": datetime.now(timezone.utc).isoformat(), # yf is 15-min delayed
+                                        },
+                                    )
+                                    await self._dispatch(event)
+                            except KeyError:
+                                pass
+                    await asyncio.sleep(1) # rate limit protection
+                    
             except Exception as e:
-                logger.warning("Market stream error", error=str(e))
+                logger.warning("yfinance realtime error", error=str(e))
 
-            # 60 saniye — ücretsiz kaynaklarla makul interval
-            # Lisanslı feed ile bu 0 olur (real-time streaming)
-            await asyncio.sleep(60)
+            # Poll interval (15 dakika - yfinance 15dk gecikmeli)
+            await asyncio.sleep(900)
 
     # =====================================================
     # Macro Events (düşük frekans — zaten nadir değişir)

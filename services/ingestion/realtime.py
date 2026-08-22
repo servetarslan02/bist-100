@@ -64,39 +64,50 @@ class RealtimeDataProvider:
             try:
                 start = time.time()
 
-                # Batch download
-                tickers_yf = [f"{t}.IS" for t in tickers[:50]]
-                data = yf.download(tickers_yf, period="1d", group_by="ticker",
-                                  threads=True, progress=False)
+                # Chunked download
+                for i in range(0, len(tickers), 50):
+                    chunk = tickers[i:i+50]
+                    tickers_yf = [f"{t}.IS" for t in chunk]
+                    data = yf.download(tickers_yf, period="1d", group_by="ticker",
+                                      threads=True, progress=False)
 
-                for ticker in tickers[:50]:
-                    try:
-                        td = data[f"{ticker}.IS"].dropna()
-                        if len(td) > 0:
-                            latest = td.iloc[-1]
-                            price = float(latest["Close"])
-                            volume = int(latest.get("Volume", 0))
+                    for ticker in chunk:
+                        try:
+                            # yf returns a DataFrame where columns might be a MultiIndex if multiple tickers
+                            if len(chunk) == 1:
+                                td = data.dropna()
+                            else:
+                                td = data[f"{ticker}.IS"].dropna()
 
-                            # Değişim hesapla
-                            prev = self._last_prices.get(ticker, price)
-                            change_pct = (price / prev - 1) * 100 if prev > 0 else 0
+                            if len(td) > 0:
+                                latest = td.iloc[-1]
+                                price = float(latest["Close"])
+                                volume = int(latest.get("Volume", 0))
 
-                            # Güncelle
-                            self._last_prices[ticker] = price
-                            self._last_update[ticker] = datetime.now(timezone.utc)
+                                # Değişim hesapla
+                                prev = self._last_prices.get(ticker, price)
+                                change_pct = (price / prev - 1) * 100 if prev > 0 else 0
 
-                            # Handler'ları çağır
-                            for handler in self._handlers:
-                                try:
-                                    if asyncio.iscoroutinefunction(handler):
-                                        await handler(ticker, price, volume, change_pct)
-                                    else:
-                                        handler(ticker, price, volume, change_pct)
-                                except Exception as e:
-                                    logger.warning("Handler error", ticker=ticker, error=str(e))
-                    except Exception as e:
-                        logger.debug("Handled exception", error=str(e), context="realtime.py:94")
-                        pass
+                                # Güncelle
+                                self._last_prices[ticker] = price
+                                from datetime import timedelta
+                                self._last_update[ticker] = datetime.now(timezone.utc) - timedelta(minutes=15)
+
+                                # Handler'ları çağır
+                                for handler in self._handlers:
+                                    try:
+                                        if asyncio.iscoroutinefunction(handler):
+                                            await handler(ticker, price, volume, change_pct)
+                                        else:
+                                            handler(ticker, price, volume, change_pct)
+                                    except Exception as e:
+                                        logger.warning("Handler error", ticker=ticker, error=str(e))
+                        except Exception as e:
+                            logger.debug("Handled exception", error=str(e), ticker=ticker)
+                            pass
+                    
+                    # Rate limit protection between chunks
+                    await asyncio.sleep(1)
 
                 elapsed = time.time() - start
                 logger.info("yfinance poll completed", tickers=len(tickers), elapsed=f"{elapsed:.1f}s")

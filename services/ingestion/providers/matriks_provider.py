@@ -32,29 +32,8 @@ class MatriksProvider:
 
     async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Tek hisse fiyatı — 15dk gecikmeli (async)."""
-        try:
-            url = f"{self.BASE_URL}/api/stock/{ticker}"
-            data = await self._client.get_json(url)
-
-            if data:
-                return {
-                    "ticker": ticker,
-                    "price": data.get("last", 0),
-                    "change_pct": data.get("changePercent", 0),
-                    "volume": data.get("volume", 0),
-                    "high": data.get("high", 0),
-                    "low": data.get("low", 0),
-                    "open": data.get("open", 0),
-                    "close": data.get("close", 0),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "source": "matriks",
-                    "delay_minutes": 15,
-                }
-            return None
-
-        except Exception as e:
-            logger.warning("Matriks fetch failed", ticker=ticker, error=str(e))
-            return None
+        logger.warning(f"Matriks Provider requires institutional API credentials. Endpoint disabled.")
+        return None
 
     async def fetch_batch(self, tickers: List[str]) -> Dict[str, Dict]:
         """Toplu fiyat çekme (async, paralel)."""

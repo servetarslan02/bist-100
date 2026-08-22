@@ -242,8 +242,9 @@ class PortfolioSimulatorV3:
 
         # Otomatik quantity hesapla
         if quantity is None:
+            total_equity = self.get_total_value()
             max_amount = min(
-                self._cash * self._max_position_pct,
+                total_equity * self._max_position_pct,
                 self._cash * 0.95  # %5 nakit buffer
             )
             quantity = int(max_amount / (price * (1 + self._slippage_rate + 0.001)))
