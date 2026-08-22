@@ -314,6 +314,20 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("macro_surprise_failed", ticker=ticker, error=str(e))
 
+        # ━━━ 2.5. NEWS & KAP SENTIMENT INTEGRATION ━━━
+        try:
+            news_pipe = self._services.get("news_pipeline")
+            if news_pipe and market_data.get("news"):
+                for raw_item in market_data["news"]:
+                    processed = news_pipe.process(raw_item)
+                    if processed and hasattr(processed, "sentiment"):
+                        features["news_sentiment"] = processed.sentiment
+                        features["news_importance"] = getattr(processed, "importance", 0.5)
+                        if hasattr(processed, "key_insight") and processed.key_insight:
+                            features["news_key_insight"] = processed.key_insight
+        except Exception as e:
+            logger.debug("news_sentiment_failed", ticker=ticker, error=str(e))
+
         # ━━━ 3. WORLD STATE ━━━
         world_state = {}
         try:
