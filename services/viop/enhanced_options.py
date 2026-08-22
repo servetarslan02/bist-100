@@ -1565,7 +1565,7 @@ class OptionsBacktestEngine:
         return self._summarize_trades(trades)
 
     def _summarize_trades(self, trades: List[BacktestTrade]) -> BacktestResult:
-        """İşlemleri özetle."""
+        """İşlemleri özetle (vektörize)."""
         if not trades:
             return BacktestResult(
                 total_trades=0, winning_trades=0, losing_trades=0,
@@ -1574,24 +1574,26 @@ class OptionsBacktestEngine:
                 profit_factor=0, trades=[],
             )
 
-        winning = [t for t in trades if t.pnl > 0]
-        losing = [t for t in trades if t.pnl < 0]
+        pnls = np.array([t.pnl for t in trades])
+        holding_days = np.array([t.holding_days for t in trades])
 
-        total_pnl = sum(t.pnl for t in trades)
-        gross_profit = sum(t.pnl for t in winning) if winning else 0
-        gross_loss = abs(sum(t.pnl for t in losing)) if losing else 1
-        avg_holding = sum(t.holding_days for t in trades) / len(trades)
+        winning_mask = pnls > 0
+        losing_mask = pnls < 0
+
+        total_pnl = float(np.sum(pnls))
+        gross_profit = float(np.sum(pnls[winning_mask])) if np.any(winning_mask) else 0
+        gross_loss = float(np.abs(np.sum(pnls[losing_mask]))) if np.any(losing_mask) else 1
 
         return BacktestResult(
             total_trades=len(trades),
-            winning_trades=len(winning),
-            losing_trades=len(losing),
-            win_rate=round(len(winning) / len(trades) * 100, 1) if trades else 0,
+            winning_trades=int(np.sum(winning_mask)),
+            losing_trades=int(np.sum(losing_mask)),
+            win_rate=round(int(np.sum(winning_mask)) / len(trades) * 100, 1) if trades else 0,
             total_pnl=round(total_pnl, 2),
-            avg_pnl=round(total_pnl / len(trades), 2) if trades else 0,
-            max_profit=round(max(t.pnl for t in trades), 2) if trades else 0,
-            max_loss=round(min(t.pnl for t in trades), 2) if trades else 0,
-            avg_holding_days=round(avg_holding, 1),
+            avg_pnl=round(float(np.mean(pnls)), 2) if trades else 0,
+            max_profit=round(float(np.max(pnls)), 2) if trades else 0,
+            max_loss=round(float(np.min(pnls)), 2) if trades else 0,
+            avg_holding_days=round(float(np.mean(holding_days)), 1),
             profit_factor=round(gross_profit / gross_loss, 2) if gross_loss > 0 else float("inf"),
             trades=trades,
         )
