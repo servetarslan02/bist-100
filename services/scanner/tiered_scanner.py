@@ -14,11 +14,10 @@ Tier 5: Decision            → 3-5 → 0-3, risk kontrollü karar
 Haber/KAP/makro → herhangi bir hisseyi Tier 0'dan Tier 3'e atlayabilir.
 """
 
-import math
-import time
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -46,7 +45,7 @@ class AssetTierState:
     instrument_id: int = 0
     current_tier: int = Tier.CONTINUOUS_WATCH
     tier_score: float = 0.0
-    last_tier_update: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    last_tier_update: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # Tier 0 — State tracking
     price: float = 0.0
@@ -61,11 +60,11 @@ class AssetTierState:
     day_low: float = 0.0
 
     # Bar states
-    bar_1m: Optional[Dict] = None
-    bar_5m: Optional[Dict] = None
-    bar_15m: Optional[Dict] = None
-    bar_1h: Optional[Dict] = None
-    bar_1d: Optional[Dict] = None
+    bar_1m: dict | None = None
+    bar_5m: dict | None = None
+    bar_15m: dict | None = None
+    bar_1h: dict | None = None
+    bar_1d: dict | None = None
 
     # Index/sector relations
     index_beta: float = 1.0
@@ -118,7 +117,7 @@ class MarketRegime:
     confidence: float = 0.5
 
     # Rejime göre ağırlıklar
-    weights: Dict[str, float] = field(default_factory=lambda: {
+    weights: dict[str, float] = field(default_factory=lambda: {
         "momentum": 1.0,
         "volume_anomaly": 1.0,
         "breakout": 1.0,
@@ -173,7 +172,7 @@ class TieredScanner:
     """Katmanlı tarama motoru."""
 
     def __init__(self):
-        self._assets: Dict[str, AssetTierState] = {}
+        self._assets: dict[str, AssetTierState] = {}
         self._regime = MarketRegime()
         self._scan_count = 0
         self._tier_counts = {i: 0 for i in range(6)}
@@ -185,7 +184,7 @@ class TieredScanner:
                 ticker=ticker, instrument_id=instrument_id
             )
 
-    def register_assets(self, tickers: List[str]):
+    def register_assets(self, tickers: list[str]):
         """Birden fazla hisse kaydet."""
         for i, ticker in enumerate(tickers):
             self.register_asset(ticker, instrument_id=i + 1)
@@ -195,7 +194,7 @@ class TieredScanner:
     # =====================================================
 
     def process_tick(self, ticker: str, price: float, volume: int,
-                     bid: float = 0, ask: float = 0, timestamp: Optional[datetime] = None):
+                     bid: float = 0, ask: float = 0, timestamp: datetime | None = None):
         """
         Yeni tick → sadece state güncelle.
         800 hissenin geçmişini baştan okumaz.
@@ -218,17 +217,20 @@ class TieredScanner:
         if prev_price > 0:
             asset.price_change_pct = (price / prev_price - 1) * 100
 
-        asset.last_tier_update = timestamp or datetime.now(timezone.utc)
+        asset.last_tier_update = timestamp or datetime.now(UTC)
 
     # =====================================================
     # Tier 1: Quant Scan (Matematiksel Filtreler)
     # =====================================================
 
-    def run_quant_scan(self, features_map: Dict[str, Dict[str, float]]):
+    def run_quant_scan(self, features_map: dict[str, dict[str, float]]):
         """
         800 hisse için quant skorları hesapla.
         Her hisse için sadece feature'lardan skor üret.
         """
+        w = self._regime.weights
+        w_sum = sum(w.values())
+
         for ticker, features in features_map.items():
             if ticker not in self._assets:
                 continue
@@ -246,7 +248,6 @@ class TieredScanner:
             asset.liquidity_score = self._score_liquidity(features)
 
             # Weighted opportunity score (rejime göre ağırlıklı)
-            w = self._regime.weights
             asset.opportunity_score = (
                 asset.momentum_score * w["momentum"]
                 + asset.volume_anomaly_score * w["volume_anomaly"]
@@ -256,7 +257,7 @@ class TieredScanner:
                 + asset.sector_divergence_score * w["sector_divergence"]
                 + asset.flow_correlation_score * w["flow_correlation"]
                 + asset.liquidity_score * w["liquidity"]
-            ) / sum(w.values())
+            ) / w_sum
 
             asset.current_tier = Tier.QUANT_SCAN
 
@@ -266,7 +267,7 @@ class TieredScanner:
     # Tier 2: Opportunity Engine (800 → 50)
     # =====================================================
 
-    def select_opportunities(self, top_n: int = 50) -> List[AssetTierState]:
+    def select_opportunities(self, top_n: int = 50) -> list[AssetTierState]:
         """
         En ilginç N hisseyi seç.
         Sadece quant skoruna göre filtrele.
@@ -291,9 +292,9 @@ class TieredScanner:
     # Tier 3: Deep Analysis (50 → 10)
     # =====================================================
 
-    def run_deep_analysis(self, opportunities: List[AssetTierState],
-                          ml_results: Dict[str, Dict],
-                          historical_data: Dict[str, Any]) -> List[AssetTierState]:
+    def run_deep_analysis(self, opportunities: list[AssetTierState],
+                          ml_results: dict[str, dict],
+                          historical_data: dict[str, Any]) -> list[AssetTierState]:
         """
         50 aday için derin analiz.
         ML ensemble, historical analogues, scenario analysis.
@@ -340,7 +341,7 @@ class TieredScanner:
     # Tier 4: Gemma (10 → 3-5)
     # =====================================================
 
-    def select_for_gemma(self, deep_candidates: List[AssetTierState]) -> List[AssetTierState]:
+    def select_for_gemma(self, deep_candidates: list[AssetTierState]) -> list[AssetTierState]:
         """
         Gemma'ya gönderilecek en güçlü adayları seç.
         Sadece en yüksek confidence + expected return olanlar.
@@ -363,8 +364,8 @@ class TieredScanner:
     # Tier 5: Decision (3-5 → 0-3)
     # =====================================================
 
-    def make_decisions(self, gemma_results: List[AssetTierState],
-                       risk_limits: Dict[str, float]) -> List[AssetTierState]:
+    def make_decisions(self, gemma_results: list[AssetTierState],
+                       risk_limits: dict[str, float]) -> list[AssetTierState]:
         """
         Risk motoru son kararı verir.
         """
@@ -438,7 +439,7 @@ class TieredScanner:
     # Quant Scoring Fonksiyonları
     # =====================================================
 
-    def _score_momentum(self, features: Dict) -> float:
+    def _score_momentum(self, features: dict) -> float:
         """Momentum skoru (0-100)."""
         mom5 = features.get("roc_5d", 0)
         mom20 = features.get("momentum_20d", 0)
@@ -460,7 +461,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_volume_anomaly(self, features: Dict) -> float:
+    def _score_volume_anomaly(self, features: dict) -> float:
         """Hacim anomalisi skoru (0-100)."""
         vol_z = features.get("volume_zscore", 0)
         vol_ratio = features.get("volume_ratio_20d", 1)
@@ -476,7 +477,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_breakout(self, features: Dict) -> float:
+    def _score_breakout(self, features: dict) -> float:
         """Kırılım skoru (0-100)."""
         bb_pos = features.get("bb_position", 0.5)
         near_high = features.get("near_20d_high", 0)
@@ -495,7 +496,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_volatility(self, features: Dict) -> float:
+    def _score_volatility(self, features: dict) -> float:
         """Volatilite skoru (0-100)."""
         vol_ratio = features.get("volatility_ratio", 1)
         atr_pct = features.get("atr_14_pct", 2)
@@ -513,7 +514,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_relative_strength(self, features: Dict) -> float:
+    def _score_relative_strength(self, features: dict) -> float:
         """Göreceli güç skoru (0-100)."""
         mom5 = features.get("roc_5d", 0)
         mom20 = features.get("momentum_20d", 0)
@@ -528,7 +529,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_sector_divergence(self, features: Dict) -> float:
+    def _score_sector_divergence(self, features: dict) -> float:
         """Sektör sapma skoru (0-100).
         Hisse kendi sektöründen pozitif sapma gösteriyorsa yüksek skor.
         Negatif sapma gösteriyorsa düşük skor.
@@ -566,7 +567,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_flow_correlation(self, features: Dict) -> float:
+    def _score_flow_correlation(self, features: dict) -> float:
         """Akış korelasyon skoru (0-100).
         Hacim-fiyat korelasyonunu ölçer.
         Yüksek hacim + yükseliş = pozitif akış (yüksek skor)
@@ -600,7 +601,7 @@ class TieredScanner:
 
         return max(0, min(100, score))
 
-    def _score_liquidity(self, features: Dict) -> float:
+    def _score_liquidity(self, features: dict) -> float:
         """Likidite skoru (0-100)."""
         vol = features.get("volume", 0)
         vol_ratio = features.get("volume_ratio_20d", 1)
@@ -620,7 +621,7 @@ class TieredScanner:
     # Rapor
     # =====================================================
 
-    def get_tier_summary(self) -> Dict[str, Any]:
+    def get_tier_summary(self) -> dict[str, Any]:
         """Tier bazlı özet."""
         tier_counts = {i: 0 for i in range(6)}
         for asset in self._assets.values():
@@ -639,7 +640,7 @@ class TieredScanner:
             "scan_count": self._scan_count,
         }
 
-    def get_top_opportunities(self, n: int = 20) -> List[Dict]:
+    def get_top_opportunities(self, n: int = 20) -> list[dict]:
         """En iyi fırsatları döndür."""
         ranked = sorted(
             self._assets.values(),

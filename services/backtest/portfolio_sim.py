@@ -15,10 +15,11 @@ Finansal doğruluk:
 Mevcut v2.0 ile aynı finansal sonuçları üretir.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from collections import defaultdict
+from datetime import UTC
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -56,7 +57,7 @@ class Trade:
     pnl_pct: float = 0.0
     holding_days: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trade_id": self.trade_id,
             "ticker": self.ticker,
@@ -96,7 +97,7 @@ class Position:
             return 0.0
         return (self.market_value / self.cost_basis - 1) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "quantity": self.quantity,
@@ -121,7 +122,7 @@ class EquitySnapshot:
     drawdown: float
     daily_return: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date,
             "equity": round(self.equity, 2),
@@ -140,7 +141,7 @@ class AuditEntry:
     date: str
     entry_type: str    # BUY | SELL | EQUITY | ERROR | INFO
     ticker: str = ""
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 # =====================================================
@@ -195,20 +196,20 @@ class PortfolioSimulatorV3:
         self._avg_daily_volume = avg_daily_volume
         self._volatility_ratio = volatility_ratio
 
-        self._positions: Dict[str, Position] = {}
-        self._trades: List[Trade] = []
-        self._equity_curve: List[EquitySnapshot] = []
-        self._audit_log: List[AuditEntry] = []
+        self._positions: dict[str, Position] = {}
+        self._trades: list[Trade] = []
+        self._equity_curve: list[EquitySnapshot] = []
+        self._audit_log: list[AuditEntry] = []
 
         self._high_water_mark = initial_capital
         self._prev_equity = initial_capital
         self._trade_counter = 0
 
         # Benchmark
-        self._benchmark_equity: List[Tuple[str, float]] = []
+        self._benchmark_equity: list[tuple[str, float]] = []
 
         # MaxDD duration tracking
-        self._drawdown_start_date: Optional[str] = None
+        self._drawdown_start_date: str | None = None
         self._max_drawdown_duration_days: int = 0
 
     # ===================== CORE OPERATIONS =====================
@@ -218,10 +219,10 @@ class PortfolioSimulatorV3:
         ticker: str,
         price: float,
         date: str,
-        quantity: Optional[int] = None,
-        avg_daily_volume: Optional[float] = None,
-        volatility_ratio: Optional[float] = None,
-    ) -> Optional[Trade]:
+        quantity: int | None = None,
+        avg_daily_volume: float | None = None,
+        volatility_ratio: float | None = None,
+    ) -> Trade | None:
         """Alım emri execute et.
 
         quantity belirtilmezse max_position_pct'ye göre otomatik hesapla.
@@ -337,9 +338,9 @@ class PortfolioSimulatorV3:
         ticker: str,
         price: float,
         date: str,
-        avg_daily_volume: Optional[float] = None,
-        volatility_ratio: Optional[float] = None,
-    ) -> Optional[Trade]:
+        avg_daily_volume: float | None = None,
+        volatility_ratio: float | None = None,
+    ) -> Trade | None:
         """Satım emri execute et (tam kapatma)."""
         if ticker not in self._positions:
             return None
@@ -410,9 +411,9 @@ class PortfolioSimulatorV3:
 
     def update_equity(
         self,
-        prices: Dict[str, float],
+        prices: dict[str, float],
         date: str,
-        benchmark_price: Optional[float] = None,
+        benchmark_price: float | None = None,
     ):
         """Günlük equity snapshot al."""
         # Pozisyon fiyatlarını güncelle
@@ -496,27 +497,29 @@ class PortfolioSimulatorV3:
     def has_position(self, ticker: str) -> bool:
         return ticker in self._positions
 
-    def get_trades(self) -> List[Trade]:
+    def get_trades(self) -> list[Trade]:
         return self._trades
 
-    def get_equity_curve(self) -> List[EquitySnapshot]:
+    def get_equity_curve(self) -> list[EquitySnapshot]:
         return self._equity_curve
 
-    def get_audit_log(self) -> List[AuditEntry]:
+    def get_audit_log(self) -> list[AuditEntry]:
         return self._audit_log
 
     # ===================== METRICS =====================
 
-    def compute_metrics(self) -> Dict[str, Any]:
+    def compute_metrics(self) -> dict[str, Any]:
         """Performans metrikleri hesapla."""
         # Trade-based metrics (equity curve gerektirmez)
         sell_trades = [t for t in self._trades if t.side == "SELL"]
-        winning = sum(1 for t in sell_trades if t.pnl > 0)
-        win_rate = winning / len(sell_trades) * 100 if sell_trades else 0
-        gross_profit = sum(t.pnl for t in sell_trades if t.pnl > 0)
-        gross_loss = abs(sum(t.pnl for t in sell_trades if t.pnl < 0))
+        sell_pnls = np.array([t.pnl for t in sell_trades]) if sell_trades else np.array([])
+
+        winning = int(np.sum(sell_pnls > 0)) if len(sell_pnls) > 0 else 0
+        win_rate = winning / len(sell_pnls) * 100 if len(sell_pnls) > 0 else 0
+        gross_profit = float(np.sum(sell_pnls[sell_pnls > 0])) if len(sell_pnls) > 0 else 0
+        gross_loss = float(np.abs(np.sum(sell_pnls[sell_pnls < 0]))) if len(sell_pnls) > 0 else 0
         profit_factor = gross_profit / gross_loss if gross_loss > 0 else float('inf')
-        expectancy = float(np.mean([t.pnl for t in sell_trades])) if sell_trades else 0
+        expectancy = float(np.mean(sell_pnls)) if len(sell_pnls) > 0 else 0
         total_commission = sum(t.commission for t in self._trades)
         total_slippage = sum(t.slippage for t in self._trades)
 
@@ -613,7 +616,7 @@ class PortfolioSimulatorV3:
 
     # ===================== INVARIANT CHECKS =====================
 
-    def check_invariants(self) -> Tuple[bool, List[str]]:
+    def check_invariants(self) -> tuple[bool, list[str]]:
         """Finansal invariant'ları kontrol et."""
         errors = []
 
@@ -652,13 +655,13 @@ class PortfolioSimulatorV3:
             d1 = datetime.strptime(entry_date, "%Y-%m-%d")
             d2 = datetime.strptime(exit_date, "%Y-%m-%d")
             return max(0, (d2 - d1).days)
-        except Exception as e:
+        except Exception:
             return 0
 
-    def _audit(self, date: str, entry_type: str, ticker: str, details: Dict[str, Any]):
-        from datetime import datetime, timezone
+    def _audit(self, date: str, entry_type: str, ticker: str, details: dict[str, Any]):
+        from datetime import datetime
         self._audit_log.append(AuditEntry(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             date=date,
             entry_type=entry_type,
             ticker=ticker,

@@ -16,12 +16,12 @@ Kaynaklar:
 FAZ 2: Feature Drift Detection
 """
 
-import json
 import math
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from enum import Enum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -63,7 +63,7 @@ class DriftResult:
     drift_detected: bool
     severity: DriftSeverity
     statistic: float              # Test istatistiği
-    p_value: Optional[float]      # KS test p-değeri (PSI/zscore'da None)
+    p_value: float | None      # KS test p-değeri (PSI/zscore'da None)
     threshold: float              # Kullanılan eşik
     baseline_mean: float
     current_mean: float
@@ -71,9 +71,9 @@ class DriftResult:
     current_std: float
     baseline_count: int
     current_count: int
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "feature": self.feature_name,
             "ticker": self.ticker,
@@ -98,13 +98,13 @@ class DriftReport:
     """Tüm feature'lar için drift raporu."""
     ticker: str
     timestamp: str
-    results: List[DriftResult]
+    results: list[DriftResult]
     total_features: int
     drifted_features: int
     critical_drifts: int
     overall_status: DriftSeverity
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp,
@@ -115,7 +115,7 @@ class DriftReport:
             "details": [r.to_dict() for r in self.results],
         }
 
-    def get_drifted_features(self) -> List[str]:
+    def get_drifted_features(self) -> list[str]:
         """Drift tespit edilen feature isimlerini döndür."""
         return [r.feature_name for r in self.results if r.drift_detected]
 
@@ -128,7 +128,7 @@ class DriftAlert:
     severity: DriftSeverity
     message: str
     drift_result: DriftResult
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 # =====================================================
@@ -159,7 +159,7 @@ class FeatureDriftDetector:
         self.rolling_threshold = rolling_threshold
         self.min_samples = min_samples
         self._alert_callback = alert_callback
-        self._alert_history: List[DriftAlert] = []
+        self._alert_history: list[DriftAlert] = []
 
     # =====================================================
     # ANA DRIFT TESPİT
@@ -168,9 +168,9 @@ class FeatureDriftDetector:
     def detect_all(
         self,
         ticker: str,
-        baseline: Dict[str, List[float]],
-        current: Dict[str, List[float]],
-        methods: Optional[List[DriftMethod]] = None,
+        baseline: dict[str, list[float]],
+        current: dict[str, list[float]],
+        methods: list[DriftMethod] | None = None,
     ) -> DriftReport:
         """Tüm feature'lar için drift tespiti yap.
 
@@ -208,7 +208,7 @@ class FeatureDriftDetector:
 
         report = DriftReport(
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             results=results,
             total_features=len(set(baseline.keys()) & set(current.keys())),
             drifted_features=drifted,
@@ -228,10 +228,10 @@ class FeatureDriftDetector:
         self,
         feature_name: str,
         ticker: str,
-        baseline_values: List[float],
-        current_values: List[float],
+        baseline_values: list[float],
+        current_values: list[float],
         method: DriftMethod = DriftMethod.KS_TEST,
-    ) -> Optional[DriftResult]:
+    ) -> DriftResult | None:
         """Tek bir feature için drift tespiti."""
         if len(baseline_values) < self.min_samples or len(current_values) < self.min_samples:
             return None
@@ -247,10 +247,10 @@ class FeatureDriftDetector:
         self,
         feature_name: str,
         ticker: str,
-        baseline: List[float],
-        current: List[float],
+        baseline: list[float],
+        current: list[float],
         method: DriftMethod,
-    ) -> Optional[DriftResult]:
+    ) -> DriftResult | None:
         """Tek bir feature için tek yöntemle drift tespiti."""
         try:
             if method == DriftMethod.KS_TEST:
@@ -270,7 +270,7 @@ class FeatureDriftDetector:
 
     def _ks_test(
         self, feature_name: str, ticker: str,
-        baseline: List[float], current: List[float],
+        baseline: list[float], current: list[float],
     ) -> DriftResult:
         """Kolmogorov-Smirnov test — dağılım değişikliği.
 
@@ -329,7 +329,7 @@ class FeatureDriftDetector:
 
     def _psi_test(
         self, feature_name: str, ticker: str,
-        baseline: List[float], current: List[float],
+        baseline: list[float], current: list[float],
     ) -> DriftResult:
         """Population Stability Index (PSI) — dağılım kayması.
 
@@ -381,7 +381,7 @@ class FeatureDriftDetector:
 
     def _zscore_test(
         self, feature_name: str, ticker: str,
-        baseline: List[float], current: List[float],
+        baseline: list[float], current: list[float],
     ) -> DriftResult:
         """Z-score drift — ortalama kayması.
 
@@ -420,7 +420,7 @@ class FeatureDriftDetector:
 
     def _rolling_test(
         self, feature_name: str, ticker: str,
-        baseline: List[float], current: List[float],
+        baseline: list[float], current: list[float],
     ) -> DriftResult:
         """Rolling window drift — iki pencere arasındaki fark.
 
@@ -458,7 +458,7 @@ class FeatureDriftDetector:
     # ALERT
     # =====================================================
 
-    def check_alerts(self, report: DriftReport) -> List[DriftAlert]:
+    def check_alerts(self, report: DriftReport) -> list[DriftAlert]:
         """Drift raporundan alert'ler üret."""
         alerts = []
 
@@ -499,9 +499,9 @@ class FeatureDriftDetector:
 
     def get_alert_history(
         self,
-        ticker: Optional[str] = None,
+        ticker: str | None = None,
         limit: int = 50,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Alert geçmişini getir."""
         alerts = self._alert_history
         if ticker:
@@ -547,7 +547,7 @@ class FeatureDriftDetector:
             else:
                 return DriftSeverity.NONE
 
-    def _compute_overall_status(self, results: List[DriftResult]) -> DriftSeverity:
+    def _compute_overall_status(self, results: list[DriftResult]) -> DriftSeverity:
         """Genel drift durumunu hesapla."""
         if not results:
             return DriftSeverity.NONE
@@ -565,34 +565,24 @@ class FeatureDriftDetector:
         return DriftSeverity.LOW
 
     @staticmethod
-    def _mean(values: List[float]) -> float:
+    def _mean(values: list[float]) -> float:
         if not values:
             return 0.0
-        return sum(values) / len(values)
+        return float(np.mean(values))
 
     @staticmethod
-    def _std(values: List[float]) -> float:
+    def _std(values: list[float]) -> float:
         if len(values) < 2:
             return 0.0
-        mean = sum(values) / len(values)
-        variance = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        return math.sqrt(variance)
+        return float(np.std(values, ddof=1))
 
     @staticmethod
-    def _bin_counts(values: List[float], edges: List[float]) -> List[int]:
-        """Değerleri bin'lere yerleştir."""
-        n_bins = len(edges) - 1
-        counts = [0] * n_bins
-        for v in values:
-            placed = False
-            for i in range(n_bins):
-                if v <= edges[i + 1]:
-                    counts[i] += 1
-                    placed = True
-                    break
-            if not placed:
-                counts[-1] += 1
-        return counts
+    def _bin_counts(values: list[float], edges: list[float]) -> list[int]:
+        """Değerleri bin'lere yerleştir (vektörize)."""
+        arr = np.array(values)
+        edges_arr = np.array(edges)
+        counts = np.histogram(arr, bins=edges_arr)[0]
+        return counts.tolist()
 
     @staticmethod
     def _ks_p_value(lambda_val: float) -> float:
@@ -618,10 +608,10 @@ class FeatureDriftDetector:
         self,
         ticker: str,
         feature_name: str,
-        baseline: List[float],
-        new_values: List[float],
+        baseline: list[float],
+        new_values: list[float],
         auto_update: bool = False,
-    ) -> Tuple[bool, Optional[DriftResult]]:
+    ) -> tuple[bool, DriftResult | None]:
         """Yeni değerlerle drift kontrolü yap, opsiyonel olarak baseline güncelle.
 
         Args:
