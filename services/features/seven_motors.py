@@ -375,24 +375,17 @@ class VolumeMicrostructureMotor:
                 if vol_std > 0:
                     features[f"volume_zscore_{period}d"] = round(float((valid_vol[-1] - vol_mean) / vol_std), 4)
 
-        # On-balance volume (OBV)
-        obv = 0
-        for i in range(1, n):
-            if valid_close[i] > valid_close[i-1]:
-                obv += valid_vol[i]
-            elif valid_close[i] < valid_close[i-1]:
-                obv -= valid_vol[i]
-        features["obv"] = round(float(obv), 0)
+        # On-balance volume (OBV — vektörize)
+        price_diff = np.diff(valid_close)
+        obv = float(np.sum(valid_vol[1:][price_diff > 0]) - np.sum(valid_vol[1:][price_diff < 0]))
+        features["obv"] = round(obv, 0)
 
-        # OBV momentum
+        # OBV momentum (vektörize)
         if n >= 20:
-            obv_20 = 0
-            for i in range(n-20, n):
-                if valid_close[i] > valid_close[i-1]:
-                    obv_20 += valid_vol[i]
-                elif valid_close[i] < valid_close[i-1]:
-                    obv_20 -= valid_vol[i]
-            features["obv_20d"] = round(float(obv_20), 0)
+            pd_20 = np.diff(valid_close[-20:])
+            vol_20 = valid_vol[-19:]
+            obv_20 = float(np.sum(vol_20[pd_20 > 0]) - np.sum(vol_20[pd_20 < 0]))
+            features["obv_20d"] = round(obv_20, 0)
 
         # Volume trend (hacim artıyor mu azalıyor mu)
         if len(valid_vol) >= 10:
