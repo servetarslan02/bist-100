@@ -90,6 +90,8 @@ class FeatureImportanceTracker:
                 model_version=model_version,
             )
             self._history.append(record)
+            if len(self._history) > 1000:
+                self._history = self._history[-1000:]
 
             # Rejim bazlı
             vals = self._regime_importance[regime][name]

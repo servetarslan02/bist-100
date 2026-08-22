@@ -101,15 +101,23 @@ class ShadowModeManager:
                 champion_dir = pred.champion_prediction.get("direction", "LONG")
                 if champion_dir == "LONG":
                     self._champion_returns.append(actual_return)
+                    if len(self._champion_returns) > 1000:
+                        self._champion_returns = self._champion_returns[-1000:]
                 else:
                     self._champion_returns.append(-actual_return)
+                    if len(self._champion_returns) > 1000:
+                        self._champion_returns = self._champion_returns[-1000:]
 
                 # Challenger outcome
                 challenger_dir = pred.challenger_prediction.get("direction", "LONG")
                 if challenger_dir == "LONG":
                     self._challenger_returns.append(actual_return)
+                    if len(self._challenger_returns) > 1000:
+                        self._challenger_returns = self._challenger_returns[-1000:]
                 else:
                     self._challenger_returns.append(-actual_return)
+                    if len(self._challenger_returns) > 1000:
+                        self._challenger_returns = self._challenger_returns[-1000:]
                 break
 
     def evaluate(self) -> Optional[ShadowResult]:

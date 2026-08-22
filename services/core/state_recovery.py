@@ -60,6 +60,8 @@ class StateRecovery:
                         recovered += 1
             except Exception as e:
                 self._recovery_errors.append(f"{ticker}: {e}")
+                if len(self._recovery_errors) > 500:
+                    self._recovery_errors = self._recovery_errors[-500:]
                 logger.warning("State recovery failed", ticker=ticker, error=str(e))
 
         logger.info("State recovery completed",

@@ -281,6 +281,8 @@ class RiskMonitor:
     def add_rule(self, rule: AlertRule):
         """Yeni alert kuralı ekle."""
         self._rules.append(rule)
+        if len(self._rules) > 100:
+            self._rules = self._rules[-100:]
         logger.info("Alert rule added", rule_id=rule.rule_id, name=rule.name)
 
     def remove_rule(self, rule_id: str):
@@ -297,6 +299,8 @@ class RiskMonitor:
     def register_callback(self, callback: Callable):
         """Alert callback kaydet."""
         self._alert_callbacks.append(callback)
+        if len(self._alert_callbacks) > 100:
+            self._alert_callbacks = self._alert_callbacks[-100:]
 
     def get_alerts(
         self,

@@ -70,6 +70,8 @@ class ModelRegistry:
         )
 
         self._records.append(record)
+        if len(self._records) > 1000:
+            self._records = self._records[-1000:]
         self._cleanup_old_versions()
 
         logger.info("Model registered", model_id=model_id, version=version, status=status)

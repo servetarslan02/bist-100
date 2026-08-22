@@ -78,6 +78,8 @@ class IntegratedLearningSystem:
         )
 
         self._predictions.append(pred)
+        if len(self._predictions) > 5000:
+            self._predictions = self._predictions[-5000:]
 
         logger.debug("Prediction recorded",
             ticker=ticker, direction=predicted_direction,
@@ -175,6 +177,8 @@ class IntegratedLearningSystem:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._outcomes.append(outcome_record)
+        if len(self._outcomes) > 5000:
+            self._outcomes = self._outcomes[-5000:]
 
         # Feature importance güncelle — doğru tahmin eden feature'ları ağırlıklandır
         if pred.feature_snapshot:

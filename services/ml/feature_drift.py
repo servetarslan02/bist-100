@@ -79,6 +79,8 @@ class FeatureDriftDetector:
     def record_distribution(self, feature_data: Dict[str, np.ndarray]):
         """Feature dağılımı kaydet (PSI hesaplama için)."""
         self._feature_distributions.append(feature_data)
+        if len(self._feature_distributions) > 500:
+            self._feature_distributions = self._feature_distributions[-500:]
 
     def check_drift(self) -> List[DriftReport]:
         """Tüm feature'lar için kapsamlı drift kontrolü."""

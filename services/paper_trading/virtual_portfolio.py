@@ -166,6 +166,8 @@ class VirtualPortfolio:
             "reason": reason,
         }
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
 
         if self._state_store:
             self._state_store.save_trade(trade)
@@ -220,6 +222,8 @@ class VirtualPortfolio:
             "reason": reason,
         }
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         if self._state_store:
             self._state_store.save_trade(trade)
 

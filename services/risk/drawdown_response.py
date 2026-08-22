@@ -164,6 +164,8 @@ class DrawdownResponseSystem:
                 equity_before=self._current_equity,
             )
             self._events.append(event)
+            if len(self._events) > 500:
+                self._events = self._events[-500:]
 
             logger.warning("Drawdown action changed",
                           drawdown_pct=f"{drawdown_pct:.1f}%",

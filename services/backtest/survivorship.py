@@ -81,6 +81,8 @@ class SurvivorshipBiasHandler:
     def register_delisting(self, event: DelistingEvent):
         """Delisting olayı kaydet."""
         self._delisting_events.append(event)
+        if len(self._delisting_events) > 500:
+            self._delisting_events = self._delisting_events[-500:]
         self._delisted_tickers[event.ticker] = event.delisting_date
         logger.info("Delisting registered",
                     ticker=event.ticker,

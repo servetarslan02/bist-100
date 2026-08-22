@@ -161,6 +161,8 @@ class HMMRegimeDetector:
         if not self._is_fitted or self._model is None:
             result = self._rule_based_fallback(returns, volatility)
             self._regime_history.append(result)
+            if len(self._regime_history) > 1000:
+                self._regime_history = self._regime_history[-1000:]
             return result
 
         try:
@@ -186,6 +188,8 @@ class HMMRegimeDetector:
             )
 
             self._regime_history.append(result)
+            if len(self._regime_history) > 1000:
+                self._regime_history = self._regime_history[-1000:]
 
             return result
 

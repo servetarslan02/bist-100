@@ -106,6 +106,8 @@ class CustomFilterEngine:
             custom_filter: Özel filtre
         """
         self._filters.append(custom_filter)
+        if len(self._filters) > 100:
+            self._filters = self._filters[-100:]
         logger.info("Custom filter added", name=custom_filter.name)
 
     def remove_filter(self, name: str):

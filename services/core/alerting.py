@@ -346,6 +346,8 @@ class NotificationRouter:
 
     def add_provider(self, provider):
         self._providers.append(provider)
+        if len(self._providers) > 100:
+            self._providers = self._providers[-100:]
 
     def get_providers_for_severity(self, severity: str) -> List[Any]:
         """Severity'ye göre uygun provider'ları döndür."""
@@ -769,6 +771,8 @@ class AlertingSystem:
                     notification_status=row["notification_status"],
                 )
                 self._alerts.append(alert)
+                if len(self._alerts) > 500:
+                    self._alerts = self._alerts[-500:]
             logger.info("Alerts loaded from DB", count=len(rows))
         except Exception as e:
             logger.warning("Alert load from DB failed", error=str(e))
@@ -788,6 +792,8 @@ class AlertingSystem:
             return
 
         self._alerts.append(alert)
+        if len(self._alerts) > 500:
+            self._alerts = self._alerts[-500:]
         self._trim_alerts()
         self._dedup_cache[alert.fingerprint] = time.time()
 
@@ -834,8 +840,12 @@ class AlertingSystem:
         for provider in providers:
             result = await self._send_with_retry(provider, alert)
             self._notification_log.append(result)
+            if len(self._notification_log) > 1000:
+                self._notification_log = self._notification_log[-1000:]
             if not result.success:
                 self._failed_notifications.append(result)
+                if len(self._failed_notifications) > 500:
+                    self._failed_notifications = self._failed_notifications[-500:]
                 alert.notification_status = "failed"
             else:
                 alert.notification_status = "sent"

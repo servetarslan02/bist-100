@@ -176,12 +176,18 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
 
     def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot):
         self._fundamentals.append(snapshot)
+        if len(self._fundamentals) > 500:
+            self._fundamentals = self._fundamentals[-500:]
 
     def add_event_snapshot(self, snapshot: EventSnapshot):
         self._events.append(snapshot)
+        if len(self._events) > 500:
+            self._events = self._events[-500:]
 
     def add_catalyst_snapshot(self, snapshot: CatalystSnapshot):
         self._catalysts.append(snapshot)
+        if len(self._catalysts) > 500:
+            self._catalysts = self._catalysts[-500:]
 
     def clear(self):
         self._fundamentals.clear()

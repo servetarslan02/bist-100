@@ -184,6 +184,8 @@ class SystemStateGovernor:
             triggered_by=triggered_by,
         )
         self._transition_history.append(transition)
+        if len(self._transition_history) > 1000:
+            self._transition_history = self._transition_history[-1000:]
 
         logger.warning("System state transition",
                       old=old_state.value,
@@ -219,6 +221,8 @@ class SystemStateGovernor:
     def register_callback(self, callback: Callable):
         """State change callback'i kaydet."""
         self._callbacks.append(callback)
+        if len(self._callbacks) > 100:
+            self._callbacks = self._callbacks[-100:]
 
     async def run_health_checks(self) -> Dict[str, HealthCheck]:
         """

@@ -111,6 +111,8 @@ class ContinuousLearningPipeline:
         daily_metrics = self._record_daily_performance(date, predictions, actual_returns)
         results["daily_metrics"] = daily_metrics
         self._daily_performance.append(daily_metrics)
+        if len(self._daily_performance) > 1000:
+            self._daily_performance = self._daily_performance[-1000:]
 
         # 2. Drift kontrolü
         if self._should_check_drift(date):
@@ -162,6 +164,8 @@ class ContinuousLearningPipeline:
                 model_version=retrain_result.get("version_id", ""),
             )
             self._cycles.append(cycle)
+            if len(self._cycles) > 500:
+                self._cycles = self._cycles[-500:]
 
         # 4. A/B test değerlendirme
         ab_result = self._evaluate_ab_test(date)

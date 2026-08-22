@@ -72,6 +72,8 @@ class AgentCommunicationBus:
         """Mesaj gönder."""
         self._message_queue[message.receiver].append(message)
         self._message_log.append(message)
+        if len(self._message_log) > 1000:
+            self._message_log = self._message_log[-1000:]
 
     def receive(self, role: AgentRole) -> List[AgentMessage]:
         """Mesaj al (ve kuyruktan sil)."""

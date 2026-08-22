@@ -82,6 +82,8 @@ class MacroImpactAnalyzer:
             half_life_days=half_life,
         )
         self._shock_history.append(event)
+        if len(self._shock_history) > 1000:
+            self._shock_history = self._shock_history[-1000:]
 
         logger.warning("Macro shock recorded",
                       shock_type=shock_type, magnitude=magnitude,

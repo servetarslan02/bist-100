@@ -330,6 +330,8 @@ class PortfolioSimulatorV3:
             slippage=slippage_amount,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         self._audit(date, "BUY", ticker, trade.to_dict())
         return trade
 
@@ -406,6 +408,8 @@ class PortfolioSimulatorV3:
             holding_days=holding_days,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         self._audit(date, "SELL", ticker, trade.to_dict())
         return trade
 
@@ -471,11 +475,15 @@ class PortfolioSimulatorV3:
             daily_return=daily_return,
         )
         self._equity_curve.append(snapshot)
+        if len(self._equity_curve) > 5000:
+            self._equity_curve = self._equity_curve[-5000:]
         self._prev_equity = equity
 
         # Benchmark
         if benchmark_price is not None:
             self._benchmark_equity.append((date, benchmark_price))
+            if len(self._benchmark_equity) > 5000:
+                self._benchmark_equity = self._benchmark_equity[-5000:]
 
     # ===================== QUERIES =====================
 

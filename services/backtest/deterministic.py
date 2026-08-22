@@ -121,6 +121,8 @@ class DeterministicRecovery:
         checkpoint.hash_state = checkpoint.compute_state_hash()
 
         self._checkpoints.append(checkpoint)
+        if len(self._checkpoints) > 500:
+            self._checkpoints = self._checkpoints[-500:]
         self._persist_checkpoint(checkpoint)
 
         logger.info("Checkpoint created",

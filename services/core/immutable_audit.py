@@ -143,6 +143,8 @@ class ImmutableAuditLog:
         self._last_hash = entry.entry_hash
 
         self._entries.append(entry)
+        if len(self._entries) > 1000:
+            self._entries = self._entries[-1000:]
         self._total_entries += 1
 
         logger.info("Audit log entry",

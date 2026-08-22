@@ -182,6 +182,8 @@ class CircuitBreakerMetricsCollector:
             "new_state": new_state,
         }
         self._history.append(entry)
+        if len(self._history) > 1000:
+            self._history = self._history[-1000:]
 
         if len(self._history) > self._max_history:
             self._history = self._history[-self._max_history:]

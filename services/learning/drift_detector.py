@@ -179,6 +179,8 @@ class AdvancedDriftDetector:
         )
 
         self._drift_history.append(report)
+        if len(self._drift_history) > 1000:
+            self._drift_history = self._drift_history[-1000:]
         self._last_report = report
 
         if report.overall_drift:

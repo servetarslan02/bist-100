@@ -134,6 +134,8 @@ class MacroRegimeDetector:
                     confidence=best_score,
                 )
                 self._transitions.append(transition)
+                if len(self._transitions) > 500:
+                    self._transitions = self._transitions[-500:]
                 self._regime_duration = 0
 
                 logger.warning("Macro regime change",
@@ -157,6 +159,8 @@ class MacroRegimeDetector:
         )
 
         self._regime_history.append(result)
+        if len(self._regime_history) > 1000:
+            self._regime_history = self._regime_history[-1000:]
         return result
 
     def compute_regime_features(self, macro_features: Dict[str, float]) -> Dict[str, float]:

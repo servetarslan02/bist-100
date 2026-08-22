@@ -173,6 +173,8 @@ class SuperIntelligenceEngine:
 
         with self._lock:
             self._healing_queue.append(healing_record)
+            if len(self._healing_queue) > 100:
+                self._healing_queue = self._healing_queue[-100:]
 
         logger.warning("Self-healing triggered",
                       module=module_name, action=healing_action, error=error_msg)
@@ -279,6 +281,8 @@ class SuperIntelligenceEngine:
         )
 
         self._model_versions.append(new_version)
+        if len(self._model_versions) > 500:
+            self._model_versions = self._model_versions[-500:]
 
         # Eski versiyonları temizle
         if len(self._model_versions) > self.max_models_history:
@@ -418,6 +422,8 @@ class SuperIntelligenceEngine:
         )
 
         self._ab_test_results.append(result)
+        if len(self._ab_test_results) > 1000:
+            self._ab_test_results = self._ab_test_results[-1000:]
         self._ab_test_active = False
 
         # Kazananı aktif yap

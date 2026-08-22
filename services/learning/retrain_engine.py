@@ -147,6 +147,8 @@ class RetrainEngine:
             )
 
             self._retrain_history.append(result)
+            if len(self._retrain_history) > 1000:
+                self._retrain_history = self._retrain_history[-1000:]
             self._last_retrain = result
 
             logger.info("Retrain completed",

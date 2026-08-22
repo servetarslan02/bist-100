@@ -152,6 +152,8 @@ class EnhancedReplayEngine:
             config_hash=config_hash,
         )
         self._state_snapshots.append(state)
+        if len(self._state_snapshots) > 1000:
+            self._state_snapshots = self._state_snapshots[-1000:]
         return state
 
     def restore_snapshot(self, snapshot: SystemState) -> Dict[str, Any]:
@@ -419,6 +421,8 @@ class EnhancedReplayEngine:
         )
         self._current_hash = record.seal(self._current_hash)
         self._audit_trail.append(record)
+        if len(self._audit_trail) > 1000:
+            self._audit_trail = self._audit_trail[-1000:]
 
     def get_audit_trail(self) -> List[Dict[str, Any]]:
         """Audit trail'i döndür."""

@@ -110,6 +110,8 @@ class JobMonitor:
         )
 
         self._records.append(record)
+        if len(self._records) > 1000:
+            self._records = self._records[-1000:]
 
         # Limit
         if len(self._records) > self._max_history:
@@ -247,10 +249,14 @@ class JobMonitor:
     def register_callback(self, callback: Callable):
         """Alert callback kaydet."""
         self._callbacks.append(callback)
+        if len(self._callbacks) > 100:
+            self._callbacks = self._callbacks[-100:]
 
     def _fire_alert(self, alert: JobAlert):
         """Alert tetikle."""
         self._alerts.append(alert)
+        if len(self._alerts) > 500:
+            self._alerts = self._alerts[-500:]
 
         if len(self._alerts) > 500:
             self._alerts = self._alerts[-500:]

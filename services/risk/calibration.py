@@ -147,6 +147,8 @@ class ScoreCalibrator:
         brier = float(np.mean((predicted - outcomes) ** 2))
 
         self._brier_scores.append(brier)
+        if len(self._brier_scores) > 1000:
+            self._brier_scores = self._brier_scores[-1000:]
 
         logger.info("Brier score computed",
                    brier=round(brier, 4),

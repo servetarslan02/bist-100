@@ -225,6 +225,8 @@ class CostMonitor:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
         self._costs.append(entry)
+        if len(self._costs) > 1000:
+            self._costs = self._costs[-1000:]
         self._total_cost += cost_usd
         self._costs = self._costs[-10000:]
 

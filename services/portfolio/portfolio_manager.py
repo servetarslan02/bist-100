@@ -349,6 +349,8 @@ class PortfolioManager:
             reference_id=reference_id,
         )
         self._cash_ledger.append(entry)
+        if len(self._cash_ledger) > 1000:
+            self._cash_ledger = self._cash_ledger[-1000:]
         self._trim_list(self._cash_ledger, MAX_CASH_LEDGER)
 
     def deposit_cash(self, amount: float, description: str = "Sermaye Ekleme") -> float:
@@ -398,6 +400,8 @@ class PortfolioManager:
             reference_id=reference_id,
         )
         self._position_history.append(entry)
+        if len(self._position_history) > 1000:
+            self._position_history = self._position_history[-1000:]
         self._trim_list(self._position_history, MAX_POSITION_HISTORY)
 
     def get_position_history(self, ticker: str = "", limit: int = 100) -> List[Dict]:
@@ -455,6 +459,8 @@ class PortfolioManager:
                 drawdown_from_hwm=dd_pct,
             )
             self._equity_snapshots.append(snapshot)
+            if len(self._equity_snapshots) > 5000:
+                self._equity_snapshots = self._equity_snapshots[-5000:]
             self._trim_list(self._equity_snapshots, MAX_EQUITY_CURVE)
             self._last_snapshot_date = today
 
@@ -621,6 +627,8 @@ class PortfolioManager:
             realized_pnl=realized_pnl,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         self._trim_list(self._trades, MAX_TRADES)
 
         # Nakit güncelle
@@ -722,6 +730,8 @@ class PortfolioManager:
             realized_pnl=realized_pnl,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
 
         # Audit trail
         qty_before = pos.quantity

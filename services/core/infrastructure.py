@@ -77,6 +77,8 @@ class CatalystEngine:
     def add_catalyst(self, catalyst: CatalystEvent):
         """Yaklaşan olay ekle."""
         self._catalysts.append(catalyst)
+        if len(self._catalysts) > 500:
+            self._catalysts = self._catalysts[-500:]
 
     def get_upcoming(self, days: int = 7) -> List[Dict]:
         """Yaklaşan olayları getir."""
@@ -125,6 +127,8 @@ class NotificationSystem:
             "read": False,
         }
         self._notifications.append(notification)
+        if len(self._notifications) > 500:
+            self._notifications = self._notifications[-500:]
         logger.info("Notification", category=category, title=title, severity=severity)
 
     def get_unread(self, limit: int = 20) -> List[Dict]:
@@ -188,6 +192,8 @@ class SnapshotSystem:
             "state": state,
         }
         self._snapshots.append(snapshot)
+        if len(self._snapshots) > 1000:
+            self._snapshots = self._snapshots[-1000:]
         # Son 100 snapshot tut
         self._snapshots = self._snapshots[-100:]
 
@@ -252,6 +258,8 @@ class JobQueue:
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         self._queue.append(job)
+        if len(self._queue) > 100:
+            self._queue = self._queue[-100:]
         return job["job_id"]
 
     def dequeue(self) -> Optional[Dict]:
@@ -263,6 +271,8 @@ class JobQueue:
             job = self._queue.pop(0)
             job["status"] = "RUNNING"
             self._running.append(job)
+            if len(self._running) > 1000:
+                self._running = self._running[-1000:]
             return job
         return None
 
@@ -274,6 +284,8 @@ class JobQueue:
                 job["result"] = result
                 job["completed_at"] = datetime.now(timezone.utc).isoformat()
                 self._completed.append(self._running.pop(i))
+                if len(self._completed) > 1000:
+                    self._completed = self._completed[-1000:]
                 return
 
     def get_stats(self) -> Dict:

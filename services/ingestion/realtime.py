@@ -40,6 +40,8 @@ class RealtimeDataProvider:
     def on_tick(self, handler: Callable):
         """Tick handler kaydet."""
         self._handlers.append(handler)
+        if len(self._handlers) > 100:
+            self._handlers = self._handlers[-100:]
 
     async def start(self, tickers: List[str], provider: str = "yfinance"):
         """Veri akışını başlat."""

@@ -70,6 +70,8 @@ class GracefulShutdown:
     def register_handler(self, handler: Callable):
         """Shutdown handler kaydet."""
         self._shutdown_handlers.append(handler)
+        if len(self._shutdown_handlers) > 100:
+            self._shutdown_handlers = self._shutdown_handlers[-100:]
 
     async def shutdown(self, reason: str = "manual"):
         """Graceful shutdown başlat."""

@@ -538,6 +538,8 @@ class AgentOrchestrator:
             role_val, result = item
             results[role_val] = result
             self._results.append(result)
+            if len(self._results) > 1000:
+                self._results = self._results[-1000:]
 
         # Synthesis
         synth_agent = self._agents.get(AgentRole.SYNTHESIS) or BaseAgent(

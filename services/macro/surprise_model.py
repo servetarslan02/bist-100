@@ -191,6 +191,8 @@ class MacroSurpriseModel:
         )
 
         self._surprise_history.append(result)
+        if len(self._surprise_history) > 1000:
+            self._surprise_history = self._surprise_history[-1000:]
         self._active_surprises[indicator] = result
 
         if magnitude != "NONE":

@@ -483,6 +483,8 @@ class FeatureDriftDetector:
                 )
                 alerts.append(alert)
                 self._alert_history.append(alert)
+                if len(self._alert_history) > 1000:
+                    self._alert_history = self._alert_history[-1000:]
 
         # Son 1000 alert tut
         self._alert_history = self._alert_history[-1000:]

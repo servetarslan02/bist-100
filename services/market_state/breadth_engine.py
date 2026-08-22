@@ -164,6 +164,8 @@ class MarketBreadthEngine:
 
         # 5. McClellan Oscillator
         self._net_advances_history.append(net_advances)
+        if len(self._net_advances_history) > 1000:
+            self._net_advances_history = self._net_advances_history[-1000:]
         mcclellan_osc = self._compute_mcclellan()
 
         # 6. McClellan Summation Index

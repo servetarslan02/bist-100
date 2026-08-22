@@ -116,7 +116,11 @@ class RegimeEngine:
                 current_ret = features.get("momentum_avg", 0) / 100
                 current_vol = features.get("volatility_avg", 20) / 100
                 self._return_history.append(current_ret)
+                if len(self._return_history) > 1000:
+                    self._return_history = self._return_history[-1000:]
                 self._vol_history.append(current_vol)
+                if len(self._vol_history) > 1000:
+                    self._vol_history = self._vol_history[-1000:]
                 # Son 63 gözleme odaklan (rolling window)
                 window = 63
                 returns = np.array(self._return_history[-window:])
@@ -212,6 +216,8 @@ class RegimeEngine:
 
         self._current_regime = new_state
         self._regime_history.append(new_state)
+        if len(self._regime_history) > 1000:
+            self._regime_history = self._regime_history[-1000:]
 
         logger.info("Regime detected", regime=best_regime.value, confidence=confidence, duration=duration)
         return new_state

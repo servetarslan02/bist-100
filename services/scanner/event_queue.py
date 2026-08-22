@@ -50,6 +50,8 @@ class EventPriorityQueue:
         for i in range(self._max_workers):
             task = asyncio.create_task(self._worker(f"worker-{i}"))
             self._workers.append(task)
+            if len(self._workers) > 1000:
+                self._workers = self._workers[-1000:]
         logger.info("Event queue started", workers=self._max_workers)
 
     async def stop(self):

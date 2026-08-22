@@ -50,6 +50,8 @@ class AuditLog:
         """Audit kaydı ekle (append-only)."""
         idx = len(self._entries)
         self._entries.append(entry)
+        if len(self._entries) > 1000:
+            self._entries = self._entries[-1000:]
 
         # Index güncelle
         key = f"{entry.entity_type}:{entry.entity_id}"

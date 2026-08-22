@@ -126,6 +126,8 @@ class RegimeTransitionTracker:
                 to_confidence=confidence,
             )
             self._transitions.append(transition)
+            if len(self._transitions) > 500:
+                self._transitions = self._transitions[-500:]
 
             # Transition counts güncelle
             if self._current_regime not in self._transition_counts:

@@ -94,6 +94,8 @@ class ScanPerformanceTracker:
         )
 
         self._scan_metrics.append(metric)
+        if len(self._scan_metrics) > 1000:
+            self._scan_metrics = self._scan_metrics[-1000:]
 
         # Limit kontrolü
         if len(self._scan_metrics) > self._max_history:
@@ -106,6 +108,8 @@ class ScanPerformanceTracker:
             outcome: Sinyal sonucu
         """
         self._signal_outcomes.append(outcome)
+        if len(self._signal_outcomes) > 5000:
+            self._signal_outcomes = self._signal_outcomes[-5000:]
 
         if len(self._signal_outcomes) > self._max_history:
             self._signal_outcomes = self._signal_outcomes[-self._max_history:]

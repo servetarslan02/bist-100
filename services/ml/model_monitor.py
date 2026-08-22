@@ -327,6 +327,8 @@ class ModelMonitor:
     def register_retrain_callback(self, callback: Any):
         """Auto-retrain callback kaydet."""
         self._retrain_callbacks.append(callback)
+        if len(self._retrain_callbacks) > 100:
+            self._retrain_callbacks = self._retrain_callbacks[-100:]
 
     def _compute_trend(self, values: List[float]) -> str:
         """Performans trendi."""
@@ -366,6 +368,8 @@ class ModelMonitor:
         )
 
         self._alerts.append(alert)
+        if len(self._alerts) > 500:
+            self._alerts = self._alerts[-500:]
         self._last_alert[alert_key] = now
 
         logger.warning("model_alert", **{"model_id": model_id, "severity": report.alert_level, "metric": report.metric_name, "z_score": report.z_score})

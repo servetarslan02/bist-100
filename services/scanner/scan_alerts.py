@@ -255,6 +255,8 @@ class ScanAlertManager:
             callback: Alert callback fonksiyonu
         """
         self._callbacks.append(callback)
+        if len(self._callbacks) > 100:
+            self._callbacks = self._callbacks[-100:]
 
     def add_rule(self, rule: ScanAlertRule):
         """Yeni alert kuralı ekle.
@@ -263,6 +265,8 @@ class ScanAlertManager:
             rule: Alert kuralı
         """
         self._rules.append(rule)
+        if len(self._rules) > 100:
+            self._rules = self._rules[-100:]
         logger.info("Scan alert rule added", rule_id=rule.rule_id)
 
     def get_alerts(

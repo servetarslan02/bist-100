@@ -92,6 +92,8 @@ class PerformanceTracker:
             self._state_store.save_daily_performance(perf)
 
         self._daily_perf_cache.append(perf)
+        if len(self._daily_perf_cache) > 1000:
+            self._daily_perf_cache = self._daily_perf_cache[-1000:]
         return perf
 
     def compute_full_metrics(self, equity_curve: List[Dict[str, Any]], trades: List[Dict[str, Any]], benchmark_returns: Optional[List[float]] = None) -> Dict[str, Any]:

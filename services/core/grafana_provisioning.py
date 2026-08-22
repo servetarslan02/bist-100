@@ -110,6 +110,8 @@ class GrafanaProvisioner:
                             if put_resp.status == 200:
                                 logger.info("Datasource updated", name=ds_config.name)
                                 self._provisioned_datasources.append(ds_config.name)
+                                if len(self._provisioned_datasources) > 1000:
+                                    self._provisioned_datasources = self._provisioned_datasources[-1000:]
                                 return True
 
                 # Yeni oluştur
@@ -121,6 +123,8 @@ class GrafanaProvisioner:
                     if resp.status in (200, 201):
                         logger.info("Datasource created", name=ds_config.name)
                         self._provisioned_datasources.append(ds_config.name)
+                        if len(self._provisioned_datasources) > 1000:
+                            self._provisioned_datasources = self._provisioned_datasources[-1000:]
                         return True
                     else:
                         body = await resp.text()

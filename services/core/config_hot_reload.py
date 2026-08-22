@@ -95,6 +95,8 @@ class ConfigHotReload:
         Callback imzası: async def callback(old_config, new_config, changed_keys)
         """
         self._callbacks.append(callback)
+        if len(self._callbacks) > 100:
+            self._callbacks = self._callbacks[-100:]
 
     def add_validator(self, validator: Callable):
         """
@@ -104,6 +106,8 @@ class ConfigHotReload:
         Returns: (is_valid, error_message)
         """
         self._validators.append(validator)
+        if len(self._validators) > 1000:
+            self._validators = self._validators[-1000:]
 
     async def start(self):
         """İzlemeyi başlat."""

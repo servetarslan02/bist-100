@@ -126,6 +126,8 @@ class BISTTradingEnv:
                 portfolio_value += self._positions[ticker] * self.prices[ticker][self._current_step]
 
         self._portfolio_values.append(portfolio_value)
+        if len(self._portfolio_values) > 5000:
+            self._portfolio_values = self._portfolio_values[-5000:]
         self._current_step += 1
 
         # Reward

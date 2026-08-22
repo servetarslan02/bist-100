@@ -135,6 +135,8 @@ class LearningHealthMonitor:
         """Modül restart isteği."""
         if module not in self._restart_requests:
             self._restart_requests.append(module)
+            if len(self._restart_requests) > 100:
+                self._restart_requests = self._restart_requests[-100:]
             logger.info("Restart requested", module=module)
 
     def get_restart_requests(self) -> List[str]:

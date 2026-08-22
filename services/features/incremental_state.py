@@ -91,6 +91,8 @@ class IncrementalAssetState:
 
         # Volume history
         self._volume_history.append(volume)
+        if len(self._volume_history) > 1000:
+            self._volume_history = self._volume_history[-1000:]
 
         self.features_dirty = True
 

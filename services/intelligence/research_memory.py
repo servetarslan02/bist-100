@@ -55,6 +55,8 @@ class ResearchMemory:
         """Araştırma kaydı ekle."""
         idx = len(self._records)
         self._records.append(record)
+        if len(self._records) > 1000:
+            self._records = self._records[-1000:]
         if record.ticker not in self._ticker_index:
             self._ticker_index[record.ticker] = []
         self._ticker_index[record.ticker].append(idx)
@@ -115,6 +117,8 @@ class DataLineage:
         """Lineage düğümü ekle."""
         idx = len(self._nodes)
         self._nodes.append(node)
+        if len(self._nodes) > 1000:
+            self._nodes = self._nodes[-1000:]
         key = f"{node.node_type}:{node.node_id}"
         if key not in self._index:
             self._index[key] = []

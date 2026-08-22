@@ -135,6 +135,8 @@ class BISTTradingEnv:
         self._capital += portfolio_return - commission
         self._position = new_position
         self._portfolio_values.append(self._capital)
+        if len(self._portfolio_values) > 5000:
+            self._portfolio_values = self._portfolio_values[-5000:]
         self._current_step += 1
 
         # Reward

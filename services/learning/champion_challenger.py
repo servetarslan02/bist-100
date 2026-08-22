@@ -63,6 +63,8 @@ class ChampionChallengerEngine:
         )
 
         self._champion_history.append(self._current_champion)
+        if len(self._champion_history) > 1000:
+            self._champion_history = self._champion_history[-1000:]
 
         logger.info("Challenger promoted to champion",
                    challenger=challenger_id,

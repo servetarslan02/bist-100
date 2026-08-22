@@ -228,6 +228,8 @@ class PortfolioSimulator:
             commission=commission, slippage=slippage,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         return trade
 
     def execute_sell(self, ticker: str, price: float, date: str) -> Optional[BacktestTrade]:
@@ -255,6 +257,8 @@ class PortfolioSimulator:
             commission=commission, slippage=slippage, pnl=pnl,
         )
         self._trades.append(trade)
+        if len(self._trades) > 5000:
+            self._trades = self._trades[-5000:]
         del self._positions[ticker]
         return trade
 

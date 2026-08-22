@@ -339,6 +339,8 @@ class AuthManager:
 
     def add_provider(self, provider: AuthProvider):
         self._providers.append(provider)
+        if len(self._providers) > 100:
+            self._providers = self._providers[-100:]
 
     async def verify(self, token: str, request_context: Dict[str, Any] = None) -> AuthResult:
         """Tüm provider'ları dene — ilk başarılı olanı döndür."""

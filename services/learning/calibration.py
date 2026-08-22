@@ -143,6 +143,8 @@ class ConfidenceCalibrator:
         )
 
         self._calibration_history.append(result)
+        if len(self._calibration_history) > 1000:
+            self._calibration_history = self._calibration_history[-1000:]
         self._last_calibration = result
 
         logger.info("Calibration completed",
