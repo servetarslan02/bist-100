@@ -138,13 +138,9 @@ class TechnicalFeatureEngine:
         features["volume_sma_20"] = float(np.mean(volumes[-20:]))
         features["volume_ratio"] = volumes[-1] / features["volume_sma_20"] if features["volume_sma_20"] > 0 else 1
 
-        # OBV (On Balance Volume)
-        obv = 0
-        for i in range(1, len(prices)):
-            if prices[i] > prices[i-1]:
-                obv += volumes[i]
-            elif prices[i] < prices[i-1]:
-                obv -= volumes[i]
+        # OBV (On Balance Volume) — vektörize
+        price_diff = np.diff(prices)
+        obv = np.sum(volumes[1:][price_diff > 0]) - np.sum(volumes[1:][price_diff < 0])
         features["obv"] = float(obv)
 
         # Volume acceleration
@@ -194,22 +190,22 @@ class TechnicalFeatureEngine:
         return float(100 - (100 / (1 + rs)))
 
     def _atr(self, highs: np.ndarray, lows: np.ndarray, closes: np.ndarray, period: int = 14) -> float:
-        """Average True Range."""
+        """Average True Range (vektörize)."""
         if len(highs) < period + 1:
             return 0.0
-        tr_list = []
-        for i in range(1, len(highs)):
-            tr = max(
-                highs[i] - lows[i],
-                abs(highs[i] - closes[i-1]),
-                abs(lows[i] - closes[i-1])
+        # True Range vektörize
+        tr = np.maximum(
+            highs[1:] - lows[1:],
+            np.maximum(
+                np.abs(highs[1:] - closes[:-1]),
+                np.abs(lows[1:] - closes[:-1])
             )
-            tr_list.append(tr)
-        if len(tr_list) < period:
-            return float(np.mean(tr_list))
-        atr = float(np.mean(tr_list[:period]))
-        for tr in tr_list[period:]:
-            atr = (atr * (period - 1) + tr) / period
+        )
+        if len(tr) < period:
+            return float(np.mean(tr))
+        atr = float(np.mean(tr[:period]))
+        for t in tr[period:]:
+            atr = (atr * (period - 1) + t) / period
         return atr
 
 
