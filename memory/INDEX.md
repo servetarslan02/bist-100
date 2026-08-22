@@ -1,12 +1,13 @@
 # ALPHA BIST — Memory Index
 
-**Son güncelleme:** 2026-08-18
+**Son güncelleme:** 2026-08-23
 
 ## 📁 Dizin Yapısı
 
 ```
 memory/
 ├── VISION.md                        ← Nihai hayal ve sistem vizyonu
+├── CURRENT-STATE.md                 ← Mevcut denetim durumu
 ├── INDEX.md                         ← Bu dosya
 │
 ├── documentation/                   ← Proje dokümantasyonu (12 dosya)
@@ -27,101 +28,79 @@ memory/
 │   ├── Sistem tanımı                ← Detaylı sistem tanımı (71KB)
 │   ├── Çalışma şekli                ← Çalışma şekli (12KB)
 │   ├── Hatalar                      ← Hata raporu (17KB)
-│   ├── bolumler/                    ← 32 bölüm detaylı doküman
-│   │   ├── bolum-01 ... bolum-32
-│   └── planlar/                     ← Uygulama planları
-│       ├── IMPLEMENTATION-PLAN-v4.md
-│       ├── IMPLEMENTATION-PLAN-v4-BOLUM9-16.md
-│       ├── IMPLEMENTATION-PLAN-v4-BOLUM17-22.md
-│       ├── IMPLEMENTATION-PLAN-v4-BOLUM23-32.md
-│       └── ARCHITECTURE-MAP-v1.md
+│   └── bolumler/                    ← 32 bölüm detaylı doküman
+│       ├── bolum-01 ... bolum-32
 │
-└── modules/                         ← 20 katman modül dokümantasyonu
+└── modules/                         ← 24 servis katmanı modül dokümantasyonu
     │
     ├── Genel Rehberler (3 dosya)
     │   ├── BIST-RULES.md            ← BIST piyasa kuralları (13 kategori)
     │   ├── DEPENDENCY-ORDER.md      ← Modül bağımlılık sırası (15 seviye)
     │   └── TEST-EXPECTATIONS.md     ← Test gereksinimleri
     │
-    ├── agents/                      ← AI Agent Sistemi
-    │   ├── README.md
-    │   └── AGENT-SYSTEM-NIHAI-SPEC.md
-    ├── alternative/                 ← Alternatif Veri
-    │   ├── README.md
-    │   └── ALTERNATIVE-DATA-NIHAI-SPEC.md
-    ├── api/                         ← API & Dashboard
-    │   ├── README.md
-    │   └── API-NIHAI-SPEC.md
-    ├── backtest/                    ← Backtest Motoru
-    │   ├── README.md
-    │   └── BACKTEST-NIHAI-SPEC.md
-    ├── core/                        ← Temel Altyapı
-    │   ├── README.md
-    │   └── CORE-NIHAI-SPEC.md
-    ├── event_study/                 ← Event Study
-    │   ├── README.md
-    │   └── EVENT-STUDY-NIHAI-SPEC.md
-    ├── factors/                     ← Factor Investing
-    │   ├── README.md
-    │   └── FACTORS-NIHAI-SPEC.md
-    ├── features/                    ← Feature Engineering
-    │   ├── README.md
-    │   └── FEATURES-NIHAI-SPEC.md
-    ├── ingestion/                   ← Veri Toplama
-    │   ├── README.md
-    │   └── INGESTION-NIHAI-SPEC.md
-    ├── intelligence/                ← Analiz & Tahmin
-    │   ├── README.md
-    │   └── INTELLIGENCE-NIHAI-SPEC.md
-    ├── learning/                    ← Öğrenme Sistemi
-    │   ├── README.md
-    │   └── LEARNING-NIHAI-SPEC.md
-    ├── macro/                       ← Makro Ekonomi
-    │   ├── README.md
-    │   └── MACRO-NIHAI-SPEC.md
-    ├── market_state/                ← Piyasa Durumu
-    │   ├── README.md
-    │   └── MARKET-STATE-NIHAI-SPEC.md
-    ├── ml/                          ← Makine Öğrenmesi
-    │   ├── README.md
-    │   └── ML-NIHAI-SPEC.md
-    ├── portfolio/                   ← Portföy Yönetimi
-    │   ├── README.md
-    │   └── PORTFOLIO-NIHAI-SPEC.md
-    ├── risk/                        ← Risk Yönetimi
-    │   ├── README.md
-    │   └── RISK-NIHAI-SPEC.md
-    ├── scanner/                     ← Tarama Motoru
-    │   ├── README.md
-    │   └── SCANNER-NIHAI-SPEC.md
-    ├── scheduler/                   ← Zamanlayıcı
-    │   ├── README.md
-    │   └── SCHEDULER-NIHAI-SPEC.md
-    ├── simulation/                  ← Simülasyon
-    │   ├── README.md
-    │   └── SIMULATION-NIHAI-SPEC.md
-    └── viop/                        ← VIOP & Opsiyon
-        ├── README.md
-        └── VIOP-NIHAI-SPEC.md
+    ├── core/MODULE.md               ← Temel altyapı: orchestrator, decision engine, data quality, event bus, security
+    ├── data/MODULE.md               ← Veri kaynakları: historical adapter, fundamental provider, persistent repository
+    ├── events/MODULE.md             ← Olay altyapısı: event schema, event bus, infrastructure
+    ├── labels/MODULE.md             ← Etiket üretimi: cross-sectional rank, forward return, purge/embargo
+    │
+    ├── ingestion/MODULE.md          ← Veri toplama: providers (yfinance, KAP, BIST, macro), PIT store, pipeline
+    ├── features/MODULE.md           ← Feature üretimi: 7 motor, cross-sectional, panel engine, drift detector
+    │
+    ├── intelligence/MODULE.md       ← Analiz ve tahmin: regime detection, forecasting, Monte Carlo, LLM agent, KAP extraction
+    ├── market_state/MODULE.md       ← Piyasa durumu: breadth engine, ensemble regime, risk appetite, transition tracker
+    ├── macro/MODULE.md              ← Makro ekonomi: TCMB, inflation, FX, CDS, surprise model, stress test
+    │
+    ├── ml/MODULE.md                 ← Makine öğrenmesi: LightGBM, ranking model, ensemble, champion/challenger, calibration
+    ├── learning/MODULE.md           ← Öğrenme sistemi: drift detection, calibration, attribution, continuous learning
+    │
+    ├── risk/MODULE.md               ← Risk yönetimi: position sizing, VaR/CVaR, stress test, tail hedge, risk parity
+    ├── portfolio/MODULE.md          ← Portföy yönetimi: portfolio manager, PnL, reconciliation
+    ├── paper_trading/MODULE.md      ← Sanal işlem: execution simulator, virtual portfolio, risk gate, performance tracker
+    ├── simulation/MODULE.md         ← Simülasyon: Monte Carlo, execution simulator, order book, stress test
+    │
+    ├── backtest/MODULE.md           ← Backtest motoru: walk-forward, deflated Sharpe, bias detector, survivorship
+    ├── scanner/MODULE.md            ← Tarama motoru: opportunity engine, alpha scanner, dynamic scanner, event scanner
+    ├── factors/MODULE.md            ← Factor investing: Fama-French, Piotroski, Altman, Beneish, factor rotation
+    ├── event_study/MODULE.md        ← Event study: abnormal return, CAR, KAP event, statistical test
+    │
+    ├── agents/MODULE.md             ← AI Agent sistemi: agent pipeline, debate engine, synthesis, self-evaluator
+    ├── alternative/MODULE.md        ← Alternatif veri: Google Trends, sosyal medya, uydu, LLM sentiment, web scraping
+    ├── viop/MODULE.md               ← VIOP ve opsiyonlar: Greeks, options pricing, hedging, strategies
+    ├── api/MODULE.md                ← API ve Dashboard: FastAPI, v1 endpoints, auth, rate limiter
+    ├── scheduler/MODULE.md          ← Zamanlayıcı: unified scheduler, daily workflow, learning scheduler
+    │
+    ├── techstack/                   ← Teknoloji stack araştırması (6 dosya)
+    │   ├── BEST-TECH-STACK-2026.md
+    │   ├── BREAKING-CHANGES-ANALYSIS.md
+    │   ├── CURRENT-STATE.md
+    │   ├── INTEGRATION-STATUS.md
+    │   ├── ML-BENCHMARK-RESULTS.md
+    │   └── ATTENTION-ITEMS-RESOLVED.md
+    │
+    └── dashboard/README.md          ← Dashboard modülü
 ```
 
 ## 📊 Özet
 
-| Kategori | Dosya |
-|----------|-------|
-| Dokümantasyon | 12 |
-| Sistem tanımı + bölümler + planlar | 39 |
-| Genel rehber | 3 |
-| Modül dokümanı (20 × 2) | 40 |
-| Vizyon | 1 |
-| **TOPLAM** | **95 dosya** |
+| Kategori | Dosya | Satır |
+|----------|-------|-------|
+| Dokümantasyon (01-11) | 12 | ~3,000 |
+| Sistem tanımı + bölümler | 35 | ~5,000 |
+| Genel rehber | 3 | ~500 |
+| Modül MODULE.md (24) | 24 | ~4,500 |
+| Modül README (24) | 24 | ~1,200 |
+| Modül CURRENT-STATE (6) | 6 | ~300 |
+| Techstack araştırması | 6 | ~800 |
+| Vizyon + durum | 2 | ~400 |
+| **TOPLAM** | **~112** | **~15,700** |
 
 ## 🏷️ Otorite Sırası
 
-1. `BIST-RULES.md` — BIST kuralları
-2. `DEPENDENCY-ORDER.md` — Modül bağımlılıkları
-3. `TEST-EXPECTATIONS.md` — Test gereksinimleri
-4. `modules/*/NIHAI-SPEC.md` — Modül nihai spesifikasyonları
-5. `documentation/*` — Proje dokümantasyonu
-6. `system/*` — Sistem tanımı ve bölümler
-7. `VISION.md` — Nihai hayal
+1. `documentation/01-VIZYON-VE-MANIFESTO.md` — Vizyon ve kırmızı çizgiler
+2. `BIST-RULES.md` — BIST kuralları
+3. `DEPENDENCY-ORDER.md` — Modül bağımlılıkları
+4. `TEST-EXPECTATIONS.md` — Test gereksinimleri
+5. `modules/*/MODULE.md` — Modül detaylı spesifikasyonları
+6. `documentation/*` — Proje dokümantasyonu
+7. `system/*` — Sistem tanımı ve bölümler
+8. `VISION.md` — Nihai hayal
