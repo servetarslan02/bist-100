@@ -62,12 +62,10 @@ class CovarianceEstimator:
         avg_corr = np.mean(corr[np.triu_indices_from(corr, k=1)])
 
         target = np.zeros_like(sample_cov)
-        for i in range(n_assets):
-            for j in range(n_assets):
-                if i == j:
-                    target[i, j] = variances[i]
-                else:
-                    target[i, j] = avg_corr * stds[i] * stds[j]
+        np.fill_diagonal(target, variances)
+        # Off-diagonal: avg_corr * std_i * std_j
+        off_diag_mask = ~np.eye(n_assets, dtype=bool)
+        target[off_diag_mask] = avg_corr * np.outer(stds, stds)[off_diag_mask]
 
         # Optimal shrinkage intensity (Ledoit-Wolf)
         delta = self._compute_shrinkage_intensity(returns, sample_cov, target)
@@ -105,13 +103,11 @@ class CovarianceEstimator:
         """Ledoit-Wolf optimal shrinkage intensity."""
         n_samples, n_assets = returns.shape
 
-        # Pi: Sample covariance variance
-        pi = 0
-        for i in range(n_assets):
-            for j in range(n_assets):
-                diff = returns[:, i] * returns[:, j] - sample_cov[i, j]
-                pi += np.sum(diff ** 2)
-        pi /= n_samples
+        # Pi: Sample covariance variance (vektörize)
+        # diff[i,j] = sum_t (r_ti * r_tj - cov[i,j])^2
+        outer_products = np.einsum('ti,tj->tij', returns, returns)  # (n_samples, n_assets, n_assets)
+        diff_sq = (outer_products - sample_cov) ** 2  # (n_samples, n_assets, n_assets)
+        pi = float(np.sum(diff_sq)) / n_samples
 
         # Rho: Target bias
         rho = np.sum((target - sample_cov) ** 2)

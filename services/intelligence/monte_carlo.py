@@ -233,18 +233,12 @@ class MonteCarloEngine:
         Z = np.random.standard_normal((num_simulations, horizon_days, n))
         correlated_Z = Z @ L.T  # (n_sims, horizon_days, n_assets) @ (n_assets, n_assets)
 
-        # Her gün için portföy getirisi
-        daily_returns = np.zeros((num_simulations, horizon_days))
-        for sim in range(num_simulations):
-            for day in range(horizon_days):
-                # Her hisse için günlük getiri
-                stock_returns = np.array([
-                    (returns_annual[i] - 0.5 * vols_annual[i] ** 2) * dt
-                    + correlated_Z[sim, day, i]
-                    for i in range(n)
-                ])
-                # Ağırlıklı portföy getirisi
-                daily_returns[sim, day] = np.sum(weights * stock_returns)
+        # Her gün için portföy getirisi (vektörize)
+        # stock_returns shape: (n_sims, horizon_days, n_assets)
+        drift = (returns_annual - 0.5 * vols_annual ** 2) * dt  # (n_assets,)
+        stock_returns = drift + correlated_Z  # broadcasting: (n_sims, horizon_days, n)
+        # Ağırlıklı portföy getirisi
+        daily_returns = np.einsum('ijk,k->ij', stock_returns, weights)  # (n_sims, horizon_days)
 
         # Kümülatif getiri
         cumulative_returns = np.cumprod(1 + daily_returns, axis=1)
