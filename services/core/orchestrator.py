@@ -32,11 +32,10 @@ def _get_bg_loop():
     return _bg_loop
 
 def _publish_event_async(event, key="default"):
-    """Publish event from sync context via background loop."""
+    """Publish event directly (publish_event is synchronous)."""
     try:
         from services.core.event_bus import publish_event
-        loop = _get_bg_loop()
-        asyncio.run_coroutine_threadsafe(publish_event(event, key=key), loop)
+        publish_event(event, key=key)
     except Exception as e:
         logger.debug("event_publish_failed", error=str(e))
 

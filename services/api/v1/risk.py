@@ -439,33 +439,39 @@ async def run_stress_test(
             breaking = engine.find_breaking_point(portfolio, max_loss_pct=20.0)
 
             return {
-                "risk_score": report.risk_score,
-                "avg_impact_pct": report.avg_impact_pct,
-                "max_loss_amount": report.max_loss_amount,
+                "risk_score": float(report.risk_score),
+                "avg_impact_pct": float(report.avg_impact_pct),
+                "max_loss_amount": float(report.max_loss_amount),
                 "worst_scenario": {
                     "name": report.worst_scenario.scenario_name,
-                    "impact_pct": report.worst_scenario.total_impact_pct,
-                    "impact_amount": report.worst_scenario.total_impact_amount,
+                    "impact_pct": float(report.worst_scenario.total_impact_pct),
+                    "impact_amount": float(report.worst_scenario.total_impact_amount),
                 } if report.worst_scenario else None,
                 "best_scenario": {
                     "name": report.best_scenario.scenario_name,
-                    "impact_pct": report.best_scenario.total_impact_pct,
+                    "impact_pct": float(report.best_scenario.total_impact_pct),
                 } if report.best_scenario else None,
                 "recommendations": report.recommendations,
-                "breaking_point": breaking,
+                "breaking_point": float(breaking) if breaking is not None else None,
                 "scenarios_count": len(report.scenarios),
             }
         else:
             result = engine.run_scenario(portfolio, scenario)
+            
+            # Cast position impacts explicitly to avoid numpy.float64 errors
+            position_impacts_clean = {}
+            for k, v in result.position_impacts.items():
+                position_impacts_clean[k] = float(v)
+                
             return {
                 "scenario": result.scenario_name,
                 "type": result.scenario_type,
-                "total_impact_pct": result.total_impact_pct,
-                "total_impact_amount": result.total_impact_amount,
+                "total_impact_pct": float(result.total_impact_pct),
+                "total_impact_amount": float(result.total_impact_amount),
                 "worst_position": result.worst_position,
                 "best_position": result.best_position,
-                "recovery_estimate_days": result.recovery_estimate_days,
-                "position_impacts": result.position_impacts,
+                "recovery_estimate_days": int(result.recovery_estimate_days),
+                "position_impacts": position_impacts_clean,
             }
     except Exception as e:
         raise HTTPException(500, f"Stress test run error: {e}")

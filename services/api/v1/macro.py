@@ -84,6 +84,11 @@ def _fetch_live_macro_data() -> Dict[str, Any]:
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
 
+        # UI Mapping
+        result["usd_strength"] = round(max(0.0, min(1.0, (result.get("dxy", 100) - 90) / 20)), 2)
+        result["turkey_macro_risk"] = round(max(0.0, min(1.0, result.get("turkey_cds_5y", 300) / 600)), 2)
+        result["oil_pressure"] = round(max(0.0, min(1.0, (result.get("brent_crude", 80) - 60) / 60)), 2)
+
         _cached_macro_data = result
         _last_macro_fetch = now
     except Exception as e:
