@@ -77,15 +77,23 @@ class DataSourceManager:
         if self.use_cache:
             cached = self._load_from_cache(ticker, interval)
             if cached is not None and not cached.empty:
-                # Tarih filtresi uygula
-                if start_date:
-                    cached = cached[cached.index >= start_date]
-                if end_date:
-                    cached = cached[cached.index <= end_date]
-
-                if not cached.empty:
-                    logger.info("Data loaded from cache", ticker=ticker, rows=len(cached))
-                    return cached
+                cache_min_date = cached.index.min().strftime('%Y-%m-%d')
+                cache_max_date = cached.index.max().strftime('%Y-%m-%d')
+                
+                cache_is_valid = True
+                if start_date and start_date < cache_min_date:
+                    cache_is_valid = False
+                if end_date and end_date > cache_max_date:
+                    cache_is_valid = False
+                    
+                if cache_is_valid:
+                    if start_date:
+                        cached = cached[cached.index >= start_date]
+                    if end_date:
+                        cached = cached[cached.index <= end_date]
+                    if not cached.empty:
+                        logger.info("Data loaded from cache", ticker=ticker, rows=len(cached))
+                        return cached
 
         # Cache yoksa kaynaklardan dene
         for source_name in source_priority:
@@ -259,10 +267,12 @@ class YahooFinanceSource:
 
             stock = yf.Ticker(ticker)
 
+            print(f"FETCHING YFINANCE: {ticker} start={start_date} end={end_date}")
             if start_date and end_date:
                 df = stock.history(start=start_date, end=end_date, interval=interval)
             else:
                 df = stock.history(period=period, interval=interval)
+            print(f"YFINANCE RETURNED: {len(df)} rows")
 
             if df.empty:
                 return None
