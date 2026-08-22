@@ -320,6 +320,17 @@ class CanonicalScoringPipeline:
             rule_score=round(rule_score, 2),
         )
 
+    def score(
+        self,
+        ticker: str,
+        features: Dict[str, Any],
+        regime: str = "UNKNOWN",
+        ml_model=None,
+    ) -> CanonicalScore:
+        """Geriye uyumlu score() alias metodu."""
+        model = ml_model if ml_model is not None else getattr(self, "_ml_model", None)
+        return self.compute_canonical_score(ticker, features, regime=regime, ml_model=model)
+
     # =====================================================
     # BOYUT HESAPLAMA (mevcut rule-based score ile uyumlu)
     # =====================================================
@@ -432,13 +443,17 @@ class CanonicalScoringPipeline:
 
         bsq = self._s(f.get("balance_sheet_quality", 0))
         if bsq != 0:
-            score += bsq * 0.0003
+            score += (bsq - 50) * 0.08  # Düzeltildi: 0-100 ölçeğinde ±4 puanlık etki
 
         value = self._s(f.get("value_score", 0))
         score += value * 0.1
 
         quality = self._s(f.get("quality_score", 0))
         score += quality * 0.05
+
+        roe = self._s(f.get("roe", 0))
+        if roe != 0:
+            score += min(max(roe * 0.1, -5.0), 5.0)
 
         return max(0, min(100, score))
 

@@ -109,7 +109,8 @@ class FeatureCalculator:
 
         # === ATR (mask-aware) ===
         features["atr_14"] = self._atr_masked(high, low, close, 14)
-        features["atr_pct"] = (features["atr_14"] / _valid_data(close)[-1] * 100) if len(_valid_data(close)) > 0 else 0
+        v_close = _valid_data(close)
+        features["atr_pct"] = (features["atr_14"] / v_close[-1] * 100) if len(v_close) > 0 and v_close[-1] > 0 else 0.0
 
         # === ADX (mask-aware) ===
         features["adx"] = self._adx_masked(high, low, close, 14)
@@ -227,14 +228,20 @@ class FeatureCalculator:
         valid = _valid_data(data)
         if len(valid) <= period:
             return float('nan')
-        return (valid[-1] / valid[-period - 1] - 1) * 100
+        denom = valid[-period - 1]
+        if denom == 0 or np.isnan(denom):
+            return 0.0
+        return float((valid[-1] / denom - 1) * 100)
 
     def _momentum_masked(self, data: np.ndarray, period: int) -> float:
         """Mask-aware momentum."""
         valid = _valid_data(data)
         if len(valid) <= period:
             return float('nan')
-        return (valid[-1] - valid[-period - 1]) / valid[-period - 1] * 100
+        denom = valid[-period - 1]
+        if denom == 0 or np.isnan(denom):
+            return 0.0
+        return float((valid[-1] - denom) / denom * 100)
 
     def _rsi_masked(self, data: np.ndarray, period: int = 14) -> float:
         """Mask-aware RSI — Wilder's Smoothing (vektörize)."""
@@ -434,8 +441,14 @@ class FeatureCalculator:
         valid = _valid_data(data)
         if len(valid) < period:
             return float('nan')
-        returns = np.diff(valid[-period:]) / valid[-period:-1]
-        return float(np.std(returns) * np.sqrt(252) * 100)
+        denoms = valid[-period:-1]
+        diffs = np.diff(valid[-period:])
+        valid_idx = (denoms > 0) & ~np.isnan(denoms)
+        if np.sum(valid_idx) < 2:
+            return 0.0
+        returns = diffs[valid_idx] / denoms[valid_idx]
+        vol = float(np.std(returns) * np.sqrt(252) * 100)
+        return vol if np.isfinite(vol) else 0.0
 
     def _volume_profile(self, close: np.ndarray, volume: np.ndarray) -> dict:
         """Volume profile (dinamik bins)."""

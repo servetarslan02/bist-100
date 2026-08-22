@@ -432,9 +432,15 @@ class RegimeEngine:
             for s in history
         ]
 
-    def get_regime(self) -> RegimeState:
+    def get_regime(self) -> Optional[RegimeState]:
         """Mevcut rejim durumunu döndür."""
-        return self._current_state
+        return self._current_regime
+
+    def get_current_regime(self) -> str:
+        """Mevcut rejim adını döndür."""
+        if self._current_regime and hasattr(self._current_regime, "regime"):
+            return self._current_regime.regime.value
+        return "BULL"
 
     def override_regime(
         self,
@@ -484,7 +490,7 @@ class RegimeEngine:
                 )
                 return False
 
-        old_regime = self._current_state.regime.value if self._current_state else "UNKNOWN"
+        old_regime = self._current_regime.regime.value if self._current_regime else "UNKNOWN"
 
         # Yeni state oluştur
         override_state = RegimeState(
@@ -497,7 +503,7 @@ class RegimeEngine:
 
         # Geçmiş'e ekle
         self._regime_history.append(override_state)
-        self._current_state = override_state
+        self._current_regime = override_state
 
         logger.critical(
             "⚠️  REGIME OVERRIDDEN BY LLM AGENT",

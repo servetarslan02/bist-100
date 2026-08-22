@@ -435,9 +435,11 @@ class DecisionEngine:
         if direction == "LONG":
             stop_price = price * (1 - stop_pct / 100)
             target_price = price * (1 + target_pct / 100)
-        else:
+        elif direction == "SHORT":
             stop_price = price * (1 + stop_pct / 100)
             target_price = price * (1 - target_pct / 100)
+        else:
+            return 0.0, 0.0
 
         return round(stop_price, 2), round(target_price, 2)
 
@@ -499,16 +501,25 @@ class DecisionEngine:
         return reasons
 
     def _calculate_expected_return(self, inp: DecisionInput, direction: str) -> float:
-        """Beklenen getiri."""
-        f = inp.features
+        """Çok kaynaklı harmanlanmış beklenen getiri hesapla."""
+        if direction not in ("LONG", "SHORT"):
+            return 0.0
 
-        # Basit beklenti: momentum + ROC ortalaması
-        expected = (f.get("momentum_20d", 0) + f.get("roc_5d", 0)) / 2
+        f = inp.features
+        raw_momentum = (f.get("momentum_20d", 0) + f.get("roc_5d", 0)) / 2.0
+
+        # Eğer ML ve Monte Carlo modelleri tahmin üretmişse bunları ağırlıklandır
+        if inp.ml_return_5d != 0 or inp.sim_expected_return != 0:
+            expected = (raw_momentum * 0.3) + (inp.ml_return_5d * 0.4) + (inp.sim_expected_return * 0.3)
+        else:
+            expected = raw_momentum
 
         if direction == "SHORT":
-            expected = -expected
+            expected = -abs(expected) if expected > 0 else expected
+        elif direction == "LONG":
+            expected = abs(expected) if expected < 0 and raw_momentum > 0 else expected
 
-        return round(expected, 2)
+        return round(float(expected), 2)
 
     def decide_from_canonical(self, score, price: float = 0):
         """CanonicalScore'tan karar üret.
@@ -556,13 +567,23 @@ class DecisionEngine:
             action = "SELL"
 
         # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
-        # (Hem BUY hem SELL için uygulanır; önceden yalnızca BUY kontrol
-        # ediliyordu ve yüksek riskli SHORT sinyalleri bu korumayı hiç
-        # görmüyordu.)
         if score.risk_score < 30:
             if action in ("BUY", "SELL"):
                 action = "HOLD"  # Çok riskli — pozisyon açma
                 direction = "NEUTRAL"
+
+        # Stop ve Target hesaplama (price verilmişse)
+        stop_price = 0.0
+        target_price = 0.0
+        if price > 0 and action in ("BUY", "SELL"):
+            stop_pct = self.DEFAULT_STOP_FALLBACK
+            target_pct = stop_pct * 2.0
+            if direction == "LONG":
+                stop_price = round(price * (1 - stop_pct / 100), 2)
+                target_price = round(price * (1 + target_pct / 100), 2)
+            elif direction == "SHORT":
+                stop_price = round(price * (1 + stop_pct / 100), 2)
+                target_price = round(price * (1 - target_pct / 100), 2)
 
         # Conviction
         if score.opportunity_score >= 80 and score.confidence >= 0.8:
@@ -609,6 +630,8 @@ class DecisionEngine:
             score=score.opportunity_score,
             reasons=reasons,
             risks=risks,
+            stop_price=stop_price,
+            target_price=target_price,
             conviction=conviction,
         )
 

@@ -238,14 +238,15 @@ class SignalFusionEngine:
         """Gerekçe üret."""
         reasons = []
 
-        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "monte_carlo"]:
+        for component in ["technical", "fundamental", "momentum", "sentiment", "news", "macro", "valuation", "ai", "spec", "monte_carlo"]:
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
             score = getattr(result, f"{component}_score", 50)
 
+            label = "AI Analizi" if component == "ai" else component.title()
             if direction == "LONG" and score > 60:
-                reasons.append(f"{component.title()} pozitif: {score:.0f}")
+                reasons.append(f"{label} pozitif: {score:.0f}")
             elif direction == "SHORT" and score < 40:
-                reasons.append(f"{component.title()} negatif: {score:.0f}")
+                reasons.append(f"{label} negatif: {score:.0f}")
 
         if result.opportunity_score > 65:
             reasons.append(f"Fırsat skoru yüksek: {result.opportunity_score:.0f}")
@@ -259,14 +260,15 @@ class SignalFusionEngine:
         if result.has_conflict:
             risks.append("Sinyal çakışması var")
 
-        for component in ["technical", "fundamental", "momentum"]:
+        for component in ["technical", "fundamental", "momentum", "ai", "macro"]:
             direction = getattr(result, f"{component}_direction", "NEUTRAL")
             score = getattr(result, f"{component}_score", 50)
 
+            label = "AI Analizi" if component == "ai" else component.title()
             if direction == "LONG" and score < 40:
-                risks.append(f"{component.title()} zayıf")
+                risks.append(f"{label} zayıf: {score:.0f}")
             elif direction == "SHORT" and score > 60:
-                risks.append(f"{component.title()} Short pozisyonda güçlü")
+                risks.append(f"{label} Short pozisyonda güçlü: {score:.0f}")
 
         if result.fused_confidence < 0.3:
             risks.append("Düşük güven")

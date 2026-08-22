@@ -125,20 +125,19 @@ class VaRCalculator:
         Returns:
             VaR (pozitif değer, TL)
         """
-        from scipy.stats import norm
+        try:
+            from scipy.stats import norm
+            z_alpha = float(norm.ppf(1 - confidence))
+        except (ImportError, Exception):
+            if confidence >= 0.99:
+                z_alpha = -2.326348
+            elif confidence >= 0.95:
+                z_alpha = -1.644853
+            elif confidence >= 0.90:
+                z_alpha = -1.281552
+            else:
+                z_alpha = -1.644853
 
-        if len(returns) < 2 or holding_period_days < 1:
-            return 0.0
-
-        mu = np.mean(returns)
-        sigma = np.std(returns, ddof=1)
-
-        if sigma <= 0:
-            return float(max(0.0, -mu * holding_period_days * portfolio_value))
-
-        z_alpha = norm.ppf(1 - confidence)
-        # The return quantile is on the left tail.  VaR is a *loss*, so a
-        # positive quantile means there is no loss at this confidence level.
         horizon_quantile = mu * holding_period_days + sigma * z_alpha * np.sqrt(holding_period_days)
         var_amount = max(0.0, -horizon_quantile * portfolio_value)
 
@@ -164,8 +163,6 @@ class VaRCalculator:
         Returns:
             CVaR (pozitif değer, TL)
         """
-        from scipy.stats import norm
-
         if len(returns) < 2 or holding_period_days < 1:
             return 0.0
 
@@ -175,10 +172,21 @@ class VaRCalculator:
         if sigma <= 0:
             return float(max(0.0, -mu * holding_period_days * portfolio_value))
 
-        z_alpha = norm.ppf(1 - confidence)
-        phi_z = norm.pdf(z_alpha)
-        # E[R | R <= q_(1-alpha)] for a normal distribution.  The sign in
-        # front of phi is negative because this is the left (loss) tail.
+        try:
+            from scipy.stats import norm
+            z_alpha = float(norm.ppf(1 - confidence))
+            phi_z = float(norm.pdf(z_alpha))
+        except (ImportError, Exception):
+            if confidence >= 0.99:
+                z_alpha = -2.326348
+            elif confidence >= 0.95:
+                z_alpha = -1.644853
+            elif confidence >= 0.90:
+                z_alpha = -1.281552
+            else:
+                z_alpha = -1.644853
+            phi_z = (1.0 / math.sqrt(2 * math.pi)) * math.exp(-0.5 * z_alpha * z_alpha)
+
         tail_mean = (
             mu * holding_period_days
             - sigma * np.sqrt(holding_period_days) * phi_z / (1 - confidence)
