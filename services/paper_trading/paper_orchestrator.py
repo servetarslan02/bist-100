@@ -462,19 +462,7 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, f"Risk gate blocked: {reason}", ticker)
             return {}
 
-        # Ertesi Seans Açılışı (T+1 Open) / Gerçek BIST Açılış Fiyatı Zorunluluğu
-        next_open = signal.get("next_open_price") or next_open_prices.get(ticker)
-        if next_open is not None and float(next_open) > 0:
-            market_price = float(next_open)
-        else:
-            if self.require_next_open:
-                msg = f"NO_NEXT_OPEN_PRICE: Real T+1 open price required for BIST execution on {ticker} — NO_TRADE"
-                logger.warning(msg, ticker=ticker, date=date)
-                self._audit_no_trade(date, msg, ticker)
-                return {}
-            market_price = float(price)
-
-        # Likidite ve Mikro-Yapı Metrikleri (YALNIZCA T anına kadar olan geçmiş veri - SIFIR VERİ SIZINTISI)
+        # 4. Likidite ve Mikro-Yapı Metrikleri (YALNIZCA T anına kadar olan geçmiş veri - SIFIR VERİ SIZINTISI)
         from services.paper_trading.synthetic_liquidity import SyntheticLiquidityEstimator
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
 

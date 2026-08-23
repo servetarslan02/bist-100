@@ -28,7 +28,7 @@ class PaperRiskGate:
         self,
         max_position_pct: float = 10.0,
         max_sector_pct: float = 30.0,
-        max_portfolio_exposure_pct: float = 95.0,
+        max_portfolio_exposure_pct: float = 100.0,
         max_drawdown_pct: float = 20.0,
         kill_switch_drawdown_pct: float = 25.0,
         daily_loss_limit_pct: float = 5.0,
