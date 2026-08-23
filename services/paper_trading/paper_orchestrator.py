@@ -35,11 +35,12 @@ class PaperTradingOrchestrator:
         initial_capital: float = 1_000_000.0,
         db_path: str = "data/paper_trading_state.db",
         store: Optional[PaperStateStore] = None,
+        state_store: Optional[PaperStateStore] = None,
         execution: Optional[PaperExecutionEngine] = None,
     ):
         self._champion_version = champion_version
         self.initial_capital = initial_capital
-        self.store = store or PaperStateStore(db_path=db_path)
+        self.store = store or state_store or PaperStateStore(db_path=db_path)
         self.portfolio = VirtualPortfolio(initial_capital=initial_capital, state_store=self.store)
         self.execution = execution or paper_execution
         self.performance = PerformanceTracker()
@@ -62,6 +63,7 @@ class PaperTradingOrchestrator:
         sector_map: Optional[Dict[str, str]] = None,
         benchmark_return_pct: float = 0.0,
         circuit_breaker_active: bool = False,
+        data_quality_ok: bool = True,
     ) -> Dict[str, Any]:
         """Günlük simülasyon döngüsünü kurumsal BIST kurallarıyla çalıştırır."""
         logger.info("Starting daily paper trading cycle", date=date, num_signals=len(signals))
@@ -75,12 +77,19 @@ class PaperTradingOrchestrator:
         sector_map = sector_map or {}
         previous_equity = self.portfolio.get_total_value()
 
+        # 0. Veri Kalitesi Kontrolü
+        if not data_quality_ok:
+            msg = "Data quality check FAILED — NO_TRADE"
+            logger.warning(msg)
+            self._audit_no_trade(date, msg)
+            return {"status": "NO_TRADE", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
+
         # 1. Devre Kesici Kontrolü
         if circuit_breaker_active or self.risk_gate.is_kill_switch_active():
             msg = "Kill switch active or Circuit Breaker engaged — NO_TRADE"
             logger.warning(msg)
             self._audit_no_trade(date, msg)
-            return {"status": "HALTED", "reason": msg, "date": date}
+            return {"status": "HALTED", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
 
         # 2. Champion Model Sinyal Filtreleme
         valid_signals = [s for s in signals if s.get("model_version") == self._champion_version]
@@ -88,12 +97,12 @@ class PaperTradingOrchestrator:
             msg = "No valid champion signals — NO_TRADE"
             logger.warning(msg)
             self._audit_no_trade(date, msg)
-            return {"status": "NO_TRADE", "reason": msg, "date": date}
+            return {"status": "NO_TRADE", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
 
         # 3. Sinyal -> Risk -> Seans -> Eşleşme
         for sig in valid_signals:
             try:
-                res = self._process_signal(date, sig, prices, volumes, reference_prices, sector_map)
+                res = self._process_signal(date, sig, prices, volumes, reference_prices, sector_map, data_quality_ok=data_quality_ok)
                 if res.get("order"):
                     orders_today.append(res["order"])
                 if res.get("trade"):
@@ -139,6 +148,110 @@ class PaperTradingOrchestrator:
             "errors": errors,
         }
 
+    def run_daily_cycle(
+        self,
+        date: str,
+        market_data: Optional[Dict[str, Any]] = None,
+        sector_map: Optional[Dict[str, str]] = None,
+        champion_signals: Optional[List[Dict[str, Any]]] = None,
+        signals: Optional[List[Dict[str, Any]]] = None,
+        prices: Optional[Dict[str, float]] = None,
+        volumes: Optional[Dict[str, int]] = None,
+        reference_prices: Optional[Dict[str, float]] = None,
+        benchmark_return_pct: float = 0.0,
+        circuit_breaker_active: bool = False,
+        data_quality_ok: bool = True,
+    ) -> Dict[str, Any]:
+        """Test/Replay ve Canlı için ortak günlük döngü arayüzü."""
+        import pandas as pd
+
+        sig_list = champion_signals if champion_signals is not None else (signals or [])
+        price_dict = dict(prices or {})
+        vol_dict = dict(volumes or {})
+        ref_dict = dict(reference_prices or {})
+
+        if market_data is not None:
+            if not market_data:
+                # Boş market_data fail-safe kontrolü
+                msg = "Empty market data — fail safe NO_TRADE"
+                self._audit_no_trade(date, msg)
+                return {"status": "NO_TRADE", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
+
+            for ticker, df in market_data.items():
+                if hasattr(df, "loc"):
+                    try:
+                        dt_lookup = pd.to_datetime(date)
+                        if dt_lookup in df.index:
+                            row = df.loc[dt_lookup]
+                        elif date in df.index:
+                            row = df.loc[date]
+                        else:
+                            row = df.iloc[-1]
+
+                        def _get_val(r, *keys, default=0.0):
+                            for k in keys:
+                                if k in r:
+                                    return r[k]
+                            return default
+
+                        price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
+                        vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
+                    except Exception:
+                        if len(df) > 0:
+                            row = df.iloc[-1]
+                            close_p = row.get("close", row.get("Close", 0.0))
+                            price_dict[ticker] = float(close_p)
+                            vol_dict[ticker] = int(row.get("volume", row.get("Volume", 1_000_000)))
+
+        return self.process_daily_cycle(
+            date=date,
+            signals=sig_list,
+            prices=price_dict,
+            volumes=vol_dict,
+            reference_prices=ref_dict,
+            sector_map=sector_map,
+            benchmark_return_pct=benchmark_return_pct,
+            circuit_breaker_active=circuit_breaker_active,
+            data_quality_ok=data_quality_ok,
+        )
+
+    def run_backtest_replay(
+        self,
+        market_data: Dict[str, Any],
+        sector_map: Dict[str, str],
+        signals_by_date: Dict[str, List[Dict[str, Any]]],
+        benchmark_returns: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        """Tarihsel veride adım adım replay."""
+        benchmark_returns = benchmark_returns or {}
+        dates = sorted(list(signals_by_date.keys()))
+
+        for d in dates:
+            sigs = signals_by_date.get(d, [])
+            bench_ret = benchmark_returns.get(d, 0.0)
+            self.run_daily_cycle(
+                date=d,
+                market_data=market_data,
+                sector_map=sector_map,
+                champion_signals=sigs,
+                benchmark_return_pct=bench_ret,
+            )
+
+        return self.get_full_report()
+
+    def get_full_report(self) -> Dict[str, Any]:
+        equity_curve = self.portfolio.get_equity_curve()
+        trades = self.portfolio.get_trades()
+        metrics = self.performance.compute_full_metrics(equity_curve, trades)
+        return {
+            "champion_version": self._champion_version,
+            "initial_capital": self.initial_capital,
+            "portfolio_summary": self.portfolio.get_summary(),
+            "performance_metrics": metrics,
+            "equity_curve_length": len(equity_curve),
+            "total_trades": len(trades),
+        }
+
     def _process_signal(
         self,
         date: str,
@@ -147,6 +260,7 @@ class PaperTradingOrchestrator:
         volumes: Dict[str, int],
         reference_prices: Dict[str, float],
         sector_map: Dict[str, str],
+        data_quality_ok: bool = True,
     ) -> Dict[str, Any]:
         ticker = signal.get("ticker", "")
         direction = signal.get("direction", "")
@@ -192,7 +306,7 @@ class PaperTradingOrchestrator:
             quantity=quantity,
             price=price,
             sector=sector,
-            data_quality_ok=True,
+            data_quality_ok=data_quality_ok,
             model_version_valid=(signal.get("model_version") == self._champion_version),
         )
         if not self.risk_gate.is_trade_allowed(risk_checks):
@@ -200,14 +314,12 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, f"Risk gate blocked: {reason}", ticker)
             return {}
 
-        # Ertesi Seans Açılışı (T+1 Open) / Stokastik Gecelik Gap
+        # Ertesi Seans Açılışı (T+1 Open) / Deterministik Fiyat
         next_open = signal.get("next_open_price")
         if next_open is not None and next_open > 0:
             market_price = float(next_open)
         else:
-            _vol = 0.25
-            gap_pct = float(np.clip(np.random.normal(0.0, _vol / 20.0), -0.03, 0.03))
-            market_price = price * (1.0 + gap_pct)
+            market_price = float(price)
 
         market_price = round_to_bist_tick(market_price, side=side)
 

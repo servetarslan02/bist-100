@@ -22,8 +22,14 @@ logger = structlog.get_logger()
 class VirtualPortfolio:
     """Sanal portföy — T+2 Takas, Bloke Bakiye ve BIST Brüt Takas destekli."""
 
-    def __init__(self, initial_capital: float = 1_000_000.0, state_store=None):
+    def __init__(
+        self,
+        initial_capital: float = 1_000_000.0,
+        state_store=None,
+        strict_t2: bool = False,
+    ):
         self.initial_capital = initial_capital
+        self.strict_t2 = strict_t2
         # T+2 Takas & Valörlü Bakiye Modeli
         self.settled_cash: float = initial_capital       # T+0 Serbest, çekilebilir nakit
         self.unsettled_cash_t1: float = 0.0             # 1 gün sonra takası tamamlanacak nakit
@@ -41,12 +47,19 @@ class VirtualPortfolio:
         self._max_equity = initial_capital
         self._current_date = ""
 
-        logger.info("VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital)
+        logger.info("VirtualPortfolio initialized with T+2 Settlement", initial_capital=initial_capital, strict_t2=strict_t2)
+
+    @property
+    def purchasing_power(self) -> float:
+        """Hisse alımında kullanılabilir işlem gücü (Strict T+2 vs Valörlü Alım Gücü)."""
+        if self.strict_t2:
+            return max(0.0, self.settled_cash - self.blocked_cash)
+        return max(0.0, self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash)
 
     @property
     def cash(self) -> float:
-        """Hisse alımında kullanılabilir toplam işlem gücü (Purchasing Power)."""
-        return max(0.0, self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash)
+        """Geriye dönük uyumluluk için purchasing_power döndürür."""
+        return self.purchasing_power
 
     @cash.setter
     def cash(self, value: float):
@@ -363,6 +376,7 @@ class VirtualPortfolio:
         return self._equity_curve
 
     def get_max_drawdown(self) -> float:
+        """Maksimum drawdown yüzdesi (0.0 - 100.0)."""
         if not self._equity_curve:
             return 0.0
         peak = self.initial_capital
@@ -375,7 +389,17 @@ class VirtualPortfolio:
                 dd = (peak - eq) / peak
                 if dd > max_dd:
                     max_dd = dd
-        return max_dd
+        return max_dd * 100.0
+
+    def get_current_drawdown(self) -> float:
+        """Güncel portföy değerinin zirveye göre drawdown yüzdesi (0.0 - 100.0)."""
+        if self._max_equity <= 0:
+            return 0.0
+        if self._equity_curve:
+            tot = self._equity_curve[-1].get("equity", self.get_total_value())
+        else:
+            tot = self.get_total_value()
+        return max(0.0, ((self._max_equity - tot) / self._max_equity) * 100.0)
 
     def get_summary(self) -> Dict[str, Any]:
         """Portföy özet metrikleri."""

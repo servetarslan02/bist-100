@@ -12,11 +12,6 @@ Portfolio Risk Yonetimi:
 
 KURAL: Risk Gate 'NO_TRADE' diyebilmeli. Sistem hicbir kosulda
 islem yapmak zorunda olmamali.
-
-Mevcut services.risk.main.RiskEngine'den farkli:
-- Sync (async degil)
-- Paper trading'e ozel (gercek broker baglantisi yok)
-- Fail-closed (belirsiz durumda BLOCK)
 """
 
 from typing import Dict, List, Optional, Any
@@ -53,6 +48,13 @@ class PaperRiskGate:
         self._kill_switch_reason = ""
         self._consecutive_errors = 0
         self._max_consecutive_errors = 3
+
+    def is_kill_switch_active(self) -> bool:
+        """Kill switch aktif mi?"""
+        return self._kill_switch_active
+
+    def get_kill_switch_reason(self) -> str:
+        return self._kill_switch_reason
 
     def reset_kill_switch(self):
         """Kill switch'i manuel resetle."""

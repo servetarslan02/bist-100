@@ -173,14 +173,15 @@ class TestPaperExecutionEngine(unittest.TestCase):
         self.assertEqual(order["status"], "FILLED")
         self.assertLess(order["execution_price"], 260)  # Slippage
 
-    def test_liquidity_rejection(self):
+    def test_liquidity_partial_fill(self):
         order = self.engine.execute_signal(
             date="2024-01-15", ticker="THYAO", side="BUY",
             quantity=1_000_000, signal_price=250, market_price=250,
             avg_volume=1_000,  # Cok dusuk hacim
         )
-        self.assertEqual(order["status"], "REJECTED")
-        self.assertIn("LIQUIDITY", order["rejection_reason"])
+        self.assertEqual(order["status"], "PARTIAL_FILL")
+        self.assertEqual(order["quantity"], 50)  # günlük hacmin %5'i
+        self.assertIsNone(order["rejection_reason"])
 
     def test_commission_calculation(self):
         amount = 100 * 250

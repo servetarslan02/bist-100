@@ -6,13 +6,8 @@ Signal -> Order Simulation:
 - Commission (BIST yapisina uygun)
 - Slippage (volatilite, hacim, spread, emir buyuklugu)
 - Turnover takibi
-- Likidite kisiti (gunluk hacmin %10'u)
-- Ayni fiyat uzerinden signal uretip islem gerceklestirme; look-ahead bias YOK.
-
-Mevcut services.backtest.engine.BacktestEngine'den farkli:
-- O gunluk, ertesi seans execution
-- Persistent order kaydi
-- BIST komisyon yapisi
+- Likidite kisiti (gunluk hacmin %5'i)
+- PreTradeRiskEngine ve MarketMicrostructureEngine Entegrasyonu
 """
 
 import uuid
@@ -20,6 +15,9 @@ import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import structlog
+
+from services.core.bist_tick_size import round_to_bist_tick, get_bist_tick_size
+from services.paper_trading.market_microstructure_engine import market_microstructure, MarketMicrostructureEngine
 
 logger = structlog.get_logger()
 
@@ -35,6 +33,7 @@ class PaperExecutionEngine:
         min_commission: float = 1.0,
         slippage_base_pct: float = 0.05,      # %0.05 base
         slippage_max_pct: float = 0.5,        # %0.5 max
+        microstructure: Optional[MarketMicrostructureEngine] = None,
     ):
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
@@ -43,6 +42,11 @@ class PaperExecutionEngine:
         self.slippage_base_pct = slippage_base_pct
         self.slippage_max_pct = slippage_max_pct
         self._daily_turnover_value: float = 0.0
+        self.microstructure = microstructure or market_microstructure
+
+    def execute_call_auction(self, ticker: str, reference_price: float = 0.0) -> Dict[str, Any]:
+        """Açık artırma havuzundaki emirleri BIST denge fiyatıyla eşleştirir."""
+        return self.microstructure.execute_call_auction(ticker=ticker, reference_price=reference_price)
 
     def execute_signal(
         self,
@@ -108,8 +112,7 @@ class PaperExecutionEngine:
         # === EXECUTION PRICE ===
         execution_price = market_price
 
-        # Limit emir yalnızca limit fiyatı piyasa tarafından karşılanmışsa
-        # gerçekleşir; aksi halde sırada bekler (bu sade motorda fill yoktur).
+        # Limit emir kontrolü
         if order_type in {"LIMIT", "STOP_LIMIT"}:
             if not limit_price or limit_price <= 0:
                 order["status"] = "REJECTED"
@@ -121,13 +124,11 @@ class PaperExecutionEngine:
                 return order
 
         # === BIST TAVAN / TABAN & DEVRE KESİCİ KİLİT KONTROLÜ ===
-        # BIST fiyat marjı sinyal fiyatına değil, önceki seansın baz/referans
-        # fiyatına göre kontrol edilir.
         ref_price = reference_price if reference_price and reference_price > 0 else signal_price
         if ref_price > 0:
             price_change_pct = ((execution_price / ref_price) - 1.0) * 100.0
 
-            # Taban Kilidi Kontrolü: Hisse tabana kilitliyse (-%9.95 ve altı), satış likiditesi sıfırdır, satış emri gerçekleşmez!
+            # Taban Kilidi Kontrolü: Taban fiyatta satıcı kuyruğu kilitlidir
             lock_threshold = price_limit_pct - 0.10
             if side == "SELL" and price_change_pct <= -lock_threshold:
                 order["status"] = "REJECTED"
@@ -135,7 +136,7 @@ class PaperExecutionEngine:
                 logger.warning("Order rejected: Limit Down Locked", ticker=ticker, change_pct=price_change_pct)
                 return order
 
-            # Tavan Kilidi Kontrolü: Hisse tavana kilitliyse (+%9.95 ve üstü), satıcı yoktur, alış emri gerçekleşmez!
+            # Tavan Kilidi Kontrolü: Tavan fiyatta alıcı kuyruğu kilitlidir
             if side == "BUY" and price_change_pct >= lock_threshold:
                 order["status"] = "REJECTED"
                 order["rejection_reason"] = f"BIST_LIMIT_UP_LOCKED: {ticker} tavan fiyatta (%{price_change_pct:.2f}). Tavanda satıcı yok, alış emri gerçekleşmedi."
@@ -157,15 +158,14 @@ class PaperExecutionEngine:
             fill_price = execution_price * (1 - slippage)
         fill_price = self._round_to_tick(fill_price, side)
 
-        # Kayma fiyatı günlük marj dışına taşıyamaz; o fiyat seviyesinde işlem
-        # gerçekleşmiş varsaymak yerine emir reddedilir.
+        # Kayma fiyatı günlük marj dışına taşıyamaz
         if ref_price > 0 and abs((fill_price / ref_price - 1) * 100) > price_limit_pct:
             order["status"] = "REJECTED"
             order["rejection_reason"] = "PRICE_LIMIT: fill price outside BIST daily price band"
             return order
 
         # === LİKİDİTE VE KISMİ DOLUM (PARTIAL FILL) MODELİ ===
-        # BIST piyasa yapıcı kuralı: Tek barda ortalama hacmin en fazla %5'i kadar aktif dolum yapılabilir
+        # BIST: Tek barda ortalama hacmin en fazla %5'i kadar aktif dolum yapılabilir
         filled_quantity = quantity
         if avg_volume > 0:
             max_participate_qty = max(1, int(avg_volume * 0.05))
@@ -246,29 +246,8 @@ class PaperExecutionEngine:
         max_slippage = self.slippage_max_pct / 100
         return min(total_slippage, max_slippage)
 
-    @staticmethod
-    def _tick_size(price: float) -> float:
-        """BIST pay fiyat adımları."""
-        if price < 20:
-            return 0.01
-        if price < 50:
-            return 0.02
-        if price < 100:
-            return 0.05
-        if price < 250:
-            return 0.10
-        if price < 500:
-            return 0.25
-        if price < 1000:
-            return 0.50
-        if price < 2500:
-            return 1.00
-        return 2.50
-
     def _round_to_tick(self, price: float, side: str) -> float:
-        tick = self._tick_size(price)
-        units = math.ceil(price / tick) if side == "BUY" else math.floor(price / tick)
-        return round(units * tick, 4)
+        return round_to_bist_tick(price, side=side)
 
     def _compute_commission(self, amount: float) -> float:
         """BIST komisyon yapisi."""
