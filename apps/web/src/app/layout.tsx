@@ -32,7 +32,6 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`}
         style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)" }}
       >
-        <GlobalTelemetrySync />
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
           <div
