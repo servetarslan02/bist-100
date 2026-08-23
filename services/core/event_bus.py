@@ -280,19 +280,27 @@ async def _publish_with_idempotency(event: CanonicalEvent):
     await _publish_to_stream(event)
 
 
+_redis_conn = None
+_redis_loop = None
+
+
 async def _get_redis():
-    """Reuse module-level Redis connection."""
-    global _redis_conn
-    if _redis_conn is None:
+    """Reuse module-level Redis connection or create new if loop changed/closed."""
+    global _redis_conn, _redis_loop
+    try:
+        current_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        current_loop = None
+
+    if _redis_conn is None or _redis_loop is not current_loop:
         try:
             import redis.asyncio as aioredis
             _redis_conn = aioredis.from_url(settings.redis_url, decode_responses=True)
-        except ImportError:
+            _redis_loop = current_loop
+        except (ImportError, Exception):
             _redis_conn = InMemoryRedis()
+            _redis_loop = current_loop
     return _redis_conn
-
-
-_redis_conn = None
 
 
 async def _check_and_mark_published(event_id: str) -> bool:
@@ -309,23 +317,24 @@ async def _check_and_mark_published(event_id: str) -> bool:
             return True
         return False
     except Exception as e:
-        logger.warning("Redis idempotency check failed", error=str(e), context="event_bus.py:271")
+        logger.debug("Redis idempotency check skipped", error=str(e))
 
     # 2. PostgreSQL dene
     try:
         from services.core.database_dev import dev_db
-        existing = await dev_db.pg_fetchrow(
-            "SELECT event_id FROM event_ledger WHERE event_id = ?", event_id
-        )
-        if existing:
-            return False
-        await dev_db.pg_execute(
-            "INSERT OR IGNORE INTO event_ledger (event_id, published_at) VALUES (?, CURRENT_TIMESTAMP)",
-            event_id
-        )
-        return True
+        if hasattr(dev_db, "pg_fetchrow") and getattr(dev_db, "_pool", None) is not None:
+            existing = await dev_db.pg_fetchrow(
+                "SELECT event_id FROM event_ledger WHERE event_id = ?", event_id
+            )
+            if existing:
+                return False
+            await dev_db.pg_execute(
+                "INSERT OR IGNORE INTO event_ledger (event_id, published_at) VALUES (?, CURRENT_TIMESTAMP)",
+                event_id
+            )
+            return True
     except Exception as e:
-        logger.warning("PostgreSQL idempotency check failed", error=str(e), context="event_bus.py:287")
+        logger.debug("PostgreSQL idempotency check skipped", error=str(e))
 
     # 3. Fail-open
     return True
