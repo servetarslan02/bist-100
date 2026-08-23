@@ -272,6 +272,47 @@ class PaperTradingOrchestrator:
             next_open_prices=next_open_dict,
         )
 
+    def queue_pending_signals(self, signals: List[Dict[str, Any]], date: str) -> Dict[str, Any]:
+        """18:15 EOD: Sinyalleri ertesi seans acilisi (09:55-10:00) icin 'bekleyen emir' olarak kaydeder."""
+        valid_sigs = [s for s in signals if s.get("model_version") == self._champion_version]
+        self.store.save_pending_signals(valid_sigs, date)
+        msg = f"Queued {len(valid_sigs)} pending signals for next morning execution"
+        self._audit_no_trade(date, msg)
+        logger.info("Pending signals queued for morning execution", count=len(valid_sigs), date=date)
+        return {"status": "QUEUED", "count": len(valid_sigs), "date": date}
+
+    def execute_pending_signals(
+        self,
+        date: str,
+        market_data: Optional[Dict[str, Any]] = None,
+        sector_map: Optional[Dict[str, str]] = None,
+        benchmark_return_pct: float = 0.0,
+        data_quality_ok: bool = True,
+    ) -> Dict[str, Any]:
+        """09:55-10:00 Sabah Acilisi: Bekleyen sinyalleri T+1 gercek acilis fiyatlariyla yurutur."""
+        pending = self.store.load_pending_signals()
+        if not pending:
+            logger.info("No pending signals found for morning execution", date=date)
+            return {"status": "NO_PENDING_SIGNALS", "date": date, "num_orders": 0, "num_trades": 0}
+
+        report = self.run_daily_cycle(
+            date=date,
+            market_data=market_data,
+            sector_map=sector_map,
+            champion_signals=pending,
+            benchmark_return_pct=benchmark_return_pct,
+            data_quality_ok=data_quality_ok,
+        )
+        self.store.clear_pending_signals()
+        return report
+
+    def mark_to_market_cycle(self, prices: Dict[str, float], date: str) -> Dict[str, Any]:
+        """Gun sonu portfoy mark-to-market degerlemesi ve T+2 takas kaydirimi."""
+        self.portfolio.mark_to_market(prices, date)
+        self.portfolio.roll_settlement_day()
+        self.portfolio.save_to_store(date)
+        return self.portfolio.get_summary()
+
     def run_backtest_replay(
         self,
         market_data: Dict[str, Any],

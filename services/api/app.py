@@ -124,26 +124,39 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"auto_storage_optimizer: {e}")
 
     async def _paper_trading_scheduler():
-        """Her gun saat 18:15'te AlphaEngine'i calistirir."""
+        """BIST seans takvimine gore calisir: 18:15 EOD sinyal uretimi & 09:55 sabah acilisi yurutme."""
         while True:
             now = datetime.now()
-            # 18:15'e ne kadar kaldigini hesapla
-            target = now.replace(hour=18, minute=15, second=0, microsecond=0)
-            if now > target:
-                target += timedelta(days=1)
-                
-            sleep_seconds = (target - now).total_seconds()
-            logger.info(f"paper_trading_scheduler: {sleep_seconds} saniye sonra (18:15) tetiklenecek.")
+            # Gunluk hedefler: 09:55 ve 18:15
+            t_morning = now.replace(hour=9, minute=55, second=0, microsecond=0)
+            t_eod = now.replace(hour=18, minute=15, second=0, microsecond=0)
+
+            upcoming = []
+            if now < t_morning:
+                upcoming.append((t_morning, "MORNING"))
+            if now < t_eod:
+                upcoming.append((t_eod, "EOD"))
+            if not upcoming:
+                # Ertesi gunun 09:55'ine ayarla
+                upcoming.append((t_morning + timedelta(days=1), "MORNING"))
+
+            target_time, phase = min(upcoming, key=lambda x: x[0])
+            sleep_seconds = (target_time - now).total_seconds()
+            logger.info(f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')}) tetiklenecek.")
             await asyncio.sleep(sleep_seconds)
-            
+
             # Sadece hafta ici calissin
             if datetime.now().weekday() < 5:
                 try:
-                    logger.info("paper_trading_scheduler: Unified Daily dongusu basliyor...")
-                    from ...pipeline.run_unified_daily import run_unified_daily_cycle
-                    await run_unified_daily_cycle()
+                    from ...pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
+                    if phase == "MORNING":
+                        logger.info("paper_trading_scheduler: Sabah acilisi yurutme dongusu basliyor...")
+                        await run_morning_execution_cycle()
+                    else:
+                        logger.info("paper_trading_scheduler: EOD sinyal uretim ve MTM dongusu basliyor...")
+                        await run_eod_signal_cycle()
                 except Exception as e:
-                    logger.error(f"paper_trading_scheduler error: {e}")
+                    logger.error(f"paper_trading_scheduler error in {phase}: {e}")
 
     task = asyncio.create_task(_radar_cache_refresher())
     ml_task = asyncio.create_task(_ml_learning_scheduler())

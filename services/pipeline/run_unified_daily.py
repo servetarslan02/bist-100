@@ -1,40 +1,49 @@
 """
-GRAND UNIFICATION: PHASE 18 (BEYIN) + PORTFOLIO MANAGER (ELLER)
-==============================================================
-Bu betik, Phase 18'in %51.86 CAGR gosteren backtest stratejisini,
-mevcut kurumsal altyapiyla (PortfolioManager) birlestirir.
+UNIFIED BIST DAILY PIPELINE: EOD SIGNAL GENERATION & MORNING MICROSTRUCTURE EXECUTION
+=====================================================================================
+Bu modül, Borsa İstanbul (BIST) işlem takvimine ve mikro-yapı gerçekliğine tam uyumlu
+iki aşamalı günlük işlem akışını yönetir:
 
-Kurallar:
-1. Sinyal: Sadece Phase 18 AlphaEngine'den alinir.
-2. Agirlik: Top 10 hisseye %10 Esit Agirlik (Equal Weight).
-3. Vade: 63 Gunluk sabit tutma suresi (Holding Period). Her gun al/sat YAPILMAZ!
-4. RiskManager: Sadece Shadow modunda, mudahale etmez.
-5. LearningPipeline: Sadece kaydeder, mudahale etmez.
+1. Seans Sonu (EOD / 18:15):
+   - AlphaEngine model eğitimi ve tahmin üretimi.
+   - Sinyaller derlenir ve "BEKLEYEN EMİR" (PENDING) olarak PaperStateStore'a kaydedilir.
+   - Aynı gün kapanışından ASLA emir doldurulmaz (Sıfır Geleceğe Bakış / Zero Lookahead).
+   - Mevcut portföy Mark-to-Market ile değerlenir ve T+2 valör kaydırılır.
+
+2. Seans Açılışı (Morning / 09:55 - 10:05):
+   - T+1 gerçek açılış fiyatları ve 20 günlük geçmiş OHLCV çekilir.
+   - KAP kısıtları (KAPMarketRestrictionRegistry: VBTS, Brüt Takas, Devre Kesici) denetlenir.
+   - Pre-trade bloklayıcı risk kapısı (PaperRiskGate - Shadow mod DEĞİL!) çalıştırılır.
+   - 10 Kademeli sentetik derinlik defteri ve Walk-the-Book (SyntheticOrderBookBuilder) ile emirler yürütülür.
+   - Gerçekleşen işlemler tekil portföy defterine (VirtualPortfolio) kaydedilir.
 """
 
 import asyncio
 import json
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import pandas as pd
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
-# Sistemin ana bilesenleri
 from services.core.database import pg_fetch, pg_execute, init_databases
 from services.core.alpha_engine import AlphaEngine
-from services.portfolio.portfolio_manager import PortfolioManager
+from services.paper_trading.paper_orchestrator import paper_orchestrator
+from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
+from services.paper_trading.synthetic_liquidity import LiquidityScenario
 
 logger = logging.getLogger("unified_daily")
 logger.setLevel(logging.INFO)
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-logger.addHandler(ch)
+if not logger.handlers:
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+    logger.addHandler(ch)
 
-# Backtest ile birebir ayni holding suresi
-HOLDING_PERIOD_DAYS = 63 
+# Backtest ile birebir aynı holding süresi (63 iş günü = ~88 takvim günü)
+HOLDING_PERIOD_DAYS = 63
 
-async def get_last_rebalance_date() -> date:
-    """Veritabanindan son gercek rebalance (al-sat yapilan) tarihi doner."""
+
+async def get_last_rebalance_date() -> Optional[date]:
+    """Veritabanından son gerçek rebalance tarihini döner."""
     query = """
         SELECT created_at 
         FROM paper_trade_portfolio 
@@ -50,163 +59,142 @@ async def get_last_rebalance_date() -> date:
         pass
     return None
 
-async def run_unified_daily_cycle():
-    """Her gun saat 18:15'te tetiklenen ana Dongu."""
+
+async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, Any]:
+    """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     await init_databases()
-    logger.info("Grand Unification: Otonom Gun Sonu (EOD) dongusu basladi.")
-    
-    # 1. KONTROL: BUGUN REBALANCE GUNU MU?
-    today = date.today()
+    today_str = target_date or date.today().strftime("%Y-%m-%d")
+    today_dt = pd.to_datetime(today_str).date()
+    logger.info("EOD Signal Cycle Started", date=today_str)
+
     last_rebalance = await get_last_rebalance_date()
-    
     needs_rebalance = True
-    
-    if last_rebalance is None:
-        logger.info("Hic rebalance kaydi bulunamadi. Ilk portfoy olusturuluyor!")
-        needs_rebalance = True
-    else:
-        # Trading gunu hesabi (Basit yaklasim: hafta sonlari haric say)
-        # Daha dogrusu, BIST is gunu sayisidir. 
-        # Simdilik takvim gunu uzerinden yaklasik 88 gun (63 is gunu = ~88 takvim gunu) 
-        days_passed = (today - last_rebalance).days
-        if days_passed >= 88: 
-            logger.info(f"{days_passed} takvim gunu gecti. REBALANCE TETIKLENIYOR.")
-            needs_rebalance = True
-        else:
-            logger.info(f"Son rebalance uzerinden {days_passed} gun gecti. Sadece MTM (Mark-to-Market) yapilacak.")
-            
-    # 2. MOTORLARI AYARLA
+    if last_rebalance is not None:
+        days_passed = (today_dt - last_rebalance).days
+        if days_passed < 88:
+            needs_rebalance = False
+            logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
+
     engine = AlphaEngine()
-    
-    # Guncel Fiyatlari Cek (Mark-to-Market icin sart)
-    start_date = (today - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
-    end_date = today.strftime("%Y-%m-%d")
-    market_data, bm_df, sector_map = engine.fetch_data(start_date, end_date)
-    
-    if bm_df.empty:
-        logger.error("Veri cekilemedi! Dongu iptal.")
-        return
-        
+    start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+    market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
+
+    if bm_df.empty or not market_data:
+        logger.error("Market data fetch failed! EOD cycle aborted", date=today_str)
+        return {"status": "ERROR", "reason": "EMPTY_MARKET_DATA", "date": today_str}
+
     current_prices = {}
     for ticker, df in market_data.items():
         if not df.empty:
             current_prices[ticker] = float(df['Close'].iloc[-1])
-            
-    from services.api.v1.portfolio import _get_pm
-    pm = _get_pm()
-    # (PortfolioManager icinde state yukleme metodu var mi? 
-    # Varsa cagirmaliyiz, simdilik baslangic durumu varsayip simule ediyoruz).
-    # Normalde PortfolioManager'in redis/db serialize yapisi kullanilmalidir.
-    
+
+    # 1. Mevcut portföy Mark-to-Market değerlemesi
+    mtm_summary = paper_orchestrator.mark_to_market_cycle(current_prices, today_str)
+
+    queued_signals = []
     if needs_rebalance:
-        # 3. BEYIN: PHASE 18 KARAR ALIYOR
         common_dates = list(sorted([d.strftime('%Y-%m-%d') for d in bm_df.index]))
-        train_start = common_dates[0]
-        train_end = common_dates[-2]
-        target_date = common_dates[-1]
-        
-        logger.info(f"Phase 18 (Optuna) egitimi basliyor: {train_start} -> {train_end}")
-        success = engine.train(market_data, bm_df, sector_map, train_start, train_end, optimize=True)
-        
-        if success:
-            preds = engine.predict(market_data, bm_df, sector_map, target_date)
-            
-            # Redis'e skorlari kaydet ki UI / radar onlari okuyabilsin
-            try:
-                from services.core.redis_helper import set_cached
-                set_cached("phase18:predictions", preds, ttl=86400 * 3) # 3 gun
-                set_cached("phase18:last_trained", datetime.now().isoformat(), ttl=86400 * 3)
-            except Exception as e:
-                logger.warning(f"Redis cache yazilamadi: {e}")
-                
+        if len(common_dates) >= 2:
+            train_start = common_dates[0]
+            train_end = common_dates[-2]
+            signal_date = common_dates[-1]
 
-            # CHIEF RISK OFFICER: Liquidity Filter (10 Million TL)
-            valid_preds = []
-            MIN_LIQUIDITY_TL = 10_000_000
-            for p in preds:
-                tick = p["ticker"]
-                if tick in market_data:
-                    df = market_data[tick]
-                    df_past = df.loc[df.index <= target_date]
-                    if len(df_past) >= 20:
-                        avg_vol = df_past['Volume'].tail(20).mean()
-                        avg_close = df_past['Close'].tail(20).mean()
-                        if (avg_vol * avg_close) >= MIN_LIQUIDITY_TL:
-                            valid_preds.append(p)
-            
-            top_10 = valid_preds[:10]
+            logger.info("Training AlphaEngine for EOD signals", start=train_start, end=train_end)
+            success = engine.train(market_data, bm_df, sector_map, train_start, train_end, optimize=True)
+            if success:
+                preds = engine.predict(market_data, bm_df, sector_map, signal_date)
 
-            logger.info(f"YENI TOP 10 (PHASE 18): {top_10}")
-            
-            # 4. UYGULAMA: Portfolio Manager
-            # Hedef agirliklar: %10
-            from services.api.v1.portfolio import _get_service
-            ps = _get_service()
-            if not getattr(ps, "_running", False):
-                await ps.start()
-                
-            target_weights = {item["ticker"]: 0.10 for item in top_10}
-            
-            # Portfoy yoneticisine hedef veriyoruz (sanal rebalance)
-            pm.update_prices(current_prices)
-            orders = pm.compute_rebalance_orders(target_weights, turnover_limit=1.0)
-            executed_orders = []
-            
-            # Emirleri uygula
-            for order in orders:
-                ticker = order["ticker"]
-                action = order["action"]
-                value = order["value"]
-                price = current_prices.get(ticker, 1.0)
-                
-                if action == "SELL":
-                    pos = pm.get_position(ticker)
-                    quantity = pos["quantity"] if pos else 0
-                else:
-                    quantity = int(value / price) if price > 0 else 0
-                
-                if quantity <= 0:
-                    continue
-                    
-                import hashlib
-                instrument_id = int(hashlib.md5(ticker.encode()).hexdigest(), 16) % 1000000
-                
-                # Insert instrument into SQLite to satisfy FK
-                from services.core.database_dev import dev_db
+                # Likidite filtresi (Minimum 10M TL ADV)
+                valid_preds = []
+                MIN_LIQUIDITY_TL = 10_000_000
+                for p in preds:
+                    tick = p["ticker"]
+                    if tick in market_data:
+                        df = market_data[tick]
+                        df_past = df.loc[df.index <= signal_date]
+                        if len(df_past) >= 20:
+                            avg_vol = df_past['Volume'].tail(20).mean()
+                            avg_close = df_past['Close'].tail(20).mean()
+                            if (avg_vol * avg_close) >= MIN_LIQUIDITY_TL:
+                                valid_preds.append(p)
+
+                top_10 = valid_preds[:10]
+                queued_signals = [
+                    {
+                        "ticker": item["ticker"],
+                        "direction": "LONG",
+                        "rank": idx + 1,
+                        "score": float(item.get("score", 10.0 - idx)),
+                        "confidence": float(item.get("confidence", 0.85)),
+                        "model_version": paper_orchestrator._champion_version,
+                        "target_weight": 0.10,
+                        "sector": sector_map.get(item["ticker"], ""),
+                    }
+                    for idx, item in enumerate(top_10)
+                ]
+
+                # Sinyalleri sabah açılışı için bekleyen emir olarak kaydet
+                paper_orchestrator.queue_pending_signals(queued_signals, today_str)
+
+                # DB log kaydı
+                top_10_tickers = [item["ticker"] for item in top_10]
                 try:
-                    await dev_db.pg_execute("INSERT OR IGNORE INTO instruments (id, symbol, exchange, instrument_type) VALUES (?, ?, 'BIST', 'EQUITY')", instrument_id, ticker)
-                except Exception:
-                    pass
-                    
-                if action == "BUY":
-                    res = await ps.execute_buy(ticker, quantity, price, instrument_id=instrument_id)
-                    executed_orders.append(res)
-                elif action == "SELL":
-                    res = await ps.execute_sell(ticker, quantity, price, instrument_id=instrument_id)
-                    executed_orders.append(res)
-                elif action == "REDUCE":
-                    res = await ps.execute_sell(ticker, quantity, price, instrument_id=instrument_id)
-                    executed_orders.append(res)
-                    
-            # 5. DB KAYDI
-            top_10_tickers = [item["ticker"] for item in top_10]
-            tickers_json = json.dumps(top_10_tickers)
-            try:
-                await pg_execute(
-                    "INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime, is_rebalance) VALUES ($1, $2, $3, $4)",
-                    today, tickers_json, False, True
-                )
-            except Exception as e:
-                logger.error(f"DB Kayit Hatasi: {e}")
-                
-            logger.info("Grand Unification Dongusu Tamamlandi.")
-            return {"needs_rebalance": True, "executed": executed_orders}
-            
+                    await pg_execute(
+                        "INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime, is_rebalance) VALUES ($1, $2, $3, $4)",
+                        today_dt, json.dumps(top_10_tickers), False, True
+                    )
+                except Exception as e:
+                    logger.error("DB Record Error", error=str(e))
+
+    return {
+        "status": "COMPLETED",
+        "phase": "EOD_SIGNAL_PHASE",
+        "date": today_str,
+        "needs_rebalance": needs_rebalance,
+        "queued_signals_count": len(queued_signals),
+        "portfolio_summary": mtm_summary,
+    }
+
+
+async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict[str, Any]:
+    """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür."""
+    await init_databases()
+    today_str = target_date or date.today().strftime("%Y-%m-%d")
+    today_dt = pd.to_datetime(today_str).date()
+    logger.info("Morning Execution Cycle Started", date=today_str)
+
+    engine = AlphaEngine()
+    start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+    market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
+
+    bm_ret = 0.0
+    if not bm_df.empty and len(bm_df) >= 2:
+        bm_ret = float((bm_df['Close'].iloc[-1] / bm_df['Close'].iloc[-2] - 1.0) * 100)
+
+    # Bekleyen sinyalleri T+1 açılış fiyatları, KAP kısıtları ve sentetik derinlikle yürüt
+    report = paper_orchestrator.execute_pending_signals(
+        date=today_str,
+        market_data=market_data,
+        sector_map=sector_map,
+        benchmark_return_pct=bm_ret,
+        data_quality_ok=(not bm_df.empty),
+    )
+
+    logger.info("Morning Execution Cycle Completed", report=report)
+    return report
+
+
+async def run_unified_daily_cycle() -> Dict[str, Any]:
+    """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu."""
+    now_hour = datetime.now().hour
+    if now_hour < 12:
+        # Sabah seansı: Bekleyen emirleri yürüt
+        return await run_morning_execution_cycle()
     else:
-        # SADECE MTM YAPIYORUZ
-        pm.update_prices(current_prices)
-        logger.info("Mark-to-Market degerlemesi yapildi.")
-        return {"needs_rebalance": False, "message": "Sadece MTM yapildi."}
+        # Akşam seansı: Sinyalleri üret ve bekleyen emir olarak kuyruğa al
+        return await run_eod_signal_cycle()
+
 
 if __name__ == '__main__':
     asyncio.run(run_unified_daily_cycle())
+

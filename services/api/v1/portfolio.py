@@ -485,38 +485,61 @@ async def rebalance_orders(
 
 @router.get("/status")
 async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Portföy servis durumu — health + trading enabled.
-
-    Returns:
-        Status, trading_enabled, positions_count, cash, total_value
-    """
+    """Portföy servis durumu — health + trading enabled + PaperTrading tekil defter özeti."""
     try:
-        pm = _get_pm()
-        pf = pm.get_portfolio()
-        acc = pm.get_accounting_summary()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
 
         return {
             "status": "ok",
             "trading_enabled": True,
-            "positions_count": pf.get("positions_count", 0),
-            "cash": pf.get("cash", 0),
-            "total_value": pf.get("total_value", 0),
-            "invariant_check": acc.get("invariant_check", True),
-            "drawdown_pct": round(pm.get_drawdown() * 100, 4),
+            "positions_count": summary.get("num_positions", 0),
+            "cash": summary.get("cash", 0.0),
+            "settled_cash": summary.get("settled_cash", 0.0),
+            "unsettled_cash_t1": summary.get("unsettled_cash_t1", 0.0),
+            "unsettled_cash_t2": summary.get("unsettled_cash_t2", 0.0),
+            "total_value": summary.get("total_value", 0.0),
+            "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
+            "realized_pnl": summary.get("realized_pnl", 0.0),
+            "drawdown_pct": summary.get("max_drawdown_pct", 0.0),
+            "strict_t2": paper_orchestrator.portfolio.strict_t2,
         }
     except Exception as e:
         raise HTTPException(500, f"Portfolio status error: {e}")
 
 
+@router.post("/trigger_eod_signals")
+async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
+    try:
+        from ...pipeline.run_unified_daily import run_eod_signal_cycle
+        res = await run_eod_signal_cycle()
+        return {"status": "success", "message": "EOD sinyal uretimi ve portfoy MTM degerlemesi tamamlandi.", "details": res}
+    except Exception as e:
+        raise HTTPException(500, f"EOD trigger error: {e}")
+
+
+@router.post("/trigger_morning_execution")
+async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """09:55 Sabah Acilisi: Bekleyen emirleri gercek T+1 acilis fiyatlari ve sentetik likiditeyle yurutur."""
+    try:
+        from ...pipeline.run_unified_daily import run_morning_execution_cycle
+        res = await run_morning_execution_cycle()
+        return {"status": "success", "message": "Sabah acilisi mikro-yapi yurutme dongusu tamamlandi.", "details": res}
+    except Exception as e:
+        raise HTTPException(500, f"Morning execution trigger error: {e}")
+
+
 @router.post("/trigger_phase18")
 async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """API icinde Phase 18 unified daily dongusunu tetikler, boylece in-memory pm guncellenir."""
+    """API icinde Phase 18 unified daily dongusunu tetikler."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
         res = await run_unified_daily_cycle()
-        return {"status": "success", "message": "Phase 18 (18:15 dongusu) manuel tetiklendi ve gercek fiyatlarla portfoy kuruldu.", "details": res}
+        return {"status": "success", "message": "Unified Daily dongusu tetiklendi.", "details": res}
     except Exception as e:
         raise HTTPException(500, f"Trigger error: {e}")
+
 
 @router.post("/auto_rebalance")
 async def trigger_auto_rebalance(
@@ -524,11 +547,11 @@ async def trigger_auto_rebalance(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Otonom portfy yeniden dengeleme artik Phase 18'e baglandi."""
+    """Otonom portfoy yeniden dengeleme artik PaperTradingOrchestrator'a baglandi."""
     try:
         from ...pipeline.run_unified_daily import run_unified_daily_cycle
         res = await run_unified_daily_cycle()
-        return {"status": "success", "message": "Phase 18 (18:15 dongusu) manuel tetiklendi.", "details": res}
+        return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
     except Exception as e:
         raise HTTPException(500, f"Auto-rebalance error: {e}")
 

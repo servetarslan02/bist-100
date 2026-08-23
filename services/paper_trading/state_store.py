@@ -126,10 +126,25 @@ class PaperStateStore:
                     updated_at TEXT NOT NULL
                 );
 
+                CREATE TABLE IF NOT EXISTS pending_signals (
+                    signal_id TEXT PRIMARY KEY,
+                    date TEXT NOT NULL,
+                    ticker TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    rank INTEGER,
+                    score REAL,
+                    confidence REAL,
+                    model_version TEXT,
+                    target_weight REAL,
+                    json_data TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
                 CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
                 CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date);
                 CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date);
                 CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_log(entry_type);
+                CREATE INDEX IF NOT EXISTS idx_pending_signals_date ON pending_signals(date);
             """)
             conn.commit()
 
@@ -328,6 +343,48 @@ class PaperStateStore:
                  "invested": r["invested"], "benchmark_equity": r["benchmark_equity"]}
                 for r in rows
             ]
+
+    # ===================== PENDING SIGNALS =====================
+
+    def save_pending_signals(self, signals: List[Dict[str, Any]], date: str):
+        """EOD (18:15) anında üretilen sinyalleri sabah seans açılışında yürütülmek üzere kaydeder."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM pending_signals")
+            now_iso = datetime.now(timezone.utc).isoformat()
+            for idx, sig in enumerate(signals):
+                sig_id = f"SIG_{date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
+                conn.execute("""
+                    INSERT OR REPLACE INTO pending_signals (
+                        signal_id, date, ticker, direction, rank, score, confidence,
+                        model_version, target_weight, json_data, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    sig_id,
+                    date,
+                    sig.get("ticker", ""),
+                    sig.get("direction", "LONG"),
+                    sig.get("rank", idx + 1),
+                    sig.get("score", 0.0),
+                    sig.get("confidence", 0.0),
+                    sig.get("model_version", ""),
+                    sig.get("target_weight", 0.10),
+                    json.dumps(sig),
+                    now_iso,
+                ))
+            conn.commit()
+        logger.info("Saved pending signals for next session execution", count=len(signals), date=date)
+
+    def load_pending_signals(self) -> List[Dict[str, Any]]:
+        """Bekleyen sinyalleri yukle."""
+        with self._connect() as conn:
+            rows = conn.execute("SELECT json_data FROM pending_signals ORDER BY rank ASC").fetchall()
+            return [json.loads(r["json_data"]) for r in rows]
+
+    def clear_pending_signals(self):
+        """Yurutulen bekleyen sinyalleri temizle."""
+        with self._connect() as conn:
+            conn.execute("DELETE FROM pending_signals")
+            conn.commit()
 
     # ===================== CONFIG =====================
 
