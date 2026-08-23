@@ -202,6 +202,12 @@ class PaperTradingOrchestrator:
             for ticker, df in market_data.items():
                 if hasattr(df, "loc"):
                     try:
+                        def _get_val(r, *keys, default=0.0):
+                            for k in keys:
+                                if k in r:
+                                    return r[k]
+                            return default
+
                         dt_lookup = pd.to_datetime(date)
                         if dt_lookup in df.index:
                             curr_idx = df.index.get_loc(dt_lookup)
@@ -213,14 +219,38 @@ class PaperTradingOrchestrator:
                             curr_idx = len(df) - 1
                             row = df.iloc[-1]
 
-                        def _get_val(r, *keys, default=0.0):
-                            for k in keys:
-                                if k in r:
-                                    return r[k]
-                            return default
-
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
+
+                        # Tarihsel 20 Günlük OHLCV Geçmişi (T anına kadar — SIFIR VERİ SIZINTISI)
+                        high_c = float(_get_val(row, "high", "High", default=0.0))
+                        low_c = float(_get_val(row, "low", "Low", default=0.0))
+                        high_p = 0.0
+                        low_p = 0.0
+
+                        if isinstance(curr_idx, int) and curr_idx >= 1:
+                            prev_row = df.iloc[curr_idx - 1]
+                            high_p = float(_get_val(prev_row, "high", "High", default=0.0))
+                            low_p = float(_get_val(prev_row, "low", "Low", default=0.0))
+
+                        start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
+                        hist_slice = df.iloc[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
+                        
+                        highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
+                        lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
+                        vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+
+                        if not hasattr(self, "_history_cache"):
+                            self._history_cache = {}
+                        self._history_cache[ticker] = {
+                            "high_curr": high_c if high_c > 0 else price_dict[ticker],
+                            "low_curr": low_c if low_c > 0 else price_dict[ticker],
+                            "high_prev": high_p if high_p > 0 else (high_c if high_c > 0 else price_dict[ticker]),
+                            "low_prev": low_p if low_p > 0 else (low_c if low_c > 0 else price_dict[ticker]),
+                            "highs": highs_list if len(highs_list) >= 2 else [price_dict[ticker], price_dict[ticker]],
+                            "lows": lows_list if len(lows_list) >= 2 else [price_dict[ticker], price_dict[ticker]],
+                            "volumes": vols_list if len(vols_list) >= 1 else [vol_dict[ticker]],
+                        }
 
                         # T+1 Açılış Fiyatı (Next Open Price) Çıkarımı
                         if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
@@ -361,10 +391,25 @@ class PaperTradingOrchestrator:
 
         # Likidite ve Mikro-Yapı Metrikleri (YALNIZCA T anına kadar olan geçmiş veri - SIFIR VERİ SIZINTISI)
         from services.paper_trading.synthetic_liquidity import SyntheticLiquidityEstimator
-        high_prev = float(signal.get("high_prev", price * 1.01))
-        low_prev = float(signal.get("low_prev", price * 0.99))
-        high_curr = float(signal.get("high", price * 1.01))
-        low_curr = float(signal.get("low", price * 0.99))
+        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
+
+        hist = getattr(self, "_history_cache", {}).get(ticker, {})
+        high_prev = float(hist.get("high_prev", signal.get("high_prev", 0.0)))
+        low_prev = float(hist.get("low_prev", signal.get("low_prev", 0.0)))
+        high_curr = float(hist.get("high_curr", signal.get("high", 0.0)))
+        low_curr = float(hist.get("low_curr", signal.get("low", 0.0)))
+        highs_arr = hist.get("highs", signal.get("highs", []))
+        lows_arr = hist.get("lows", signal.get("lows", []))
+        vols_arr = hist.get("volumes", [float(volume)] if volume > 0 else [])
+
+        if high_curr <= 0:
+            high_curr = price
+        if low_curr <= 0:
+            low_curr = price
+        if high_prev <= 0:
+            high_prev = high_curr
+        if low_prev <= 0:
+            low_prev = low_curr
 
         liq_metrics = SyntheticLiquidityEstimator.compute_liquidity_metrics(
             ticker=ticker,
@@ -373,7 +418,9 @@ class PaperTradingOrchestrator:
             high_curr=high_curr,
             low_curr=low_curr,
             price=price,
-            volumes=[float(volume)] if volume > 0 else [1_000_000.0],
+            volumes=vols_arr if len(vols_arr) > 0 else [float(volume)],
+            highs=highs_arr if len(highs_arr) >= 2 else None,
+            lows=lows_arr if len(lows_arr) >= 2 else None,
         )
 
         order = self.execution.execute_signal(
@@ -398,6 +445,9 @@ class PaperTradingOrchestrator:
         if order["status"] not in ["FILLED", "PARTIAL_FILL"]:
             return {"order": order}
 
+        # Brüt Takas doğrudan KAP kısıt sicilinden teyit edilir
+        is_gross = kap_restriction_registry.is_gross_settlement(ticker, date) or bool(signal.get("is_gross_settlement", False))
+
         executed_qty = order["quantity"]
         if side == "BUY":
             res = self.portfolio.open_position(
@@ -407,7 +457,7 @@ class PaperTradingOrchestrator:
                 sector=sector,
                 date=date,
                 commission=order["commission"],
-                is_gross_settlement=bool(signal.get("is_gross_settlement", False)),
+                is_gross_settlement=is_gross,
             )
         else:
             res = self.portfolio.close_position(
