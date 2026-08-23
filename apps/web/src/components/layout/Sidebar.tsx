@@ -103,6 +103,7 @@ export function Sidebar() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  prefetch={true}
                   className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] mb-0.5 transition-all duration-150 group ${
                     isActive ? "nav-active" : "hover:bg-white/5"
                   }`}

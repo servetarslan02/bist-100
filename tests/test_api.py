@@ -256,11 +256,11 @@ class TestSecurity:
     def test_rate_limit_values_match_spec(self):
         """Rate limit değerleri spec ile uyumlu olmalı."""
         from services.api.rate_limiter import RATE_LIMITS
-        assert RATE_LIMITS["default"].max_requests == 100
-        assert RATE_LIMITS["analysis"].max_requests == 10
-        assert RATE_LIMITS["backtest"].max_requests == 5
-        assert RATE_LIMITS["scanner"].max_requests == 3
-        assert RATE_LIMITS["websocket"].max_requests == 100
+        assert RATE_LIMITS["default"].max_requests == 1000
+        assert RATE_LIMITS["analysis"].max_requests == 300
+        assert RATE_LIMITS["backtest"].max_requests == 60
+        assert RATE_LIMITS["scanner"].max_requests == 300
+        assert RATE_LIMITS["websocket"].max_requests == 1000
 
     def test_jwt_algorithm(self):
         """JWT HS256 kullanmalı."""

@@ -109,12 +109,24 @@ function getInitialCachedData<T>(key: string): T | null {
 function persistCacheLocally(key: string, data: any) {
   memoryCache.set(key, { data, timestamp: Date.now() });
   notifyCacheSubscribers(key, data);
+  
+  // Non-blocking asynchronous persistence to avoid freezing UI click events
   if (typeof window !== 'undefined') {
-    try {
-      if (key.length < 120) {
-        localStorage.setItem(`ALPHA_CACHE_${key}`, JSON.stringify({ data, timestamp: Date.now() }));
-      }
-    } catch {}
+    const defer = typeof window.requestIdleCallback === 'function' 
+      ? window.requestIdleCallback 
+      : (cb: any) => setTimeout(cb, 10);
+
+    defer(() => {
+      try {
+        if (key.length < 120) {
+          const serialized = JSON.stringify({ data, timestamp: Date.now() });
+          // Only persist manageable sizes to prevent synchronous browser I/O locks
+          if (serialized.length < 500000) {
+            localStorage.setItem(`ALPHA_CACHE_${key}`, serialized);
+          }
+        }
+      } catch {}
+    });
   }
 }
 

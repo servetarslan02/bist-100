@@ -29,14 +29,14 @@ class RateLimitConfig:
     window_seconds: int
 
 
-# Endpoint grup limitleri
+# Endpoint grup limitleri — Canlı Dashboard ve Sürekli Telemetri Uyumlu
 RATE_LIMITS: Dict[str, RateLimitConfig] = {
-    "default": RateLimitConfig(max_requests=100, window_seconds=60),
-    "analysis": RateLimitConfig(max_requests=10, window_seconds=60),
-    "backtest": RateLimitConfig(max_requests=5, window_seconds=60),
-    "scanner": RateLimitConfig(max_requests=3, window_seconds=60),
-    "websocket": RateLimitConfig(max_requests=100, window_seconds=1),
-    "auth": RateLimitConfig(max_requests=5, window_seconds=60),
+    "default": RateLimitConfig(max_requests=1000, window_seconds=60),
+    "analysis": RateLimitConfig(max_requests=300, window_seconds=60),
+    "backtest": RateLimitConfig(max_requests=60, window_seconds=60),
+    "scanner": RateLimitConfig(max_requests=300, window_seconds=60),
+    "websocket": RateLimitConfig(max_requests=1000, window_seconds=1),
+    "auth": RateLimitConfig(max_requests=60, window_seconds=60),
 }
 
 
