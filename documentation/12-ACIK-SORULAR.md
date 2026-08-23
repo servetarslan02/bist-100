@@ -1,23 +1,129 @@
-# A��k Sorular ve ��pheli �� Mant��� Listesi
-(Sistem sahibi taraf�ndan karar verilmesi gereken konular)
+# Açık Sorular ve Şüpheli İş Mantığı Listesi
+
+(Sistem sahibi tarafından karar verilmesi gereken konular — bu dosya kod
+değişikliği içermez, sadece karar bekleyen açık soruları listeler.)
+
+**Not (encoding düzeltmesi):** Bu dosya önceki halinde bozuk karakter
+kodlamasıyla (Türkçe karakterler `�` olarak) kaydedilmişti; içerik
+korunarak doğru UTF-8 ile yeniden yazıldı.
 
 ## 1. services/core/regime_detector.py (Rejim Tespiti)
-- **Senaryo:** Hisse veya pazar ge�mi�i 200 g�nden k�saysa (�rn. yeni halka arz), sma200 hesaplanamad��� i�in sma50'ye fallback yap�l�yor. Bu durumda sma50 > sma200 e�itli�i hi�bir zaman sa�lanam�yor (False d�n�yor) ve Trend skoru 20 puan eksik ��k�yor.
-- **Neden ��pheli:** K�sa ge�mi�li varl�klar�n (�rne�in son 6 ayl�k verisi olanlar�n) rejim tespiti, teknik olarak hi�bir zaman tam bir 'BULL' trend skoruna ula�amayabilir.
-- **Soru:** 200 g�nden az ge�mi�i olan varl�klar i�in bu fakt�r�n (20 puanl�k k�sm�n) a��rl��� di�er fakt�rlere mi da��t�lmal�, yoksa rejim hesaplamas�nda tamamen exclude mu edilmelidir?
+- **Senaryo:** Hisse veya pazar geçmişi 200 günden kısaysa (örn. yeni
+  halka arz), sma200 hesaplanamadığı için sma50'ye fallback yapılıyor.
+  Bu durumda sma50 > sma200 eşitliği hiçbir zaman sağlanamıyor (False
+  dönüyor) ve Trend skoru 20 puan eksik çıkıyor.
+- **Neden şüpheli:** Kısa geçmişli varlıkların (örneğin son 6 aylık
+  verisi olanların) rejim tespiti, teknik olarak hiçbir zaman tam bir
+  'BULL' trend skoruna ulaşamayabilir.
+- **Soru:** 200 günden az geçmişi olan varlıklar için bu faktörün (20
+  puanlık kısmın) ağırlığı diğer faktörlere mi dağıtılmalı, yoksa rejim
+  hesaplamasında tamamen exclude mu edilmelidir?
 
 ## 2. services/core/data_quality.py (Limit-Up/Down Feature Maskeleme)
-- **Senaryo:** Tavan/taban olan (limit-up/limit-down) hisseler i�in fiyat g�venilir olmad��� gerek�esiyle price_mask = 0.0 yap�l�yor. 
-- **Neden ��pheli:** Al�m/sat�m i�lemi ger�ekle�tirilemedi�i i�in Execution motorunda kullan�lmamas� kesinlikle do�ru, ancak Hareketli Ortalamalar (SMA20/SMA50 vb.) gibi ge�mi� trend feature'lar� hesaplan�rken o g�nk� fiyat�n tamamiyle 'None' (NaN) varsay�lmas� sinyal �izgilerini (MACD vb.) koparabilir/bozabilir.
-- **Soru:** Mask-first kural� kesin bir kural olarak tan�mlanm��, ancak momentum ve osilat�r feature'lar�nda serinin kopmamas� i�in tavan/taban fiyatlar�n *sadece hesaplama ama�l�* kullan�l�p, sadece execution'da maskelenmesi daha do�ru olmaz m�?
-
+- **Senaryo:** Tavan/taban olan (limit-up/limit-down) hisseler için
+  fiyat güvenilir olmadığı gerekçesiyle price_mask = 0.0 yapılıyor.
+- **Neden şüpheli:** Alım/satım işlemi gerçekleştirilemediği için
+  Execution motorunda kullanılmaması kesinlikle doğru, ancak Hareketli
+  Ortalamalar (SMA20/SMA50 vb.) gibi geçmiş trend feature'ları
+  hesaplanırken o günkü fiyatın tamamıyla 'None' (NaN) varsayılması
+  sinyal çizgilerini (MACD vb.) koparabilir/bozabilir.
+- **Soru:** Mask-first kuralı kesin bir kural olarak tanımlanmış, ancak
+  momentum ve osilatör feature'larında serinin kopmaması için tavan/taban
+  fiyatların *sadece hesaplama amaçlı* kullanılıp, sadece execution'da
+  maskelenmesi daha doğru olmaz mı?
 
 ## 3. services/core/event_bus.py (Fail-Open Publish)
-- **Senaryo:** Redis veya Kafka event gönderme (publish) işleminde hata oluştuğunda, sistem sadece log yazıp (exception swallow) sessizce işleme devam ediyor.
-- **Neden Şüpheli:** Eğer bu bir trade sinyali veya order iptal emri ise, hedefe ulaşmadığı halde sistemin normal seyrine devam etmesi finansal olarak fail-open (güvensiz) bir davranıştır.
-- **Soru:** Publish hatalarında işlem durdurulmalı (fail-closed) mı, yoksa sadece loglayıp devam etmek yeterli mi?
-
+- **Senaryo:** Redis veya Kafka event gönderme (publish) işleminde hata
+  oluştuğunda, sistem sadece log yazıp (exception swallow) sessizce
+  işleme devam ediyor.
+- **Neden şüpheli:** Eğer bu bir trade sinyali veya order iptal emri ise,
+  hedefe ulaşmadığı halde sistemin normal seyrine devam etmesi finansal
+  olarak fail-open (güvensiz) bir davranıştır.
+- **Soru:** Publish hatalarında işlem durdurulmalı (fail-closed) mı,
+  yoksa sadece loglayıp devam etmek yeterli mi?
 
 ## 4. [ÇÖZÜLDÜ] Stop-Loss Eşik Uyumsuzluğu
-- **Çözüm:** decision_engine.py fallback stop-loss değeri (%5.0) backtest/learning katmanındaki canonical parametrelerle (%6.5 hard stop, 2.5x ATR, min %4.0) eşlendi ve regression testine alındı.
+- **Çözüm:** decision_engine.py fallback stop-loss değeri (%5.0)
+  backtest/learning katmanındaki canonical parametrelerle (%6.5 hard
+  stop, 2.5x ATR, min %4.0) eşlendi ve regression testine alındı.
 
+---
+
+## 5. services/market_state/ensemble_regime.py (Ağırlık Dairesellik Şüphesi)
+- **Senaryo:** `get_regime_adapted_weights()` artık gerçekten çağrılıyor
+  (bağlantı hatası düzeltildi — bkz. `documentation/09` madde ile ilgili
+  commit), ama mekanizmanın kendisi: skor-bazlı yöntemin ürettiği
+  "preliminary rejim" tahmini, aynı skor yönteminin kendi ağırlığını
+  artırmak için kullanılıyor (örn. BULL tahmininde skor ağırlığı
+  0.50→0.60'a çıkıyor).
+- **Neden şüpheli:** Bu bir dairesellik (circularity) riski — skor
+  yöntemi ne derse desin, kendi dediğine daha çok inanılıyor; HMM/GMM'nin
+  "farklı görüyorum" deme gücü tam da anlaşmadıkları anlarda azalıyor.
+- **Soru:** Bu tasarım bilinçli olarak kabul edilebilir mi (bazı
+  sistemlerde "kendine güvenen yöntem daha güvenilirdir" varsayımı
+  vardır), yoksa ağırlık adaptasyonu bağımsız bir sinyale (örn.
+  volatilite seviyesi, veri kalitesi) mi dayandırılmalı?
+
+## 6. services/core/decision_engine.py (`_calculate_composite_score`) — "Kazanan Kazanır" Yanlılığı
+- **Senaryo:** `ml_component = max(inp.ml_score, inp.spec_score * 0.9)` —
+  iki bağımsız skordan (ML modeli ve kural-tabanlı sistem) her zaman daha
+  iyimser olanı seçiliyor, ortalama/ağırlıklı birleşim değil.
+- **Neden şüpheli:** Bu, sistematik aşırı-güven (overconfidence)
+  yanlılığı yaratabilir — iki kaynaktan biri yanılıp iyimser bir skor
+  üretse bile, o skor kazanıyor.
+- **Soru:** Bu "en iyimser olanı seç" mantığı kasıtlı bir tasarım mı,
+  yoksa ortalama veya ağırlıklı ortalamaya mı çevrilmeli?
+
+## 7. services/ingestion/providers/bist_provider.py, matriks_provider.py — Muhtemelen Var Olmayan API Uç Noktaları
+- **Senaryo:** `bist_provider.py` (`BASE_URL="https://www.borsaistanbul.com"`,
+  "güvenilirlik 10/10" olarak belgelenmiş) ve `matriks_provider.py`
+  (`BASE_URL="https://www.matriks.com"`, "güvenilirlik 8/10") web
+  araştırmasıyla doğrulanamadı — gerçek BIST API'si (VERDA) ayrı bir
+  kimlik-doğrulamalı domain'de (`verda.borsaistanbul.com`), gerçek
+  Matriks API'si de ücretli/sözleşmeli bir domain'de (`matriksdata.com`).
+  Bu iki dosyadaki endpoint'ler büyük ihtimalle hiç çalışmıyor (her
+  çağrı `except Exception` ile sessizce yutulup boş/None dönüyor).
+- **Neden şüpheli:** Provider failover mantığı bu iki kaynağı "yüksek
+  güvenilirlikli" olarak önceliklendiriyor olabilir; gerçekte sürekli
+  başarısız oluyorlarsa, sistem iddia ettiği "çoklu kaynak/çapraz
+  doğrulama" mimarisine sahip değil, sessizce tek kaynağa (yfinance)
+  bağımlı çalışıyor olabilir.
+- **Soru:** Bu iki provider'a gerçek (ücretli/kimlik doğrulamalı) erişim
+  sağlanacak mı, yoksa dürüstçe kaldırılıp mimari "gerçekte tek kaynaklı"
+  olarak mı güncellenecek?
+
+## 8. services/paper_trading/paper_orchestrator.py — Canlı/Sanal İşlemde T+1 Koruması Devre Dışı
+- **Senaryo:** `execute_signal(signal_price=price, market_price=price)`
+  — ikisine de aynı değişken veriliyor. `paper_execution.py`'nin kendi
+  docstring'i bu iki fiyatın AYRI olması gerektiğini (look-ahead bias'ı
+  önlemek için) açıkça belirtiyor, ama çağıran kod bunu sağlamıyor.
+- **Neden şüpheli:** Bu, `services/backtest/multi_asset_engine.py`'de
+  bulunup düzeltilen T+1 execution hatasının (bkz. commit `3edfb45`)
+  canlı/sanal işlem tarafındaki karşılığı — orada düzeltildi, burada
+  henüz düzeltilmedi.
+- **Soru:** Canlı/sanal tarafta da gerçek "ertesi an/tick" fiyatı nasıl
+  temin edilecek (streaming veri gecikmesi göz önüne alınarak)? Bu,
+  sadece kod değişikliği değil, gerçek zamanlı veri akışının
+  zamanlamasıyla ilgili bir tasarım kararı gerektiriyor.
+
+## 9. services/ingestion/realtime.py, realtime_provider.py — Yanlış "Tazelik" Zaman Damgası
+- **Senaryo:** `self._last_update[ticker] = datetime.now(timezone.utc)`
+  — bu, verinin gerçek piyasa zaman damgası değil, kodun çalıştığı an.
+  yfinance kaynağı zaten ~15-20 dakika gecikmeli (bilinen bir Yahoo
+  Finance sınırlaması), ama "son güncelleme" alanı her zaman "az önce"
+  gösteriyor.
+- **Neden şüpheli:** Herhangi bir "bu veri taze mi?" kontrolü, gerçekte
+  15-20 dakika eski bir fiyatı "şu an" sanabilir — sessiz, tespit
+  edilemez bir tazelik yanılsaması.
+- **Soru:** Zaman damgası, sağlayıcının döndürdüğü gerçek bar/veri
+  zaman damgasına mı çevrilmeli (fetch zamanı yerine)?
+
+## 10. services/ingestion/ — Sabit Evren Tavanı (En Az 2 Yerde)
+- **Senaryo:** `BIST_STOCKS[:50]` / `tickers[:50]` gibi sabit ilk-N
+  sınırlamaları en az iki "gerçek zamanlı" veri modülünde var.
+- **Neden şüpheli:** `documentation/02.7`'deki HOT/WARM/COLD adaptif
+  önceliklendirme modeliyle çelişiyor; evrenin büyük kısmı için canlı
+  fiyat hiç güncellenmiyor olabilir.
+- **Soru:** Bu sabit tavan, HOT/WARM/COLD modeliyle mi değiştirilecek,
+  yoksa bilinçli bir kaynak kısıtlaması olarak mı kalacak (ki bu durumda
+  en azından açıkça belgelenmeli)?

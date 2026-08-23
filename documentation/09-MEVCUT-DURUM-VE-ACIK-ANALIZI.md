@@ -104,3 +104,71 @@ walk-forward gerçekliği (P1) hâlâ açıktır. Ancak Mask-first ihlali çöz�
 - RiskGate negatif emir miktarı/fiyat zafiyeti ve Orchestrator dict risk bypass zafiyeti çözüldü.
 - Tüm 6 regression testi geçildi.
 - services/core tamamlama şartlarının tamamı sağlandı.
+
+### Matematiksel/Finansal Hesaplama Denetimi — Sonuçlar (ayrı oturumlarda kanıtlı çalıştırmayla düzeltildi)
+
+Bu bölüm, kod okuyarak değil, **gerçek çalıştırma ve sayısal doğrulamayla**
+bulunup düzeltilen matematiksel hataları listeler (commit hash'leri ile).
+
+- **`services/risk/var_cvar.py`** (commit `02c071c`): Tarihsel VaR/CVaR
+  percentile index hesabı, kayan nokta hassasiyeti ve kesirli örneklem
+  büyüklüklerinde (özellikle n=252, en yaygın kullanılan yıllık işlem
+  günü sayısı) riski hedefin altına düşürüyordu. Doğru "nearest-rank"
+  formülüyle (`math.ceil(x)-1`, epsilon toleranslı) değiştirildi;
+  artık her durumda kapsam hedefin altına düşmüyor (risk hiç
+  küçümsenmiyor).
+- **`services/backtest/deflated_sharpe.py`** (commit `c5e2333`): İki
+  kritik hata — (1) `E[max Sharpe]` formülü literatürden (Bailey &
+  Lopez de Prado 2014) sapıyordu, Monte Carlo ile ~%15-20 hata
+  kanıtlandı; (2) daha ciddisi, yıllıklaştırma birim uyuşmazlığı
+  yüzünden `deflated_sharpe` gerçek değerinin **~252 katı** şişiyordu
+  (somut örnekte 21.5 → düzeltmeden sonra -0.78; "anlamlı" → "anlamlı
+  değil"). Bu, DSR'ın çoklu-test/şans eseri strateji eleme işlevini
+  tamamen etkisiz bırakıyordu.
+- **`services/risk/risk_parity.py`** (commit `02de123`): Ağırlık
+  normalize etme/negatif-temizleme sırası ters idi; düzeltildi,
+  ağırlıkların toplamının her zaman tam 1.0 olması garanti edildi.
+- **`services/backtest/multi_asset_engine.py`, `survivorship.py`**
+  (commit `3edfb45`): (1) T+1 execution hiç uygulanmıyordu — sinyal
+  ile execution aynı günün kapanışını kullanıyordu (look-ahead bias);
+  artık execution D+1 açılışında gerçekleşiyor. (2) `universe_tickers`
+  parametresi (survivorship bias için) tanımlıydı ama hiç
+  kullanılmıyordu; artık gerçekten evreni filtreliyor. Sahte
+  `"EXAMPLE1"` placeholder delisting verisi kaldırıldı (gerçek veri
+  hâlâ eksik — bkz. açık soru).
+- **`services/market_state/ensemble_regime.py`** (commit `f1b57b0`):
+  `get_regime_adapted_weights()` tanımlıydı ama `detect()` içinde hiç
+  çağrılmıyordu — rejime duyarlı ağırlıklandırma tamamen ölü kod idi.
+  Bağlantı kuruldu (tasarımın kendisinin dairesellik riski taşıyıp
+  taşımadığı hâlâ açık bir soru — bkz. `documentation/12` madde 5).
+- **`services/agents/`** (commit `83a77e4`, `50f0bcb`): Bull/Bear
+  debate mekanizması bir crash bug (`KeyError`) ve bir sessiz mantık
+  hatası (`"position"` vs `"direction"` alan adı uyuşmazlığı — her
+  debate turu sahte "NEUTRAL" uzlaşmasına düşüyordu) yüzünden hiç
+  çalışmıyordu; ikisi de düzeltildi. Ayrıca `agent_memory.py`'de
+  episodic hafızanın her yeniden başlatmada sessizce kaybolduğu
+  (persistence bug), `risk_assessor.py`'de risk seviyesi bucketing
+  off-by-one hatası (CRITICAL eşiği yanlışlıkla 70'te tetikleniyordu,
+  85 yerine), ve `self_evaluator.py`'de gereksiz çift hesaplama
+  bulunup düzeltildi.
+
+Bu liste, "P0/P1 açıkların bir kısmı zaten kapatılmaya başlandı" anlamına
+gelir ama **tamamı kapatılmamıştır** — özellikle sahte/sabit veri (P0) ve
+walk-forward gerçekliği (P1) hâlâ açıktır. Ancak Mask-first ihlali çözülmüştür.
+
+### Veri Alım Katmanı (services/ingestion) — Henüz Düzeltilmemiş Kritik Bulgular
+
+Bu bulgular (kullanıcının "canlı veride sürekli zarar" şüphesi üzerine
+yapılan araştırmada bulundu) henüz **düzeltilmedi**, sadece tespit edildi
+— detaylar ve çözüm önerileri için `documentation/12` madde 7-10'a bakın:
+
+- `bist_provider.py` ve `matriks_provider.py`'nin hedeflediği API
+  uç noktalarının gerçekte var olmadığı şüphesi (web araştırmasıyla
+  doğrulanamadı) — sistem muhtemelen iddia ettiği çoklu-kaynak
+  mimarisine sahip değil, sessizce tek kaynağa (yfinance) bağımlı.
+- Canlı/sanal işlemde (`paper_orchestrator.py`) T+1 koruması kâğıt
+  üzerinde var ama devre dışı — backtest'te düzeltilen aynı sorunun
+  canlı tarafındaki hâlâ açık hali.
+- "Son güncelleme" zaman damgasının gerçek veri zaman damgası yerine
+  fetch anını göstermesi — tazelik kontrolünü kör bırakıyor.
+- En az iki modülde sabit `[:50]` evren tavanı.

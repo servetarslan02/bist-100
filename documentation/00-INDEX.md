@@ -50,6 +50,7 @@ hepsini tek bir okunabilir program haline getirir.
 | 09 | `09-MEVCUT-DURUM-VE-ACIK-ANALIZI.md` | Bugün kod tabanında gerçekte ne var, ne yok — dürüst envanter | Herkes — gerçeklik kontrolü |
 | 10 | `10-YONETISIM-GUVENLIK-VE-UYUM.md` | Governance Brain, sır yönetimi, denetim, felaket senaryoları, düzenleyici çerçeve | Yönetim / güvenlik |
 | 11 | `11-SOZLUK.md` | Terimler sözlüğü | Herkes — referans |
+| 12 | `12-ACIK-SORULAR.md` | Şüpheli iş mantığı / finansal tasarım kararları — sistem sahibinin karar vermesi gereken açık sorular (kod değişikliği içermez) | Sistem sahibi — karar bekleyen konular |
 
 ## Temel ilkeler (bu setin her belgesinde geçerlidir)
 
