@@ -289,7 +289,7 @@ class DevDatabase:
         await self.pg_execute("""
             INSERT INTO portfolios (name, description, initial_capital, current_capital, cash_balance, is_paper)
             VALUES (?, ?, ?, ?, ?, ?)
-        """, "ALPHA Paper Portfolio", "Default paper trading portfolio", 100000, 100000, 100000, True)
+        """, "ALPHA Paper Portfolio", "Default automated paper trading portfolio", 10000000.0, 10000000.0, 10000000.0, 1)
 
         row = await self.pg_fetchrow(
             "SELECT id FROM portfolios WHERE name = ? LIMIT 1",

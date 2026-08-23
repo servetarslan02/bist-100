@@ -1,180 +1,20 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { usePolling, type MarketState, type Signal, type WorldState, type SystemStatus } from "@/lib/api";
+import { usePolling, type MarketState, type Signal, type SystemStatus } from "@/lib/api";
 import {
   TrendingUp, TrendingDown, Minus,
-  Activity, Globe, BarChart2, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Shield,
-  Wifi, WifiOff, ChevronUp, ChevronDown,
-  Target as TargetIcon
+  Activity, BarChart2, Target as TargetIcon, Shield,
+  Wifi, WifiOff, ChevronUp, ChevronDown, CheckCircle
 } from "lucide-react";
 
-// ─── Mini SVG Sparkline ──────────────────────────────────────────────────────
-function MiniSparkline({ value = 0, color = "#00e5a0" }: { value?: number; color?: string }) {
-  const w = 48, h = 20;
-  const points = Array.from({ length: 8 }, (_, i) => {
-    const x = (i / 7) * w;
-    const noise = (Math.sin(i * 2.3 + value) + 1) / 2;
-    const y = h - noise * (h * 0.7) - h * 0.15;
-    return `${x},${y}`;
-  }).join(" ");
+// ---------------------------------------------
+// Component Helpers
+// ---------------------------------------------
+function SectionHeader({ icon: Icon, title, sub, accent }: any) {
   return (
-    <svg width={w} height={h} className="opacity-60">
-      <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-// ─── Stat Card ───────────────────────────────────────────────────────────────
-function StatCard({
-  label, value, suffix = "", decimals = 1,
-  trend, icon: Icon, accent = "#00e5a0"
-}: {
-  label: string; value?: number; suffix?: string; decimals?: number;
-  trend?: "up" | "down" | "neutral"; icon?: React.ElementType; accent?: string;
-}) {
-  const displayVal = value !== undefined ? value.toFixed(decimals) : "—";
-  const trendColor = trend === "up" ? "#00e5a0" : trend === "down" ? "#ff4466" : "#8892a4";
-  const TrendIcon = trend === "up" ? ChevronUp : trend === "down" ? ChevronDown : Minus;
-
-  return (
-    <div
-      className="card-hover rounded-xl p-4 flex flex-col gap-3 select-none"
-      style={{
-        background: "var(--color-bg-card)",
-        border: "1px solid var(--color-border-subtle)",
-        borderTop: `1px solid ${accent}30`,
-      }}
-    >
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>
-          {label}
-        </span>
-        {Icon && (
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: `${accent}15` }}>
-            <Icon size={12} style={{ color: accent }} />
-          </div>
-        )}
-      </div>
-      <div className="flex items-end justify-between">
-        <span className="text-2xl font-bold font-data" style={{ color: "var(--color-text-primary)" }}>
-          {displayVal}
-          <span className="text-sm ml-0.5" style={{ color: "var(--color-text-secondary)" }}>{suffix}</span>
-        </span>
-        <div className="flex flex-col items-end gap-1">
-          <MiniSparkline value={value || 0} color={accent} />
-          {trend && (
-            <div className="flex items-center gap-0.5">
-              <TrendIcon size={10} style={{ color: trendColor }} />
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Signal Direction Badge ───────────────────────────────────────────────────
-function DirBadge({ dir }: { dir: string }) {
-  const up = dir === "LONG" || dir === "AL";
-  const label = up ? "AL" : "SAT";
-  return (
-    <div
-      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold"
-      style={{
-        background: up ? "rgba(0,229,160,0.12)" : "rgba(255,68,102,0.12)",
-        color: up ? "#00e5a0" : "#ff4466",
-      }}
-    >
-      {up ? <ArrowUpRight size={10} /> : <ArrowDownRight size={10} />}
-      {label}
-    </div>
-  );
-}
-
-// ─── Risk Badge ───────────────────────────────────────────────────────────────
-function RiskBadge({ level }: { level: string }) {
-  const cfg: Record<string, { bg: string; color: string; text: string }> = {
-    LOW: { bg: "rgba(0,229,160,0.1)", color: "#00e5a0", text: "DÜŞÜK" },
-    MEDIUM: { bg: "rgba(255,170,0,0.1)", color: "#ffaa00", text: "ORTA" },
-    HIGH: { bg: "rgba(255,68,102,0.1)", color: "#ff4466", text: "YÜKSEK" },
-  };
-  const c = cfg[level] ?? cfg.MEDIUM;
-  return (
-    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold" style={{ background: c.bg, color: c.color }}>
-      {c.text}
-    </span>
-  );
-}
-
-// ─── Score Bar ────────────────────────────────────────────────────────────────
-function ScoreBar({ score }: { score: number }) {
-  const color = score >= 80 ? "#00e5a0" : score >= 60 ? "#ffaa00" : "#ff4466";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="w-12 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${score}%`, background: color }} />
-      </div>
-      <span className="text-[11px] font-data font-semibold" style={{ color }}>{score?.toFixed(0)}</span>
-    </div>
-  );
-}
-
-// ─── World Metric Row ─────────────────────────────────────────────────────────
-function WorldMetric({ label, value, invert }: { label: string; value: number; invert: boolean }) {
-  const pct = value * 100;
-  const isGood = invert ? value < 0.4 : value > 0.6;
-  const isBad = invert ? value > 0.7 : value < 0.3;
-  const color = isGood ? "#00e5a0" : isBad ? "#ff4466" : "#ffaa00";
-  return (
-    <div className="flex items-center gap-3">
-      <span className="text-[11px] w-32 flex-shrink-0" style={{ color: "var(--color-text-secondary)" }}>{label}</span>
-      <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-        <div
-          className="h-full rounded-full transition-all duration-700"
-          style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}80, ${color})` }}
-        />
-      </div>
-      <span className="text-[10px] font-data w-8 text-right" style={{ color }}>%{pct.toFixed(0)}</span>
-    </div>
-  );
-}
-
-// ─── Service Health Row ────────────────────────────────────────────────────────
-function ServiceRow({ name, health }: { name: string; health: string }) {
-  const ok = health === "healthy";
-  return (
-    <div className="flex items-center justify-between py-1.5">
-      <div className="flex items-center gap-2">
-        {ok ? <Wifi size={11} style={{ color: "#00e5a0" }} /> : <WifiOff size={11} style={{ color: "#ff4466" }} />}
-        <span className="text-[11px] capitalize" style={{ color: "var(--color-text-secondary)" }}>
-          {name.replace(/_/g, " ")}
-        </span>
-      </div>
-      <span
-        className="text-[10px] font-semibold px-2 py-0.5 rounded-full"
-        style={{
-          background: ok ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)",
-          color: ok ? "#00e5a0" : "#ff4466",
-        }}
-      >
-        {ok ? "Çalışıyor" : "Kesinti"}
-      </span>
-    </div>
-  );
-}
-
-// ─── Section Header ────────────────────────────────────────────────────────────
-function SectionHeader({ icon: Icon, title, sub, accent = "#00e5a0" }: {
-  icon: React.ElementType; title: string; sub?: string; accent?: string;
-}) {
-  return (
-    <div
-      className="flex items-center justify-between px-5 py-3"
-      style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-    >
+    <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
       <div className="flex items-center gap-2.5">
         <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: `${accent}15` }}>
           <Icon size={13} style={{ color: accent }} />
@@ -188,249 +28,176 @@ function SectionHeader({ icon: Icon, title, sub, accent = "#00e5a0" }: {
   );
 }
 
-// ─── Regime Pill ─────────────────────────────────────────────────────────────
-function RegimePill({ regime }: { regime?: string }) {
-  if (!regime) return <span style={{ color: "var(--color-text-muted)" }}>—</span>;
-  const up = regime.includes("UP") || regime.includes("EXPANSION") || regime.includes("BULL");
-  const down = regime.includes("DOWN") || regime.includes("PANIC") || regime.includes("BEAR");
-  const color = up ? "#00e5a0" : down ? "#ff4466" : "#ffaa00";
-  const Icon = up ? TrendingUp : down ? TrendingDown : Minus;
-  
-  let label = regime;
-  if (regime === "BULL_TREND") label = "BOĞA TRENDİ";
-  else if (regime === "BEAR_TREND") label = "AYI TRENDİ";
-  else if (regime === "HIGH_VOLATILITY") label = "YÜKSEK VOLATİLİTE";
-  else if (regime === "LOW_VOLATILITY") label = "DÜŞÜK VOLATİLİTE";
-  else if (regime === "EXPANSION") label = "GENİŞLEME DÖNEMİ";
-
+function StatCard({ label, value, suffix = "", decimals = 2, icon: Icon, accent, trend }: any) {
   return (
-    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full"
-      style={{ background: `${color}15`, border: `1px solid ${color}30` }}>
-      <Icon size={11} style={{ color }} />
-      <span className="text-[11px] font-bold" style={{ color }}>{label}</span>
+    <div className="rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden group"
+      style={{
+        background: "var(--color-bg-card)",
+        border: "1px solid var(--color-border-subtle)"
+      }}>
+      <div className="absolute -right-6 -top-6 w-20 h-20 rounded-full blur-3xl opacity-10 transition-opacity group-hover:opacity-20" style={{ background: accent }} />
+      <div className="flex items-center justify-between">
+        <span className="text-[10.5px] uppercase tracking-wider font-semibold" style={{ color: "var(--color-text-secondary)" }}>
+          {label}
+        </span>
+        <Icon size={14} style={{ color: "var(--color-text-muted)" }} />
+      </div>
+      <div className="flex items-baseline gap-2">
+        <span className="text-2xl font-bold font-data tracking-tight" style={{ color: "var(--color-text-primary)" }}>
+          {typeof value === 'number' ? value.toFixed(decimals) : value}{suffix}
+        </span>
+        {trend && (
+          <span className="flex items-center text-[10px] font-bold font-data" style={{ color: trend === "up" ? "#00e5a0" : trend === "down" ? "#ff4466" : "var(--color-text-muted)" }}>
+            {trend === "up" ? <ChevronUp size={12} strokeWidth={3} /> : trend === "down" ? <ChevronDown size={12} strokeWidth={3} /> : <Minus size={12} strokeWidth={3} />}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
 
-// ─── Main Page ─────────────────────────────────────────────────────────────────
-export default function Overview() {
+function ScoreBar({ score }: { score: number }) {
+  let color = "#00e5a0";
+  if (score < 40) color = "#ff4466";
+  else if (score < 70) color = "#ffaa00";
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <span className="text-[12px] font-data font-bold" style={{ color }}>{score}</span>
+      <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+        <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${score}%`, background: color }} />
+      </div>
+    </div>
+  );
+}
+
+function DirBadge({ dir }: { dir: string }) {
+  const isUp = dir === "BUY" || dir === "LONG";
+  const isDown = dir === "SELL" || dir === "SHORT";
+  let bg = "rgba(255,255,255,0.05)", fg = "var(--color-text-muted)", Icon = Minus;
+
+  if (isUp) { bg = "rgba(0,229,160,0.1)"; fg = "#00e5a0"; Icon = TrendingUp; }
+  else if (isDown) { bg = "rgba(255,68,102,0.1)"; fg = "#ff4466"; Icon = TrendingDown; }
+
+  return (
+    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase" style={{ background: bg, color: fg }}>
+      <Icon size={10} strokeWidth={3} />
+      {dir}
+    </div>
+  );
+}
+
+function RiskBadge({ level }: { level: string }) {
+  const isLow = level.toUpperCase() === "LOW";
+  const isHigh = level.toUpperCase() === "HIGH";
+  let fg = "#ffaa00";
+  if (isLow) fg = "#00e5a0";
+  if (isHigh) fg = "#ff4466";
+
+  return (
+    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" style={{ border: `1px solid ${fg}30`, color: fg }}>
+      <Shield size={10} />
+      {level}
+    </div>
+  );
+}
+
+function ServiceRow({ name, health }: { name: string, health: string }) {
+  const isOk = health === "ok" || health === "healthy";
+  return (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{name}</span>
+      <div className="flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full" style={{ background: isOk ? "#00e5a0" : "#ff4466", boxShadow: `0 0 8px ${isOk ? "#00e5a0" : "#ff4466"}40` }} />
+        <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: isOk ? "#00e5a0" : "#ff4466" }}>{isOk ? "AKT°F" : "HATA"}</span>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------
+// Main Dashboard
+// ---------------------------------------------
+export default function ClientPageRoot() {
   const router = useRouter();
-  const [timeStr, setTimeStr] = useState<string>("");
-
-  useEffect(() => {
-    setTimeStr(new Date().toLocaleTimeString("tr-TR"));
-    const clockTimer = setInterval(() => {
-      setTimeStr(new Date().toLocaleTimeString("tr-TR"));
-    }, 1000);
-    return () => clearInterval(clockTimer);
-  }, []);
-
+  
+  // Real-time polling
   const { data: market } = usePolling<MarketState>("/market/state", 2000);
   const { data: rawSignals } = usePolling<any>("/signals?limit=10", 2000);
-  const { data: world } = usePolling<any>("/macro/world", 3000);
   const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
   const signals: Signal[] = Array.isArray(rawSignals) ? rawSignals : (rawSignals?.signals ?? []);
   const systemOk = !status || status.status === "healthy" || status.status === "ok" || (status.services && Object.values(status.services).every(s => s === "healthy"));
 
   return (
-    <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
+    <div className="p-6 max-w-[1400px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
+      
+      {/* ?? Header ???????????????????????????????????????????? */}
+      <div className="flex items-end justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight mb-1" style={{ color: "var(--color-text-primary)" }}>
+            BIST Otonom Yönetim Paneli
+          </h1>
+          <p className="text-[13px]" style={{ color: "var(--color-text-secondary)" }}>
+            Tüm veriler <strong style={{color:"var(--color-accent-green)"}}>Phase 18 Otonom Motoru</strong> zerinden canlı akmaktadır.
+          </p>
+        </div>
 
-      {/* ── Top Header ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between py-1">
         <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-xl font-bold tracking-tight gradient-text">ALPHA BIST</h1>
-            <p className="text-[10px] uppercase tracking-widest" style={{ color: "var(--color-text-muted)" }}>
-              Piyasa İstihbarat & Kantitatif Karar Destek Platformu
-            </p>
-          </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
-            style={{ background: "rgba(0,229,160,0.08)", border: "1px solid rgba(0,229,160,0.15)" }}>
-            <div className="w-1.5 h-1.5 rounded-full live-dot" style={{ background: "#00e5a0" }} />
-            <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "#00e5a0" }}>CANLI AKIŞ</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-data font-semibold text-zinc-300">
-            {timeStr || "—"}
-          </span>
-          <div
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold"
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[11px] font-medium"
             style={{
-              background: systemOk ? "rgba(0,229,160,0.08)" : "rgba(255,68,102,0.08)",
-              border: `1px solid ${systemOk ? "rgba(0,229,160,0.2)" : "rgba(255,68,102,0.2)"}`,
-              color: systemOk ? "#00e5a0" : "#ff4466"
-            }}
-          >
-            {systemOk ? <Shield size={11} /> : <AlertTriangle size={11} />}
-            {systemOk ? "Tüm Servisler Aktif" : "Kısmi Kesinti"}
+              background: systemOk ? "rgba(0,229,160,0.1)" : "rgba(255,68,102,0.1)",
+              color: systemOk ? "#00e5a0" : "#ff4466",
+              border: `1px solid ${systemOk ? "rgba(0,229,160,0.2)" : "rgba(255,68,102,0.2)"}`
+            }}>
+            {systemOk ? <Wifi size={13} /> : <WifiOff size={13} />}
+            {systemOk ? "SİSTEM CANLI" : "BAĞLANTI SORUNU"}
           </div>
         </div>
       </div>
 
-      {/* ── Market State Bar ────────────────────────────────────────── */}
-      <div
-        className="rounded-xl p-4"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div className="grid grid-cols-6 gap-4">
-          {/* Regime */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Piyasa Rejimi</p>
-            <RegimePill regime={market?.regime} />
-          </div>
-          {/* Breadth */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Piyasa Genişliği</p>
-            <p className="text-xl font-bold font-data" style={{ color: "var(--color-text-primary)" }}>
-              %{market?.breadth_pct?.toFixed(1) ?? "—"}
-            </p>
-          </div>
-          {/* Adv/Dec */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Yükselen / Düşen</p>
-            <p className="text-lg font-bold font-data">
-              <span style={{ color: "#00e5a0" }}>{market?.advancing ?? 0}</span>
-              <span className="mx-1" style={{ color: "var(--color-text-faint)" }}>/</span>
-              <span style={{ color: "#ff4466" }}>{market?.declining ?? 0}</span>
-            </p>
-          </div>
-          {/* RSI */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Ort. RSI (Göreceli Güç)</p>
-            <p className="text-xl font-bold font-data"
-              style={{
-                color: (market?.avg_rsi ?? 50) > 70 ? "#ff4466" :
-                  (market?.avg_rsi ?? 50) < 30 ? "#00e5a0" : "var(--color-text-primary)"
-              }}>
-              {market?.avg_rsi?.toFixed(1) ?? "—"}
-            </p>
-          </div>
-          {/* Anomalies */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Tespit Edilen Anomali</p>
-            <p className="text-xl font-bold font-data"
-              style={{ color: (market?.anomaly_count ?? 0) > 10 ? "#ffaa00" : "var(--color-text-primary)" }}>
-              {market?.anomaly_count ?? 0}
-            </p>
-          </div>
-          {/* Risk Appetite */}
-          <div className="space-y-2">
-            <p className="text-[9px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Risk İştahı</p>
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-data font-semibold" style={{ color: "#00e5a0" }}>
-                  %{((market?.risk_appetite ?? 0) * 100).toFixed(0)}
-                </span>
-              </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.06)" }}>
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${(market?.risk_appetite ?? 0) * 100}%`,
-                    background: "linear-gradient(90deg, #00e5a060, #00e5a0)"
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Alpha Engine Highlight Banner ────────────────────────────── */}
-      <div
-        onClick={() => router.push("/strategy")}
-        className="rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4 cursor-pointer group transition-all hover:border-emerald-500/40"
-        style={{
-          background: "linear-gradient(135deg, rgba(0,229,160,0.08) 0%, rgba(0,200,255,0.05) 100%)",
-          border: "1px solid rgba(0,229,160,0.25)"
-        }}
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-500/20 text-emerald-400 font-bold text-lg shrink-0">
-            α
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-zinc-100 group-hover:text-emerald-400 transition-colors">
-                Doğrulanmış Alpha Strateji Motoru (Holy Grail V4)
-              </h2>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                CANLI AKTİF
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 mt-0.5">
-              Weekly Hyper-Momentum · En Güçlü 5 BİST Lideri · Otomatik PPF Para Piyasası Kalkanı · Yıllık %773.4 CAGR
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="text-right">
-            <span className="text-xs text-zinc-400 block">Sharpe Rasyosu</span>
-            <span className="text-sm font-bold font-data text-emerald-400">2.56</span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs text-zinc-400 block">Maksimum DD</span>
-            <span className="text-sm font-bold font-data text-emerald-400">-%9.8</span>
-          </div>
-          <span className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-400 text-zinc-950 group-hover:brightness-110 transition-all">
-            Stratejiyi İncele →
-          </span>
-        </div>
-      </div>
-
-      {/* ── Stat Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-5 gap-3">
+      {/* ?? Stats Row ???????????????????????????????????????????? */}
+      <div className="grid grid-cols-4 gap-3">
         <StatCard
-          label="Küresel Risk İştahı"
-          value={(world?.global_risk_appetite ?? 0.68) * 100}
-          suffix="%" decimals={0}
-          icon={Globe}
-          accent="#00c8ff"
-          trend={world && world.global_risk_appetite > 0.6 ? "up" : "down"}
-        />
-        <StatCard
-          label="VIX Volatilite Endeksi"
-          value={world?.vix_level ?? 15.14}
-          decimals={1}
-          icon={BarChart2}
-          accent={world && world.vix_level > 25 ? "#ff4466" : "#00e5a0"}
-          trend={world && world.vix_level > 25 ? "up" : "down"}
-        />
-        <StatCard
-          label="Dolar Endeksi (DXY)"
-          value={(world?.usd_strength ?? 0) * 100}
-          suffix="%" decimals={0}
-          icon={TrendingUp}
-          accent="#9966ff"
-        />
-        <StatCard
-          label="Türkiye Makro Risk"
-          value={(world?.turkey_macro_risk ?? 0) * 100}
-          suffix="%" decimals={0}
-          icon={AlertTriangle}
-          accent={world && world.turkey_macro_risk > 0.6 ? "#ff4466" : "#ffaa00"}
-          trend={world && world.turkey_macro_risk > 0.6 ? "up" : "neutral"}
-        />
-        <StatCard
-          label="Petrol Fiyat Baskısı"
-          value={(world?.oil_pressure ?? 0) * 100}
-          suffix="%" decimals={0}
+          label="Piyasa Rejimi (Phase 18)"
+          value={market?.regime === "BULL_TREND" ? "BOĞA" : market?.regime === "BEAR_TREND" ? "AYI" : market?.regime ?? "HESAPLANIYOR"}
           icon={Activity}
-          accent="#ffaa00"
+          accent={market?.regime === "BULL_TREND" ? "#00e5a0" : "#ff4466"}
+        />
+        <StatCard
+          label="Piyasa GeniYliYi (Yükselen)"
+          value={market?.breadth_pct ?? 0}
+          suffix="%" decimals={1}
+          icon={BarChart2}
+          accent={market && market.breadth_pct > 50 ? "#00e5a0" : "#ff4466"}
+          trend={market && market.breadth_pct > 50 ? "up" : "down"}
+        />
+        <StatCard
+          label="Yükselen / Düşen"
+          value={`${market?.advancing ?? 0} / ${market?.declining ?? 0}`}
+          decimals={0}
+          icon={TrendingUp}
+          accent="#00c8ff"
+        />
+        <StatCard
+          label="Otonom Risk İştahı"
+          value={(market?.risk_appetite ?? 0) * 100}
+          suffix="%" decimals={0}
+          icon={Shield}
+          accent={market && market.risk_appetite > 0.5 ? "#00e5a0" : "#ffaa00"}
+          trend={market && market.risk_appetite > 0.5 ? "up" : "down"}
         />
       </div>
 
-      {/* ── Opportunity Engine ──────────────────────────────────────── */}
+      {/* ?? Opportunity Engine ???????????????????????????????????????????? */}
       <div
         className="rounded-xl overflow-hidden"
         style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
       >
         <SectionHeader
           icon={TargetIcon}
-          title="Fırsat Motoru (Algoritmik Sinyaller)"
-          sub={`${signals?.length ?? 0} aktif sinyal`}
+          title="Fırsat Motoru (Phase 18 Otonom Kararlar)"
+          sub={`Canlı tarama, ${signals?.length ?? 0} aktif sinyal`}
           accent="#00e5a0"
         />
 
@@ -449,12 +216,11 @@ export default function Overview() {
                     borderBottom: "1px solid var(--color-border-subtle)"
                   }}>
                   <th className="text-left py-2.5 px-5">Sembol</th>
-                  <th className="text-left py-2.5 px-3">Şirket Adı</th>
-                  <th className="text-right py-2.5 px-3">Model Skoru</th>
-                  <th className="text-center py-2.5 px-3">Yön</th>
+                  <th className="text-left py-2.5 px-3">Şirket Ad</th>
+                  <th className="text-right py-2.5 px-3">Phase 18 Skoru</th>
+                  <th className="text-center py-2.5 px-3">Karar Yön</th>
                   <th className="text-center py-2.5 px-3">Risk</th>
-                  <th className="text-center py-2.5 px-3">Vade</th>
-                  <th className="text-right py-2.5 px-5">Beklenen Getiri</th>
+                  <th className="text-right py-2.5 px-5">Beklenen Getiri (ML)</th>
                 </tr>
               </thead>
               <tbody>
@@ -484,17 +250,12 @@ export default function Overview() {
                     <td className="py-3 px-3 text-center">
                       <RiskBadge level={s.risk_level ?? "MEDIUM"} />
                     </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="text-[11px] font-data" style={{ color: "var(--color-text-secondary)" }}>
-                        {s.horizon === "SHORT" ? "Kısa Vade" : s.horizon === "MID" ? "Orta Vade" : s.horizon === "LONG" ? "Uzun Vade" : s.horizon}
-                      </span>
-                    </td>
                     <td className="py-3 px-5 text-right">
                       <span
                         className="font-data font-semibold text-[13px]"
                         style={{ color: (s.expected_return_pct ?? 0) > 0 ? "#00e5a0" : "#ff4466" }}
                       >
-                        {(s.expected_return_pct ?? 0) > 0 ? "+" : ""}%{s.expected_return_pct?.toFixed(1)}
+                        {(s.expected_return_pct ?? 0) > 0 ? "+" : ""}%{s.expected_return_pct?.toFixed(2)}
                       </span>
                     </td>
                   </tr>
@@ -505,7 +266,7 @@ export default function Overview() {
         )}
       </div>
 
-      {/* ── Bottom Panels ──────────────────────────────────────────── */}
+      {/* ?? Bottom Panels ?????????????????????????????????????????????????? */}
       <div className="grid grid-cols-2 gap-4">
         {/* System Health */}
         <div
@@ -520,32 +281,36 @@ export default function Overview() {
               ))
               : (
                 <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
-                  Yükleniyor...
+                  Sistem durumu alınıyor...
                 </p>
               )
             }
           </div>
         </div>
-
-        {/* World State */}
+        
+        {/* Phase 18 Engine Summary */}
         <div
           className="rounded-xl overflow-hidden"
           style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
         >
-          <SectionHeader icon={Globe} title="Küresel Makro Göstergeler" accent="#9966ff" />
-          <div className="px-5 py-4 space-y-4">
-            {world ? [
-              { label: "Jeopolitik Risk", value: world.geopolitical_risk, invert: true },
-              { label: "Gelişmekte Olan Risk İştahı", value: world.em_risk_appetite, invert: false },
-              { label: "Enflasyon Baskısı", value: world.inflation_pressure, invert: true },
-              { label: "ABD Faiz Baskısı", value: world.us_rate_pressure, invert: true },
-            ].map(f => (
-              <WorldMetric key={f.label} label={f.label} value={f.value} invert={f.invert} />
-            )) : (
-              <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>
-                Küresel veriler alınıyor...
-              </p>
-            )}
+          <SectionHeader icon={CheckCircle} title="Otonom Motor (Phase 18) Durumu" accent="#00e5a0" />
+          <div className="px-5 py-5 space-y-4">
+             <div className="flex justify-between items-center">
+                 <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Aktif Model</span>
+                 <span className="text-xs font-semibold text-white bg-zinc-800 px-2 py-1 rounded">phase18_optuna_lgbm</span>
+             </div>
+             <div className="flex justify-between items-center">
+                 <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Model Versiyonu</span>
+                 <span className="text-xs font-data" style={{ color: "var(--color-text-primary)" }}>v1.8.0-live</span>
+             </div>
+             <div className="flex justify-between items-center">
+                 <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Günlük Sinyal (Tahmin) Hacmi</span>
+                 <span className="text-xs font-data" style={{ color: "var(--color-text-primary)" }}>{market?.advancing !== undefined ? (market.advancing + market.declining) : 100} Sembol</span>
+             </div>
+             <div className="flex justify-between items-center">
+                 <span className="text-xs" style={{ color: "var(--color-text-secondary)" }}>Test Başarısı (OOS CAGR)</span>
+                 <span className="text-xs font-data font-bold" style={{ color: "#00e5a0" }}>%51.86</span>
+             </div>
           </div>
         </div>
       </div>

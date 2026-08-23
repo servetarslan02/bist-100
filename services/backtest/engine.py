@@ -135,6 +135,9 @@ class BacktestEngine:
         commission_rate: float | None = None,
         slippage_pct: float = 0.05,
         dump_ledger: bool = False,
+        stop_loss_pct: float = 0.07,
+        trailing_stop_pct: float = 0.15,
+        market_regime: float = 1.0,
     ):
         import csv
         import os
@@ -205,11 +208,45 @@ class BacktestEngine:
         for current_date in all_dates:
             day_prices = price_lookup.get(current_date, {})
             
-            # 1. Market Value & Equity Before Trades
+            # 1. Market Value & Equity Before Trades & Trailing Stop Checks
             total_market_value = 0.0
+            to_sell_due_to_stop = []
+            
             for t, p in positions.items():
                 current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
-                total_market_value += p["qty"] * current_price
+                
+                # Update peak price for trailing stop
+                p["peak_price"] = max(p.get("peak_price", current_price), current_price)
+                
+                # Check stops
+                is_stop_loss = current_price <= p["avg_cost"] * (1 - stop_loss_pct)
+                is_trailing_stop = current_price <= p["peak_price"] * (1 - trailing_stop_pct)
+                
+                if is_stop_loss or is_trailing_stop:
+                    to_sell_due_to_stop.append(t)
+                else:
+                    total_market_value += p["qty"] * current_price
+            
+            # Execute stop sells immediately before normal signal processing
+            for t in to_sell_due_to_stop:
+                p = positions[t]
+                current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
+                qty = p["qty"]
+                gross = qty * current_price
+                comm = _cm.calculate(gross)
+                capital += (gross - comm)
+                
+                trades.append(BacktestTrade(
+                    trade_id=trade_id, ticker=t, side="SELL", entry_date=p["entry_date"],
+                    exit_date=current_date, entry_price=p["avg_cost"], exit_price=current_price,
+                    quantity=qty, pnl=(gross - comm) - (qty * p["avg_cost"]),
+                    pnl_pct=(current_price / p["avg_cost"]) - 1.0,
+                    holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]),
+                    commission=comm
+                ))
+                trade_id += 1
+                del positions[t]
+                
             current_equity = capital + total_market_value
             
             if current_date in signals_by_date:
@@ -239,8 +276,13 @@ class BacktestEngine:
                     if action == "BUY" and ticker not in positions:
                         fill_price = exec_price * (1 + effective_slippage / 100)
                         
-                        risk_pct = min(15.0, 15.0 * confidence)
-                        position_value = current_equity * (risk_pct / 100)
+                        # Use dynamic weight if provided (e.g. from RiskManager), fallback to equal 10%
+                        weight = signal.get("weight", 0.10)
+                        
+                        # Apply market regime (e.g. 0.5 means halve all position sizes)
+                        adjusted_weight = weight * market_regime
+                        
+                        position_value = current_equity * adjusted_weight
                         shares = int(position_value / fill_price)
                         shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
 
@@ -257,6 +299,7 @@ class BacktestEngine:
                                     "qty": shares,
                                     "avg_cost": fill_price,
                                     "entry_date": current_date,
+                                    "peak_price": fill_price,
                                     "commission": commission,
                                 }
                                 

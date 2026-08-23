@@ -40,12 +40,35 @@ async def audit_trail(decision_id: str, user=Depends(get_current_user), _=Depend
     return {"decision_id": decision_id, "audit": [], "message": "Audit trail requires event bus logs"}
 
 
-@router.get("/opportunities")
+@router.get("/pending-opportunities")
 async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Bekleyen fırsatlar."""
+    """Phase 18 (AlphaEngine) tarafindan uretilen en guncel firsatlari getirir."""
     try:
-        from ...scanner.opportunity_engine import OpportunityDiscoveryEngine
-        return {"opportunities": [], "message": "Requires live scan"}
+        from ...core.database import pg_fetch
+        import json
+        
+        query = """
+            SELECT created_at, target_date, tickers, is_cash_regime, is_rebalance
+            FROM paper_trade_portfolio
+            ORDER BY target_date DESC, created_at DESC
+            LIMIT 1
+        """
+        rows = await pg_fetch(query)
+        
+        if not rows:
+            return {"opportunities": [], "message": "Henuz gun sonu modeli (18:15) calismadi veya veri yok."}
+            
+        row = rows[0]
+        tickers = json.loads(row["tickers"]) if isinstance(row["tickers"], str) else row["tickers"]
+        
+        return {
+            "opportunities": tickers,
+            "target_date": row["target_date"].isoformat(),
+            "generated_at": row["created_at"].isoformat(),
+            "is_cash_regime": row["is_cash_regime"],
+            "is_rebalance": row["is_rebalance"],
+            "message": "Phase 18 AI Engine: Guncel Portfoy (63-Day Hold Mode)"
+        }
     except Exception as e:
         return {"opportunities": [], "error": str(e)}
 

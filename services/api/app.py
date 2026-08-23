@@ -47,6 +47,13 @@ async def lifespan(app: FastAPI):
 
     # Database connections başlat
     await init_databases()
+    
+    try:
+        from services.portfolio.main import portfolio_service
+        await portfolio_service.start()
+        logger.info("PortfolioService started in API lifespan")
+    except Exception as e:
+        logger.error(f"PortfolioService baslatilamadi: {e}")
 
     # OpenTelemetry başlat
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
@@ -113,15 +120,39 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 logger.warning(f"auto_storage_optimizer: {e}")
 
+    async def _paper_trading_scheduler():
+        """Her gun saat 18:15'te AlphaEngine'i calistirir."""
+        while True:
+            now = datetime.now()
+            # 18:15'e ne kadar kaldigini hesapla
+            target = now.replace(hour=18, minute=15, second=0, microsecond=0)
+            if now > target:
+                target += timedelta(days=1)
+                
+            sleep_seconds = (target - now).total_seconds()
+            logger.info(f"paper_trading_scheduler: {sleep_seconds} saniye sonra (18:15) tetiklenecek.")
+            await asyncio.sleep(sleep_seconds)
+            
+            # Sadece hafta ici calissin
+            if datetime.now().weekday() < 5:
+                try:
+                    logger.info("paper_trading_scheduler: Unified Daily dongusu basliyor...")
+                    from ...pipeline.run_unified_daily import run_unified_daily_cycle
+                    await run_unified_daily_cycle()
+                except Exception as e:
+                    logger.error(f"paper_trading_scheduler error: {e}")
+
     task = asyncio.create_task(_radar_cache_refresher())
     ml_task = asyncio.create_task(_ml_learning_scheduler())
     storage_task = asyncio.create_task(_auto_storage_optimizer())
+    paper_task = asyncio.create_task(_paper_trading_scheduler())
 
     yield
 
     task.cancel()
     ml_task.cancel()
     storage_task.cancel()
+    paper_task.cancel()
 
     # OpenTelemetry kapat
     shutdown_telemetry()

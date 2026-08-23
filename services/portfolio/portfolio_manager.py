@@ -1245,15 +1245,7 @@ class PortfolioManager:
                 pass
             
             if not signals:
-                # Otomatik piyasa tarayıcı ve BİST liderleri sinyali üret
-                signals = [
-                    {"ticker": "THYAO", "price": 312.50, "score": 94, "stop_loss": 296.0, "target": 352.0, "sector": "Havacılık & Ulaştırma"},
-                    {"ticker": "ASELS", "price": 403.25, "score": 92, "stop_loss": 384.0, "target": 448.0, "sector": "Savunma Sanayi"},
-                    {"ticker": "GARAN", "price": 128.40, "score": 89, "stop_loss": 122.0, "target": 142.0, "sector": "Bankacılık"},
-                    {"ticker": "KCHOL", "price": 242.00, "score": 86, "stop_loss": 230.0, "target": 268.0, "sector": "Holding"},
-                    {"ticker": "TUPRS", "price": 154.20, "score": 85, "stop_loss": 146.0, "target": 172.0, "sector": "Enerji & Petrol"},
-                    {"ticker": "BIMAS", "price": 540.00, "score": 82, "stop_loss": 515.0, "target": 590.0, "sector": "Perakende Ticaret"},
-                ]
+                signals = []
 
         executed = []
         total_equity = self._cash + sum(p.market_value for p in self._positions.values())

@@ -131,7 +131,7 @@ services:
       - ./config:/app/config
       - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 512m
+    mem_limit: 10g
     depends_on:
       postgres:
         condition: service_healthy

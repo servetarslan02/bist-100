@@ -34,7 +34,7 @@ class PortfolioService:
     - DB transaction içinde atomik işlemler
     """
 
-    def __init__(self, initial_capital: float = 100000.0):
+    def __init__(self, initial_capital: float = 10000000.0):
         self._running = False
         self._portfolio_id: Optional[int] = None
         self._pm = PortfolioManager(initial_capital=initial_capital)
@@ -457,6 +457,7 @@ class PortfolioService:
 
         # In-process cash kontrolü
         if self._pm._cash < quantity * price + commission:
+            logger.error(f"Yetersiz nakit: cash={self._pm._cash}, cost={quantity * price + commission}, qty={quantity}, price={price}, comm={commission}")
             return {"success": False, "error": "Yetersiz nakit"}
 
         # DB'den güncel cash oku (multi-instance tutarlılığı)

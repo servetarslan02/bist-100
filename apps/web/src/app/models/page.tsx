@@ -24,75 +24,12 @@ interface ModelRegistryItem {
   last_trained: string;
 }
 
-const FALLBACK_MODELS: ModelRegistryItem[] = [
-  {
-    id: "lgbm_alpha_v4",
-    name: "LightGBM Quant Alpha",
-    type: "Gradient Boosting",
-    role: "Fiyat & Trend Tahmini",
-    version: "v4.2.1",
-    status: "CHAMPION",
-    metrics: { ic: 0.084, r2: 0.142, sharpe: 2.35, latency_ms: 3.2 },
-    features_count: 148,
-    last_trained: "2026-08-21 12:00",
-  },
-  {
-    id: "catboost_momentum",
-    name: "CatBoost Cross-Sectional",
-    type: "Categorical GBDT",
-    role: "Sektörel Sıralama & Momentum",
-    version: "v3.1.0",
-    status: "CHAMPION",
-    metrics: { ic: 0.076, r2: 0.128, sharpe: 2.10, latency_ms: 4.1 },
-    features_count: 112,
-    last_trained: "2026-08-21 06:00",
-  },
-  {
-    id: "lstm_temporal_v2",
-    name: "LSTM Deep Sequence",
-    type: "Recurrent Neural Network",
-    role: "Volatilite & Rejim Değişimi",
-    version: "v2.4.0",
-    status: "CHALLENGER",
-    metrics: { ic: 0.069, r2: 0.115, sharpe: 1.94, latency_ms: 12.8 },
-    features_count: 96,
-    last_trained: "2026-08-20 18:00",
-  },
-  {
-    id: "ensemble_meta_v1",
-    name: "Alpha Ensemble Stacking",
-    type: "Meta Learner",
-    role: "Kombine Karar ve Sinyal Filtresi",
-    version: "v1.8.2",
-    status: "CHAMPION",
-    metrics: { ic: 0.098, r2: 0.168, sharpe: 2.62, latency_ms: 6.4 },
-    features_count: 220,
-    last_trained: "2026-08-21 14:00",
-  },
-];
+
 
 export default function ModelCenterPage() {
-  const { data: matrixData } = usePolling<any>("/learning/performance-matrix", 10000);
+  const { data: modelsData } = usePolling<any>("/models/list", 10000);
 
-  const models = useMemo(() => {
-    if (matrixData?.models && matrixData.models.length > 0) {
-      return FALLBACK_MODELS.map((fb, idx) => {
-        const live = matrixData.models[idx];
-        if (live) {
-          return {
-            ...fb,
-            metrics: {
-              ...fb.metrics,
-              sharpe: live.sharpe_ratio ?? fb.metrics.sharpe,
-              ic: live.information_coefficient ?? fb.metrics.ic,
-            }
-          };
-        }
-        return fb;
-      });
-    }
-    return FALLBACK_MODELS;
-  }, [matrixData]);
+  const models: ModelRegistryItem[] = useMemo(() => modelsData?.models || [], [modelsData]);
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
@@ -192,3 +129,5 @@ export default function ModelCenterPage() {
     </div>
   );
 }
+
+

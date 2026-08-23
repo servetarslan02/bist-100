@@ -21,7 +21,7 @@ def _tz_naive(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 class AlphaEngine:
-    def __init__(self):
+    def __init__(self, exclude_features: List[str] = None):
         self.params = {
             "objective": "regression",
             "metric": "rmse",
@@ -34,21 +34,64 @@ class AlphaEngine:
         }
         self.model = None
         self.features = []
+        
+        # Phase 18: Kalici olarak cope atilan gurultu gostergeler (Ablation Test sonuclari)
+        default_bad_features = [
+            'momentum_accel', 'roc_120d', 'dist_sma200', 
+            'cs_zscore_ret_1d', 'roc_5d'
+        ]
+        self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
     def fetch_data(self, start_date: str, end_date: str) -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
-        tickers = bist_universe.BIST_100_TICKERS
+        tickers = bist_universe.BIST_ALL_TICKERS
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
         
         # Load stocks
         market_data = {}
-        for ticker in tickers:
-            try:
-                df = yf.Ticker(f"{ticker}.IS").history(start=start_date, end=end_date)
-                if not df.empty:
-                    market_data[ticker] = _tz_naive(df)
-            except Exception as e:
-                logger.warning(f"Failed to fetch {ticker}", error=str(e))
-                
+        try:
+            download_tickers = [f"{t}.IS" for t in tickers]
+            df_all = yf.download(download_tickers, start=start_date, end=end_date, progress=False)
+            if not df_all.empty and 'Close' in df_all:
+                for t in tickers:
+                    tick_sym = f"{t}.IS"
+                    if tick_sym in df_all['Close']:
+                        df_tick = df_all.xs(tick_sym, level=1, axis=1) if isinstance(df_all.columns, pd.MultiIndex) else df_all
+                        if isinstance(df_all.columns, pd.MultiIndex):
+                            # It's multi-index, we already got xs
+                            pass
+                        else:
+                            # Single ticker or something
+                            pass
+                        
+                        # simpler way to extract: 
+                        # Actually yfinance returns multi-index if multiple tickers: columns are (PriceType, Ticker)
+                        # Let's just do it cleanly
+                        pass
+        except:
+            pass
+            
+        # simpler yf.download extraction
+        import pandas as pd
+        market_data = {}
+        download_tickers = [f"{t}.IS" for t in tickers]
+        batch_size = 50
+        for i in range(0, len(download_tickers), batch_size):
+            batch = download_tickers[i:i+batch_size]
+            df_batch = yf.download(batch, start=start_date, end=end_date, group_by="ticker", progress=False)
+            if not df_batch.empty:
+                for t in tickers[i:i+batch_size]:
+                    tick_sym = f"{t}.IS"
+                    if isinstance(df_batch.columns, pd.MultiIndex):
+                        if tick_sym in df_batch.columns.levels[0]:
+                            df_t = df_batch[tick_sym].dropna(how="all")
+                            if not df_t.empty:
+                                market_data[t] = _tz_naive(df_t)
+                    else:
+                        if tick_sym == batch[0]: # single ticker case
+                            df_t = df_batch.dropna(how="all")
+                            if not df_t.empty:
+                                market_data[t] = _tz_naive(df_t)
+
         # Load benchmark
         bm_df = yf.Ticker("XU100.IS").history(start=start_date, end=end_date)
         bm_df = _tz_naive(bm_df)
@@ -92,6 +135,11 @@ class AlphaEngine:
                 if not feats: continue
                 if ticker not in market_data: continue
                 
+                # Exclude features for ablation
+                if self.exclude_features:
+                    for exf in self.exclude_features:
+                        feats.pop(exf, None)
+                
                 df_fwd = market_data[ticker][(market_data[ticker].index >= t_snap) & (market_data[ticker].index <= t_fwd)]
                 bm_fwd = bm_df[(bm_df.index >= t_snap) & (bm_df.index <= t_fwd)]
                 
@@ -116,7 +164,7 @@ class AlphaEngine:
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         return X, y, all_keys
 
-    def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str):
+    def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True):
         t_start = pd.Timestamp(train_start_str)
         t_end = pd.Timestamp(train_end_str)
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
@@ -126,6 +174,17 @@ class AlphaEngine:
             return False
             
         self.features = feature_names
+        
+        if optimize:
+            # Optuna ile dinamik hyperparameter tuning (TimeSeriesSplit korumali)
+            from services.ml.hyper_optimizer import HyperOptimizer
+            optimizer = HyperOptimizer(n_trials=20)
+            best_params = optimizer.optimize(X, y, feature_names)
+            
+            # Bulunan en iyi parametreleri guncelle
+            self.params.update(best_params)
+            logger.info(f"Optuna params found: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}, max_depth={self.params.get('max_depth', 0)}")
+            
         train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         self.model = lgb.train(self.params, train_data, num_boost_round=100)
         logger.info(f"Model trained successfully on {len(X)} samples.")
@@ -136,7 +195,7 @@ class AlphaEngine:
             raise ValueError("Model not trained")
             
         target_date = pd.Timestamp(target_date_str)
-        start_date_dt = target_date - pd.Timedelta(days=252)
+        start_date_dt = target_date - pd.Timedelta(days=400)
         
         snap_md = {}
         for t, df in market_data.items():
@@ -149,6 +208,12 @@ class AlphaEngine:
             raise ValueError("Insufficient benchmark data for prediction")
             
         features = compute_universe_features(snap_md, snap_bm, sector_map)
+        
+        # Exclude features for ablation
+        if self.exclude_features:
+            for ticker, feats in features.items():
+                for exf in self.exclude_features:
+                    feats.pop(exf, None)
         
         predictions = []
         for ticker, feats in features.items():
@@ -168,7 +233,7 @@ class AlphaEngine:
     def run_daily_pipeline(self, date: str):
         """Run daily production logic"""
         end_date_dt = pd.Timestamp(date)
-        start_date_dt = end_date_dt - pd.Timedelta(days=252)  # Match exactly TRAIN_DAYS=252 from validation
+        start_date_dt = end_date_dt - pd.Timedelta(days=400)  # Match exactly TRAIN_DAYS=252 from validation
         
         market_data, bm_df, sector_map = self.fetch_data(
             start_date_dt.strftime('%Y-%m-%d'), 

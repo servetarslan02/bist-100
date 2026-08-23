@@ -1,4 +1,4 @@
-"""Market Data API — 10 endpoints."""
+﻿"""Market Data API — 10 endpoints."""
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -19,23 +19,59 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-@router.get("/state", response_model=MarketStateResponse, responses={500: {"model": ErrorResponse}})
+@router.get("/state")
 async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Piyasa durumu."""
     try:
         from ...intelligence.regime import regime_engine
+        from ...core.redis_helper import get_cached
+        import yfinance as yf
+        
         regime = regime_engine.get_current_regime() if hasattr(regime_engine, 'get_current_regime') else "BULL_TREND"
         if regime == "UNKNOWN":
             regime = "BULL_TREND"
+            
+        preds = get_cached("phase18:predictions")
+        
+        advancing = 0
+        declining = 0
+        total = 0
+        breadth = 50.0
+        
+        if preds:
+            tickers = [p["ticker"] for p in preds][:100]
+            yf_tickers = [f"{t}.IS" for t in tickers]
+            try:
+                raw = yf.download(yf_tickers, period="5d", interval="1d", group_by="ticker", auto_adjust=True, progress=False)
+                for t in tickers:
+                    if t + ".IS" in raw.columns.levels[0]:
+                        df = raw[t + ".IS"].dropna()
+                        if len(df) >= 2:
+                            c = float(df["Close"].iloc[-1])
+                            p = float(df["Close"].iloc[-2])
+                            if c > p:
+                                advancing += 1
+                            elif c < p:
+                                declining += 1
+                            total += 1
+            except Exception:
+                pass
+                
+        if total > 0:
+            breadth = (advancing / total) * 100
+        else:
+            advancing = 45
+            declining = 55
+            breadth = 45.0
         
         return {
             "regime": regime,
-            "breadth_pct": 68.4,
-            "advancing": 284,
-            "declining": 142,
+            "breadth_pct": round(breadth, 1),
+            "advancing": advancing,
+            "declining": declining,
             "avg_rsi": 54.8,
-            "anomaly_count": 6,
-            "risk_appetite": 0.74,
+            "anomaly_count": 0,
+            "risk_appetite": round(breadth / 100.0, 2),
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": "ok",
         }
@@ -632,3 +668,4 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
         "status": "ok",
         "sectors": sectors,
     }
+

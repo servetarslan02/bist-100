@@ -40,18 +40,10 @@ from .schemas import (
 logger = structlog.get_logger()
 router = APIRouter()
 
-from ..dependencies import get_current_user, check_rate_limit
-import structlog
-
-logger = structlog.get_logger()
-
-router = APIRouter()
-
-
 def _get_pm():
-    """PortfolioManager singleton'ı al."""
-    from ...portfolio.portfolio_manager import portfolio_manager
-    return portfolio_manager
+    """PortfolioManager'in singleton ornegini al (PortfolioService uzerinden)."""
+    from ...portfolio.main import portfolio_service
+    return portfolio_service._pm
 
 
 def _get_service():
@@ -502,22 +494,27 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
         raise HTTPException(500, f"Portfolio status error: {e}")
 
 
+@router.post("/trigger_phase18")
+async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """API icinde Phase 18 unified daily dongusunu tetikler, boylece in-memory pm guncellenir."""
+    try:
+        from ...pipeline.run_unified_daily import run_unified_daily_cycle
+        res = await run_unified_daily_cycle()
+        return {"status": "success", "message": "Phase 18 (18:15 dongusu) manuel tetiklendi ve gercek fiyatlarla portfoy kuruldu.", "details": res}
+    except Exception as e:
+        raise HTTPException(500, f"Trigger error: {e}")
+
 @router.post("/auto_rebalance")
 async def trigger_auto_rebalance(
     body: Optional[Any] = Body(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Otonom portföy yeniden dengeleme (Auto-Rebalance Bot)."""
+    """Otonom portfy yeniden dengeleme artik Phase 18'e baglandi."""
     try:
-        signals = None
-        if isinstance(body, dict):
-            signals = body.get("signals")
-        elif isinstance(body, list):
-            signals = body
-        pm = _get_pm()
-        res = pm.execute_auto_rebalance(signals=signals)
-        return res
+        from ...pipeline.run_unified_daily import run_unified_daily_cycle
+        res = await run_unified_daily_cycle()
+        return {"status": "success", "message": "Phase 18 (18:15 dongusu) manuel tetiklendi.", "details": res}
     except Exception as e:
         raise HTTPException(500, f"Auto-rebalance error: {e}")
 
