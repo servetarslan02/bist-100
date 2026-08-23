@@ -34,18 +34,25 @@ function normalizeApiPath(path: string): string {
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const inFlightRequests = new Map<string, Promise<any>>();
 
-// 5. LocalStorage Hydration Helper
+// 5. LocalStorage Hydration Helper with strict 30s Freshness TTL
 function getInitialCachedData<T>(key: string): T | null {
   if (memoryCache.has(key)) {
-    return memoryCache.get(key)!.data as T;
+    const entry = memoryCache.get(key)!;
+    if (Date.now() - entry.timestamp < 30000) {
+      return entry.data as T;
+    }
   }
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(`ALPHA_CACHE_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp });
-        return parsed.data as T;
+        if (parsed && parsed.timestamp && Date.now() - parsed.timestamp < 30000) {
+          memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp });
+          return parsed.data as T;
+        } else {
+          localStorage.removeItem(`ALPHA_CACHE_${key}`);
+        }
       }
     } catch {}
   }
