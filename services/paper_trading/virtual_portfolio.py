@@ -86,17 +86,17 @@ class VirtualPortfolio:
         date: str = "",
         commission: float = 0.0,
     ) -> Dict[str, Any]:
-        """Yeni pozisyon ac veya mevcut pozisyonu artir."""
+        """Yeni pozisyon aç veya mevcut pozisyonu artır (komisyon nakitten tam düşülür ve maliyete girer)."""
         cost = quantity * price
-        total_cost = cost + commission  # Toplam nakit çıkışı
+        total_cost = cost + commission  # Toplam nakit çıkışı (hisse bedeli + komisyon)
 
         if total_cost > self.cash:
             logger.warning("Insufficient cash for position",
-                         ticker=ticker, required=cost, available=self.cash)
-            return {"success": False, "error": "INSUFFICIENT_CASH", "required": cost, "available": self.cash}
+                         ticker=ticker, required=total_cost, available=self.cash)
+            return {"success": False, "error": "INSUFFICIENT_CASH", "required": total_cost, "available": self.cash}
 
         if ticker in self._positions:
-            # Mevcut pozisyonu artir — weighted average cost
+            # Mevcut pozisyonu artır — ağırlıklı ortalama maliyet (komisyon dahil)
             pos = self._positions[ticker]
             old_cost = pos["quantity"] * pos["avg_cost"]
             new_cost = quantity * price + commission
@@ -108,8 +108,8 @@ class VirtualPortfolio:
             pos["sector"] = sector or pos.get("sector", "")
             logger.info("Position increased", ticker=ticker, new_qty=total_qty, avg_cost=pos["avg_cost"])
         else:
-            # Yeni pozisyon
-            avg_with_commission = price  # Komisyon maliyete dahil edilmez (close_position'da düşülür)
+            # Yeni pozisyon — alış komisyonu başlangıç birim maliyetine eklenir
+            avg_with_commission = (cost + commission) / quantity if quantity > 0 else price
             self._positions[ticker] = {
                 "ticker": ticker,
                 "quantity": quantity,
@@ -120,9 +120,9 @@ class VirtualPortfolio:
                 "entry_date": date,
                 "last_update": datetime.now(timezone.utc).isoformat(),
             }
-            logger.info("Position opened", ticker=ticker, quantity=quantity, price=price)
+            logger.info("Position opened", ticker=ticker, quantity=quantity, price=price, avg_cost=avg_with_commission)
 
-        self.cash -= cost
+        self.cash -= total_cost  # Nakitten hisse bedeli + komisyon tam düşülür
         self._current_date = date
         return {"success": True, "ticker": ticker, "quantity": quantity, "cash_remaining": self.cash}
 
@@ -130,31 +130,33 @@ class VirtualPortfolio:
         self,
         ticker: str,
         price: float,
+        quantity: Optional[int] = None,
         date: str = "",
         commission: float = 0.0,
         reason: str = "EXIT_SIGNAL",
     ) -> Dict[str, Any]:
-        """Pozisyon kapat."""
+        """Pozisyon kapat veya kısmi satış yap (satış komisyonu nakitten düşülür)."""
         if ticker not in self._positions:
             return {"success": False, "error": "NO_POSITION", "ticker": ticker}
 
         pos = self._positions[ticker]
-        quantity = pos["quantity"]
+        total_holding = pos["quantity"]
+        sold_quantity = quantity if (quantity is not None and 0 < quantity < total_holding) else total_holding
 
-        # Revenue
-        revenue = quantity * price - commission
+        # Net gelir (satış tutarı - satış komisyonu)
+        revenue = sold_quantity * price - commission
         self.cash += revenue
 
         # Realized P&L
-        realized_pnl = (price - pos["avg_cost"]) * quantity - commission
+        realized_pnl = (price - pos["avg_cost"]) * sold_quantity - commission
         realized_pnl_pct = (price / pos["avg_cost"] - 1) * 100 if pos["avg_cost"] > 0 else 0
 
-        # Trade kaydi
+        # Trade kaydı
         trade = {
             "trade_id": f"TRD_{date}_{ticker}_{uuid.uuid4().hex[:8]}",
             "ticker": ticker,
             "side": "SELL",
-            "quantity": quantity,
+            "quantity": sold_quantity,
             "entry_price": pos["avg_cost"],
             "exit_price": price,
             "entry_date": pos.get("entry_date", date),
@@ -172,15 +174,24 @@ class VirtualPortfolio:
         if self._state_store:
             self._state_store.save_trade(trade)
 
-        del self._positions[ticker]
+        # Pozisyon güncellemesi (Kısmi vs Tam Kapatma)
+        if sold_quantity >= total_holding:
+            del self._positions[ticker]
+            logger.info("Position fully closed", ticker=ticker, qty=sold_quantity, realized_pnl=realized_pnl, reason=reason)
+        else:
+            remaining_qty = total_holding - sold_quantity
+            pos["quantity"] = remaining_qty
+            pos["current_price"] = price
+            pos["market_value"] = remaining_qty * price
+            pos["last_update"] = datetime.now(timezone.utc).isoformat()
+            logger.info("Position partially sold", ticker=ticker, sold_qty=sold_quantity, remaining_qty=remaining_qty, realized_pnl=realized_pnl)
 
-        logger.info("Position closed", ticker=ticker, realized_pnl=realized_pnl, reason=reason)
         self._current_date = date
         return {
             "success": True,
             "ticker": ticker,
+            "quantity_sold": sold_quantity,
             "realized_pnl": realized_pnl,
-            "realized_pnl_pct": realized_pnl_pct,
             "cash": self.cash,
             "trade": trade,
         }

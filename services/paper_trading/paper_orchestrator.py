@@ -282,26 +282,28 @@ class PaperTradingOrchestrator:
         # Audit: signal
         self._audit_signal(date, signal)
 
-        # Determine side
+        # Determine side & exact quantity
         if direction == "LONG":
             side = "BUY"
             if ticker in self.portfolio._positions:
                 self._audit_no_trade(date, f"Already holding {ticker}", ticker)
                 return {}
+            # Position sizing (Risk Parity / Eşit Ağırlık Alış)
+            total_value = self.portfolio.get_total_value()
+            target_weight = min(self.risk_gate.max_position_pct / 100, 0.1)
+            position_value = total_value * target_weight
+            quantity = int(position_value / price)
         elif direction == "SHORT":
             if ticker not in self.portfolio._positions:
                 self._audit_no_trade(date, f"No position to exit for {ticker}", ticker)
                 return {}
             side = "SELL"
+            # Satış emri: Açık pozisyonun tam adediyle birebir eşleşir
+            current_pos = self.portfolio._positions[ticker]
+            quantity = current_pos["quantity"]
         else:
             self._audit_no_trade(date, f"Unknown direction: {direction}", ticker)
             return {}
-
-        # Position sizing (esit agirlik)
-        total_value = self.portfolio.get_total_value()
-        target_weight = min(self.risk_gate.max_position_pct / 100, 0.1)
-        position_value = total_value * target_weight
-        quantity = int(position_value / price)
 
         if quantity <= 0:
             self._audit_no_trade(date, f"Quantity too small for {ticker}", ticker)
@@ -327,14 +329,23 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, f"Risk gate blocked: {reason}", ticker)
             return {}
 
-        # === EXECUTION ===
-        # Volatilite ve spread'i hesapla (sabit değerler yerine)
+        # === EXECUTION (ERTESİ SEANS AÇILIŞI / T+1 GAP MODELİ) ===
         _vol = self._estimate_volatility(ticker) if hasattr(self, '_estimate_volatility') else 0.25
         _spread = self._estimate_spread(ticker, volume) if hasattr(self, '_estimate_spread') else 0.1
+        
+        # Gerçek ertesi seans açılış fiyatı varsa kullanılır, yoksa volatilite bazlı stokastik gecelik gap simüle edilir
+        next_open = signal.get("next_open_price")
+        if next_open is not None and next_open > 0:
+            market_price = float(next_open)
+        else:
+            # Gecelik BIST gap simülasyonu
+            gap_pct = float(np.clip(np.random.normal(0.0, _vol / 20.0), -0.03, 0.03))
+            market_price = price * (1.0 + gap_pct)
+
         order = self.execution.execute_signal(
             date=date, ticker=ticker, side=side, quantity=quantity,
             signal_price=price, 
-            market_price=price * (1.002 if side == "BUY" else 0.998), # FIX: Simulate live execution gap/delay
+            market_price=market_price,
             avg_volume=volume, volatility=_vol, spread_pct=_spread,
             sector=sector,
         )
@@ -342,19 +353,21 @@ class PaperTradingOrchestrator:
         self._audit_order(date, order)
         self.store.save_order(order)
 
-        if order["status"] != "FILLED":
+        if order["status"] not in ["FILLED", "PARTIAL_FILL"]:
             return {"order": order}
 
         # === PORTFOLIO UPDATE ===
+        executed_qty = order["quantity"]
         if side == "BUY":
             result = self.portfolio.open_position(
-                ticker=ticker, quantity=quantity,
+                ticker=ticker, quantity=executed_qty,
                 price=order["execution_price"], sector=sector,
                 date=date, commission=order["commission"],
             )
         else:
             result = self.portfolio.close_position(
                 ticker=ticker, price=order["execution_price"],
+                quantity=executed_qty,
                 date=date, commission=order["commission"],
                 reason="EXIT_SIGNAL",
             )

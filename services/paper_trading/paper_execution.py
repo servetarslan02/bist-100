@@ -81,9 +81,28 @@ class PaperExecutionEngine:
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        # === EXECUTION TIMING ===
-        # Ertesi seans acilisinda islem (realistic)
+        # === EXECUTION PRICE ===
         execution_price = market_price
+
+        # === BIST TAVAN / TABAN & DEVRE KESİCİ KİLİT KONTROLÜ ===
+        # Önceki kapanışa göre %10 tavan/taban kilit kontrolü
+        ref_price = signal_price if signal_price > 0 else execution_price
+        if ref_price > 0:
+            price_change_pct = ((execution_price / ref_price) - 1.0) * 100.0
+
+            # Taban Kilidi Kontrolü: Hisse tabana kilitliyse (-%9.95 ve altı), satış likiditesi sıfırdır, satış emri gerçekleşmez!
+            if side == "SELL" and price_change_pct <= -9.90:
+                order["status"] = "REJECTED"
+                order["rejection_reason"] = f"BIST_LIMIT_DOWN_LOCKED: {ticker} taban fiyatta (%{price_change_pct:.2f}). Satış kuyruğunda likidite yok, işlem gerçekleşmedi."
+                logger.warning("Order rejected: Limit Down Locked", ticker=ticker, change_pct=price_change_pct)
+                return order
+
+            # Tavan Kilidi Kontrolü: Hisse tavana kilitliyse (+%9.95 ve üstü), satıcı yoktur, alış emri gerçekleşmez!
+            if side == "BUY" and price_change_pct >= 9.90:
+                order["status"] = "REJECTED"
+                order["rejection_reason"] = f"BIST_LIMIT_UP_LOCKED: {ticker} tavan fiyatta (%{price_change_pct:.2f}). Tavanda satıcı yok, alış emri gerçekleşmedi."
+                logger.warning("Order rejected: Limit Up Locked", ticker=ticker, change_pct=price_change_pct)
+                return order
 
         # === SLIPPAGE ===
         slippage = self._compute_slippage(
@@ -99,34 +118,39 @@ class PaperExecutionEngine:
         else:
             fill_price = execution_price * (1 - slippage)
 
-        # === LIQUIDITY CONSTRAINT ===
+        # === LİKİDİTE VE KISMİ DOLUM (PARTIAL FILL) MODELİ ===
+        # BIST piyasa yapıcı kuralı: Tek barda ortalama hacmin en fazla %5'i kadar aktif dolum yapılabilir
+        filled_quantity = quantity
         if avg_volume > 0:
-            max_qty = int(avg_volume * 0.1)  # Gunluk hacmin %10'u
-            if quantity > max_qty:
-                order["status"] = "REJECTED"
-                order["rejection_reason"] = f"LIQUIDITY: qty {quantity} > max {max_qty} (10% of daily volume)"
-                logger.warning("Order rejected: liquidity", ticker=ticker, qty=quantity, max_qty=max_qty)
-                return order
+            max_participate_qty = max(1, int(avg_volume * 0.05))
+            if quantity > max_participate_qty:
+                filled_quantity = max_participate_qty
+                order["status"] = "PARTIAL_FILL"
+                logger.info("Order partially filled due to liquidity participation cap",
+                            ticker=ticker, requested=quantity, filled=filled_quantity)
 
         # === COMMISSION ===
-        amount = quantity * fill_price
+        amount = filled_quantity * fill_price
         commission = self._compute_commission(amount)
 
         # === FILL ===
+        order["quantity"] = filled_quantity
         order["execution_price"] = round(fill_price, 4)
         order["commission"] = round(commission, 2)
         order["slippage_pct"] = round(slippage * 100, 4)
-        order["status"] = "FILLED"
+        if order["status"] != "PARTIAL_FILL":
+            order["status"] = "FILLED"
 
         # Turnover guncelle
         self._daily_turnover_value += amount
 
         logger.info("Order executed",
                    order_id=order_id, ticker=ticker, side=side,
-                   qty=quantity, signal_price=signal_price,
+                   qty=filled_quantity, signal_price=signal_price,
                    execution_price=order["execution_price"],
                    commission=order["commission"],
-                   slippage=order["slippage_pct"])
+                   slippage=order["slippage_pct"],
+                   status=order["status"])
 
         # ORDER_FILLED event publish
         try:
