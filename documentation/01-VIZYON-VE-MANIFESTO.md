@@ -118,6 +118,49 @@ raporlayabilmesi. Getiri/Sharpe/precision gibi metrikler ancak bu temel
 sağlandıktan **sonra** anlamlı hale gelir — aksi halde "iyi görünen ama
 yanlış" bir sistem inşa etme riski çok yüksektir.
 
+### 1.7.1 "Yıllık %X getiri" neden yanlış hedef çerçevesi
+
+BIST'te bir getiri rakamını tek başına hedef koymak yanıltıcıdır, çünkü:
+
+- **Nominal ≠ reel.** TL'nin yıllar içindeki değer kaybı, BIST100'ün
+  nominal TL getirisini yapay olarak şişirir. Bir stratejinin "başarılı"
+  sayılabilmesi için **BIST100 endeksinin aynı bazda (nominal-nominal
+  veya dolar/reel-dolar/reel) karşılaştırılmış getirisinin üzerinde**
+  olması gerekir — mutlak bir sayının kendisi değil.
+- **Seçilmiş dönem (cherry-picking) riski.** Belirli bir boğa yılına
+  bakıp "bu standarttır" demek istatistiksel olarak yanıltıcıdır. Aynı
+  stratejinin ayı/yatay dönemdeki performansı da hesaba katılmadan
+  hiçbir getiri iddiası anlamlı değildir.
+- **Yıllık %100+ gibi "sabit/garantili" getiri iddiaları teknik olarak
+  imkansızdır.** Böyle bir getiri gerçek olsaydı, piyasadaki her
+  kurumsal oyuncu anında kopyalar ve avantaj kaybolurdu (etkin piyasa
+  mantığı). Bu projede geçmişte üretilip gerçek testte başarısız olan
+  "%300-700 CAGR" iddialı modeller (bkz. `memory/CURRENT-STATE.md`),
+  bu ilkenin somut kanıtıdır — yüksek getiri iddiası olan bir model,
+  incelendiğinde neredeyse her zaman overfitting veya veri sızıntısı
+  içerir.
+
+### 1.7.2 Somut, gerçekçi hedef aralığı (resmi hedef — bu belge bunu esas alır)
+
+| Metrik | Hedef | Gerekçe |
+|---|---|---|
+| **BIST100 üzeri yıllık alfa** | %10-20 (endeksin üzerinde, aynı bazda) | Disiplinli sistematik stratejilerde bu seviye kurumsal standartlarda "çok iyi" sayılır. %50+ alfa iddiası, kanıtlanmadıkça overfitting şüphesiyle karşılanır (bkz. Bölüm 07 — Deflated Sharpe testi zorunludur). |
+| **Sharpe Oranı** | 1.0–1.5, yıllar boyunca istikrarlı | 2 üzeri Sharpe'ı uzun vadede sürdürmek dünya çapında nadirdir (halka kapalı en iyi fonlar seviyesi); bu seviyeyi "kolay ulaşılabilir" varsaymak tehlikelidir. |
+| **Maksimum Drawdown** | %25–35 altında | BIST'in doğal volatilitesi (tavan/taban limitleri, gap riski) göz önüne alınarak belirlenmiş makul bir bant. |
+| **Doğrulama ufku** | En az 3 tam piyasa döngüsü (yükseliş + düşüş/düzeltme + yatay) | Tek bir iyi yıl hiçbir şey kanıtlamaz (bkz. Bölüm 07.6). |
+
+BIST'in gerçek, sınırlı bir yapısal avantaj kaynağı sunabileceği kabul
+edilir: gelişmiş piyasalara göre görece daha az yoğun kurumsal/algoritmik
+rekabet ve perakende yatırımcı ağırlıklı akış (duygusal/momentum
+hareketlerin daha belirgin olması). Bu, disiplinli bir sisteme **makul
+bir ek alfa potansiyeli** sağlayabilir — ama bu potansiyel yukarıdaki
+aralığın (%10-20 ek alfa) üzerine çıkan iddiaları haklı çıkarmaz.
+
+**Bu tablo, projenin resmi hedef tanımıdır.** Sonraki hiçbir doküman,
+sunum veya iddia bu aralığın üzerinde bir hedefi "resmi" olarak
+sunamaz; üzerindeki her iddia Bölüm 07'deki istatistiksel anlamlılık
+standardından geçmek zorundadır.
+
 ## 1.8 Bu vizyonun sahibi kim?
 
 Ürün ve nihai karar sahibi projenin insan kurucusudur (Servet). ALPHA'nın

@@ -74,6 +74,26 @@ edilmez**. Aşağıdaki kontroller zorunludur:
   (örn. tek bir güçlü boğa piyasası ayı) mı geliyor? Öyleyse bu, genel
   bir "edge" değil, o döneme özgü bir şans olabilir.
 
+### 7.5.1 Resmi hedef aralığı ve otomatik şüphe eşiği
+
+`documentation/01-VIZYON-VE-MANIFESTO.md` §1.7.2'de tanımlanan resmi
+hedef aralığı (BIST100 üzeri yıllık alfa %10-20, Sharpe 1.0-1.5, maks.
+drawdown %25-35) bu belgenin de referans standardıdır. Buna ek olarak:
+
+- **Otomatik şüphe eşiği**: Bir strateji/model, benchmark üzeri **%50'den
+  fazla yıllık alfa** iddia ediyorsa, bu iddia varsayılan olarak
+  **"doğrulanmamış ve şüpheli"** kabul edilir ve normal inceleme
+  sürecinden (Deflated Sharpe, walk-forward, çoklu-test düzeltmesi)
+  **ek bir tur** geçmeden hiçbir aşamada "champion" statüsüne alınamaz.
+- Bu eşik keyfi değildir: projenin kendi geçmişinde (bkz.
+  `memory/CURRENT-STATE.md`) %300-700 CAGR iddia eden modeller
+  üretilmiş ve gerçek/canlı testte başarısız olmuştur. Bu belge, aynı
+  hatanın tekrarını önlemek için bu eşiği resmi olarak tanımlar.
+- Nominal/reel ayrımı zorunludur: bir CAGR rakamı sunulurken, aynı
+  dönemdeki BIST100 nominal getirisi ve (mümkünse) TL enflasyon/döviz
+  düzeltmesi **yan yana** gösterilmeden hiçbir getiri rakamı tek başına
+  "başarı" olarak sunulamaz.
+
 ## 7.6 Zaman ufku ve minimum kanıt eşiği
 
 Sistemin "gerçekten çalışıyor" denilebilmesi için asgari şu koşullar
