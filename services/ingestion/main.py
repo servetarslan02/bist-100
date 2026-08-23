@@ -387,29 +387,32 @@ class IngestionService:
                 # Fetch from X (Twitter)
                 if hasattr(settings, 'x_api_key') and settings.x_api_key:
                     social_provider.x_api_key = settings.x_api_key
-                    mentions = social_provider.fetch_x_mentions()
-                    for mention in mentions:
-                        event = CanonicalEvent(
-                            event_type=EventType.SOCIAL_EVENT,
-                            source="x",
-                            data=mention,
-                        )
-                        publish_event(event, key="social")
+                    try:
+                        mentions = await social_provider.fetch_x_mentions()
+                        for mention in (mentions or []):
+                            event = CanonicalEvent(
+                                event_type=EventType.SOCIAL_EVENT,
+                                source="x",
+                                data=mention,
+                            )
+                            publish_event(event, key="social")
+                    except Exception:
+                        pass
 
                 # Fetch StockTwits for top stocks
                 top_tickers = ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"]
                 for ticker in top_tickers:
                     try:
-                        messages = social_provider.fetch_stocktwits(ticker)
-                        for msg in messages:
+                        messages = await social_provider.fetch_stocktwits(ticker)
+                        for msg in (messages or []):
                             event = CanonicalEvent(
                                 event_type=EventType.SOCIAL_EVENT,
                                 source="stocktwits",
                                 data={**msg, "ticker": ticker},
                             )
                             publish_event(event, key=f"social_{ticker}")
-                    except Exception as e:
-                        pass  # Intentional: silent error handling
+                    except Exception:
+                        pass
 
                 flush_producer()
                 logger.info("Social media fetch cycle completed")
