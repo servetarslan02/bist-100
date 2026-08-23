@@ -38,12 +38,14 @@ class PaperTradingOrchestrator:
         state_store: Optional[PaperStateStore] = None,
         execution: Optional[PaperExecutionEngine] = None,
         require_next_open: bool = True,
+        strict_t2: bool = True,
     ):
         self._champion_version = champion_version
         self.initial_capital = initial_capital
         self.require_next_open = require_next_open
+        self.strict_t2 = strict_t2
         self.store = store or state_store or PaperStateStore(db_path=db_path)
-        self.portfolio = VirtualPortfolio(initial_capital=initial_capital, state_store=self.store)
+        self.portfolio = VirtualPortfolio(initial_capital=initial_capital, state_store=self.store, strict_t2=strict_t2)
         self.execution = execution or paper_execution
         self.performance = PerformanceTracker()
         self.risk_gate = PaperRiskGate()
@@ -54,7 +56,8 @@ class PaperTradingOrchestrator:
         logger.info("PaperTradingOrchestrator initialized",
                     champion=self._champion_version,
                     initial_capital=initial_capital,
-                    require_next_open=require_next_open)
+                    require_next_open=require_next_open,
+                    strict_t2=strict_t2)
 
     def process_daily_cycle(
         self,

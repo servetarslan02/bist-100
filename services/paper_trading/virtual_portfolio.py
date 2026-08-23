@@ -26,7 +26,7 @@ class VirtualPortfolio:
         self,
         initial_capital: float = 1_000_000.0,
         state_store=None,
-        strict_t2: bool = False,
+        strict_t2: bool = True,
     ):
         self.initial_capital = initial_capital
         self.strict_t2 = strict_t2
