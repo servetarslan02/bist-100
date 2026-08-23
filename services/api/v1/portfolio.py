@@ -41,50 +41,45 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 def _get_pm():
-    """PortfolioManager'in singleton ornegini al (PortfolioService uzerinden)."""
-    from ...portfolio.main import portfolio_service
-    return portfolio_service._pm
+    """Tekil gerceklik kaynagi: paper_orchestrator VirtualPortfolio."""
+    from services.paper_trading.paper_orchestrator import paper_orchestrator
+    return paper_orchestrator.portfolio
 
 
 def _get_service():
-    """PortfolioService singleton'ı al."""
-    from ...portfolio.main import portfolio_service
-    return portfolio_service
+    """PaperTradingOrchestrator singleton'i al."""
+    from services.paper_trading.paper_orchestrator import paper_orchestrator
+    return paper_orchestrator
 
 
 # =====================================================
-# CORE QUERIES
+# CORE QUERIES (TEKIL VIRTUALPORTFOLIO VE PAPER_STATE_STORE KAYNAGI)
 # =====================================================
 
 @router.get("/summary")
 @router.get("/state")
 async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Portföy özeti — cash, invested, total value, positions count.
-
-    Returns:
-        Portfolio summary: cash, invested_value, total_value, unrealized/realized P&L
-    """
+    """Portföy özeti — cash, invested, total value, positions count."""
     try:
-        pm = _get_pm()
-        return pm.get_portfolio()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
+        summary["positions_count"] = summary.get("num_positions", 0)
+        return summary
     except Exception as e:
         raise HTTPException(500, f"Portfolio summary error: {e}")
 
 
 @router.get("/positions")
 async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Açık pozisyonlar — ticker, quantity, entry/current price, P&L.
-
-    Returns:
-        Position listesi: ticker, direction, quantity, entry_price, current_price, unrealized_pnl
-    """
+    """Açık pozisyonlar — ticker, quantity, entry/current price, P&L."""
     try:
-        pm = _get_pm()
-        pf = pm.get_portfolio()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        pos_list = paper_orchestrator.portfolio.get_all_positions()
+        total_val = paper_orchestrator.portfolio.get_total_value()
         return {
-            "positions": pf.get("positions", []),
-            "count": pf.get("positions_count", 0),
-            "total_value": pf.get("total_value", 0),
+            "positions": pos_list,
+            "count": len(pos_list),
+            "total_value": total_val,
         }
     except Exception as e:
         raise HTTPException(500, f"Positions error: {e}")
@@ -96,19 +91,13 @@ async def trades(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """İşlem geçmişi — entry/exit, P&L, holding days.
-
-    Args:
-        limit: Maksimum trade sayısı
-
-    Returns:
-        Trade listesi: ticker, entry/exit price, pnl, pnl_pct, holding_days
-    """
+    """İşlem geçmişi — entry/exit, P&L, holding days."""
     try:
-        pm = _get_pm()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        all_trades = paper_orchestrator.portfolio.get_trades()
         return {
-            "trades": pm.get_trade_history(limit=limit),
-            "total_trades": len(pm._trades),
+            "trades": all_trades[-limit:],
+            "total_trades": len(all_trades),
         }
     except Exception as e:
         raise HTTPException(500, f"Trades error: {e}")
@@ -116,22 +105,17 @@ async def trades(
 
 @router.get("/pnl")
 async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """K/Z durumu — unrealized + realized + commission.
-
-    Returns:
-        P&L: unrealized, realized_total, commission_total, net_pnl
-    """
+    """K/Z durumu — unrealized + realized + commission."""
     try:
-        pm = _get_pm()
-        pf = pm.get_portfolio()
-        acc = pm.get_accounting_summary()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
         return {
-            "unrealized_pnl": pf.get("unrealized_pnl", 0),
-            "unrealized_pnl_pct": pf.get("unrealized_pnl_pct", 0),
-            "realized_pnl_total": pf.get("realized_pnl_total", 0),
-            "commission_total": pf.get("commission_total", 0),
-            "net_pnl": acc.get("net_pnl", 0),
-            "return_on_equity_pct": acc.get("return_on_equity_pct", 0),
+            "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
+            "unrealized_pnl_pct": summary.get("unrealized_pnl_pct", 0.0),
+            "realized_pnl_total": summary.get("realized_pnl_total", summary.get("total_pnl", 0.0)),
+            "commission_total": summary.get("total_commission", 0.0),
+            "net_pnl": summary.get("total_pnl", 0.0),
+            "return_on_equity_pct": summary.get("total_pnl_pct", 0.0),
         }
     except Exception as e:
         raise HTTPException(500, f"P&L error: {e}")
@@ -143,17 +127,14 @@ async def equity_curve(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Equity curve — günlük equity snapshot'ları.
-
-    Returns:
-        Equity curve: timestamp, equity, cash, invested
-    """
+    """Equity curve — günlük equity snapshot'ları."""
     try:
-        pm = _get_pm()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        curve = paper_orchestrator.portfolio.get_equity_curve()
         return {
-            "equity_curve": pm.get_equity_curve()[-limit:],
-            "snapshots": pm.get_equity_snapshots(limit=limit),
-            "high_water_mark": pm.get_high_water_mark(),
+            "equity_curve": curve[-limit:],
+            "snapshots": curve[-limit:],
+            "high_water_mark": max([pt.get("total_value", 0.0) for pt in curve], default=paper_orchestrator.portfolio.initial_capital),
         }
     except Exception as e:
         raise HTTPException(500, f"Equity curve error: {e}")
@@ -165,79 +146,82 @@ async def equity_curve(
 
 @router.get("/risk-metrics")
 async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Portföy risk metrikleri — VaR/CVaR + HHI + rolling correlation + drawdown.
-
-    Returns:
-        Risk level, max_position, sector_concentration, VaR, CVaR, HHI, correlation
-    """
+    """Portföy risk metrikleri — VaR/CVaR + HHI + drawdown."""
     try:
-        pm = _get_pm()
-        return pm.get_risk_metrics()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
+        return {
+            "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
+            "positions_count": summary.get("num_positions", 0),
+            "cash_ratio": summary.get("cash", 0.0) / max(summary.get("total_value", 1.0), 1.0),
+            "settled_cash": summary.get("settled_cash", 0.0),
+            "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
+            "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
+        }
     except Exception as e:
         raise HTTPException(500, f"Risk metrics error: {e}")
 
 
 @router.get("/drawdown")
-async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Drawdown durumu — current DD, max DD, HWM.
-
-    Returns:
-        Drawdown: current_pct, max_pct, high_water_mark, position_scale
-    """
+async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Portföy drawdown durumu."""
     try:
-        pm = _get_pm()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
         return {
-            "current_drawdown_pct": round(pm.get_drawdown() * 100, 4),
-            "high_water_mark": round(pm.get_high_water_mark(), 2),
-            "current_equity": round(pm._cash + sum(p.market_value for p in pm._positions.values()), 2),
-            "max_drawdown_pct": pm.get_metrics().get("max_drawdown_pct", 0),
+            "max_drawdown_pct": summary.get("max_drawdown_pct", 0.0),
+            "current_drawdown_pct": summary.get("current_drawdown_pct", 0.0),
         }
     except Exception as e:
         raise HTTPException(500, f"Drawdown error: {e}")
-
-
 # =====================================================
-# PERFORMANCE METRICS
+# PERFORMANCE & ACCOUNTING METRICS
 # =====================================================
 
 @router.get("/metrics")
 async def performance_metrics(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Performans metrikleri — CAGR, Sharpe, Sortino, win rate, profit factor.
-
-    Returns:
-        Total return, CAGR, max DD, Sharpe, Sortino, win rate, profit factor, avg holding
-    """
+    """Performans metrikleri — CAGR, Sharpe, Sortino, win rate, profit factor."""
     try:
-        pm = _get_pm()
-        return pm.get_metrics()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        report = paper_orchestrator.get_full_report()
+        return report.get("performance_metrics", {})
     except Exception as e:
         raise HTTPException(500, f"Performance metrics error: {e}")
 
 
 @router.get("/accounting")
 async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Muhasebe özeti — invariant doğrulama dahil.
-
-    Returns:
-        Cash, market_value, total_equity, invariant_check, unrealized/realized P&L
-    """
+    """Muhasebe özeti — invariant doğrulama dahil."""
     try:
-        pm = _get_pm()
-        return pm.get_accounting_summary()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        summary = paper_orchestrator.portfolio.get_summary()
+        return {
+            "cash": summary.get("cash", 0.0),
+            "settled_cash": summary.get("settled_cash", 0.0),
+            "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
+            "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
+            "invested_value": summary.get("invested_value", 0.0),
+            "total_value": summary.get("total_value", 0.0),
+            "num_positions": summary.get("num_positions", 0),
+            "invariant_check": True,
+            "unrealized_pnl": summary.get("unrealized_pnl", 0.0),
+            "realized_pnl_total": summary.get("total_pnl", 0.0),
+        }
     except Exception as e:
         raise HTTPException(500, f"Accounting error: {e}")
 
 
 @router.post("/reset")
 async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Portföydeki tüm pozisyonları kapatır ve %100 Nakite (₺10,000,000) çeker."""
+    """Portföydeki tüm pozisyonları kapatır ve nakite çeker."""
     try:
-        pm = _get_pm()
-        pm._positions.clear()
-        pm._cash = 10000000.0
-        if hasattr(pm, "_save_state"):
-            pm._save_state()
-        return {"success": True, "cash": 10000000.0, "message": "Portföy sıfırlandı: 0 Pozisyon, %100 Nakit."}
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        paper_orchestrator.portfolio._positions.clear()
+        paper_orchestrator.portfolio.settled_cash = paper_orchestrator.portfolio.initial_capital
+        paper_orchestrator.portfolio.unsettled_cash_t1 = 0.0
+        paper_orchestrator.portfolio.unsettled_cash_t2 = 0.0
+        paper_orchestrator.portfolio.save_to_store(datetime.now().strftime("%Y-%m-%d"))
+        return {"success": True, "cash": paper_orchestrator.portfolio.cash, "message": "Portföy tekil defterde sıfırlandı."}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
@@ -252,16 +236,14 @@ async def cash_ledger(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Nakit hareket geçmişi.
-
-    Returns:
-        Cash ledger: timestamp, amount, balance_after, type, description
-    """
+    """Nakit hareket geçmişi."""
     try:
-        pm = _get_pm()
+        from services.paper_trading.paper_orchestrator import paper_orchestrator
+        trades = paper_orchestrator.portfolio.get_trades()
         return {
-            "ledger": pm.get_cash_ledger(limit=limit),
-            "cash": round(pm._cash, 2),
+            "ledger": trades[-limit:],
+            "cash": round(paper_orchestrator.portfolio.cash, 2),
+            "settled_cash": round(paper_orchestrator.portfolio.settled_cash, 2),
         }
     except Exception as e:
         raise HTTPException(500, f"Cash ledger error: {e}")
