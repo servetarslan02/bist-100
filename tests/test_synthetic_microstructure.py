@@ -190,6 +190,62 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertEqual(eval_fail["decision"], "INVALID_STRATEGY")
         self.assertTrue(any("OPTIMISTIC_ONLY_BIAS" in r for r in eval_fail["rejection_reasons"]))
 
+    def test_missing_bars_and_date_mismatch_failsafe(self):
+        """Eksik bar veya tarih uyuşmazlığında sıfır sentetik varsayım ve kesin NO_TRADE testi."""
+        from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
+        import pandas as pd
+
+        orch = PaperTradingOrchestrator(
+            champion_version="LambdaRank_v3_LOCKED",
+            require_next_open=False, # Yalnızca bar kontrolünü test ediyoruz
+        )
+
+        # 1. High/Low eksik/0 olan sinyal -> Kesin NO_TRADE
+        sig_no_bars = {
+            "ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 10,
+            "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED",
+            "high": 0.0, "low": 0.0,
+        }
+        res = orch.process_daily_cycle(
+            date="2024-01-01",
+            signals=[sig_no_bars],
+            prices={"THYAO": 100.0},
+            volumes={"THYAO": 1_000_000},
+        )
+        self.assertEqual(res["num_orders"], 0)
+        audit_log = orch.store.load_audit_log()
+        self.assertTrue(any("INSUFFICIENT_HISTORICAL_BARS" in a.get("reason", "") for a in audit_log))
+
+        # 2. DataFrame'de tarih bulunamadığında asla iloc[-1] (geleceğe bakış) kullanılmaz -> Kesin NO_TRADE
+        dates = pd.date_range("2024-01-10", periods=5, freq='B')
+        df = pd.DataFrame({
+            'Open': [100]*5, 'High': [102]*5, 'Low': [98]*5, 'Close': [101]*5, 'Volume': [1000000]*5
+        }, index=dates)
+
+        res_date_mismatch = orch.run_daily_cycle(
+            date="2024-01-01", # Veri 2024-01-10'dan başlıyor, bu tarih yok
+            market_data={"THYAO": df},
+            champion_signals=[sig_no_bars],
+        )
+        self.assertEqual(res_date_mismatch["num_orders"], 0)
+
+    def test_exclusive_kap_registry_gross_settlement(self):
+        """Brüt takasın yalnızca KAP kısıt sicilinden teyit edilmesi testi."""
+        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
+        
+        # Sinyalde is_gross_settlement=True gelse bile KAP sicilinde yoksa brüt takas uygulanmaz
+        self.assertFalse(kap_restriction_registry.is_gross_settlement("KCHOL", "2024-01-01"))
+        
+        # KAP siciline tescil edildiğinde devreye girer
+        kap_restriction_registry.register_restriction(
+            ticker="KCHOL",
+            restriction_type="VBTS_GROSS_SETTLEMENT",
+            published_at="2024-01-01T18:30:00Z",
+            effective_date="2024-01-02",
+        )
+        self.assertFalse(kap_restriction_registry.is_gross_settlement("KCHOL", "2024-01-01"))
+        self.assertTrue(kap_restriction_registry.is_gross_settlement("KCHOL", "2024-01-02"))
+
 
 if __name__ == "__main__":
     unittest.main()

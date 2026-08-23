@@ -216,8 +216,8 @@ class PaperTradingOrchestrator:
                             curr_idx = df.index.get_loc(date)
                             row = df.loc[date]
                         else:
-                            curr_idx = len(df) - 1
-                            row = df.iloc[-1]
+                            # Tarih uyuşmazlığında asla iloc[-1] kullanılmaz (Look-ahead bias engeli)
+                            continue
 
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
@@ -243,13 +243,13 @@ class PaperTradingOrchestrator:
                         if not hasattr(self, "_history_cache"):
                             self._history_cache = {}
                         self._history_cache[ticker] = {
-                            "high_curr": high_c if high_c > 0 else price_dict[ticker],
-                            "low_curr": low_c if low_c > 0 else price_dict[ticker],
-                            "high_prev": high_p if high_p > 0 else (high_c if high_c > 0 else price_dict[ticker]),
-                            "low_prev": low_p if low_p > 0 else (low_c if low_c > 0 else price_dict[ticker]),
-                            "highs": highs_list if len(highs_list) >= 2 else [price_dict[ticker], price_dict[ticker]],
-                            "lows": lows_list if len(lows_list) >= 2 else [price_dict[ticker], price_dict[ticker]],
-                            "volumes": vols_list if len(vols_list) >= 1 else [vol_dict[ticker]],
+                            "high_curr": high_c,
+                            "low_curr": low_c,
+                            "high_prev": high_p,
+                            "low_prev": low_p,
+                            "highs": highs_list,
+                            "lows": lows_list,
+                            "volumes": vols_list,
                         }
 
                         # T+1 Açılış Fiyatı (Next Open Price) Çıkarımı
@@ -257,11 +257,7 @@ class PaperTradingOrchestrator:
                             next_row = df.iloc[curr_idx + 1]
                             next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
                     except Exception:
-                        if len(df) > 0:
-                            row = df.iloc[-1]
-                            close_p = row.get("close", row.get("Close", 0.0))
-                            price_dict[ticker] = float(close_p)
-                            vol_dict[ticker] = int(row.get("volume", row.get("Volume", 1_000_000)))
+                        continue
 
         return self.process_daily_cycle(
             date=date,
@@ -400,12 +396,15 @@ class PaperTradingOrchestrator:
         low_curr = float(hist.get("low_curr", signal.get("low", 0.0)))
         highs_arr = hist.get("highs", signal.get("highs", []))
         lows_arr = hist.get("lows", signal.get("lows", []))
-        vols_arr = hist.get("volumes", [float(volume)] if volume > 0 else [])
+        vols_arr = hist.get("volumes", signal.get("volumes", [float(volume)] if volume > 0 else []))
 
-        if high_curr <= 0:
-            high_curr = price
-        if low_curr <= 0:
-            low_curr = price
+        # Eksik barlarda asla yapay fiyata düşülmez -> Kesin NO_TRADE
+        if high_curr <= 0 or low_curr <= 0:
+            msg = f"INSUFFICIENT_HISTORICAL_BARS: Valid historical High/Low bars required for microstructure estimation on {ticker} — NO_TRADE"
+            logger.warning(msg, ticker=ticker, date=date)
+            self._audit_no_trade(date, msg, ticker)
+            return {}
+
         if high_prev <= 0:
             high_prev = high_curr
         if low_prev <= 0:
@@ -445,8 +444,8 @@ class PaperTradingOrchestrator:
         if order["status"] not in ["FILLED", "PARTIAL_FILL"]:
             return {"order": order}
 
-        # Brüt Takas doğrudan KAP kısıt sicilinden teyit edilir
-        is_gross = kap_restriction_registry.is_gross_settlement(ticker, date) or bool(signal.get("is_gross_settlement", False))
+        # Brüt Takas yalnızca KAP kısıt sicilinden teyit edilir
+        is_gross = kap_restriction_registry.is_gross_settlement(ticker, date)
 
         executed_qty = order["quantity"]
         if side == "BUY":
