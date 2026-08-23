@@ -30,28 +30,43 @@ function normalizeApiPath(path: string): string {
   return `/api/v1${p}`;
 }
 
-// 1 & 4. Global In-Memory Cache & In-Flight Request Deduplication Bus
+// 1 & 4. Global In-Memory Cache, In-Flight Request Deduplication Bus & Global PubSub
 const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const inFlightRequests = new Map<string, Promise<any>>();
+const cacheSubscribers = new Map<string, Set<(data: any) => void>>();
 
-// 5. LocalStorage Hydration Helper with strict 30s Freshness TTL
+function subscribeToCache(key: string, callback: (data: any) => void) {
+  if (!cacheSubscribers.has(key)) {
+    cacheSubscribers.set(key, new Set());
+  }
+  cacheSubscribers.get(key)!.add(callback);
+  return () => {
+    cacheSubscribers.get(key)?.delete(callback);
+  };
+}
+
+function notifyCacheSubscribers(key: string, data: any) {
+  const listeners = cacheSubscribers.get(key);
+  if (listeners) {
+    listeners.forEach(cb => {
+      try { cb(data); } catch {}
+    });
+  }
+}
+
+// 5. LocalStorage Hydration Helper (Instant Zero-Lag Hydration)
 function getInitialCachedData<T>(key: string): T | null {
   if (memoryCache.has(key)) {
-    const entry = memoryCache.get(key)!;
-    if (Date.now() - entry.timestamp < 30000) {
-      return entry.data as T;
-    }
+    return memoryCache.get(key)!.data as T;
   }
   if (typeof window !== 'undefined') {
     try {
       const stored = localStorage.getItem(`ALPHA_CACHE_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.timestamp && Date.now() - parsed.timestamp < 30000) {
-          memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp });
+        if (parsed && parsed.data) {
+          memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp || Date.now() });
           return parsed.data as T;
-        } else {
-          localStorage.removeItem(`ALPHA_CACHE_${key}`);
         }
       }
     } catch {}
@@ -61,10 +76,10 @@ function getInitialCachedData<T>(key: string): T | null {
 
 function persistCacheLocally(key: string, data: any) {
   memoryCache.set(key, { data, timestamp: Date.now() });
+  notifyCacheSubscribers(key, data);
   if (typeof window !== 'undefined') {
     try {
-      // Sadece kompakt ve kritik verileri localStorage'a yaz (Kota aşımını önlemek için)
-      if (key.length < 100) {
+      if (key.length < 120) {
         localStorage.setItem(`ALPHA_CACHE_${key}`, JSON.stringify({ data, timestamp: Date.now() }));
       }
     } catch {}
@@ -74,7 +89,7 @@ function persistCacheLocally(key: string, data: any) {
 export async function api<T>(path: string): Promise<T> {
   const url = normalizeApiPath(path);
 
-  // 4. Request Deduplication: Eğer bu URL için zaten süren bir istek varsa, ikinciyi atma; mevcut isteğe bağlan!
+  // Request Deduplication
   if (inFlightRequests.has(url)) {
     return inFlightRequests.get(url) as Promise<T>;
   }
@@ -113,7 +128,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 // =====================================================
-// 1. SWR Polling Hook (0.0ms Instant Render & Silent Revalidation)
+// 1. SWR Polling Hook (0.0ms Instant Render & Global Live Sync)
 // =====================================================
 
 export function usePolling<T>(path: string, intervalMs: number = 3000) {
@@ -141,10 +156,24 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
   }, [path]);
 
   useEffect(() => {
+    // 1. Listen for background global telemetry pushes
+    const unsubscribe = subscribeToCache(path, (freshData) => {
+      setData(freshData);
+      setLoading(false);
+      setError(null);
+      setLastUpdated(new Date());
+      setTick(t => t + 1);
+    });
+
+    // 2. Fetch immediately and start periodic interval
     fetchData();
     const timer = setInterval(fetchData, intervalMs);
-    return () => clearInterval(timer);
-  }, [fetchData, intervalMs]);
+
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, [fetchData, intervalMs, path]);
 
   return { data, loading, error, lastUpdated, tick, refetch: fetchData };
 }

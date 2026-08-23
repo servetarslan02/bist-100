@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { GlobalTelemetrySync } from "@/components/providers/GlobalTelemetrySync";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,6 +32,7 @@ export default function RootLayout({
         className={`${inter.variable} ${jetbrains.variable} font-sans antialiased`}
         style={{ background: "var(--color-bg-primary)", color: "var(--color-text-primary)" }}
       >
+        <GlobalTelemetrySync />
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
           <div
