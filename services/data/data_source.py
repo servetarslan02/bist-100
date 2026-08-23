@@ -43,9 +43,10 @@ class DataSourceManager:
 
         # Veri kaynakları
         self._sources = {
+            "warehouse": WarehouseSource(),
+            "local": LocalParquetSource(cache_dir),
             "yahoo": YahooFinanceSource(),
             "bist": BISTSource(),
-            "local": LocalParquetSource(cache_dir),
         }
 
         logger.info("DataSourceManager initialized",
@@ -58,7 +59,7 @@ class DataSourceManager:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-        source_priority: list[str] = ["local", "yahoo", "bist"],
+        source_priority: list[str] = ["warehouse", "local", "yahoo", "bist"],
     ) -> pd.DataFrame:
         """Hisse verisini getir (cache-aware, multi-source).
 
@@ -523,6 +524,54 @@ class LocalParquetSource:
             return df
         except Exception as e:
             logger.warning("Local parquet read failed", error=str(e))
+            return None
+
+
+class WarehouseSource:
+    """30 Yıllık SQLite Veri Deposundan (bist_30y_warehouse.db) anlık OHLCV çeker."""
+
+    def __init__(self, db_path: str = "data/bist_30y_warehouse.db"):
+        self.db_path = Path(db_path)
+
+    def fetch(
+        self,
+        ticker: str,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        period: str = "2y",
+        interval: str = "1d",
+    ) -> pd.DataFrame | None:
+        if not self.db_path.exists():
+            return None
+        import sqlite3
+        sym = ticker.upper().replace(".IS", "").strip()
+        try:
+            conn = sqlite3.connect(str(self.db_path))
+            tbl = "benchmark_data" if sym in ["XU100", "^XU100", "BIST100"] else "stock_data"
+            
+            if tbl == "benchmark_data":
+                query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM benchmark_data"
+                df = pd.read_sql_query(query, conn)
+            else:
+                query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM stock_data WHERE symbol = ? OR symbol = ?"
+                df = pd.read_sql_query(query, conn, params=(sym, f"{sym}.IS"))
+            conn.close()
+
+            if df.empty:
+                return None
+
+            df["Date"] = pd.to_datetime(df["date"])
+            df.set_index("Date", inplace=True)
+            df.drop(columns=["date"], errors="ignore", inplace=True)
+            df.sort_index(inplace=True)
+
+            if start_date:
+                df = df[df.index >= start_date]
+            if end_date:
+                df = df[df.index <= end_date]
+            return df
+        except Exception as e:
+            logger.warning("WarehouseSource fetch failed", ticker=ticker, error=str(e))
             return None
 
 

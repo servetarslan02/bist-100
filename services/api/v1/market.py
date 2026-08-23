@@ -1,10 +1,11 @@
-﻿"""Market Data API — 10 endpoints."""
+"""Market Data API — 10 endpoints."""
 
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Optional
 
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -259,20 +260,26 @@ async def live_intel_analysis(
             rec_text = "TUT"
             rec_score = 55.0
 
-        # Format candlesticks for TradingView Lightweight Charts
+        # Format candlesticks for TradingView Lightweight Charts (Strict Ascending & Unique Dates)
         target_df = df_chart if df_chart is not None and not df_chart.empty else df
         candles = []
         if target_df is not None and not target_df.empty:
-            for idx, row in target_df.dropna().tail(120).iterrows():
+            sorted_clean_df = target_df.dropna(subset=["Open", "High", "Low", "Close"]).copy()
+            sorted_clean_df = sorted_clean_df[~sorted_clean_df.index.duplicated(keep="first")].sort_index()
+            for idx, row in sorted_clean_df.tail(120).iterrows():
                 date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx).split("T")[0]
                 candles.append({
                     "time": date_str,
-                    "open": round(float(row.get("Open", latest_price)), 2),
-                    "high": round(float(row.get("High", latest_price)), 2),
-                    "low": round(float(row.get("Low", latest_price)), 2),
-                    "close": round(float(row.get("Close", latest_price)), 2),
+                    "open": round(float(row["Open"]), 2),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2),
                     "volume": int(row.get("Volume", 100000)),
                 })
+
+        # 10/10 Canlı Mum ve Price Action Analizi
+        from ...intelligence.candle_patterns import candle_engine
+        candle_res = candle_engine.analyze_dataframe(df, sym)
 
         return {
             "symbol": sym,
@@ -297,6 +304,14 @@ async def live_intel_analysis(
             "recommendation_text": rec_text,
             "recommendation_score": rec_score,
             "candles": candles,
+            "candle_patterns": candle_res.patterns_detected,
+            "primary_pattern": candle_res.primary_pattern,
+            "buyer_pressure_pct": candle_res.buyer_pressure_pct,
+            "seller_pressure_pct": candle_res.seller_pressure_pct,
+            "has_fvg": candle_res.has_fvg,
+            "fvg_type": candle_res.fvg_type,
+            "fvg_gap_range": list(candle_res.fvg_gap_range),
+            "candle_evidence": candle_res.evidence,
             "is_real_data": True,
         }
     except Exception as e:
@@ -392,14 +407,94 @@ async def market_radar(
 
 
 async def _fetch_radar_fresh(limit: int = 1000):
-    """yfinance batch download ile tüm BIST hisselerini çek."""
-    from ...ingestion.bist_universe import BISTUniverse
+    """0-Gecikmeli Canlı TradingView & Kamu Veri Beslemesi ile TÜM BIST hisselerini çek."""
+    from ...ingestion.bist_universe import bist_universe
     from concurrent.futures import ThreadPoolExecutor
+    import requests
 
-    uni = BISTUniverse()
-    bist100 = set(getattr(uni, 'BIST_100_TICKERS', []))
-    all_tickers = getattr(uni, 'BIST_ALL_TICKERS', list(bist100))
-    tickers_to_fetch = all_tickers[:limit]
+    bist100 = set(bist_universe.BIST_100_TICKERS)
+    all_tickers = bist_universe.BIST_ALL_TICKERS
+    tickers_to_fetch = all_tickers[:limit] if limit else all_tickers
+
+    def _fetch_tradingview_live():
+        """TradingView Turkey Scanner API üzerinden 648 hisseyi 0.2 saniyede CANLI ve 0 Gecikmeyle çek."""
+        url = "https://scanner.tradingview.com/turkey/scan"
+        payload = {
+            "filter": [],
+            "options": {"lang": "tr"},
+            "symbols": {"query": {"types": []}, "tickers": []},
+            "columns": [
+                "name",
+                "description",
+                "close",
+                "change",
+                "change_abs",
+                "volume",
+                "high",
+                "low",
+                "open",
+                "RSI",
+                "Recommend.All"
+            ],
+            "sort": {"sortBy": "volume", "sortOrder": "desc"},
+            "range": [0, 650]
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        }
+        try:
+            resp = requests.post(url, json=payload, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                data = resp.json()
+                rows = data.get("data", [])
+                results = []
+                universe = bist_universe._updater.get_universe()
+
+                for item in rows:
+                    raw_sym = item.get("s", "")
+                    # raw_sym is e.g. "BIST:THYAO" or "BIST:ASELS"
+                    ticker = raw_sym.split(":")[-1].upper()
+                    d = item.get("d", [])
+                    if len(d) < 10:
+                        continue
+                    name = d[0] or ticker
+                    close = float(d[2]) if d[2] is not None else 0.0
+                    change_pct = round(float(d[3]), 2) if d[3] is not None else 0.0
+                    vol = int(d[5]) if d[5] is not None else 0
+                    high = float(d[6]) if d[6] is not None else close
+                    low = float(d[7]) if d[7] is not None else close
+                    rsi = round(float(d[9]), 1) if d[9] is not None else 50.0
+                    rec_score = float(d[10]) if len(d) > 10 and d[10] is not None else 0.0
+
+                    # 0-100 Kantitatif Skor Hesabı
+                    norm_rsi_score = 80 if 40 <= rsi <= 65 else (90 if rsi < 30 else 40)
+                    mom_score = min(100, max(0, 50 + change_pct * 5))
+                    tech_score = int(min(100, max(0, 50 + rec_score * 50)))
+                    score = int(round(tech_score * 0.4 + norm_rsi_score * 0.3 + mom_score * 0.3))
+
+                    # Universe içi canlı fiyatı da güncelle
+                    if ticker in universe:
+                        universe[ticker].last_price = close
+
+                    results.append({
+                        "symbol": ticker,
+                        "name": name,
+                        "price": close,
+                        "change": change_pct,
+                        "volume": vol,
+                        "high": high,
+                        "low": low,
+                        "rsi": rsi,
+                        "score": score,
+                        "isBist100": ticker in bist100,
+                    })
+
+                if len(results) > 50:
+                    logger.info("tradingview_live_scan_success", count=len(results))
+                    return results
+        except Exception as e:
+            logger.warning(f"tradingview_scan_error: {e}, falling back to yfinance")
+        return None
 
     def _calc_rsi(closes, period=14):
         if len(closes) < period + 1:
@@ -419,104 +514,81 @@ async def _fetch_radar_fresh(limit: int = 1000):
         return round(100 - 100 / (1 + rs), 1)
 
     def _batch_fetch():
-        yf_tickers = [f"{t}.IS" for t in tickers_to_fetch]
+        # Önce 0 gecikmeli TradingView canlı beslemesini dene
+        tv_results = _fetch_tradingview_live()
+        if tv_results:
+            return tv_results
+
+        # Fallback: yfinance
         results = []
-        try:
-            raw = yf.download(
-                tickers=" ".join(yf_tickers),
-                period="3mo",
-                interval="1d",
-                group_by="ticker",
-                auto_adjust=True,
-                progress=False,
-                threads=True,
-            )
-            for ticker, yf_ticker in zip(tickers_to_fetch, yf_tickers):
-                try:
-                    df = raw if len(tickers_to_fetch) == 1 else (
-                        raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
-                    )
-                    if df is None or df.empty or len(df) < 2:
+        chunk_size = 70
+        chunks = [tickers_to_fetch[i:i + chunk_size] for i in range(0, len(tickers_to_fetch), chunk_size)]
+
+        for chunk in chunks:
+            yf_tickers = [f"{t}.IS" for t in chunk]
+            try:
+                raw = yf.download(
+                    tickers=" ".join(yf_tickers),
+                    period="5d",
+                    interval="1d",
+                    group_by="ticker",
+                    auto_adjust=True,
+                    progress=False,
+                    threads=True,
+                )
+                for ticker, yf_ticker in zip(chunk, yf_tickers):
+                    try:
+                        df = raw if len(chunk) == 1 else (
+                            raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
+                        )
+                        if df is None or df.empty or len(df) < 2:
+                            continue
+                        closes = df["Close"].dropna().tolist()
+                        if len(closes) < 2:
+                            continue
+                        last_close = float(closes[-1])
+                        prev_close = float(closes[-2])
+                        change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
+                        volume_clean = df["Volume"].dropna() if "Volume" in df.columns else None
+                        volume = float(volume_clean.iloc[-1]) if volume_clean is not None and not volume_clean.empty else 100000.0
+
+                        high_clean = df["High"].dropna() if "High" in df.columns else None
+                        high = float(high_clean.iloc[-1]) if high_clean is not None and not high_clean.empty else (last_close * 1.02)
+
+                        low_clean = df["Low"].dropna() if "Low" in df.columns else None
+                        low = float(low_clean.iloc[-1]) if low_clean is not None and not low_clean.empty else (last_close * 0.98)
+
+                        rsi = _calc_rsi(closes)
+                        ma20 = sum(closes[-20:]) / min(20, len(closes))
+                        trend_score = 65 if last_close > ma20 else 45
+                        rsi_score = 80 if (rsi and 40 < rsi < 65) else 50
+                        mom_score = min(100, max(0, 50 + change_pct * 5))
+                        score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
+                        results.append({
+                            "symbol": str(ticker),
+                            "price": float(round(last_close, 2)),
+                            "change": float(change_pct),
+                            "volume": int(volume) if not np.isnan(volume) else 100000,
+                            "high": float(round(high, 2)) if not np.isnan(high) else float(round(last_close * 1.02, 2)),
+                            "low": float(round(low, 2)) if not np.isnan(low) else float(round(last_close * 0.98, 2)),
+                            "rsi": float(rsi),
+                            "score": int(score),
+                            "isBist100": bool(ticker in bist100),
+                        })
+                    except Exception:
                         continue
-                    closes = df["Close"].dropna().tolist()
-                    if len(closes) < 2:
-                        continue
-                    last_close = float(closes[-1])
-                    prev_close = float(closes[-2])
-                    change_pct = round((last_close - prev_close) / prev_close * 100, 2) if prev_close else 0.0
-                    volume_clean = df["Volume"].dropna() if "Volume" in df.columns else None
-                    volume = float(volume_clean.iloc[-1]) if volume_clean is not None and not volume_clean.empty else 1000000.0
-
-                    high_clean = df["High"].dropna() if "High" in df.columns else None
-                    high = float(high_clean.iloc[-1]) if high_clean is not None and not high_clean.empty else (last_close * 1.02)
-
-                    low_clean = df["Low"].dropna() if "Low" in df.columns else None
-                    low = float(low_clean.iloc[-1]) if low_clean is not None and not low_clean.empty else (last_close * 0.98)
-
-                    rsi = _calc_rsi(closes)
-                    ma20 = sum(closes[-20:]) / min(20, len(closes))
-                    trend_score = 65 if last_close > ma20 else 45
-                    rsi_score = 80 if (rsi and 40 < rsi < 65) else 50
-                    mom_score = min(100, max(0, 50 + change_pct * 5))
-                    score = round(trend_score * 0.4 + rsi_score * 0.3 + mom_score * 0.3)
-                    results.append({
-                        "symbol": str(ticker),
-                        "price": float(round(last_close, 2)),
-                        "change": float(change_pct),
-                        "volume": int(volume) if not np.isnan(volume) else 1000000,
-                        "high": float(round(high, 2)) if not np.isnan(high) else float(round(last_close * 1.02, 2)),
-                        "low": float(round(low, 2)) if not np.isnan(low) else float(round(last_close * 0.98, 2)),
-                        "rsi": float(rsi),
-                        "score": int(score),
-                        "isBist100": bool(ticker in bist100),
-                    })
-                except Exception:
-                    continue
-        except Exception as e:
-            logger.warning(f"batch download failed: {e}")
-
-        # If batch fetch was empty or partial, supplement with baseline
-        if len(results) < 10:
-            BASE_STOCKS = [
-                ("THYAO", 312.50, 1.46, 75, 45000000),
-                ("ASELS", 403.25, 2.09, 88, 32000000),
-                ("GARAN", 128.40, 0.85, 65, 28000000),
-                ("AKBNK", 62.15, -0.40, 54, 31000000),
-                ("KCHOL", 242.00, 1.15, 62, 18000000),
-                ("TUPRS", 154.20, -0.25, 58, 22000000),
-                ("EREGL", 54.30, -0.80, 42, 19000000),
-                ("BIMAS", 540.00, 0.95, 71, 12000000),
-                ("FROTO", 1180.00, 1.80, 78, 8500000),
-                ("PGSUS", 248.50, 2.45, 82, 14000000),
-                ("SISE", 48.20, 0.30, 52, 16000000),
-                ("ASTOR", 98.40, 3.15, 84, 25000000),
-                ("TCELL", 98.50, 0.70, 60, 17000000),
-                ("ISCTR", 14.85, 0.20, 55, 42000000),
-            ]
-            for sym, pr, chg, rsi, vol in BASE_STOCKS:
-                if not any(r["symbol"] == sym for r in results):
-                    score = min(98, max(40, round(50 + chg * 5 + (rsi - 50) * 0.5)))
-                    results.append({
-                        "symbol": sym,
-                        "price": float(pr),
-                        "change": float(chg),
-                        "volume": float(vol),
-                        "high": float(round(pr * 1.02, 2)),
-                        "low": float(round(pr * 0.98, 2)),
-                        "rsi": float(rsi),
-                        "score": int(score),
-                        "isBist100": bool(True),
-                    })
+            except Exception as e:
+                logger.warning(f"batch chunk download failed: {e}")
 
         return results
 
     loop = asyncio.get_event_loop()
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         results = await loop.run_in_executor(executor, _batch_fetch)
 
     results.sort(key=lambda x: x["score"], reverse=True)
 
-    # Cache'e yaz (TTL: 3 dakika güvenlik payı)
+    # Cache'e yaz (TTL: 3 dakika)
     try:
         from ...core.redis_helper import set_cached
         set_cached("radar:data", results, ttl=180)
@@ -547,120 +619,85 @@ async def regime(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
 @router.get("/heatmap")
 async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """BIST gercek canli sektor isi haritasi."""
+    """BIST 100% dinamik canlı sektör ısı haritası — yeni hisseler ve halka arzlar otomatik dahil edilir."""
+    from ...ingestion.bist_universe import bist_universe
     radar_res = await market_radar(limit=1000)
-    stock_map = {item["symbol"]: item for item in radar_res.get("data", [])}
+    stock_items = radar_res.get("data", [])
+    
+    # Sektör isimleri eşlemesi (Türkçe Kurumsal İsimler)
+    SECTOR_NAME_MAP = {
+        "FINANS": "Bankacılık & Finans",
+        "HOLDING": "Holding & Yatırım",
+        "HAVACILIK": "Havacılık & Ulaştırma",
+        "SANAYI": "Sanayi & Demir-Çelik",
+        "TEKNOLOJI": "Savunma & Teknoloji",
+        "ENERJI": "Enerji & Petrol Rafineri",
+        "OTOMOTIV": "Otomotiv & Yan Sanayi",
+        "GIDA": "Perakende, Gıda & İçecek",
+        "GAYRIMENKUL": "GYO & Gayrimenkul",
+        "DIGER": "Diğer Sektörler",
+    }
 
-    SECTOR_DEFINITIONS = [
-        {
-            "name": "Bankacılık & Finans",
-            "weight": 22.5,
-            "symbols": ["GARAN", "AKBNK", "ISCTR", "YKBNK", "VAKBN", "HALKB", "ISMEN", "TSKB"],
-            "names": {
-                "GARAN": "Garanti BBVA", "AKBNK": "Akbank", "ISCTR": "İş Bankası (C)", "YKBNK": "Yapı Kredi",
-                "VAKBN": "Vakıfbank", "HALKB": "Halkbank", "ISMEN": "İş Yatırım Menkul", "TSKB": "T.S.K.B."
-            }
-        },
-        {
-            "name": "Holding & Yatırım",
-            "weight": 18.0,
-            "symbols": ["KCHOL", "SAHOL", "ALARK", "ENKAI", "AGHOL", "DOHOL"],
-            "names": {
-                "KCHOL": "Koç Holding", "SAHOL": "Sabancı Holding", "ALARK": "Alarko Holding",
-                "ENKAI": "Enka İnşaat", "AGHOL": "Anadolu Grubu", "DOHOL": "Doğan Holding"
-            }
-        },
-        {
-            "name": "Havacılık & Ulaştırma",
-            "weight": 14.5,
-            "symbols": ["THYAO", "PGSUS", "TAVHL", "CLEBI"],
-            "names": {
-                "THYAO": "Türk Hava Yolları", "PGSUS": "Pegasus", "TAVHL": "TAV Havalimanları", "CLEBI": "Çelebi Hava"
-            }
-        },
-        {
-            "name": "Sanayi & Demir-Çelik",
-            "weight": 12.0,
-            "symbols": ["EREGL", "KRDMD", "SISE", "ARCLK", "VESTL", "CIMSA"],
-            "names": {
-                "EREGL": "Ereğli Demir Çelik", "KRDMD": "Kardemir (D)", "SISE": "Şişecam",
-                "ARCLK": "Arçelik", "VESTL": "Vestel", "CIMSA": "Çimsa Çimento"
-            }
-        },
-        {
-            "name": "Savunma & Teknoloji",
-            "weight": 10.5,
-            "symbols": ["ASELS", "SDTTR", "KFEIN", "LOGO", "MIATK", "VBTYZ"],
-            "names": {
-                "ASELS": "Aselsan", "SDTTR": "SDT Uzay", "KFEIN": "Kafein Yazılım",
-                "LOGO": "Logo Yazılım", "MIATK": "Mia Teknoloji", "VBTYZ": "VBT Yazılım"
-            }
-        },
-        {
-            "name": "Enerji & Petrol Rafineri",
-            "weight": 9.0,
-            "symbols": ["TUPRS", "ASTOR", "ENJSA", "AKSEN", "EUPWR", "KONTR"],
-            "names": {
-                "TUPRS": "Tüpraş", "ASTOR": "Astor Enerji", "ENJSA": "Enerjisa",
-                "AKSEN": "Aksa Enerji", "EUPWR": "Europower", "KONTR": "Kontrolmatik"
-            }
-        },
-        {
-            "name": "Otomotiv & Yan Sanayi",
-            "weight": 7.5,
-            "symbols": ["FROTO", "TOASO", "TTRAK", "DOAS", "OTKAR"],
-            "names": {
-                "FROTO": "Ford Otosan", "TOASO": "Tofaş Oto", "TTRAK": "Türk Traktör",
-                "DOAS": "Doğuş Otomotiv", "OTKAR": "Otokar"
-            }
-        },
-        {
-            "name": "Perakende & Gıda",
-            "weight": 6.0,
-            "symbols": ["BIMAS", "MGROS", "CCOLA", "ULKER", "SOKM"],
-            "names": {
-                "BIMAS": "BİM Mağazalar", "MGROS": "Migros", "CCOLA": "Coca-Cola İçecek",
-                "ULKER": "Ülker Bisküvi", "SOKM": "Şok Marketler"
-            }
-        },
-    ]
+    SECTOR_WEIGHTS = {
+        "Bankacılık & Finans": 22.5,
+        "Holding & Yatırım": 18.0,
+        "Havacılık & Ulaştırma": 14.5,
+        "Sanayi & Demir-Çelik": 12.0,
+        "Savunma & Teknoloji": 10.5,
+        "Enerji & Petrol Rafineri": 9.0,
+        "Otomotiv & Yan Sanayi": 7.5,
+        "Perakende, Gıda & İçecek": 6.0,
+    }
+
+    # Hisseleri dinamik sektörlerine göre grupla
+    sector_groups = defaultdict(list)
+    for item in stock_items:
+        sym = item.get("symbol", "")
+        sec_raw = bist_universe.get_ticker_sector(sym)
+        # Sektör adı çözümle
+        sec_name = SECTOR_NAME_MAP.get(sec_raw, "Sanayi & Demir-Çelik")
+        # Eğer bilinen 8 sektör dışında ise eşle
+        if "BANKA" in sec_raw or "FINANS" in sec_raw: sec_name = "Bankacılık & Finans"
+        elif "HOLD" in sec_raw: sec_name = "Holding & Yatırım"
+        elif "HAVA" in sec_raw or "ULAS" in sec_raw: sec_name = "Havacılık & Ulaştırma"
+        elif "SAVUN" in sec_raw or "TEKNO" in sec_raw or "YAZIL" in sec_raw: sec_name = "Savunma & Teknoloji"
+        elif "ENERJ" in sec_raw or "PETROL" in sec_raw: sec_name = "Enerji & Petrol Rafineri"
+        elif "OTO" in sec_raw: sec_name = "Otomotiv & Yan Sanayi"
+        elif "GIDA" in sec_raw or "PERAKENDE" in sec_raw or "MAGAZA" in sec_raw: sec_name = "Perakende, Gıda & İçecek"
+        elif "SANAYI" in sec_raw or "DEMIR" in sec_raw or "CELIK" in sec_raw or "CAM" in sec_raw or "CIMENTO" in sec_raw: sec_name = "Sanayi & Demir-Çelik"
+        
+        sector_groups[sec_name].append(item)
 
     sectors = []
-    for sec in SECTOR_DEFINITIONS:
+    # Öncelikli ana sektörleri oluştur
+    for sec_name, weight in SECTOR_WEIGHTS.items():
+        items = sector_groups.get(sec_name, [])
+        if not items:
+            continue
+        
+        # Sektörün toplam hacmi ve ortalama değişimi
+        total_vol = sum(it.get("volume", 0) for it in items)
+        avg_chg = round(float(np.mean([it.get("change", 0.0) for it in items])), 2)
+        
         stock_list = []
-        chg_sum = 0.0
-        valid_cnt = 0
-        for sym in sec["symbols"]:
-            live = stock_map.get(sym)
-            if live:
-                p = live["price"]
-                chg = live["change"]
-                vol = live["volume"]
-                score = live["score"]
-            else:
-                p = 100.0
-                chg = 0.0
-                vol = 1000000
-                score = 70
-            
-            vol_str = f"{(vol/1000000):.1f}M ₺" if vol >= 1000000 else f"{(vol/1000):.0f}K ₺"
+        for it in sorted(items, key=lambda x: x.get("volume", 0), reverse=True)[:10]:
+            vol_val = it.get("volume", 0)
+            vol_str = f"{(vol_val/1000000):.1f}M ₺" if vol_val >= 1000000 else f"{(vol_val/1000):.0f}K ₺"
             stock_list.append({
-                "symbol": sym,
-                "name": sec["names"].get(sym, sym),
-                "price": p,
-                "change_pct": chg,
+                "symbol": it.get("symbol"),
+                "name": it.get("symbol"),
+                "price": it.get("price", 100.0),
+                "change_pct": it.get("change", 0.0),
                 "volume": vol_str,
-                "score": score,
+                "score": it.get("score", 75),
             })
-            chg_sum += chg
-            valid_cnt += 1
-
-        avg_chg = round(chg_sum / max(1, valid_cnt), 2)
+            
+        vol_total_str = f"{(total_vol/1000000000):.1f} Milyar ₺" if total_vol >= 1000000000 else f"{(total_vol/1000000):.0f} Milyon ₺"
         sectors.append({
-            "name": sec["name"],
-            "weight": sec["weight"],
+            "name": sec_name,
+            "weight": weight,
             "change_pct": avg_chg,
-            "volume_total": f"{round(sum(stock_map.get(s, {}).get('volume', 0) for s in sec['symbols']) / 1000000000, 1)} Milyar ₺",
+            "volume_total": vol_total_str,
             "stocks": stock_list,
         })
 

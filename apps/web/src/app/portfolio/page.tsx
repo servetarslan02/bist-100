@@ -31,35 +31,29 @@ function MetricCard({ label, value, prefix = "", suffix = "", color }: {
 
 export default function PortfolioPage() {
   const router = useRouter();
-  const { data, loading } = usePolling<PortfolioData>("/portfolio", 15000);
+  const { data, loading, refetch } = usePolling<PortfolioData>("/portfolio", 15000);
   const [rebalancing, setRebalancing] = useState(false);
   const [rebalanceMsg, setRebalanceMsg] = useState<string | null>(null);
 
+  // BIST Seans Kontrolü (10:00 - 18:00 İstanbul)
+  const isBistOpen = () => {
+    const now = new Date();
+    const istanbul = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Istanbul" }));
+    const day = istanbul.getDay();
+    if (day === 0 || day === 6) return false;
+    const minutes = istanbul.getHours() * 60 + istanbul.getMinutes();
+    return minutes >= 600 && minutes < 1080;
+  };
+  const marketOpen = isBistOpen();
+
   const rawP = (data as any)?.portfolio ?? data ?? {};
-  const currentCapital = rawP.current_capital ?? rawP.total_value ?? 100000;
+  const currentCapital = rawP.current_capital ?? rawP.total_value ?? 10000000;
   const investedValue = rawP.invested_value ?? 0;
-  const cashBalance = rawP.cash_balance ?? rawP.cash ?? 100000;
+  const cashBalance = rawP.cash_balance ?? rawP.cash ?? 10000000;
   const totalPnl = rawP.total_pnl ?? rawP.unrealized_pnl ?? 0;
   const totalReturnPct = rawP.total_return_pct ?? rawP.unrealized_pnl_pct ?? 0;
   const positions = data?.positions ?? rawP.positions ?? [];
   const totalPnlPos = totalPnl >= 0;
-
-  const handleAutoRebalance = async () => {
-    setRebalancing(true);
-    setRebalanceMsg(null);
-    try {
-      const res = await fetch("/api/v1/portfolio/auto_rebalance", { method: "POST" });
-      const r = await res.json();
-      if (r.success) {
-        setRebalanceMsg(`${r.rebalanced_count} adet yüksek skorlu hisse (THYAO, ASELS, GARAN, KCHOL) Kelly kriterine göre portföye eklendi.`);
-        window.location.reload();
-      }
-    } catch (e) {
-      setRebalanceMsg("Yeniden dengeleme hatası oluştu.");
-    } finally {
-      setRebalancing(false);
-    }
-  };
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -67,20 +61,24 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi & Otonom İşlem Motoru</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold gradient-text">Portföy Yönetimi & Risk Parity Telemetrisi</h1>
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold border ${
+              marketOpen 
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+            }`}>
+              {marketOpen ? "● BIST SEANSI AÇIK" : "○ BIST KAPALI (t+1 Emir Kuyruğu Aktif)"}
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/10 border border-purple-500/30 text-purple-300">
+              🤖 %100 OTONOM YÜRÜTME
+            </span>
+          </div>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Sanal İşlem (Paper Trading) · Fractional Kelly Sizing · {positions.length} aktif pozisyon
+            30-Yıllık ML Ensemble & Risk Parity Motoru Kontrolünde · Sıfır Manuel Müdahale · {positions.length} aktif pozisyon
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleAutoRebalance}
-            disabled={rebalancing}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 text-zinc-950 hover:brightness-110 cursor-pointer shadow-lg transition-all"
-          >
-            <Wallet size={14} className={rebalancing ? "animate-spin" : ""} />
-            {rebalancing ? "Dengeleniyor..." : "Otonom Yeniden Dengele (Kelly Bot)"}
-          </button>
           <div
             className="flex items-center gap-2 px-4 py-2 rounded-xl"
             style={{

@@ -27,8 +27,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+try:
+    import orjson
+except ImportError:
+    import json as orjson
 import structlog
-import orjson
 from fastapi.responses import Response as FastAPIResponse
 
 from .v1 import v1_router
@@ -69,10 +72,10 @@ async def lifespan(app: FastAPI):
                 now = datetime.now()
                 is_market_active = (now.weekday() < 5) and (now.hour >= 9 and (now.hour < 18 or (now.hour == 18 and now.minute <= 30)))
                 
-                from .v1.market import _fetch_radar_fresh
-                logger.info(f"radar_cache: yenileniyor (Seans Durumu: {'Açık' if is_market_active else 'Kapalı/Düşük Güç'})...")
-                await _fetch_radar_fresh(limit=200)
-                logger.info("radar_cache: güncellendi")
+                from ..ingestion.bist_universe import bist_universe
+                logger.info(f"radar_cache: TÜM BIST hisseleri ({len(bist_universe.BIST_ALL_TICKERS)} hisse) yenileniyor (Seans: {'Açık' if is_market_active else 'Kapalı'})...")
+                await _fetch_radar_fresh(limit=1000)
+                logger.info("radar_cache: başarıyla güncellendi")
                 
                 sleep_time = 120 if is_market_active else 600
             except Exception as e:
@@ -163,11 +166,24 @@ async def lifespan(app: FastAPI):
 
 
 class ORJSONResponse(FastAPIResponse):
-    """ORJSON tabanlı response — json'dan daha hızlı."""
+    """ORJSON tabanlı response — json'dan daha hızlı ve 100% güvenli."""
     media_type = "application/json"
 
     def render(self, content: any) -> bytes:
-        return orjson.dumps(content)
+        if isinstance(content, bytes):
+            return content
+        try:
+            if hasattr(orjson, "OPT_NON_STR_KEYS"):
+                res = orjson.dumps(content, default=str, option=orjson.OPT_NON_STR_KEYS)
+            else:
+                res = orjson.dumps(content, default=str)
+        except Exception:
+            import json
+            res = json.dumps(content, default=str)
+
+        if isinstance(res, str):
+            return res.encode("utf-8")
+        return res
 
 
 def create_app() -> FastAPI:
@@ -241,17 +257,19 @@ def create_app() -> FastAPI:
 
     # v1 router
     app.include_router(v1_router)
+    from .v1.ws import router as root_ws_router
+    app.include_router(root_ws_router, prefix="/ws", tags=["WebSockets (Root)"])
 
-    # Root endpoints
-    @app.get("/")
-    async def root():
-        return {
-            "name": "ALPHA BIST API",
-            "version": "2.0.0",
-            "docs": "/docs",
-            "health": "/health",
-            "api_v1": "/api/v1",
-        }
+    # Root endpoints & Web UI Dashboard
+    @app.get("/", response_class=FastAPIResponse)
+    @app.get("/dashboard", response_class=FastAPIResponse)
+    async def dashboard():
+        dashboard_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "apps", "web", "dashboard.html")
+        if os.path.exists(dashboard_path):
+            with open(dashboard_path, "rb") as f:
+                content = f.read()
+            return FastAPIResponse(content=content, media_type="text/html")
+        return JSONResponse(content={"name": "ALPHA BIST API", "version": "2.0.0", "docs": "/docs"})
 
     @app.get("/health")
     @app.get("/api/health")

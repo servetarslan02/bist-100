@@ -228,6 +228,20 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
         raise HTTPException(500, f"Accounting error: {e}")
 
 
+@router.post("/reset")
+async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Portföydeki tüm pozisyonları kapatır ve %100 Nakite (₺10,000,000) çeker."""
+    try:
+        pm = _get_pm()
+        pm._positions.clear()
+        pm._cash = 10000000.0
+        if hasattr(pm, "_save_state"):
+            pm._save_state()
+        return {"success": True, "cash": 10000000.0, "message": "Portföy sıfırlandı: 0 Pozisyon, %100 Nakit."}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 # =====================================================
 # LEDGER & HISTORY
 # =====================================================

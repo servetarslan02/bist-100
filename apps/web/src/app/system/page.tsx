@@ -58,7 +58,7 @@ function ResourceBar({ label, value, icon: Icon }: { label: string; value: numbe
 }
 
 export default function SystemHealth() {
-  const { data: status } = usePolling<any>("/status", 3000);
+  const { data: status } = usePolling<any>("/system/status", 3000);
   const services = status?.services || {};
   const allHealthy = Object.values(services).every(s => s === "healthy");
   const healthyCount = Object.values(services).filter(s => s === "healthy").length;

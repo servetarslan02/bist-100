@@ -91,16 +91,40 @@ class DynamicOpportunityScanner:
                 mom_1m = (p_now / float(closes.iloc[-21]) - 1.0) * 100 if len(closes) >= 22 else 0
                 mom_3m = (p_now / float(closes.iloc[-63]) - 1.0) * 100 if len(closes) >= 64 else 0
 
-                # Formasyon ve Fırsat Sınıflandırması
-                score = 50
+                # 10/10 Gelişmiş Mum ve Price Action Analizi
+                from ..intelligence.candle_patterns import candle_engine
+                candle_res = candle_engine.analyze_dataframe(df, t)
+
+                score = int(round(candle_res.candle_score * 0.4 + 50 * 0.6))
                 signal_type = "TREND_WATCH"
                 category = "WATCH"
                 reason = "İzleme Listesi (Dengeli Piyasa)"
                 target_pct = 12.0
                 stop_pct = 5.0
 
-                # 1. Hacim Patlaması & 20-Günlük Zirve Kırılımı (Tavan / Güçlü İvme)
-                if p_now >= high20 * 0.99 and vol_ratio >= 1.5 and p_now > sma50:
+                patterns = candle_res.patterns_detected
+
+                # 1. Yutan Boğa (Bullish Engulfing) & Hacim Patlaması
+                if "BULLISH_ENGULFING" in patterns and (vol_ratio >= 1.2 or p_now > sma50):
+                    score = min(99, 88 + int(vol_ratio * 2) + (5 if mom_1m > 0 else 0))
+                    signal_type = "BULLISH_ENGULFING"
+                    category = "HIGH_CONVICTION"
+                    reason = f"Yutan Boğa Mumu & %{candle_res.buyer_pressure_pct:.0f} Alıcı Hakimiyeti"
+                    target_pct = 24.0
+                    stop_pct = 5.0
+
+                # 2. Sabah Yıldızı (Morning Star) 3-Mumluk Kurumsal Dip Dönüşü
+                elif "MORNING_STAR" in patterns or ("HAMMER_PINBAR" in patterns and rsi <= 45):
+                    score = min(96, 86 + int((50 - rsi) * 0.5))
+                    signal_type = "HAMMER_BOUNCE" if "HAMMER_PINBAR" in patterns else "MORNING_STAR"
+                    category = "HIGH_CONVICTION"
+                    pat_name = "Çekiç Dip Mumu" if "HAMMER_PINBAR" in patterns else "Sabah Yıldızı"
+                    reason = f"{pat_name} ile Dip Dönüş Teyidi & RSI({rsi:.0f}) Desteği"
+                    target_pct = 20.0
+                    stop_pct = 4.5
+
+                # 3. Hacim Patlaması & 20-Günlük Zirve Kırılımı (Tavan / Güçlü İvme)
+                elif p_now >= high20 * 0.99 and vol_ratio >= 1.5 and p_now > sma50:
                     score = min(98, 85 + int(vol_ratio * 3) + (5 if mom_1m > 10 else 0))
                     signal_type = "VOLUME_BREAKOUT"
                     category = "HIGH_CONVICTION"
@@ -108,7 +132,16 @@ class DynamicOpportunityScanner:
                     target_pct = 22.0
                     stop_pct = 5.5
 
-                # 2. Güçlü Trendde Sağlıklı Düzeltme (Dip Alımı / Swing)
+                # 4. Boğa FVG (Fair Value Gap / Dengesizlik Boşluğu)
+                elif candle_res.has_fvg and candle_res.fvg_type == "BULLISH_FVG" and p_now > sma50:
+                    score = 90
+                    signal_type = "BULLISH_FVG"
+                    category = "CANDIDATE"
+                    reason = f"Kurumsal Alım Boşluğu (FVG: {candle_res.fvg_gap_range[0]:.2f}₺ - {candle_res.fvg_gap_range[1]:.2f}₺)"
+                    target_pct = 19.0
+                    stop_pct = 4.8
+
+                # 5. Güçlü Trendde Sağlıklı Düzeltme (Dip Alımı / Swing)
                 elif p_now > sma50 and rsi <= 42 and mom_3m > 15:
                     score = min(94, 82 + int((45 - rsi) * 1.5))
                     signal_type = "PULLBACK_BOUNCE"
@@ -117,7 +150,7 @@ class DynamicOpportunityScanner:
                     target_pct = 18.0
                     stop_pct = 4.5
 
-                # 3. Yüksek Momentum Lideri
+                # 6. Yüksek Momentum Lideri
                 elif mom_3m >= 35 and p_now > sma20 and p_now > sma50:
                     score = min(92, 80 + int(mom_3m * 0.2))
                     signal_type = "MOMENTUM_LEADER"
@@ -126,7 +159,7 @@ class DynamicOpportunityScanner:
                     target_pct = 25.0
                     stop_pct = 6.0
 
-                # 4. Erken Trend Başlangıcı
+                # 7. Erken Trend Başlangıcı
                 elif p_now > sma20 and p_now > sma50 and closes.iloc[-10] <= sma50:
                     score = 84
                     signal_type = "EARLY_TREND"
@@ -155,6 +188,9 @@ class DynamicOpportunityScanner:
                     "signal_type": signal_type,
                     "spec_category": category,
                     "spec_reason": reason,
+                    "candle_patterns": patterns,
+                    "buyer_pressure_pct": candle_res.buyer_pressure_pct,
+                    "seller_pressure_pct": candle_res.seller_pressure_pct,
                     "expected_return_pct": target_pct,
                     "target_price": target_price,
                     "target_price_2": round(p_now * (1 + (target_pct * 1.6) / 100), 2),

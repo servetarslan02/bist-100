@@ -1,8 +1,8 @@
-﻿"use client";
+"use client";
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { usePolling } from "@/lib/api";
+import { usePolling, useDebounce } from "@/lib/api";
 import {
   Target, ArrowUpRight, ArrowDownRight, Flame, Eye, Star, Layers,
   TrendingUp, ShieldAlert, BarChart3, Zap, Filter, Search, RefreshCw, ExternalLink
@@ -43,13 +43,14 @@ const CAT_FILTERS = [
 
 export default function OpportunitiesPage() {
   const router = useRouter();
-  const { data: rawSignals, loading, refresh } = usePolling<OpportunitySignal[]>(
+  const { data: rawSignals, loading, refetch } = usePolling<OpportunitySignal[]>(
     "/scanner/signals?limit=50",
-    20000
+    15000
   );
 
   const [activeFilter, setActiveFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState<string>("");
+  const debouncedSearch = useDebounce(searchTerm, 150);
 
   const signals = useMemo(() => {
     if (!rawSignals) return [];
@@ -65,14 +66,16 @@ export default function OpportunitiesPage() {
       if (activeFilter === "PULLBACK_BOUNCE" && s.signal_type !== "PULLBACK_BOUNCE") return false;
       if (activeFilter === "MOMENTUM_LEADER" && s.signal_type !== "MOMENTUM_LEADER") return false;
 
-      // Arama filtresi
-      if (searchTerm) {
-        const q = searchTerm.toLowerCase();
-        return s.symbol.toLowerCase().includes(q) || (s.spec_reason && s.spec_reason.toLowerCase().includes(q));
+      // Arama filtresi with debounce
+      if (debouncedSearch) {
+        const q = debouncedSearch.toLowerCase();
+        const sym = (s.symbol || s.ticker || "").toLowerCase();
+        const rsn = (s.spec_reason || "").toLowerCase();
+        return sym.includes(q) || rsn.includes(q);
       }
       return true;
     });
-  }, [signals, activeFilter, searchTerm]);
+  }, [signals, activeFilter, debouncedSearch]);
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>

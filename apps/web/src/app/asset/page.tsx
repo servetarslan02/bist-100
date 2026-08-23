@@ -2,13 +2,19 @@
 
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
+import { api } from "@/lib/api";
 import {
   Search, TrendingUp, TrendingDown, Sparkles,
   BarChart3, Activity, ShieldCheck, Zap, Layers,
   Compass, ArrowUpRight, ArrowDownRight, RefreshCw,
-  Cpu, Target, CheckCircle2, Copy, Check
+  Cpu, Target, CheckCircle2, Copy, Check, Flame
 } from "lucide-react";
-import { TradingViewChart } from "@/components/charts/TradingViewChart";
+
+const TradingViewChart = dynamic(
+  () => import("@/components/charts/TradingViewChart").then((mod) => mod.TradingViewChart),
+  { ssr: false, loading: () => <div className="h-[300px] flex items-center justify-center text-xs text-zinc-500">Grafik Yükleniyor...</div> }
+);
 
 interface LiveAssetData {
   symbol: string;
@@ -33,6 +39,14 @@ interface LiveAssetData {
   recommendation_text: string;
   recommendation_score: number;
   candles: Array<{ time: string; open: number; high: number; low: number; close: number; volume: number }>;
+  candle_patterns?: string[];
+  primary_pattern?: string;
+  buyer_pressure_pct?: number;
+  seller_pressure_pct?: number;
+  has_fvg?: boolean;
+  fvg_type?: string;
+  fvg_gap_range?: number[];
+  candle_evidence?: string[];
   is_real_data: boolean;
 }
 
@@ -83,13 +97,9 @@ function AssetIntelContent() {
 
       const tf = TIMEFRAME_CONFIG[timeframe];
       try {
-        const res = await fetch(
-          `/api/v1/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`
+        const data = await api<LiveAssetData>(
+          `/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`
         );
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: ${activeTicker} için canlı veri alınamadı`);
-        }
-        const data = await res.json();
         if (isMounted) {
           setAsset(data);
         }
@@ -315,6 +325,66 @@ function AssetIntelContent() {
 
             <div className="w-full h-[320px] rounded-lg overflow-hidden bg-black/20 p-2">
               <TradingViewChart data={asset.candles || []} height={300} />
+            </div>
+
+            {/* 10/10 Gelişmiş Mum ve Price Action Zekası Paneli */}
+            <div className="p-4 rounded-xl bg-zinc-900/60 border border-zinc-800/80 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-zinc-800/50 pb-2.5">
+                <div className="flex items-center gap-2">
+                  <Flame size={14} className="text-amber-400" />
+                  <span className="text-xs font-bold text-zinc-200 tracking-wide uppercase">
+                    Price Action & Mum Formasyon Zekası
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    10/10 AKTİF ANALİZ
+                  </span>
+                </div>
+
+                {/* Buyer / Seller Pressure Bar */}
+                <div className="flex items-center gap-2 text-[10px] font-data">
+                  <span className="text-emerald-400 font-bold">Alıcı %{asset.buyer_pressure_pct ?? 50}</span>
+                  <div className="w-24 h-1.5 rounded-full bg-red-500/30 overflow-hidden flex">
+                    <div
+                      className="bg-emerald-400 h-full transition-all duration-500"
+                      style={{ width: `${asset.buyer_pressure_pct ?? 50}%` }}
+                    />
+                  </div>
+                  <span className="text-red-400 font-bold">Satıcı %{asset.seller_pressure_pct ?? 50}</span>
+                </div>
+              </div>
+
+              {/* Formations Badges & Insights */}
+              <div className="flex flex-wrap items-center gap-2">
+                {(asset.candle_patterns && asset.candle_patterns.length > 0) ? (
+                  asset.candle_patterns.map((pat) => (
+                    <span
+                      key={pat}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold font-data bg-amber-500/10 text-amber-300 border border-amber-500/20 flex items-center gap-1.5"
+                    >
+                      <Zap size={10} className="text-amber-400" />
+                      {pat.replace(/_/g, " ")}
+                    </span>
+                  ))
+                ) : (
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-zinc-800/50 text-zinc-400">
+                    Normal Dengeli Mum Formasyonu
+                  </span>
+                )}
+
+                {asset.has_fvg && (
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 flex items-center gap-1">
+                    <Target size={10} />
+                    {asset.fvg_type === "BULLISH_FVG" ? "Boğa FVG (Kurumsal Boşluk)" : "Ayı FVG"}
+                  </span>
+                )}
+              </div>
+
+              {/* Evidence / Reason Text */}
+              {asset.candle_evidence && asset.candle_evidence.length > 0 && (
+                <p className="text-[11px] text-zinc-400 bg-black/20 p-2.5 rounded-lg border border-white/5">
+                  💡 <strong>Mum Okuma İpucu:</strong> {asset.candle_evidence.join(" · ")}
+                </p>
+              )}
             </div>
           </div>
 

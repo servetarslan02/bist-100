@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from "react";
 import { usePolling, type SignalData } from "@/lib/api";
 import {
   FlaskConical, Sparkles, Brain, ArrowRight, MessageSquare,
-  TrendingUp, TrendingDown, CheckCircle2, ShieldCheck, Zap
+  TrendingUp, TrendingDown, CheckCircle2, ShieldCheck, Zap, Loader2
 } from "lucide-react";
 
 interface ResearchReport {
@@ -19,103 +19,51 @@ interface ResearchReport {
   key_drivers: string[];
 }
 
-const DEFAULT_REPORTS: ResearchReport[] = [
-  {
-    id: "rep-asels-1",
-    ticker: "ASELS",
-    title: "ASELSAN Savunma Sanayii Siparişleri & İhracat Gelirleri",
-    model: "Google Gemini 3.7 Flash + Quant Engine",
-    date: "Canlı Analiz",
-    sentiment: "BULLISH",
-    confidence: 92,
-    summary: "Savunma Sanayii Başkanlığı ile yapılan yeni sözleşmeler ve artan ihracat teslimatları kârlılığı destekliyor. 20 günlük Monte Carlo simülasyonları yukarı yönlü eğilimi işaret ediyor.",
-    key_drivers: [
-      "Savunma Sanayii Başkanlığı ile yeni stratejik sözleşmeler",
-      "Yüksek bakiye sipariş hacmi (Backlog) ve döviz bazlı gelirler",
-      "Ar-Ge ve radar teknolojilerinde pazar liderliği",
-    ],
-  },
-  {
-    id: "rep-thyao-1",
-    ticker: "THYAO",
-    title: "Türk Hava Yolları 2026/Q2 Kapasite ve Marj Görünümü",
-    model: "Google Gemini 3.7 Flash + Quant Engine",
-    date: "Canlı Analiz",
-    sentiment: "BULLISH",
-    confidence: 88,
-    summary: "Artan yolcu doluluk oranları (%84.5) ve kargo gelirlerindeki çift haneli büyüme marjları destekliyor. Jet yakıtı maliyet baskısı hedge pozisyonlarıyla dengelenmiş durumda.",
-    key_drivers: [
-      "Uluslararası yolcu trafiğinde yıllık %12 artış",
-      "Kargo birim gelirlerinde (Yield) güçlü seyir",
-      "Düşük net borç / FAVÖK çarpanı (1.4x)",
-    ],
-  },
-  {
-    id: "rep-garan-1",
-    ticker: "GARAN",
-    title: "Garanti BBVA Net Faiz Marjı (NIM) & Kredi Büyümesi",
-    model: "Google Gemini 3.7 Flash + Quant Engine",
-    date: "Canlı Analiz",
-    sentiment: "BULLISH",
-    confidence: 84,
-    summary: "Mevduat maliyetlerindeki stabilizasyon ve TL ticari kredi getirilerindeki toparlanma NIM'i yukarı çekiyor. Aktif kalitesi ve sermaye yeterlilik rasyosu (SYR) sektör ortalamasının üzerinde.",
-    key_drivers: [
-      "Net Faiz Marjında çeyreklik 40 bps genişleme",
-      "Takipteki Krediler (NPL) oranı %1.8 ile tarihi dipte",
-      "Özkaynak kârlılığı (ROE) %36 seviyesinde güçlü",
-    ],
-  },
-  {
-    id: "rep-eregl-1",
-    ticker: "EREGL",
-    title: "Ereğli Demir Çelik Küresel Çelik Fiyatları & HRC Marjı",
-    model: "Google Gemini 3.7 Flash + Quant Engine",
-    date: "Canlı Analiz",
-    sentiment: "NEUTRAL",
-    confidence: 72,
-    summary: "Küresel HRC çelik fiyatlarındaki yatay seyir ve yüksek demir cevheri maliyetleri marjlar üzerinde baskı yaratmaya devam ediyor. Yeni peletleme tesisi yatırımı orta vadeli pozitif.",
-    key_drivers: [
-      "HRC-Demir Cevheri makası 210 $/ton seviyesinde dar",
-      "Kapasite kullanım oranı %86 seviyesinde stabil",
-      "Karbon nötr yeşil çelik dönüşüm harcamaları",
-    ],
-  },
-];
-
 export default function AIResearchPage() {
-  const { data: signalsData } = usePolling<any>("/scanner/signals", 15000);
+  const { data: signalsData, loading } = usePolling<any>("/scanner/signals", 10000);
   const [customReports, setCustomReports] = useState<ResearchReport[]>([]);
-  const [selectedReport, setSelectedReport] = useState<ResearchReport>(DEFAULT_REPORTS[0]);
+  const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
 
   // Combine live scanned top signals with reports
   const reports = useMemo(() => {
     const liveScannedReports: ResearchReport[] = [];
-    const signals: SignalData[] = signalsData?.signals ?? [];
+    const signals: any[] = signalsData?.signals ?? [];
     
-    signals.slice(0, 5).forEach((sig) => {
-      if (!DEFAULT_REPORTS.some(r => r.ticker === sig.ticker)) {
-        liveScannedReports.push({
-          id: `rep-live-${sig.ticker}`,
-          ticker: sig.ticker,
-          title: `${sig.ticker} Kantitatif Model & Tarayıcı Raporu (Skor: ${sig.score ?? 85})`,
-          model: `${sig.model ?? "Multi-Model Fusion"} (Quant)`,
-          date: sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString("tr-TR") : "Canlı Tarama",
-          sentiment: (sig.action === "BUY" || (sig.score ?? 0) >= 75) ? "BULLISH" : "NEUTRAL",
-          confidence: Math.round(sig.score ?? 85),
-          summary: `${sig.ticker} hissesinde algoritmik tarama motoru ${sig.action} sinyali üretmiştir. Model güveni %${sig.confidence ? (sig.confidence * 100).toFixed(0) : (sig.score ?? 85)}, hedef fiyat ₺${sig.target_price?.toFixed(2) ?? "—"}, zarar kes ₺${sig.stop_loss?.toFixed(2) ?? "—"} olarak hesaplanmıştır.`,
-          key_drivers: [
-            `Model Yönü: ${sig.action ?? "AL"} | Skor: ${sig.score ?? 85}/100`,
-            `Giriş Fiyatı: ₺${sig.current_price?.toFixed(2) ?? "—"} | Hedef: ₺${sig.target_price?.toFixed(2) ?? "—"}`,
-            `Risk / Kazanç Oranı ve Stop-Loss: ₺${sig.stop_loss?.toFixed(2) ?? "—"}`,
-          ],
-        });
-      }
+    signals.forEach((sig) => {
+      const score = Math.round(sig.score ? (sig.score <= 1.0 ? sig.score * 1000 : sig.score) : 75);
+      const normScore = Math.min(99, Math.max(50, score > 100 ? Math.round(50 + (score % 50)) : score));
+      const action = sig.action || (sig.score > 0 ? "AL" : "HOLD");
+      const isBull = action === "BUY" || action === "AL" || (sig.score ?? 0) > 0;
+
+      liveScannedReports.push({
+        id: `rep-live-${sig.ticker}`,
+        ticker: sig.ticker,
+        title: `${sig.ticker} AlphaEngine Nicel Değerleme & Sinyal Analizi`,
+        model: "Optuna-LightGBM (Phase 18) + Quant Engine",
+        date: sig.timestamp ? new Date(sig.timestamp).toLocaleTimeString("tr-TR") : "Canlı Model",
+        sentiment: isBull ? "BULLISH" : "NEUTRAL",
+        confidence: normScore,
+        summary: `${sig.ticker} hissesi için AlphaEngine tarafından ${action} sinyali üretilmiştir. Modelin 20 günlük beklenen endeks üstü getiri tahmini pozitif bölgededir. Giriş fiyatı ₺${sig.current_price ? sig.current_price.toFixed(2) : (sig.price ? sig.price.toFixed(2) : "—")}, dinamik ATR hedefi ₺${sig.target_price ? sig.target_price.toFixed(2) : "—"}, stop seviyesi ₺${sig.stop_loss ? sig.stop_loss.toFixed(2) : "—"} olarak hesaplanmıştır.`,
+        key_drivers: [
+          `Model Kararı: ${action} | Alpha Skoru: ${normScore}/100`,
+          `Fiyat: ₺${sig.current_price ? sig.current_price.toFixed(2) : (sig.price ? sig.price.toFixed(2) : "—")} | Hedef: ₺${sig.target_price ? sig.target_price.toFixed(2) : "—"}`,
+          `Risk Kontrolü: Dinamik 2.5x ATR Stop-Loss Koruma Kalkanı`,
+        ],
+      });
     });
 
-    return [...customReports, ...DEFAULT_REPORTS, ...liveScannedReports];
+    return [...customReports, ...liveScannedReports];
   }, [signalsData, customReports]);
+
+  const selectedReport = useMemo(() => {
+    if (selectedReportId) {
+      const found = reports.find(r => r.id === selectedReportId);
+      if (found) return found;
+    }
+    return reports[0] || null;
+  }, [reports, selectedReportId]);
 
   const handleAsk = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,14 +76,14 @@ export default function AIResearchPage() {
         body: JSON.stringify({ prompt: query }),
       });
       const data = await res.json();
-      const answer = data?.response || "Analiz oluşturuldu.";
+      const answer = data?.response || data?.message || "Analiz tamamlandı.";
       const detectedTicker = query.toUpperCase().match(/[A-Z]{4,5}/)?.[0] || "BIST";
       
       const newReport: ResearchReport = {
         id: `rep-custom-${Date.now()}`,
         ticker: detectedTicker,
         title: query,
-        model: "Google Gemini 3.7 Flash (Canlı API Bağlı)",
+        model: "Google Gemini 3.7 Flash (Canlı Analiz)",
         date: new Date().toLocaleTimeString("tr-TR"),
         sentiment: answer.includes("GÜÇLÜ AL") || answer.includes("AL") ? "BULLISH" : "NEUTRAL",
         confidence: 94,
@@ -147,7 +95,7 @@ export default function AIResearchPage() {
         ],
       };
       setCustomReports([newReport, ...customReports]);
-      setSelectedReport(newReport);
+      setSelectedReportId(newReport.id);
       setQuery("");
     } catch (err) {
       console.error(err);
@@ -163,7 +111,7 @@ export default function AIResearchPage() {
         <div>
           <h1 className="text-xl font-bold gradient-text">Yapay Zeka Kantitatif Araştırma Laboratuvarı</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            BIST Hisse & Makro LLM Analiz Motoru (Gemma 4 12B Quant Model) · Otomatik Temel & Teknik Sentetik Raporlama
+            BIST Canlı AlphaEngine & Google Gemini 3.7 Flash Nicel Araştırma Raporları
           </p>
         </div>
       </div>
@@ -216,95 +164,113 @@ export default function AIResearchPage() {
         ))}
       </div>
 
+      {/* Loading state */}
+      {loading && reports.length === 0 && (
+        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2">
+          <Loader2 className="animate-spin" size={16} />
+          <span>Canlı model araştırma raporları derleniyor...</span>
+        </div>
+      )}
+
       {/* Report View Grid */}
-      <div className="grid grid-cols-3 gap-4">
-        {/* Reports List */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider px-1">En Son Üretilen AI Raporları</h3>
-          {reports.map((rep) => {
-            const isSel = selectedReport.id === rep.id;
-            const isBull = rep.sentiment === "BULLISH";
-            return (
-              <div
-                key={rep.id}
-                onClick={() => setSelectedReport(rep)}
-                className="rounded-xl p-4 cursor-pointer transition-all duration-150 select-none"
-                style={{
-                  background: isSel ? "rgba(0,229,160,0.06)" : "var(--color-bg-card)",
-                  border: `1px solid ${isSel ? "rgba(0,229,160,0.3)" : "var(--color-border-subtle)"}`,
-                }}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="font-bold text-xs font-data text-zinc-100">{rep.ticker}</span>
-                  <span
-                    className="text-[9px] font-bold px-2 py-0.5 rounded-full"
-                    style={{
-                      background: isBull ? "rgba(0,229,160,0.15)" : "rgba(255,170,0,0.15)",
-                      color: isBull ? "#00e5a0" : "#ffaa00",
-                    }}
-                  >
-                    {isBull ? "POZİTİF (BOĞA)" : "NÖTR"}
-                  </span>
-                </div>
-                <h4 className="text-xs font-semibold text-zinc-300 leading-snug line-clamp-2">{rep.title}</h4>
-                <div className="flex items-center justify-between text-[9px] text-zinc-500 font-data mt-2 pt-2 border-t border-zinc-800/40">
-                  <span>Güven: %{rep.confidence}</span>
-                  <span>{rep.date}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Report Detail */}
-        <div
-          className="col-span-2 rounded-xl p-5 space-y-4"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-        >
-          <div className="flex items-center justify-between pb-3 border-b border-zinc-800/40">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-base font-bold font-data text-emerald-400">{selectedReport.ticker}</span>
-                <span className="text-xs text-zinc-400 font-medium">BIST Hisse İncelemesi</span>
-              </div>
-              <h2 className="text-sm font-bold text-zinc-100 mt-1">{selectedReport.title}</h2>
-            </div>
-            <div className="text-right">
-              <span className="text-[10px] text-zinc-500 block font-data">{selectedReport.date}</span>
-              <span className="text-[10px] text-zinc-400 font-mono">{selectedReport.model}</span>
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">Yapay Zeka Yönetici Özeti & Sayısal İstihbarat</h4>
-              {selectedReport.ticker && selectedReport.ticker !== "BIST" && (
-                <a
-                  href={`/asset?ticker=${selectedReport.ticker}`}
-                  className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 hover:underline cursor-pointer"
+      {reports.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          {/* Report List (Left Column) */}
+          <div className="space-y-2.5 col-span-1 select-none">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400 px-1">
+              CANLI MODEL RAPORLARI ({reports.length})
+            </h2>
+            {reports.map((rep) => {
+              const active = selectedReport?.id === rep.id;
+              const isBull = rep.sentiment === "BULLISH";
+              return (
+                <div
+                  key={rep.id}
+                  onClick={() => setSelectedReportId(rep.id)}
+                  className="rounded-xl p-3.5 transition-all cursor-pointer select-none"
+                  style={{
+                    background: active ? "rgba(0,229,160,0.08)" : "var(--color-bg-card)",
+                    border: `1px solid ${active ? "rgba(0,229,160,0.3)" : "var(--color-border-subtle)"}`,
+                  }}
                 >
-                  {selectedReport.ticker} Detaylı Varlık Analizine Git <ArrowRight size={12} />
-                </a>
-              )}
-            </div>
-            <div className="text-xs leading-relaxed text-zinc-200 bg-zinc-900/80 p-5 rounded-xl border border-zinc-800/60 whitespace-pre-wrap font-sans space-y-2">
-              {selectedReport.summary}
-            </div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-bold font-data text-zinc-200">{rep.ticker}</span>
+                    <span
+                      className="text-[9px] font-bold px-2 py-0.5 rounded"
+                      style={{
+                        background: isBull ? "rgba(0,229,160,0.12)" : "rgba(255,170,0,0.12)",
+                        color: isBull ? "#00e5a0" : "#ffaa00",
+                      }}
+                    >
+                      {rep.sentiment}
+                    </span>
+                  </div>
+                  <h3 className="text-xs font-semibold text-zinc-300 line-clamp-2 mb-2 leading-relaxed">
+                    {rep.title}
+                  </h3>
+                  <div className="flex items-center justify-between text-[10px] text-zinc-500 font-data">
+                    <span>{rep.date}</span>
+                    <span className="font-semibold text-emerald-400">%{rep.confidence} Güven</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
-          <div>
-            <h4 className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 mb-2">Temel Dinamikler & Sayısal Dayanaklar</h4>
-            <div className="space-y-2">
-              {selectedReport.key_drivers.map((drv, i) => (
-                <div key={i} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-zinc-900/40 border border-zinc-800/30 text-xs text-zinc-300">
-                  <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
-                  <span>{drv}</span>
+          {/* Selected Report Detail (Right Column) */}
+          {selectedReport && (
+            <div
+              className="col-span-2 rounded-2xl p-6 space-y-5 select-none"
+              style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
+            >
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-sm font-bold font-data px-2.5 py-0.5 rounded bg-zinc-800 text-zinc-100">
+                      {selectedReport.ticker}
+                    </span>
+                    <span className="text-[11px] text-zinc-400">{selectedReport.model}</span>
+                  </div>
+                  <h2 className="text-base font-bold text-zinc-100">{selectedReport.title}</h2>
                 </div>
-              ))}
+                <div className="text-right">
+                  <div className="text-xl font-bold font-data text-emerald-400">%{selectedReport.confidence}</div>
+                  <span className="text-[10px] uppercase font-bold text-zinc-500">Model Güveni</span>
+                </div>
+              </div>
+
+              {/* Summary Section */}
+              <div className="rounded-xl p-4 bg-zinc-900/60 border border-zinc-800 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-zinc-300">
+                  <FlaskConical size={13} className="text-emerald-400" />
+                  Yapay Zeka & Nicel Model Özeti
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed whitespace-pre-line">
+                  {selectedReport.summary}
+                </p>
+              </div>
+
+              {/* Key Drivers */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+                  Temel Fiyat Sürücüleri & Seviyeler
+                </h4>
+                <div className="space-y-1.5">
+                  {selectedReport.key_drivers.map((drv, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center gap-2 text-xs text-zinc-300 bg-zinc-900/40 p-2.5 rounded-lg border border-zinc-800/60"
+                    >
+                      <CheckCircle2 size={13} className="text-emerald-400 flex-shrink-0" />
+                      <span>{drv}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

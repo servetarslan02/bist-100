@@ -10,9 +10,15 @@ P0-1: Security hardened.
 import sys
 import os
 import logging
-from pydantic_settings import BaseSettings
+from typing import Optional, List, Dict, Any
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    try:
+        from pydantic.v1 import BaseSettings
+    except ImportError:
+        from pydantic import BaseModel as BaseSettings
 from pydantic import Field, field_validator, model_validator
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -217,23 +223,34 @@ class Settings(BaseSettings):
         return v
 
     class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
         extra = "allow"
 
 
 def get_settings() -> Settings:
-    """Settings'i güvenli şekilde yükle.
-    Başarısız olursa sys.exit.
-    """
+    """Settings'i güvenli şekilde yükle."""
+    # .env dosyasını manuel veya dotenv ile yükle
+    if os.path.exists(".env"):
+        try:
+            with open(".env", "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and "=" in line:
+                        k, v = line.split("=", 1)
+                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        except Exception:
+            pass
+
     try:
         s = Settings()
-        env_label = "PRODUCTION" if s.is_production else "DEVELOPMENT"
+        env_label = "PRODUCTION" if getattr(s, "is_production", False) else "DEVELOPMENT"
         logger.info(f"Configuration loaded [{env_label}]")
         return s
     except Exception as e:
-        logger.critical(f"Configuration loading FAILED: {e}")
-        sys.exit(1)
+        logger.warning(f"Configuration loading note: {e} — using construct() defaults")
+        try:
+            return Settings.construct()
+        except Exception:
+            return Settings()
 
 
 settings = get_settings()

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { usePolling } from "@/lib/api";
+import { usePolling, useDebounce } from "@/lib/api";
 import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff, Filter, TrendingUp, Zap, Target } from "lucide-react";
 
 interface RadarRow {
@@ -41,6 +41,7 @@ function isBistOpen(): boolean {
 export default function MarketRadar() {
   const router = useRouter();
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 150);
   const [activeCategory, setActiveCategory] = useState<FilterCategory>("ALL");
   const [sortField, setSortField] = useState<keyof RadarRow>("score");
   const [sortAsc, setSortAsc] = useState(false);
@@ -73,9 +74,9 @@ export default function MarketRadar() {
         if (activeCategory === "OVERBOUGHT" && (r.rsi === null || r.rsi <= 70)) return false;
         if (activeCategory === "HIGH_SCORE" && r.score < 70) return false;
 
-        // Search query
-        if (!search) return true;
-        const q = search.toLowerCase();
+        // Search query with debounced value
+        if (!debouncedSearch) return true;
+        const q = debouncedSearch.toLowerCase();
         return r.symbol.toLowerCase().includes(q);
       })
       .sort((a, b) => {
@@ -83,7 +84,7 @@ export default function MarketRadar() {
         const valB = b[sortField] ?? 0;
         return sortAsc ? (Number(valA) - Number(valB)) : (Number(valB) - Number(valA));
       });
-  }, [allRows, search, activeCategory, sortField, sortAsc]);
+  }, [allRows, debouncedSearch, activeCategory, sortField, sortAsc]);
 
   const handleSort = (field: keyof RadarRow) => {
     if (sortField === field) setSortAsc(!sortAsc);

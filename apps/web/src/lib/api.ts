@@ -1,14 +1,13 @@
-// ALPHA BIST - API Client & WebSocket Hook v2.0 (Real-Time Live Streaming)
+// ALPHA BIST - Institutional-Grade API Client, SWR Cache, Deduplication & Real-Time WebSockets v3.0
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 // =====================================================
-// API Client
+// API Client & Normalizer
 // =====================================================
 
-// Normalizer helper
 function normalizeApiPath(path: string): string {
   let p = path.startsWith('/') ? path : `/${path}`;
   if (p.startsWith('/api/v1/')) return p;
@@ -31,16 +30,67 @@ function normalizeApiPath(path: string): string {
   return `/api/v1${p}`;
 }
 
+// 1 & 4. Global In-Memory Cache & In-Flight Request Deduplication Bus
+const memoryCache = new Map<string, { data: any; timestamp: number }>();
+const inFlightRequests = new Map<string, Promise<any>>();
+
+// 5. LocalStorage Hydration Helper
+function getInitialCachedData<T>(key: string): T | null {
+  if (memoryCache.has(key)) {
+    return memoryCache.get(key)!.data as T;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem(`ALPHA_CACHE_${key}`);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp });
+        return parsed.data as T;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function persistCacheLocally(key: string, data: any) {
+  memoryCache.set(key, { data, timestamp: Date.now() });
+  if (typeof window !== 'undefined') {
+    try {
+      // Sadece kompakt ve kritik verileri localStorage'a yaz (Kota aşımını önlemek için)
+      if (key.length < 100) {
+        localStorage.setItem(`ALPHA_CACHE_${key}`, JSON.stringify({ data, timestamp: Date.now() }));
+      }
+    } catch {}
+  }
+}
+
 export async function api<T>(path: string): Promise<T> {
   const url = normalizeApiPath(path);
-  const res = await fetch(url, {
-    headers: {
-      'Accept': 'application/json',
-    },
-    cache: 'no-store',
-  });
-  if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
-  return res.json();
+
+  // 4. Request Deduplication: Eğer bu URL için zaten süren bir istek varsa, ikinciyi atma; mevcut isteğe bağlan!
+  if (inFlightRequests.has(url)) {
+    return inFlightRequests.get(url) as Promise<T>;
+  }
+
+  const fetchPromise = (async () => {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+        },
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
+      const data = await res.json();
+      persistCacheLocally(path, data);
+      return data;
+    } finally {
+      inFlightRequests.delete(url);
+    }
+  })();
+
+  inFlightRequests.set(url, fetchPromise);
+  return fetchPromise;
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
@@ -56,14 +106,17 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 }
 
 // =====================================================
-// Polling Hook (Ultra-Fast Live Polling: Default 3s)
+// 1. SWR Polling Hook (0.0ms Instant Render & Silent Revalidation)
 // =====================================================
 
 export function usePolling<T>(path: string, intervalMs: number = 3000) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<T | null>(() => getInitialCachedData<T>(path));
+  const [loading, setLoading] = useState<boolean>(() => !memoryCache.has(path));
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [lastUpdated, setLastUpdated] = useState<Date>(() => {
+    const c = memoryCache.get(path);
+    return c ? new Date(c.timestamp) : new Date();
+  });
   const [tick, setTick] = useState(0);
 
   const fetchData = useCallback(async () => {
@@ -90,42 +143,98 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
 }
 
 // =====================================================
-// WebSocket Hook (Live Streaming)
+// 2. Resilient WebSocket Hook (Heartbeat & Auto-Reconnect)
 // =====================================================
 
 export function useWebSocket(channel: string) {
   const [data, setData] = useState<any>(null);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<any>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/${channel}`;
-    try {
-      const ws = new WebSocket(wsUrl);
-      wsRef.current = ws;
+    let isSubscribed = true;
 
-      ws.onopen = () => setConnected(true);
-      ws.onclose = () => setConnected(false);
-      ws.onerror = () => setConnected(false);
-      ws.onmessage = (event) => {
-        try {
-          setData(JSON.parse(event.data));
-        } catch {}
-      };
+    function connectWs() {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/${channel}`;
+      
+      try {
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
-      return () => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.close();
-        }
-      };
-    } catch {
-      setConnected(false);
+        ws.onopen = () => {
+          if (!isSubscribed) return;
+          setConnected(true);
+        };
+
+        ws.onclose = () => {
+          if (!isSubscribed) return;
+          setConnected(false);
+          // 3 saniye sonra otomatik yeniden bağlan
+          reconnectTimeoutRef.current = setTimeout(connectWs, 3000);
+        };
+
+        ws.onerror = () => {
+          if (!isSubscribed) return;
+          setConnected(false);
+        };
+
+        ws.onmessage = (event) => {
+          if (!isSubscribed) return;
+          try {
+            const parsed = JSON.parse(event.data);
+            setData(parsed);
+          } catch {}
+        };
+      } catch {
+        setConnected(false);
+      }
     }
+
+    connectWs();
+
+    // 15 saniyede bir Heartbeat Ping göndererek hattı açık tut
+    const heartbeatTimer = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send("ping");
+        } catch {}
+      }
+    }, 15000);
+
+    return () => {
+      isSubscribed = false;
+      clearInterval(heartbeatTimer);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+    };
   }, [channel]);
 
   return { data, connected };
+}
+
+// =====================================================
+// 4. Debounce Utility Hook (Filtreleme & Arama Fırtınasını Önler)
+// =====================================================
+
+export function useDebounce<T>(value: T, delay: number = 250): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
 }
 
 // =====================================================

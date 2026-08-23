@@ -1,11 +1,12 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Radar, Target, LineChart,
   Briefcase, Cpu, Activity, Database,
-  ChevronRight
+  ChevronRight, Zap, Globe, Bell, Radio, Layers,
+  Map, TrendingUp, Sparkles
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -13,13 +14,18 @@ const NAV_ITEMS = [
     group: "ÇEKİRDEK",
     items: [
       { href: "/", label: "Genel Bakış", icon: LayoutDashboard },
-      { href: "/radar", label: "Phase 18 Radar", icon: Radar },
+      { href: "/radar", label: "Piyasa Radarı", icon: Radar },
+      { href: "/map", label: "Sektör Isı Haritası", icon: Map },
     ],
   },
   {
-    group: "İSTİHBARAT & ANALİZ",
+    group: "İSTİHBARAT & HABER",
     items: [
       { href: "/opportunities", label: "Otonom Fırsatlar", icon: Target },
+      { href: "/events", label: "KAP & Haber Akışı", icon: Zap },
+      { href: "/research", label: "AI Araştırma Raporları", icon: Sparkles },
+      { href: "/world", label: "Küresel Makro & Dünya", icon: Globe },
+      { href: "/alerts", label: "Canlı Alarmlar", icon: Bell },
       { href: "/asset", label: "Varlık Analizi", icon: LineChart },
     ],
   },
@@ -27,6 +33,7 @@ const NAV_ITEMS = [
     group: "PORTFÖY & İŞLEM",
     items: [
       { href: "/portfolio", label: "Canlı Portföy", icon: Briefcase },
+      { href: "/strategy", label: "Strateji & Backtest", icon: TrendingUp },
     ],
   },
   {
@@ -37,8 +44,10 @@ const NAV_ITEMS = [
     ],
   },
   {
-    group: "SİSTEM",
+    group: "VERİ & SİSTEM",
     items: [
+      { href: "/data", label: "Veri Kaynakları", icon: Radio },
+      { href: "/scenario", label: "Senaryo & Stres", icon: Layers },
       { href: "/system", label: "Sistem Sağlığı", icon: Database },
     ],
   },

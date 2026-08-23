@@ -66,22 +66,53 @@ class RegimeDetector:
 
         factors = {}
 
-        # 1. TREND FAKTÖRÜ
+        # 1. TREND FAKTÖRÜ (Kısa Geçmişli/Halka Arz Uyumlu Dinamik Puanlama)
+        has_200 = len(close) >= 200
+        has_50 = len(close) >= 50
+        has_60 = len(close) >= 60
+
         sma20 = np.mean(close[-20:])
-        sma50 = np.mean(close[-50:]) if len(close) >= 50 else sma20
-        sma200 = np.mean(close[-200:]) if len(close) >= 200 else sma50
+        sma50 = np.mean(close[-50:]) if has_50 else sma20
+        sma200 = np.mean(close[-200:]) if has_200 else sma50
 
         trend_score = 0
+        points_possible = 0
+
+        # Close > SMA20
+        points_possible += 20
         if close[-1] > sma20:
             trend_score += 20
-        if sma20 > sma50:
-            trend_score += 20
-        if sma50 > sma200:
-            trend_score += 20
+
+        # SMA20 > SMA50
+        if has_50:
+            points_possible += 20
+            if sma20 > sma50:
+                trend_score += 20
+
+        # SMA50 > SMA200 (veya kısa geçmiş için Close > SMA50)
+        if has_200:
+            points_possible += 20
+            if sma50 > sma200:
+                trend_score += 20
+        elif has_50:
+            points_possible += 20
+            if close[-1] > sma50:
+                trend_score += 20
+
+        # Close > Close[-20]
+        points_possible += 20
         if close[-1] > close[-20]:
             trend_score += 20
-        if close[-1] > close[-60]:
-            trend_score += 20
+
+        # Close > Close[-60]
+        if has_60:
+            points_possible += 20
+            if close[-1] > close[-60]:
+                trend_score += 20
+
+        # 0-100 Skalasına normalize et
+        if points_possible > 0:
+            trend_score = int(round((trend_score / points_possible) * 100))
 
         factors["trend_score"] = trend_score
 

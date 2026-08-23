@@ -84,10 +84,35 @@ def _fetch_live_macro_data() -> Dict[str, Any]:
         result["global_risk_appetite"] = round(max(0.1, min(0.95, 1.0 - (vix_val / 45.0))), 2)
         result["em_risk_appetite"] = round(max(0.1, min(0.95, result["global_risk_appetite"] * 0.9)), 2)
 
-        # UI Mapping
+        # UI Mapping & Dynamic Regime Commentary
         result["usd_strength"] = round(max(0.0, min(1.0, (result.get("dxy", 100) - 90) / 20)), 2)
         result["turkey_macro_risk"] = round(max(0.0, min(1.0, result.get("turkey_cds_5y", 300) / 600)), 2)
         result["oil_pressure"] = round(max(0.0, min(1.0, (result.get("brent_crude", 80) - 60) / 60)), 2)
+
+        # Dinamik Makro Yorum ve BIST Etki Puanı
+        dxy_v = result.get("dxy", 100)
+        cds_v = result.get("turkey_cds_5y", 270)
+        brent_v = result.get("brent_crude", 85)
+        us10_v = result.get("us10y", 4.5)
+
+        commentary_parts = []
+        if dxy_v > 103:
+            commentary_parts.append("Dolar küresel çapta güçlü (Gelişmekte olan piyasalara sermaye akışı baskı altında).")
+        else:
+            commentary_parts.append("Dolar endeksi stabil (Gelişmekte olan piyasalar için nötr-pozitif ortam).")
+
+        if cds_v < 280:
+            commentary_parts.append(f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) gerileme eğiliminde (Ülke risk primi olumlu).")
+        else:
+            commentary_parts.append(f"Türkiye 5Y CDS primi ({cds_v:.0f} bps) temkinli bölgede.")
+
+        if brent_v > 90:
+            commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) yüksek (Cari denge ve sanayi marjları üzerinde maliyet baskısı).")
+        else:
+            commentary_parts.append(f"Brent petrol ({brent_v:.1f} $) dengeli seviyelerde.")
+
+        result["macro_commentary"] = " ".join(commentary_parts)
+        result["bist_macro_bias"] = "POZİTİF" if (cds_v < 290 and dxy_v < 104) else "NÖTR"
 
         _cached_macro_data = result
         _last_macro_fetch = now

@@ -93,21 +93,33 @@ class DecisionEngine:
         self._min_score = 60.0
         logger.info("DecisionEngine initialized")
 
+    def _get_dynamic_thresholds(self, regime: str) -> tuple[float, float]:
+        """Piyasa rejimine göre dinamik skor ve güven eşikleri."""
+        regime_upper = (regime or "").upper()
+        if "BEAR" in regime_upper or "PANIC" in regime_upper or "CRASH" in regime_upper:
+            return 68.0, 0.70  # Ayı piyasasında katı eşik (sermaye koruma)
+        elif "VOLATILE" in regime_upper or "HIGH_VOL" in regime_upper or "SIDEWAYS" in regime_upper:
+            return 63.0, 0.65  # Yatay/oynak piyasada seçici
+        elif "BULL" in regime_upper or "TREND" in regime_upper:
+            return 58.0, 0.60  # Boğa piyasasında trend takip
+        return self._min_score, self._min_confidence
+
     def decide(self, inp: DecisionInput) -> Decision:
         """Karar ver."""
 
         # 1. Composite skor hesapla
         score = self._calculate_composite_score(inp)
 
-        # 2. Eşik kontrolü
-        if score < self._min_score or inp.ml_confidence < self._min_confidence:
+        # 2. Rejime duyarlı dinamik eşik kontrolü
+        min_score, min_conf = self._get_dynamic_thresholds(inp.regime)
+        if score < min_score or inp.ml_confidence < min_conf:
             return Decision(
                 ticker=inp.ticker,
                 action="NO_ACTION",
                 direction="NEUTRAL",
                 confidence=inp.ml_confidence,
                 score=score,
-                reasons=["Skor veya güven eşiğinin altında"],
+                reasons=[f"Skor ({score:.1f} < {min_score}) veya güven ({inp.ml_confidence:.2f} < {min_conf}) rejim eşiğinin altında ({inp.regime})"],
             )
 
         # 3. Yön belirle

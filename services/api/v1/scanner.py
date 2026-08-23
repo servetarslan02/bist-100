@@ -1,4 +1,4 @@
-﻿"""
+"""
 Scanner API v2.0 â€” TÃ¼m endpoint'ler gerÃ§ek servislere baÄŸlÄ±.
 
 Endpoints:
@@ -41,133 +41,22 @@ def _get_engine():
 
 
 @router.get("/signals")
+@router.get("/opportunities")
 async def scanner_signals(
-    limit: int = Query(10, ge=1, le=100),
+    limit: int = Query(50, ge=1, le=100),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
-    from ...core.redis_helper import get_cached
-    import yfinance as yf
-    
-    preds = get_cached("phase18:predictions")
-    if not preds:
-        return {"signals": []}
-
-    top_preds = sorted(preds, key=lambda x: x["score"], reverse=True)[:limit]
-    
-    # Gercek fiyatlari yfinance uzerinden tek seferde cek
-    tickers_to_fetch = [f"{p['ticker']}.IS" for p in top_preds]
-    prices = {}
     try:
-        import pandas as pd
-        df = yf.download(tickers_to_fetch, period="5d", progress=False)
-        if not df.empty and 'Close' in df:
-            for i, t in enumerate(top_preds):
-                tick = f"{t['ticker']}.IS"
-                if tick in df['Close']:
-                    last_valid = df['Close'][tick].dropna()
-                    if not last_valid.empty:
-                        prices[t['ticker']] = float(last_valid.iloc[-1])
+        from ...scanner.bist_ml_scanner import bist_ml_scanner
+        signals = bist_ml_scanner.scan_all_opportunities(limit=limit)
+        return {"signals": signals, "count": len(signals)}
     except Exception as e:
-        print(f"yfinance download error: {e}")
-    
-    signals = []
-    for p in top_preds:
-        ticker = p["ticker"]
-        score = p["score"]
-        # Score is e.g. 0.0255 (2.55%)
-        # Convert score to a UI score 0-100 relative to max (we will just map 0.03 to 100 approx, or use rank)
-        
-        # Real price from yfinance fallback to 100 if failed (shouldn't happen)
-        real_price = prices.get(ticker, 0.0)
-        
-        if real_price == 0.0:
-            # Fallback one by one
-            try:
-                hist = yf.Ticker(f"{ticker}.IS").history(period="1d")
-                if not hist.empty:
-                    real_price = float(hist["Close"].iloc[-1])
-                else:
-                    real_price = 100.0
-            except:
-                real_price = 100.0
-                
-        expected_ret = score  # e.g. 0.0255
-        target = real_price * (1 + expected_ret)
-        # Stop loss around 5% or half of expected_ret if we want 1:2 R/R
-        stop_loss = real_price * (1 - (expected_ret / 2.0))
-        
-        # Fetch RSI from features if available
-        features = p.get("features", {})
-        rsi = features.get("rsi_14", 50.0)
-        
-        ui_score = min(100, max(0, int((score / 0.05) * 100))) # if 5% return -> 100 score
-        
-        signals.append({
-            "symbol": ticker,
-            "ticker": ticker,
-            "name": ticker,
-            "score": ui_score if ui_score > 0 else 70,
-            "direction": "BUY",
-            "risk_level": "Medium",
-            "horizon": "Short Term",
-            "expected_return_pct": round(expected_ret * 100, 2),
-            "spec_category": "HIGH_CONVICTION",
-            "signal_type": "VOLUME_BREAKOUT",
-            "spec_reason": "Phase 18 Otonom algoritmasi (Optuna+LightGBM) tarafindan ongorulen yuksek getiri sinyali.",
-            "price": round(real_price, 2),
-            "target_price": round(target, 2),
-            "stop_loss": round(stop_loss, 2),
-            "risk_reward_ratio": 2.0,
-            "volume_ratio": round(features.get("volume_trend_ratio", 1.0), 2),
-            "rsi": round(rsi, 1),
-            "timestamp": "Simdi"
-        })
-        
-    return {"signals": signals}
+        logger.error(f"bist_ml_scanner error: {e}")
+        return {"signals": [], "count": 0}
 
 # =====================================================
 # STATUS & DASHBOARD
-@router.get("/signals")
-async def scanner_signals(
-    limit: int = Query(10, ge=1, le=100),
-    user=Depends(get_current_user),
-    _=Depends(check_rate_limit)
-):
-    from ...core.redis_helper import get_cached
-    import yfinance as yf
-    from ...ingestion.bist_universe import BISTUniverse
-    
-    preds = get_cached("phase18:predictions")
-    if not preds:
-        return {"signals": []}
-        
-    uni = BISTUniverse()
-    names = getattr(uni, 'COMPANY_NAMES', {})
-
-    # Top 10 signals from highest score
-    top_preds = sorted(preds, key=lambda x: x["score"], reverse=True)[:limit]
-    
-    signals = []
-    for p in top_preds:
-        ticker = p["ticker"]
-        score = p["score"]
-        
-        ui_score = min(100, max(0, int((score + 0.05) * 1000)))
-        signals.append({
-            "ticker": ticker,
-            "name": names.get(ticker, ticker),
-            "score": ui_score,
-            "direction": "BUY",
-            "risk_level": "Medium",
-            "horizon": "Short Term",
-            "expected_return_pct": round(score * 100, 2),
-            "spec_category": "Phase 18 Otonom",
-            "timestamp": "Simdi"
-        })
-        
-    return {"signals": signals}
-
 # =====================================================
 
 @router.get("/status")

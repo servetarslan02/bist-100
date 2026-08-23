@@ -7,12 +7,15 @@ Market kapalıyken veri veya işlem üretmemeli.
 FAZ 1.7: Trading Calendar
 """
 
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, date, time, timedelta, timezone
 from typing import Optional, List, Dict, Tuple
 from enum import Enum
 import structlog
 
 logger = structlog.get_logger()
+
+# Europe/Istanbul timezone (UTC+3)
+_TZ_ISTANBUL = timezone(timedelta(hours=3))
 
 
 class MarketSession(str, Enum):
@@ -89,7 +92,7 @@ class MarketCalendar:
     def is_market_open(self, dt: Optional[datetime] = None) -> bool:
         """Şu an piyasa açık mı?"""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         # İşlem günü değilse kapalı
         if not self.is_trading_day(dt.date()):
@@ -110,7 +113,7 @@ class MarketCalendar:
     def get_session(self, dt: Optional[datetime] = None) -> MarketSession:
         """Mevcut işlem seansını döndür (tek seans sistemi)."""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         if not self.is_trading_day(dt.date()):
             return MarketSession.CLOSED
@@ -131,7 +134,7 @@ class MarketCalendar:
     def get_status(self, dt: Optional[datetime] = None) -> MarketStatus:
         """Piyasa durumunu döndür."""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         session = self.get_session(dt)
 
@@ -149,11 +152,11 @@ class MarketCalendar:
     def next_open(self, dt: Optional[datetime] = None) -> datetime:
         """Bir sonraki piyasa açılış zamanını döndür."""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         # Bugün açıksa ve henüz açılmadıysa
         if self.is_trading_day(dt.date()):
-            today_open = datetime.combine(dt.date(), self.MARKET_OPEN)
+            today_open = datetime.combine(dt.date(), self.MARKET_OPEN, tzinfo=_TZ_ISTANBUL)
             if dt < today_open:
                 return today_open
 
@@ -161,7 +164,7 @@ class MarketCalendar:
         check_date = dt.date() + timedelta(days=1)
         for _ in range(10):  # Max 10 gün ileriye bak
             if self.is_trading_day(check_date):
-                return datetime.combine(check_date, self.MARKET_OPEN)
+                return datetime.combine(check_date, self.MARKET_OPEN, tzinfo=_TZ_ISTANBUL)
             check_date += timedelta(days=1)
 
         # Fallback
@@ -170,17 +173,17 @@ class MarketCalendar:
     def next_close(self, dt: Optional[datetime] = None) -> datetime:
         """Bir sonraki piyasa kapanış zamanını döndür."""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         if self.is_trading_day(dt.date()):
-            today_close = datetime.combine(dt.date(), self.MARKET_CLOSE)
+            today_close = datetime.combine(dt.date(), self.MARKET_CLOSE, tzinfo=_TZ_ISTANBUL)
             if dt < today_close:
                 return today_close
 
         check_date = dt.date() + timedelta(days=1)
         for _ in range(10):
             if self.is_trading_day(check_date):
-                return datetime.combine(check_date, self.MARKET_CLOSE)
+                return datetime.combine(check_date, self.MARKET_CLOSE, tzinfo=_TZ_ISTANBUL)
             check_date += timedelta(days=1)
 
         return dt + timedelta(days=1)
@@ -213,7 +216,7 @@ class MarketCalendar:
     def get_info(self, dt: Optional[datetime] = None) -> Dict:
         """Piyasa bilgisi döndür."""
         if dt is None:
-            dt = datetime.now()
+            dt = datetime.now(_TZ_ISTANBUL)
 
         return {
             "is_trading_day": self.is_trading_day(dt.date()),

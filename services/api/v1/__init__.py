@@ -22,6 +22,7 @@ from .alternative import router as alternative_router
 from .viop import router as viop_router
 from .event_study import router as event_study_router
 from .system import router as system_router
+from .ws import router as ws_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -41,3 +42,4 @@ v1_router.include_router(alternative_router, prefix="/alternative", tags=["Alter
 v1_router.include_router(viop_router, prefix="/viop", tags=["VIOP"])
 v1_router.include_router(event_study_router, prefix="/event-study", tags=["Event Study"])
 v1_router.include_router(system_router, prefix="/system", tags=["System"])
+v1_router.include_router(ws_router, prefix="/ws", tags=["WebSockets"])

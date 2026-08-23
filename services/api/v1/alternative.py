@@ -29,11 +29,31 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
         return {"ticker": ticker, "error": str(e)}
 
 
-@router.get("/google-trends/{query}")
-async def google_trends(query: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Google Trends verisi."""
+@router.get("/news")
+async def live_news(limit: int = Query(default=20, le=50)):
+    """Canlı KAP Bildirimleri ve Finans Haberleri Akışı."""
     try:
-        from ...alternative.google_trends import GoogleTrendsAdapter
-        return {"query": query, "trends_available": True}
+        from ...ingestion.providers.news_provider import news_provider
+        news_items = await news_provider.fetch_financial_news_rss(max_items=limit)
+        return {
+            "status": "success",
+            "count": len(news_items),
+            "news": news_items,
+        }
     except Exception as e:
-        return {"query": query, "error": str(e)}
+        return {"status": "error", "error": str(e), "news": []}
+
+
+@router.get("/macro")
+async def live_macro():
+    """Canlı Küresel Makro ve Emtia Verileri."""
+    try:
+        from ...ingestion.providers.macro_provider import MacroProvider
+        macro_prov = MacroProvider()
+        data = await macro_prov.fetch_yahoo_macro()
+        return {
+            "status": "success",
+            "macro": data,
+        }
+    except Exception as e:
+        return {"status": "error", "error": str(e), "macro": {}}

@@ -45,15 +45,16 @@ interface AlphaSignalResponse {
 }
 
 const YEARLY_PERFORMANCE = [
-  { year: "2021", bh: 30.0, alpha: 164.8, excess: "Erken Boğa Uyumu" },
-  { year: "2022", bh: 206.9, alpha: 9133.4, excess: "+8926.5% Net Alpha (Dev Ralli)" },
-  { year: "2023", bh: 55.1, alpha: 710.9, excess: "+655.8% Net Alpha" },
-  { year: "2024", bh: 46.4, alpha: 513.4, excess: "+467.0% Net Alpha" },
-  { year: "2025", bh: 8.0, alpha: 30.1, excess: "Başlangıç İvmesi" },
+  { year: "2000 (Kriz)", bh: -46.1, alpha: -6.2, excess: "+39.9% Sermaye Koruma (Bankacılık Çöküşü)" },
+  { year: "2008 (Kriz)", bh: -50.9, alpha: -3.0, excess: "+47.9% Sermaye Koruma (%94 Kayıp Önleme)" },
+  { year: "2018 (Kriz)", bh: -22.3, alpha: -3.3, excess: "+19.0% Sermaye Koruma (Kur Şoku)" },
+  { year: "2022 (Boğa)", bh: 185.9, alpha: 147.7, excess: "Trend Sağma & 20G Breakout (PF 7.98)" },
+  { year: "2024 (Kör OOS)", bh: 28.9, alpha: 31.5, excess: "+2.6% Net Alfa (PF 2.62, Max DD -%10.9)" },
+  { year: "2024-26 (OOS)", bh: 90.4, alpha: 27.8, excess: "Kilitli Kör Doğrulama (PF 1.35, Max DD -%22.83)" },
 ];
 
 export default function StrategyPage() {
-  const { data: alphaData, loading, error, refresh } = usePolling<AlphaSignalResponse>(
+  const { data: alphaData, loading, error, refetch } = usePolling<AlphaSignalResponse>(
     "/portfolio/alpha-signals",
     30000
   );
@@ -115,90 +116,75 @@ export default function StrategyPage() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold gradient-text">Doğrulanmış Alpha Strateji Motoru</h1>
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-fuchsia-500/10 text-fuchsia-400 border border-fuchsia-500/20">
-              CANLI v4.0 (HOLY GRAIL)
+            <h1 className="text-xl font-bold gradient-text">30 Yıllık Risk Parity & Kriz Savunma Stratejisi</h1>
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              KİLİTLİ KÖR TEST (2024–2026)
             </span>
           </div>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Weekly Hyper-Momentum V4 · Yıllık %773.4 Gerçek Doğrulanmış CAGR (2.0x Kaldıraçlı)
+            1997–2026 Tarihsel Depo · %1 İşlem Riski · %5 Portföy Isı Sınırı · 3G Kriz Teyit Filtresi
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => refresh()}
+            onClick={() => refetch()}
             className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
             title="Sinyalleri Yenile"
           >
             <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
           </button>
-          <button
-            onClick={handleApplyAllocation}
-            disabled={rebalancing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-fuchsia-500 hover:bg-fuchsia-400 text-black transition-colors"
-          >
-            <Zap size={13} />
-            {rebalancing ? "Uygulanıyor..." : "Portföye Uygula"}
-          </button>
         </div>
       </div>
-
-      {rebalanceMsg && (
-        <div className="p-3 rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/30 text-fuchsia-400 text-xs flex items-center gap-2">
-          <CheckCircle2 size={14} />
-          {rebalanceMsg}
-        </div>
-      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="rounded-xl p-4 space-y-1.5 bg-zinc-900/60 border border-zinc-800/80">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-            Audit Edilmiş Yıllık CAGR
+            Kör OOS Yıllık CAGR (2024–26)
           </span>
-          <div className="text-2xl font-bold font-data text-fuchsia-400">
-            %773.4
+          <div className="text-2xl font-bold font-data text-emerald-400">
+            %9.86
           </div>
-          <span className="text-[10px] text-fuchsia-500 block">
-            Hedefin (>%300) Çok Üzerinde
+          <span className="text-[10px] text-emerald-500 block">
+            Pozitif Reel Büyüme
           </span>
         </div>
 
         <div className="rounded-xl p-4 space-y-1.5 bg-zinc-900/60 border border-zinc-800/80">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-            Sharpe Oranı
+            OOS Profit Factor (PF)
           </span>
           <div className="text-2xl font-bold font-data text-blue-400">
-            3.85
+            1.35
           </div>
           <span className="text-[10px] text-zinc-500 block">
-            Üstün Risk/Getiri Skoru
+            Hedef > 1.20 Başarılı
           </span>
         </div>
 
         <div className="rounded-xl p-4 space-y-1.5 bg-zinc-900/60 border border-zinc-800/80">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-            Maksimum Düşüş (Max DD)
+            Kör OOS Max Drawdown
           </span>
           <div className="text-2xl font-bold font-data text-amber-400">
-            -%57.0
+            -%22.83
           </div>
           <span className="text-[10px] text-zinc-500 block">
-            10-Haftalık Cash Shield ile Korunmalı
+            {"Hedef < %25 Güvenli Sınırda"}
           </span>
         </div>
 
         <div className="rounded-xl p-4 space-y-1.5 bg-zinc-900/60 border border-zinc-800/80">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
-            Piyasa Rejimi (Haftalık)
+            Risk & Kriz Savunması
           </span>
           <div className="text-base font-bold font-data text-zinc-200 mt-1 flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${isInvestable ? "bg-fuchsia-400" : "bg-red-400"}`} />
-            {regime}
+            <span className="w-2 h-2 rounded-full bg-emerald-400" />
+            %1 Risk / %5 Isı
           </div>
           <span className="text-[10px] text-zinc-500 block">
-            BIST > 10W-SMA: {isInvestable ? "EVET" : "HAYIR"}
+            3-Günlük Kriz Teyidi Aktif
           </span>
         </div>
       </div>

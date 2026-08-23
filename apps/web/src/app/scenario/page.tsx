@@ -1,397 +1,635 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { api } from "@/lib/api";
 import {
-  TestTube, Play, RotateCcw, AlertTriangle, ShieldAlert,
-  TrendingDown, TrendingUp, BarChart3, Activity, Zap, CheckCircle2
+  ShieldAlert, BarChart3, Activity, Zap, CheckCircle2, Loader2,
+  Sliders, ShieldCheck, PieChart, Layers, RefreshCw, Crosshair
 } from "lucide-react";
 
+interface FanCones {
+  p05: number[];
+  p25: number[];
+  p50: number[];
+  p75: number[];
+  p95: number[];
+}
+
+interface HistogramBin {
+  bin_start: number;
+  bin_end: number;
+  count: number;
+  is_loss: boolean;
+}
+
+interface ScenarioDetails {
+  id: string;
+  name: string;
+  market_shock_pct: number;
+  portfolio_loss_pct: number;
+  vol_spike: string;
+  defense: string;
+  recovery_days: number;
+}
+
 interface SimulationResult {
-  mean_return: number;
-  median_return: number;
+  horizon_days: number;
+  vol_multiplier: number;
+  expected_return: number;
   var_95: number;
   cvar_95: number;
-  max_drawdown: number;
-  win_rate: number;
+  prob_positive: number;
+  scenario_details: ScenarioDetails;
+  all_scenarios?: ScenarioDetails[];
+  fan_cones: FanCones;
+  histogram: HistogramBin[];
   paths: number[][];
 }
 
-const STRESS_SCENARIOS = [
+const DEFAULT_SCENARIOS = [
   {
     id: "gfc_2008",
-    name: "2008 Küresel Finans Krizi",
-    desc: "BIST-100 endeksinde %35 ani çöküş, likidite daralması ve yüksek volatilite.",
-    impact: "-%28.4 Beklenen Kayıp",
-    severity: "CRITICAL",
-    shock_market: -0.35,
-    shock_vol: 2.5,
+    name: "2008 Lehman Çöküşü",
+    market_shock_pct: -35.0,
+    portfolio_loss_pct: -3.0,
+    vol_spike: "2.8x Volatilite Sıçraması",
+    defense: "Risk Parity %1.0 Risk Sizing + Nakit Kalkanı",
+    recovery_days: 18,
   },
   {
     id: "currency_2018",
-    name: "2018 Kur ve Enflasyon Şoku",
-    desc: "Dolar/TL paritesinde %40 artış, faiz şoku (+800 bps) ve CDS sıçraması.",
-    impact: "-%16.8 Beklenen Kayıp",
-    severity: "HIGH",
-    shock_market: -0.18,
-    shock_vol: 1.8,
+    name: "2018 Kur & Faiz Şoku",
+    market_shock_pct: -22.3,
+    portfolio_loss_pct: -3.3,
+    vol_spike: "2.2x Kur Oynaklığı",
+    defense: "3-Günlük Kriz Teyit Filtresi (Whipsaw Koruması)",
+    recovery_days: 14,
   },
   {
-    id: "interest_hike",
-    name: "Agresif Faiz Artışı (+500 bps)",
-    desc: "TCMB politika faizinde beklenmedik sıkılaşma, bankacılık marj baskısı.",
-    impact: "-%9.2 Beklenen Kayıp",
-    severity: "MEDIUM",
-    shock_market: -0.09,
-    shock_vol: 1.3,
+    id: "covid_2020",
+    name: "2020 Pandemi Çöküşü",
+    market_shock_pct: -19.8,
+    portfolio_loss_pct: -2.4,
+    vol_spike: "3.5x VIX / Oynaklık",
+    defense: "Volatilite Eşitleme (%5 Isı Tavanı)",
+    recovery_days: 12,
   },
   {
-    id: "oil_spike",
-    name: "Küresel Enerji & Petrol Sıçraması",
-    desc: "Brent petrol fiyatında %30 ani artış, sanayi ve ulaştırma marj daralması.",
-    impact: "-%7.5 Beklenen Kayıp",
-    severity: "MEDIUM",
-    shock_market: -0.07,
-    shock_vol: 1.2,
+    id: "bull_2022",
+    name: "2022 Enflasyon Boğası",
+    market_shock_pct: 196.5,
+    portfolio_loss_pct: 147.7,
+    vol_spike: "Yüksek Pozitif Momentum",
+    defense: "20G Donchian Breakout Trend Takip Motoru",
+    recovery_days: 0,
   },
 ];
 
+// Ultra-fast instant client-side path generator for 0ms slider drag response
+function generateInstantPaths(horizon: number, volMult: number, initialVal = 100000) {
+  const numPaths = 30;
+  const meanDaily = 0.0012;
+  const baseVol = 0.018 * volMult;
+  const paths: number[][] = [];
+
+  // Deterministic seeded random simulation
+  let seed = 1337;
+  const pseudoRandom = () => {
+    seed = (seed * 9301 + 49297) % 233280;
+    const u = seed / 233280;
+    seed = (seed * 9301 + 49297) % 233280;
+    const v = seed / 233280;
+    return Math.sqrt(-2 * Math.log(Math.max(1e-6, u))) * Math.cos(2 * Math.PI * v);
+  };
+
+  for (let p = 0; p < numPaths; p++) {
+    const path = [initialVal];
+    let curr = initialVal;
+    for (let t = 1; t <= horizon; t++) {
+      const shock = meanDaily + pseudoRandom() * baseVol;
+      curr = curr * (1 + shock);
+      path.push(Math.round(curr * 100) / 100);
+    }
+    paths.push(path);
+  }
+
+  // Calculate fan cones (p05, p25, p50, p75, p95)
+  const p05: number[] = [];
+  const p25: number[] = [];
+  const p50: number[] = [];
+  const p75: number[] = [];
+  const p95: number[] = [];
+
+  for (let t = 0; t <= horizon; t++) {
+    const stepVals = paths.map(p => p[t]).sort((a, b) => a - b);
+    p05.push(stepVals[Math.floor(numPaths * 0.05)]);
+    p25.push(stepVals[Math.floor(numPaths * 0.25)]);
+    p50.push(stepVals[Math.floor(numPaths * 0.50)]);
+    p75.push(stepVals[Math.floor(numPaths * 0.75)]);
+    p95.push(stepVals[Math.floor(numPaths * 0.95)]);
+  }
+
+  return {
+    paths,
+    fan_cones: { p05, p25, p50, p75, p95 },
+  };
+}
+
 export default function ScenarioLab() {
-  const [numSimulations, setNumSimulations] = useState<number>(1000);
   const [timeHorizon, setTimeHorizon] = useState<number>(30);
   const [volMultiplier, setVolMultiplier] = useState<number>(1.0);
-  const [selectedScenario, setSelectedScenario] = useState<string | null>("gfc_2008");
+  const [selectedScenario, setSelectedScenario] = useState<string>("gfc_2008");
   const [running, setRunning] = useState<boolean>(false);
-  const [simSeed, setSimSeed] = useState<number>(0);
+  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
 
-  // Generate Monte Carlo simulation paths on the fly with live seed
-  const simResult = useMemo<SimulationResult>(() => {
-    const paths: number[][] = [];
-    const steps = timeHorizon;
-    const initial = 100000;
-    const dailyDrift = 0.0005;
-    const dailyVol = 0.015 * volMultiplier;
+  // High-performance canvas ref
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [mousePos, setMousePos] = useState<{ x: number; y: number; step: number } | null>(null);
 
-    let finalValues: number[] = [];
-    let maxDds: number[] = [];
-
-    for (let p = 0; p < Math.min(numSimulations, 50); p++) {
-      const path = [initial];
-      let peak = initial;
-      let maxDd = 0;
-
-      for (let t = 1; t <= steps; t++) {
-        // Box-Muller normal distribution approximation
-        const u1 = Math.max(0.0001, Math.random());
-        const u2 = Math.random();
-        const z = Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
-        
-        const ret = dailyDrift + dailyVol * z;
-        const current = path[t - 1] * (1 + ret);
-        path.push(current);
-
-        if (current > peak) peak = current;
-        const dd = (peak - current) / peak;
-        if (dd > maxDd) maxDd = dd;
-      }
-
-      paths.push(path);
-      finalValues.push((path[path.length - 1] - initial) / initial);
-      maxDds.push(maxDd);
-    }
-
-    finalValues.sort((a, b) => a - b);
-    const varIndex = Math.floor(finalValues.length * 0.05);
-    const var_95 = finalValues[varIndex] || -0.08;
-    const cvar_95 = finalValues.slice(0, varIndex + 1).reduce((a, b) => a + b, 0) / (varIndex + 1) || -0.12;
-    const mean_return = finalValues.reduce((a, b) => a + b, 0) / finalValues.length;
-    const max_drawdown = Math.max(...maxDds);
-    const win_rate = finalValues.filter(v => v > 0).length / finalValues.length;
-
-    return {
-      mean_return,
-      median_return: finalValues[Math.floor(finalValues.length / 2)] || 0,
-      var_95,
-      cvar_95,
-      max_drawdown,
-      win_rate,
-      paths,
-    };
-  }, [numSimulations, timeHorizon, volMultiplier, simSeed]);
-
-  const handleRun = async () => {
+  // Sync with Backend
+  const fetchBackendSimulation = useCallback(async (horizon: number, vol: number, sc: string) => {
     setRunning(true);
     try {
-      await fetch(`/api/v1/intelligence/simulation/THYAO?horizon_days=${timeHorizon}&n_sims=${numSimulations}`);
+      const data: any = await api(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
+      if (data && data.paths) {
+        setSimResult(data);
+      }
     } catch (e) {
-      console.warn(e);
+      console.error("Simulation fetch error", e);
     } finally {
-      setSimSeed(s => s + 1);
-      setTimeout(() => setRunning(false), 500);
+      setRunning(false);
+    }
+  }, []);
+
+  // Initial fetch and on scenario change
+  useEffect(() => {
+    fetchBackendSimulation(timeHorizon, volMultiplier, selectedScenario);
+  }, [selectedScenario, fetchBackendSimulation]);
+
+  // Handle instant slider change with immediate 0ms canvas recalculation
+  const handleHorizonChange = (val: number) => {
+    setTimeHorizon(val);
+    const instant = generateInstantPaths(val, volMultiplier);
+    setSimResult(prev => prev ? {
+      ...prev,
+      horizon_days: val,
+      paths: instant.paths,
+      fan_cones: instant.fan_cones,
+    } : null);
+
+    // Debounced background sync
+    clearTimeout((window as any)._mc_timer);
+    (window as any)._mc_timer = setTimeout(() => {
+      fetchBackendSimulation(val, volMultiplier, selectedScenario);
+    }, 150);
+  };
+
+  const handleVolChange = (val: number) => {
+    setVolMultiplier(val);
+    const instant = generateInstantPaths(timeHorizon, val);
+    setSimResult(prev => prev ? {
+      ...prev,
+      vol_multiplier: val,
+      paths: instant.paths,
+      fan_cones: instant.fan_cones,
+    } : null);
+
+    // Debounced background sync
+    clearTimeout((window as any)._mc_timer);
+    (window as any)._mc_timer = setTimeout(() => {
+      fetchBackendSimulation(timeHorizon, val, selectedScenario);
+    }, 150);
+  };
+
+  // High-Speed Smooth HTML5 Canvas 60 FPS Renderer
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !simResult || !simResult.paths || simResult.paths.length === 0) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const w = rect.width;
+    const h = rect.height;
+    const padL = 60;
+    const padR = 25;
+    const padT = 25;
+    const padB = 30;
+
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    const allVals = simResult.paths.flat();
+    const minVal = Math.min(...allVals);
+    const maxVal = Math.max(...allVals);
+    const valRange = Math.max(1, maxVal - minVal);
+    const steps = simResult.horizon_days;
+
+    const getX = (step: number) => padL + (step / steps) * chartW;
+    const getY = (val: number) => padT + chartH - ((val - minVal) / valRange) * chartH;
+
+    // 1. Clear background
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#07090e";
+    ctx.fillRect(0, 0, w, h);
+
+    // 2. Horizontal Grid Lines & Price Labels
+    const numGridLines = 5;
+    ctx.font = "10px JetBrains Mono, monospace";
+    for (let i = 0; i <= numGridLines; i++) {
+      const gy = padT + (i / numGridLines) * chartH;
+      const gVal = maxVal - (i / numGridLines) * valRange;
+
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
+      ctx.lineWidth = 1;
+      ctx.moveTo(padL, gy);
+      ctx.lineTo(w - padR, gy);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`₺${Math.round(gVal).toLocaleString("tr-TR")}`, padL - 8, gy);
+    }
+
+    // 3. Vertical Grid Lines (Time Steps)
+    const stepInterval = Math.max(5, Math.round(steps / 6));
+    for (let s = 0; s <= steps; s += stepInterval) {
+      const gx = getX(s);
+      ctx.beginPath();
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
+      ctx.moveTo(gx, padT);
+      ctx.lineTo(gx, h - padB);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      ctx.fillText(`${s}G`, gx, h - padB + 8);
+    }
+
+    // 4. Shaded Confidence Fan Bands (Quantile Clouds)
+    const fc = simResult.fan_cones;
+    if (fc && fc.p95 && fc.p05) {
+      // 90% Confidence Band (p05 - p95)
+      const gradOuter = ctx.createLinearGradient(0, padT, 0, h - padB);
+      gradOuter.addColorStop(0, "rgba(0, 229, 160, 0.12)");
+      gradOuter.addColorStop(1, "rgba(255, 68, 102, 0.12)");
+
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(fc.p95[0]));
+      for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p95[i]));
+      for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p05[i]));
+      ctx.closePath();
+      ctx.fillStyle = gradOuter;
+      ctx.fill();
+
+      // 50% Confidence Band (p25 - p75)
+      const gradInner = ctx.createLinearGradient(0, padT, 0, h - padB);
+      gradInner.addColorStop(0, "rgba(0, 200, 255, 0.22)");
+      gradInner.addColorStop(1, "rgba(0, 200, 255, 0.08)");
+
+      ctx.beginPath();
+      ctx.moveTo(getX(0), getY(fc.p75[0]));
+      for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p75[i]));
+      for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p25[i]));
+      ctx.closePath();
+      ctx.fillStyle = gradInner;
+      ctx.fill();
+    }
+
+    // 5. Baseline Reference Line (₺100,000)
+    const baseY = getY(100000);
+    ctx.beginPath();
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = "rgba(0, 200, 255, 0.75)";
+    ctx.lineWidth = 1.2;
+    ctx.moveTo(padL, baseY);
+    ctx.lineTo(w - padR, baseY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // 6. Stochastic Paths
+    simResult.paths.forEach((path) => {
+      const isPos = path[path.length - 1] >= 100000;
+      ctx.beginPath();
+      ctx.strokeStyle = isPos ? "rgba(0, 229, 160, 0.28)" : "rgba(255, 68, 102, 0.28)";
+      ctx.lineWidth = 0.9;
+      ctx.moveTo(getX(0), getY(path[0]));
+      for (let s = 1; s <= steps; s++) {
+        ctx.lineTo(getX(s), getY(path[s]));
+      }
+      ctx.stroke();
+    });
+
+    // 7. Median Path (p50 Glowing Line)
+    if (fc && fc.p50) {
+      ctx.beginPath();
+      ctx.strokeStyle = "#00c8ff";
+      ctx.lineWidth = 2.2;
+      ctx.shadowColor = "#00c8ff";
+      ctx.shadowBlur = 8;
+      ctx.moveTo(getX(0), getY(fc.p50[0]));
+      for (let s = 1; s <= steps; s++) {
+        ctx.lineTo(getX(s), getY(fc.p50[s]));
+      }
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // 8. Mouse Crosshair & Tooltip Overlay
+    if (mousePos && mousePos.step >= 0 && mousePos.step <= steps) {
+      const hx = getX(mousePos.step);
+      const medianVal = fc?.p50?.[mousePos.step] || 100000;
+      const hy = getY(medianVal);
+
+      // Vertical line
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 1;
+      ctx.moveTo(hx, padT);
+      ctx.lineTo(hx, h - padB);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Point circle
+      ctx.beginPath();
+      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#00e5a0";
+      ctx.shadowColor = "#00e5a0";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }, [simResult, mousePos]);
+
+  // Canvas Mouse Move Handler
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !simResult) return;
+    const rect = canvas.getBoundingClientRect();
+    const padL = 60;
+    const padR = 25;
+    const chartW = rect.width - padL - padR;
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    if (mouseX >= padL && mouseX <= rect.width - padR) {
+      const stepRatio = (mouseX - padL) / chartW;
+      const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
+      setMousePos({ x: mouseX, y: mouseY, step });
+    } else {
+      setMousePos(null);
     }
   };
 
+  const scenariosList = useMemo(() => {
+    return simResult?.all_scenarios || DEFAULT_SCENARIOS;
+  }, [simResult]);
+
+  const activeScenarioObj = useMemo(() => {
+    return scenariosList.find(s => s.id === selectedScenario) || scenariosList[0];
+  }, [scenariosList, selectedScenario]);
+
   return (
-    <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div
+      className="h-[calc(100vh-3.2rem)] max-h-[calc(100vh-3.2rem)] overflow-hidden flex flex-col justify-between p-3 gap-2.5 select-none"
+      style={{ background: "var(--color-bg-primary)" }}
+    >
+      {/* 1. Header & Dynamic Scenario Ribbon */}
+      <div className="flex items-center justify-between px-1">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Senaryo & Stres Testi Laboratuvarı</h1>
-          <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            Monte Carlo Patika Analizi · Tarihsel Kriz Simülasyonları · Parametrik VaR / CVaR Risk Modellemesi
+          <h1 className="text-base font-bold gradient-text">Stres Testi & Monte Carlo Projeksiyonu</h1>
+          <p className="text-[11px] text-zinc-400">
+            30-Yıllık BIST Tarihsel Kriz Simülasyonları · Stokastik Konfidan Koni Projeksiyonu · %95 VaR & CVaR
           </p>
         </div>
+
+        {/* Dynamic Scenario Cards Ribbon */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleRun}
-            disabled={running}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-lg"
-            style={{
-              background: "linear-gradient(135deg, #00e5a0 0%, #00c8ff 100%)",
-              color: "#080b12",
-            }}
-          >
-            {running ? <Activity size={14} className="animate-spin" /> : <Play size={14} />}
-            {running ? "Simüle Ediliyor..." : "Simülasyonu Çalıştır"}
-          </button>
-        </div>
-      </div>
-
-      {/* Control & Parameters Bar */}
-      <div
-        className="rounded-xl p-4 grid grid-cols-4 gap-4 select-none"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "var(--color-text-muted)" }}>
-            Simülasyon Patika Sayısı
-          </label>
-          <select
-            value={numSimulations}
-            onChange={(e) => setNumSimulations(Number(e.target.value))}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-data text-zinc-200 focus:outline-none"
-          >
-            <option value="500">500 Patika</option>
-            <option value="1000">1.000 Patika (Önerilen)</option>
-            <option value="5000">5.000 Patika</option>
-            <option value="10000">10.000 Patika (Derinlik)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "var(--color-text-muted)" }}>
-            Zaman Vadesi (İş Günü)
-          </label>
-          <select
-            value={timeHorizon}
-            onChange={(e) => setTimeHorizon(Number(e.target.value))}
-            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-data text-zinc-200 focus:outline-none"
-          >
-            <option value="10">10 İş Günü (2 Hafta)</option>
-            <option value="30">30 İş Günü (1.5 Ay)</option>
-            <option value="60">60 İş Günü (1 Çeyrek)</option>
-            <option value="120">120 İş Günü (6 Ay)</option>
-            <option value="252">252 İş Günü (1 Yıl)</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "var(--color-text-muted)" }}>
-            Volatilite Çarpanı (Stres)
-          </label>
-          <div className="flex items-center gap-2 mt-1">
-            <input
-              type="range"
-              min="0.5"
-              max="3.0"
-              step="0.1"
-              value={volMultiplier}
-              onChange={(e) => setVolMultiplier(Number(e.target.value))}
-              className="flex-1 accent-emerald-400"
-            />
-            <span className="text-xs font-data font-bold px-2 py-1 rounded bg-zinc-900 border border-zinc-800" style={{ color: "#00e5a0" }}>
-              {volMultiplier.toFixed(1)}x
-            </span>
-          </div>
-        </div>
-
-        <div>
-          <label className="text-[10px] font-semibold uppercase tracking-wider block mb-1.5" style={{ color: "var(--color-text-muted)" }}>
-            Varsayılan Portföy Değeri
-          </label>
-          <div className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs font-data text-zinc-200">
-            ₺100.000 (Sanal Portföy)
-          </div>
-        </div>
-      </div>
-
-      {/* Metrics Summary Cards */}
-      <div className="grid grid-cols-5 gap-3">
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #00e5a030" }}
-        >
-          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Beklenen Ortalama Getiri</p>
-          <p className="text-2xl font-bold font-data" style={{ color: simResult.mean_return >= 0 ? "#00e5a0" : "#ff4466" }}>
-            {simResult.mean_return >= 0 ? "+" : ""}%{(simResult.mean_return * 100).toFixed(2)}
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Medyan: %{(simResult.median_return * 100).toFixed(2)}</p>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #ffaa0030" }}
-        >
-          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>%95 Parametrik VaR</p>
-          <p className="text-2xl font-bold font-data" style={{ color: "#ffaa00" }}>
-            %{(Math.abs(simResult.var_95) * 100).toFixed(2)}
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Maksimum Kayıp Riski</p>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #ff446630" }}
-        >
-          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>%99 Koşullu CVaR (Kuyruk)</p>
-          <p className="text-2xl font-bold font-data" style={{ color: "#ff4466" }}>
-            %{(Math.abs(simResult.cvar_95) * 100).toFixed(2)}
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>En Kötü Senaryo Ortalaması</p>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #00c8ff30" }}
-        >
-          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Maksimum Çekilme (MDD)</p>
-          <p className="text-2xl font-bold font-data" style={{ color: "#00c8ff" }}>
-            -%{(simResult.max_drawdown * 100).toFixed(1)}
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Tepeden Dibe Düşüş</p>
-        </div>
-
-        <div
-          className="rounded-xl p-4 space-y-1.5"
-          style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #9966ff30" }}
-        >
-          <p className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: "var(--color-text-muted)" }}>Pozitif Kapanış Olasılığı</p>
-          <p className="text-2xl font-bold font-data" style={{ color: "#9966ff" }}>
-            %{(simResult.win_rate * 100).toFixed(1)}
-          </p>
-          <p className="text-[10px]" style={{ color: "var(--color-text-muted)" }}>Kârlı Biten Patikalar</p>
-        </div>
-      </div>
-
-      {/* Simulation Graph Canvas */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div
-          className="flex items-center justify-between px-5 py-3"
-          style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(0,229,160,0.12)" }}>
-              <Activity size={13} style={{ color: "#00e5a0" }} />
-            </div>
-            <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
-              Monte Carlo Patika Simülasyonu ({timeHorizon} Günlük İzdüşüm)
-            </h2>
-          </div>
-          <div className="flex items-center gap-4 text-[10px]" style={{ color: "var(--color-text-muted)" }}>
-            <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-emerald-400 inline-block" /> Boğa Patikaları</span>
-            <span className="flex items-center gap-1"><span className="w-2 h-0.5 bg-red-400 inline-block" /> Ayı Patikaları</span>
-          </div>
-        </div>
-
-        <div className="p-5">
-          <div className="h-64 w-full relative flex items-center justify-center">
-            {/* SVG Path Render */}
-            <svg className="w-full h-full" viewBox={`0 0 ${timeHorizon * 10} 200`} preserveAspectRatio="none">
-              {simResult.paths.map((p, idx) => {
-                const final = p[p.length - 1];
-                const isPos = final >= 100000;
-                const points = p.map((val, step) => {
-                  const x = step * 10;
-                  const normalized = ((val - 70000) / 60000);
-                  const y = Math.max(10, Math.min(190, 200 - normalized * 200));
-                  return `${x},${y}`;
-                }).join(" ");
-
-                return (
-                  <polyline
-                    key={idx}
-                    points={points}
-                    fill="none"
-                    stroke={isPos ? "#00e5a0" : "#ff4466"}
-                    strokeWidth="1.2"
-                    strokeOpacity={idx === 0 ? "0.8" : "0.25"}
-                  />
-                );
-              })}
-              {/* Baseline 100k */}
-              <line x1="0" y1="100" x2={timeHorizon * 10} y2="100" stroke="rgba(255,255,255,0.2)" strokeDasharray="4 4" />
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      {/* Historical Crisis Stress Testing Scenarios */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
-      >
-        <div
-          className="flex items-center gap-2.5 px-5 py-3"
-          style={{ borderBottom: "1px solid var(--color-border-subtle)" }}
-        >
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "rgba(255,68,102,0.12)" }}>
-            <ShieldAlert size={13} style={{ color: "#ff4466" }} />
-          </div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>
-            Tarihsel Kriz Stres Testi Senaryoları
-          </h2>
-        </div>
-
-        <div className="p-5 grid grid-cols-2 gap-4">
-          {STRESS_SCENARIOS.map((sc) => {
+          {scenariosList.map((sc) => {
             const active = selectedScenario === sc.id;
+            const isLoss = sc.market_shock_pct < 0;
+            const borderClr = sc.id === "gfc_2008" ? "#ff4466" : sc.id === "currency_2018" ? "#ffaa00" : sc.id === "covid_2020" ? "#a855f7" : "#00e5a0";
+
             return (
               <div
                 key={sc.id}
                 onClick={() => setSelectedScenario(sc.id)}
-                className="rounded-xl p-4 cursor-pointer transition-all duration-200 select-none"
+                className={`flex flex-col justify-between p-2 rounded-lg text-xs transition-all cursor-pointer border ${
+                  active
+                    ? "bg-zinc-800 border-zinc-700 shadow-md ring-1 ring-cyan-500/50"
+                    : "bg-zinc-900/60 border-zinc-800/80 hover:border-zinc-700 text-zinc-400"
+                }`}
                 style={{
-                  background: active ? "rgba(255,68,102,0.08)" : "var(--color-bg-elevated)",
-                  border: `1px solid ${active ? "rgba(255,68,102,0.4)" : "var(--color-border-subtle)"}`,
+                  borderLeft: `3px solid ${borderClr}`,
+                  minWidth: "170px",
                 }}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle size={14} style={{ color: sc.severity === "CRITICAL" ? "#ff4466" : "#ffaa00" }} />
-                    <h3 className="text-xs font-bold" style={{ color: "var(--color-text-primary)" }}>{sc.name}</h3>
-                  </div>
-                  <span
-                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                    style={{
-                      background: sc.severity === "CRITICAL" ? "rgba(255,68,102,0.15)" : "rgba(255,170,0,0.15)",
-                      color: sc.severity === "CRITICAL" ? "#ff4466" : "#ffaa00"
-                    }}
-                  >
-                    {sc.impact}
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-zinc-100 truncate text-[11px]">{sc.name.split("(")[0]}</span>
+                  <span className="text-[10px] font-data font-bold" style={{ color: isLoss ? "#ff4466" : "#00e5a0" }}>
+                    %{sc.portfolio_loss_pct > 0 ? `+${sc.portfolio_loss_pct}` : sc.portfolio_loss_pct}
                   </span>
                 </div>
-                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--color-text-secondary)" }}>
-                  {sc.desc}
-                </p>
-                <div className="flex items-center gap-4 text-[10px] font-data" style={{ color: "var(--color-text-muted)" }}>
-                  <span>Piyasa Şoku: %{(sc.shock_market * 100).toFixed(0)}</span>
-                  <span>Volatilite Artışı: {sc.shock_vol}x</span>
+                <div className="flex items-center justify-between text-[9px] font-data text-zinc-500 mt-1">
+                  <span>Piyasa: %{sc.market_shock_pct}</span>
+                  <span className="text-zinc-400 font-semibold">{sc.vol_spike.split(" ")[0]}</span>
                 </div>
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* 2. Main 2-Column Responsive Workspace */}
+      <div className="flex-1 grid grid-cols-12 gap-3 min-h-0">
+        {/* Left Side: Parameters & Quant Metrics (3.5 cols) */}
+        <div className="col-span-4 flex flex-col justify-between gap-2 h-full min-h-0">
+          {/* Sliders Box with Real-Time Instant Dragging */}
+          <div className="rounded-xl p-3 bg-zinc-900/60 border border-zinc-800 space-y-2.5">
+            <div className="flex items-center justify-between text-xs font-bold text-zinc-300">
+              <span className="flex items-center gap-1.5"><Sliders size={13} className="text-cyan-400" /> Parametreler (Anlık Sürükleme)</span>
+              {running && <Loader2 size={12} className="animate-spin text-cyan-400" />}
+            </div>
+
+            {/* Time Horizon Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-400">Projeksiyon Ufku</span>
+                <span className="font-bold font-data text-cyan-400">{timeHorizon} Seans ({Math.round(timeHorizon / 20 * 10) / 10} Ay)</span>
+              </div>
+              <input
+                type="range"
+                min="5"
+                max="90"
+                step="1"
+                value={timeHorizon}
+                onChange={(e) => handleHorizonChange(Number(e.target.value))}
+                className="w-full accent-cyan-400 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+              />
+            </div>
+
+            {/* Volatility Multiplier Slider */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-400">Volatilite Şoku</span>
+                <span className="font-bold font-data text-amber-400">{volMultiplier.toFixed(1)}x Çarpan</span>
+              </div>
+              <input
+                type="range"
+                min="0.5"
+                max="3.0"
+                step="0.05"
+                value={volMultiplier}
+                onChange={(e) => handleVolChange(Number(e.target.value))}
+                className="w-full accent-amber-400 h-1.5 bg-zinc-800 rounded-lg cursor-pointer"
+              />
+            </div>
+          </div>
+
+          {/* Defense Mechanism Box (Model-Driven) */}
+          {simResult && (
+            <div className="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/30 space-y-1.5 text-xs">
+              <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+                <ShieldCheck size={14} />
+                <span>Otonom Risk Parity Kalkanı</span>
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-snug font-sans">
+                {simResult.scenario_details.defense}
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1 font-data text-[11px]">
+                <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
+                  <div className="text-[9px] text-zinc-500">Piyasa Şoku</div>
+                  <div className="font-bold text-rose-400">%{simResult.scenario_details.market_shock_pct}</div>
+                </div>
+                <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
+                  <div className="text-[9px] text-zinc-500">Portföy Etkisi</div>
+                  <div className="font-bold text-emerald-400">%{simResult.scenario_details.portfolio_loss_pct}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Risk Metrics Table */}
+          {simResult && (
+            <div className="rounded-xl p-3 bg-zinc-900/60 border border-zinc-800 space-y-2">
+              <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+                <ShieldAlert size={13} className="text-rose-400" />
+                <span>Matematiksel Risk Metrikleri</span>
+              </div>
+              <div className="grid grid-cols-2 gap-1.5 font-data text-[11px]">
+                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                  <span className="text-[10px] text-zinc-500">Beklenen Getiri</span>
+                  <span className={`font-bold ${simResult.expected_return >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {simResult.expected_return >= 0 ? "+" : ""}%{(simResult.expected_return * 100).toFixed(2)}
+                  </span>
+                </div>
+                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                  <span className="text-[10px] text-zinc-500">Kazanma Oranı</span>
+                  <span className="font-bold text-emerald-400">%{(simResult.prob_positive * 100).toFixed(1)}</span>
+                </div>
+                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                  <span className="text-[10px] text-zinc-500">VaR (%95)</span>
+                  <span className="font-bold text-rose-400">-%{Math.abs(simResult.var_95 * 100).toFixed(2)}</span>
+                </div>
+                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                  <span className="text-[10px] text-zinc-500">CVaR (%95)</span>
+                  <span className="font-bold text-rose-500">-%{Math.abs(simResult.cvar_95 * 100).toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Return Histogram (Mini) */}
+          {simResult && simResult.histogram && (
+            <div className="rounded-xl p-2.5 bg-zinc-900/60 border border-zinc-800 space-y-1.5">
+              <div className="flex justify-between items-center text-[10px] text-zinc-400">
+                <span className="font-bold flex items-center gap-1"><PieChart size={11} className="text-purple-400" /> Getiri Dağılım Çanı</span>
+                <span className="font-data">12 Aralık</span>
+              </div>
+              <div className="grid grid-cols-12 gap-1 items-end h-12 bg-zinc-950/70 rounded p-1.5 border border-zinc-800/80">
+                {simResult.histogram.map((bin, i) => {
+                  const maxC = Math.max(...simResult.histogram.map(h => h.count), 1);
+                  const hPct = Math.max(10, (bin.count / maxC) * 100);
+                  return (
+                    <div
+                      key={i}
+                      className="w-full rounded-t transition-all"
+                      style={{
+                        height: `${hPct}%`,
+                        background: bin.is_loss ? "#ff4466cc" : "#00e5a0cc",
+                      }}
+                      title={`%${bin.bin_start} ~ %${bin.bin_end}: ${bin.count} patika`}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Side: Fluid HTML5 Hardware-Accelerated Canvas (8.5 cols) */}
+        <div className="col-span-8 rounded-xl bg-zinc-900/60 border border-zinc-800 p-3 flex flex-col justify-between min-h-0 relative">
+          {/* Top Bar HUD */}
+          <div className="flex items-center justify-between text-xs pb-2 border-b border-zinc-800/80">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={15} className="text-cyan-400" />
+              <span className="font-bold text-zinc-200 uppercase tracking-wider text-[11px]">
+                30-Patika Monte Carlo Kanvası
+              </span>
+            </div>
+            
+            {/* Live Hover HUD Stats */}
+            {mousePos && simResult && simResult.fan_cones ? (
+              <div className="flex items-center gap-3 font-data text-[11px] bg-cyan-500/10 px-3 py-0.5 rounded-full border border-cyan-500/30 text-cyan-300 animate-fade">
+                <span>Gün: <strong>{mousePos.step}</strong></span>
+                <span>Medyan: <strong>₺{Math.round(simResult.fan_cones.p50[mousePos.step] || 100000).toLocaleString("tr-TR")}</strong></span>
+                <span>Üst %95: <strong>₺{Math.round(simResult.fan_cones.p95[mousePos.step] || 100000).toLocaleString("tr-TR")}</strong></span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 font-data text-[11px] text-zinc-400">
+                <span>Başlangıç: <strong className="text-zinc-200">₺100,000</strong></span>
+                <span className="text-emerald-400 font-semibold">● Canlı İmleç Aktif</span>
+              </div>
+            )}
+          </div>
+
+          {/* Canvas Container */}
+          <div className="flex-1 w-full relative min-h-0 my-1 rounded-lg overflow-hidden border border-zinc-800/60 bg-zinc-950">
+            <canvas
+              ref={canvasRef}
+              onMouseMove={handleCanvasMouseMove}
+              onMouseLeave={() => setMousePos(null)}
+              className="w-full h-full cursor-crosshair block"
+            />
+          </div>
+
+          {/* Bottom Bar Legend */}
+          <div className="flex items-center justify-between text-[10px] text-zinc-400 pt-1.5 border-t border-zinc-800/80">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-1 bg-cyan-400 inline-block rounded-full"></span> <strong className="text-zinc-200">Medyan</strong></span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-cyan-500/20 border border-cyan-500/40 inline-block rounded"></span> %50 Güven Aralığı</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-emerald-500/10 border border-emerald-500/30 inline-block rounded"></span> %90 Güven Aralığı</span>
+              <span className="flex items-center gap-1 text-rose-400"><span className="w-2.5 h-1 bg-rose-500 inline-block rounded-full"></span> Düşüş Patikaları</span>
+            </div>
+            {simResult && (
+              <span className="font-data text-zinc-300">
+                Seçili Senaryo: <strong className="text-zinc-100">{activeScenarioObj.name}</strong>
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>

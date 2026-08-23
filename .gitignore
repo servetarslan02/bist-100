@@ -34,6 +34,9 @@ out/
 *.parquet
 *.csv
 *.db
+*.db-shm
+*.db-wal
+*.db-journal
 *.sqlite
 
 # ML Models

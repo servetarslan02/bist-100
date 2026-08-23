@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { usePolling, apiPost } from "@/lib/api";
 import {
   Activity, RefreshCw, Zap, TrendingUp, AlertTriangle, CheckCircle2,
   Cpu, Layers, BarChart2, ShieldCheck, Award, FileText
@@ -8,43 +9,22 @@ import {
 
 export default function LearningLabPage() {
   const [training, setTraining] = useState(false);
-  const [modelsData, setModelsData] = useState<any[]>([]);
-  const [trustScores, setTrustScores] = useState<any[]>([]);
-  const [fusionWeights, setFusionWeights] = useState<Record<string, number>>({});
-  const [reportMarkdown, setReportMarkdown] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"matrix" | "report" | "pipeline">("matrix");
 
-  const fetchLearningData = async () => {
-    try {
-      const res = await fetch("/api/v1/learning/performance-matrix");
-      if (res.ok) {
-        const data = await res.json();
-        setModelsData(data.models || []);
-        setTrustScores(data.trust_scores || []);
-        setFusionWeights(data.fusion_weights || {});
-      }
+  const { data: matrixData, refetch: refetchMatrix } = usePolling<any>("/learning/performance-matrix", 15000);
+  const { data: repData, refetch: refetchReport } = usePolling<any>("/learning/report", 15000);
 
-      const repRes = await fetch("/api/v1/learning/report");
-      if (repRes.ok) {
-        const repData = await repRes.json();
-        setReportMarkdown(repData.markdown || "");
-      }
-    } catch (err) {
-      console.error("Learning data fetch error:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchLearningData();
-  }, []);
+  const modelsData = matrixData?.models || [];
+  const trustScores = matrixData?.trust_scores || [];
+  const fusionWeights = matrixData?.fusion_weights || {};
+  const reportMarkdown = repData?.markdown || "";
 
   const triggerRetrainCycle = async () => {
     setTraining(true);
     try {
-      const res = await fetch("/api/v1/learning/cycle", { method: "POST" });
-      if (res.ok) {
-        await fetchLearningData();
-      }
+      await apiPost("/learning/cycle", {});
+      refetchMatrix();
+      refetchReport();
     } catch (err) {
       console.error("Cycle trigger error:", err);
     } finally {

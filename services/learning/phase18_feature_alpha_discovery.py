@@ -47,11 +47,13 @@ def extract_forensic_features(df):
     bb_lower = sma20 - 2 * bb_std
     feats["bb_position"] = (close - bb_lower) / (bb_upper - bb_lower).replace(0, 1.0)
     
-    # FORWARD RETURNS FOR EVALUATION
-    feats["target_1d_ret"] = (close.shift(-1) / close - 1.0) * 100.0
-    feats["target_5d_ret"] = (close.shift(-5) / close - 1.0) * 100.0
-    feats["target_10d_ret"] = (close.shift(-10) / close - 1.0) * 100.0
-    feats["target_20d_ret"] = (close.shift(-20) / close - 1.0) * 100.0
+    # FORWARD RETURNS FOR EVALUATION (T+1 Open to T+N Close Execution)
+    open_p = df["Open"] if "Open" in df.columns else close
+    next_open = open_p.shift(-1).replace(0, np.nan)
+    feats["target_1d_ret"] = (close.shift(-1) / next_open - 1.0) * 100.0
+    feats["target_5d_ret"] = (close.shift(-5) / next_open - 1.0) * 100.0
+    feats["target_10d_ret"] = (close.shift(-10) / next_open - 1.0) * 100.0
+    feats["target_20d_ret"] = (close.shift(-20) / next_open - 1.0) * 100.0
     
     return feats.dropna(subset=["roc_20d", "volatility_20d"])
 

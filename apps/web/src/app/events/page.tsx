@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import { usePolling } from "@/lib/api";
 import {
   Zap, Filter, Clock, ExternalLink, Radio, CheckCircle2,
-  TrendingUp, TrendingDown, AlertCircle
+  TrendingUp, TrendingDown, AlertCircle, Loader2
 } from "lucide-react";
 
 interface EventItem {
@@ -21,41 +22,36 @@ interface EventItem {
 const EVENT_TYPES = [
   { id: "ALL", label: "Tüm Olaylar" },
   { id: "KAP", label: "KAP Bildirimleri" },
-  { id: "NEWS", label: "Haber Akışı (AA/Reuters)" },
+  { id: "NEWS", label: "Haber Akışı (Canlı RSS)" },
   { id: "MACRO", label: "Makro & TCMB" },
-  { id: "SOCIAL", label: "Sosyal Medya Radarı" },
-];
-
-const MOCK_EVENTS: EventItem[] = [
-  { id: "1", timestamp: "14:32:17", type: "KAP", source: "kap.org.tr", title: "THYAO - Yeni uçak alım ve filo genişletme kararı açıklandı", ticker: "THYAO", sentiment: 0.64, importance: 0.88 },
-  { id: "2", timestamp: "14:28:05", type: "NEWS", source: "AA Finans", title: "TCMB Para Politikası Kurulu faiz karar metnini yayımladı", sentiment: -0.1, importance: 0.95 },
-  { id: "3", timestamp: "14:25:42", type: "MACRO", source: "TÜİK", title: "Tüketici Fiyat Endeksi (TÜFE) aylık %2.4 artış kaydetti", sentiment: -0.3, importance: 0.90 },
-  { id: "4", timestamp: "14:21:18", type: "KAP", source: "kap.org.tr", title: "ASELS - Savunma Sanayii Başkanlığı ile 140M $ sözleşme imzalandı", ticker: "ASELS", sentiment: 0.82, importance: 0.85 },
-  { id: "5", timestamp: "14:18:33", type: "NEWS", source: "Reuters", title: "BIST Bankacılık Endeksi (XBANK) yabancı alımlarıyla %2 yükseldi", sentiment: 0.55, importance: 0.70 },
-  { id: "6", timestamp: "14:15:07", type: "SOCIAL", source: "X Finans", title: "TUPRS rafineri bakım ve marjları hakkında artan sosyal medya ilgisi", ticker: "TUPRS", sentiment: 0.28, importance: 0.45 },
-  { id: "7", timestamp: "14:12:44", type: "KAP", source: "kap.org.tr", title: "EREGL - 2. Çeyrek finansal sonuçları ve kâr dağıtım kararı", ticker: "EREGL", sentiment: 0.15, importance: 0.80 },
 ];
 
 export default function EventCenterPage() {
   const router = useRouter();
   const [filter, setFilter] = useState<string>("ALL");
-  const [events] = useState<EventItem[]>(MOCK_EVENTS);
+  const { data: eventsData, loading, lastUpdated } = usePolling<{ events: EventItem[]; count: number }>("/event-study/events", 4000);
 
-  const filtered = filter === "ALL" ? events : events.filter(e => e.type === filter);
+  const events = useMemo(() => eventsData?.events ?? [], [eventsData]);
+  const filtered = useMemo(() => filter === "ALL" ? events : events.filter(e => e.type === filter), [filter, events]);
 
   return (
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold gradient-text">Olay Merkezi & Anlık Haber Akışı</h1>
+          <h1 className="text-xl font-bold gradient-text">Olay Merkezi & Canlı Haber Akışı</h1>
           <p className="text-[11px] mt-0.5" style={{ color: "var(--color-text-muted)" }}>
-            KAP Bildirimleri · AA / Reuters Finans Akışı · TCMB & Makro Veriler · Yapay Zeka Duygu (Sentiment) Analizi
+            Canlı KAP Bildirimleri · BloombergHT / Bigpara / TRT Finans Akışı · TCMB & Makro Olay Analizi
           </p>
         </div>
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-          <div className="w-1.5 h-1.5 rounded-full live-dot" />
-          CANLI AKIŞ
+        <div className="flex items-center gap-3">
+          <span className="text-[11px] text-zinc-400">
+            Son Güncelleme: <span className="text-zinc-200 font-mono">{lastUpdated?.toLocaleTimeString()}</span>
+          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+            <div className="w-1.5 h-1.5 rounded-full live-dot animate-ping" />
+            OTOMATİK CANLI AKIŞ (4sn)
+          </div>
         </div>
       </div>
 
@@ -79,6 +75,14 @@ export default function EventCenterPage() {
           );
         })}
       </div>
+
+      {/* Loading state */}
+      {loading && events.length === 0 && (
+        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2">
+          <Loader2 className="animate-spin" size={16} />
+          <span>Canlı haber ve KAP akışı yükleniyor...</span>
+        </div>
+      )}
 
       {/* Events List */}
       <div className="space-y-3">

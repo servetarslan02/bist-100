@@ -1,0 +1,114 @@
+{
+  "trained_date": "2026-08-23",
+  "train_samples": 172730,
+  "oos_samples": 22109,
+  "features": [
+    "rsi_14",
+    "atr_pct",
+    "ret_1d",
+    "ret_5d",
+    "ret_20d",
+    "vol_surge",
+    "buyer_pressure",
+    "near_20d_high",
+    "breakout_setup",
+    "dip_setup",
+    "bm_is_bull",
+    "bm_dist_sma200",
+    "bm_is_crisis",
+    "bm_ret_5d",
+    "bm_vol_20d"
+  ],
+  "models_trained": [
+    "lightgbm",
+    "xgboost",
+    "catboost",
+    "extratrees"
+  ],
+  "individual_results": {
+    "lightgbm": {
+      "r2": -0.0229,
+      "ic": -0.0002,
+      "feature_importances": {
+        "rsi_14": 678.0,
+        "atr_pct": 740.0,
+        "ret_1d": 390.0,
+        "ret_5d": 608.0,
+        "ret_20d": 693.0,
+        "vol_surge": 456.0,
+        "buyer_pressure": 372.0,
+        "near_20d_high": 13.0,
+        "breakout_setup": 12.0,
+        "dip_setup": 18.0,
+        "bm_is_bull": 261.0,
+        "bm_dist_sma200": 2860.0,
+        "bm_is_crisis": 53.0,
+        "bm_ret_5d": 2281.0,
+        "bm_vol_20d": 2565.0
+      }
+    },
+    "xgboost": {
+      "r2": -0.0195,
+      "ic": -0.0131,
+      "feature_importances": {
+        "rsi_14": 0.0493,
+        "atr_pct": 0.0885,
+        "ret_1d": 0.0445,
+        "ret_5d": 0.0577,
+        "ret_20d": 0.0646,
+        "vol_surge": 0.0547,
+        "buyer_pressure": 0.051,
+        "near_20d_high": 0.0386,
+        "breakout_setup": 0.03,
+        "dip_setup": 0.0243,
+        "bm_is_bull": 0.0975,
+        "bm_dist_sma200": 0.095,
+        "bm_is_crisis": 0.1143,
+        "bm_ret_5d": 0.0909,
+        "bm_vol_20d": 0.0991
+      }
+    },
+    "catboost": {
+      "r2": -0.0103,
+      "ic": 0.0052,
+      "feature_importances": {
+        "rsi_14": 3.0545,
+        "atr_pct": 11.0543,
+        "ret_1d": 1.2597,
+        "ret_5d": 4.5409,
+        "ret_20d": 5.8221,
+        "vol_surge": 3.2203,
+        "buyer_pressure": 1.5015,
+        "near_20d_high": 0.0603,
+        "breakout_setup": 0.008,
+        "dip_setup": 0.085,
+        "bm_is_bull": 3.7273,
+        "bm_dist_sma200": 25.8194,
+        "bm_is_crisis": 0.8072,
+        "bm_ret_5d": 17.7099,
+        "bm_vol_20d": 21.3296
+      }
+    }
+  },
+  "ensemble_metrics": {
+    "oos_information_coefficient_ic": -0.0028,
+    "oos_r2_score": -0.0165
+  },
+  "top_feature_importances": {
+    "bm_dist_sma200": 961.9715,
+    "bm_vol_20d": 862.1429,
+    "bm_ret_5d": 766.2669,
+    "atr_pct": 250.3809,
+    "ret_20d": 232.9622,
+    "rsi_14": 227.0346,
+    "ret_5d": 204.1995,
+    "vol_surge": 153.0917,
+    "ret_1d": 130.4347,
+    "buyer_pressure": 124.5175,
+    "bm_is_bull": 88.2749,
+    "bm_is_crisis": 17.9738,
+    "dip_setup": 6.0364,
+    "near_20d_high": 4.3663,
+    "breakout_setup": 4.0127
+  }
+}
