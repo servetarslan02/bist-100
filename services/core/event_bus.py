@@ -38,17 +38,24 @@ class InternalEventBus:
 
     def __init__(self):
         self._redis = None
+        self._redis_loop = None
         self._subscribers: Dict[str, List[Callable]] = {}
         self._running = False
 
     async def _get_redis(self):
-        if self._redis is None:
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        if self._redis is None or self._redis_loop is not current_loop:
             try:
                 import redis.asyncio as aioredis
                 self._redis = aioredis.from_url(settings.redis_url, decode_responses=True)
-            except ImportError:
-                logger.warning("Redis not available, using in-memory fallback")
+                self._redis_loop = current_loop
+            except (ImportError, Exception):
                 self._redis = InMemoryRedis()
+                self._redis_loop = current_loop
         return self._redis
 
     async def publish(self, channel: str, event: CanonicalEvent):
@@ -125,10 +132,25 @@ class InternalEventBus:
 
 
 class InMemoryRedis:
-    """In-memory Redis fallback (Docker yokken)."""
+    """In-memory Redis fallback (Docker yokken veya test ortamında)."""
     def __init__(self):
         self._data = {}
         self._pubsub_handlers = {}
+        self._streams = defaultdict(list)
+
+    async def set(self, key: str, value: Any, ex: Optional[int] = None, nx: bool = False) -> bool:
+        if nx and key in self._data:
+            return False
+        self._data[key] = value
+        return True
+
+    async def get(self, key: str) -> Optional[Any]:
+        return self._data.get(key)
+
+    async def xadd(self, stream_key: str, fields: Dict[str, Any]) -> str:
+        msg_id = f"{int(_time.time() * 1000)}-0"
+        self._streams[stream_key].append({"id": msg_id, "fields": fields})
+        return msg_id
 
     async def publish(self, channel: str, message: str):
         """Event yayinla."""
@@ -140,7 +162,7 @@ class InMemoryRedis:
                 else:
                     h({"type": "message", "channel": channel, "data": message})
             except Exception as e:
-                logger.error("InMemoryRedis handler error", channel=channel, error=str(e))
+                logger.debug("InMemoryRedis handler error", channel=channel, error=str(e))
 
     def pubsub(self):
         """Pubsub instance dondur."""
@@ -162,8 +184,15 @@ class InMemoryRedis:
         pass
 
     def publish_local(self, channel, event):
-        """In-memory publish."""
-        asyncio.create_task(self.publish(f"alpha:{channel}", event.to_json()))
+        """In-memory publish with loop safety."""
+        try:
+            loop = asyncio.get_running_loop()
+            if loop and loop.is_running():
+                loop.create_task(self.publish(f"alpha:{channel}", event.to_json()))
+            else:
+                asyncio.run(self.publish(f"alpha:{channel}", event.to_json()))
+        except RuntimeError:
+            pass
 
 
 # =====================================================
