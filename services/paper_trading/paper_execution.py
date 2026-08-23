@@ -66,6 +66,7 @@ class PaperExecutionEngine:
         order_type: str = "MARKET",
         limit_price: Optional[float] = None,
         market_phase: str = "CONTINUOUS",
+        scenario: str = "NORMAL",
     ) -> Dict[str, Any]:
         """
         Sinyali sanal order'a cevir.
@@ -91,6 +92,17 @@ class PaperExecutionEngine:
             "rejection_reason": None,
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
+
+        # === KAP KURUMSAL VE VBTS TEDBİR DENETİMİ ===
+        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry as kap_registry
+        from services.paper_trading.synthetic_liquidity import SyntheticOrderBookBuilder, LiquidityScenario
+
+        is_eligible, kap_reason = kap_registry.validate_trading_eligibility(ticker, date, side)
+        if not is_eligible:
+            order["status"] = "REJECTED"
+            order["rejection_reason"] = kap_reason
+            logger.warning("Order rejected by KAP Registry", ticker=ticker, reason=kap_reason)
+            return order
 
         if is_halted:
             order["status"] = "REJECTED"
@@ -125,6 +137,9 @@ class PaperExecutionEngine:
 
         # === BIST TAVAN / TABAN & DEVRE KESİCİ KİLİT KONTROLÜ ===
         ref_price = reference_price if reference_price and reference_price > 0 else signal_price
+        limit_up_price = ref_price * (1.0 + price_limit_pct / 100.0) if ref_price > 0 else float("inf")
+        limit_down_price = ref_price * (1.0 - price_limit_pct / 100.0) if ref_price > 0 else 0.0
+
         if ref_price > 0:
             price_change_pct = ((execution_price / ref_price) - 1.0) * 100.0
 
@@ -143,20 +158,33 @@ class PaperExecutionEngine:
                 logger.warning("Order rejected: Limit Up Locked", ticker=ticker, change_pct=price_change_pct)
                 return order
 
-        # === SLIPPAGE ===
-        slippage = self._compute_slippage(
-            quantity=quantity,
-            avg_volume=avg_volume,
+        # === SENTETİK DEFTER & WALK-THE-BOOK EŞLEŞTİRME ===
+        scenario_enum = LiquidityScenario(scenario) if isinstance(scenario, str) else scenario
+        book = SyntheticOrderBookBuilder.build_synthetic_book(
+            ticker=ticker,
+            mid_price=execution_price,
+            adv=avg_volume,
             volatility=volatility,
             spread_pct=spread_pct,
-            side=side,
+            scenario=scenario_enum,
+            num_levels=10,
+            limit_up_price=limit_up_price,
+            limit_down_price=limit_down_price,
         )
 
-        if side == "BUY":
-            fill_price = execution_price * (1 + slippage)
-        else:
-            fill_price = execution_price * (1 - slippage)
-        fill_price = self._round_to_tick(fill_price, side)
+        walk_res = SyntheticOrderBookBuilder.execute_market_order_walk(
+            book=book,
+            side=side,
+            requested_quantity=quantity,
+            adv=avg_volume,
+            scenario=scenario_enum,
+            limit_up_price=limit_up_price,
+            limit_down_price=limit_down_price,
+        )
+
+        fill_price = walk_res["vwap_price"]
+        filled_quantity = walk_res["filled_quantity"]
+        slippage = walk_res["slippage_pct"] / 100.0
 
         # Kayma fiyatı günlük marj dışına taşıyamaz
         if ref_price > 0 and abs((fill_price / ref_price - 1) * 100) > price_limit_pct:
@@ -164,16 +192,11 @@ class PaperExecutionEngine:
             order["rejection_reason"] = "PRICE_LIMIT: fill price outside BIST daily price band"
             return order
 
-        # === LİKİDİTE VE KISMİ DOLUM (PARTIAL FILL) MODELİ ===
-        # BIST: Tek barda ortalama hacmin en fazla %5'i kadar aktif dolum yapılabilir
-        filled_quantity = quantity
-        if avg_volume > 0:
-            max_participate_qty = max(1, int(avg_volume * 0.05))
-            if quantity > max_participate_qty:
-                filled_quantity = max_participate_qty
-                order["status"] = "PARTIAL_FILL"
-                logger.info("Order partially filled due to liquidity participation cap",
-                            ticker=ticker, requested=quantity, filled=filled_quantity)
+        if walk_res["is_partial"]:
+            order["status"] = "PARTIAL_FILL"
+            logger.info("Order partially filled due to synthetic liquidity cap",
+                        ticker=ticker, requested=quantity, filled=filled_quantity,
+                        remaining=walk_res["remaining_quantity"], scenario=scenario_enum.value)
 
         # === COMMISSION ===
         amount = filled_quantity * fill_price

@@ -39,11 +39,13 @@ class PaperTradingOrchestrator:
         execution: Optional[PaperExecutionEngine] = None,
         require_next_open: bool = True,
         strict_t2: bool = True,
+        scenario: str = "NORMAL",
     ):
         self._champion_version = champion_version
         self.initial_capital = initial_capital
         self.require_next_open = require_next_open
         self.strict_t2 = strict_t2
+        self.scenario = scenario
         self.store = store or state_store or PaperStateStore(db_path=db_path)
         self.portfolio = VirtualPortfolio(initial_capital=initial_capital, state_store=self.store, strict_t2=strict_t2)
         self.execution = execution or paper_execution
@@ -57,7 +59,8 @@ class PaperTradingOrchestrator:
                     champion=self._champion_version,
                     initial_capital=initial_capital,
                     require_next_open=require_next_open,
-                    strict_t2=strict_t2)
+                    strict_t2=strict_t2,
+                    scenario=self.scenario)
 
     def process_daily_cycle(
         self,
@@ -356,7 +359,22 @@ class PaperTradingOrchestrator:
                 return {}
             market_price = float(price)
 
-        market_price = round_to_bist_tick(market_price, side=side)
+        # Likidite ve Mikro-Yapı Metrikleri (YALNIZCA T anına kadar olan geçmiş veri - SIFIR VERİ SIZINTISI)
+        from services.paper_trading.synthetic_liquidity import SyntheticLiquidityEstimator
+        high_prev = float(signal.get("high_prev", price * 1.01))
+        low_prev = float(signal.get("low_prev", price * 0.99))
+        high_curr = float(signal.get("high", price * 1.01))
+        low_curr = float(signal.get("low", price * 0.99))
+
+        liq_metrics = SyntheticLiquidityEstimator.compute_liquidity_metrics(
+            ticker=ticker,
+            high_prev=high_prev,
+            low_prev=low_prev,
+            high_curr=high_curr,
+            low_curr=low_curr,
+            price=price,
+            volumes=[float(volume)] if volume > 0 else [1_000_000.0],
+        )
 
         order = self.execution.execute_signal(
             date=date,
@@ -365,12 +383,13 @@ class PaperTradingOrchestrator:
             quantity=quantity,
             signal_price=price,
             market_price=market_price,
-            avg_volume=volume,
-            volatility=0.25,
-            spread_pct=0.1,
+            avg_volume=int(liq_metrics.adv),
+            volatility=liq_metrics.volatility,
+            spread_pct=liq_metrics.spread_pct,
             sector=sector,
             reference_price=reference_price,
             is_halted=bool(signal.get("is_halted", False)),
+            scenario=self.scenario,
         )
 
         self._audit_order(date, order)

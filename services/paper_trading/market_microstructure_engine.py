@@ -22,6 +22,11 @@ from services.core.bist_tick_size import round_to_bist_tick, get_bist_tick_size
 from services.simulation.auction_engine import AuctionOrder, call_auction_engine
 from services.simulation.order_book import OrderBook
 from services.paper_trading.pre_trade_risk import pre_trade_risk_engine
+from services.paper_trading.synthetic_liquidity import (
+    SyntheticOrderBookBuilder,
+    SyntheticLiquidityEstimator,
+    LiquidityScenario,
+)
 
 logger = structlog.get_logger()
 
@@ -71,6 +76,7 @@ class MarketMicrostructureEngine:
         avg_volume: int = 1_000_000,
         volatility: float = 0.25,
         spread_pct: float = 0.1,
+        scenario: LiquidityScenario = LiquidityScenario.NORMAL,
     ) -> Dict[str, Any]:
         """BIST kurallarına göre emri doğrular, seans durumuna göre deftere veya açık artırmaya iletir."""
         current_phase = market_phase or bist_session_fsm.get_phase(ticker=ticker)
@@ -134,31 +140,49 @@ class MarketMicrostructureEngine:
 
         # B) Sürekli Müzayede (CONTINUOUS_AUCTION)
         elif current_phase == BISTMarketPhase.CONTINUOUS_AUCTION:
-            # Slippage & Likidite Katılım Oranı
-            slippage = self._compute_slippage(quantity, avg_volume, volatility, spread_pct)
-            fill_price = exec_price * (1.0 + slippage) if side == "BUY" else exec_price * (1.0 - slippage)
-            fill_price = round_to_bist_tick(fill_price, side=side)
+            # 5-10 Kademeli Deterministik Sentetik Emir Defteri Üret (Walk-the-Book)
+            scenario_enum = LiquidityScenario(scenario) if isinstance(scenario, str) else scenario
+            book = SyntheticOrderBookBuilder.build_synthetic_book(
+                ticker=ticker,
+                mid_price=exec_price,
+                adv=avg_volume,
+                volatility=volatility,
+                spread_pct=spread_pct,
+                scenario=scenario_enum,
+                num_levels=10,
+            )
 
-            # Likidite katılım limiti (tek barda max %5)
-            filled_qty = quantity
-            if avg_volume > 0:
-                max_participate = max(1, int(avg_volume * 0.05))
-                if quantity > max_participate:
-                    filled_qty = max_participate
-                    order_record["status"] = "PARTIAL_FILL"
+            # Defter üzerinde kademe tüketerek eşleştir
+            walk_result = SyntheticOrderBookBuilder.execute_market_order_walk(
+                book=book,
+                side=side,
+                requested_quantity=quantity,
+                adv=avg_volume,
+                scenario=scenario_enum,
+            )
+
+            filled_qty = walk_result["filled_quantity"]
+            fill_price = walk_result["vwap_price"]
+            slippage_pct = walk_result["slippage_pct"]
 
             amount = filled_qty * fill_price
             commission = self._compute_commission(amount)
 
             order_record["quantity"] = filled_qty
+            order_record["filled_quantity"] = filled_qty
+            order_record["remaining_quantity"] = walk_result["remaining_quantity"]
             order_record["execution_price"] = fill_price
             order_record["commission"] = round(commission, 2)
-            order_record["slippage_pct"] = round(slippage * 100, 4)
-            if order_record["status"] != "PARTIAL_FILL":
-                order_record["status"] = "FILLED"
+            order_record["slippage_pct"] = round(slippage_pct, 4)
+            order_record["levels_consumed"] = walk_result["levels_consumed"]
+            order_record["scenario"] = scenario_enum.value
+            order_record["status"] = "PARTIAL_FILL" if walk_result["is_partial"] else "FILLED"
 
             self._daily_turnover += amount
-            logger.info("Continuous Auction Order Executed", ticker=ticker, side=side, fill_price=fill_price, qty=filled_qty)
+            logger.info("Continuous Auction Order Executed (Walk-the-Book)",
+                        ticker=ticker, side=side, fill_price=fill_price, qty=filled_qty,
+                        slippage=slippage_pct, levels=walk_result["levels_consumed"],
+                        scenario=scenario_enum.value)
             return order_record
 
         # C) Kapanış Fiyatından İşlemler (CLOSING_PRICE_TRADING)
