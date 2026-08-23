@@ -119,7 +119,27 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, A
                                 valid_preds.append(p)
 
                 top_10 = valid_preds[:10]
-                queued_signals = [
+                top_10_set = {item["ticker"] for item in top_10}
+                current_positions = list(paper_orchestrator.portfolio.get_all_positions().keys())
+
+                # 1. Top-10 dışına çıkan mevcut pozisyonlar için SATIŞ (EXIT/SHORT) sinyalleri
+                exit_signals = [
+                    {
+                        "ticker": ticker,
+                        "direction": "SHORT",
+                        "rank": 99,
+                        "score": 0.0,
+                        "confidence": 1.0,
+                        "model_version": paper_orchestrator._champion_version,
+                        "target_weight": 0.0,
+                        "sector": sector_map.get(ticker, ""),
+                    }
+                    for ticker in current_positions
+                    if ticker not in top_10_set
+                ]
+
+                # 2. Yeni giren hisseler için ALIŞ (LONG) sinyalleri
+                entry_signals = [
                     {
                         "ticker": item["ticker"],
                         "direction": "LONG",
@@ -131,7 +151,10 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, A
                         "sector": sector_map.get(item["ticker"], ""),
                     }
                     for idx, item in enumerate(top_10)
+                    if item["ticker"] not in current_positions
                 ]
+
+                queued_signals = exit_signals + entry_signals
 
                 # Sinyalleri sabah açılışı için bekleyen emir olarak kaydet
                 paper_orchestrator.queue_pending_signals(queued_signals, today_str)

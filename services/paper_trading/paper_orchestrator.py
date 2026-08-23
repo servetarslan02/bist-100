@@ -102,13 +102,16 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, msg)
             return {"status": "HALTED", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
 
-        # 2. Champion Model Sinyal Filtreleme
+        # 2. Champion Model Sinyal Filtreleme & Çıkış Önceliği
         valid_signals = [s for s in signals if s.get("model_version") == self._champion_version]
         if not valid_signals:
             msg = "No valid champion signals — NO_TRADE"
             logger.warning(msg)
             self._audit_no_trade(date, msg)
             return {"status": "NO_TRADE", "reason": msg, "date": date, "num_orders": 0, "num_trades": 0}
+
+        # Satış/Çıkış (SHORT) sinyalleri nakit ve limit açmak için ALIŞ'lardan (LONG) ÖNCE işletilir
+        valid_signals.sort(key=lambda s: 0 if s.get("direction") == "SHORT" else 1)
 
         # 3. Sinyal -> Risk -> Seans -> Eşleşme
         for sig in valid_signals:
