@@ -15,63 +15,32 @@ LOG_FILE="$SCRIPT_DIR/data/alpha.log"
 SNAPSHOT_FILE="$SCRIPT_DIR/data/system_snapshot.json"
 
 start() {
-    if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-        echo "⚡ ALPHA BIST zaten çalışıyor (PID: $(cat "$PID_FILE"))"
-        return 1
-    fi
-
-    echo "⚡ ALPHA BIST başlatılıyor..."
-    mkdir -p "$SCRIPT_DIR/data"
-
+    echo "⚡ ALPHA BIST mikro-servisleri (Docker) başlatılıyor..."
     cd "$SCRIPT_DIR"
-    nohup python3 main.py --mode daily >> "$LOG_FILE" 2>&1 &
-    echo $! > "$PID_FILE"
-
-    sleep 2
-    if kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
-        echo "✅ ALPHA BIST başlatıldı (PID: $(cat "$PID_FILE"))"
-        echo "📊 Dashboard: http://localhost:8000/"
-        echo "📋 Loglar: ./alpha logs"
-    else
-        echo "❌ Başlatılamadı. Logları kontrol edin: ./alpha logs"
-        rm -f "$PID_FILE"
-        return 1
-    fi
+    docker compose up -d
+    
+    echo "✅ ALPHA BIST başlatıldı!"
+    echo "🌐 Web Dashboard : http://localhost:3000"
+    echo "🔌 REST API       : http://localhost:8000"
+    echo "📚 API Docs       : http://localhost:8000/docs"
 }
 
 stop() {
-    if [ ! -f "$PID_FILE" ]; then
-        echo "⚠️  ALPHA BIST çalışmıyor"
-        return 1
-    fi
-
-    PID=$(cat "$PID_FILE")
-    if kill -0 "$PID" 2>/dev/null; then
-        echo "⏹  ALPHA BIST durduruluyor (PID: $PID)..."
-        kill -TERM "$PID"
-        # Graceful shutdown için bekle
-        for i in $(seq 1 10); do
-            if ! kill -0 "$PID" 2>/dev/null; then
-                break
-            fi
-            sleep 1
-        done
-        # Hala çalışıyorsa zorla kapat
-        if kill -0 "$PID" 2>/dev/null; then
-            kill -9 "$PID"
-            echo "⚠️  Zorla kapatıldı"
-        else
-            echo "✅ Graceful shutdown tamamlandı"
-        fi
-        rm -f "$PID_FILE"
-    else
-        echo "⚠️  Process bulunamadı"
-        rm -f "$PID_FILE"
-    fi
+    echo "⏹  ALPHA BIST mikro-servisleri (Docker) durduruluyor..."
+    cd "$SCRIPT_DIR"
+    docker compose down
+    echo "✅ Tüm servisler durduruldu."
 }
 
 status() {
-    echo "=== ALPHA BIST Durum ==="
+    echo "=== ALPHA BIST Mikro-Servis Durumu ==="
+    echo ""
+    cd "$SCRIPT_DIR"
+    docker compose ps
+    echo ""
+    echo "🌐 Web Dashboard : http://localhost:3000"
+    echo "🔌 REST API       : http://localhost:8000"
+}
     echo ""
 
     # Process durumu
