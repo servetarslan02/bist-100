@@ -303,6 +303,12 @@ def create_app() -> FastAPI:
             },
         }
 
+    @app.get("/metrics")
+    async def metrics():
+        """Prometheus metrics endpoint."""
+        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
     return app
 
 
