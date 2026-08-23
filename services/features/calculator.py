@@ -11,10 +11,19 @@ from services.ml.feature_engine import FeatureEngine, compute_universe_features
 class FeatureCalculator(FeatureEngine):
     """Canonical FeatureEngine bridge for feature calculator."""
     
-    def compute_all_features(self, df: pd.DataFrame, ticker: str = "") -> Dict[str, float]:
+    def compute_all_features(self, df: Any, ticker: str = "") -> Dict[str, float]:
         """Compute all features for given dataframe and ticker."""
-        if df is None or len(df) < 20:
+        if df is None:
             return {}
-        return self.compute_all(ticker=ticker, df=df)
+        if hasattr(df, "to_pandas"):
+            pdf = df.to_pandas()
+        elif isinstance(df, pd.DataFrame):
+            pdf = df
+        else:
+            return {}
+
+        if len(pdf) < 5:
+            return {}
+        return self.compute_all(ticker=ticker, df=pdf)
 
 feature_calculator = FeatureCalculator()

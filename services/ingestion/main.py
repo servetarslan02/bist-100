@@ -250,35 +250,36 @@ class IngestionService:
                 from_date = (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d")
                 to_date = datetime.now().strftime("%Y-%m-%d")
 
-                disclosures = kap_provider.fetch_disclosures(
+                disclosures = await kap_provider.fetch_disclosures(
                     from_date=from_date,
                     to_date=to_date,
                 )
 
-                for disc in disclosures:
-                    ticker = disc.get("ticker", "")
-                    instrument_id = self._instrument_map.get(ticker)
+                if disclosures:
+                    for disc in disclosures:
+                        ticker = disc.get("ticker", "")
+                        instrument_id = self._instrument_map.get(ticker)
 
-                    event = CanonicalEvent(
-                        event_type=EventType.KAP_EVENT,
-                        source="kap",
-                        data={
-                            "kap_id": disc.get("kap_id", ""),
-                            "ticker": ticker,
-                            "instrument_id": instrument_id,
-                            "title": disc.get("title", ""),
-                            "summary": disc.get("summary", ""),
-                            "category": disc.get("category", ""),
-                            "sentiment": disc.get("sentiment", 0),
-                            "importance": disc.get("importance", 0),
-                            "is_price_sensitive": disc.get("is_price_sensitive", False),
-                            "publish_date": disc.get("publish_date", ""),
-                        },
-                    )
-                    publish_event(event, key=ticker or "kap")
+                        event = CanonicalEvent(
+                            event_type=EventType.KAP_EVENT,
+                            source="kap",
+                            data={
+                                "kap_id": disc.get("kap_id", ""),
+                                "ticker": ticker,
+                                "instrument_id": instrument_id,
+                                "title": disc.get("title", ""),
+                                "summary": disc.get("summary", ""),
+                                "category": disc.get("category", ""),
+                                "sentiment": disc.get("sentiment", 0),
+                                "importance": disc.get("importance", 0),
+                                "is_price_sensitive": disc.get("is_price_sensitive", False),
+                                "publish_date": disc.get("publish_date", ""),
+                            },
+                        )
+                        publish_event(event, key=ticker or "kap")
 
-                flush_producer()
-                logger.info("KAP fetch cycle completed", count=len(disclosures))
+                    flush_producer()
+                logger.info("KAP fetch cycle completed", count=len(disclosures) if disclosures else 0)
 
                 # Wait 5 minutes
                 await asyncio.sleep(300)
@@ -339,31 +340,32 @@ class IngestionService:
             try:
                 logger.info("Starting news fetch cycle")
 
-                # Fetch from NewsAPI
-                if settings.news_api_key:
-                    news_provider.news_api_key = settings.news_api_key
-                    articles = news_provider.fetch_newsapi()
-
-                    for article in articles:
+                # Fetch from RSS
+                rss_articles = await news_provider.fetch_financial_news_rss()
+                if rss_articles:
+                    for article in rss_articles:
                         event = CanonicalEvent(
                             event_type=EventType.NEWS_RAW,
-                            source="newsapi",
+                            source="rss",
                             data=article,
                         )
-                        publish_event(event, key="news")
+                        publish_event(event, key="news_rss")
 
-                # Fetch from RSS
-                rss_articles = news_provider.fetch_financial_news_rss()
-                for article in rss_articles:
-                    event = CanonicalEvent(
-                        event_type=EventType.NEWS_RAW,
-                        source="rss",
-                        data=article,
-                    )
-                    publish_event(event, key="news_rss")
+                # Also fetch official KAP and TCMB news feeds
+                try:
+                    official_kap = await news_provider.fetch_official_kap_disclosures()
+                    for article in (official_kap or []):
+                        event = CanonicalEvent(
+                            event_type=EventType.NEWS_RAW,
+                            source="official_kap",
+                            data=article,
+                        )
+                        publish_event(event, key="news_kap")
+                except Exception:
+                    pass
 
                 flush_producer()
-                logger.info("News fetch cycle completed")
+                logger.info("News fetch cycle completed", count=len(rss_articles) if rss_articles else 0)
 
                 # Wait 10 minutes
                 await asyncio.sleep(600)
