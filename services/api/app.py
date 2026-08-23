@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
                 is_market_active = (now.weekday() < 5) and (now.hour >= 9 and (now.hour < 18 or (now.hour == 18 and now.minute <= 30)))
                 
                 from ..ingestion.bist_universe import bist_universe
+                from .v1.market import _fetch_radar_fresh
                 logger.info(f"radar_cache: TÜM BIST hisseleri ({len(bist_universe.BIST_ALL_TICKERS)} hisse) yenileniyor (Seans: {'Açık' if is_market_active else 'Kapalı'})...")
                 await _fetch_radar_fresh(limit=1000)
                 logger.info("radar_cache: başarıyla güncellendi")
