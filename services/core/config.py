@@ -11,14 +11,17 @@ import sys
 import os
 import logging
 from typing import Optional, List, Dict, Any
+
+# Ortamda pydantic-settings yoksa BaseSettings pydantic.v1'den gelir. Field
+# ve validator'ların da aynı API'den gelmesi şarttır; v2 Field ile v1
+# BaseSettings karışınca tüm alanlar NoneType'a dönüşüp ayarlar yok sayılıyordu.
 try:
     from pydantic_settings import BaseSettings
+    from pydantic import Field, field_validator, model_validator
+    _PYDANTIC_V2 = True
 except ImportError:
-    try:
-        from pydantic.v1 import BaseSettings
-    except ImportError:
-        from pydantic import BaseModel as BaseSettings
-from pydantic import Field, field_validator, model_validator
+    from pydantic.v1 import BaseSettings, Field, validator, root_validator
+    _PYDANTIC_V2 = False
 
 logger = logging.getLogger(__name__)
 
@@ -171,34 +174,45 @@ class Settings(BaseSettings):
             return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/0"
         return f"redis://{self.redis_host}:{self.redis_port}/0"
 
-    @model_validator(mode="after")
-    def _validate_production_security(self) -> "Settings":
+    @root_validator if not _PYDANTIC_V2 else model_validator(mode="after")
+    def _validate_production_security(cls, values):
         """Production'da insecure configuration kontrolü.
         Bu fonksiyon startup'ta çalışır ve insecure config varsa FAIL.
         """
-        if not self.is_production:
-            return self
+        if _PYDANTIC_V2:
+            self = values
+            if not self.is_production:
+                return self
+            config = self.__dict__
+        else:
+            config = values
+            if str(config.get("app_env", "development")).lower() not in ("production", "prod", "staging"):
+                return values
 
         errors = []
 
         # Secret key kontrolü
-        if not self.secret_key or self.secret_key in _INSECURE_VALUES:
+        secret_key = config.get("secret_key", "")
+        jwt_secret = config.get("jwt_secret", "")
+        postgres_password = config.get("postgres_password", "")
+        app_debug = config.get("app_debug", True)
+        if not secret_key or secret_key in _INSECURE_VALUES:
             errors.append("SECRET_KEY is insecure or empty")
-        elif len(self.secret_key) < _MIN_SECRET_LENGTH:
+        elif len(secret_key) < _MIN_SECRET_LENGTH:
             errors.append(f"SECRET_KEY too short (min {_MIN_SECRET_LENGTH} chars)")
 
         # JWT secret kontrolü
-        if not self.jwt_secret or self.jwt_secret in _INSECURE_VALUES:
+        if not jwt_secret or jwt_secret in _INSECURE_VALUES:
             errors.append("JWT_SECRET is insecure or empty")
-        elif len(self.jwt_secret) < _MIN_SECRET_LENGTH:
+        elif len(jwt_secret) < _MIN_SECRET_LENGTH:
             errors.append(f"JWT_SECRET too short (min {_MIN_SECRET_LENGTH} chars)")
 
         # PostgreSQL password kontrolü
-        if not self.postgres_password or self.postgres_password in _INSECURE_VALUES:
+        if not postgres_password or postgres_password in _INSECURE_VALUES:
             errors.append("POSTGRES_PASSWORD is insecure or empty")
 
         # Debug mode kontrolü
-        if self.app_debug:
+        if app_debug:
             errors.append("APP_DEBUG must be False in production")
 
         if errors:
@@ -206,16 +220,16 @@ class Settings(BaseSettings):
             logger.critical(f"\n{'='*60}\nPRODUCTION SECURITY VIOLATION:\n{error_msg}\n{'='*60}")
             sys.exit(1)
 
-        return self
+        return self if _PYDANTIC_V2 else values
 
-    @field_validator("app_port")
+    @validator("app_port") if not _PYDANTIC_V2 else field_validator("app_port")
     @classmethod
     def _validate_port(cls, v: int) -> int:
         if not 1 <= v <= 65535:
             raise ValueError(f"Invalid port: {v}")
         return v
 
-    @field_validator("postgres_port")
+    @validator("postgres_port") if not _PYDANTIC_V2 else field_validator("postgres_port")
     @classmethod
     def _validate_pg_port(cls, v: int) -> int:
         if not 1 <= v <= 65535:
@@ -236,7 +250,13 @@ def get_settings() -> Settings:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:
                         k, v = line.split("=", 1)
-                        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+                        # .env içinde "VALUE  # açıklama" kullanımı pydantic'in
+                        # bool/sayı ayrıştırmasını bozmasın. Tırnaklı değerlerde
+                        # # karakteri korunur.
+                        value = v.strip()
+                        if not (value.startswith(('"', "'")) and value.endswith(('"', "'"))):
+                            value = value.split(" #", 1)[0].rstrip()
+                        os.environ.setdefault(k.strip(), value.strip('"').strip("'"))
         except Exception:
             pass
 

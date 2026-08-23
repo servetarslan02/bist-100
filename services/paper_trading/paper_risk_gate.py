@@ -90,7 +90,7 @@ class PaperRiskGate:
         checks.append(self._check_sector_concentration(portfolio, ticker, side, quantity, price, sector))
 
         # === 5. PORTFOLIO EXPOSURE ===
-        checks.append(self._check_portfolio_exposure(portfolio, side, quantity, price))
+        checks.append(self._check_portfolio_exposure(portfolio, ticker, side, quantity, price))
 
         # === 6. DRAWDOWN ===
         checks.append(self._check_drawdown(portfolio))
@@ -205,7 +205,7 @@ class PaperRiskGate:
             }
         return {"check_name": "sector_concentration", "result": "PASS", "details": f"Max sector {max_sector_pct:.1f}% <= {self.max_sector_pct}%", "severity": "INFO"}
 
-    def _check_portfolio_exposure(self, portfolio, side: str, quantity: int, price: float) -> Dict[str, Any]:
+    def _check_portfolio_exposure(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> Dict[str, Any]:
         total_value = portfolio.get_total_value()
         if total_value <= 0:
             return {"check_name": "portfolio_exposure", "result": "PASS", "details": "Portfolio value is zero", "severity": "INFO"}

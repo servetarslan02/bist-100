@@ -285,3 +285,5 @@ class OrderBookSimulator:
 
 # Singleton
 order_book_sim = OrderBookSimulator()
+OrderBook = OrderBookSimulator
+
