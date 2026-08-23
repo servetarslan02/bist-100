@@ -37,9 +37,11 @@ class PaperTradingOrchestrator:
         store: Optional[PaperStateStore] = None,
         state_store: Optional[PaperStateStore] = None,
         execution: Optional[PaperExecutionEngine] = None,
+        require_next_open: bool = True,
     ):
         self._champion_version = champion_version
         self.initial_capital = initial_capital
+        self.require_next_open = require_next_open
         self.store = store or state_store or PaperStateStore(db_path=db_path)
         self.portfolio = VirtualPortfolio(initial_capital=initial_capital, state_store=self.store)
         self.execution = execution or paper_execution
@@ -51,7 +53,8 @@ class PaperTradingOrchestrator:
 
         logger.info("PaperTradingOrchestrator initialized",
                     champion=self._champion_version,
-                    initial_capital=initial_capital)
+                    initial_capital=initial_capital,
+                    require_next_open=require_next_open)
 
     def process_daily_cycle(
         self,
@@ -64,6 +67,7 @@ class PaperTradingOrchestrator:
         benchmark_return_pct: float = 0.0,
         circuit_breaker_active: bool = False,
         data_quality_ok: bool = True,
+        next_open_prices: Optional[Dict[str, float]] = None,
     ) -> Dict[str, Any]:
         """Günlük simülasyon döngüsünü kurumsal BIST kurallarıyla çalıştırır."""
         logger.info("Starting daily paper trading cycle", date=date, num_signals=len(signals))
@@ -75,6 +79,7 @@ class PaperTradingOrchestrator:
         volumes = volumes or {}
         reference_prices = reference_prices or {}
         sector_map = sector_map or {}
+        next_open_prices = next_open_prices or {}
         previous_equity = self.portfolio.get_total_value()
 
         # 0. Veri Kalitesi Kontrolü
@@ -102,7 +107,16 @@ class PaperTradingOrchestrator:
         # 3. Sinyal -> Risk -> Seans -> Eşleşme
         for sig in valid_signals:
             try:
-                res = self._process_signal(date, sig, prices, volumes, reference_prices, sector_map, data_quality_ok=data_quality_ok)
+                res = self._process_signal(
+                    date,
+                    sig,
+                    prices,
+                    volumes,
+                    reference_prices,
+                    sector_map,
+                    data_quality_ok=data_quality_ok,
+                    next_open_prices=next_open_prices,
+                )
                 if res.get("order"):
                     orders_today.append(res["order"])
                 if res.get("trade"):
@@ -161,6 +175,7 @@ class PaperTradingOrchestrator:
         benchmark_return_pct: float = 0.0,
         circuit_breaker_active: bool = False,
         data_quality_ok: bool = True,
+        next_open_prices: Optional[Dict[str, float]] = None,
     ) -> Dict[str, Any]:
         """Test/Replay ve Canlı için ortak günlük döngü arayüzü."""
         import pandas as pd
@@ -169,6 +184,7 @@ class PaperTradingOrchestrator:
         price_dict = dict(prices or {})
         vol_dict = dict(volumes or {})
         ref_dict = dict(reference_prices or {})
+        next_open_dict = dict(next_open_prices or {})
 
         if market_data is not None:
             if not market_data:
@@ -182,10 +198,13 @@ class PaperTradingOrchestrator:
                     try:
                         dt_lookup = pd.to_datetime(date)
                         if dt_lookup in df.index:
+                            curr_idx = df.index.get_loc(dt_lookup)
                             row = df.loc[dt_lookup]
                         elif date in df.index:
+                            curr_idx = df.index.get_loc(date)
                             row = df.loc[date]
                         else:
+                            curr_idx = len(df) - 1
                             row = df.iloc[-1]
 
                         def _get_val(r, *keys, default=0.0):
@@ -196,6 +215,11 @@ class PaperTradingOrchestrator:
 
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
+
+                        # T+1 Açılış Fiyatı (Next Open Price) Çıkarımı
+                        if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
+                            next_row = df.iloc[curr_idx + 1]
+                            next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
                     except Exception:
                         if len(df) > 0:
                             row = df.iloc[-1]
@@ -213,6 +237,7 @@ class PaperTradingOrchestrator:
             benchmark_return_pct=benchmark_return_pct,
             circuit_breaker_active=circuit_breaker_active,
             data_quality_ok=data_quality_ok,
+            next_open_prices=next_open_dict,
         )
 
     def run_backtest_replay(
@@ -261,6 +286,7 @@ class PaperTradingOrchestrator:
         reference_prices: Dict[str, float],
         sector_map: Dict[str, str],
         data_quality_ok: bool = True,
+        next_open_prices: Optional[Dict[str, float]] = None,
     ) -> Dict[str, Any]:
         ticker = signal.get("ticker", "")
         direction = signal.get("direction", "")
@@ -268,6 +294,7 @@ class PaperTradingOrchestrator:
         volume = volumes.get(ticker, 1_000_000)
         reference_price = reference_prices.get(ticker, price)
         sector = sector_map.get(ticker, signal.get("sector", ""))
+        next_open_prices = next_open_prices or {}
 
         if price <= 0:
             self._audit_no_trade(date, f"No price for {ticker}", ticker)
@@ -314,11 +341,16 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, f"Risk gate blocked: {reason}", ticker)
             return {}
 
-        # Ertesi Seans Açılışı (T+1 Open) / Deterministik Fiyat
-        next_open = signal.get("next_open_price")
-        if next_open is not None and next_open > 0:
+        # Ertesi Seans Açılışı (T+1 Open) / Gerçek BIST Açılış Fiyatı Zorunluluğu
+        next_open = signal.get("next_open_price") or next_open_prices.get(ticker)
+        if next_open is not None and float(next_open) > 0:
             market_price = float(next_open)
         else:
+            if self.require_next_open:
+                msg = f"NO_NEXT_OPEN_PRICE: Real T+1 open price required for BIST execution on {ticker} — NO_TRADE"
+                logger.warning(msg, ticker=ticker, date=date)
+                self._audit_no_trade(date, msg, ticker)
+                return {}
             market_price = float(price)
 
         market_price = round_to_bist_tick(market_price, side=side)
