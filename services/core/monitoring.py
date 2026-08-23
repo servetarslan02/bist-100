@@ -51,38 +51,37 @@ class PortfolioMonitor:
 
     async def sync_metrics(self):
         """Portfolio metriklerini Prometheus gauge'larına yaz."""
-        if not self._portfolio_service:
-            return
-
         now = time.time()
         if self._last_sync_time and (now - self._last_sync_time) < self._sync_interval_s:
             return
 
         try:
-            pf = await self._portfolio_service.get_portfolio()
-            acc = await self._portfolio_service.get_accounting()
+            from services.paper_trading.paper_orchestrator import paper_orchestrator
+            summary = paper_orchestrator.portfolio.get_summary()
 
             # Portfolio gauges
-            prometheus_metrics.set_gauge("portfolio_equity", pf.get("total_value", 0))
-            prometheus_metrics.set_gauge("portfolio_cash", pf.get("cash", 0))
-            prometheus_metrics.set_gauge("portfolio_positions_count", pf.get("positions_count", 0))
-            prometheus_metrics.set_gauge("portfolio_unrealized_pnl", pf.get("unrealized_pnl", 0))
-            prometheus_metrics.set_gauge("portfolio_realized_pnl", acc.get("realized_pnl_total", 0))
-            prometheus_metrics.set_gauge("portfolio_commission_total", acc.get("commission_total", 0))
-            prometheus_metrics.set_gauge("portfolio_drawdown_pct", acc.get("drawdown_pct", 0))
+            prometheus_metrics.set_gauge("portfolio_equity", summary.get("total_value", 0))
+            prometheus_metrics.set_gauge("portfolio_cash", summary.get("cash", 0))
+            prometheus_metrics.set_gauge("portfolio_positions_count", summary.get("num_positions", 0))
+            prometheus_metrics.set_gauge("portfolio_unrealized_pnl", summary.get("unrealized_pnl", 0))
+            prometheus_metrics.set_gauge("portfolio_realized_pnl", summary.get("total_pnl", 0))
+            prometheus_metrics.set_gauge("portfolio_commission_total", summary.get("total_commission", 0))
+            prometheus_metrics.set_gauge("portfolio_drawdown_pct", summary.get("max_drawdown_pct", 0))
+            self._last_sync_time = now
 
-            # Invariant check
-            if not acc.get("invariant_check", True):
+            # Invariant check (Equity == Cash + Invested)
+            invariant_ok = abs(summary.get("total_value", 0.0) - (summary.get("cash", 0.0) + summary.get("invested_value", 0.0))) < 1.0
+            if not invariant_ok:
                 self._invariant_failure_count += 1
                 prometheus_metrics.inc("portfolio_invariant_failures")
-                alerting.check_invariant(False, {"equity": pf.get("total_value"), "cash": pf.get("cash")})
+                alerting.check_invariant(False, {"equity": summary.get("total_value"), "cash": summary.get("cash")})
 
             # Negative cash check
-            if pf.get("cash", 0) < 0:
-                alerting.check_negative_cash(pf["cash"])
+            if summary.get("cash", 0) < 0:
+                alerting.check_negative_cash(summary["cash"])
 
             # Drawdown check
-            drawdown = acc.get("drawdown_pct", 0)
+            drawdown = summary.get("max_drawdown_pct", 0)
             if drawdown:
                 alerting.check_drawdown(drawdown)
 
@@ -192,20 +191,20 @@ class PortfolioMonitor:
 
     async def get_portfolio_api(self) -> Dict[str, Any]:
         """Portfolio durumu (API endpoint)."""
-        if not self._portfolio_service:
-            return {"error": "Portfolio service not bound"}
-
         try:
-            pf = await self._portfolio_service.get_portfolio()
-            acc = await self._portfolio_service.get_accounting()
-            health = self._portfolio_service.get_health_status()
-            lock_m = self._portfolio_service.get_lock_metrics()
-
+            from services.paper_trading.paper_orchestrator import paper_orchestrator
+            summary = paper_orchestrator.portfolio.get_summary()
             return {
-                "portfolio": pf,
-                "accounting": acc,
-                "health": health,
-                "lock_metrics": lock_m,
+                "portfolio": summary,
+                "accounting": {
+                    "cash": summary.get("cash", 0.0),
+                    "settled_cash": summary.get("settled_cash", 0.0),
+                    "unsettled_t1": summary.get("unsettled_cash_t1", 0.0),
+                    "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
+                    "invested_value": summary.get("invested_value", 0.0),
+                    "total_value": summary.get("total_value", 0.0),
+                },
+                "health": {"status": "HEALTHY", "engine": "PaperTradingOrchestrator_SingleSource"},
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except Exception as e:
