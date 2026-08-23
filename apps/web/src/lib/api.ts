@@ -35,6 +35,33 @@ const memoryCache = new Map<string, { data: any; timestamp: number }>();
 const inFlightRequests = new Map<string, Promise<any>>();
 const cacheSubscribers = new Map<string, Set<(data: any) => void>>();
 
+let lastGlobalSyncTimestamp = Date.now();
+const syncStatusListeners = new Set<(ts: number) => void>();
+
+export function useGlobalSyncStatus() {
+  const [lastSync, setLastSync] = useState(lastGlobalSyncTimestamp);
+  const [secondsAgo, setSecondsAgo] = useState(0);
+
+  useEffect(() => {
+    const handler = (ts: number) => {
+      setLastSync(ts);
+      setSecondsAgo(0);
+    };
+    syncStatusListeners.add(handler);
+
+    const interval = setInterval(() => {
+      setSecondsAgo(Math.max(0, Math.floor((Date.now() - lastGlobalSyncTimestamp) / 1000)));
+    }, 1000);
+
+    return () => {
+      syncStatusListeners.delete(handler);
+      clearInterval(interval);
+    };
+  }, []);
+
+  return { lastSync: new Date(lastSync), secondsAgo };
+}
+
 function subscribeToCache(key: string, callback: (data: any) => void) {
   if (!cacheSubscribers.has(key)) {
     cacheSubscribers.set(key, new Set());
@@ -46,6 +73,11 @@ function subscribeToCache(key: string, callback: (data: any) => void) {
 }
 
 function notifyCacheSubscribers(key: string, data: any) {
+  lastGlobalSyncTimestamp = Date.now();
+  syncStatusListeners.forEach(cb => {
+    try { cb(lastGlobalSyncTimestamp); } catch {}
+  });
+
   const listeners = cacheSubscribers.get(key);
   if (listeners) {
     listeners.forEach(cb => {

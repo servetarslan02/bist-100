@@ -53,8 +53,11 @@ const NAV_ITEMS = [
   },
 ];
 
+import { useGlobalSyncStatus } from "@/lib/api";
+
 export function Sidebar() {
   const pathname = usePathname();
+  const { lastSync, secondsAgo } = useGlobalSyncStatus();
 
   return (
     <aside
@@ -124,15 +127,19 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="px-4 py-3" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
-        <div className="flex items-center gap-2">
-          <div
-            className="w-1.5 h-1.5 rounded-full live-dot flex-shrink-0"
-            style={{ background: "var(--color-accent-green)" }}
-          />
-          <span className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--color-text-muted)" }}>
-            CANLI - PHASE 18
+      <div className="px-3.5 py-3" style={{ borderTop: "1px solid var(--color-border-subtle)", background: "rgba(0,0,0,0.2)" }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00e5a0]" />
+            <span className="text-[10px] font-bold text-emerald-400 tracking-wider">CANLI MOTOR</span>
+          </div>
+          <span className="text-[9px] font-data text-zinc-400 bg-zinc-800/80 px-1.5 py-0.5 rounded border border-zinc-700">
+            {secondsAgo === 0 ? "Şimdi" : `${secondsAgo}s önce`}
           </span>
+        </div>
+        <div className="flex items-center justify-between text-[9px] font-data text-zinc-500 mt-1">
+          <span>Son Veri: {lastSync.toLocaleTimeString("tr-TR")}</span>
+          <span className="text-cyan-400 font-semibold">100% Aktif</span>
         </div>
       </div>
     </aside>
