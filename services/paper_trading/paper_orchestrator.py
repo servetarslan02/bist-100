@@ -185,6 +185,7 @@ class PaperTradingOrchestrator:
         circuit_breaker_active: bool = False,
         data_quality_ok: bool = True,
         next_open_prices: Optional[Dict[str, float]] = None,
+        is_morning_execution: bool = False,
     ) -> Dict[str, Any]:
         """Test/Replay ve Canlı için ortak günlük döngü arayüzü."""
         import pandas as pd
@@ -225,23 +226,53 @@ class PaperTradingOrchestrator:
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
 
-                        # Tarihsel 20 Günlük OHLCV Geçmişi (T anına kadar — SIFIR VERİ SIZINTISI)
-                        high_c = float(_get_val(row, "high", "High", default=0.0))
-                        low_c = float(_get_val(row, "low", "Low", default=0.0))
-                        high_p = 0.0
-                        low_p = 0.0
+                        if is_morning_execution:
+                            # Sabah Açılışı: Emir BUGÜNÜN (date) AÇILIŞ fiyatından gerçekleşir
+                            open_p = float(_get_val(row, "open", "Open", "close", "Close", default=0.0))
+                            next_open_dict[ticker] = open_p
+                            price_dict[ticker] = open_p
 
-                        if isinstance(curr_idx, int) and curr_idx >= 1:
-                            prev_row = df.iloc[curr_idx - 1]
-                            high_p = float(_get_val(prev_row, "high", "High", default=0.0))
-                            low_p = float(_get_val(prev_row, "low", "Low", default=0.0))
+                            # Likidite tahmini: YALNIZCA dün ve öncesine (T-1) ait geçmiş barlar kullanılır
+                            if isinstance(curr_idx, int) and curr_idx >= 1:
+                                hist_slice = df.iloc[max(0, curr_idx - 20) : curr_idx]
+                                prev_1 = df.iloc[curr_idx - 1]
+                                prev_2 = df.iloc[curr_idx - 2] if curr_idx >= 2 else prev_1
+                                high_c = float(_get_val(prev_1, "high", "High", default=0.0))
+                                low_c = float(_get_val(prev_1, "low", "Low", default=0.0))
+                                high_p = float(_get_val(prev_2, "high", "High", default=0.0))
+                                low_p = float(_get_val(prev_2, "low", "Low", default=0.0))
+                            else:
+                                hist_slice = df.iloc[:1]
+                                high_c = float(_get_val(row, "high", "High", default=0.0))
+                                low_c = float(_get_val(row, "low", "Low", default=0.0))
+                                high_p = high_c
+                                low_p = low_c
 
-                        start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
-                        hist_slice = df.iloc[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
-                        
-                        highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
-                        lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
-                        vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+                            highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
+                            lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
+                            vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+                        else:
+                            # EOD / Backtest Replay: T anı kapanışı bilinir, T+1 açılışı sonraki satırdan alınır
+                            high_c = float(_get_val(row, "high", "High", default=0.0))
+                            low_c = float(_get_val(row, "low", "Low", default=0.0))
+                            high_p = 0.0
+                            low_p = 0.0
+
+                            if isinstance(curr_idx, int) and curr_idx >= 1:
+                                prev_row = df.iloc[curr_idx - 1]
+                                high_p = float(_get_val(prev_row, "high", "High", default=0.0))
+                                low_p = float(_get_val(prev_row, "low", "Low", default=0.0))
+
+                            start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
+                            hist_slice = df.iloc[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
+                            
+                            highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
+                            lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
+                            vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
+
+                            if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
+                                next_row = df.iloc[curr_idx + 1]
+                                next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
 
                         if not hasattr(self, "_history_cache"):
                             self._history_cache = {}
@@ -254,11 +285,6 @@ class PaperTradingOrchestrator:
                             "lows": lows_list,
                             "volumes": vols_list,
                         }
-
-                        # T+1 Açılış Fiyatı (Next Open Price) Çıkarımı
-                        if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
-                            next_row = df.iloc[curr_idx + 1]
-                            next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
                     except Exception:
                         continue
 
@@ -305,8 +331,12 @@ class PaperTradingOrchestrator:
             champion_signals=pending,
             benchmark_return_pct=benchmark_return_pct,
             data_quality_ok=data_quality_ok,
+            is_morning_execution=True,
         )
-        self.store.clear_pending_signals()
+        if report.get("status") == "COMPLETED":
+            self.store.clear_pending_signals()
+        else:
+            logger.warning("Morning execution incomplete; keeping pending signals for retry", date=date, status=report.get("status"))
         return report
 
     def mark_to_market_cycle(self, prices: Dict[str, float], date: str) -> Dict[str, Any]:
@@ -336,6 +366,7 @@ class PaperTradingOrchestrator:
                 sector_map=sector_map,
                 champion_signals=sigs,
                 benchmark_return_pct=bench_ret,
+                is_morning_execution=False,
             )
 
         return self.get_full_report()
@@ -378,7 +409,19 @@ class PaperTradingOrchestrator:
 
         self._audit_signal(date, signal)
 
-        # Alış veya Satış Yönü
+        # 1. Gerçek BIST Açılış / Yürütme Fiyatı Tespiti
+        next_open = signal.get("next_open_price") or next_open_prices.get(ticker)
+        if next_open is not None and float(next_open) > 0:
+            market_price = float(next_open)
+        else:
+            if self.require_next_open:
+                msg = f"NO_NEXT_OPEN_PRICE: Real T+1 open price required for BIST execution on {ticker} — NO_TRADE"
+                logger.warning(msg, ticker=ticker, date=date)
+                self._audit_no_trade(date, msg, ticker)
+                return {}
+            market_price = float(price)
+
+        # 2. Alış veya Satış Yönü & Gerçekçi Miktar Boyutlandırması (Açılış + %2 Kayma/Komisyon Tamponu)
         if direction == "LONG":
             side = "BUY"
             if ticker in self.portfolio._positions:
@@ -386,7 +429,9 @@ class PaperTradingOrchestrator:
                 return {}
             total_value = self.portfolio.get_total_value()
             target_weight = min(self.risk_gate.max_position_pct / 100.0, 0.1)
-            quantity = int((total_value * target_weight) / price)
+            # Gerçek açılış fiyatı + en kötü senaryo kayma tamponu ile miktar hesabı
+            worst_case_exec_price = market_price * 1.02
+            quantity = int((total_value * target_weight) / worst_case_exec_price) if worst_case_exec_price > 0 else 0
         elif direction == "SHORT":
             if ticker not in self.portfolio._positions:
                 self._audit_no_trade(date, f"No position to exit for {ticker}", ticker)
@@ -401,13 +446,13 @@ class PaperTradingOrchestrator:
             self._audit_no_trade(date, f"Quantity too small for {ticker}", ticker)
             return {}
 
-        # Risk Kapısı
+        # 3. Ön-İşlem (Pre-Trade) Risk Kapısı Kontrolleri (Gerçek Giriş Fiyatı ile)
         risk_checks = self.risk_gate.check_all(
             portfolio=self.portfolio,
             ticker=ticker,
             side=side,
             quantity=quantity,
-            price=price,
+            price=market_price,
             sector=sector,
             data_quality_ok=data_quality_ok,
             model_version_valid=(signal.get("model_version") == self._champion_version),

@@ -120,7 +120,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, A
 
                 top_10 = valid_preds[:10]
                 top_10_set = {item["ticker"] for item in top_10}
-                current_positions = list(paper_orchestrator.portfolio.get_all_positions().keys())
+                current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
 
                 # 1. Top-10 dışına çıkan mevcut pozisyonlar için SATIŞ (EXIT/SHORT) sinyalleri
                 exit_signals = [

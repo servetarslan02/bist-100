@@ -148,7 +148,7 @@ async def lifespan(app: FastAPI):
             # Sadece hafta ici calissin
             if datetime.now().weekday() < 5:
                 try:
-                    from ...pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
+                    from services.pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
                     if phase == "MORNING":
                         logger.info("paper_trading_scheduler: Sabah acilisi yurutme dongusu basliyor...")
                         await run_morning_execution_cycle()

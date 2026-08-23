@@ -113,7 +113,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.orch.portfolio.cash = 0.0
         self.orch.portfolio.settled_cash = 0.0
 
-        dates = pd.date_range("2024-01-01", periods=3, freq='B')
+        dates = pd.date_range("2024-01-01", periods=5, freq='B')
         market_data = self._make_mock_history(["THYAO"], dates)
 
         report = self.orch.execute_pending_signals(
@@ -124,6 +124,61 @@ class TestUnifiedPipeline(unittest.TestCase):
 
         # Yetersiz bakiye nedeniyle emir açılmamalıdır (Risk kapısı bloklar)
         self.assertEqual(report["num_orders"], 0)
+
+    def test_friday_eod_to_monday_morning_open_execution(self):
+        """Cuma akşamı üretilen sinyal Pazartesi sabahı Pazartesi açılış fiyatıyla yürütülmelidir."""
+        # Cuma (2024-01-05) ve Pazartesi (2024-01-08)
+        dates = pd.date_range("2024-01-01", periods=10, freq='B')
+        # 2024-01-05 Cuma = index 4, 2024-01-08 Pazartesi = index 5
+        market_data = self._make_mock_history(["THYAO"], dates)
+        
+        # Pazartesi açılış fiyatını belirgin bir değere sabitleyelim
+        df = market_data["THYAO"]
+        pazartesi_ts = pd.to_datetime("2024-01-08")
+        df.loc[pazartesi_ts, "Open"] = 285.50
+        df.loc[pazartesi_ts, "Close"] = 290.00
+
+        # Cuma akşamı sinyal üretildi
+        signals = [
+            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
+             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+        ]
+        self.orch.queue_pending_signals(signals, "2024-01-05")
+
+        # Pazartesi sabahı açılış yürütmesi
+        report = self.orch.execute_pending_signals(
+            date="2024-01-08",
+            market_data=market_data,
+            sector_map={"THYAO": "Havacilik"},
+        )
+
+        self.assertEqual(report["status"], "COMPLETED")
+        self.assertEqual(report["num_orders"], 1)
+
+        # Gerçekleşen fiyat Pazartesi açılışı (285.50) + slippage olmalıdır (asla Salı açılışı değil!)
+        pos = self.orch.portfolio._positions["THYAO"]
+        self.assertAlmostEqual(pos["avg_cost"], 285.50, delta=2.0)
+
+    def test_pending_signals_retained_on_failed_morning_run(self):
+        """Sabah yürütmesi veri kalitesi / kesinti nedeniyle başarısız olursa bekleyen sinyaller silinmez."""
+        signals = [
+            {"ticker": "THYAO", "direction": "LONG", "rank": 1, "score": 9.5,
+             "confidence": 0.85, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10},
+        ]
+        self.orch.queue_pending_signals(signals, "2024-01-05")
+
+        # Veri kalitesi hatasıyla sabah çalıştırması
+        report = self.orch.execute_pending_signals(
+            date="2024-01-08",
+            market_data={},
+            data_quality_ok=False,
+        )
+
+        self.assertEqual(report["status"], "NO_TRADE")
+
+        # Hata durumunda bekleyen sinyaller silinmeyip korunmalıdır
+        pending = self.store.load_pending_signals()
+        self.assertEqual(len(pending), 1)
 
 
 if __name__ == "__main__":
