@@ -57,8 +57,13 @@ class VirtualPortfolio:
         return max(0.0, self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash)
 
     @property
+    def total_cash(self) -> float:
+        """Toplam nakit varlığı (Settled + T1 + T2 - Blocked)."""
+        return self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash
+
+    @property
     def cash(self) -> float:
-        """Geriye dönük uyumluluk için purchasing_power döndürür."""
+        """Alım gücü / harcanabilir nakit."""
         return self.purchasing_power
 
     @cash.setter
@@ -329,9 +334,9 @@ class VirtualPortfolio:
     # ===================== QUERIES =====================
 
     def get_total_value(self) -> float:
-        """Toplam portföy değeri (cash + positions)."""
+        """Toplam portföy net aktif değeri (NAV = Toplam Nakit + Pozisyonlar)."""
         invested = sum(p["market_value"] for p in self._positions.values())
-        return self.cash + invested
+        return self.total_cash + invested
 
     def get_invested_value(self) -> float:
         return sum(p["market_value"] for p in self._positions.values())
@@ -417,6 +422,8 @@ class VirtualPortfolio:
         return {
             "initial_capital": self.initial_capital,
             "total_value": round(total_val, 2),
+            "total_cash": round(self.total_cash, 2),
+            "purchasing_power": round(self.purchasing_power, 2),
             "cash": round(self.cash, 2),
             "settled_cash": round(self.settled_cash, 2),
             "unsettled_cash_t1": round(self.unsettled_cash_t1, 2),
