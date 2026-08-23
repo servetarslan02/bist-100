@@ -426,7 +426,7 @@ class VirtualPortfolio:
             "realized_pnl": round(realized, 2),
             "total_pnl": round(total_pnl, 2),
             "total_return_pct": round(total_return_pct, 2),
-            "max_drawdown_pct": round(self.get_max_drawdown() * 100, 2),
+            "max_drawdown_pct": round(self.get_max_drawdown(), 2),
             "num_positions": len(self._positions),
             "num_trades": len(self._trades),
             "win_rate": round(win_rate, 4),

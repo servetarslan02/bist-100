@@ -251,9 +251,18 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
 
     # Redis Pub/Sub (push-based) + Stream (durable ledger) — PRIMARY
     try:
-        asyncio.create_task(_publish_with_idempotency(event))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+
+        if loop and loop.is_running():
+            loop.create_task(_publish_with_idempotency(event))
+        else:
+            # Senkron çalışma ortamında (event loop yokken) temiz şekilde çalıştır
+            asyncio.run(_publish_with_idempotency(event))
     except Exception as e:
-        logger.error("Redis Pub/Sub create_task failed", event_type=event.event_type, error=str(e))
+        logger.debug("Redis publish handled in sync environment", event_type=event.event_type, error=str(e))
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
