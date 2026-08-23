@@ -312,6 +312,56 @@ class KAPProvider:
                     continue
         return None
 
+    def sync_disclosures_to_registry(self, disclosures: List[Dict[str, Any]], current_date: str) -> int:
+        """KAP bildirimlerinden VBTS / Tedbir / İşlem durdurma kararlarını ayıklar ve KAPMarketRestrictionRegistry'ye kaydeder."""
+        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
+        
+        registered_count = 0
+        for item in disclosures:
+            ticker = item.get("ticker", "").strip()
+            if not ticker:
+                continue
+            
+            title = (item.get("title", "") + " " + item.get("summary", "")).lower()
+            pub_date = item.get("publish_date", current_date)
+            
+            # 1. VBTS Brüt Takas Tespiti
+            if any(w in title for w in ["brüt takas", "brut takas", "gross settlement"]):
+                kap_restriction_registry.register_restriction(
+                    ticker=ticker,
+                    restriction_type="VBTS_GROSS_SETTLEMENT",
+                    published_at=pub_date,
+                    effective_date=current_date,
+                    details=item.get("title", "KAP VBTS Brüt Takas Bildirimi")
+                )
+                registered_count += 1
+            
+            # 2. VBTS Açığa Satış ve Kredili İşlem Yasağı
+            elif any(w in title for w in ["açığa satış", "kredili işlem", "short sale ban"]):
+                kap_restriction_registry.register_restriction(
+                    ticker=ticker,
+                    restriction_type="VBTS_SHORT_BAN",
+                    published_at=pub_date,
+                    effective_date=current_date,
+                    details=item.get("title", "KAP Açığa Satış Yasağı")
+                )
+                registered_count += 1
+            
+            # 3. İşlem Sırası Durdurma / Devre Kesici (Halt)
+            elif any(w in title for w in ["işlem sırası durdurul", "işleme kapatıl", "devre kesici"]):
+                kap_restriction_registry.register_restriction(
+                    ticker=ticker,
+                    restriction_type="HALT",
+                    published_at=pub_date,
+                    effective_date=current_date,
+                    details=item.get("title", "KAP İşlem Sırası Durdurma")
+                )
+                registered_count += 1
+                
+        if registered_count > 0:
+            logger.info("Automated KAP market restrictions synced", count=registered_count, date=current_date)
+        return registered_count
+
     async def close(self):
         await self._client.close()
 
