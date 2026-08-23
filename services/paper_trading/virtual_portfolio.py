@@ -51,15 +51,19 @@ class VirtualPortfolio:
 
     @property
     def purchasing_power(self) -> float:
-        """Hisse alımında kullanılabilir işlem gücü (Strict T+2 vs Valörlü Alım Gücü)."""
-        if self.strict_t2:
-            return max(0.0, self.settled_cash - self.blocked_cash)
+        """Hisse alımında kullanılabilir işlem gücü (Takasbank T+2 Mahsup Kuralı).
+        Aynı günkü hisse satış alacakları (T+2), yeni hisse alımlarında (T+2) mahsup edilebilir."""
         return max(0.0, self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash)
+
+    @property
+    def withdrawable_cash(self) -> float:
+        """Banka hesabına serbest çekilebilir nakit (Sadece T+0 Takası Tamamlanmış Bakiye)."""
+        return max(0.0, self.settled_cash - self.blocked_cash)
 
     @property
     def total_cash(self) -> float:
         """Toplam nakit varlığı (Settled + T1 + T2 - Blocked)."""
-        return self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash
+        return max(0.0, self.settled_cash + self.unsettled_cash_t1 + self.unsettled_cash_t2 - self.blocked_cash)
 
     @property
     def cash(self) -> float:
@@ -424,6 +428,7 @@ class VirtualPortfolio:
             "total_value": round(total_val, 2),
             "total_cash": round(self.total_cash, 2),
             "purchasing_power": round(self.purchasing_power, 2),
+            "withdrawable_cash": round(self.withdrawable_cash, 2),
             "cash": round(self.cash, 2),
             "settled_cash": round(self.settled_cash, 2),
             "unsettled_cash_t1": round(self.unsettled_cash_t1, 2),
