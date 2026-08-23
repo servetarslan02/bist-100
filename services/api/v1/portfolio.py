@@ -64,6 +64,7 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
         from services.paper_trading.paper_orchestrator import paper_orchestrator
         summary = paper_orchestrator.portfolio.get_summary()
         summary["positions_count"] = summary.get("num_positions", 0)
+        summary["positions"] = paper_orchestrator.portfolio.get_all_positions()
         return summary
     except Exception as e:
         raise HTTPException(500, f"Portfolio summary error: {e}")

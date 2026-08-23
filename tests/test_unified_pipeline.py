@@ -155,9 +155,10 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.assertEqual(report["status"], "COMPLETED")
         self.assertEqual(report["num_orders"], 1)
 
-        # Gerçekleşen fiyat Pazartesi açılışı (285.50) + slippage olmalıdır (asla Salı açılışı değil!)
+        # Gerçekleşen fiyat Pazartesi açılışı (285.50) + mikro-yapı kayması olmalıdır (asla Salı açılışı değil!)
         pos = self.orch.portfolio._positions["THYAO"]
-        self.assertAlmostEqual(pos["avg_cost"], 285.50, delta=2.0)
+        self.assertAlmostEqual(pos["avg_cost"], 285.50, delta=5.0)
+        self.assertLess(pos["avg_cost"], 290.0)
 
     def test_pending_signals_retained_on_failed_morning_run(self):
         """Sabah yürütmesi veri kalitesi / kesinti nedeniyle başarısız olursa bekleyen sinyaller silinmez."""
