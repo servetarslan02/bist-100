@@ -118,15 +118,18 @@ services:
         --store_dir /data
         --max_payload 1048576
         --max_pending 67108864
+        --sync_interval 30s
     volumes:
       - nats_data:/data
     mem_limit: 128m
     cpus: 0.25
+    storage_opt:
+      size: '128M'
     healthcheck:
-      test: ["CMD", "nats-server", "--signal", "ldm=localhost:4222"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
       timeout: 5s
-n      retries: 10
+      retries: 10
       start_period: 5s
 
   redpanda:
