@@ -87,6 +87,7 @@ CREATE TABLE portfolios (
     invested_value DECIMAL(15,2) DEFAULT 0,
     total_pnl DECIMAL(15,2) DEFAULT 0,
     total_return_pct DECIMAL(8,4) DEFAULT 0,
+    peak_equity DECIMAL(15,2) DEFAULT 0,
     status VARCHAR(20) DEFAULT 'ACTIVE',
     is_paper BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -99,6 +100,7 @@ CREATE TABLE positions (
     instrument_id INTEGER REFERENCES instruments(id),
     quantity INTEGER NOT NULL DEFAULT 0,
     avg_cost DECIMAL(12,4) NOT NULL,
+    entry_commission DECIMAL(12,4) DEFAULT 0,
     current_price DECIMAL(12,4),
     market_value DECIMAL(15,2),
     unrealized_pnl DECIMAL(15,2) DEFAULT 0,
@@ -423,6 +425,7 @@ CREATE INDEX idx_state_snapshots_time ON state_snapshots(snapshot_time DESC);
 CREATE TABLE IF NOT EXISTS position_history (
     id SERIAL PRIMARY KEY,
     portfolio_id INTEGER REFERENCES portfolios(id),
+    reference_id VARCHAR(50),
     ticker VARCHAR(20) NOT NULL,
     action VARCHAR(20) NOT NULL CHECK (action IN ('OPEN', 'CLOSE', 'REDUCE', 'ADD')),
     direction VARCHAR(10) DEFAULT 'LONG',
@@ -606,6 +609,83 @@ CREATE TABLE IF NOT EXISTS backtest_equity (
 CREATE INDEX idx_backtest_trades_run ON backtest_trades(run_id);
 CREATE INDEX idx_backtest_equity_run ON backtest_equity(run_id);
 CREATE INDEX idx_backtest_equity_date ON backtest_equity(run_id, date);
+
+-- =====================================================
+-- CASH LEDGER (Cash movement audit trail)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS cash_ledger (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER REFERENCES portfolios(id),
+    amount DECIMAL(15, 4) NOT NULL,
+    balance_after DECIMAL(15, 4) NOT NULL,
+    entry_type VARCHAR(20) NOT NULL,
+    description TEXT,
+    ticker VARCHAR(20),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_cash_ledger_portfolio ON cash_ledger(portfolio_id);
+CREATE INDEX idx_cash_ledger_type ON cash_ledger(entry_type);
+
+-- =====================================================
+-- EQUITY SNAPSHOTS (Daily portfolio equity)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS equity_snapshots (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER REFERENCES portfolios(id),
+    snapshot_date DATE NOT NULL,
+    total_equity DECIMAL(15, 4) NOT NULL,
+    cash DECIMAL(15, 4) NOT NULL,
+    invested DECIMAL(15, 4) DEFAULT 0,
+    unrealized_pnl DECIMAL(15, 4) DEFAULT 0,
+    realized_pnl_today DECIMAL(15, 4) DEFAULT 0,
+    commission_today DECIMAL(15, 4) DEFAULT 0,
+    positions_count INTEGER DEFAULT 0,
+    high_water_mark DECIMAL(15, 4) DEFAULT 0,
+    drawdown_from_hwm DECIMAL(8, 4) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_equity_snapshots_portfolio ON equity_snapshots(portfolio_id);
+CREATE INDEX idx_equity_snapshots_date ON equity_snapshots(snapshot_date DESC);
+
+-- =====================================================
+-- DAILY P&L (Daily performance tracking)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS daily_pnl (
+    id SERIAL PRIMARY KEY,
+    portfolio_id INTEGER REFERENCES portfolios(id),
+    pnl_date DATE NOT NULL,
+    realized_pnl DECIMAL(15, 4) DEFAULT 0,
+    unrealized_pnl DECIMAL(15, 4) DEFAULT 0,
+    commission DECIMAL(15, 4) DEFAULT 0,
+    net_pnl DECIMAL(15, 4) DEFAULT 0,
+    equity_start DECIMAL(15, 4) DEFAULT 0,
+    equity_end DECIMAL(15, 4) DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(portfolio_id, pnl_date)
+);
+
+CREATE INDEX idx_daily_pnl_portfolio ON daily_pnl(portfolio_id);
+CREATE INDEX idx_daily_pnl_date ON daily_pnl(pnl_date DESC);
+
+-- =====================================================
+-- EVENT LEDGER (Event bus idempotency)
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS event_ledger (
+    id SERIAL PRIMARY KEY,
+    event_id VARCHAR(100) UNIQUE NOT NULL,
+    event_type VARCHAR(50),
+    payload TEXT,
+    published_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_event_ledger_id ON event_ledger(event_id);
+CREATE INDEX idx_event_ledger_type ON event_ledger(event_type);
 
 -- =====================================================
 -- DEFAULT DATA

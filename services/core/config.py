@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     # Redpanda (Kafka-compatible)
     redpanda_brokers: str = Field(default="localhost:9092", alias="REDPANDA_BROKERS")
 
+    # NATS (yüksek throughput, düşük gecikme)
+    nats_url: str = Field(default="nats://localhost:4222", alias="NATS_URL")
+
+    # gRPC
+    grpc_port: int = Field(default=50051, alias="GRPC_PORT")
+
     # LLM
     ollama_base_url: str = Field(default="http://host.docker.internal:11434", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field(default="gemma4:12b-q4_0", alias="OLLAMA_MODEL")

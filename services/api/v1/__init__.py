@@ -23,6 +23,7 @@ from .viop import router as viop_router
 from .event_study import router as event_study_router
 from .system import router as system_router
 from .ws import router as ws_router
+from .sse import router as sse_router
 
 v1_router = APIRouter(prefix="/api/v1")
 
@@ -43,6 +44,7 @@ v1_router.include_router(viop_router, prefix="/viop", tags=["VIOP"])
 v1_router.include_router(event_study_router, prefix="/event-study", tags=["Event Study"])
 v1_router.include_router(system_router, prefix="/system", tags=["System"])
 v1_router.include_router(ws_router, prefix="/ws", tags=["WebSockets"])
+v1_router.include_router(sse_router, prefix="/sse", tags=["Server-Sent Events"])
 
 # Direct Frontend Route Aliases (Sıfır 404 Garantisi)
 v1_router.include_router(scanner_router, prefix="", tags=["Scanner (Direct)"])

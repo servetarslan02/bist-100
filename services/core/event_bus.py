@@ -5,6 +5,7 @@ Dış kaynaklardan veri PUSH ile gelir.
 Sürekli API isteği YOKTUR.
 """
 
+import os
 import json
 import asyncio
 from typing import Optional, Callable, Dict, Any, List
@@ -295,7 +296,7 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
-    """Idempotent publish to Redis Pub/Sub + Stream."""
+    """Idempotent publish to Redis Pub/Sub + Stream + NATS."""
     # Idempotency check
     is_new = await _check_and_mark_published(event.event_id)
     if not is_new:
@@ -307,6 +308,9 @@ async def _publish_with_idempotency(event: CanonicalEvent):
 
     # Stream (durable ledger)
     await _publish_to_stream(event)
+
+    # NATS (yüksek throughput, düşük gecikme)
+    await _publish_to_nats(event)
 
 
 _redis_conn = None
@@ -350,18 +354,17 @@ async def _check_and_mark_published(event_id: str) -> bool:
 
     # 2. PostgreSQL dene
     try:
-        from services.core.database_dev import dev_db
-        if hasattr(dev_db, "pg_fetchrow") and getattr(dev_db, "_pool", None) is not None:
-            existing = await dev_db.pg_fetchrow(
-                "SELECT event_id FROM event_ledger WHERE event_id = ?", event_id
-            )
-            if existing:
-                return False
-            await dev_db.pg_execute(
-                "INSERT OR IGNORE INTO event_ledger (event_id, published_at) VALUES (?, CURRENT_TIMESTAMP)",
-                event_id
-            )
-            return True
+        from services.core.database import pg_fetchrow, pg_execute
+        existing = await pg_fetchrow(
+            "SELECT event_id FROM event_ledger WHERE event_id = $1", event_id
+        )
+        if existing:
+            return False
+        await pg_execute(
+            "INSERT INTO event_ledger (event_id, published_at) VALUES ($1, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
+            event_id
+        )
+        return True
     except Exception as e:
         logger.debug("PostgreSQL idempotency check skipped", error=str(e))
 
@@ -389,14 +392,40 @@ async def _publish_to_stream(event: CanonicalEvent):
 
     # 2. PostgreSQL dene
     try:
-        from services.core.database_dev import dev_db
-        await dev_db.pg_execute(
-            "INSERT OR IGNORE INTO event_ledger (event_id, event_type, payload, published_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+        from services.core.database import pg_execute
+        await pg_execute(
+            "INSERT INTO event_ledger (event_id, event_type, payload, published_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) ON CONFLICT (event_id) DO NOTHING",
             event.event_id, event.event_type, event.to_json()
         )
         return
     except Exception as e:
         logger.warning("PG event ledger write failed", error=str(e))
+
+
+# =====================================================
+# NATS Integration (Yüksek throughput, düşük gecikme)
+# Tek client: services.nats.client.nats_client
+# =====================================================
+
+
+async def _publish_to_nats(event: CanonicalEvent):
+    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
+    try:
+        from ..nats.client import nats_client
+        subject = f"alpha.{event.event_type}"
+        await nats_client.publish(subject, event.to_json())
+    except Exception as e:
+        logger.debug("NATS publish skipped", error=str(e))
+
+
+async def subscribe_nats(subject: str, handler: Callable):
+    """NATS konusuna abone ol."""
+    try:
+        from ..nats.client import nats_client
+        await nats_client.subscribe(subject, handler=handler)
+        logger.info("NATS subscribed", subject=subject)
+    except Exception as e:
+        logger.debug("NATS subscribe skipped", error=str(e))
 
 
 def flush_producer():

@@ -12,7 +12,7 @@ ALL_MODULES = [
     "services.core.decision_engine","services.core.infrastructure","services.core.event_bus",
     "services.core.observability","services.core.recovery","services.core.state_recovery",
     "services.core.config","services.core.models","services.core.event_schema",
-    "services.core.logging","services.core.database","services.core.database_dev",
+    "services.core.logging","services.core.database",
     "services.core.short_selling","services.core.fee_calculator","services.core.price_limits",
     "services.core.halt_monitor","services.core.gross_settlement","services.core.viop_monitor","services.core.compliance",
     # B27: SPK
@@ -62,7 +62,7 @@ ALL_MODULES = [
     "services.scanner.event_scanner","services.scanner.live_scanner","services.scanner.opportunity_engine","services.scanner.tiered_scanner",
     "services.scheduler.daily_report","services.scheduler.unified_scheduler",
     "services.simulation.execution_simulator","services.simulation.main",
-    "services.api.main","services.api.server","services.api.websocket","services.market_state.main",
+    "services.api.app","services.api.websocket","services.market_state.main",
     # Alternative Data (5)
     "services.alternative.web_scraping","services.alternative.social","services.alternative.jobs",
     "services.alternative.credit_card","services.alternative.satellite",

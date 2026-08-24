@@ -1,20 +1,24 @@
 """
-ALPHA BIST — NATS Client v1.0
+ALPHA BIST — NATS Client v2.0 (Unified)
 
+Tek NATS client — tüm sistem bu client'ı kullanır.
 Redis Pub/Sub'a alternatif: daha hızlı, daha dayanıklı.
 10M+ msg/s throughput, JetStream ile kalıcılık.
 
 Kullanım:
-    from services.nats.client import NatsClient
-    
-    async with NatsClient() as nc:
-        await nc.publish("market.ticks", data)
-        async for msg in nc.subscribe("market.ticks"):
-            print(msg)
+    from services.nats.client import nats_client, Subjects
+
+    # Publish
+    await nats_client.publish(Subjects.TICKS, {"ticker": "THYAO", "price": 100})
+
+    # Subscribe
+    async for msg in nats_client.subscribe(Subjects.TICKS):
+        print(msg)
 """
 
 import asyncio
 import json
+import os
 from typing import Optional, Callable, Dict, Any, AsyncIterator
 import structlog
 
@@ -29,125 +33,132 @@ logger = structlog.get_logger()
 
 
 class NatsClient:
-    """NATS istemcisi — Redis Pub/Sub'a alternatif."""
+    """NATS istemcisi — tek instance, tüm sistem kullanır."""
 
-    def __init__(self, servers: str = "nats://localhost:4222"):
-        self.servers = servers
+    def __init__(self):
         self._nc: Optional[NATS] = None
         self._subscriptions: Dict[str, Any] = {}
+        self._connected = False
 
-    async def connect(self):
+    async def connect(self, servers: str = None) -> bool:
         """NATS'a bağlan."""
         if not HAS_NATS:
-            logger.warning("nats-py not installed, falling back to Redis")
+            logger.debug("nats-py not installed")
             return False
 
+        if self._connected and self._nc:
+            return True
+
         try:
-            self._nc = await nats.connect(self.servers)
-            logger.info("NATS connected", servers=self.servers)
+            url = servers or os.environ.get("NATS_URL", "nats://localhost:4222")
+            self._nc = await nats.connect(url)
+            self._connected = True
+            logger.info("NATS connected", url=url)
             return True
         except Exception as e:
-            logger.warning("NATS connection failed", error=str(e))
+            logger.debug("NATS connection failed", error=str(e))
+            self._connected = False
             return False
 
     async def close(self):
         """Bağlantıyı kapat."""
         if self._nc:
-            await self._nc.close()
+            try:
+                await self._nc.close()
+            except Exception:
+                pass
             self._nc = None
+            self._connected = False
 
-    async def publish(self, subject: str, data: Any):
-        """Veri yayınla."""
-        if not self._nc:
-            # Fallback: Redis Pub/Sub
-            await self._publish_redis(subject, data)
-            return
+    @property
+    def is_connected(self) -> bool:
+        return self._connected and self._nc is not None
+
+    async def publish(self, subject: str, data: Any) -> bool:
+        """Veri yayınla. Başarısız olursa False döner."""
+        if not self.is_connected:
+            if not await self.connect():
+                return False
 
         try:
             if isinstance(data, dict):
-                payload = json.dumps(data).encode()
+                payload = json.dumps(data, default=str).encode()
             elif isinstance(data, bytes):
                 payload = data
+            elif isinstance(data, str):
+                payload = data.encode()
             else:
-                payload = str(data).encode()
+                payload = json.dumps(data, default=str).encode()
 
             await self._nc.publish(subject, payload)
+            return True
         except Exception as e:
-            logger.error("NATS publish failed", subject=subject, error=str(e))
+            logger.debug("NATS publish failed", subject=subject, error=str(e))
+            self._connected = False
+            return False
 
-    async def subscribe(self, subject: str) -> AsyncIterator[Dict[str, Any]]:
-        """Konuya abone ol."""
-        if not self._nc:
-            async for msg in self._subscribe_redis(subject):
-                yield msg
-            return
+    async def subscribe(self, subject: str, handler: Callable = None) -> AsyncIterator[Dict[str, Any]]:
+        """Konuya abone ol. handler verilirse callback, verilmezse async iterator döner."""
+        if not self.is_connected:
+            if not await self.connect():
+                return
 
         try:
-            sub = await self._nc.subscribe(subject)
-            self._subscriptions[subject] = sub
+            if handler:
+                # Callback mode
+                async def _msg_handler(msg):
+                    try:
+                        data = json.loads(msg.data.decode())
+                        if asyncio.iscoroutinefunction(handler):
+                            await handler(data)
+                        else:
+                            handler(data)
+                    except Exception as e:
+                        logger.error("NATS handler error", subject=subject, error=str(e))
 
-            async for msg in sub.messages:
-                try:
-                    data = json.loads(msg.data.decode())
-                    yield data
-                except json.JSONDecodeError:
-                    yield {"raw": msg.data.decode()}
+                sub = await self._nc.subscribe(subject, cb=_msg_handler)
+                self._subscriptions[subject] = sub
+                logger.debug("NATS subscribed (callback)", subject=subject)
+            else:
+                # Iterator mode
+                sub = await self._nc.subscribe(subject)
+                self._subscriptions[subject] = sub
+
+                async for msg in sub.messages:
+                    try:
+                        data = json.loads(msg.data.decode())
+                        yield data
+                    except json.JSONDecodeError:
+                        yield {"raw": msg.data.decode()}
         except Exception as e:
-            logger.error("NATS subscribe failed", subject=subject, error=str(e))
+            logger.debug("NATS subscribe failed", subject=subject, error=str(e))
 
     async def request(self, subject: str, data: Any, timeout: float = 5.0) -> Dict[str, Any]:
         """İstek-yanıt (request-reply pattern)."""
-        if not self._nc:
-            return {}
+        if not self.is_connected:
+            if not await self.connect():
+                return {}
 
         try:
             if isinstance(data, dict):
-                payload = json.dumps(data).encode()
+                payload = json.dumps(data, default=str).encode()
             else:
                 payload = str(data).encode()
 
             response = await self._nc.request(subject, payload, timeout=timeout)
             return json.loads(response.data.decode())
         except Exception as e:
-            logger.error("NATS request failed", subject=subject, error=str(e))
+            logger.debug("NATS request failed", subject=subject, error=str(e))
             return {}
 
-    async def _publish_redis(self, subject: str, data: Any):
-        """Redis Pub/Sub fallback."""
-        try:
-            import redis.asyncio as aioredis
-            from ..core.config import settings
-            r = aioredis.from_url(settings.redis_url, decode_responses=True)
-            await r.publish(subject, json.dumps(data, default=str))
-            await r.close()
-        except Exception as e:
-            logger.error("Redis publish fallback failed", error=str(e))
-
-    async def _subscribe_redis(self, subject: str) -> AsyncIterator[Dict[str, Any]]:
-        """Redis Pub/Sub fallback."""
-        try:
-            import redis.asyncio as aioredis
-            from ..core.config import settings
-            r = aioredis.from_url(settings.redis_url, decode_responses=True)
-            pubsub = r.pubsub()
-            await pubsub.subscribe(subject)
-
-            async for message in pubsub.listen():
-                if message["type"] == "message":
-                    try:
-                        data = json.loads(message["data"])
-                        yield data
-                    except json.JSONDecodeError:
-                        yield {"raw": message["data"]}
-        except Exception as e:
-            logger.error("Redis subscribe fallback failed", error=str(e))
-
-    async def __aenter__(self):
-        await self.connect()
-        return self
-
-    async def __aexit__(self, *args):
-        await self.close()
+    async def unsubscribe(self, subject: str):
+        """Aboneliği iptal et."""
+        if subject in self._subscriptions:
+            try:
+                await self._subscriptions[subject].unsubscribe()
+            except Exception:
+                pass
+            del self._subscriptions[subject]
 
 
 # =====================================================
@@ -156,12 +167,21 @@ class NatsClient:
 
 class Subjects:
     """NATS konu tanımları — organize mesajlaşma."""
-    TICKS = "market.ticks"
-    OHLCV = "market.ohlcv"
-    SIGNALS = "signals.new"
-    PORTFOLIO = "portfolio.update"
-    RISK = "risk.alerts"
-    EVENTS = "events.market"
-    ALERTS = "alerts.all"
-    REGIME = "market.regime"
-    LEARNING = "learning.update"
+    TICKS = "alpha.market.ticks"
+    OHLCV = "alpha.market.ohlcv"
+    SIGNALS = "alpha.signals.new"
+    PORTFOLIO = "alpha.portfolio.update"
+    RISK = "alpha.risk.alerts"
+    EVENTS = "alpha.events.market"
+    ALERTS = "alpha.alerts.all"
+    REGIME = "alpha.market.regime"
+    LEARNING = "alpha.learning.update"
+    DECISIONS = "alpha.decisions.created"
+    ORDERS = "alpha.orders.placed"
+
+
+# =====================================================
+# Singleton
+# =====================================================
+
+nats_client = NatsClient()

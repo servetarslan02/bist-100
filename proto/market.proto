@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package alpha_bist;
 
-option python_package = "services.grpc";
-
 // =====================================================
 // ALPHA BIST — Protobuf Tanımları v1.0
 // JSON'dan 10x küçük, 10x hızlı

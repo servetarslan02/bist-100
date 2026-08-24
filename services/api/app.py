@@ -209,12 +209,45 @@ async def lifespan(app: FastAPI):
     storage_task = asyncio.create_task(_auto_storage_optimizer())
     paper_task = asyncio.create_task(_paper_trading_scheduler())
 
+    # gRPC sunucusunu başlat (servisler arası hızlı iletişim)
+    grpc_server = None
+    try:
+        from ..grpc.server import start_grpc_server
+        grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
+        grpc_server = await start_grpc_server(port=grpc_port)
+        if grpc_server:
+            logger.info("gRPC server started", port=grpc_port)
+    except Exception as e:
+        logger.warning("gRPC server not started", error=str(e))
+
+    # NATS bağlantısını başlat (tek client)
+    try:
+        from ..nats.client import nats_client
+        await nats_client.connect()
+    except Exception as e:
+        logger.warning("NATS not connected", error=str(e))
+
     yield
 
     task.cancel()
     ml_task.cancel()
     storage_task.cancel()
     paper_task.cancel()
+
+    # gRPC sunucusunu kapat
+    if grpc_server:
+        try:
+            await grpc_server.stop(grace=5)
+            logger.info("gRPC server stopped")
+        except Exception as e:
+            logger.warning("gRPC stop error", error=str(e))
+
+    # NATS bağlantısını kapat
+    try:
+        from ..nats.client import nats_client
+        await nats_client.close()
+    except Exception:
+        pass
 
     # OpenTelemetry kapat
     shutdown_telemetry()
@@ -335,13 +368,32 @@ def create_app() -> FastAPI:
     async def health():
         from datetime import datetime, timezone
         db_health = await check_db_health()
-        all_healthy = all(v == "healthy" for v in db_health.values())
+
+        # NATS sağlık kontrolü
+        nats_status = "unavailable"
+        try:
+            from ..nats.client import nats_client
+            if nats_client.is_connected:
+                nats_status = "healthy"
+        except Exception:
+            pass
+
+        # gRPC sağlık kontrolü
+        grpc_status = "unavailable"
+        try:
+            from ..grpc.server import HAS_GRPC
+            grpc_status = "healthy" if HAS_GRPC else "unavailable"
+        except Exception:
+            pass
+
+        all_services = {**db_health, "nats": nats_status, "grpc": grpc_status}
+        all_healthy = all(v == "healthy" for v in all_services.values())
         return {
             "status": "healthy" if all_healthy else "degraded",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "version": "2.0.0",
             "server": "canonical (app.py)",
-            "services": db_health,
+            "services": all_services,
         }
 
     @app.get("/health/detailed")

@@ -24,20 +24,12 @@ logger = structlog.get_logger()
 
 
 async def _db_fetchrow(query, *args):
-    """Fetch single row - try dev_db first, then pg."""
-    try:
-        from ..core.database_dev import dev_db
-        return await dev_db.pg_fetchrow(query, *args)
-    except Exception as e:
-        return await pg_fetchrow(query, *args)
+    """Fetch single row from PostgreSQL."""
+    return await pg_fetchrow(query, *args)
 
 async def _db_fetchval(query, *args):
-    """Fetch single value - try dev_db first, then pg."""
-    try:
-        from ..core.database_dev import dev_db
-        return await dev_db.pg_fetchval(query, *args)
-    except Exception as e:
-        return await pg_fetchval(query, *args)
+    """Fetch single value from PostgreSQL."""
+    return await pg_fetchval(query, *args)
 
 
 class RiskEngine:

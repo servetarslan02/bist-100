@@ -105,6 +105,30 @@ services:
       retries: 10
       start_period: 5s
 
+  nats:
+    <<: *common
+    image: nats:2.11-alpine
+    container_name: alpha-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: >
+      nats-server
+        --jetstream
+        --store_dir /data
+        --max_payload 1048576
+        --max_pending 67108864
+    volumes:
+      - nats_data:/data
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "nats-server", "--signal", "ldm=localhost:4222"]
+      interval: 5s
+      timeout: 5s
+n      retries: 10
+      start_period: 5s
+
   redpanda:
     <<: *common
     image: redpandadata/redpanda:v25.3.17
@@ -159,6 +183,7 @@ services:
     container_name: alpha-api
     ports:
       - "8000:8000"
+      - "50051:50051"
     volumes:
       - ./services:/app/services:ro
       - ./ml:/app/ml:ro
@@ -180,6 +205,8 @@ services:
       - TORCH_DEVICE=cuda
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - NATS_URL=nats://nats:4222
+      - GRPC_PORT=50051
     mem_limit: 512m
     cpus: 0.5
     healthcheck:
@@ -196,6 +223,8 @@ services:
       redis:
         condition: service_healthy
       redpanda:
+        condition: service_healthy
+      nats:
         condition: service_healthy
 
   ingestion:
@@ -548,6 +577,7 @@ volumes:
   clickhouse_data:
   redis_data:
   redpanda_data:
+  nats_data:
 
 networks:
   alpha-net:
