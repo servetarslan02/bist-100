@@ -21,7 +21,7 @@ NOT: Bu dosya CANONICAL production entry point'tir.
 import os
 import time
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -125,10 +125,19 @@ async def lifespan(app: FastAPI):
                 logger.warning(f"auto_storage_optimizer: {e}")
 
     async def _paper_trading_scheduler():
-        """BIST seans takvimine gore calisir: 18:15 EOD sinyal uretimi & 09:55 sabah acilisi yurutme."""
+        """BIST seans takvimine gore calisir: 18:15 EOD sinyal uretimi & 09:55 sabah acilisi yurutme.
+
+        NOT: Container'lar genelde UTC calisir (dockerd.log dogrulandi: TZ=UTC).
+        datetime.now() ONCEDEN UTC dondugunden, 09:55/18:15 hedefleri gercekte
+        BIST/Turkiye saatinde (UTC+3) 12:55 ve 21:15'e denk geliyordu — yani
+        "sabah acilisi" gercek acilistan (10:00 TR) 2.5 saat SONRA, "EOD" da
+        gercek kapanistan (18:00 TR) 3 saat SONRA (piyasa çoktan kapanmisken)
+        tetikleniyordu. Bu satirlar TR_TZ (UTC+3) ile hesaplaniyor.
+        """
+        TR_TZ = timezone(timedelta(hours=3))
         while True:
-            now = datetime.now()
-            # Gunluk hedefler: 09:55 ve 18:15
+            now = datetime.now(TR_TZ)
+            # Gunluk hedefler: 09:55 ve 18:15 (Turkiye/BIST saatiyle)
             t_morning = now.replace(hour=9, minute=55, second=0, microsecond=0)
             t_eod = now.replace(hour=18, minute=15, second=0, microsecond=0)
 
@@ -143,11 +152,11 @@ async def lifespan(app: FastAPI):
 
             target_time, phase = min(upcoming, key=lambda x: x[0])
             sleep_seconds = (target_time - now).total_seconds()
-            logger.info(f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')}) tetiklenecek.")
+            logger.info(f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')} TR) tetiklenecek.")
             await asyncio.sleep(sleep_seconds)
 
-            # Sadece hafta ici calissin
-            if datetime.now().weekday() < 5:
+            # Sadece hafta ici calissin (TR saatine gore)
+            if datetime.now(TR_TZ).weekday() < 5:
                 try:
                     from services.pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
                     if phase == "MORNING":
