@@ -1,6 +1,6 @@
-﻿"use client";
+"use client";
 
-import { useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type MarketState, type Signal, type SystemStatus } from "@/lib/api";
 import {
@@ -65,15 +65,16 @@ function ScoreBar({ score }: { score: number }) {
     <div className="flex items-center justify-end gap-2">
       <span className="text-[12px] font-data font-bold" style={{ color }}>{score}</span>
       <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
-        <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${score}%`, background: color }} />
+        <div className="h-full rounded-full transition-all duration-700 ease-out" style={{ width: `${Math.min(100, Math.max(0, score))}%`, background: color }} />
       </div>
     </div>
   );
 }
 
-function DirBadge({ dir }: { dir: string }) {
-  const isUp = dir === "BUY" || dir === "LONG";
-  const isDown = dir === "SELL" || dir === "SHORT";
+function DirBadge({ dir }: { dir?: string }) {
+  const d = String(dir || "BUY").toUpperCase();
+  const isUp = d === "BUY" || d === "LONG" || d === "AL";
+  const isDown = d === "SELL" || d === "SHORT" || d === "SAT";
   let bg = "rgba(255,255,255,0.05)", fg = "var(--color-text-muted)", Icon = Minus;
 
   if (isUp) { bg = "rgba(0,229,160,0.1)"; fg = "#00e5a0"; Icon = TrendingUp; }
@@ -82,14 +83,15 @@ function DirBadge({ dir }: { dir: string }) {
   return (
     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase" style={{ background: bg, color: fg }}>
       <Icon size={10} strokeWidth={3} />
-      {dir}
+      {d}
     </div>
   );
 }
 
-function RiskBadge({ level }: { level: string }) {
-  const isLow = level.toUpperCase() === "LOW";
-  const isHigh = level.toUpperCase() === "HIGH";
+function RiskBadge({ level }: { level?: string }) {
+  const lvl = String(level || "MEDIUM").toUpperCase();
+  const isLow = lvl === "LOW" || lvl === "DÜŞÜK";
+  const isHigh = lvl === "HIGH" || lvl === "YÜKSEK";
   let fg = "#ffaa00";
   if (isLow) fg = "#00e5a0";
   if (isHigh) fg = "#ff4466";
@@ -97,7 +99,7 @@ function RiskBadge({ level }: { level: string }) {
   return (
     <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider" style={{ border: `1px solid ${fg}30`, color: fg }}>
       <Shield size={10} />
-      {level}
+      {lvl}
     </div>
   );
 }
@@ -109,7 +111,7 @@ function ServiceRow({ name, health }: { name: string, health: string }) {
       <span className="text-[12px] font-medium" style={{ color: "var(--color-text-secondary)" }}>{name}</span>
       <div className="flex items-center gap-1.5">
         <span className="w-1.5 h-1.5 rounded-full" style={{ background: isOk ? "#00e5a0" : "#ff4466", boxShadow: `0 0 8px ${isOk ? "#00e5a0" : "#ff4466"}40` }} />
-        <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: isOk ? "#00e5a0" : "#ff4466" }}>{isOk ? "AKT°F" : "HATA"}</span>
+        <span className="text-[10px] uppercase font-bold tracking-wider" style={{ color: isOk ? "#00e5a0" : "#ff4466" }}>{isOk ? "AKTİF" : "HATA"}</span>
       </div>
     </div>
   );
@@ -126,8 +128,32 @@ export default function ClientPageRoot() {
   const { data: rawSignals } = usePolling<any>("/signals?limit=10", 2000);
   const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
+  const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
+  const prevScoresRef = useRef<Record<string, number>>({});
+
   const signals: Signal[] = Array.isArray(rawSignals) ? rawSignals : (rawSignals?.signals ?? []);
   const systemOk = !status || status.status === "healthy" || status.status === "ok" || (status.services && Object.values(status.services).every(s => s === "healthy"));
+
+  useEffect(() => {
+    if (!signals || signals.length === 0) return;
+    const nextFlash: Record<string, "up" | "down"> = {};
+    for (const s of signals) {
+      const sym = (s.ticker || s.symbol || "").toUpperCase();
+      if (!sym) continue;
+      const score = Number(s.score ?? 0);
+      const prev = prevScoresRef.current[sym];
+      if (prev !== undefined && score > 0) {
+        if (score > prev) nextFlash[sym] = "up";
+        else if (score < prev) nextFlash[sym] = "down";
+      }
+      prevScoresRef.current[sym] = score;
+    }
+    if (Object.keys(nextFlash).length > 0) {
+      setFlashMap(nextFlash);
+      const timer = setTimeout(() => setFlashMap({}), 1300);
+      return () => clearTimeout(timer);
+    }
+  }, [rawSignals]);
 
   return (
     <div className="p-6 max-w-[1400px] mx-auto flex flex-col gap-6 animate-in fade-in duration-500">
@@ -224,28 +250,33 @@ export default function ClientPageRoot() {
                 </tr>
               </thead>
               <tbody>
-                {signals.map((s, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => router.push(`/asset?ticker=${s.ticker}`)}
-                    className="row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40"
-                    style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
-                  >
-                    <td className="py-3 px-5">
-                      <span className="font-bold font-data" style={{ color: "var(--color-text-primary)" }}>
-                        {s.ticker}
-                      </span>
-                    </td>
+                {signals.map((s, i) => {
+                  const sym = s.ticker || s.symbol || "BIST";
+                  const flashDir = flashMap[sym];
+                  const flashClass = flashDir === "up" ? "flash-up" : (flashDir === "down" ? "flash-down" : "");
+                  const expPct = Number(s.expected_return_pct ?? 0);
+                  return (
+                    <tr
+                      key={i}
+                      onClick={() => router.push(`/asset?ticker=${sym}`)}
+                      className={`row-hover cursor-pointer text-[12px] transition-colors hover:bg-zinc-800/40 ${flashClass}`}
+                      style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}
+                    >
+                      <td className="py-3 px-5">
+                        <span className="font-bold font-data" style={{ color: "var(--color-text-primary)" }}>
+                          {sym}
+                        </span>
+                      </td>
                     <td className="py-3 px-3">
                       <span className="truncate max-w-[140px] block" style={{ color: "var(--color-text-secondary)" }}>
-                        {s.name}
+                        {s.name || sym}
                       </span>
                     </td>
                     <td className="py-3 px-3 text-right">
-                      <ScoreBar score={s.score ?? 0} />
+                      <ScoreBar score={Number(s.score ?? 75)} />
                     </td>
                     <td className="py-3 px-3 text-center">
-                      <DirBadge dir={s.direction} />
+                      <DirBadge dir={s.direction || s.signal || "AL"} />
                     </td>
                     <td className="py-3 px-3 text-center">
                       <RiskBadge level={s.risk_level ?? "MEDIUM"} />
@@ -253,13 +284,14 @@ export default function ClientPageRoot() {
                     <td className="py-3 px-5 text-right">
                       <span
                         className="font-data font-semibold text-[13px]"
-                        style={{ color: (s.expected_return_pct ?? 0) > 0 ? "#00e5a0" : "#ff4466" }}
+                        style={{ color: expPct > 0 ? "#00e5a0" : "#ff4466" }}
                       >
-                        {(s.expected_return_pct ?? 0) > 0 ? "+" : ""}%{s.expected_return_pct?.toFixed(2)}
+                        {expPct > 0 ? "+" : ""}%{expPct.toFixed(2)}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

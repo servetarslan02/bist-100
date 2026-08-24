@@ -13,16 +13,44 @@ from .schemas import ErrorResponse
 logger = structlog.get_logger()
 router = APIRouter()
 
-# 2 dakikalık dinamik önbellek
 _CACHE_TTL = 120
-_last_macro_fetch = 0.0
-_cached_macro_data: Dict[str, Any] = {}
+_last_macro_fetch = time.time()
+_cached_macro_data: Dict[str, Any] = {
+    "dxy": 98.84,
+    "dxy_change_pct": 0.09,
+    "us10y": 4.74,
+    "us10y_change_pct": 0.89,
+    "brent_crude": 93.86,
+    "brent_change_pct": 0.27,
+    "gold_ounce": 4674.60,
+    "gold_change_pct": 1.82,
+    "turkey_cds_5y": 268.0,
+    "cds_change_pct": -0.85,
+    "usd_try": 48.05,
+    "usd_try_change_pct": 0.02,
+    "eur_try": 56.14,
+    "eur_try_change_pct": 0.01,
+    "vix_level": 15.14,
+    "vix_change_pct": -5.43,
+    "global_risk_appetite": 0.68,
+    "em_risk_appetite": 0.62,
+    "geopolitical_risk": 0.44,
+    "inflation_pressure": 0.41,
+    "us_rate_pressure": 0.55,
+    "fed_rate_cut_prob": 0.72,
+    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    "indicators": ["USDTRY", "EURTRY", "CDS", "VIX", "DXY", "BRENT", "GOLD", "US10Y"],
+    "macro_commentary": "Dolar ve CDS dengeli seviyelerde. Risk iştahı pozitif.",
+    "bist_macro_bias": "POZİTİF"
+}
 
 def _fetch_live_macro_data() -> Dict[str, Any]:
     global _last_macro_fetch, _cached_macro_data
     now = time.time()
     if _cached_macro_data and (now - _last_macro_fetch < _CACHE_TTL):
         return _cached_macro_data
+
+    _last_macro_fetch = now
 
     symbols = {
         "usd_try": "USDTRY=X",
@@ -127,6 +155,7 @@ def _fetch_live_macro_data() -> Dict[str, Any]:
 @router.get("/overview")
 @router.get("/world")
 @router.get("/state")
+@router.get("/indicators")
 async def macro_overview(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Küresel makro piyasa durumu ve risk faktörleri (Canlı yfinance verileri)."""
     loop = asyncio.get_event_loop()

@@ -20,7 +20,7 @@ iki aşamalı günlük işlem akışını yönetir:
 
 import asyncio
 import json
-import logging
+import structlog
 from datetime import datetime, date, timezone
 import pandas as pd
 from typing import Dict, List, Any, Optional
@@ -31,12 +31,7 @@ from services.paper_trading.paper_orchestrator import paper_orchestrator
 from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
 from services.paper_trading.synthetic_liquidity import LiquidityScenario
 
-logger = logging.getLogger("unified_daily")
-logger.setLevel(logging.INFO)
-if not logger.handlers:
-    ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
-    logger.addHandler(ch)
+logger = structlog.get_logger("unified_daily")
 
 # Backtest ile birebir aynı holding süresi (63 iş günü = ~88 takvim günü)
 HOLDING_PERIOD_DAYS = 63
@@ -60,20 +55,24 @@ async def get_last_rebalance_date() -> Optional[date]:
     return None
 
 
-async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, Any]:
+async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalance: bool = False) -> Dict[str, Any]:
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
     today_dt = pd.to_datetime(today_str).date()
     logger.info("EOD Signal Cycle Started", date=today_str)
 
+    current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
     last_rebalance = await get_last_rebalance_date()
+    
+    # Eger portfoyde hic pozisyon yoksa (0 pozisyon) veya force_rebalance istenmisse MUTLAKA rebalance yap
     needs_rebalance = True
-    if last_rebalance is not None:
-        days_passed = (today_dt - last_rebalance).days
-        if days_passed < 88:
-            needs_rebalance = False
-            logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
+    if len(current_positions) > 0 and not force_rebalance:
+        if last_rebalance is not None:
+            days_passed = (today_dt - last_rebalance).days
+            if days_passed < HOLDING_PERIOD_DAYS:
+                needs_rebalance = False
+                logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
 
     engine = AlphaEngine()
     start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
@@ -104,23 +103,25 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None) -> Dict[str, A
             if success:
                 preds = engine.predict(market_data, bm_df, sector_map, signal_date)
 
-                # Likidite filtresi (Minimum 10M TL ADV)
+                # Likidite filtresi (Minimum 5M TL ADV)
                 valid_preds = []
-                MIN_LIQUIDITY_TL = 10_000_000
+                MIN_LIQUIDITY_TL = 5_000_000
                 for p in preds:
                     tick = p["ticker"]
                     if tick in market_data:
                         df = market_data[tick]
                         df_past = df.loc[df.index <= signal_date]
-                        if len(df_past) >= 20:
-                            avg_vol = df_past['Volume'].tail(20).mean()
-                            avg_close = df_past['Close'].tail(20).mean()
+                        if len(df_past) >= 10:
+                            avg_vol = df_past['Volume'].tail(20).mean() if len(df_past) >= 20 else df_past['Volume'].mean()
+                            avg_close = df_past['Close'].tail(20).mean() if len(df_past) >= 20 else df_past['Close'].mean()
                             if (avg_vol * avg_close) >= MIN_LIQUIDITY_TL:
                                 valid_preds.append(p)
 
+                if not valid_preds:
+                    valid_preds = preds[:10]
+
                 top_10 = valid_preds[:10]
                 top_10_set = {item["ticker"] for item in top_10}
-                current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
 
                 # 1. Top-10 dışına çıkan mevcut pozisyonlar için SATIŞ (EXIT/SHORT) sinyalleri
                 exit_signals = [
@@ -186,6 +187,12 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
     today_dt = pd.to_datetime(today_str).date()
     logger.info("Morning Execution Cycle Started", date=today_str)
 
+    # Eger bekleyen sinyal yoksa ve portfoy bossa, aninda sinyal uretimini bootstrap et
+    pending = paper_orchestrator.store.load_pending_signals()
+    if not pending:
+        logger.info("No pending signals in store, triggering immediate signal generation cycle...")
+        await run_eod_signal_cycle(target_date=today_str, force_rebalance=True)
+
     engine = AlphaEngine()
     start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
@@ -210,11 +217,10 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
 async def run_unified_daily_cycle() -> Dict[str, Any]:
     """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu."""
     now_hour = datetime.now().hour
-    if now_hour < 12:
-        # Sabah seansı: Bekleyen emirleri yürüt
+    # Sabah seansinda veya portfoy henuz bosken sabah yurutme dongusu calisir
+    if len(paper_orchestrator.portfolio.get_all_positions()) == 0 or now_hour < 12:
         return await run_morning_execution_cycle()
     else:
-        # Akşam seansı: Sinyalleri üret ve bekleyen emir olarak kuyruğa al
         return await run_eod_signal_cycle()
 
 

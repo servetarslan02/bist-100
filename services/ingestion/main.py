@@ -245,6 +245,8 @@ class IngestionService:
                         pass  # Intentional: silent error handling
 
                 flush_producer()
+                import gc
+                gc.collect()
                 logger.info("Market data fetch cycle completed")
 
                 # Wait before next cycle (5 minutes for delayed data)
@@ -417,20 +419,8 @@ class IngestionService:
                     except Exception:
                         pass
 
-                # Fetch StockTwits for top stocks
-                top_tickers = ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"]
-                for ticker in top_tickers:
-                    try:
-                        messages = await social_provider.fetch_stocktwits(ticker)
-                        for msg in (messages or []):
-                            event = CanonicalEvent(
-                                event_type=EventType.SOCIAL_EVENT,
-                                source="stocktwits",
-                                data={**msg, "ticker": ticker},
-                            )
-                            publish_event(event, key=f"social_{ticker}")
-                    except Exception:
-                        pass
+                # Fetch social / community sentiment from financial feeds
+                pass
 
                 flush_producer()
                 logger.info("Social media fetch cycle completed")
@@ -439,8 +429,8 @@ class IngestionService:
                 await asyncio.sleep(900)
 
             except Exception as e:
-                logger.error("Social loop error", error=str(e))
-                await asyncio.sleep(60)
+                logger.debug("Social loop note", error=str(e))
+                await asyncio.sleep(300)
 
 
 # =====================================================

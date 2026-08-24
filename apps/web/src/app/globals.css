@@ -154,3 +154,35 @@ body {
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
+
+/* Stock Market Real-Time Price Tick Flash (Borsa Canli Yanip Sonme) */
+@keyframes flashGreen {
+  0% {
+    background-color: rgba(0, 229, 160, 0.35);
+    color: #00e5a0;
+    text-shadow: 0 0 10px rgba(0, 229, 160, 0.8);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+@keyframes flashRed {
+  0% {
+    background-color: rgba(255, 68, 102, 0.35);
+    color: #ff4466;
+    text-shadow: 0 0 10px rgba(255, 68, 102, 0.8);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.flash-up {
+  animation: flashGreen 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.flash-down {
+  animation: flashRed 1.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+

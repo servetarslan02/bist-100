@@ -17,6 +17,10 @@ const nextConfig = {
         source: '/api/:path*',
         destination: process.env.API_URL ? `${process.env.API_URL}/api/:path*` : 'http://alpha-api:8000/api/:path*',
       },
+      {
+        source: '/ws/:path*',
+        destination: process.env.API_URL ? `${process.env.API_URL}/ws/:path*` : 'http://alpha-api:8000/ws/:path*',
+      },
     ];
   },
   async headers() {

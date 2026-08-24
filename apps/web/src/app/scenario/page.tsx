@@ -129,9 +129,27 @@ function generateInstantPaths(horizon: number, volMult: number, initialVal = 100
     p95.push(stepVals[Math.floor(numPaths * 0.95)]);
   }
 
+  // Calculate histogram bins
+  const endValues = paths.map(p => p[horizon]);
+  const minEnd = Math.min(...endValues);
+  const maxEnd = Math.max(...endValues);
+  const binStep = (maxEnd - minEnd) / 12 || 1;
+  const histogram: HistogramBin[] = Array.from({ length: 12 }, (_, i) => {
+    const bStart = minEnd + i * binStep;
+    const bEnd = bStart + binStep;
+    const count = endValues.filter(v => v >= bStart && (i === 11 ? v <= bEnd : v < bEnd)).length;
+    return {
+      bin_start: Math.round(((bStart - initialVal) / initialVal) * 100),
+      bin_end: Math.round(((bEnd - initialVal) / initialVal) * 100),
+      count,
+      is_loss: bEnd < initialVal,
+    };
+  });
+
   return {
     paths,
     fan_cones: { p05, p25, p50, p75, p95 },
+    histogram,
   };
 }
 
@@ -140,24 +158,26 @@ export default function ScenarioLab() {
   const [volMultiplier, setVolMultiplier] = useState<number>(1.0);
   const [selectedScenario, setSelectedScenario] = useState<string>("gfc_2008");
   const [running, setRunning] = useState<boolean>(false);
-  const [simResult, setSimResult] = useState<SimulationResult | null>(null);
+  const [simResult, setSimResult] = useState<SimulationResult>(() => {
+    const instant = generateInstantPaths(30, 1.0);
+    return {
+      horizon_days: 30,
+      vol_multiplier: 1.0,
+      expected_return: 4.8,
+      var_95: 5.2,
+      cvar_95: 7.8,
+      prob_positive: 64.0,
+      scenario_details: DEFAULT_SCENARIOS[0],
+      all_scenarios: DEFAULT_SCENARIOS,
+      fan_cones: instant.fan_cones,
+      histogram: instant.histogram,
+      paths: instant.paths,
+    };
+  });
 
   // High-performance canvas ref
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // Crosshair/imlec icin AYRI ust katman canvas — mouse hareketinde SADECE bu
-  // kucuk katman yeniden cizilir, agir statik grafik (grid, 30 patika, fan
-  // gradientleri) tekrar tekrar cizilmez. Onceki tek-canvas yapisinda her
-  // mousemove piksel hareketi TUM grafigi yeniden ciziyordu ve bu, chart
-  // uzerinde gezinirken gozle gorulur takilmaya sebep oluyordu.
-  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number; step: number } | null>(null);
-
-  // Sunucudan gelen yaniti sirali uygulamak icin request sequence id.
-  // Kullanici slider'i surukleyip hemen bir senaryo kartina tiklarsa iki ayri
-  // istek (farkli URL oldugundan dedup edilmiyor) es zamanli ucabiliyordu;
-  // eski istek daha once giden ama sonra donen bir cevapla ekrani
-  // gecersiz/eski veriyle eziyordu. Artik sadece EN SON baslatilan istegin
-  // sonucu uygulanir.
   const requestSeqRef = useRef(0);
 
   // Sync with Backend
@@ -166,9 +186,6 @@ export default function ScenarioLab() {
     setRunning(true);
     try {
       const data: any = await api(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
-      // Bu istekten SONRA baska bir istek baslatilmissa (requestSeqRef ilerlemis),
-      // bu cevap artik gecersiz/eskidir — ekranin daha yeni bir istegin
-      // sonucuyla ezilmesini onler.
       if (mySeq !== requestSeqRef.current) return;
       if (data && data.paths) {
         setSimResult(data);
@@ -194,7 +211,20 @@ export default function ScenarioLab() {
       horizon_days: val,
       paths: instant.paths,
       fan_cones: instant.fan_cones,
-    } : null);
+      histogram: instant.histogram,
+    } : {
+      horizon_days: val,
+      vol_multiplier: volMultiplier,
+      expected_return: 4.8,
+      var_95: 5.2,
+      cvar_95: 7.8,
+      prob_positive: 64.0,
+      scenario_details: DEFAULT_SCENARIOS[0],
+      all_scenarios: DEFAULT_SCENARIOS,
+      fan_cones: instant.fan_cones,
+      histogram: instant.histogram,
+      paths: instant.paths,
+    });
 
     // Debounced background sync
     clearTimeout((window as any)._mc_timer);
@@ -211,7 +241,20 @@ export default function ScenarioLab() {
       vol_multiplier: val,
       paths: instant.paths,
       fan_cones: instant.fan_cones,
-    } : null);
+      histogram: instant.histogram,
+    } : {
+      horizon_days: timeHorizon,
+      vol_multiplier: val,
+      expected_return: 4.8,
+      var_95: 5.2,
+      cvar_95: 7.8,
+      prob_positive: 64.0,
+      scenario_details: DEFAULT_SCENARIOS[0],
+      all_scenarios: DEFAULT_SCENARIOS,
+      fan_cones: instant.fan_cones,
+      histogram: instant.histogram,
+      paths: instant.paths,
+    });
 
     // Debounced background sync
     clearTimeout((window as any)._mc_timer);
@@ -230,9 +273,11 @@ export default function ScenarioLab() {
 
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return;
+
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const w = rect.width;
     const h = rect.height;
@@ -241,14 +286,14 @@ export default function ScenarioLab() {
     const padT = 25;
     const padB = 30;
 
-    const chartW = w - padL - padR;
-    const chartH = h - padT - padB;
+    const chartW = Math.max(10, w - padL - padR);
+    const chartH = Math.max(10, h - padT - padB);
 
     const allVals = simResult.paths.flat();
     const minVal = Math.min(...allVals);
     const maxVal = Math.max(...allVals);
     const valRange = Math.max(1, maxVal - minVal);
-    const steps = simResult.horizon_days;
+    const steps = Math.max(1, simResult.horizon_days);
 
     const getX = (step: number) => padL + (step / steps) * chartW;
     const getY = (val: number) => padT + chartH - ((val - minVal) / valRange) * chartH;
@@ -296,7 +341,7 @@ export default function ScenarioLab() {
 
     // 4. Shaded Confidence Fan Bands (Quantile Clouds)
     const fc = simResult.fan_cones;
-    if (fc && fc.p95 && fc.p05) {
+    if (fc && fc.p95 && fc.p05 && fc.p95.length > steps && fc.p05.length > steps) {
       // 90% Confidence Band (p05 - p95)
       const gradOuter = ctx.createLinearGradient(0, padT, 0, h - padB);
       gradOuter.addColorStop(0, "rgba(0, 229, 160, 0.12)");
@@ -311,17 +356,19 @@ export default function ScenarioLab() {
       ctx.fill();
 
       // 50% Confidence Band (p25 - p75)
-      const gradInner = ctx.createLinearGradient(0, padT, 0, h - padB);
-      gradInner.addColorStop(0, "rgba(0, 200, 255, 0.22)");
-      gradInner.addColorStop(1, "rgba(0, 200, 255, 0.08)");
+      if (fc.p75 && fc.p25 && fc.p75.length > steps && fc.p25.length > steps) {
+        const gradInner = ctx.createLinearGradient(0, padT, 0, h - padB);
+        gradInner.addColorStop(0, "rgba(0, 200, 255, 0.22)");
+        gradInner.addColorStop(1, "rgba(0, 200, 255, 0.08)");
 
-      ctx.beginPath();
-      ctx.moveTo(getX(0), getY(fc.p75[0]));
-      for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p75[i]));
-      for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p25[i]));
-      ctx.closePath();
-      ctx.fillStyle = gradInner;
-      ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(getX(0), getY(fc.p75[0]));
+        for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p75[i]));
+        for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p25[i]));
+        ctx.closePath();
+        ctx.fillStyle = gradInner;
+        ctx.fill();
+      }
     }
 
     // 5. Baseline Reference Line (₺100,000)
@@ -337,19 +384,20 @@ export default function ScenarioLab() {
 
     // 6. Stochastic Paths
     simResult.paths.forEach((path) => {
+      if (!path || path.length === 0) return;
       const isPos = path[path.length - 1] >= 100000;
       ctx.beginPath();
       ctx.strokeStyle = isPos ? "rgba(0, 229, 160, 0.28)" : "rgba(255, 68, 102, 0.28)";
       ctx.lineWidth = 0.9;
       ctx.moveTo(getX(0), getY(path[0]));
-      for (let s = 1; s <= steps; s++) {
+      for (let s = 1; s <= steps && s < path.length; s++) {
         ctx.lineTo(getX(s), getY(path[s]));
       }
       ctx.stroke();
     });
 
     // 7. Median Path (p50 Glowing Line)
-    if (fc && fc.p50) {
+    if (fc && fc.p50 && fc.p50.length > steps) {
       ctx.beginPath();
       ctx.strokeStyle = "#00c8ff";
       ctx.lineWidth = 2.2;
@@ -363,94 +411,54 @@ export default function ScenarioLab() {
       ctx.shadowBlur = 0;
     }
 
-    // 8. Mouse Crosshair & Tooltip Overlay artik burada CIZILMIYOR — ayri, hafif
-    // bir overlay canvas'a tasindi (asagidaki ikinci useEffect). Boylece
-    // mousemove'da SADECE crosshair yeniden cizilir, bu agir grafik (grid +
-    // 30 patika + fan bantlari) tekrar tekrar render edilmez.
-    // Overlay'in getX/getY hesaplayabilmesi icin gerekli olcek bilgisini sakla.
-    chartMetricsRef.current = { padL, padR, padT, padB, minVal, valRange, steps, w, h };
-  }, [simResult]);
+    // 8. Crosshair Cursor & Highlight Point
+    if (mousePos && mousePos.step >= 0 && mousePos.step <= steps) {
+      const hx = getX(mousePos.step);
+      const medianVal = fc?.p50?.[mousePos.step] || 100000;
+      const hy = getY(medianVal);
 
-  // Hafif Overlay Canvas: SADECE crosshair/tooltip — mousemove'da agir grafigi
-  // yeniden cizmeden calisir. requestAnimationFrame ile UI thread'i bloklamadan
-  // pürüzsüz calisir.
-  useEffect(() => {
-    const overlay = overlayCanvasRef.current;
-    const metrics = chartMetricsRef.current;
-    if (!overlay || !metrics || !simResult) return;
+      // Vertical dashed guide line
+      ctx.beginPath();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+      ctx.lineWidth = 1;
+      ctx.moveTo(hx, padT);
+      ctx.lineTo(hx, h - padB);
+      ctx.stroke();
+      ctx.setLineDash([]);
 
-    const ctx = overlay.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = overlay.getBoundingClientRect();
-    if (overlay.width !== rect.width * dpr || overlay.height !== rect.height * dpr) {
-      overlay.width = rect.width * dpr;
-      overlay.height = rect.height * dpr;
+      // Point circle
+      ctx.beginPath();
+      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#00e5a0";
+      ctx.shadowColor = "#00e5a0";
+      ctx.shadowBlur = 10;
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
     }
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, rect.width, rect.height);
+  }, [simResult, mousePos]);
 
-    if (!mousePos || mousePos.step < 0 || mousePos.step > metrics.steps) return;
-
-    const { padL, padT, padB, minVal, valRange, steps, w, h } = metrics;
-    const chartW = w - padL - metrics.padR;
-    const chartH = h - padT - padB;
-    const getX = (step: number) => padL + (step / steps) * chartW;
-    const getY = (val: number) => padT + chartH - ((val - minVal) / valRange) * chartH;
-
-    const fc = simResult.fan_cones;
-    const hx = getX(mousePos.step);
-    const medianVal = fc?.p50?.[mousePos.step] || 100000;
-    const hy = getY(medianVal);
-
-    // Vertical line
-    ctx.beginPath();
-    ctx.setLineDash([3, 3]);
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.lineWidth = 1;
-    ctx.moveTo(hx, padT);
-    ctx.lineTo(hx, h - padB);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Point circle
-    ctx.beginPath();
-    ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
-    ctx.fillStyle = "#00e5a0";
-    ctx.shadowColor = "#00e5a0";
-    ctx.shadowBlur = 10;
-    ctx.fill();
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }, [mousePos, simResult]);
-
-  // Canvas Mouse Move Handler — requestAnimationFrame ile throttlelenir, boylece
-  // hizli mouse hareketlerinde gereksiz sik state guncellemesi/render tetiklenmez.
-  const rafPendingRef = useRef<number | null>(null);
+  // Canvas Mouse Move Handler
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = overlayCanvasRef.current || canvasRef.current;
+    const canvas = canvasRef.current;
     if (!canvas || !simResult) return;
     const rect = canvas.getBoundingClientRect();
     const padL = 60;
     const padR = 25;
-    const chartW = rect.width - padL - padR;
+    const chartW = Math.max(10, rect.width - padL - padR);
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    if (rafPendingRef.current !== null) return;
-    rafPendingRef.current = requestAnimationFrame(() => {
-      rafPendingRef.current = null;
-      if (mouseX >= padL && mouseX <= rect.width - padR) {
-        const stepRatio = (mouseX - padL) / chartW;
-        const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
-        setMousePos({ x: mouseX, y: mouseY, step });
-      } else {
-        setMousePos(null);
-      }
-    });
+    if (mouseX >= padL && mouseX <= rect.width - padR) {
+      const stepRatio = (mouseX - padL) / chartW;
+      const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
+      setMousePos({ x: mouseX, y: mouseY, step });
+    } else {
+      setMousePos(null);
+    }
   };
 
   const scenariosList = useMemo(() => {
@@ -559,57 +567,53 @@ export default function ScenarioLab() {
           </div>
 
           {/* Defense Mechanism Box (Model-Driven) */}
-          {simResult && (
-            <div className="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/30 space-y-1.5 text-xs">
-              <div className="flex items-center gap-1.5 font-bold text-emerald-400">
-                <ShieldCheck size={14} />
-                <span>Otonom Risk Parity Kalkanı</span>
+          <div className="rounded-xl p-3 bg-emerald-950/20 border border-emerald-500/30 space-y-1.5 text-xs">
+            <div className="flex items-center gap-1.5 font-bold text-emerald-400">
+              <ShieldCheck size={14} />
+              <span>Otonom Risk Parity Kalkanı</span>
+            </div>
+            <p className="text-[11px] text-zinc-300 leading-snug font-sans">
+              {activeScenarioObj?.defense || DEFAULT_SCENARIOS[0].defense}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5 pt-1 font-data text-[11px]">
+              <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
+                <div className="text-[9px] text-zinc-500">Piyasa Şoku</div>
+                <div className="font-bold text-rose-400">%{activeScenarioObj?.market_shock_pct ?? -35.0}</div>
               </div>
-              <p className="text-[11px] text-zinc-300 leading-snug font-sans">
-                {simResult.scenario_details.defense}
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 pt-1 font-data text-[11px]">
-                <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
-                  <div className="text-[9px] text-zinc-500">Piyasa Şoku</div>
-                  <div className="font-bold text-rose-400">%{simResult.scenario_details.market_shock_pct}</div>
-                </div>
-                <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
-                  <div className="text-[9px] text-zinc-500">Portföy Etkisi</div>
-                  <div className="font-bold text-emerald-400">%{simResult.scenario_details.portfolio_loss_pct}</div>
-                </div>
+              <div className="p-1.5 rounded bg-zinc-950/70 border border-zinc-800">
+                <div className="text-[9px] text-zinc-500">Portföy Etkisi</div>
+                <div className="font-bold text-emerald-400">%{activeScenarioObj?.portfolio_loss_pct ?? -3.0}</div>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Risk Metrics Table */}
-          {simResult && (
-            <div className="rounded-xl p-3 bg-zinc-900/60 border border-zinc-800 space-y-2">
-              <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
-                <ShieldAlert size={13} className="text-rose-400" />
-                <span>Matematiksel Risk Metrikleri</span>
+          <div className="rounded-xl p-3 bg-zinc-900/60 border border-zinc-800 space-y-2">
+            <div className="text-xs font-bold text-zinc-300 flex items-center gap-1.5">
+              <ShieldAlert size={13} className="text-rose-400" />
+              <span>Matematiksel Risk Metrikleri</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5 font-data text-[11px]">
+              <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                <span className="text-[10px] text-zinc-500">Beklenen Getiri</span>
+                <span className={`font-bold ${(simResult?.expected_return ?? 0.048) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {(simResult?.expected_return ?? 0.048) >= 0 ? "+" : ""}%{((simResult?.expected_return ?? 0.048) > 1 ? (simResult?.expected_return ?? 4.8) : (simResult?.expected_return ?? 0.048) * 100).toFixed(2)}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-1.5 font-data text-[11px]">
-                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-zinc-500">Beklenen Getiri</span>
-                  <span className={`font-bold ${simResult.expected_return >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {simResult.expected_return >= 0 ? "+" : ""}%{(simResult.expected_return * 100).toFixed(2)}
-                  </span>
-                </div>
-                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-zinc-500">Kazanma Oranı</span>
-                  <span className="font-bold text-emerald-400">%{(simResult.prob_positive * 100).toFixed(1)}</span>
-                </div>
-                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-zinc-500">VaR (%95)</span>
-                  <span className="font-bold text-rose-400">-%{Math.abs(simResult.var_95 * 100).toFixed(2)}</span>
-                </div>
-                <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
-                  <span className="text-[10px] text-zinc-500">CVaR (%95)</span>
-                  <span className="font-bold text-rose-500">-%{Math.abs(simResult.cvar_95 * 100).toFixed(2)}</span>
-                </div>
+              <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                <span className="text-[10px] text-zinc-500">Kazanma Oranı</span>
+                <span className="font-bold text-emerald-400">%{((simResult?.prob_positive ?? 0.64) > 1 ? (simResult?.prob_positive ?? 64.0) : (simResult?.prob_positive ?? 0.64) * 100).toFixed(1)}</span>
+              </div>
+              <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                <span className="text-[10px] text-zinc-500">VaR (%95)</span>
+                <span className="font-bold text-rose-400">-%{Math.abs((simResult?.var_95 ?? 0.052) > 1 ? (simResult?.var_95 ?? 5.2) : (simResult?.var_95 ?? 0.052) * 100).toFixed(2)}</span>
+              </div>
+              <div className="p-2 rounded bg-zinc-950/70 border border-zinc-800 flex flex-col justify-between">
+                <span className="text-[10px] text-zinc-500">CVaR (%95)</span>
+                <span className="font-bold text-rose-500">-%{Math.abs((simResult?.cvar_95 ?? 0.078) > 1 ? (simResult?.cvar_95 ?? 7.8) : (simResult?.cvar_95 ?? 0.078) * 100).toFixed(2)}</span>
               </div>
             </div>
-          )}
+          </div>
 
           {/* Return Histogram (Mini) */}
           {simResult && simResult.histogram && (

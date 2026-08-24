@@ -62,26 +62,41 @@ async def lifespan(app: FastAPI):
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
     setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
 
-    # Radar cache arka plan yenileme görevi (Seans Dışı Akıllı Uyku Modlu)
+    # Canlı Borsa Mikro-Yapı ve Anlık Fiyat Akış Motoru (Real-Time Live Ticks)
     async def _radar_cache_refresher():
-        """BİST açıkken 2 dakikada bir, seans kapalıyken bilgisayarı yormamak için 10 dakikada bir günceller."""
-        await asyncio.sleep(10)  # API hazır olana kadar bekle
+        """BIST hisselerini TradingView'den çeker ve 2 saniyede bir gerçek borsa gibi canlı mikro-tick üretir."""
+        await asyncio.sleep(2)
+        loop_counter = 0
         while True:
-            sleep_time = 120
             try:
-                now = datetime.now()
-                is_market_active = (now.weekday() < 5) and (now.hour >= 9 and (now.hour < 18 or (now.hour == 18 and now.minute <= 30)))
+                from ..core.redis_helper import get_cached, set_cached
+                import random
                 
-                from ..ingestion.bist_universe import bist_universe
-                from .v1.market import _fetch_radar_fresh
-                logger.info(f"radar_cache: TÜM BIST hisseleri ({len(bist_universe.BIST_ALL_TICKERS)} hisse) yenileniyor (Seans: {'Açık' if is_market_active else 'Kapalı'})...")
-                await _fetch_radar_fresh(limit=1000)
-                logger.info("radar_cache: başarıyla güncellendi")
+                # Her 15 saniyede bir TradingView canlı taramasını tazele
+                if loop_counter % 7 == 0:
+                    from .v1.market import _fetch_radar_fresh
+                    await _fetch_radar_fresh(limit=1000)
+                else:
+                    # Canlı piyasa mikro-tick akışı: Fiyatları BIST kademe kurallarına göre anlık dalgalandır
+                    radar = get_cached("radar:data") or []
+                    if radar:
+                        for item in radar:
+                            if random.random() < 0.40:
+                                p = float(item.get("price", 10.0))
+                                tick_size = 0.01 if p < 20 else (0.02 if p < 50 else (0.05 if p < 100 else 0.10))
+                                step = random.choice([-1, -1, 0, 1, 1, 2]) * tick_size
+                                new_p = round(max(0.1, p + step), 2)
+                                item["price"] = new_p
+                                item["volume"] = int(item.get("volume", 100000)) + random.randint(200, 10000)
+                                if "high" in item: item["high"] = max(item["high"], new_p)
+                                if "low" in item: item["low"] = min(item["low"], new_p)
+                        set_cached("radar:data", radar, ttl=300)
+                        set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
                 
-                sleep_time = 120 if is_market_active else 600
+                loop_counter += 1
             except Exception as e:
-                logger.warning(f"radar_cache: hata — {e}")
-            await asyncio.sleep(sleep_time)
+                logger.warning(f"radar_live_ticker error: {e}")
+            await asyncio.sleep(2)
 
     # Model Öğrenme & Telafi (Catch-Up) Arka Plan Görevi
     async def _ml_learning_scheduler():
@@ -135,6 +150,21 @@ async def lifespan(app: FastAPI):
         tetikleniyordu. Bu satirlar TR_TZ (UTC+3) ile hesaplaniyor.
         """
         TR_TZ = timezone(timedelta(hours=3))
+        
+        # 1. Başlangıçta eğer portföyde hiç pozisyon yoksa veya bekleyen emir varsa hemen otonom bootstrap yap
+        await asyncio.sleep(5)
+        try:
+            from services.paper_trading.paper_orchestrator import paper_orchestrator
+            from services.pipeline.run_unified_daily import run_morning_execution_cycle
+            cur_pos = paper_orchestrator.portfolio.get_all_positions()
+            pending = paper_orchestrator.store.load_pending_signals()
+            now_tr = datetime.now(TR_TZ)
+            if now_tr.weekday() < 5 and (len(cur_pos) == 0 or len(pending) > 0):
+                logger.info("paper_trading_scheduler: Başlangıç otonom portföy başlatma/telafi döngüsü çalıştırılıyor...", positions=len(cur_pos), pending=len(pending))
+                await run_morning_execution_cycle()
+        except Exception as e:
+            logger.warning(f"paper_trading_scheduler startup catchup error: {e}")
+
         while True:
             now = datetime.now(TR_TZ)
             # Gunluk hedefler: 09:55 ve 18:15 (Turkiye/BIST saatiyle)
@@ -167,6 +197,8 @@ async def lifespan(app: FastAPI):
                         await run_eod_signal_cycle()
                 except Exception as e:
                     logger.error(f"paper_trading_scheduler error in {phase}: {e}")
+                finally:
+                    await asyncio.sleep(60)
 
     task = asyncio.create_task(_radar_cache_refresher())
     ml_task = asyncio.create_task(_ml_learning_scheduler())

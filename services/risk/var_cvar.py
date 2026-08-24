@@ -125,6 +125,15 @@ class VaRCalculator:
         Returns:
             VaR (pozitif değer, TL)
         """
+        if len(returns) < 2 or holding_period_days < 1:
+            return 0.0
+
+        mu = float(np.mean(returns))
+        sigma = float(np.std(returns, ddof=1))
+
+        if sigma <= 0:
+            return float(max(0.0, -mu * holding_period_days * portfolio_value))
+
         try:
             from scipy.stats import norm
             z_alpha = float(norm.ppf(1 - confidence))

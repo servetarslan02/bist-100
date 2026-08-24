@@ -166,6 +166,17 @@ export async function api<T>(path: string): Promise<T> {
   return fetchPromise;
 }
 
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = normalizeApiPath(path);
+  const res = await fetch(url, {
+    headers: { 'Accept': 'application/json' },
+    cache: 'no-store',
+    ...init,
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status} (${url})`);
+  return res.json();
+}
+
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const url = normalizeApiPath(path);
   const res = await fetch(url, {

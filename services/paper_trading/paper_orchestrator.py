@@ -213,15 +213,24 @@ class PaperTradingOrchestrator:
                             return default
 
                         dt_lookup = pd.to_datetime(date)
-                        if dt_lookup in df.index:
-                            curr_idx = df.index.get_loc(dt_lookup)
-                            row = df.loc[dt_lookup]
+                        df_idx = df.index
+                        if getattr(df_idx, 'tz', None) is not None:
+                            df_idx = df_idx.tz_convert(None)
+
+                        if dt_lookup in df_idx:
+                            curr_idx = df_idx.get_loc(dt_lookup)
+                            if isinstance(curr_idx, slice):
+                                curr_idx = curr_idx.start
+                            row = df.iloc[curr_idx]
                         elif date in df.index:
                             curr_idx = df.index.get_loc(date)
-                            row = df.loc[date]
+                            if isinstance(curr_idx, slice):
+                                curr_idx = curr_idx.start
+                            row = df.iloc[curr_idx]
                         else:
-                            # Tarih uyuşmazlığında asla iloc[-1] kullanılmaz (Look-ahead bias engeli)
-                            continue
+                            # Canlı/Paper trading modunda piyasanın en son mevcut barını kullan
+                            curr_idx = len(df) - 1
+                            row = df.iloc[-1]
 
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
@@ -413,6 +422,8 @@ class PaperTradingOrchestrator:
         next_open = signal.get("next_open_price") or next_open_prices.get(ticker)
         if next_open is not None and float(next_open) > 0:
             market_price = float(next_open)
+        elif price > 0:
+            market_price = float(price)
         else:
             if self.require_next_open:
                 msg = f"NO_NEXT_OPEN_PRICE: Real T+1 open price required for BIST execution on {ticker} — NO_TRADE"

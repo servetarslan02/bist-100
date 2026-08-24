@@ -43,3 +43,9 @@ v1_router.include_router(viop_router, prefix="/viop", tags=["VIOP"])
 v1_router.include_router(event_study_router, prefix="/event-study", tags=["Event Study"])
 v1_router.include_router(system_router, prefix="/system", tags=["System"])
 v1_router.include_router(ws_router, prefix="/ws", tags=["WebSockets"])
+
+# Direct Frontend Route Aliases (Sıfır 404 Garantisi)
+v1_router.include_router(scanner_router, prefix="", tags=["Scanner (Direct)"])
+v1_router.include_router(system_router, prefix="", tags=["System (Direct)"])
+v1_router.include_router(portfolio_router, prefix="/strategy", tags=["Strategy (Direct)"])
+

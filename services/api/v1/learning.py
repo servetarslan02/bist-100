@@ -32,6 +32,7 @@ async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_l
 
 
 @router.get("/performance-matrix")
+@router.get("/metrics")
 async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Tüm modellerin 30-Yıllık ve OOS karşılaştırmalı performans matrisi."""
     models_list = [

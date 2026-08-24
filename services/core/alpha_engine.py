@@ -42,59 +42,50 @@ class AlphaEngine:
         ]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
-    def fetch_data(self, start_date: str, end_date: str) -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
-        tickers = bist_universe.BIST_ALL_TICKERS
+    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None) -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
+        if tickers is None:
+            tickers = bist_universe.BIST_100_TICKERS if hasattr(bist_universe, 'BIST_100_TICKERS') and bist_universe.BIST_100_TICKERS else bist_universe.BIST_ALL_TICKERS[:100]
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
         
-        # Load stocks
-        market_data = {}
-        try:
-            download_tickers = [f"{t}.IS" for t in tickers]
-            df_all = yf.download(download_tickers, start=start_date, end=end_date, progress=False)
-            if not df_all.empty and 'Close' in df_all:
-                for t in tickers:
-                    tick_sym = f"{t}.IS"
-                    if tick_sym in df_all['Close']:
-                        df_tick = df_all.xs(tick_sym, level=1, axis=1) if isinstance(df_all.columns, pd.MultiIndex) else df_all
-                        if isinstance(df_all.columns, pd.MultiIndex):
-                            # It's multi-index, we already got xs
-                            pass
-                        else:
-                            # Single ticker or something
-                            pass
-                        
-                        # simpler way to extract: 
-                        # Actually yfinance returns multi-index if multiple tickers: columns are (PriceType, Ticker)
-                        # Let's just do it cleanly
-                        pass
-        except:
-            pass
-            
-        # simpler yf.download extraction
-        import pandas as pd
         market_data = {}
         download_tickers = [f"{t}.IS" for t in tickers]
-        batch_size = 50
-        for i in range(0, len(download_tickers), batch_size):
-            batch = download_tickers[i:i+batch_size]
-            df_batch = yf.download(batch, start=start_date, end=end_date, group_by="ticker", progress=False)
-            if not df_batch.empty:
-                for t in tickers[i:i+batch_size]:
+        try:
+            raw = yf.download(
+                tickers=" ".join(download_tickers),
+                start=start_date,
+                end=end_date,
+                group_by="ticker",
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+            if not raw.empty:
+                for t in tickers:
                     tick_sym = f"{t}.IS"
-                    if isinstance(df_batch.columns, pd.MultiIndex):
-                        if tick_sym in df_batch.columns.levels[0]:
-                            df_t = df_batch[tick_sym].dropna(how="all")
-                            if not df_t.empty:
+                    try:
+                        if isinstance(raw.columns, pd.MultiIndex):
+                            if tick_sym in raw.columns.levels[0]:
+                                df_t = raw[tick_sym].dropna(how="all")
+                                if not df_t.empty and len(df_t) >= 10:
+                                    market_data[t] = _tz_naive(df_t)
+                        else:
+                            df_t = raw.dropna(how="all")
+                            if not df_t.empty and len(df_t) >= 10:
                                 market_data[t] = _tz_naive(df_t)
-                    else:
-                        if tick_sym == batch[0]: # single ticker case
-                            df_t = df_batch.dropna(how="all")
-                            if not df_t.empty:
-                                market_data[t] = _tz_naive(df_t)
+                    except Exception:
+                        continue
+        except Exception as e:
+            logger.warning(f"AlphaEngine batch download warning: {e}")
 
         # Load benchmark
-        bm_df = yf.Ticker("XU100.IS").history(start=start_date, end=end_date)
-        bm_df = _tz_naive(bm_df)
+        try:
+            bm_df = yf.download("XU100.IS", start=start_date, end=end_date, auto_adjust=True, progress=False)
+            if isinstance(bm_df.columns, pd.MultiIndex):
+                bm_df = bm_df.xs("XU100.IS", level=0, axis=1) if "XU100.IS" in bm_df.columns.levels[0] else bm_df
+            bm_df = _tz_naive(bm_df.dropna(how="all"))
+        except Exception as e:
+            logger.warning(f"Benchmark download warning: {e}")
+            bm_df = pd.DataFrame()
         
         return market_data, bm_df, sector_map
 
@@ -145,12 +136,21 @@ class AlphaEngine:
                 
                 if len(df_fwd) < 2 or len(bm_fwd) < 2: continue
                     
-                p_0, p_1 = df_fwd["Close"].iloc[0], df_fwd["Close"].iloc[-1]
-                b_0, b_1 = bm_fwd["Close"].iloc[0], bm_fwd["Close"].iloc[-1]
+                p_close = df_fwd["Close"].squeeze() if hasattr(df_fwd["Close"], 'squeeze') else df_fwd["Close"]
+                bm_close = bm_fwd["Close"].squeeze() if hasattr(bm_fwd["Close"], 'squeeze') else bm_fwd["Close"]
                 
-                if p_0 <= 0 or b_0 <= 0: continue
+                try:
+                    p_0 = float(p_close.iloc[0])
+                    p_1 = float(p_close.iloc[-1])
+                    b_0 = float(bm_close.iloc[0])
+                    b_1 = float(bm_close.iloc[-1])
+                except Exception:
+                    continue
+                
+                if p_0 <= 0 or b_0 <= 0:
+                    continue
                     
-                excess_ret = ((p_1 / p_0) - 1.0) - ((b_1 / b_0) - 1.0)
+                excess_ret = float(((p_1 / p_0) - 1.0) - ((b_1 / b_0) - 1.0))
                 
                 rows.append(feats)
                 labels.append(excess_ret)

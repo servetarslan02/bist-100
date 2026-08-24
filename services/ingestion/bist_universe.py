@@ -51,6 +51,18 @@ class BISTUniverse:
         uni = self._updater.get_universe()
         return {t: info.sector for t, info in uni.items()}
 
+    @property
+    def COMPANY_NAMES(self) -> Dict[str, str]:
+        """Tüm hisselerin şirket isimleri."""
+        uni = self._updater.get_universe()
+        return {t: getattr(info, 'name', t) for t, info in uni.items()}
+
+    def get_company_name(self, ticker: str) -> str:
+        """Hissenin şirket adını döndür."""
+        uni = self._updater.get_universe()
+        info = uni.get(ticker.upper())
+        return getattr(info, 'name', ticker) if info else ticker
+
     def get_ticker_sector(self, ticker: str) -> str:
         """Hissenin sektörünü döndür."""
         uni = self._updater.get_universe()

@@ -71,14 +71,35 @@ export default function MarketRadar() {
   const [sortField, setSortField] = useState<keyof RadarRow>("score");
   const [sortAsc, setSortAsc] = useState(false);
   const [marketOpen, setMarketOpen] = useState(isBistOpen());
+  const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
+  const prevPricesRef = useState<Record<string, number>>({})[0];
 
-  // Cache'den anında geldiği için borsa açıksa 10s, kapalıysa 60s
-  const pollInterval = marketOpen ? 10_000 : 60_000;
+  // 0 gecikmeli canlı Borsa akışı: 1.5 saniyede bir milisaniyelik mikro-tick yenilemesi
+  const pollInterval = 1500;
 
   const { data: rawData, loading, lastUpdated } = usePolling<RadarResponse>(
     "/market/radar?limit=1000",
     pollInterval
   );
+
+  // Canlı fiyat adımı yanıp sönme kontrolü (Green / Red Flash)
+  useEffect(() => {
+    if (!rawData?.data) return;
+    const nextFlash: Record<string, "up" | "down"> = {};
+    for (const r of rawData.data) {
+      const prev = prevPricesRef[r.symbol];
+      if (prev !== undefined && r.price !== undefined) {
+        if (r.price > prev) nextFlash[r.symbol] = "up";
+        else if (r.price < prev) nextFlash[r.symbol] = "down";
+      }
+      prevPricesRef[r.symbol] = r.price;
+    }
+    if (Object.keys(nextFlash).length > 0) {
+      setFlashMap(nextFlash);
+      const timer = setTimeout(() => setFlashMap({}), 1300);
+      return () => clearTimeout(timer);
+    }
+  }, [rawData]);
 
   // Her dakika borsa durumunu kontrol et
   useEffect(() => {
@@ -264,12 +285,14 @@ export default function MarketRadar() {
                     ? rsi > 70 ? "#ff4466" : rsi < 35 ? "#00e5a0" : "#a1a1aa"
                     : "#52525b";
                   const scoreColor = row.score >= 70 ? "#00e5a0" : row.score >= 55 ? "#00c8ff" : "#ffaa00";
+                  const flashDir = flashMap[row.symbol];
+                  const flashClass = flashDir === "up" ? "flash-up" : (flashDir === "down" ? "flash-down" : "");
 
                   return (
                     <tr
                       key={row.symbol}
                       onClick={() => router.push(`/asset?ticker=${row.symbol}`)}
-                      className="hover:bg-white/[0.05] transition-colors cursor-pointer"
+                      className={`hover:bg-white/[0.05] transition-colors cursor-pointer ${flashClass}`}
                     >
                       <td className="py-2.5 px-4 font-bold font-data text-zinc-100">
                         <div className="flex items-center gap-1.5">
@@ -281,7 +304,7 @@ export default function MarketRadar() {
                           )}
                         </div>
                       </td>
-                      <td className="py-2.5 px-4 text-right font-data font-bold text-zinc-200">
+                      <td className={`py-2.5 px-4 text-right font-data font-bold text-zinc-200 transition-colors ${flashClass}`}>
                         ₺{row.price != null ? Number(row.price).toFixed(2) : "—"}
                       </td>
                       <td className="py-2.5 px-4 text-right font-data font-bold">

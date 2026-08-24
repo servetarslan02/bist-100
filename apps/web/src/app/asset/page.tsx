@@ -84,6 +84,8 @@ function AssetIntelContent() {
   const [aiReport, setAiReport] = useState<string | null>(null);
   const [loadingAi, setLoadingAi] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [priceFlash, setPriceFlash] = useState<"flash-up" | "flash-down" | "">("");
+  const prevPriceRef = useState<{ val: number | null }>({ val: null })[0];
 
   useEffect(() => {
     const qTicker = (searchParams.get("symbol") || searchParams.get("ticker"))?.toUpperCase();
@@ -93,24 +95,23 @@ function AssetIntelContent() {
     }
   }, [searchParams]);
 
-  // Fetch real live intelligence data from backend
+  // Fetch real live intelligence data from backend with continuous 1.5s live stream
   useEffect(() => {
     let isMounted = true;
+    let isInitial = true;
+
     async function fetchAssetData() {
       const tf = TIMEFRAME_CONFIG[timeframe];
       const cacheKey = `/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`;
 
-      // Cache'ten aninda goster (varsa), UI'i hic "loading" ekranina dusurme.
-      // Ardindan arka planda taze veriyi cek ve guncelle (stale-while-revalidate).
       const cached = getCachedData<LiveAssetData>(cacheKey);
-      if (cached) {
-        setAsset(cached);
-        setLoading(false);
-        setChartLoading(true);
-      } else if (!asset) {
-        setLoading(true);
-      } else {
-        setChartLoading(true);
+      if (isInitial) {
+        if (cached) {
+          setAsset(cached);
+          setLoading(false);
+        } else if (!asset) {
+          setLoading(true);
+        }
       }
       setError(null);
 
@@ -118,22 +119,38 @@ function AssetIntelContent() {
         const data = await api<LiveAssetData>(cacheKey);
         if (isMounted) {
           setAsset(data);
+          if (data && data.price != null) {
+            const p = Number(data.price);
+            if (prevPriceRef.val !== null) {
+              if (p > prevPriceRef.val) {
+                setPriceFlash("flash-up");
+                setTimeout(() => setPriceFlash(""), 1300);
+              } else if (p < prevPriceRef.val) {
+                setPriceFlash("flash-down");
+                setTimeout(() => setPriceFlash(""), 1300);
+              }
+            }
+            prevPriceRef.val = p;
+          }
         }
       } catch (err: any) {
-        if (isMounted && !cached) {
+        if (isMounted && !cached && !asset) {
           setError(err.message || "Veri çekme hatası");
         }
       } finally {
-        if (isMounted) {
+        if (isMounted && isInitial) {
           setLoading(false);
-          setChartLoading(false);
+          isInitial = false;
         }
       }
     }
 
     fetchAssetData();
+    const intervalTimer = setInterval(fetchAssetData, 1500);
+
     return () => {
       isMounted = false;
+      clearInterval(intervalTimer);
     };
   }, [activeTicker, timeframe]);
 
@@ -293,7 +310,7 @@ function AssetIntelContent() {
                   {loadingAi ? "Gemini 3.7 Analiz Ediyor..." : "Gemini 3.7 Canlı Raporu"}
                 </button>
                 <div className="text-right">
-                  <span className="text-2xl font-bold font-data block text-zinc-100">
+                  <span className={`text-2xl font-bold font-data block text-zinc-100 rounded px-1 transition-colors ${priceFlash}`}>
                     ₺{asset.price != null ? Number(asset.price).toFixed(2) : "—"}
                   </span>
                   <div className="flex items-center justify-end gap-1">

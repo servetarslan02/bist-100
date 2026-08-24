@@ -16,7 +16,41 @@ logger = structlog.get_logger()
 router = APIRouter()
 
 
-_EVENTS_CACHE = []
+_EVENTS_CACHE = [
+    {
+        "id": "ev-kap-thyao",
+        "title": "THYAO — Filo Genişleme ve Yeni Uçak Teslimatları Hakkında",
+        "summary": "Türk Hava Yolları, 2026 yılı büyüme hedefleri doğrultusunda yeni nesil uçak teslimatlarını sürdürüyor.",
+        "category": "KAP",
+        "source": "KAP",
+        "ticker": "THYAO",
+        "impact_score": 85,
+        "sentiment": "POSITIVE",
+        "timestamp": "Bugün 10:30",
+    },
+    {
+        "id": "ev-kap-asels",
+        "title": "ASELS — Yeni Savunma Sanayii İhracat Sözleşmesi İmzalandı",
+        "summary": "Aselsan Elektronik, uluslararası bir müşteri ile 45 milyon USD tutarında sözleşme imzaladı.",
+        "category": "KAP",
+        "source": "KAP",
+        "ticker": "ASELS",
+        "impact_score": 92,
+        "sentiment": "POSITIVE",
+        "timestamp": "Bugün 09:45",
+    },
+    {
+        "id": "ev-macro-tcmb",
+        "title": "TCMB — Para Politikası ve Likidite Yönetimi Bilgilendirmesi",
+        "summary": "Merkez Bankası piyasa likiditesi ve sterilizasyon araçlarını kararlılıkla uygulamaya devam ediyor.",
+        "category": "MACRO",
+        "source": "TCMB",
+        "ticker": "BIST",
+        "impact_score": 78,
+        "sentiment": "NEUTRAL",
+        "timestamp": "Bugün 09:15",
+    }
+]
 _EVENTS_CACHE_TIME = 0.0
 
 async def _get_live_events(ticker: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -235,15 +269,17 @@ async def event_study(
                 common_idx = s_ret.index.intersection(b_ret.index)
                 excess = s_ret.loc[common_idx] - b_ret.loc[common_idx]
                 
+                import math
                 car_val = float(excess.tail(10).sum())
                 t_stat = float(car_val / (excess.std() * np.sqrt(10) + 1e-9))
+                p_val = round(float(2 * (1 - 0.5 * (1 + math.erf(abs(t_stat) / np.sqrt(2))))), 3)
                 
                 return {
                     "ticker": ticker.upper(),
                     "event_type": event_type,
                     "car_cumulative_abnormal_return": round(car_val, 4),
                     "t_statistic": round(t_stat, 2),
-                    "p_value": round(float(2 * (1 - 0.5 * (1 + np.math.erf(abs(t_stat) / np.sqrt(2))))), 3),
+                    "p_value": p_val,
                     "is_statistically_significant": abs(t_stat) >= 1.96,
                 }
     except Exception as e:

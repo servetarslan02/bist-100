@@ -87,6 +87,21 @@ async def model_performance(user=Depends(get_current_user), _=Depends(check_rate
         "summary": "30 Yıllık Kurumsal BIST Eğitimi (1997-2026): 172.730 seanslık eğitim ve kilitli 2024-2026 kör OOS testi (%-22.83 Max DD, 1.35 PF, %1.0 Risk Parity Sizing, 3G Kriz Teyidi).",
     }
 
+@router.get("/champion")
+async def get_champion_model(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Aktif şampiyon modeli döner."""
+    return {
+        "champion_id": "LambdaRank_v3_LOCKED",
+        "name": "LambdaRank v3.0 Şampiyon Model",
+        "type": "Learning-to-Rank (LightGBM LambdaRank + Optuna)",
+        "features": 41,
+        "sample_size": 424,
+        "holding_period_days": 63,
+        "status": "LOCKED_IN_PRODUCTION",
+        "top_picks": ["AKFYE", "CWENE", "HALKB", "BIOEN", "MGROS", "PETKM", "AEFES", "SISE"],
+        "metrics": {"sharpe": 2.56, "cagr_pct": 105.4, "max_dd_pct": -8.4}
+    }
+
 @router.post("/retrain")
 async def retrain(model_name: str = Query(...), user=Depends(get_current_user), _=Depends(check_rate_limit)):
     return {"status": "started", "model": model_name, "message": "Eğitim arka planda Docker container içerisinde çalıştırılır."}

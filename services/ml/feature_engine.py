@@ -29,6 +29,18 @@ import structlog
 logger = structlog.get_logger()
 
 
+def _safe_float(v) -> float:
+    if v is None:
+        return np.nan
+    if hasattr(v, 'iloc'):
+        v = v.iloc[-1] if len(v) > 0 else np.nan
+    try:
+        val = float(v)
+        return np.nan if np.isnan(val) else val
+    except Exception:
+        return np.nan
+
+
 class FeatureEngine:
     """
     Tüm feature hesaplamalarının tek kaynağı.
@@ -56,13 +68,15 @@ class FeatureEngine:
     }
 
     def _normalize_index(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Tüm DataFrame index'lerini timezone-naive'e dönüştür."""
+        """Tüm DataFrame index'lerini timezone-naive'e dönüştür ve MultiIndex sütunları düzleştir."""
         if df is None or df.empty:
             return df
-        idx = pd.to_datetime(df.index)
-        if idx.tz is not None:
-            idx = idx.tz_convert(None)
         df = df.copy()
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
+        idx = pd.to_datetime(df.index)
+        if getattr(idx, 'tz', None) is not None:
+            idx = idx.tz_convert(None)
         df.index = idx
         return df
 
@@ -89,15 +103,22 @@ class FeatureEngine:
 
         if sector_returns is not None and hasattr(sector_returns, 'index'):
             idx = pd.to_datetime(sector_returns.index)
-            if idx.tz is not None:
+            if getattr(idx, 'tz', None) is not None:
                 idx = idx.tz_convert(None)
             sector_returns = sector_returns.copy()
             sector_returns.index = idx
 
-        close = df["Close"].astype(float)
-        volume = df.get("Volume", pd.Series(dtype=float))
-        high = df.get("High", close)
-        low = df.get("Low", close)
+        close_raw = df["Close"]
+        close = (close_raw.squeeze() if hasattr(close_raw, 'squeeze') else close_raw).astype(float)
+        
+        vol_raw = df["Volume"] if "Volume" in df else pd.Series(dtype=float)
+        volume = (vol_raw.squeeze() if hasattr(vol_raw, 'squeeze') else vol_raw).astype(float)
+        
+        high_raw = df["High"] if "High" in df else close
+        high = (high_raw.squeeze() if hasattr(high_raw, 'squeeze') else high_raw).astype(float)
+        
+        low_raw = df["Low"] if "Low" in df else close
+        low = (low_raw.squeeze() if hasattr(low_raw, 'squeeze') else low_raw).astype(float)
 
         features: Dict[str, float] = {}
 
@@ -106,7 +127,9 @@ class FeatureEngine:
 
         # --- B) Relative Strength ---
         if benchmark_df is not None and len(benchmark_df) >= 20:
-            bm_close = benchmark_df["Close"].astype(float).reindex(close.index, method="ffill")
+            bm_raw = benchmark_df["Close"]
+            bm_s = (bm_raw.squeeze() if hasattr(bm_raw, 'squeeze') else bm_raw).astype(float)
+            bm_close = bm_s.reindex(close.index, method="ffill")
             features.update(self._relative_strength_vs_bm(close, bm_close))
 
         if sector_returns is not None and len(sector_returns) >= 5:
@@ -131,9 +154,7 @@ class FeatureEngine:
         features.update(self._fundamental_proxy(close, volume))
 
         # NaN olmayan sayılara çevir; gerçek NaN'lar kalır
-        return {k: (float(v) if not np.isnan(float(v)) else np.nan)
-                for k, v in features.items()
-                if v is not None}
+        return {k: _safe_float(v) for k, v in features.items() if v is not None}
 
     # ------------------------------------------------------------------ #
     # A) Price Context
@@ -145,20 +166,20 @@ class FeatureEngine:
         # Getiri / momentum
         for label, w in [("5d", 5), ("20d", 20), ("60d", 60), ("120d", 120)]:
             if n > w:
-                f[f"roc_{label}"] = float(close.pct_change(w).iloc[-1])
+                f[f"roc_{label}"] = _safe_float(close.pct_change(w).iloc[-1])
 
         # SMA uzaklık
         for label, w in [("sma20", 20), ("sma50", 50), ("sma200", 200)]:
             if n > w:
                 sma = close.rolling(w).mean().iloc[-1]
-                f[f"dist_{label}"] = float((close.iloc[-1] / sma) - 1)
+                f[f"dist_{label}"] = _safe_float((close.iloc[-1] / sma) - 1)
 
         # 52-haftalık yüksekten uzaklık
         if n > 100:
             high_52w = high.rolling(252).max().iloc[-1] if n >= 252 else high.max()
             low_52w  = low.rolling(252).min().iloc[-1]  if n >= 252 else low.min()
-            f["pct_from_52w_high"] = float((close.iloc[-1] / high_52w) - 1)
-            f["pct_from_52w_low"]  = float((close.iloc[-1] / low_52w) - 1)
+            f["pct_from_52w_high"] = _safe_float((close.iloc[-1] / high_52w) - 1)
+            f["pct_from_52w_low"]  = _safe_float((close.iloc[-1] / low_52w) - 1)
 
         # RSI-14
         if n > 20:
@@ -167,7 +188,7 @@ class FeatureEngine:
             loss = (-delta.clip(upper=0)).rolling(14).mean()
             rs = gain / loss.replace(0, np.nan)
             rsi = (100 - 100 / (1 + rs)).iloc[-1]
-            f["rsi_14"] = float(rsi) if not np.isnan(rsi) else np.nan
+            f["rsi_14"] = _safe_float(rsi)
 
         # Momentum acceleration (roc_5 vs roc_20 farkı — trend ivmesi)
         if "roc_5d" in f and "roc_20d" in f:
@@ -176,7 +197,7 @@ class FeatureEngine:
         # Kısa dönem mean reversion potansiyeli
         if n > 20:
             std = close.pct_change().rolling(20).std().iloc[-1]
-            f["zscore_vs_sma20"] = float(
+            f["zscore_vs_sma20"] = _safe_float(
                 (close.iloc[-1] - close.rolling(20).mean().iloc[-1]) / (std * close.rolling(20).mean().iloc[-1] + 1e-9)
             )
 
@@ -194,7 +215,7 @@ class FeatureEngine:
             try:
                 s = (1 + stock_ret.tail(w)).prod() - 1
                 b = (1 + bm_ret.tail(w)).prod() - 1
-                f[f"rs_vs_bist_{label}"] = float(s - b)
+                f[f"rs_vs_bist_{label}"] = _safe_float(s - b)
             except Exception:
                 pass
 
@@ -202,7 +223,7 @@ class FeatureEngine:
         if len(stock_ret) > 25:
             rs_series = stock_ret - bm_ret
             rs_5d = rs_series.rolling(5).sum()
-            f["rs_trend_5d"] = float(rs_5d.diff(5).iloc[-1]) if len(rs_5d) > 5 else np.nan
+            f["rs_trend_5d"] = _safe_float(rs_5d.diff(5).iloc[-1]) if len(rs_5d) > 5 else np.nan
 
         return f
 
@@ -215,7 +236,7 @@ class FeatureEngine:
             try:
                 s = (1 + stock_ret.tail(w)).prod() - 1
                 b = (1 + sect_ret.tail(w)).prod() - 1
-                f[f"rs_vs_sector_{label}"] = float(s - b)
+                f[f"rs_vs_sector_{label}"] = _safe_float(s - b)
             except Exception:
                 pass
 

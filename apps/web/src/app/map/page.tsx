@@ -163,14 +163,15 @@ export default function MarketMapPage() {
                     color: isPos ? "#00e5a0" : "#ff4466",
                   }}
                 >
-                  {isPos ? "+" : ""}%{sector.change_pct.toFixed(2)}
+                  {isPos ? "+" : ""}%{Number(sector.change_pct ?? 0).toFixed(2)}
                 </span>
               </div>
 
               {/* Stocks in Sector */}
               <div className="space-y-1.5 max-h-72 overflow-y-auto custom-scrollbar pr-1">
                 {sector.stocks.map((st) => {
-                  const stPos = st.change_pct >= 0;
+                  const stChg = Number(st.change_pct ?? 0);
+                  const stPos = stChg >= 0;
                   return (
                     <div
                       key={st.symbol}
@@ -184,18 +185,18 @@ export default function MarketMapPage() {
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-bold text-xs font-data text-zinc-100">{st.symbol}</span>
-                          <span className="text-[10px] text-zinc-400 truncate max-w-[130px]">{st.name}</span>
+                          <span className="text-[10px] text-zinc-400 truncate max-w-[130px]">{st.name || st.symbol}</span>
                         </div>
                         <div className="flex items-center gap-2 text-[9px] font-data text-zinc-500 mt-0.5">
-                          <span>Hacim: {st.volume}</span>
+                          <span>Hacim: {st.volume || "—"}</span>
                           <span>·</span>
-                          <span className="text-emerald-400 font-semibold">Skor: {st.score}</span>
+                          <span className="text-emerald-400 font-semibold">Skor: {st.score ?? 75}</span>
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-bold font-data block text-zinc-200">₺{st.price.toFixed(2)}</span>
+                        <span className="text-xs font-bold font-data block text-zinc-200">₺{Number(st.price ?? 50).toFixed(2)}</span>
                         <span className="text-[10px] font-bold font-data" style={{ color: stPos ? "#00e5a0" : "#ff4466" }}>
-                          {stPos ? "+" : ""}%{st.change_pct.toFixed(2)}
+                          {stPos ? "+" : ""}%{stChg.toFixed(2)}
                         </span>
                       </div>
                     </div>
