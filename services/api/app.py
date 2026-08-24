@@ -77,21 +77,25 @@ async def lifespan(app: FastAPI):
                     from .v1.market import _fetch_radar_fresh
                     await _fetch_radar_fresh(limit=1000)
                 else:
-                    # Canlı piyasa mikro-tick akışı: Fiyatları BIST kademe kurallarına göre anlık dalgalandır
-                    radar = get_cached("radar:data") or []
-                    if radar:
-                        for item in radar:
-                            if random.random() < 0.40:
-                                p = float(item.get("price", 10.0))
-                                tick_size = 0.01 if p < 20 else (0.02 if p < 50 else (0.05 if p < 100 else 0.10))
-                                step = random.choice([-1, -1, 0, 1, 1, 2]) * tick_size
-                                new_p = round(max(0.1, p + step), 2)
-                                item["price"] = new_p
-                                item["volume"] = int(item.get("volume", 100000)) + random.randint(200, 10000)
-                                if "high" in item: item["high"] = max(item["high"], new_p)
-                                if "low" in item: item["low"] = min(item["low"], new_p)
-                        set_cached("radar:data", radar, ttl=300)
-                        set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
+                    # Canlı piyasa mikro-tick akışı: SADECE borsa açıkken (CONTINUOUS_AUCTION vb.) kademe dalgalandır
+                    from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
+                    current_phase = bist_session_fsm.get_phase()
+                    
+                    if current_phase != BISTMarketPhase.CLOSED:
+                        radar = get_cached("radar:data") or []
+                        if radar:
+                            for item in radar:
+                                if random.random() < 0.40:
+                                    p = float(item.get("price", 10.0))
+                                    tick_size = 0.01 if p < 20 else (0.02 if p < 50 else (0.05 if p < 100 else 0.10))
+                                    step = random.choice([-1, -1, 0, 1, 1, 2]) * tick_size
+                                    new_p = round(max(0.1, p + step), 2)
+                                    item["price"] = new_p
+                                    item["volume"] = int(item.get("volume", 100000)) + random.randint(200, 10000)
+                                    if "high" in item: item["high"] = max(item["high"], new_p)
+                                    if "low" in item: item["low"] = min(item["low"], new_p)
+                            set_cached("radar:data", radar, ttl=300)
+                            set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
                 
                 loop_counter += 1
             except Exception as e:
