@@ -150,7 +150,12 @@ services:
     volumes:
       - ./services:/app/services
       - ./.env:/app/.env:ro
-    mem_limit: 256m
+    # NOT: Onceden 256m idi. 629 hisseyi senkron/tek-tek yfinance ile ceken
+    # market_data_loop, her cagrida yeni ThreadPoolExecutor + yeni HTTP session
+    # yarattigindan bellek tuketimi 256m limitini asip surekli OOMKilled (137)
+    # oluyordu; restart:unless-stopped da onu sonsuz crash-loop'a sokup WSL VM'ini
+    # (ve dolayisiyla tum docker komutlarini) donduruyordu. Limit yukseltildi.
+    mem_limit: 768m
     depends_on:
       api:
         condition: service_started

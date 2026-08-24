@@ -176,35 +176,53 @@ class IngestionService:
             try:
                 logger.info("Starting market data fetch cycle")
 
-                # Fetch current prices for all stocks
-                for ticker in BIST_STOCKS:
+                # NOT: Onceden bu dongu 629 hisseyi TEK TEK, senkron
+                # fetch_current_price() cagrisiyla cekiyordu; her cagri kendi
+                # ThreadPoolExecutor'ini ve (curl_cffi tarafinda) yeni bir HTTP
+                # session'ini yaratiyordu. Bu, sureklilikte bellek tuketimini
+                # container'in mem_limit'ini asacak sekilde artiriyor,
+                # OOMKilled (exit 137) + restart:unless-stopped ile sonsuz
+                # crash-loop'a ve sonunda WSL VM'inin tamamen donmasina
+                # (docker komutlarinin yanit vermemesine) sebep oluyordu.
+                # Artik kucuk gruplar (chunk) halinde, gruplar arasi kisa
+                # bekleme ile cekiliyor; bellek kullanimi sabit ve dusuk kalir.
+                CHUNK_SIZE = 20
+                for i in range(0, len(BIST_STOCKS), CHUNK_SIZE):
                     if not self._running:
                         break
+                    chunk = BIST_STOCKS[i:i + CHUNK_SIZE]
+                    for ticker in chunk:
+                        if not self._running:
+                            break
 
-                    try:
-                        data = yfinance_provider.fetch_current_price(ticker)
-                        if data and data.get("price"):
-                            instrument_id = self._instrument_map.get(ticker)
-                            if instrument_id:
-                                # Publish tick event
-                                event = CanonicalEvent(
-                                    event_type=EventType.MARKET_TICK,
-                                    source="yfinance",
-                                    data={
-                                        "instrument_id": instrument_id,
-                                        "ticker": ticker,
-                                        "price": data["price"],
-                                        "volume": data.get("volume", 0),
-                                        "bid": data.get("bid"),
-                                        "ask": data.get("ask"),
-                                        "source": "yfinance",
-                                    },
-                                )
-                                publish_event(event, key=ticker)
+                        try:
+                            data = yfinance_provider.fetch_current_price(ticker)
+                            if data and data.get("price"):
+                                instrument_id = self._instrument_map.get(ticker)
+                                if instrument_id:
+                                    # Publish tick event
+                                    event = CanonicalEvent(
+                                        event_type=EventType.MARKET_TICK,
+                                        source="yfinance",
+                                        data={
+                                            "instrument_id": instrument_id,
+                                            "ticker": ticker,
+                                            "price": data["price"],
+                                            "volume": data.get("volume", 0),
+                                            "bid": data.get("bid"),
+                                            "ask": data.get("ask"),
+                                            "source": "yfinance",
+                                        },
+                                    )
+                                    publish_event(event, key=ticker)
 
-                    except Exception as e:
-                        logger.warning("Failed to fetch ticker", ticker=ticker, error=str(e))
-                        continue
+                        except Exception as e:
+                            logger.warning("Failed to fetch ticker", ticker=ticker, error=str(e))
+                            continue
+
+                    # Chunk'lar arasi kisa bekleme: bellek/baglanti birikimini
+                    # ve rate-limit riskini azaltir, event loop'u da nefes aldirir.
+                    await asyncio.sleep(1)
 
                 # Fetch indices
                 for index_symbol, index_name in BIST_INDICES.items():
