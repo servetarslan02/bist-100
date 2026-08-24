@@ -11,7 +11,7 @@ Memory consolidation periyodik yapılır.
 FAZ 3: Agent Memory
 """
 
-import json
+import orjson
 import time
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
@@ -426,7 +426,7 @@ class AgentMemory:
 
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(save_path, "w") as f:
-            json.dump(data, f, indent=2, default=str)
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str).decode())
 
         logger.info("Memory saved", path=save_path)
 
@@ -438,7 +438,7 @@ class AgentMemory:
 
         try:
             with open(load_path) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
 
             # Working memory
             for item in data.get("working", {}).get("items", []):

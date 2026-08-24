@@ -25,10 +25,11 @@
 
 | Format | Amaç | ALPHA BIST |
 |---|---|---|
-| **orjson** | Ana JSON serializer (10x hızlı) | ✅ Tek kaynak |
+| **orjson** | Ana JSON serializer (Rust tabanlı, 4x hızlı) | ✅ Tek kaynak (130+ dosyada aktif) |
 | **Protobuf** | gRPC binary iletişim | ✅ Sadece gRPC |
+| **pickle** | ML model serialization (LightGBM, XGBoost, PyTorch) | ✅ Sadece ML modelleri |
 
-**Strateji:** orjson tek JSON kaynağı. Protobuf sadece gRPC için. MessagePack kaldırıldı.
+**Strateji:** orjson tek JSON kaynağı. Protobuf sadece gRPC için. pickle sadece ML model serialization için. MessagePack kaldırıldı.
 
 ---
 

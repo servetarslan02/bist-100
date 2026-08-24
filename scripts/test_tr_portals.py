@@ -2,7 +2,7 @@
 Test Turkish financial portals: Doviz.com, Bigpara, Mynet, IsYatirim
 """
 import requests
-import json
+import orjson
 import sys
 
 if sys.platform == "win32":

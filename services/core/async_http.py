@@ -56,8 +56,8 @@ class AsyncHTTPClient:
         text = await self.get_text(url, params=params)
         if text:
             try:
-                import json
-                return json.loads(text)
+                import orjson
+                return orjson.loads(text)
             except Exception as e:
                 logger.warning("JSON parse error", url=url, error=str(e))
         return None
@@ -100,8 +100,8 @@ class AsyncHTTPClient:
                     if resp.status < 400:
                         text = await resp.text()
                         try:
-                            import json
-                            return json.loads(text)
+                            import orjson
+                            return orjson.loads(text)
                         except Exception as e:
                             logger.debug("json_parse_failed", url=url, error=str(e))
                             return text

@@ -12,7 +12,7 @@ ROADMAP v3.0 FAZ 7:
 KURAL: Sistem durmadan kendini güncellemeli, dünkü model bugünün piyasasına uymayabilir.
 """
 
-import json
+import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field

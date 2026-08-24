@@ -7,7 +7,7 @@ Canlı verilerle uçtan uca test.
 
 import sys
 import os
-import json
+import orjson
 import traceback
 import numpy as np
 import pandas as pd
@@ -1960,7 +1960,7 @@ def main():
         }
     }
     with open("reports/full_audit_report.json", "w") as f:
-        json.dump(report_data, f, indent=2, default=str)
+        f.write(orjson.dumps(report_data, option=orjson.OPT_INDENT_2, default=str).decode())
     print(f"\n📄 JSON rapor: reports/full_audit_report.json")
 
     return report

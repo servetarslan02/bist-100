@@ -16,7 +16,7 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency
 """
 
-import json
+import orjson
 import hashlib
 import pickle
 import numpy as np
@@ -56,12 +56,12 @@ class SystemCheckpoint:
 
     def compute_state_hash(self) -> str:
         """Durum hash'i hesapla (deterministik kontrol için)."""
-        content = json.dumps({
+        content = orjson.dumps({
             "config": self.config_snapshot,
             "portfolio": self.portfolio_state,
             "seed": self.random_seed,
             "counter": self.execution_counter,
-        }, sort_keys=True, default=str)
+        }, option=orjson.OPT_SORT_KEYS, default=str)
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
 
@@ -293,7 +293,7 @@ class DeterministicRecovery:
         filepath = self._storage_path / f"{checkpoint.checkpoint_id}.json"
         try:
             with open(filepath, "w") as f:
-                json.dump(checkpoint.to_dict(), f, indent=2, default=str)
+                f.write(orjson.dumps(checkpoint.to_dict(), option=orjson.OPT_INDENT_2, default=str).decode())
         except Exception as e:
             logger.warning("Failed to persist checkpoint",
                           checkpoint_id=checkpoint.checkpoint_id,
@@ -307,7 +307,7 @@ class DeterministicRecovery:
 
         try:
             with open(filepath) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             return SystemCheckpoint(
                 checkpoint_id=data["checkpoint_id"],
                 timestamp=datetime.fromisoformat(data["timestamp"]),
@@ -331,7 +331,7 @@ class DeterministicRecovery:
         for filepath in sorted(self._storage_path.glob("cp_*.json")):
             try:
                 with open(filepath) as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
                 checkpoints.append({
                     "checkpoint_id": data["checkpoint_id"],
                     "timestamp": data["timestamp"],
@@ -363,7 +363,7 @@ class IdempotencyGuard:
 
     def compute_operation_hash(self, operation: str, params: Dict[str, Any]) -> str:
         """İşlem hash'i hesapla."""
-        content = f"{operation}:{json.dumps(params, sort_keys=True, default=str)}"
+        content = f"{operation}:{orjson.dumps(params, option=orjson.OPT_SORT_KEYS, default=str).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
     def is_already_executed(self, operation: str, params: Dict[str, Any]) -> bool:

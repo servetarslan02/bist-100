@@ -12,7 +12,7 @@ Sinyal Türleri:
 """
 
 import os
-import json
+import orjson
 import logging
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional

@@ -10,7 +10,7 @@ SQLite-based persistence for backtest results:
 Recovery: restart sonrası eksiksiz veri yükler.
 """
 
-import json
+import orjson
 import sqlite3
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
@@ -113,8 +113,8 @@ class BacktestPersistence:
                     metrics.get("sharpe_ratio", 0),
                     metrics.get("max_drawdown_pct", 0),
                     metrics.get("total_trades", 0),
-                    json.dumps(config or {}),
-                    json.dumps(metrics, default=str),
+                    orjson.dumps(config or {}).decode(),
+                    orjson.dumps(metrics, default=str).decode(),
                 ),
             )
             conn.commit()
@@ -186,9 +186,9 @@ class BacktestPersistence:
             if row:
                 result = dict(row)
                 if result.get("metrics_json"):
-                    result["metrics"] = json.loads(result["metrics_json"])
+                    result["metrics"] = orjson.loads(result["metrics_json"])
                 if result.get("config_json"):
-                    result["config"] = json.loads(result["config_json"])
+                    result["config"] = orjson.loads(result["config_json"])
                 return result
             return None
         finally:

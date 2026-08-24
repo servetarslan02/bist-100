@@ -4,7 +4,7 @@ FAZ 5.1: Model metadata DB persistence.
 FAZ 4 model yapısını bozmaz; DB ile ilişkilendirme sağlar.
 """
 
-import json
+import orjson
 import hashlib
 from typing import Optional, Dict, Any, List
 from dataclasses import asdict
@@ -62,7 +62,7 @@ class ModelPersistence:
 
         # Feature contract hash
         contract_hash = hashlib.sha256(
-            json.dumps(sorted(feature_names), sort_keys=True).encode()
+            orjson.dumps(sorted(feature_names), option=orjson.OPT_SORT_KEYS).decode()
         ).hexdigest()[:16]
 
         try:
@@ -75,7 +75,7 @@ class ModelPersistence:
                     """INSERT INTO models (name, model_type, framework, features, status)
                        VALUES ($1, 'lightgbm_ranking', 'lightgbm', $2, 'ACTIVE')
                        RETURNING id""",
-                    model_name, json.dumps(feature_names)
+                    model_name, orjson.dumps(feature_names).decode()
                 )
 
             # Version kaydet (upsert)
@@ -95,9 +95,9 @@ class ModelPersistence:
                 model_id, version,
                 training_data_start, training_data_end,
                 target_horizon,
-                json.dumps(feature_names), json.dumps(cs_features),
-                confidence_score, json.dumps(confidence_details),
-                json.dumps(validation_metrics, default=str),
+                orjson.dumps(feature_names), orjson.dumps(cs_features).decode(),
+                confidence_score, orjson.dumps(confidence_details).decode(),
+                orjson.dumps(validation_metrics, default=str).decode(),
                 artifact_path
             )
 

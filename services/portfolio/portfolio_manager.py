@@ -13,7 +13,7 @@ Kurumsal seviye portföy muhasebesi:
 v1.0 API'leri 100% geriye uyumlu.
 """
 
-import json
+import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field

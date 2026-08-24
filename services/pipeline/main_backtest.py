@@ -1,5 +1,5 @@
 
-import json
+import orjson
 import gc
 import pandas as pd
 from services.core.alpha_engine import AlphaEngine

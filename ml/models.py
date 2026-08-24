@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 import structlog
 import pickle
-import json
+import orjson
 from pathlib import Path
 
 logger = structlog.get_logger()

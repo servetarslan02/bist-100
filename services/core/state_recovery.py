@@ -8,7 +8,7 @@ P0-7 düzeltmesi:
 - Consistency check sonrası current state
 """
 
-import json
+import orjson
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone, timedelta
 import structlog
@@ -85,7 +85,7 @@ class StateRecovery:
             if redis_client:
                 snapshot_data = await redis_client.get(f"state_snapshot:{ticker}")
                 if snapshot_data:
-                    snapshot = json.loads(snapshot_data)
+                    snapshot = orjson.loads(snapshot_data)
                     logger.debug("Snapshot found", ticker=ticker,
                                snapshot_time=snapshot.get("timestamp"))
                     return snapshot
@@ -99,7 +99,7 @@ class StateRecovery:
                         ORDER BY snapshot_time DESC LIMIT 1
                     """, ticker)
                     if row:
-                        snapshot = json.loads(row["state_data"])
+                        snapshot = orjson.loads(row["state_data"])
                         logger.debug("DB snapshot found", ticker=ticker,
                                    snapshot_time=row["snapshot_time"])
                         return snapshot
@@ -172,7 +172,7 @@ class StateRecovery:
             if redis_client:
                 await redis_client.set(
                     f"state_snapshot:{ticker}",
-                    json.dumps(state, default=str),
+                    orjson.dumps(state, default=str).decode(),
                     ex=86400 * 7,  # 7 gün TTL
                 )
 

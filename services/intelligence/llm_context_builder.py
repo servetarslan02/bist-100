@@ -17,7 +17,7 @@ Bu bağlam paketi llm_agent.py tarafından prompt'a eklenir.
 
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timezone
-import json
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -251,7 +251,7 @@ class LLMContextBuilder:
         JSON olarak eklenir — LLM'in yapılandırılmış veriyi daha iyi okuması için.
         """
         try:
-            return json.dumps(context, ensure_ascii=False, indent=2, default=str)
+            return orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()
         except Exception:
             return str(context)
 

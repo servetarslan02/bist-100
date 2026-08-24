@@ -16,7 +16,7 @@ Test coverage:
 
 import os
 import sys
-import json
+import orjson
 import tempfile
 import unittest
 from datetime import datetime, timezone
@@ -416,7 +416,7 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertIn("portfolio_summary", report)
         self.assertEqual(report["champion_version"], "LambdaRank_v3_LOCKED")
         print(f"\n=== REPLAY REPORT ===")
-        print(json.dumps(report["performance_metrics"], indent=2))
+        print(orjson.dumps(report["performance_metrics"], option=orjson.OPT_INDENT_2).decode())
         print(f"Portfolio summary: {report['portfolio_summary']}")
 
     def test_fail_safe_on_error(self):

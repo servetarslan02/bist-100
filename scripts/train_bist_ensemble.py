@@ -9,7 +9,7 @@ ALPHA BIST — Model Eğitimi & Kilitli Validasyon Çalıştırıcısı
 
 import sys
 import os
-import json
+import orjson
 import time
 
 # Windows UTF-8 Terminal desteği

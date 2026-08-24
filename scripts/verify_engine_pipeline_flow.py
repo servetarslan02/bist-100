@@ -9,7 +9,7 @@ ALPHA BIST — Uçtan Uca Motor Veri Akışı, Feature Hesaplama ve Model Yoruml
 
 import sys
 import os
-import json
+import orjson
 import numpy as np
 import pandas as pd
 import yfinance as yf

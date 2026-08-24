@@ -13,7 +13,7 @@ Kapsam:
 
 import sys
 import os
-import json
+import orjson
 import tempfile
 
 from services.core.config_loader import ConfigLoader

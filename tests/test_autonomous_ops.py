@@ -15,7 +15,7 @@ Kapsam:
 import sys
 import os
 import asyncio
-import json
+import orjson
 import time
 
 from services.core.alerting import (

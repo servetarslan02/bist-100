@@ -12,7 +12,7 @@ Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 """
 
 import asyncio
-import json
+import orjson
 import os
 import time
 import copy
@@ -187,7 +187,7 @@ class AlertPolicy:
             return policy
         try:
             with open(config_path) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             policy = cls._from_dict(data, config_path)
             return policy
         except Exception as e:
@@ -202,7 +202,7 @@ class AlertPolicy:
             if mtime <= self._last_modified:
                 return False
             with open(self._config_path) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             new_policy = AlertPolicy._from_dict(data, self._config_path)
             errors = new_policy.validate()
             if errors:
@@ -768,7 +768,7 @@ class AlertPolicy:
         try:
             os.makedirs(os.path.dirname(self._config_path), exist_ok=True)
             with open(self._config_path, "w") as f:
-                json.dump(self.to_dict(), f, indent=2)
+                f.write(orjson.dumps(self.to_dict(), option=orjson.OPT_INDENT_2).decode())
         except Exception as e:
             logger.warning("Policy save failed", error=str(e))
 
@@ -803,4 +803,4 @@ def ensure_default_config(path: str = None):
         return
     os.makedirs(os.path.dirname(config_path), exist_ok=True)
     with open(config_path, "w") as f:
-        json.dump({"version": 1, **AlertPolicy().to_dict()}, f, indent=2)
+        f.write(orjson.dumps({"version": 1, **AlertPolicy().to_dict()}, option=orjson.OPT_INDENT_2).decode())

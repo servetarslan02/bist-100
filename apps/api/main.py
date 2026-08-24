@@ -25,7 +25,7 @@ Endpoints:
     WS   /ws                  → Real-time updates (token gerekli)
 """
 
-import json
+import orjson
 import asyncio
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
@@ -301,7 +301,7 @@ async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
 
         while True:
             data = await websocket.receive_text()
-            message = json.loads(data)
+            message = orjson.loads(data)
 
             action = message.get("action", "")
 

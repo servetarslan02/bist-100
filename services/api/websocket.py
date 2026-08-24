@@ -14,7 +14,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 from typing import Dict, List, Set, Any, Callable
 from datetime import datetime, timezone
 import structlog
@@ -35,7 +35,7 @@ class WebSocketConnection:
     async def send(self, data: Dict[str, Any]):
         """Veri gönder."""
         try:
-            message = json.dumps(data, default=str)
+            message = orjson.dumps(data, default=str).decode()
             await self.ws.send(message)
             self.messages_sent += 1
         except Exception as e:
@@ -110,9 +110,9 @@ class WebSocketServer:
             # Bağlantıyı açık tut
             async for message in ws:
                 try:
-                    data = json.loads(message)
+                    data = orjson.loads(message)
                     await self._handle_client_message(conn, data)
-                except json.JSONDecodeError:
+                except orjson.JSONDecodeError:
                     pass
         except Exception as e:
             logger.debug("WebSocket disconnected", client=client_id, error=str(e))

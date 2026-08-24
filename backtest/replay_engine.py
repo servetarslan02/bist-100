@@ -4,7 +4,7 @@ Geçmişi canlıymış gibi oynatır.
 "13 Mart 2025 10:37'de ne biliyorsam sadece onu kullanarak karar ver."
 """
 
-import json
+import orjson
 import pickle
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any, Callable, Tuple

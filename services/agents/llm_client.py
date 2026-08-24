@@ -12,7 +12,7 @@ Retry, timeout, token counting dahil.
 """
 
 import asyncio
-import json
+import orjson
 import os
 import re
 import time
@@ -439,24 +439,24 @@ def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
 
     # 1. Doğrudan JSON
     try:
-        return json.loads(content)
-    except json.JSONDecodeError:
+        return orjson.loads(content)
+    except orjson.JSONDecodeError:
         pass
 
     # 2. ```json ... ``` bloğu
     json_block = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
     if json_block:
         try:
-            return json.loads(json_block.group(1))
-        except json.JSONDecodeError:
+            return orjson.loads(json_block.group(1))
+        except orjson.JSONDecodeError:
             pass
 
     # 3. İlk { ... }
     json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
     if json_match:
         try:
-            return json.loads(json_match.group())
-        except json.JSONDecodeError:
+            return orjson.loads(json_match.group())
+        except orjson.JSONDecodeError:
             pass
 
     # 4. Metinden fallback extraction

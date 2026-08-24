@@ -19,7 +19,7 @@ iki aşamalı günlük işlem akışını yönetir:
 """
 
 import asyncio
-import json
+import orjson
 import structlog
 from datetime import datetime, date, timezone
 import pandas as pd
@@ -165,7 +165,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
                 try:
                     await pg_execute(
                         "INSERT INTO paper_trade_portfolio (target_date, tickers, is_cash_regime, is_rebalance) VALUES ($1, $2, $3, $4)",
-                        today_dt, json.dumps(top_10_tickers), False, True
+                        today_dt, orjson.dumps(top_10_tickers).decode(), False, True
                     )
                 except Exception as e:
                     logger.error("DB Record Error", error=str(e))

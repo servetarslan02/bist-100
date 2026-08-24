@@ -11,7 +11,7 @@ Production-grade job execution with:
 
 import asyncio
 import hashlib
-import json
+import orjson
 import time
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable, Awaitable
@@ -219,7 +219,7 @@ class JobWorker:
 
     def _generate_idempotency_key(self, job_type: str, payload: Optional[Dict]) -> str:
         """Idempotency key üret."""
-        content = f"{job_type}:{json.dumps(payload or {}, sort_keys=True)}"
+        content = f"{job_type}:{orjson.dumps(payload or {}, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
     async def _check_idempotency(self, idempotency_key: str) -> Optional[int]:
@@ -254,7 +254,7 @@ class JobWorker:
                        (job_type, status, priority, payload, max_retries, idempotency_key)
                        VALUES ($1, 'PENDING', $2, $3, $4, $5)
                        RETURNING id""",
-                    job_type, priority, json.dumps(payload), max_retries, idempotency_key
+                    job_type, priority, orjson.dumps(payload).decode(), max_retries, idempotency_key
                 ),
                 timeout=3.0
             )
@@ -315,7 +315,7 @@ class JobWorker:
             return
         try:
             from .database import pg_execute
-            result_json = json.dumps(result, default=str) if result else '{}'
+            result_json = orjson.dumps(result, default=str).decode() if result else '{}'
             await pg_execute(
                 """UPDATE system_jobs SET status = 'COMPLETED', result = $1,
                    completed_at = NOW(), updated_at = NOW() WHERE id = $2""",

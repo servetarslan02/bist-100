@@ -11,7 +11,7 @@ ROADMAP v3.0 FAZ 3:
 KURAL: "En iyi %10'da mı?" sor, "yükselir mi?" sorma!
 """
 
-import json
+import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field

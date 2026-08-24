@@ -112,10 +112,10 @@ async def get_replication_metrics() -> dict:
 
 if __name__ == "__main__":
     import asyncio
-    import json
+    import orjson
 
     async def main():
         health = await check_replication_health()
-        print(json.dumps(health, indent=2, ensure_ascii=False))
+        print(orjson.dumps(health, option=orjson.OPT_INDENT_2).decode())
 
     asyncio.run(main())

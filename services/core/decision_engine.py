@@ -7,7 +7,7 @@ Stop-loss ve target hesaplaması ATR bazlı.
 FAZ 8: Decision Engine
 """
 
-import json
+import orjson
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

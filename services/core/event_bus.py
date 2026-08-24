@@ -11,7 +11,7 @@ Mesajlaşma Strateji:
 """
 
 import os
-import json
+import orjson
 import asyncio
 from typing import Optional, Callable, Dict, Any, List
 import structlog

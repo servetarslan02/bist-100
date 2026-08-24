@@ -1,7 +1,7 @@
 """ALPHA BIST - Risk Engine Service"""
 
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -117,7 +117,7 @@ class RiskEngine:
                             INSERT INTO system_config (config_key, config_value, description)
                             VALUES ($1, $2::jsonb, $3)
                             ON CONFLICT (config_key) DO NOTHING
-                        """, f"risk.{k}", json.dumps(v), f"Risk limit {k}")
+                        """, f"risk.{k}", orjson.dumps(v).decode(), f"Risk limit {k}")
                     except Exception:
                         pass
                 try:
@@ -135,7 +135,7 @@ class RiskEngine:
                     value = row["config_value"]
                     if isinstance(value, str):
                         try:
-                            value = json.loads(value)
+                            value = orjson.loads(value)
                         except Exception:
                             pass
                     if value is not None:
@@ -272,7 +272,7 @@ class RiskEngine:
                 publish_event(alert_event, key=ticker)
                 logger.warning("Decision BLOCKED by risk", ticker=ticker, checks=blocking_checks)
 
-            await redis_set(f"risk_check:{ticker}", json.dumps(result), ex=300)
+            await redis_set(f"risk_check:{ticker}", orjson.dumps(result).decode(), ex=300)
 
         except Exception as e:
             # P0-6: Exception durumunda da BLOCK

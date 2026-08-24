@@ -1,5 +1,5 @@
 import requests
-import json
+import orjson
 import sys
 
 if sys.platform == "win32":

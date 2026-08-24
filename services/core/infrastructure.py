@@ -11,7 +11,7 @@ ALPHA BIST — Event Infrastructure v1.0
 - Job Queue
 """
 
-import json
+import orjson
 import hashlib
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field

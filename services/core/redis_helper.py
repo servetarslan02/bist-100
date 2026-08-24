@@ -1,4 +1,4 @@
-import json
+import orjson
 import os
 import tempfile
 from typing import Optional, Any
@@ -14,7 +14,7 @@ def _load_cache():
     if os.path.exists(_CACHE_FILE):
         try:
             with open(_CACHE_FILE, "r") as f:
-                return json.load(f)
+                return orjson.loads(f.read())
         except Exception:
             pass
     return {}
@@ -22,7 +22,7 @@ def _load_cache():
 def _save_cache(data):
     try:
         with open(_CACHE_FILE, "w") as f:
-            json.dump(data, f)
+            f.write(orjson.dumps(data).decode())
     except Exception:
         pass
 
@@ -51,12 +51,12 @@ def get_cached(key: str) -> Optional[Any]:
     if r is None:
         cache = _load_cache()
         if key in cache:
-            return json.loads(cache[key])
+            return orjson.loads(cache[key])
         return None
     try:
         data = r.get(key)
         if data:
-            return json.loads(data)
+            return orjson.loads(data)
     except Exception:
         pass
     return None
@@ -65,11 +65,11 @@ def set_cached(key: str, data: Any, ttl: int = 300) -> bool:
     r = get_client()
     if r is None:
         cache = _load_cache()
-        cache[key] = json.dumps(data, default=str)
+        cache[key] = orjson.dumps(data, default=str).decode()
         _save_cache(cache)
         return True
     try:
-        r.setex(key, ttl, json.dumps(data, default=str))
+        r.setex(key, ttl, orjson.dumps(data, default=str).decode())
         return True
     except Exception:
         return False

@@ -9,7 +9,7 @@ v2.0: PortfolioManager v2.0 muhasebe altyapısıyla uyumlu.
 
 import asyncio
 import os
-import json
+import orjson
 from datetime import datetime, timezone, date
 from typing import Dict, List, Any, Optional
 import structlog

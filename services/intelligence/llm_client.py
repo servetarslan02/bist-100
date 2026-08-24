@@ -12,7 +12,7 @@ Yenilikler v2.0:
 - Mock fallback korunuyor
 """
 
-import json
+import orjson
 import os
 import time
 import structlog
@@ -260,7 +260,7 @@ class LLMClient:
         context_block = ""
         if context:
             try:
-                context_block = f"\n\nBAĞLAM:\n{json.dumps(context, ensure_ascii=False, indent=2, default=str)}"
+                context_block = f"\n\nBAĞLAM:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
             except Exception:
                 context_block = f"\n\nBAĞLAM: {str(context)}"
 
@@ -299,7 +299,7 @@ METİN:
                         raw_text = raw_text.split("```json")[1].split("```")[0].strip()
                     elif "```" in raw_text:
                         raw_text = raw_text.split("```")[1].split("```")[0].strip()
-                    return json.loads(raw_text)
+                    return orjson.loads(raw_text)
                 except Exception as exc:
                     logger.error("google-genai structured analysis failed", model=mod, error=str(exc))
 
@@ -314,7 +314,7 @@ METİN:
                     ),
                 )
                 text_resp = response.text if hasattr(response, "text") else "{}"
-                return json.loads(text_resp)
+                return orjson.loads(text_resp)
             except Exception as exc:
                 logger.error("Structured analysis failed", error=str(exc))
 
@@ -325,7 +325,7 @@ METİN:
         if not context:
             return prompt
         try:
-            ctx_text = json.dumps(context, ensure_ascii=False, indent=2, default=str)
+            ctx_text = orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()
             return f"BAĞLAM VERİSİ:\n{ctx_text}\n\n---\n\nGÖREV:\n{prompt}"
         except Exception:
             return prompt

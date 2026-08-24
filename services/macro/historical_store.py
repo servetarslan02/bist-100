@@ -10,7 +10,7 @@ Tarihsel makro veri deposu — point-in-time:
 KURAL: Backtest'te sadece o tarihte bilinen veriyi kullan.
 """
 
-import json
+import orjson
 import os
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
@@ -221,7 +221,7 @@ class MacroHistoricalStore:
         if os.path.exists(self._storage_path):
             try:
                 with open(self._storage_path, "r") as f:
-                    self._data = json.load(f)
+                    self._data = orjson.loads(f.read())
                 logger.info("Historical store loaded",
                            indicators=len(self._data),
                            path=self._storage_path)
@@ -234,7 +234,7 @@ class MacroHistoricalStore:
         try:
             os.makedirs(os.path.dirname(self._storage_path), exist_ok=True)
             with open(self._storage_path, "w") as f:
-                json.dump(self._data, f, indent=2)
+                f.write(orjson.dumps(self._data, option=orjson.OPT_INDENT_2).decode())
         except Exception as e:
             logger.error("Failed to save historical store", error=str(e))
 

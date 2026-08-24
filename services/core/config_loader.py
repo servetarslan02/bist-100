@@ -14,7 +14,7 @@ Kullanım:
     secret = config.get_secret("jwt_secret")  # ENV'den okur
 """
 
-import json
+import orjson
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -46,14 +46,14 @@ class ConfigLoader:
         config_path = path or str(CONFIG_DIR / "alpha_config.json")
         if os.path.exists(config_path):
             with open(config_path) as f:
-                instance._config = json.load(f)
+                instance._config = orjson.loads(f.read())
             logger.info("Config loaded", path=config_path, env=instance._environment)
 
         # Environment-specific override dosyası
         env_path = str(CONFIG_DIR / f"alpha_{instance._environment}.json")
         if os.path.exists(env_path):
             with open(env_path) as f:
-                env_config = json.load(f)
+                env_config = orjson.loads(f.read())
             instance._deep_merge(instance._config, env_config)
             logger.info("Environment config loaded", path=env_path)
 
@@ -168,8 +168,8 @@ class ConfigLoader:
         # JSON array/object
         if value.startswith(("[", "{")):
             try:
-                return json.loads(value)
-            except json.JSONDecodeError:
+                return orjson.loads(value)
+            except orjson.JSONDecodeError:
                 pass
         return value
 

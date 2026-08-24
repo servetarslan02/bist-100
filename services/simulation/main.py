@@ -1,7 +1,7 @@
 """ALPHA BIST - Simulation Engine (Monte Carlo, Scenarios, Backtest)"""
 
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -80,7 +80,7 @@ class SimulationEngine:
             await pg_execute("""
                 INSERT INTO simulations (name, simulation_type, parameters, results, status, completed_at)
                 VALUES ($1, $2, $3, $4, 'COMPLETED', NOW())
-            """, f"sim_{ticker}_{sim_type}", sim_type, json.dumps(event.data), json.dumps(result))
+            """, f"sim_{ticker}_{sim_type}", sim_type, orjson.dumps(event.data).decode(), orjson.dumps(result))
 
             # Publish result
             result_event = CanonicalEvent(

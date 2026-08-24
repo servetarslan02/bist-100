@@ -16,7 +16,7 @@ Referanslar:
 """
 
 import os
-import json
+import orjson
 import time
 import asyncio
 import hashlib
@@ -144,13 +144,13 @@ class ConfigHotReload:
             self._last_hash = hashlib.sha256(content.encode()).hexdigest()
 
             if content.strip():
-                self._current_config = json.loads(content)
+                self._current_config = orjson.loads(content)
             else:
                 self._current_config = {}
 
             return self._current_config
 
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             logger.error("Config file invalid JSON", error=str(e))
             return self._current_config
         except Exception as e:
@@ -181,7 +181,7 @@ class ConfigHotReload:
             old_config = self._current_config.copy()
             old_hash = self._last_hash
 
-            new_config = json.loads(content) if content.strip() else {}
+            new_config = orjson.loads(content) if content.strip() else {}
 
             # Find changed keys
             changed_keys = self._find_changed_keys(old_config, new_config)
@@ -207,7 +207,7 @@ class ConfigHotReload:
             if self._auto_apply:
                 await self._notify_callbacks(old_config, new_config, changed_keys)
 
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             logger.error("Config parse error during watch", error=str(e))
         except Exception as e:
             logger.error("Config watch check error", error=str(e))

@@ -254,12 +254,12 @@ class TestConfigHotReload:
 
     def test_load_and_change_detection(self):
         """Config yükleme ve değişiklik algılama."""
-        import json
+        import orjson
         import tempfile
         from services.core.config_hot_reload import ConfigHotReload
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump({"key": "value1"}, f)
+            f.write(orjson.dumps({"key": "value1"}).decode())
             path = f.name
 
         reloader = ConfigHotReload(path)
@@ -276,12 +276,12 @@ class TestConfigHotReload:
 
     def test_force_reload(self):
         """Force reload çalışmalı."""
-        import json
+        import orjson
         import tempfile
         from services.core.config_hot_reload import ConfigHotReload
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump({"x": 1}, f)
+            f.write(orjson.dumps({"x": 1}).decode())
             path = f.name
 
         reloader = ConfigHotReload(path)

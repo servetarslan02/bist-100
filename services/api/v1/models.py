@@ -1,7 +1,7 @@
 """Models API - 30-Yıllık BIST Makine Öğrenimi Ensemble Kayıt Defteri."""
 
 import os
-import json
+import orjson
 from datetime import datetime
 from fastapi import APIRouter, Depends, Query, BackgroundTasks
 

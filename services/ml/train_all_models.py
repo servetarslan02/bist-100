@@ -10,7 +10,7 @@ Tüm ML/AI modellerini gerçek feature matrisleri ve zamansal walk-forward valid
 """
 
 import os
-import json
+import orjson
 import pickle
 import numpy as np
 import pandas as pd

@@ -6,7 +6,7 @@ Sisteme akan alternatif, temel, haber, sosyal medya ve makroekonomik verilerin c
 import sys
 import os
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.abspath("."))

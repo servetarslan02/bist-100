@@ -7,7 +7,7 @@ Her teknolojinin değerini kanıtlamak için gerçek benchmark'lar.
 """
 
 import time
-import json
+import orjson
 import sys
 import os
 
@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def benchmark_json_serialization():
     """ORJSON vs json — API response hız karşılaştırması."""
-    import json as stdlib_json
+    import orjson as stdlib_json
     import orjson
 
     # Test data — gerçekçi API response'u
@@ -279,7 +279,7 @@ def run_all_benchmarks():
     # Save results
     output_path = "benchmarks/benchmark_results.json"
     with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
+        f.write(orjson.dumps(results, option=orjson.OPT_INDENT_2).decode())
     print(f"Sonuçlar kaydedildi: {output_path}")
 
     return results

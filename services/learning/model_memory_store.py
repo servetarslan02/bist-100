@@ -9,7 +9,7 @@ Kalıcı model hafızası:
 """
 
 import os
-import json
+import orjson
 import sqlite3
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
@@ -124,7 +124,7 @@ class ModelMemoryStore:
                 (
                     prediction_id, model_id, model_version, ticker, now,
                     predicted_direction, confidence, market_regime, prediction_horizon,
-                    entry_price, json.dumps(features or {})
+                    entry_price, orjson.dumps(features or {}).decode()
                 )
             )
 
@@ -150,7 +150,7 @@ class ModelMemoryStore:
             regime = r.get("market_regime", "BULL_TREND")
             horizon = r.get("prediction_horizon", "1-5D")
             entry_p = float(r.get("entry_price", 100.0))
-            features = json.dumps(r.get("features", {}))
+            features = orjson.dumps(r.get("features", {})).decode()
 
             pred_tuples.append((
                 p_id, m_id, m_ver, ticker, t_stamp, pred_dir, conf,
@@ -306,7 +306,7 @@ class ModelMemoryStore:
                     metrics.get("net_pnl", 0.0), metrics.get("annualized_sharpe", 0.0),
                     metrics.get("max_drawdown_pct", 0.0), metrics.get("brier_score", 0.25),
                     metrics.get("rank_ic", 0.0), reliability_score, fusion_weight,
-                    json.dumps(metrics)
+                    orjson.dumps(metrics).decode()
                 )
             )
 
@@ -316,7 +316,7 @@ class ModelMemoryStore:
         with self._get_conn() as conn:
             conn.execute(
                 "INSERT INTO fusion_weights_history (timestamp, market_regime, weights_json) VALUES (?, ?, ?)",
-                (now, market_regime, json.dumps(weights))
+                (now, market_regime, orjson.dumps(weights).decode())
             )
 
     def get_latest_metrics_all_models(self) -> List[Dict[str, Any]]:

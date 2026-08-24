@@ -1,6 +1,6 @@
 import argparse
 import sys
-import json
+import orjson
 from datetime import datetime, timedelta
 import structlog
 

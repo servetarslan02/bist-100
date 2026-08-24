@@ -6,7 +6,7 @@ Production Config/Secrets + Database + Model Persistence
 
 import sys
 import os
-import json
+import orjson
 import hashlib
 
 
@@ -261,12 +261,12 @@ def test_model_persistence_serialization():
 
     # Feature contract hash
     contract_hash = hashlib.sha256(
-        json.dumps(sorted(m.feature_names), sort_keys=True).encode()
+        orjson.dumps(sorted(m.feature_names), option=orjson.OPT_SORT_KEYS).decode()
     ).hexdigest()[:16]
 
     assert len(contract_hash) == 16
     assert contract_hash == hashlib.sha256(
-        json.dumps(["f1", "f2", "f3"], sort_keys=True).encode()
+        orjson.dumps(["f1", "f2", "f3"], option=orjson.OPT_SORT_KEYS).decode()
     ).hexdigest()[:16]
 
     # Metadata dict
@@ -281,8 +281,8 @@ def test_model_persistence_serialization():
     }
 
     # JSON serialization
-    serialized = json.dumps(meta, default=str)
-    deserialized = json.loads(serialized)
+    serialized = orjson.dumps(meta, default=str).decode()
+    deserialized = orjson.loads(serialized)
     assert deserialized["feature_names"] == ["f1", "f2", "f3"]
     assert deserialized["confidence_score"] == 0.75
 

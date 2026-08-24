@@ -6,7 +6,7 @@ Tüm API uç noktalarını tarar ve hiçbir sahte/mock/dummy veri olmadığını
 import sys
 import asyncio
 import httpx
-import json
+import orjson
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')

@@ -1,5 +1,5 @@
 import urllib.request
-import json
+import orjson
 import sys
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -14,7 +14,7 @@ def audit_data_and_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/system/databases", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             dbs = data.get("databases", [])
             print(f"  ✓ Aktif Dağıtık Veritabanı Kümesi: {len(dbs)} Veritabanı")
             for db in dbs:
@@ -30,7 +30,7 @@ def audit_data_and_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/system/status", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            status = json.loads(resp.read().decode())
+            status = orjson.loads(resp.read().decode())
             srvs = status.get("services", {})
             res = status.get("resources", {})
             print(f"  ✓ Genel Sistem Durumu      : {status.get('status').upper()}")
@@ -49,7 +49,7 @@ def audit_data_and_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/system/optimize_storage", data=b"{}", headers={"Content-Type": "application/json", "X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            opt = json.loads(resp.read().decode())
+            opt = orjson.loads(resp.read().decode())
             print(f"  ✓ Optimizasyon Sonucu      : {opt.get('message')}")
             print(f"  ✓ Geri Kazanılan Disk Alanı: {opt.get('reclaimed_space')}")
     except Exception as e:

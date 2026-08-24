@@ -22,7 +22,7 @@ Endpoints:
 - POST /portfolio/rebalance/orders — Rebalance emirleri oluştur
 """
 
-import json
+import orjson
 import time
 import asyncio
 from typing import Optional, Dict, List, Any
@@ -442,8 +442,8 @@ async def rebalance_analysis(
             return {"message": "target_weights parametresi gerekli (JSON format)"}
 
         try:
-            weights = json.loads(target_weights)
-        except json.JSONDecodeError:
+            weights = orjson.loads(target_weights)
+        except orjson.JSONDecodeError:
             raise HTTPException(400, "Geçersiz JSON formatı")
 
         return pm.check_rebalance(weights, threshold_pct=threshold_pct)

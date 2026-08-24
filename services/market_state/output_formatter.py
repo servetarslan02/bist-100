@@ -194,9 +194,9 @@ class MarketStateFormatter:
         multi_tf: Optional[MultiTimeframeResult] = None,
     ) -> str:
         """JSON string olarak formatla."""
-        import json
+        import orjson
         output = self.format(
             breadth, components, ensemble, transition,
             risk_appetite, risk_appetite_state, multi_tf,
         )
-        return json.dumps(output.to_dict(), default=str, ensure_ascii=False)
+        return orjson.dumps(output.to_dict(), default=str).decode()

@@ -6,7 +6,7 @@ Model dosyasından yükler, inference yapar.
 """
 
 import pickle
-import json
+import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
@@ -47,7 +47,7 @@ class MLModelLoader:
                 config_file = model_file.parent / "config.json"
                 if config_file.exists():
                     with open(config_file) as f:
-                        self._model_configs[model_name] = json.load(f)
+                        self._model_configs[model_name] = orjson.loads(f.read())
 
                 logger.info("Model loaded", name=model_name)
             except Exception as e:

@@ -14,7 +14,7 @@ Otonom sistem yönetimi için production-grade alerting.
 
 import asyncio
 import hashlib
-import json
+import orjson
 import os
 import time
 from typing import Dict, Any, List, Optional, Protocol
@@ -90,7 +90,7 @@ class Alert:
             self.fingerprint = self._compute_fingerprint()
 
     def _compute_fingerprint(self) -> str:
-        key = f"{self.alert_type}:{json.dumps(self.details, sort_keys=True)}"
+        key = f"{self.alert_type}:{orjson.dumps(self.details, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(key.encode()).hexdigest()[:16]
 
     def acknowledge(self):
@@ -310,7 +310,7 @@ class EmailProvider:
             msg = MIMEText(
                 f"Alert: {alert.alert_type}\nSeverity: {alert.severity}\n"
                 f"Status: {alert.status}\nMessage: {alert.message}\n"
-                f"Details: {json.dumps(alert.details, indent=2)}"
+                f"Details: {orjson.dumps(alert.details, option=orjson.OPT_INDENT_2).decode()}"
             )
             msg["Subject"] = f"[{alert.severity}] ALPHA BIST: {alert.alert_type}"
             msg["From"] = self.from_address
@@ -737,7 +737,7 @@ class AlertingSystem:
                 "escalation_count, notification_status, updated_at) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (alert.fingerprint, str(alert.alert_type), str(alert.severity),
-                 alert.status.value if hasattr(alert.status, "value") else str(alert.status), alert.message, json.dumps(alert.details),
+                 alert.status.value if hasattr(alert.status, "value") else str(alert.status), alert.message, orjson.dumps(alert.details).decode(),
                  alert.timestamp, alert.acknowledged_at, alert.escalated_at,
                  alert.resolved_at, alert.escalation_count,
                  alert.notification_status, time.time())
@@ -760,7 +760,7 @@ class AlertingSystem:
                     alert_type=row["alert_type"],
                     severity=row["severity"],
                     message=row["message"],
-                    details=json.loads(row["details"]) if row["details"] else {},
+                    details=orjson.loads(row["details"]) if row["details"] else {},
                     timestamp=row["timestamp"],
                     fingerprint=row["fingerprint"],
                     status=row["status"],

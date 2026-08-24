@@ -1,5 +1,5 @@
 import urllib.request
-import json
+import orjson
 import sys
 
 # Ensure UTF-8 stdout
@@ -15,7 +15,7 @@ def audit_5_questions():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/market/heatmap", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             sectors = data.get("sectors", [])
             print(f"  [OK] Toplam Sektör Sayısı: {len(sectors)} sektör aktif")
             for sec in sectors[:4]:
@@ -30,7 +30,7 @@ def audit_5_questions():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/scanner/signals", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             signals = data.get("signals", []) if isinstance(data, dict) else data
             print(f"  [OK] Model Tarafından Üretilen Sinyal Sayısı: {len(signals)} hisse")
             for s in signals[:2]:
@@ -44,7 +44,7 @@ def audit_5_questions():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/macro/overview", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            macro = json.loads(resp.read().decode())
+            macro = orjson.loads(resp.read().decode())
             print(f"  [OK] Dolar Endeksi (DXY)       : {macro.get('dxy')} (Canlı FX)")
             print(f"  [OK] Brent Petrol ($)          : {macro.get('brent_crude')} $ (Canlı Emtia)")
             print(f"  [OK] Ons Altın ($)             : {macro.get('gold_ounce')} $ (Canlı Emtia)")
@@ -61,7 +61,7 @@ def audit_5_questions():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/system/alerts", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             alerts = data.get("alerts", []) if isinstance(data, dict) else data
             print(f"  [OK] Motor Tarafından Üretilen Aktif Alarm Sayısı: {len(alerts)} alarm")
             for a in alerts[:3]:
@@ -75,7 +75,7 @@ def audit_5_questions():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/market/instruments/THYAO/live_intel", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            intel = json.loads(resp.read().decode())
+            intel = orjson.loads(resp.read().decode())
             print(f"  [OK] Sembol & Fiyat            : {intel.get('symbol')} | ₺{intel.get('price')} (Değişim: %{intel.get('change_pct')})")
             print(f"  [OK] 14 Günlük RSI             : {intel.get('rsi_14')} (Gerçek zaman serisi formülü)")
             print(f"  [OK] 14 Günlük ATR             : ₺{intel.get('atr_14')} (Volatilite bandı)")

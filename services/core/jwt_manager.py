@@ -19,7 +19,7 @@ import hashlib
 import hmac
 import os
 import secrets
-import json
+import orjson
 import base64
 import time
 from typing import Dict, List, Optional, Any, Set
@@ -141,13 +141,13 @@ class JWTManager:
 
         # Header
         header = {"alg": self._algorithm, "typ": "JWT"}
-        header_b64 = self._base64url_encode(json.dumps(header).encode())
+        header_b64 = self._base64url_encode(orjson.dumps(header).decode())
 
         # Payload
         payload = claims.to_dict()
         if custom_claims:
             payload.update(custom_claims)
-        payload_b64 = self._base64url_encode(json.dumps(payload).encode())
+        payload_b64 = self._base64url_encode(orjson.dumps(payload).decode())
 
         # Signature
         message = f"{header_b64}.{payload_b64}"
@@ -194,7 +194,7 @@ class JWTManager:
 
             # Decode payload
             payload_bytes = self._base64url_decode(payload_b64)
-            payload = json.loads(payload_bytes)
+            payload = orjson.loads(payload_bytes)
 
             claims = JWTClaims.from_dict(payload)
 
@@ -277,8 +277,8 @@ class JWTManager:
         )
 
         header = {"alg": self._algorithm, "typ": "JWT"}
-        header_b64 = self._base64url_encode(json.dumps(header).encode())
-        payload_b64 = self._base64url_encode(json.dumps(claims.to_dict()).encode())
+        header_b64 = self._base64url_encode(orjson.dumps(header).decode())
+        payload_b64 = self._base64url_encode(orjson.dumps(claims.to_dict()).decode())
 
         message = f"{header_b64}.{payload_b64}"
         signature = self._sign(message)

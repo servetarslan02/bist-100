@@ -16,7 +16,7 @@ SÜPER AKILLI, TAM OTOMATİK, KENDİ KENDİNİ YÖNETEN SİSTEM
 KURAL: Sistem insan müdahalesi olmadan 7/24 çalışmalı.
 """
 
-import json
+import orjson
 import time
 import numpy as np
 from typing import Dict, List, Optional, Any, Callable

@@ -7,7 +7,7 @@ Regime bazlı doğruluk, feature importance, model drift tespiti.
 FAZ 10: Learning System (Güncellenmiş)
 """
 
-import json
+import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field

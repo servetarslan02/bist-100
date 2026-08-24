@@ -19,7 +19,7 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency ve tekrar-oynatılabilirlik
 """
 
-import json
+import orjson
 import hashlib
 import numpy as np
 import pandas as pd
@@ -92,7 +92,7 @@ class AuditRecord:
 
     def compute_hash(self, prev_hash: str = "") -> str:
         """Hash hesapla (audit trail zinciri)."""
-        content = f"{self.event_id}:{self.timestamp.isoformat()}:{self.event_type}:{json.dumps(self.data, sort_keys=True)}"
+        content = f"{self.event_id}:{self.timestamp.isoformat()}:{self.event_type}:{orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(f"{prev_hash}:{content}".encode()).hexdigest()[:16]
 
     def seal(self, prev_hash: str = "") -> str:

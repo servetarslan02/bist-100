@@ -20,7 +20,7 @@ v2.0 Değişiklikleri:
 """
 
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -392,7 +392,7 @@ class MarketStateService:
             # 8. Store in Redis
             await redis_set(
                 "market_state",
-                json.dumps(market_state.to_dict(), default=str),
+                orjson.dumps(market_state.to_dict(), default=str).decode(),
                 ex=60,
             )
 

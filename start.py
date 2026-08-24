@@ -16,7 +16,7 @@ import time
 import subprocess
 import webbrowser
 import platform
-import json
+import orjson
 from pathlib import Path
 
 # Ensure UTF-8 output on Windows consoles

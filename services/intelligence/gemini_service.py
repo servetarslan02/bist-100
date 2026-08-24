@@ -8,7 +8,7 @@ Equipped with real-time financial tools:
 """
 
 import os
-import json
+import orjson
 import urllib.request
 import urllib.error
 from typing import Dict, Any, Optional, List
@@ -205,11 +205,11 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
         try:
             req = urllib.request.Request(
                 url,
-                data=json.dumps(payload).encode("utf-8"),
+                data=orjson.dumps(payload),
                 headers={"Content-Type": "application/json"}
             )
             with urllib.request.urlopen(req, timeout=8) as resp:
-                data = json.loads(resp.read().decode("utf-8"))
+                data = orjson.loads(resp.read().decode("utf-8"))
                 return data["candidates"][0]["content"]["parts"][0]["text"]
         except Exception as e:
             logger.warning("gemini_model_try_failed", model=model_name, error=str(e))

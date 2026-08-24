@@ -12,7 +12,7 @@ FAZ 0: Temel altyapı refactor
 """
 
 import asyncio
-import json
+import orjson
 import hashlib
 import re
 import time
@@ -336,7 +336,7 @@ class BaseAgent:
         client = llm_client or self.llm_client
 
         # Input hash
-        input_str = json.dumps({
+        input_str = orjson.dumps({
             "ticker": task.ticker,
             "prompt": task.prompt[:200],
             "context_keys": list(task.context.keys()),
@@ -367,7 +367,7 @@ class BaseAgent:
                 AgentRole.SYNTHESIS: "synthesis",
             }
             validation = AIOutputValidator.validate(
-                json.dumps(output), expected_schema=_role_schema_map.get(self.role)
+                orjson.dumps(output).decode(), expected_schema=_role_schema_map.get(self.role)
             )
             if not validation["valid"]:
                 logger.warning(

@@ -1,6 +1,6 @@
 import sys
 import os
-import json
+import orjson
 import sqlite3
 import urllib.request
 from datetime import datetime
@@ -57,7 +57,7 @@ def run_proof():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/scanner/opportunities", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             opps = data.get("opportunities", []) if isinstance(data, dict) else data
             print(f"  [OK] Canli ML Tarama Sonucu: {len(opps)} aktif firsat tespit edildi")
             for op in opps[:3]:
@@ -70,7 +70,7 @@ def run_proof():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/portfolio/state", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            pf = json.loads(resp.read().decode())
+            pf = orjson.loads(resp.read().decode())
             print(f"  [OK] Portfoy Nakit Bakiyesi  : TL {pf.get('cash'):,.2f}")
             print(f"  [OK] Acik Pozisyon Sayisi    : {pf.get('positions_count')} (Sifir Pozisyon)")
             print(f"  [OK] Seans Disi Guvenlik     : BIST kapaliyken sahte hisse alimi engellendi (%100 Koruma)")
@@ -82,7 +82,7 @@ def run_proof():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/macro/overview", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            macro = json.loads(resp.read().decode())
+            macro = orjson.loads(resp.read().decode())
             print(f"  [OK] Turkiye 5Y CDS         : {macro.get('turkey_cds_5y')} bps")
             print(f"  [OK] Dolar Endeksi (DXY)    : {macro.get('dxy')}")
             print(f"  [OK] BIST Makro Egilimi     : {macro.get('bist_macro_bias')}")

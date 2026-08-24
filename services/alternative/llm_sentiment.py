@@ -13,7 +13,7 @@ LLM: Ollama (gemma4:12b-q4_0 veya benzeri Türkçe model)
 """
 
 import asyncio
-import json
+import orjson
 import time
 from typing import Dict, Any, Optional, List
 import structlog

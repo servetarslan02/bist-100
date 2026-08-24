@@ -14,7 +14,7 @@ Kullanım:
     await provisioner.provision_all()
 """
 
-import json
+import orjson
 import os
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -156,7 +156,7 @@ class GrafanaProvisioner:
                 return None
 
             with open(path) as f:
-                dashboard_data = json.load(f)
+                dashboard_data = orjson.loads(f.read())
 
             # Grafana API payload
             payload = {

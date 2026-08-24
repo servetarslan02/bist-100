@@ -12,7 +12,7 @@ Gerçek zamanlı kaynaklar:
 
 import asyncio
 import hashlib
-import json
+import orjson
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable, List, Set
@@ -39,7 +39,7 @@ class DataEvent:
 
     def __post_init__(self):
         if not self.content_hash:
-            raw = json.dumps(self.data, sort_keys=True, default=str)
+            raw = orjson.dumps(self.data, option=orjson.OPT_SORT_KEYS, default=str).decode()
             self.content_hash = hashlib.sha256(raw.encode()).hexdigest()
 
 

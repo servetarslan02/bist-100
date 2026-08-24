@@ -13,7 +13,7 @@ Roller:
 
 import os
 import time
-import json
+import orjson
 import base64
 import hashlib
 import hmac
@@ -98,12 +98,12 @@ class JWTHandler:
 
         # Header
         header = base64.urlsafe_b64encode(
-            json.dumps({"alg": self.algorithm, "typ": "JWT"}).encode()
+            orjson.dumps({"alg": self.algorithm, "typ": "JWT"}).decode()
         ).decode().rstrip("=")
 
         # Payload
         payload_b64 = base64.urlsafe_b64encode(
-            json.dumps(payload).encode()
+            orjson.dumps(payload).decode()
         ).decode().rstrip("=")
 
         # Signature
@@ -145,7 +145,7 @@ class JWTHandler:
             if padding != 4:
                 payload_b64 += "=" * padding
 
-            payload = json.loads(base64.urlsafe_b64decode(payload_b64))
+            payload = orjson.loads(base64.urlsafe_b64decode(payload_b64))
 
             # Expiration kontrolü
             if payload.get("exp", 0) < time.time():

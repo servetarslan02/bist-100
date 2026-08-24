@@ -12,7 +12,7 @@ Kapsam:
 import sys
 import os
 import asyncio
-import json
+import orjson
 import tempfile
 
 from services.core.async_http import AsyncHTTPClient, get_client, close_all_clients
@@ -199,10 +199,10 @@ async def test_config_json_valid():
         if os.path.exists(path):
             try:
                 with open(path) as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
                 if not isinstance(data, dict):
                     issues.append(f"{filename}: dict değil")
-            except json.JSONDecodeError as e:
+            except orjson.JSONDecodeError as e:
                 issues.append(f"{filename}: geçersiz JSON: {e}")
 
     assert len(issues) == 0, f"Config JSON Valid: {issues}"
@@ -217,7 +217,7 @@ async def test_config_values():
 
     if os.path.exists(path):
         with open(path) as f:
-            config = json.load(f)
+            config = orjson.loads(f.read())
 
         # Portfolio config
         pf = config.get("portfolio", {})

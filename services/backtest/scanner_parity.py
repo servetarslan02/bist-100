@@ -13,7 +13,7 @@ Prensipler:
 """
 
 import hashlib
-import json
+import orjson
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple, Callable
@@ -272,7 +272,7 @@ class FeatureVersionLock:
             "config": computation_config,
             "registered_at": datetime.now().isoformat(),
             "hash": hashlib.sha256(
-                json.dumps({"names": feature_names, "config": computation_config}, sort_keys=True).encode()
+                orjson.dumps({"names": feature_names, "config": computation_config}, option=orjson.OPT_SORT_KEYS).decode()
             ).hexdigest()[:16],
         }
         logger.info("Feature version registered",

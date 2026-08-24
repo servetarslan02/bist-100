@@ -13,7 +13,7 @@ Kapsam:
 
 import sys
 import os
-import json
+import orjson
 import asyncio
 import sqlite3
 import time

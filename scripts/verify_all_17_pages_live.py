@@ -1,5 +1,5 @@
 import urllib.request
-import json
+import orjson
 import sys
 
 def verify_all():
@@ -63,7 +63,7 @@ def verify_all():
             with urllib.request.urlopen(req, timeout=5) as resp:
                 status = resp.getcode()
                 raw = resp.read().decode("utf-8")
-                data = json.loads(raw)
+                data = orjson.loads(raw)
                 item_count = len(data) if isinstance(data, list) else len(data.keys())
                 print(f"  [OK 200] {ep:<40} | {desc:<32} | {item_count} alan/öğe")
         except Exception as e:

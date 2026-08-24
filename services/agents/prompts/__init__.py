@@ -7,7 +7,7 @@ Version tracking ile.
 """
 
 from typing import Dict, Any, List, Optional
-import json
+import orjson
 import structlog
 
 logger = structlog.get_logger()

@@ -7,7 +7,7 @@ PIT-safe, deterministic, incremental ingestion testleri.
 
 import sys
 import os
-import json
+import orjson
 import tempfile
 import numpy as np
 from datetime import datetime, timedelta

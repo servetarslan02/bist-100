@@ -12,7 +12,7 @@ Kapsam:
 
 import sys
 import os
-import json
+import orjson
 import asyncio
 import time
 import sqlite3
@@ -189,7 +189,7 @@ async def test_policy_persist_to_file():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"version": 0}, f)
+        f.write(orjson.dumps({"version": 0}).decode())
         config_path = f.name
 
     policy = AlertPolicy(_config_path=config_path)
@@ -197,7 +197,7 @@ async def test_policy_persist_to_file():
 
     # Dosyayı oku
     with open(config_path) as f:
-        saved = json.load(f)
+        saved = orjson.loads(f.read())
 
     if saved.get("escalation_timeouts", {}).get("cash_negative") != 42:
         issues.append(f"Dosyaya kaydedilmedi: {saved}")

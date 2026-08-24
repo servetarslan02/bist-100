@@ -15,7 +15,7 @@ Kapsam:
 import sys
 import os
 import time
-import json
+import orjson
 import sqlite3
 import numpy as np
 import pandas as pd

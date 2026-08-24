@@ -30,7 +30,7 @@ default_baseline = {
 
 def _load_baseline_config() -> dict:
     """Load baseline values from config file, falling back to defaults."""
-    import json as _json
+    import orjson as _json
     config_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "tcmb_baseline.json")
     config_path = os.path.normpath(config_path)
     try:

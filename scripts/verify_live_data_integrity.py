@@ -6,7 +6,7 @@ Tüm API uç noktalarını ve veri sağlayıcılarını sorgulayarak gelen veril
 import sys
 import os
 import asyncio
-import json
+import orjson
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":

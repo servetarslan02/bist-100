@@ -16,7 +16,7 @@ Kapsam:
 import sys
 import os
 import asyncio
-import json
+import orjson
 import time
 
 from services.core.alerting import (
@@ -399,7 +399,7 @@ async def test_dashboard_json_valid():
         return "Dashboard JSON Valid", False, issues
 
     with open(dashboard_path) as f:
-        data = json.load(f)
+        data = orjson.loads(f.read())
 
     dash = data.get("dashboard", {})
     if not dash.get("panels"):

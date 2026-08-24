@@ -3,7 +3,7 @@ def run_alpha_engine_sync():
     from services.core.alpha_engine import AlphaEngine
     from services.core.risk_manager import RiskManager
     import asyncio
-    import json
+    import orjson
     import pandas as pd
     from datetime import datetime
     
@@ -50,7 +50,7 @@ def run_alpha_engine_sync():
     is_cash = regime < 1.0
     
     # JSON yapisini hazirla
-    tickers_json = json.dumps(top_picks)
+    tickers_json = orjson.dumps(top_picks).decode()
     
     # DB'ye kaydet
     async def save_to_db():

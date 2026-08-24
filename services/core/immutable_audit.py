@@ -15,7 +15,7 @@ Referanslar:
 """
 
 import hashlib
-import json
+import orjson
 import time
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -42,7 +42,7 @@ class AuditEntry:
 
     def compute_hash(self, previous_hash: str = "") -> str:
         """Hash hesapla."""
-        content = json.dumps({
+        content = orjson.dumps({
             "entry_id": self.entry_id,
             "timestamp": self.timestamp.isoformat(),
             "user_id": self.user_id,
@@ -286,7 +286,7 @@ class ImmutableAuditLog:
         """Kaydı dosyaya yaz (append-only)."""
         try:
             with open(self._storage_path, "a") as f:
-                f.write(json.dumps(entry.to_dict()) + "\n")
+                f.write(orjson.dumps(entry.to_dict()) + "\n")
         except Exception as e:
             logger.error("Audit log persist error", error=str(e))
 

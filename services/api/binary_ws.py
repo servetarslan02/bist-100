@@ -11,7 +11,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 import struct
 import time
 from typing import Dict, Any, Optional, Set
@@ -172,9 +172,9 @@ class BinaryWebSocket:
                 else:
                     # JSON fallback
                     try:
-                        data = json.loads(message)
+                        data = orjson.loads(message)
                         logger.debug("JSON message received", type=data.get("type"))
-                    except json.JSONDecodeError:
+                    except orjson.JSONDecodeError:
                         pass
         except Exception as e:
             logger.debug("WebSocket client disconnected", client_id=client_id, error=str(e))
@@ -198,7 +198,7 @@ class BinaryWebSocket:
 
     async def broadcast_json(self, data: Dict[str, Any]):
         """JSON fallback — eski istemciler için."""
-        message = json.dumps(data, default=str)
+        message = orjson.dumps(data, default=str).decode()
         await self._broadcast_text(message)
 
     async def _broadcast_binary(self, message: bytes):

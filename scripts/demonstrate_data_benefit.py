@@ -5,7 +5,7 @@ Sisteme Kâr ve Koruma Katkısının Matematiksel Kanıtı
 
 import sys
 import os
-import json
+import orjson
 import numpy as np
 import pandas as pd
 
@@ -76,7 +76,7 @@ for s in scenarios:
     print(f"     - Kararı: {s['pure_technical_decision']}")
     print(f"     - Getirisi: {s['pure_technical_pnl']}")
     print(f"  ✅ KAP + Haber + Sosyal + Bilanço + Makro Beslemeli ALPHA Robot:")
-    print(f"     - Alınan Ek Veriler: {json.dumps(s['multi_data_features'], ensure_ascii=False)}")
+    print(f"     - Alınan Ek Veriler: {orjson.dumps(s['multi_data_features']).decode()}")
     print(f"     - Motorun Yorumu: {s['alpha_engine_interpretation']}")
     print(f"     - Üretilen Karar: {s['alpha_engine_decision']}")
     print(f"     - Sağlanan Fayda: {s['alpha_engine_pnl']}")

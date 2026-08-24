@@ -9,7 +9,7 @@ ALPHA BIST — Çok Modelli Ensemble Eğitim Motoru (LightGBM + XGBoost + CatBoo
 
 import os
 import sys
-import json
+import orjson
 import pickle
 import numpy as np
 import pandas as pd
@@ -213,7 +213,7 @@ class BistEnsembleTrainer:
         }
 
         with open("data/model_metrics.json", "w", encoding="utf-8") as f:
-            json.dump(summary, f, ensure_ascii=False, indent=2)
+            f.write(orjson.dumps(summary, option=orjson.OPT_INDENT_2).decode())
 
         logger.info(f"🏆 Ensemble Tamamlandı -> OOS Information Coefficient (IC): {ens_ic:.4f}")
         return summary

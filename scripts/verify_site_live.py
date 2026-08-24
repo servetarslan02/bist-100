@@ -3,7 +3,7 @@ ALPHA BIST — Site ve Uç Nokta Canlı Veri Doğrulama Scripti
 """
 
 import sys
-import json
+import orjson
 import urllib.request
 
 if sys.platform == "win32":
@@ -26,7 +26,7 @@ def main():
     for url, name in endpoints:
         try:
             req = urllib.request.urlopen(url, timeout=30)
-            data = json.loads(req.read().decode('utf-8'))
+            data = orjson.loads(req.read().decode('utf-8'))
             sample = ""
             if "sectors" in data:
                 sample = f"Sektörler: {len(data['sectors'])} adet | İlk hisse: {data['sectors'][0]['stocks'][0]['symbol']} = ₺{data['sectors'][0]['stocks'][0]['price']}"

@@ -12,7 +12,7 @@ Kapsam:
 
 import sys
 import os
-import json
+import orjson
 import asyncio
 import time
 
@@ -426,7 +426,7 @@ async def test_dashboard_json():
         return "Dashboard JSON", False, issues
 
     with open(dashboard_path) as f:
-        data = json.load(f)
+        data = orjson.loads(f.read())
 
     if "dashboard" not in data:
         issues.append("dashboard key eksik")

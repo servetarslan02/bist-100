@@ -19,7 +19,7 @@ per-scan maliyetten ekstrapolasyon yapılır ve açıkça işaretlenir.
 
 import sys
 import os
-import json
+import orjson
 import time
 import resource
 from datetime import datetime
@@ -157,7 +157,7 @@ def main():
 
     os.makedirs("reports", exist_ok=True)
     with open("reports/scale_benchmark.json", "w") as f:
-        json.dump(report, f, indent=2, ensure_ascii=False)
+        f.write(orjson.dumps(report, option=orjson.OPT_INDENT_2).decode())
 
     # Markdown özet
     lines = ["# ALPHA BIST — Scale Benchmark\n",

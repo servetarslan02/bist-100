@@ -6,7 +6,7 @@ TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfe
 import os
 import requests
 import yfinance as yf
-import json
+import orjson
 import re
 from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass, asdict
@@ -292,7 +292,7 @@ class UniverseAutoUpdater:
         """Cache'den yükle."""
         try:
             with open(self.CACHE_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             self._universe = {}
             for ticker, info_dict in data.get("universe", {}).items():
                 self._universe[ticker] = StockInfo(**info_dict)
@@ -311,7 +311,7 @@ class UniverseAutoUpdater:
                 "total_count": len(self._universe),
             }
             with open(self.CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
         except Exception as e:
             logger.debug("Cache save failed", error=str(e))
 

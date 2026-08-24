@@ -17,7 +17,7 @@ Referanslar:
 """
 
 import asyncio
-import json
+import orjson
 import time
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field

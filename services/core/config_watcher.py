@@ -17,7 +17,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 import os
 import time
 from pathlib import Path
@@ -128,7 +128,7 @@ class ConfigWatcher:
         try:
             # Yeni config'i oku
             with open(self._config_path) as f:
-                new_config = json.load(f)
+                new_config = orjson.loads(f.read())
 
             # Validation
             if self._validate_fn:
@@ -171,7 +171,7 @@ class ConfigWatcher:
                 except Exception as e:
                     logger.warning("Config change callback failed", error=str(e))
 
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             self._error_count += 1
             self._audit_log.append(ConfigAuditEntry(
                 timestamp=time.time(), action="reload_failed",

@@ -11,7 +11,7 @@ Kullanım:
 
 import sys
 import os
-import json
+import orjson
 import argparse
 from datetime import datetime, timedelta
 

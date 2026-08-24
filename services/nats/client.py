@@ -17,7 +17,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 import os
 from typing import Optional, Callable, Dict, Any, AsyncIterator
 import structlog
@@ -112,13 +112,13 @@ class NatsClient:
 
         try:
             if isinstance(data, dict):
-                payload = json.dumps(data, default=str).encode()
+                payload = orjson.dumps(data, default=str).decode()
             elif isinstance(data, bytes):
                 payload = data
             elif isinstance(data, str):
                 payload = data.encode()
             else:
-                payload = json.dumps(data, default=str).encode()
+                payload = orjson.dumps(data, default=str).decode()
 
             await self._nc.publish(subject, payload)
             return True
@@ -138,7 +138,7 @@ class NatsClient:
                 # Callback mode
                 async def _msg_handler(msg):
                     try:
-                        data = json.loads(msg.data.decode())
+                        data = orjson.loads(msg.data.decode())
                         if asyncio.iscoroutinefunction(handler):
                             await handler(data)
                         else:
@@ -156,9 +156,9 @@ class NatsClient:
 
                 async for msg in sub.messages:
                     try:
-                        data = json.loads(msg.data.decode())
+                        data = orjson.loads(msg.data.decode())
                         yield data
-                    except json.JSONDecodeError:
+                    except orjson.JSONDecodeError:
                         yield {"raw": msg.data.decode()}
         except Exception as e:
             logger.debug("NATS subscribe failed", subject=subject, error=str(e))
@@ -175,13 +175,13 @@ class NatsClient:
 
         try:
             if isinstance(data, dict):
-                payload = json.dumps(data, default=str).encode()
+                payload = orjson.dumps(data, default=str).decode()
             elif isinstance(data, bytes):
                 payload = data
             elif isinstance(data, str):
                 payload = data.encode()
             else:
-                payload = json.dumps(data, default=str).encode()
+                payload = orjson.dumps(data, default=str).decode()
 
             # Stream adı belirtilmemişse subject'ten türet
             if stream is None:
@@ -229,7 +229,7 @@ class NatsClient:
                 # Callback mode
                 async def _msg_handler(msg):
                     try:
-                        data = json.loads(msg.data.decode())
+                        data = orjson.loads(msg.data.decode())
                         if asyncio.iscoroutinefunction(handler):
                             await handler(data)
                         else:
@@ -251,10 +251,10 @@ class NatsClient:
 
                 async for msg in psub.messages:
                     try:
-                        data = json.loads(msg.data.decode())
+                        data = orjson.loads(msg.data.decode())
                         yield data
                         await msg.ack()
-                    except json.JSONDecodeError:
+                    except orjson.JSONDecodeError:
                         yield {"raw": msg.data.decode()}
                         await msg.ack()
                     except Exception as e:
@@ -271,12 +271,12 @@ class NatsClient:
 
         try:
             if isinstance(data, dict):
-                payload = json.dumps(data, default=str).encode()
+                payload = orjson.dumps(data, default=str).decode()
             else:
                 payload = str(data).encode()
 
             response = await self._nc.request(subject, payload, timeout=timeout)
-            return json.loads(response.data.decode())
+            return orjson.loads(response.data.decode())
         except Exception as e:
             logger.debug("NATS request failed", subject=subject, error=str(e))
             return {}

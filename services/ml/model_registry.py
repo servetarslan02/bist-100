@@ -4,7 +4,7 @@ Model version tracking, metrics storage, status management, lineage,
 artifact management, model comparison, snapshot/restore.
 """
 import os
-import json
+import orjson
 import pickle
 import hashlib
 from typing import Dict, Any, Optional, List
@@ -384,7 +384,7 @@ class ModelRegistry:
             data = {k: asdict(v) for k, v in self._entries.items()}
             path = os.path.join(self._registry_path, "registry.json")
             with open(path, "w") as f:
-                json.dump(data, f, indent=2, default=str)
+                f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str).decode())
         except Exception as e:
             logger.error("registry_save_failed", error=str(e))
 
@@ -394,7 +394,7 @@ class ModelRegistry:
             path = os.path.join(self._registry_path, "registry.json")
             if os.path.exists(path):
                 with open(path, "r") as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
                 for key, entry_dict in data.items():
                     # Backward compatibility
                     valid_fields = {f.name for f in ModelEntry.__dataclass_fields__.values()}

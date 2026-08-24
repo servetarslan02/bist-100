@@ -9,7 +9,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 import pytest
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -219,12 +219,12 @@ class TestFaz0_AgentSystem:
         assert result["source"] == "rule_based_fallback"
 
     def test_output_validator_valid(self):
-        output = json.dumps({"direction": "LONG", "confidence": 0.7})
+        output = orjson.dumps({"direction": "LONG", "confidence": 0.7}).decode()
         result = AIOutputValidator.validate(output)
         assert result["valid"]
 
     def test_output_validator_invalid_direction(self):
-        output = json.dumps({"direction": "INVALID", "confidence": 0.7})
+        output = orjson.dumps({"direction": "INVALID", "confidence": 0.7}).decode()
         result = AIOutputValidator.validate(output)
         assert not result["valid"] or "Invalid direction" in str(result["errors"])
 

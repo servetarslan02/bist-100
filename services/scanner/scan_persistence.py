@@ -7,7 +7,7 @@ Geçmiş tarama analizi ve performans takibi için.
 Kaynaklar: TradingAgents (TauricResearch 2025), Endüstri standardı
 """
 
-import json
+import orjson
 import time
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -147,7 +147,7 @@ class ScanPersistence:
                 record.regime,
                 record.price,
                 record.volume,
-                json.dumps(record.features or {}),
+                orjson.dumps(record.features or {}).decode(),
                 record.timestamp,
             ))
 

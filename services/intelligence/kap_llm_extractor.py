@@ -11,7 +11,7 @@ ROADMAP v3.0 FAZ 6:
 KURAL: KAP'tan haberden anlam çıkarmak = altın değerinde.
 """
 
-import json
+import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field

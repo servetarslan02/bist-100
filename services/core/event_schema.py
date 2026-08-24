@@ -20,7 +20,7 @@ Kullanım:
     binary_data = event.to_binary()
 """
 
-import json
+import orjson
 import time
 import struct
 from enum import IntEnum
@@ -63,7 +63,7 @@ class CanonicalEvent:
 
     def to_json(self) -> str:
         """JSON formatına çevir."""
-        return json.dumps({
+        return orjson.dumps({
             "type": self.type.value,
             "ticker": self.ticker,
             "data": self.data,
@@ -88,7 +88,7 @@ class CanonicalEvent:
     def to_binary(self) -> bytes:
         """Binary formatına çevir — Protobuf uyumlu."""
         ticker_bytes = self.ticker.encode('utf-8')[:10].ljust(10, b'\x00')
-        data_json = json.dumps(self.data, default=str).encode('utf-8')[:256]
+        data_json = orjson.dumps(self.data, default=str)[:256]
         data_len = len(data_json)
 
         # Format: type(1) + ticker(10) + timestamp(8) + confidence(4) + source_len(1) + source + data_len(2) + data
@@ -109,7 +109,7 @@ class CanonicalEvent:
     @classmethod
     def from_json(cls, json_str: str) -> 'CanonicalEvent':
         """JSON'dan oluştur."""
-        data = json.loads(json_str)
+        data = orjson.loads(json_str)
         return cls(
             type=EventType(data.get("type", 0)),
             ticker=data.get("ticker", ""),
@@ -132,7 +132,7 @@ class CanonicalEvent:
 
             source = binary[26:26+source_len].decode('utf-8') if source_len > 0 else ""
             data_json = binary[26+source_len:26+source_len+data_len].decode('utf-8')
-            data = json.loads(data_json) if data_json else {}
+            data = orjson.loads(data_json) if data_json else {}
 
             return cls(
                 type=EventType(type_val),

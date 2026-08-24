@@ -10,7 +10,7 @@ Alternative data feature'ları için feature store entegrasyonu.
 - Feature manifest
 """
 
-import json
+import orjson
 import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
@@ -200,7 +200,7 @@ class FeatureStore:
 
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
         with open(save_path, "w") as f:
-            json.dump(data, f, indent=2, default=str)
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str).decode())
 
         logger.info("Feature store saved", path=save_path)
 
@@ -212,7 +212,7 @@ class FeatureStore:
 
         try:
             with open(load_path) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
 
             # Manifest'leri yükle
             for name, m_dict in data.get("manifests", {}).items():

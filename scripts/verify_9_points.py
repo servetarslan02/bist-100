@@ -1,5 +1,5 @@
 import urllib.request
-import json
+import orjson
 
 tests = [
     ("1. Otonom Firsatlar (ML Scanner)", "http://localhost:8000/api/v1/scanner/opportunities?limit=5", lambda d: f"{len(d.get('signals', []))} Dinamik Sinyal | En Yuksek: {d.get('signals', [{}])[0].get('ticker')} (Skor: {d.get('signals', [{}])[0].get('score')})"),
@@ -16,7 +16,7 @@ print("=== 9 KRİTİK ENDPOINT DOĞRULAMA TESTİ ===")
 for name, url, fmt in tests:
     try:
         resp = urllib.request.urlopen(url, timeout=5)
-        data = json.loads(resp.read().decode('utf-8'))
+        data = orjson.loads(resp.read().decode('utf-8'))
         print(f"[BASARILI] {name:<35} -> {fmt(data)}")
     except Exception as e:
         print(f"[HATA]     {name:<35} -> {e}")

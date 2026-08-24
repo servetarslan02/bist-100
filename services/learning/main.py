@@ -1,7 +1,7 @@
 """ALPHA BIST - Learning Service (ML Training, Validation, Champion/Challenger)"""
 
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Any, Optional
 import numpy as np
@@ -273,14 +273,14 @@ class LearningService:
             ON CONFLICT (name) DO UPDATE SET
                 features = $6, hyperparameters = $7, updated_at = NOW()
         """, name, config.description, config.model_type, "lightgbm", config.target,
-            json.dumps(config.features), json.dumps(config.hyperparams))
+            orjson.dumps(config.features), orjson.dumps(config.hyperparams)).decode()
 
         model_id = await pg_fetchval("SELECT id FROM models WHERE name = $1", name)
 
         await pg_execute("""
             INSERT INTO model_versions (model_id, version, metrics, status, created_at)
             VALUES ($1, $2, $3, 'CANDIDATE', NOW())
-        """, model_id, config.version, json.dumps(metrics))
+        """, model_id, config.version, orjson.dumps(metrics).decode())
 
 
 # =====================================================

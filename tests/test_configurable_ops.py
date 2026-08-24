@@ -14,7 +14,7 @@ Kapsam:
 
 import sys
 import os
-import json
+import orjson
 import asyncio
 import time
 import tempfile
@@ -36,12 +36,12 @@ async def test_policy_load_from_file():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({
+        f.write(orjson.dumps({
             "version": 1,
             "escalation_timeouts": {"cash_negative": 60, "health_change": 600},
             "notification_routing": {"WARNING": ["log"], "CRITICAL": ["log", "webhook"]},
             "severity_thresholds": {"drawdown_warning_pct": 8.0},
-        }, f)
+        }).decode())
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)
@@ -124,7 +124,7 @@ async def test_policy_reload():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"version": 1, "escalation_timeouts": {"cash_negative": 60}}, f)
+        f.write(orjson.dumps({"version": 1, "escalation_timeouts": {"cash_negative": 60}}).decode())
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)
@@ -135,7 +135,7 @@ async def test_policy_reload():
     # Dosyayı güncelle
     time.sleep(0.1)
     with open(config_path, "w") as f:
-        json.dump({"version": 2, "escalation_timeouts": {"cash_negative": 120}}, f)
+        f.write(orjson.dumps({"version": 2, "escalation_timeouts": {"cash_negative": 120}}).decode())
 
     reloaded = policy.reload_if_changed()
     if not reloaded:
@@ -152,7 +152,7 @@ async def test_policy_reload_no_change():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"version": 1, "escalation_timeouts": {"cash_negative": 60}}, f)
+        f.write(orjson.dumps({"version": 1, "escalation_timeouts": {"cash_negative": 60}}).decode())
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)
@@ -177,7 +177,7 @@ async def test_policy_default_config():
             issues.append("Default config oluşturulamadı")
         else:
             with open(config_path) as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             if "escalation_timeouts" not in data:
                 issues.append("escalation_timeouts eksik")
             if "notification_routing" not in data:
@@ -446,7 +446,7 @@ async def test_policy_based_escalation():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"version": 1, "escalation_timeouts": {"health_change": 0.1}}, f)
+        f.write(orjson.dumps({"version": 1, "escalation_timeouts": {"health_change": 0.1}}).decode())
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)
@@ -476,7 +476,7 @@ async def test_policy_notification_routing():
     issues = []
 
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
-        json.dump({"version": 1, "notification_routing": {"CRITICAL": ["log"]}}, f)
+        f.write(orjson.dumps({"version": 1, "notification_routing": {"CRITICAL": ["log"]}}).decode())
         config_path = f.name
 
     policy = AlertPolicy.load(config_path)

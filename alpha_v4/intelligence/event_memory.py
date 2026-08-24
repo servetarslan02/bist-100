@@ -7,7 +7,7 @@ produce trading signals; it only preserves what happened and what is known.
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
-import json
+import orjson
 
 
 @dataclass(frozen=True)
@@ -28,7 +28,7 @@ class EventObservation:
             "evidence_id": self.evidence_id,
             "payload": self.payload,
         }
-        return sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
+        return sha256(orjson.dumps(body, option=orjson.OPT_SORT_KEYS).decode()).hexdigest()
 
     def validate(self) -> None:
         if not self.evidence_id:

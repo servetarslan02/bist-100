@@ -10,7 +10,7 @@ ALPHA BIST — BIST Market Data Stream v1.0
 """
 
 import asyncio
-import json
+import orjson
 from typing import Dict, List, Optional, Callable, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
@@ -144,21 +144,21 @@ class BISTStreamProvider:
 
             async with websockets.connect(uri) as ws:
                 # Subscribe to BIST stocks
-                subscribe_msg = json.dumps({
+                subscribe_msg = orjson.dumps({
                     "_event": "bulk-subscribe",
                     "message": "pid-list:497,347,1052,..."  # Investing.com BIST IDs
-                })
+                }).decode()
                 await ws.send(subscribe_msg)
 
                 while self._running:
                     try:
                         msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
-                        data = json.loads(msg)
+                        data = orjson.loads(msg)
 
                         if "message" in data:
                             parts = data["message"].split("::")
                             if len(parts) >= 2:
-                                ticker_data = json.loads(parts[1])
+                                ticker_data = orjson.loads(parts[1])
                                 tick = StreamTick(
                                     ticker=ticker_data.get("symbol", ""),
                                     price=float(ticker_data.get("last", 0)),
@@ -203,23 +203,23 @@ class BISTStreamProvider:
 
             async with websockets.connect(uri) as ws:
                 # Auth
-                auth_msg = json.dumps({
+                auth_msg = orjson.dumps({
                     "type": "auth",
                     "api_key": "YOUR_API_KEY",
-                })
+                }).decode()
                 await ws.send(auth_msg)
 
                 # Subscribe
-                subscribe_msg = json.dumps({
+                subscribe_msg = orjson.dumps({
                     "type": "subscribe",
                     "symbols": ["THYAO", "ASELS", "AKBNK", "TUPRS", "EREGL"],
-                })
+                }).decode()
                 await ws.send(subscribe_msg)
 
                 while self._running:
                     try:
                         msg = await asyncio.wait_for(ws.recv(), timeout=5.0)
-                        data = json.loads(msg)
+                        data = orjson.loads(msg)
 
                         if data.get("type") == "trade":
                             tick = StreamTick(

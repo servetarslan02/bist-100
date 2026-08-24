@@ -13,7 +13,7 @@ Tüm yeni core modülleri için kapsamlı testler:
 """
 
 import asyncio
-import json
+import orjson
 import time
 import pytest
 from datetime import datetime, timezone, timedelta, timedelta
@@ -320,7 +320,7 @@ class TestConfigHotReload:
     def test_load_config(self):
         """Config yükleme."""
         with open(self.config_path, "w") as f:
-            json.dump({"key": "value"}, f)
+            f.write(orjson.dumps({"key": "value"}).decode())
 
         reloader = ConfigHotReload(self.config_path, watch_interval_seconds=1)
         config = reloader.get_current_config()

@@ -16,7 +16,7 @@ Bu modül:
 """
 from datetime import datetime, date, timedelta
 from typing import List, Tuple, Optional, Set
-import json
+import orjson
 import os
 
 import numpy as np
@@ -89,7 +89,7 @@ class BISTTradingCalendar:
         """holidays.json'dan değişken tatilleri yükle."""
         try:
             with open(path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                data = orjson.loads(f.read())
             for d in data.get("holidays", []):
                 if isinstance(d, str):
                     self._variable_holidays.add(date.fromisoformat(d))

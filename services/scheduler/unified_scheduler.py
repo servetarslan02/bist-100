@@ -19,7 +19,7 @@ Kaynaklar: arXiv Agentic Trading (2026), BIST resmi, APScheduler best practices
 """
 
 import asyncio
-import json
+import orjson
 import signal
 import time
 from datetime import datetime, time as dt_time, timezone, timedelta, date
@@ -137,7 +137,7 @@ class HolidayProvider:
             )
             if os.path.exists(config_path):
                 with open(config_path) as f:
-                    data = json.load(f)
+                    data = orjson.loads(f.read())
                     for h in data.get("holidays", []):
                         holidays.add(date.fromisoformat(h))
         except Exception as e:

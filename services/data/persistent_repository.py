@@ -8,7 +8,7 @@ Incremental ingestion, deduplication, PIT-safe sorgulama destekler.
 """
 
 import sqlite3
-import json
+import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
@@ -117,7 +117,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
             ticker=row['ticker'],
             period_end=row['period_end'],
             available_at=row['available_at'],
-            values=json.loads(row['values_json']),
+            values=orjson.loads(row['values_json']),
             source=row['source'],
             status=row['status'],
         ) for row in rows]
@@ -183,7 +183,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         """Fundamental snapshot ekle (duplicate kontrolü ile)."""
         conn = self._get_conn()
         now = datetime.now(timezone.utc).isoformat()
-        values_json = json.dumps(snapshot.values, sort_keys=True)
+        values_json = orjson.dumps(snapshot.values, option=orjson.OPT_SORT_KEYS).decode()
         checksum = hashlib.md5(values_json.encode()).hexdigest()
 
         try:

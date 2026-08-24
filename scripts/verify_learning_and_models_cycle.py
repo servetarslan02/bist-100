@@ -1,5 +1,5 @@
 import urllib.request
-import json
+import orjson
 import sys
 
 sys.stdout.reconfigure(encoding='utf-8')
@@ -14,7 +14,7 @@ def verify_learning_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/models/list", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            data = json.loads(resp.read().decode())
+            data = orjson.loads(resp.read().decode())
             models = data.get("models", [])
             print(f"  ✓ Kayıtlı Model Sayısı: {len(models)} Model")
             for m in models:
@@ -29,7 +29,7 @@ def verify_learning_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/learning/status", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            status = json.loads(resp.read().decode())
+            status = orjson.loads(resp.read().decode())
             print(f"  ✓ Öğrenme Motoru Durumu   : {status.get('status')}")
             print(f"  ✓ Kayıtlı Modeller         : {status.get('registered_models_count')} Model")
             print(f"  ✓ Aktif Piyasa Rejimi      : {status.get('active_regime')}")
@@ -42,7 +42,7 @@ def verify_learning_system():
     try:
         req = urllib.request.Request("http://localhost:8000/api/v1/learning/performance-matrix", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req) as resp:
-            mat = json.loads(resp.read().decode())
+            mat = orjson.loads(resp.read().decode())
             m_list = mat.get("models", [])
             print(f"  ✓ Değerlendirilen Model Sayısı: {len(m_list)}")
             for m in m_list:
@@ -55,7 +55,7 @@ def verify_learning_system():
     print("\n[4] CANLI ÖĞRENME DÖNGÜSÜ TETİKLEME TESTİ (/api/v1/learning/cycle)")
     try:
         # A) Tahmin Kaydet
-        pred_payload = json.dumps({
+        pred_payload = orjson.dumps({
             "model_id": "LightGBM_LambdaRank",
             "ticker": "THYAO",
             "predicted_direction": "UP",
@@ -63,27 +63,27 @@ def verify_learning_system():
             "entry_price": 274.50,
             "market_regime": "BULL_MOMENTUM",
             "prediction_horizon": "1-5D"
-        }).encode("utf-8")
+        })
         req_pred = urllib.request.Request("http://localhost:8000/api/v1/learning/record_prediction", data=pred_payload, headers={"Content-Type": "application/json", "X-User-Id": "1"})
         with urllib.request.urlopen(req_pred) as r_p:
-            res_p = json.loads(r_p.read().decode())
+            res_p = orjson.loads(r_p.read().decode())
             pred_id = res_p.get("prediction_id")
             print(f"  ✓ Adım 1 (Tahmin Kaydı)        : {pred_id} başarıyla hafızaya kaydedildi.")
 
         # B) Gerçekleşen Sonucu Bağla
-        out_payload = json.dumps({
+        out_payload = orjson.dumps({
             "prediction_id": pred_id,
             "actual_price": 278.20
-        }).encode("utf-8")
+        })
         req_out = urllib.request.Request("http://localhost:8000/api/v1/learning/record_outcome", data=out_payload, headers={"Content-Type": "application/json", "X-User-Id": "1"})
         with urllib.request.urlopen(req_out) as r_o:
-            res_o = json.loads(r_o.read().decode())
+            res_o = orjson.loads(r_o.read().decode())
             print(f"  ✓ Adım 2 (Piyasa Sonucu Bağı) : Başarılı (PnL & Başarı eşleştirildi).")
 
         # C) Öğrenme Döngüsünü Çalıştır
         req_cyc = urllib.request.Request("http://localhost:8000/api/v1/learning/cycle?regime=BULL_MOMENTUM", data=b"", headers={"X-User-Id": "1"})
         with urllib.request.urlopen(req_cyc) as r_c:
-            res_c = json.loads(r_c.read().decode())
+            res_c = orjson.loads(r_c.read().decode())
             print(f"  ✓ Adım 3 (Öğrenme Döngüsü)    : Başarıyla tamamlandı -> Durum: {res_c.get('status', 'OK')}")
 
     except Exception as e:

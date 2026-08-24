@@ -10,7 +10,7 @@ Persistent state yonetimi: SQLite.
 Mevcut services.core.audit_log.AuditLog'i extend eder.
 """
 
-import json
+import orjson
 import os
 import sqlite3
 import shutil
@@ -163,7 +163,7 @@ class PaperStateStore:
 
     def save_portfolio_state(self, state: Dict[str, Any]):
         """Portfoy durumunu kaydet (F-016: Atomic write — temp + rename pattern)."""
-        state_json = json.dumps(state, default=str)
+        state_json = orjson.dumps(state, default=str).decode()
         # Atomic write: önce temp dosyaya yaz, sonra rename ile değiştir
         tmp_path = str(self.db_path) + ".tmp"
         try:
@@ -192,7 +192,7 @@ class PaperStateStore:
         with self._connect() as conn:
             row = conn.execute("SELECT json_data FROM portfolio_state WHERE id = 1").fetchone()
             if row:
-                return json.loads(row["json_data"])
+                return orjson.loads(row["json_data"])
             return None
 
     # ===================== POSITIONS =====================
@@ -208,7 +208,7 @@ class PaperStateStore:
                 """, (
                     pos["ticker"], pos["quantity"], pos["avg_cost"], pos.get("current_price", pos["avg_cost"]),
                     pos.get("sector", ""), pos.get("entry_date", ""), pos.get("last_update", ""),
-                    json.dumps(pos),
+                    orjson.dumps(pos).decode(),
                 ))
             conn.commit()
 
@@ -216,7 +216,7 @@ class PaperStateStore:
         """Pozisyonlari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM positions").fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     # ===================== TRADES =====================
 
@@ -230,7 +230,7 @@ class PaperStateStore:
                 trade["trade_id"], trade["exit_date"], trade["ticker"], trade["side"],
                 trade["quantity"], trade["entry_price"], trade["exit_price"],
                 trade["realized_pnl"], trade["commission"], trade.get("reason", ""),
-                json.dumps(trade),
+                orjson.dumps(trade).decode(),
             ))
             conn.commit()
 
@@ -241,7 +241,7 @@ class PaperStateStore:
             if limit:
                 sql += f" LIMIT {limit}"
             rows = conn.execute(sql).fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     # ===================== ORDERS =====================
 
@@ -255,7 +255,7 @@ class PaperStateStore:
                 order["order_id"], order["date"], order["ticker"], order["side"],
                 order["quantity"], order["signal_price"], order.get("execution_price", 0),
                 order.get("commission", 0), order.get("slippage_pct", 0), order["status"],
-                order.get("rejection_reason"), json.dumps(order),
+                order.get("rejection_reason"), orjson.dumps(order).decode(),
             ))
             conn.commit()
 
@@ -266,7 +266,7 @@ class PaperStateStore:
                 rows = conn.execute("SELECT json_data FROM orders WHERE date = ? ORDER BY date DESC", (date,)).fetchall()
             else:
                 rows = conn.execute("SELECT json_data FROM orders ORDER BY date DESC").fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     # ===================== AUDIT LOG =====================
 
@@ -279,7 +279,7 @@ class PaperStateStore:
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (
                 entry["timestamp"], entry["date"], entry["entry_type"], entry.get("ticker"),
-                json.dumps(entry, default=str), entry_hash,
+                orjson.dumps(entry, default=str).decode(), entry_hash,
             ))
             conn.commit()
 
@@ -297,7 +297,7 @@ class PaperStateStore:
             sql += " ORDER BY timestamp DESC LIMIT ?"
             params.append(limit)
             rows = conn.execute(sql, params).fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     # ===================== DAILY PERFORMANCE =====================
 
@@ -313,7 +313,7 @@ class PaperStateStore:
                 perf["cumulative_return_pct"], perf["max_drawdown_pct"], perf["benchmark_return_pct"],
                 perf["alpha_pct"], perf["turnover"], perf["transaction_cost"],
                 perf["num_positions"], perf["num_trades"],
-                json.dumps(perf),
+                orjson.dumps(perf).decode(),
             ))
             conn.commit()
 
@@ -321,7 +321,7 @@ class PaperStateStore:
         """Gunluk performanslari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM daily_performance ORDER BY date ASC").fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     # ===================== EQUITY CURVE =====================
 
@@ -368,7 +368,7 @@ class PaperStateStore:
                     sig.get("confidence", 0.0),
                     sig.get("model_version", ""),
                     sig.get("target_weight", 0.10),
-                    json.dumps(sig),
+                    orjson.dumps(sig).decode(),
                     now_iso,
                 ))
             conn.commit()
@@ -378,7 +378,7 @@ class PaperStateStore:
         """Bekleyen sinyalleri yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM pending_signals ORDER BY rank ASC").fetchall()
-            return [json.loads(r["json_data"]) for r in rows]
+            return [orjson.loads(r["json_data"]) for r in rows]
 
     def clear_pending_signals(self):
         """Yurutulen bekleyen sinyalleri temizle."""
@@ -431,7 +431,7 @@ class PaperStateStore:
     @staticmethod
     def _compute_hash(entry: Dict[str, Any]) -> str:
         import hashlib
-        data = json.dumps(entry, sort_keys=True, default=str)
+        data = orjson.dumps(entry, option=orjson.OPT_SORT_KEYS, default=str).decode()
         return hashlib.sha256(data.encode()).hexdigest()[:16]
 
 

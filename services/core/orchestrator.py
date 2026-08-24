@@ -1028,7 +1028,7 @@ class MasterOrchestrator:
 
     def export_daily_report_json(self, date: str) -> str:
         """Günlük pipeline raporunu JSON olarak dışa aktar."""
-        import json as _json
+        import orjson as _json
         report = {
             "date": date,
             "status": self.get_status(),

@@ -8,7 +8,7 @@ Desteklenen formatlar:
 """
 
 import asyncio
-import json
+import orjson
 from typing import Dict, Set, Any, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import structlog
@@ -27,7 +27,7 @@ except ImportError:
 
 # Protobuf desteği (opsiyonel)
 try:
-    from google.protobuf import json_format
+    from google.protobuf import orjson_format
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -73,7 +73,7 @@ class ConnectionManager:
                     await connection.send_bytes(payload)
                 else:
                     # JSON text frame (varsayılan)
-                    payload = json.dumps(message, default=str)
+                    payload = orjson.dumps(message, default=str).decode()
                     await connection.send_text(payload)
             except Exception:
                 dead_connections.add(connection)
@@ -85,10 +85,10 @@ class ConnectionManager:
         """Dict'i binary'ye çevir (orjson — fastest JSON)."""
         try:
             import orjson
-            return orjson.dumps(message)
+            return orjson.dumps(message).decode()
         except ImportError:
             # Fallback: JSON bytes
-            return json.dumps(message, default=str).encode("utf-8")
+            return orjson.dumps(message, default=str)
 
 manager = ConnectionManager()
 
@@ -114,7 +114,7 @@ async def websocket_live(websocket: WebSocket):
         if fmt == "protobuf":
             await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
         else:
-            await websocket.send_text(json.dumps(welcome))
+            await websocket.send_text(orjson.dumps(welcome).decode())
         while True:
             data = await websocket.receive_text()
             if data == "ping":
@@ -138,7 +138,7 @@ async def websocket_radar(websocket: WebSocket):
         if fmt == "protobuf":
             await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
         else:
-            await websocket.send_text(json.dumps(welcome))
+            await websocket.send_text(orjson.dumps(welcome).decode())
         while True:
             data = await websocket.receive_text()
             if data == "ping":
@@ -162,7 +162,7 @@ async def websocket_events(websocket: WebSocket):
         if fmt == "protobuf":
             await websocket.send_bytes(manager._to_protobuf_bytes(welcome))
         else:
-            await websocket.send_text(json.dumps(welcome))
+            await websocket.send_text(orjson.dumps(welcome).decode())
         while True:
             data = await websocket.receive_text()
             if data == "ping":

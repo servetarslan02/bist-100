@@ -11,7 +11,7 @@ Immutable audit trail:
 FAZ 14: Audit Log
 """
 
-import json
+import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field

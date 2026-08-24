@@ -4,7 +4,7 @@ ALPHA BIST — Günlük Rapor Üretici
 Her gün piyasa kapandıktan sonra otomatik rapor üretir.
 """
 
-import json
+import orjson
 from datetime import datetime
 from typing import Dict, List, Any
 import structlog

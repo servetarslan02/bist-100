@@ -45,7 +45,7 @@ async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_
     """Phase 18 (AlphaEngine) tarafindan uretilen en guncel firsatlari getirir."""
     try:
         from ...core.database import pg_fetch
-        import json
+        import orjson
         
         query = """
             SELECT created_at, target_date, tickers, is_cash_regime, is_rebalance
@@ -59,7 +59,7 @@ async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_
             return {"opportunities": [], "message": "Henuz gun sonu modeli (18:15) calismadi veya veri yok."}
             
         row = rows[0]
-        tickers = json.loads(row["tickers"]) if isinstance(row["tickers"], str) else row["tickers"]
+        tickers = orjson.loads(row["tickers"]) if isinstance(row["tickers"], str) else row["tickers"]
         
         return {
             "opportunities": tickers,

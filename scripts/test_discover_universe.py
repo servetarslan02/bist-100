@@ -1,7 +1,7 @@
 import sys
 import urllib.request
 import re
-import json
+import orjson
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')

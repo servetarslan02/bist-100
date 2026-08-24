@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass, field
 import pickle
-import json
+import orjson
 from pathlib import Path
 import structlog
 
@@ -353,14 +353,14 @@ class MLTrainer:
             pickle.dump(final_model, f)
 
         with open(model_dir / "config.json", "w") as f:
-            json.dump({
+            f.write(orjson.dumps({
                 "model_name": config.model_name,
                 "target": config.target,
                 "features": feat_names,
                 "metrics": avg_metrics,
                 "confidence": confidence,
                 "training_date": datetime.now(timezone.utc).isoformat(),
-            }, f, indent=2)
+            }, option=orjson.OPT_INDENT_2).decode())
 
         self.models[config.model_name] = final_model
         self.training_results[config.model_name] = {

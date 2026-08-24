@@ -19,7 +19,7 @@ Kullanım:
 """
 
 import asyncio
-import json
+import orjson
 import time
 from typing import AsyncIterator, Dict, Any, Optional
 from fastapi import APIRouter, Request, Query
@@ -68,7 +68,7 @@ async def _sse_generator(
                     if tick:
                         data[ticker] = tick
                 if data:
-                    event_data = json.dumps(data, default=str)
+                    event_data = orjson.dumps(data, default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: tick\ndata: {event_data}\n\n"
@@ -78,7 +78,7 @@ async def _sse_generator(
             elif channel == "signals":
                 signals = get_cached("signals:latest") or []
                 if signals:
-                    event_data = json.dumps(signals, default=str)
+                    event_data = orjson.dumps(signals, default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: signal\ndata: {event_data}\n\n"
@@ -88,7 +88,7 @@ async def _sse_generator(
             elif channel == "portfolio":
                 pf = get_cached("portfolio:state")
                 if pf:
-                    event_data = json.dumps(pf, default=str)
+                    event_data = orjson.dumps(pf, default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: portfolio\ndata: {event_data}\n\n"
@@ -98,7 +98,7 @@ async def _sse_generator(
             elif channel == "alerts":
                 alerts = get_cached("alerts:latest") or []
                 if alerts:
-                    event_data = json.dumps(alerts, default=str)
+                    event_data = orjson.dumps(alerts, default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: alert\ndata: {event_data}\n\n"
@@ -108,7 +108,7 @@ async def _sse_generator(
             elif channel == "regime":
                 regime = get_cached("market:regime")
                 if regime:
-                    event_data = json.dumps(regime, default=str)
+                    event_data = orjson.dumps(regime, default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: regime\ndata: {event_data}\n\n"
@@ -118,7 +118,7 @@ async def _sse_generator(
             elif channel == "radar":
                 radar = get_cached("radar:data") or []
                 if radar:
-                    event_data = json.dumps(radar[:50], default=str)
+                    event_data = orjson.dumps(radar[:50], default=str).decode()
                     current_hash = hash(event_data)
                     if current_hash != last_data_hash:
                         yield f"event: radar\ndata: {event_data}\n\n"

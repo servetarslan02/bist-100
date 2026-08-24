@@ -8,7 +8,7 @@ ALPHA BIST — TÜM MOTORLARIN BİRBİRİNE BAĞLILIĞI, İLETİŞİMİ VE ÇEL�
 
 import sys
 import os
-import json
+import orjson
 
 sys.path.insert(0, os.path.abspath("."))
 

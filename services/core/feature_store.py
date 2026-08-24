@@ -14,7 +14,7 @@ Kullanım:
 """
 
 import hashlib
-import json
+import orjson
 import time
 from typing import Dict, List, Optional, Any
 from collections import OrderedDict
@@ -77,7 +77,7 @@ class FeatureStore:
             try:
                 data = self._redis.get(key)
                 if data:
-                    features = json.loads(data)
+                    features = orjson.loads(data)
                     self._cache[key] = {
                         "features": features,
                         "expires_at": time.time() + self._default_ttl,
@@ -118,7 +118,7 @@ class FeatureStore:
         # Redis
         if self._redis:
             try:
-                self._redis.setex(key, ttl, json.dumps(features))
+                self._redis.setex(key, ttl, orjson.dumps(features).decode())
             except Exception as e:
                 logger.debug("feature_store_redis_set_failed", key=key, error=str(e))
 

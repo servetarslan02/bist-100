@@ -1,7 +1,7 @@
 """ALPHA BIST - Intelligence Service (AI/LLM Integration)"""
 
 import asyncio
-import json
+import orjson
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional
 import httpx
@@ -90,7 +90,7 @@ class IntelligenceService:
 
             if analysis:
                 # Store analysis
-                await redis_set(f"ai_analysis:{ticker}", json.dumps(analysis), ex=3600)
+                await redis_set(f"ai_analysis:{ticker}", orjson.dumps(analysis).decode(), ex=3600)
 
                 # Publish AI analysis event
                 ai_event = CanonicalEvent(
@@ -130,7 +130,7 @@ class IntelligenceService:
             )
 
             if reasoning:
-                await redis_set(f"ai_reasoning:{ticker}", json.dumps(reasoning), ex=3600)
+                await redis_set(f"ai_reasoning:{ticker}", orjson.dumps(reasoning).decode(), ex=3600)
 
         except Exception as e:
             logger.error("Signal analysis error", error=str(e))
@@ -164,7 +164,7 @@ class IntelligenceService:
             )
 
             if interpretation:
-                await redis_set(f"ai_kap_analysis:{ticker}", json.dumps(interpretation), ex=3600)
+                await redis_set(f"ai_kap_analysis:{ticker}", orjson.dumps(interpretation).decode(), ex=3600)
 
         except Exception as e:
             logger.error("KAP analysis error", error=str(e))
@@ -422,7 +422,7 @@ Analyze the provided market data and return a JSON object with these fields:
 
 Return ONLY valid JSON, no other text. Do not give financial advice."""
 
-            user_prompt = f"{prompt}\n\nContext:\n{json.dumps(context, indent=2, default=str)}"
+            user_prompt = f"{prompt}\n\nContext:\n{orjson.dumps(context, option=orjson.OPT_INDENT_2, default=str).decode()}"
 
             # Call Ollama API
             response = await self._http_client.post(
@@ -450,13 +450,13 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
                     # JSON bloğu ara
                     json_match = re.search(r'\{[^{}]*\}', raw_response, re.DOTALL)
                     if json_match:
-                        parsed = json.loads(json_match.group())
+                        parsed = orjson.loads(json_match.group())
                         
                         # Gerekli alanları doğrula
                         required = ["assessment", "direction", "confidence"]
                         if not all(k in parsed for k in required):
                             parsed = None
-                except (json.JSONDecodeError, Exception):
+                except (orjson.JSONDecodeError, Exception):
                     parsed = None
                 
                 return {

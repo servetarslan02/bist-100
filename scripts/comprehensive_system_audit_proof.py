@@ -1,6 +1,6 @@
 import sys
 import os
-import json
+import orjson
 import sqlite3
 import pickle
 import numpy as np
@@ -91,7 +91,7 @@ def audit_backend_apis():
         try:
             req = urllib.request.Request(url, headers={"X-User-Id": "1"})
             with urllib.request.urlopen(req, timeout=5) as resp:
-                data = json.loads(resp.read().decode())
+                data = orjson.loads(resp.read().decode())
                 has_key = key in data if isinstance(data, dict) else False
                 count_info = len(data.get(key, [])) if has_key and isinstance(data.get(key), list) else "Var"
                 print(f"  [OK 200] {ep:<45} | {desc:<30} | '{key}': {count_info}")

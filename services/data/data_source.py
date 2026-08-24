@@ -12,7 +12,7 @@ ROADMAP v3.0:
 KURAL: Veri = petrol. Kirli veri = kirli petrol.
 """
 
-import json
+import orjson
 import os
 import re
 from datetime import datetime, timedelta
@@ -164,7 +164,7 @@ class DataSourceManager:
         cache_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "data", "bist_universe_cache.json")
         try:
             with open(cache_path) as f:
-                cache = json.load(f)
+                cache = orjson.loads(f.read())
             tickers = cache.get("tickers", [])
             if tickers:
                 return [f"{t}.IS" for t in tickers]

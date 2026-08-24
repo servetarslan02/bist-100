@@ -30,7 +30,7 @@ from fastapi.responses import JSONResponse
 try:
     import orjson
 except ImportError:
-    import json as orjson
+    import orjson as orjson
 import structlog
 from fastapi.responses import Response as FastAPIResponse
 
@@ -301,12 +301,12 @@ class ORJSONResponse(FastAPIResponse):
             return content
         try:
             if hasattr(orjson, "OPT_NON_STR_KEYS"):
-                res = orjson.dumps(content, default=str, option=orjson.OPT_NON_STR_KEYS)
+                res = orjson.dumps(content, default=str, option=orjson.OPT_NON_STR_KEYS).decode()
             else:
-                res = orjson.dumps(content, default=str)
+                res = orjson.dumps(content, default=str).decode()
         except Exception:
-            import json
-            res = json.dumps(content, default=str)
+            import orjson
+            res = orjson.dumps(content, default=str).decode()
 
         if isinstance(res, str):
             return res.encode("utf-8")
