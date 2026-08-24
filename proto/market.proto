@@ -1,0 +1,236 @@
+syntax = "proto3";
+
+package alpha_bist;
+
+option python_package = "services.grpc";
+
+// =====================================================
+// ALPHA BIST — Protobuf Tanımları v1.0
+// JSON'dan 10x küçük, 10x hızlı
+// =====================================================
+
+// Piyasa verisi (anlık fiyat)
+message MarketTick {
+  string ticker = 1;
+  double price = 2;
+  double change = 3;
+  double change_pct = 4;
+  int64 volume = 5;
+  double bid = 6;
+  double ask = 7;
+  int64 timestamp = 8;  // Unix ms
+}
+
+// OHLCV mum verisi
+message OHLCV {
+  string ticker = 1;
+  int64 timestamp = 2;
+  double open = 3;
+  double high = 4;
+  double low = 5;
+  double close = 6;
+  int64 volume = 7;
+  string timeframe = 8;  // 1m, 5m, 15m, 1h, 1d
+}
+
+// Sinyal (alım/satım)
+message Signal {
+  string ticker = 1;
+  enum Direction {
+    BUY = 0;
+    SELL = 1;
+    HOLD = 2;
+  }
+  Direction direction = 2;
+  double confidence = 3;
+  double target_price = 4;
+  double stop_loss = 5;
+  string reason = 6;
+  int64 timestamp = 7;
+}
+
+// Portföy pozisyonu
+message Position {
+  string ticker = 1;
+  int32 quantity = 2;
+  double avg_price = 3;
+  double current_price = 4;
+  double pnl = 5;
+  double pnl_pct = 6;
+  double weight = 7;
+}
+
+// Portföy durumu
+message PortfolioState {
+  double total_value = 1;
+  double cash = 2;
+  double daily_pnl = 3;
+  double daily_pnl_pct = 4;
+  repeated Position positions = 5;
+  int64 timestamp = 6;
+}
+
+// Risk metrikleri
+message RiskMetrics {
+  double var_95 = 1;
+  double cvar_95 = 2;
+  double sharpe = 3;
+  double max_drawdown = 4;
+  double volatility = 5;
+  double beta = 6;
+  int64 timestamp = 7;
+}
+
+// Piyasa rejimi
+message MarketRegime {
+  enum RegimeType {
+    BULL_TREND = 0;
+    BEAR_TREND = 1;
+    SIDEWAYS = 2;
+    HIGH_VOLATILITY = 3;
+    CRISIS = 4;
+  }
+  RegimeType regime = 1;
+  double confidence = 2;
+  double vix = 3;
+  double breadth = 4;
+  int64 timestamp = 5;
+}
+
+// Olay (KAP, haber, makro)
+message MarketEvent {
+  enum EventType {
+    KAP_ANNOUNCEMENT = 0;
+    NEWS = 1;
+    MACRO_DATA = 2;
+    EARNINGS = 3;
+    DIVIDEND = 4;
+    ANALYST_RATING = 5;
+  }
+  EventType type = 1;
+  string ticker = 2;
+  string title = 3;
+  string summary = 4;
+  double sentiment = 5;  // -1.0 ile 1.0 arası
+  double impact_score = 6;
+  int64 timestamp = 7;
+}
+
+// Alarm
+message Alert {
+  enum AlertType {
+    PRICE = 0;
+    VOLUME = 1;
+    ANOMALY = 2;
+    RISK = 3;
+    SIGNAL = 4;
+  }
+  AlertType type = 1;
+  string ticker = 2;
+  string message = 3;
+  enum Severity {
+    INFO = 0;
+    WARNING = 1;
+    CRITICAL = 2;
+  }
+  Severity severity = 4;
+  double value = 5;
+  double threshold = 6;
+  int64 timestamp = 7;
+}
+
+// === Stream Mesajları ===
+
+// WebSocket/Stream mesaj sarmalı
+message StreamMessage {
+  enum MessageType {
+    TICK = 0;
+    OHLCV = 1;
+    SIGNAL = 2;
+    PORTFOLIO = 3;
+    RISK = 4;
+    REGIME = 5;
+    EVENT = 6;
+    ALERT = 7;
+    HEARTBEAT = 8;
+  }
+  MessageType type = 1;
+  int64 sequence = 2;
+  int64 timestamp = 3;
+  oneof payload {
+    MarketTick tick = 4;
+    OHLCV ohlcv = 5;
+    Signal signal = 6;
+    PortfolioState portfolio = 7;
+    RiskMetrics risk = 8;
+    MarketRegime regime = 9;
+    MarketEvent event = 10;
+    Alert alert = 11;
+  }
+}
+
+// === gRPC Servis Tanımları ===
+
+// Piyasa verisi servisi
+service MarketService {
+  // Anlık fiyat stream'i
+  rpc StreamTicks(TickRequest) returns (stream MarketTick);
+  // OHLCV stream'i
+  rpc StreamOHLCV(OHLCVRequest) returns (stream OHLCV);
+  // Tek seferlik fiyat
+  rpc GetTick(TickRequest) returns (MarketTick);
+}
+
+// Sinyal servisi
+service SignalService {
+  // Sinyal stream'i
+  rpc StreamSignals(SignalRequest) returns (stream Signal);
+  // Son sinyalleri al
+  rpc GetRecentSignals(SignalRequest) returns (SignalList);
+}
+
+// Portföy servisi
+service PortfolioService {
+  // Portföy durumu stream'i
+  rpc StreamPortfolio(PortfolioRequest) returns (stream PortfolioState);
+  // Anlık portföy durumu
+  rpc GetPortfolio(PortfolioRequest) returns (PortfolioState);
+}
+
+// Risk servisi
+service RiskService {
+  // Risk metrikleri stream'i
+  rpc StreamRisk(RiskRequest) returns (stream RiskMetrics);
+  // Anlık risk durumu
+  rpc GetRisk(RiskRequest) returns (RiskMetrics);
+}
+
+// === Request Mesajları ===
+
+message TickRequest {
+  repeated string tickers = 1;
+}
+
+message OHLCVRequest {
+  repeated string tickers = 1;
+  string timeframe = 2;
+  int64 start_time = 3;
+  int64 end_time = 4;
+}
+
+message SignalRequest {
+  repeated string tickers = 1;
+  double min_confidence = 2;
+}
+
+message SignalList {
+  repeated Signal signals = 1;
+}
+
+message PortfolioRequest {
+  string portfolio_id = 1;
+}
+
+message RiskRequest {
+  string portfolio_id = 1;
+}

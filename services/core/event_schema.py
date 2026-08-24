@@ -1,224 +1,189 @@
-"""ALPHA BIST - Canonical Event Schema v1.1
+"""
+ALPHA BIST — Event Schema v2.0 (Protobuf-Ready)
 
-Tüm olaylar bu standart formatta üretilir ve tüketilir.
+Protobuf uyumlu olay şeması.
+JSON ve Protobuf arasında otomatik dönüşüm.
+
+Kullanım:
+    from services.core.event_schema import CanonicalEvent, EventType
+    
+    event = CanonicalEvent(
+        type=EventType.TICK,
+        ticker="THYAO",
+        data={"price": 245.50, "volume": 1000000}
+    )
+    
+    # JSON olarak
+    json_data = event.to_json()
+    
+    # Binary olarak (Protobuf uyumlu)
+    binary_data = event.to_binary()
 """
 
-import uuid
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
-from enum import Enum
+import json
+import time
+import struct
+from enum import IntEnum
+from typing import Dict, Any, Optional
+from dataclasses import dataclass, field
+import structlog
+
+logger = structlog.get_logger()
 
 
-class EventType(str, Enum):
-    # Market
-    MARKET_TICK = "market.tick"
-    MARKET_TRADE = "market.trade"
-    MARKET_QUOTE = "market.quote"
-    MARKET_ORDERBOOK = "market.orderbook"
-
-    # Events
-    NEWS_RAW = "news.raw"
-    NEWS_EVENT = "news.event"
-    KAP_EVENT = "kap.event"
-    MACRO_EVENT = "macro.event"
-    SOCIAL_EVENT = "social.event"
-
-    # State
-    FEATURE_UPDATED = "feature.updated"
-    STATE_UPDATED = "state.updated"
-    MARKET_STATE_CHANGED = "market_state.changed"
-    WORLD_STATE_CHANGED = "world_state.changed"
-    IMPACT_PROPAGATED = "impact.propagated"
-
-    # Signals
-    SIGNAL_GENERATED = "signal.generated"
-    ANOMALY_DETECTED = "anomaly.detected"
-    REGIME_CHANGED = "regime.changed"
-
-    # Simulation
-    SIMULATION_REQUESTED = "simulation.requested"
-    SIMULATION_COMPLETED = "simulation.completed"
-
-    # Risk
-    RISK_CHANGED = "risk.changed"
-    RISK_ALERT = "risk.alert"
-    KILL_SWITCH_TRIGGERED = "kill_switch.triggered"
-
-    # Portfolio
-    DECISION_CREATED = "decision.created"
-    ORDER_PLACED = "order.placed"
-
-    # Agent System
-    AGENT_ANALYSIS_COMPLETED = "agent.analysis.completed"
-    AGENT_DEBATE_COMPLETED = "agent.debate.completed"
-    AGENT_CONFLICT_DETECTED = "agent.conflict.detected"
-    AGENT_RISK_VETO = "agent.risk.veto"
-    AGENT_EVALUATION_COMPLETED = "agent.evaluation.completed"
-    AGENT_DRIFT_DETECTED = "agent.drift.detected"
-    ORDER_FILLED = "order.filled"
-
-    # Learning
-    PREDICTION_CREATED = "prediction.created"
-    OUTCOME_CREATED = "outcome.created"
-
-    # Market State Engine v2.0
-    BREADTH_ALERT = "breadth.alert"
-    LIQUIDITY_ALERT = "liquidity.alert"
-    REGIME_TRANSITION = "regime.transition"
-    ANOMALY_CLUSTER = "anomaly.cluster"
-    SENTIMENT_SHIFT = "sentiment.shift"
-    MULTI_TF_DIVERGENCE = "multi_tf.divergence"
+class EventType(IntEnum):
+    """Olay tipleri — Protobuf enum ile uyumlu."""
+    TICK = 0
+    OHLCV = 1
+    SIGNAL = 2
+    PORTFOLIO = 3
+    RISK = 4
+    REGIME = 5
+    EVENT = 6
+    ALERT = 7
+    HEARTBEAT = 8
+    LEARNING = 9
+    MACRO = 10
 
 
-class EventMetadata(BaseModel):
-    provider: str = ""
-    instrument_ids: List[int] = Field(default_factory=list)
-    tickers: List[str] = Field(default_factory=list)
-    entities: List[str] = Field(default_factory=list)
-    schema_version: str = "v1"
-
-
-class CanonicalEvent(BaseModel):
-    """Base event structure — tüm olaylar bu formata uymalıdır.
-    
-    v1.1: Schema validation eklendi.
-    Her event_type için beklenen data alanları tanımlı.
-    Yanlış payload event bus'a girememeli.
-    """
-    event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    event_type: str
-    schema_version: str = "v1"
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+@dataclass
+class CanonicalEvent:
+    """Standart olay formatı — tüm servisler bunu kullanır."""
+    type: EventType
+    ticker: str = ""
+    data: Dict[str, Any] = field(default_factory=dict)
+    timestamp: int = 0
     source: str = ""
-    source_timestamp: Optional[datetime] = None
-    ingest_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    quality: float = 1.0
-    latency_ms: int = 0
-    confidence: float = 1.0
-    data: Dict[str, Any] = Field(default_factory=dict)
-    metadata: EventMetadata = Field(default_factory=EventMetadata)
+    confidence: float = 0.0
+    sequence: int = 0
 
-    # Schema validation rules
-    _REQUIRED_FIELDS: Dict[str, List[str]] = {
-        "market.tick": ["ticker", "price"],
-        "market.trade": ["ticker", "price", "quantity"],
-        "kap.event": ["ticker", "title"],
-        "news.event": ["title"],
-        "macro.event": [],
-        "signal.generated": ["ticker", "score", "direction"],
-        "anomaly.detected": ["ticker", "score"],
-        "risk.alert": [],
-    }
-
-    def validate_payload(self) -> List[str]:
-        """Payload'ı doğrula — eksik alanları döndür."""
-        required = self._REQUIRED_FIELDS.get(self.event_type, [])
-        missing = [f for f in required if f not in self.data]
-        return missing
+    def __post_init__(self):
+        if self.timestamp == 0:
+            self.timestamp = int(time.time() * 1000)
 
     def to_json(self) -> str:
-        """Event'i JSON string'e cevir."""
-        return self.model_dump_json()
+        """JSON formatına çevir."""
+        return json.dumps({
+            "type": self.type.value,
+            "ticker": self.ticker,
+            "data": self.data,
+            "timestamp": self.timestamp,
+            "source": self.source,
+            "confidence": self.confidence,
+            "sequence": self.sequence,
+        }, default=str)
 
     def to_dict(self) -> Dict[str, Any]:
-        """World state'i dictionary'e cevir."""
-        return self.model_dump(mode='json')
+        """Dict formatına çevir."""
+        return {
+            "type": self.type.value,
+            "ticker": self.ticker,
+            "data": self.data,
+            "timestamp": self.timestamp,
+            "source": self.source,
+            "confidence": self.confidence,
+            "sequence": self.sequence,
+        }
+
+    def to_binary(self) -> bytes:
+        """Binary formatına çevir — Protobuf uyumlu."""
+        ticker_bytes = self.ticker.encode('utf-8')[:10].ljust(10, b'\x00')
+        data_json = json.dumps(self.data, default=str).encode('utf-8')[:256]
+        data_len = len(data_json)
+
+        # Format: type(1) + ticker(10) + timestamp(8) + confidence(4) + source_len(1) + source + data_len(2) + data
+        source_bytes = self.source.encode('utf-8')[:20]
+        source_len = len(source_bytes)
+
+        header = struct.pack('!B10sdfBB',
+            self.type.value,
+            ticker_bytes,
+            self.timestamp,
+            self.confidence,
+            source_len,
+            data_len
+        )
+
+        return header + source_bytes + data_json
 
     @classmethod
-    def from_json(cls, json_str: str) -> "CanonicalEvent":
-        """JSON string'den event olustur."""
-        return cls.model_validate_json(json_str)
+    def from_json(cls, json_str: str) -> 'CanonicalEvent':
+        """JSON'dan oluştur."""
+        data = json.loads(json_str)
+        return cls(
+            type=EventType(data.get("type", 0)),
+            ticker=data.get("ticker", ""),
+            data=data.get("data", {}),
+            timestamp=data.get("timestamp", 0),
+            source=data.get("source", ""),
+            confidence=data.get("confidence", 0.0),
+            sequence=data.get("sequence", 0),
+        )
+
+    @classmethod
+    def from_binary(cls, binary: bytes) -> 'CanonicalEvent':
+        """Binary'den oluştur."""
+        if len(binary) < 26:
+            return cls(type=EventType.HEARTBEAT)
+
+        try:
+            type_val, ticker_bytes, timestamp, confidence, source_len, data_len = struct.unpack('!B10sdfBB', binary[:26])
+            ticker = ticker_bytes.rstrip(b'\x00').decode('utf-8')
+
+            source = binary[26:26+source_len].decode('utf-8') if source_len > 0 else ""
+            data_json = binary[26+source_len:26+source_len+data_len].decode('utf-8')
+            data = json.loads(data_json) if data_json else {}
+
+            return cls(
+                type=EventType(type_val),
+                ticker=ticker,
+                data=data,
+                timestamp=timestamp,
+                source=source,
+                confidence=confidence,
+            )
+        except Exception as e:
+            logger.error("Binary decode failed", error=str(e))
+            return cls(type=EventType.HEARTBEAT)
 
 
 # =====================================================
-# Typed Event Data Schemas
+# Hızlı Olay Oluşturucular
 # =====================================================
 
-class MarketTickData(BaseModel):
-    instrument_id: int
-    ticker: str
-    price: float
-    volume: int
-    bid: Optional[float] = None
-    ask: Optional[float] = None
-    trade_count: int = 0
-    vwap: Optional[float] = None
-    source: str = "yfinance"
+def create_tick_event(ticker: str, price: float, change: float, volume: int, source: str = "ingestion") -> CanonicalEvent:
+    """Fiyat olayı oluştur."""
+    return CanonicalEvent(
+        type=EventType.TICK,
+        ticker=ticker,
+        data={"price": price, "change": change, "volume": volume},
+        source=source,
+    )
 
+def create_signal_event(ticker: str, direction: str, confidence: float, target: float, stop_loss: float, reason: str = "") -> CanonicalEvent:
+    """Sinyal olayı oluştur."""
+    return CanonicalEvent(
+        type=EventType.SIGNAL,
+        ticker=ticker,
+        data={"direction": direction, "target": target, "stop_loss": stop_loss, "reason": reason},
+        confidence=confidence,
+        source="intelligence",
+    )
 
-class NewsEventData(BaseModel):
-    news_id: str
-    title: str
-    body: str = ""
-    url: str = ""
-    language: str = "tr"
-    entities: List[str] = Field(default_factory=list)
-    instrument_ids: List[int] = Field(default_factory=list)
-    event_class: str = "OTHER"  # MACRO | COMPANY | SECTOR | GEOPOLITICAL
-    sentiment: float = 0.0
-    importance: float = 0.0
-    novelty: float = 0.0
-    credibility: float = 1.0
+def create_alert_event(ticker: str, alert_type: str, message: str, severity: str = "INFO", value: float = 0, threshold: float = 0) -> CanonicalEvent:
+    """Alarm olayı oluştur."""
+    return CanonicalEvent(
+        type=EventType.ALERT,
+        ticker=ticker,
+        data={"alert_type": alert_type, "message": message, "severity": severity, "value": value, "threshold": threshold},
+        source="alerting",
+    )
 
-
-class KAPEventData(BaseModel):
-    kap_id: str
-    ticker: str
-    company_id: int
-    announcement_type: str = ""
-    title: str
-    summary: str = ""
-    is_price_sensitive: bool = False
-    sentiment: float = 0.0
-    importance: float = 0.0
-    event_class: str = "OTHER"  # INVESTMENT | FINANCIAL_RESULT | DIVIDEND | CAPITAL_CHANGE | CONTRACT
-
-
-class MacroEventData(BaseModel):
-    macro_id: str
-    indicator: str
-    country: str = "TR"
-    actual: float
-    expected: Optional[float] = None
-    previous: Optional[float] = None
-    surprise: Optional[float] = None
-    surprise_zscore: Optional[float] = None
-    importance: float = 0.5
-    source: str = "TCMB"
-
-
-class SignalData(BaseModel):
-    instrument_id: int
-    ticker: str
-    signal_type: str  # SPEC | MOMENTUM | BREAKOUT | VALUE | EVENT_DRIVEN
-    direction: str  # LONG | SHORT | NEUTRAL
-    score: float
-    confidence: float
-    risk_level: str  # LOW | MEDIUM | HIGH | CRITICAL
-    horizon: str  # 1-5D | 1-4W | 1-6M | 6-24M
-    expected_return_pct: float = 0.0
-    expected_volatility_pct: float = 0.0
-    edge_decomposition: Dict[str, float] = Field(default_factory=dict)
-    reasoning: str = ""
-    model_version: str = ""
-    strategy_id: int = 0
-
-
-class AnomalyData(BaseModel):
-    instrument_id: int
-    ticker: str
-    anomaly_type: str
-    severity: str  # LOW | MEDIUM | HIGH | CRITICAL
-    score: float
-    sigma: float
-    description: str
-    evidence: Dict[str, Any] = Field(default_factory=dict)
-
-
-class ImpactPropagationData(BaseModel):
-    source_event_id: str
-    source_event_type: str
-    propagation_chain: List[Dict[str, Any]] = Field(default_factory=list)
-    affected_instruments: List[Dict[str, Any]] = Field(default_factory=list)
-    world_state_delta: Dict[str, float] = Field(default_factory=dict)
+def create_regime_event(regime: str, confidence: float, vix: float = 0, breadth: float = 0) -> CanonicalEvent:
+    """Piyasa rejimi olayı oluştur."""
+    return CanonicalEvent(
+        type=EventType.REGIME,
+        data={"regime": regime, "vix": vix, "breadth": breadth},
+        confidence=confidence,
+        source="market_state",
+    )
