@@ -241,7 +241,13 @@ class RiskServiceServicer(market_pb2_grpc.RiskServiceServicer if HAS_PROTOBUF el
 
 
 async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
-    """gRPC sunucusunu başlat — tüm servisleri register eder."""
+    """gRPC sunucusunu başlat — tüm servisleri register eder.
+
+    Best Practices:
+    - Health check servisi (gRPC health checking protocol)
+    - Reflection servisi (grpcurl ile test edilebilir)
+    - Graceful shutdown
+    """
     if not HAS_GRPC:
         logger.warning("gRPC not available (grpcio not installed)")
         return None
@@ -257,6 +263,33 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     market_pb2_grpc.add_SignalServiceServicer_to_server(SignalServiceServicer(), server)
     market_pb2_grpc.add_PortfolioServiceServicer_to_server(PortfolioServiceServicer(), server)
     market_pb2_grpc.add_RiskServiceServicer_to_server(RiskServiceServicer(), server)
+
+    # Health check servisi (gRPC health checking protocol)
+    try:
+        from grpc_health.v1 import health, health_pb2_grpc
+        health_servicer = health.HealthServicer()
+        health_pb2_grpc.add_HealthServicer_to_server(health_servicer, server)
+        logger.debug("gRPC health check service registered")
+    except ImportError:
+        logger.debug("grpcio-health not installed, skipping health check service")
+    except Exception as e:
+        logger.debug("gRPC health check not registered", error=str(e))
+
+    # Reflection servisi (grpcurl ile test edilebilir)
+    try:
+        from grpc_reflection.v1alpha import reflection
+        SERVICE_NAMES = (
+            market_pb2_grpc.DESCRIPTOR.services_by_name["MarketService"].full_name,
+            market_pb2_grpc.DESCRIPTOR.services_by_name["SignalService"].full_name,
+            market_pb2_grpc.DESCRIPTOR.services_by_name["PortfolioService"].full_name,
+            market_pb2_grpc.DESCRIPTOR.services_by_name["RiskService"].full_name,
+        )
+        reflection.enable_server_reflection(SERVICE_NAMES, server)
+        logger.debug("gRPC reflection service registered")
+    except ImportError:
+        logger.debug("grpcio-reflection not installed, skipping reflection service")
+    except Exception as e:
+        logger.debug("gRPC reflection not registered", error=str(e))
 
     server.add_insecure_port(f"{host}:{port}")
     await server.start()

@@ -41,7 +41,7 @@ class NatsClient:
         self._connected = False
 
     async def connect(self, servers: str = None) -> bool:
-        """NATS'a bağlan."""
+        """NATS'a bağlan (reconnect handling ile)."""
         if not HAS_NATS:
             logger.debug("nats-py not installed")
             return False
@@ -51,7 +51,27 @@ class NatsClient:
 
         try:
             url = servers or os.environ.get("NATS_URL", "nats://localhost:4222")
-            self._nc = await nats.connect(url)
+
+            # Reconnect handling: bağlantı koparsa otomatik yeniden bağlan
+            async def _disconnected_cb():
+                logger.warning("NATS disconnected, will reconnect")
+                self._connected = False
+
+            async def _reconnected_cb():
+                logger.info("NATS reconnected")
+                self._connected = True
+
+            async def _error_cb(e):
+                logger.warning("NATS error", error=str(e))
+
+            self._nc = await nats.connect(
+                url,
+                disconnected_cb=_disconnected_cb,
+                reconnected_cb=_reconnected_cb,
+                error_cb=_error_cb,
+                max_reconnect_attempts=10,
+                reconnect_time_wait=2,
+            )
             self._connected = True
             logger.info("NATS connected", url=url)
             return True

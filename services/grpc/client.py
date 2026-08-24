@@ -1,12 +1,12 @@
 """
-ALPHA BIST — gRPC Client v1.0
+ALPHA BIST — gRPC Client v2.0 (Protobuf Native)
 
-Servisler arası hızlı iletişim için gRPC istemcisi.
+Generated protobuf stub'ları ile servisler arası hızlı iletişim.
 JSON'dan 10x küçük, 10x hızlı.
 
 Kullanım:
     from services.grpc.client import MarketClient, SignalClient
-    
+
     async with MarketClient() as client:
         async for tick in client.stream_ticks(["THYAO", "ASELS"]):
             print(tick)
@@ -24,27 +24,51 @@ try:
 except ImportError:
     HAS_GRPC = False
 
+# Generated protobuf imports
+try:
+    from .generated import market_pb2
+    from .generated import market_pb2_grpc
+    HAS_PROTOBUF = True
+except ImportError:
+    HAS_PROTOBUF = False
+
 logger = structlog.get_logger()
 
 
 class BaseGRPCClient:
-    """gRPC istemci taban sınıfı."""
+    """gRPC istemci taban sınıfı — generated stub'lar ile."""
 
     def __init__(self, host: str = "localhost", port: int = 50051):
         self.host = host
         self.port = port
         self._channel = None
+        self._stub = None
 
     async def connect(self):
         if not HAS_GRPC:
-            logger.warning("gRPC not available")
-            return
-        self._channel = aio.insecure_channel(f"{self.host}:{self.port}")
-        await self._channel.channel_ready()
+            logger.warning("gRPC not available (grpcio not installed)")
+            return False
+
+        if not HAS_PROTOBUF:
+            logger.warning("Protobuf not available (generated code missing)")
+            return False
+
+        try:
+            self._channel = aio.insecure_channel(f"{self.host}:{self.port}")
+            await self._channel.channel_ready()
+            return True
+        except Exception as e:
+            logger.warning("gRPC connection failed", host=self.host, port=self.port, error=str(e))
+            return False
 
     async def close(self):
         if self._channel:
-            await self._channel.close()
+            try:
+                await self._channel.close()
+            except Exception:
+                pass
+            self._channel = None
+            self._stub = None
 
     async def __aenter__(self):
         await self.connect()
@@ -55,12 +79,18 @@ class BaseGRPCClient:
 
 
 class MarketClient(BaseGRPCClient):
-    """Piyasa verisi gRPC istemcisi."""
+    """Piyasa verisi gRPC istemcisi — Protobuf native."""
+
+    async def connect(self):
+        if await super().connect():
+            self._stub = market_pb2_grpc.MarketServiceStub(self._channel)
+            return True
+        return False
 
     async def stream_ticks(self, tickers: List[str]) -> AsyncIterator[Dict[str, Any]]:
-        """Anlık fiyat stream'i."""
-        if not HAS_GRPC:
-            # Fallback: Redis'ten oku
+        """Anlık fiyat stream'i (Protobuf binary)."""
+        if not self._stub:
+            logger.warning("MarketClient not connected, falling back to Redis")
             from ..core.redis_helper import get_cached
             while True:
                 for ticker in tickers:
@@ -75,29 +105,57 @@ class MarketClient(BaseGRPCClient):
                 await asyncio.sleep(0.1)
             return
 
-        # gRPC stream
-        stub = None  # Gerçek production'da generated stub
-        request = {"tickers": tickers}
-        async for tick in stub.StreamTicks(request):
-            yield tick
+        request = market_pb2.TickRequest(tickers=tickers)
+        try:
+            async for tick in self._stub.StreamTicks(request):
+                yield {
+                    "ticker": tick.ticker,
+                    "price": tick.price,
+                    "change": tick.change,
+                    "change_pct": tick.change_pct,
+                    "volume": tick.volume,
+                    "bid": tick.bid,
+                    "ask": tick.ask,
+                    "timestamp": tick.timestamp,
+                }
+        except grpc.RpcError as e:
+            logger.error("gRPC StreamTicks error", code=e.code(), details=e.details())
 
     async def get_tick(self, ticker: str) -> Dict[str, Any]:
-        """Tek seferlik fiyat."""
-        if not HAS_GRPC:
+        """Tek seferlik fiyat (Protobuf)."""
+        if not self._stub:
             from ..core.redis_helper import get_cached
             data = get_cached(f"price:{ticker}")
             return data or {"ticker": ticker, "price": 0}
 
-        stub = None
-        return await stub.GetTick({"ticker": ticker})
+        request = market_pb2.TickRequest(tickers=[ticker])
+        try:
+            tick = await self._stub.GetTick(request)
+            return {
+                "ticker": tick.ticker,
+                "price": tick.price,
+                "change": tick.change,
+                "change_pct": tick.change_pct,
+                "volume": tick.volume,
+                "timestamp": tick.timestamp,
+            }
+        except grpc.RpcError as e:
+            logger.error("gRPC GetTick error", code=e.code(), details=e.details())
+            return {"ticker": ticker, "price": 0, "error": str(e.details())}
 
 
 class SignalClient(BaseGRPCClient):
-    """Sinyal gRPC istemcisi."""
+    """Sinyal gRPC istemcisi — Protobuf native."""
+
+    async def connect(self):
+        if await super().connect():
+            self._stub = market_pb2_grpc.SignalServiceStub(self._channel)
+            return True
+        return False
 
     async def stream_signals(self, min_confidence: float = 0.5) -> AsyncIterator[Dict[str, Any]]:
-        """Sinyal stream'i."""
-        if not HAS_GRPC:
+        """Sinyal stream'i (Protobuf binary)."""
+        if not self._stub:
             from ..core.redis_helper import get_cached
             while True:
                 signals = get_cached("signals:latest") or []
@@ -107,33 +165,180 @@ class SignalClient(BaseGRPCClient):
                 await asyncio.sleep(1)
             return
 
-        stub = None
-        request = {"min_confidence": min_confidence}
-        async for signal in stub.StreamSignals(request):
-            yield signal
+        request = market_pb2.SignalRequest(min_confidence=min_confidence)
+        try:
+            direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
+            async for signal in self._stub.StreamSignals(request):
+                yield {
+                    "ticker": signal.ticker,
+                    "direction": direction_map.get(signal.direction, "HOLD"),
+                    "confidence": signal.confidence,
+                    "target_price": signal.target_price,
+                    "stop_loss": signal.stop_loss,
+                    "reason": signal.reason,
+                    "timestamp": signal.timestamp,
+                }
+        except grpc.RpcError as e:
+            logger.error("gRPC StreamSignals error", code=e.code(), details=e.details())
+
+    async def get_recent_signals(self, min_confidence: float = 0.5) -> List[Dict[str, Any]]:
+        """Son sinyalleri al (Protobuf)."""
+        if not self._stub:
+            from ..core.redis_helper import get_cached
+            signals = get_cached("signals:latest") or []
+            return [s for s in signals if s.get("confidence", 0) >= min_confidence]
+
+        request = market_pb2.SignalRequest(min_confidence=min_confidence)
+        try:
+            response = await self._stub.GetRecentSignals(request)
+            direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
+            return [
+                {
+                    "ticker": s.ticker,
+                    "direction": direction_map.get(s.direction, "HOLD"),
+                    "confidence": s.confidence,
+                    "target_price": s.target_price,
+                    "stop_loss": s.stop_loss,
+                    "reason": s.reason,
+                    "timestamp": s.timestamp,
+                }
+                for s in response.signals
+            ]
+        except grpc.RpcError as e:
+            logger.error("gRPC GetRecentSignals error", code=e.code(), details=e.details())
+            return []
 
 
 class PortfolioClient(BaseGRPCClient):
-    """Portföy gRPC istemcisi."""
+    """Portföy gRPC istemcisi — Protobuf native."""
+
+    async def connect(self):
+        if await super().connect():
+            self._stub = market_pb2_grpc.PortfolioServiceStub(self._channel)
+            return True
+        return False
 
     async def get_portfolio(self) -> Dict[str, Any]:
-        """Anlık portföy durumu."""
-        if not HAS_GRPC:
+        """Anlık portföy durumu (Protobuf)."""
+        if not self._stub:
             from ..core.redis_helper import get_cached
             return get_cached("portfolio:state") or {}
 
-        stub = None
-        return await stub.GetPortfolio({})
+        request = market_pb2.PortfolioRequest(portfolio_id="default")
+        try:
+            pf = await self._stub.GetPortfolio(request)
+            return {
+                "total_value": pf.total_value,
+                "cash": pf.cash,
+                "daily_pnl": pf.daily_pnl,
+                "daily_pnl_pct": pf.daily_pnl_pct,
+                "positions": [
+                    {
+                        "ticker": p.ticker,
+                        "quantity": p.quantity,
+                        "avg_price": p.avg_price,
+                        "current_price": p.current_price,
+                        "pnl": p.pnl,
+                        "pnl_pct": p.pnl_pct,
+                        "weight": p.weight,
+                    }
+                    for p in pf.positions
+                ],
+                "timestamp": pf.timestamp,
+            }
+        except grpc.RpcError as e:
+            logger.error("gRPC GetPortfolio error", code=e.code(), details=e.details())
+            return {"error": str(e.details())}
+
+    async def stream_portfolio(self) -> AsyncIterator[Dict[str, Any]]:
+        """Portföy durumu stream'i (Protobuf binary)."""
+        if not self._stub:
+            from ..core.redis_helper import get_cached
+            while True:
+                pf = get_cached("portfolio:state")
+                if pf:
+                    yield pf
+                await asyncio.sleep(2)
+            return
+
+        request = market_pb2.PortfolioRequest(portfolio_id="default")
+        try:
+            async for pf in self._stub.StreamPortfolio(request):
+                yield {
+                    "total_value": pf.total_value,
+                    "cash": pf.cash,
+                    "daily_pnl": pf.daily_pnl,
+                    "positions": [
+                        {
+                            "ticker": p.ticker,
+                            "quantity": p.quantity,
+                            "avg_price": p.avg_price,
+                            "current_price": p.current_price,
+                            "pnl": p.pnl,
+                            "pnl_pct": p.pnl_pct,
+                            "weight": p.weight,
+                        }
+                        for p in pf.positions
+                    ],
+                    "timestamp": pf.timestamp,
+                }
+        except grpc.RpcError as e:
+            logger.error("gRPC StreamPortfolio error", code=e.code(), details=e.details())
 
 
 class RiskClient(BaseGRPCClient):
-    """Risk gRPC istemcisi."""
+    """Risk gRPC istemcisi — Protobuf native."""
+
+    async def connect(self):
+        if await super().connect():
+            self._stub = market_pb2_grpc.RiskServiceStub(self._channel)
+            return True
+        return False
 
     async def get_risk(self) -> Dict[str, Any]:
-        """Anlık risk durumu."""
-        if not HAS_GRPC:
+        """Anlık risk durumu (Protobuf)."""
+        if not self._stub:
             from ..core.redis_helper import get_cached
             return get_cached("risk:metrics") or {}
 
-        stub = None
-        return await stub.GetRisk({})
+        request = market_pb2.RiskRequest(portfolio_id="default")
+        try:
+            risk = await self._stub.GetRisk(request)
+            return {
+                "var_95": risk.var_95,
+                "cvar_95": risk.cvar_95,
+                "sharpe": risk.sharpe,
+                "max_drawdown": risk.max_drawdown,
+                "volatility": risk.volatility,
+                "beta": risk.beta,
+                "timestamp": risk.timestamp,
+            }
+        except grpc.RpcError as e:
+            logger.error("gRPC GetRisk error", code=e.code(), details=e.details())
+            return {"error": str(e.details())}
+
+    async def stream_risk(self) -> AsyncIterator[Dict[str, Any]]:
+        """Risk metrikleri stream'i (Protobuf binary)."""
+        if not self._stub:
+            from ..core.redis_helper import get_cached
+            while True:
+                risk = get_cached("risk:metrics")
+                if risk:
+                    yield risk
+                await asyncio.sleep(5)
+            return
+
+        request = market_pb2.RiskRequest(portfolio_id="default")
+        try:
+            async for risk in self._stub.StreamRisk(request):
+                yield {
+                    "var_95": risk.var_95,
+                    "cvar_95": risk.cvar_95,
+                    "sharpe": risk.sharpe,
+                    "max_drawdown": risk.max_drawdown,
+                    "volatility": risk.volatility,
+                    "beta": risk.beta,
+                    "timestamp": risk.timestamp,
+                }
+        except grpc.RpcError as e:
+            logger.error("gRPC StreamRisk error", code=e.code(), details=e.details())

@@ -65,6 +65,8 @@ google-auth>=2.28.0
 # High-Performance API & Serialization
 grpcio>=1.60.0
 grpcio-tools>=1.60.0
+grpcio-health-checking>=1.60.0
+grpcio-reflection>=1.60.0
 protobuf>=4.25.0
 nats-py>=2.7.0
 msgpack>=1.0.7
