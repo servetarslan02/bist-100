@@ -1,8 +1,9 @@
 name: bist-100-main
 
 # =============================================================
-# ALPHA BIST — Minimum Stable Config
-#   CPU: i7 13th Gen | GPU: RTX 4080 | RAM: 16GB | SSD: Arızalı
+# ALPHA BIST — Production Stable Config
+#   CPU: i7 13th Gen | GPU: RTX 4080 | RAM: 16GB | SSD: NVMe
+#   SSD Yazma Limiti: 512 MB/s (cgroup v2 io.max ile)
 # =============================================================
 
 x-common: &common
@@ -31,15 +32,18 @@ services:
       - ./database/init:/docker-entrypoint-initdb.d:ro
     command: >
       postgres
-        -c fsync=off
-        -c synchronous_commit=off
-        -c full_page_writes=off
+        -c fsync=on
+        -c synchronous_commit=on
+        -c full_page_writes=on
         -c max_connections=20
         -c shared_buffers=64MB
         -c work_mem=2MB
         -c effective_cache_size=128MB
         -c wal_level=minimal
-        -c max_wal_size=32MB
+        -c max_wal_size=64MB
+        -c min_wal_size=16MB
+        -c checkpoint_completion_target=0.9
+        -c wal_buffers=4MB
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
@@ -93,7 +97,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --save "" --appendonly no --maxmemory 96mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 96mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     mem_limit: 128m
     cpus: 0.25
     storage_opt:
@@ -542,8 +546,7 @@ services:
       - "9090:9090"
     volumes:
       - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-    tmpfs:
-      - /prometheus:size=32M,mode=1777
+      - prometheus_data:/prometheus
     mem_limit: 64m
     cpus: 0.15
 
@@ -556,8 +559,7 @@ services:
     volumes:
       - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
       - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
-    tmpfs:
-      - /var/lib/grafana:size=32M,mode=1777
+      - grafana_data:/var/lib/grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
     mem_limit: 64m
@@ -569,9 +571,9 @@ services:
     container_name: alpha-mlflow
     ports:
       - "5000:5000"
-    command: "mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///:memory: --default-artifact-root /tmp/mlflow --workers 1"
-    tmpfs:
-      - /tmp/mlflow:size=32M,mode=1777
+    volumes:
+      - mlflow_data:/mlflow
+    command: "mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root /mlflow/artifacts --workers 1"
     mem_limit: 128m
     cpus: 0.15
 
@@ -581,6 +583,9 @@ volumes:
   redis_data:
   redpanda_data:
   nats_data:
+  prometheus_data:
+  grafana_data:
+  mlflow_data:
 
 networks:
   alpha-net:
