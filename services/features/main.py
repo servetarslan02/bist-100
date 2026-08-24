@@ -211,11 +211,32 @@ class FeatureEngineService:
 
 
 # =====================================================
+# Health Check HTTP Server
+# =====================================================
+
+async def _health_server(port: int = 8080):
+    """Lightweight health check HTTP server for Docker healthcheck."""
+    from aiohttp import web
+
+    async def health_handler(request):
+        return web.json_response({"status": "healthy", "service": "features"})
+
+    app = web.Application()
+    app.router.add_get('/health', health_handler)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, '0.0.0.0', port)
+    await site.start()
+    logger.info("Health server started", port=port)
+
+
+# =====================================================
 # Entry Point
 # =====================================================
 
 async def main():
     """Main entry point for the feature engine service."""
+    await _health_server()
     service = FeatureEngineService()
     try:
         await service.start()

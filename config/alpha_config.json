@@ -1,9 +1,45 @@
 {
+  "version": "4.2.0",
+  "environment": "development",
   "app": {
     "env": "development",
     "debug": true,
     "host": "0.0.0.0",
     "port": 8000
+  },
+  "models": {
+    "primary": "lightgbm",
+    "ensemble": ["lightgbm", "xgboost", "catboost"],
+    "deep_learning": ["lstm", "transformer"],
+    "reinforcement": "ppo",
+    "retrain_interval_hours": 24,
+    "min_training_samples": 500,
+    "walk_forward_folds": 5,
+    "champion_challenger_enabled": true
+  },
+  "scanner": {
+    "universe_size": 100,
+    "scan_interval_seconds": 300,
+    "min_score": 50,
+    "max_results": 20,
+    "momentum_window": 20,
+    "volume_threshold": 1000000
+  },
+  "learning": {
+    "enabled": true,
+    "brier_threshold": 0.25,
+    "directional_accuracy_threshold": 0.55,
+    "retrain_trigger_score": 0.40,
+    "max_model_age_days": 30,
+    "shadow_mode": false
+  },
+  "data_sources": {
+    "yfinance": {"enabled": true, "interval": "1d", "period": "2y"},
+    "kap": {"enabled": true, "refresh_minutes": 5},
+    "tcmb": {"enabled": true, "refresh_hours": 1},
+    "news": {"enabled": true, "refresh_minutes": 15},
+    "social": {"enabled": true, "refresh_minutes": 30},
+    "google_trends": {"enabled": true, "refresh_hours": 4}
   },
   "portfolio": {
     "initial_capital": 100000,

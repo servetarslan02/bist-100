@@ -102,7 +102,7 @@ def run_massive():
                     ret = (p_sell - p_buy) / p_buy
                     period_return += ret
                     valid_picks += 1
-                except:
+                except Exception:
                     pass
                     
         if valid_picks > 0:
@@ -115,7 +115,7 @@ def run_massive():
             bm_buy = bm_df.loc[bm_df.index <= t_end]['Close'].iloc[-1]
             bm_sell = bm_df.loc[bm_df.index <= t_test_end]['Close'].iloc[-1]
             bm_ret = (bm_sell - bm_buy) / bm_buy
-        except:
+        except Exception:
             bm_ret = 0.0
             
         print(f"-> Portfoy Getirisi: %{avg_return*100:.2f} | BIST100 Getirisi: %{bm_ret*100:.2f}")
