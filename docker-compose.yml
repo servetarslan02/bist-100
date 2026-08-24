@@ -153,14 +153,15 @@ services:
       start_period: 5s
 
   # Redis Sentinel — High Availability (3 node quorum)
+  # Template + entrypoint: ${REDIS_PASSWORD} container başlarken inject edilir
   redis-sentinel-1:
     <<: *common
     image: redis:8-alpine
     container_name: alpha-sentinel-1
-    command: >
-      redis-sentinel /etc/sentinel/sentinel.conf
+    entrypoint: ["/bin/sh", "/etc/sentinel/entrypoint.sh"]
     volumes:
-      - ./infrastructure/sentinel/sentinel-1.conf:/etc/sentinel/sentinel.conf
+      - ./infrastructure/sentinel/sentinel-1.conf.template:/etc/sentinel/sentinel.conf.template:ro
+      - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
       - sentinel_1_data:/data
     depends_on:
       redis:
@@ -172,10 +173,10 @@ services:
     <<: *common
     image: redis:8-alpine
     container_name: alpha-sentinel-2
-    command: >
-      redis-sentinel /etc/sentinel/sentinel.conf
+    entrypoint: ["/bin/sh", "/etc/sentinel/entrypoint.sh"]
     volumes:
-      - ./infrastructure/sentinel/sentinel-2.conf:/etc/sentinel/sentinel.conf
+      - ./infrastructure/sentinel/sentinel-2.conf.template:/etc/sentinel/sentinel.conf.template:ro
+      - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
       - sentinel_2_data:/data
     depends_on:
       redis:
@@ -187,10 +188,10 @@ services:
     <<: *common
     image: redis:8-alpine
     container_name: alpha-sentinel-3
-    command: >
-      redis-sentinel /etc/sentinel/sentinel.conf
+    entrypoint: ["/bin/sh", "/etc/sentinel/entrypoint.sh"]
     volumes:
-      - ./infrastructure/sentinel/sentinel-3.conf:/etc/sentinel/sentinel.conf
+      - ./infrastructure/sentinel/sentinel-3.conf.template:/etc/sentinel/sentinel.conf.template:ro
+      - ./infrastructure/sentinel/entrypoint.sh:/etc/sentinel/entrypoint.sh:ro
       - sentinel_3_data:/data
     depends_on:
       redis:
