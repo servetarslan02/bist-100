@@ -20,8 +20,22 @@ def _tz_naive(df: pd.DataFrame) -> pd.DataFrame:
     df.index = idx.tz_convert(None) if getattr(idx, 'tz', None) is not None else idx
     return df
 
+def _detect_gpu_cuda():
+    """Detect NVIDIA GPU CUDA capability."""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            device_name = torch.cuda.get_device_name(0)
+            return True, device_name
+    except Exception:
+        pass
+    return False, "CPU"
+
 class AlphaEngine:
     def __init__(self, exclude_features: List[str] = None):
+        has_gpu, dev_name = _detect_gpu_cuda()
+        self.has_gpu = has_gpu
+        self.gpu_device_name = dev_name
         self.params = {
             "objective": "regression",
             "metric": "rmse",
@@ -32,6 +46,8 @@ class AlphaEngine:
             "verbose": -1,
             "n_jobs": -1
         }
+        if self.has_gpu:
+            logger.info("AlphaEngine configured with GPU acceleration", device=self.gpu_device_name)
         self.model = None
         self.features = []
         
@@ -186,8 +202,16 @@ class AlphaEngine:
             logger.info(f"Optuna params found: lr={self.params.get('learning_rate', 0):.3f}, leaves={self.params.get('num_leaves', 0)}, max_depth={self.params.get('max_depth', 0)}")
             
         train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
-        self.model = lgb.train(self.params, train_data, num_boost_round=100)
-        logger.info(f"Model trained successfully on {len(X)} samples.")
+        train_params = dict(self.params)
+        if self.has_gpu:
+            train_params["device"] = "gpu"
+        try:
+            self.model = lgb.train(train_params, train_data, num_boost_round=100)
+            logger.info(f"Model trained successfully on {len(X)} samples with {train_params.get('device', 'cpu')}.")
+        except Exception as e:
+            train_params.pop("device", None)
+            self.model = lgb.train(train_params, train_data, num_boost_round=100)
+            logger.info(f"Model trained successfully on {len(X)} samples (CPU engine).")
         return True
 
     def predict(self, market_data, bm_df, sector_map, target_date_str: str):

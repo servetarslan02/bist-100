@@ -321,15 +321,30 @@ class VaRCalculator:
         mu = np.mean(returns)
         sigma = np.std(returns, ddof=1)
 
-        # Simülasyon: günlük getirilerden toplam getiri
-        if sigma <= 0:
-            simulated_returns = np.full(n_simulations, mu * holding_period_days)
-        else:
-            simulated_returns = rng.normal(
-                mu * holding_period_days,
-                sigma * np.sqrt(holding_period_days),
-                n_simulations,
-            )
+        # GPU / CUDA Hızlandırmalı Stokastik Simülasyon (NumPy fallback ile)
+        simulated_returns = None
+        try:
+            import torch
+            if torch.cuda.is_available():
+                if sigma <= 0:
+                    simulated_returns = np.full(n_simulations, mu * holding_period_days)
+                else:
+                    mean_val = float(mu * holding_period_days)
+                    std_val = float(sigma * np.sqrt(holding_period_days))
+                    t_samples = torch.normal(mean=mean_val, std=std_val, size=(n_simulations,), device='cuda')
+                    simulated_returns = t_samples.cpu().numpy()
+        except Exception:
+            pass
+
+        if simulated_returns is None:
+            if sigma <= 0:
+                simulated_returns = np.full(n_simulations, mu * holding_period_days)
+            else:
+                simulated_returns = rng.normal(
+                    mu * holding_period_days,
+                    sigma * np.sqrt(holding_period_days),
+                    n_simulations,
+                )
 
         # VaR/CVaR hesapla
         q_95 = float(np.percentile(simulated_returns, 5))
