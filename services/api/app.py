@@ -51,6 +51,13 @@ async def lifespan(app: FastAPI):
     # Database connections başlat
     await init_databases()
 
+    # Sharding başlat (opsiyonel)
+    try:
+        from ..core.sharding import init_sharding
+        await init_sharding()
+    except Exception as e:
+        logger.warning(f"Sharding not started: {e}")
+
     # Cache warming — sıcak veriyi önceden yükle
     try:
         from ..core.cache_warmer import cache_warmer
@@ -237,6 +244,15 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning("NATS not connected", error=str(e))
 
+    # Service mesh başlat
+    mesh_task = None
+    try:
+        from ..core.service_mesh import service_mesh, init_service_mesh
+        init_service_mesh()
+        mesh_task = asyncio.create_task(service_mesh.start_monitoring())
+    except Exception as e:
+        logger.warning(f"Service mesh not started: {e}")
+
     yield
 
     task.cancel()
@@ -245,6 +261,8 @@ async def lifespan(app: FastAPI):
     paper_task.cancel()
     if refresh_task:
         refresh_task.cancel()
+    if mesh_task:
+        mesh_task.cancel()
 
     # gRPC sunucusunu kapat
     if grpc_server:
@@ -265,6 +283,11 @@ async def lifespan(app: FastAPI):
     shutdown_telemetry()
 
     # Database connections kapat
+    try:
+        from ..core.sharding import close_sharding
+        await close_sharding()
+    except Exception:
+        pass
     await close_databases()
     logger.info("ALPHA BIST API stopped")
 

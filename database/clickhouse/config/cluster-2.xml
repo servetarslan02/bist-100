@@ -1,0 +1,30 @@
+<clickhouse>
+    <remote_servers>
+        <alpha_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </alpha_cluster>
+    </remote_servers>
+
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+
+    <macros>
+        <cluster>alpha_cluster</cluster>
+        <shard>01</shard>
+        <replica>replica2</replica>
+    </macros>
+</clickhouse>

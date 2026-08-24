@@ -57,15 +57,16 @@ async def _retry_async(coro_factory, name: str, max_retries: int = _MAX_RETRIES)
 
 
 # =====================================================
-# PostgreSQL (Async)
+# PostgreSQL (Async) — Primary + Replica
 # =====================================================
 
-_pg_pool = None
+_pg_pool = None           # Primary (yazma)
+_pg_replica_pool = None   # Replica (okuma)
 _pg_healthy = False
 
 
 async def get_pg_pool():
-    """Get or create PostgreSQL connection pool with retry."""
+    """Get or create PRIMARY PostgreSQL connection pool (writes)."""
     global _pg_pool, _pg_healthy
     if asyncpg is None:
         raise RuntimeError("asyncpg not installed. Run: pip install asyncpg")
@@ -81,32 +82,76 @@ async def get_pg_pool():
                 max_size=settings.db_pool_max,
                 command_timeout=settings.db_command_timeout,
             )
-        _pg_pool = await _retry_async(_create, "PostgreSQL pool creation")
+        _pg_pool = await _retry_async(_create, "PostgreSQL primary pool")
         _pg_healthy = True
-        logger.info("PostgreSQL pool created", host=settings.postgres_host)
+        logger.info("PostgreSQL primary pool created", host=settings.postgres_host)
     return _pg_pool
 
 
+async def get_pg_replica_pool():
+    """Get or create REPLICA PostgreSQL connection pool (reads)."""
+    global _pg_replica_pool
+    if asyncpg is None:
+        raise RuntimeError("asyncpg not installed")
+
+    replica_host = getattr(settings, 'postgres_replica_host', None)
+    replica_port = getattr(settings, 'postgres_replica_port', 5433)
+
+    if not replica_host:
+        return await get_pg_pool()
+
+    if _pg_replica_pool is None:
+        async def _create():
+            return await asyncpg.create_pool(
+                host=replica_host,
+                port=replica_port,
+                database=settings.postgres_db,
+                user=settings.postgres_user,
+                password=settings.postgres_password,
+                min_size=settings.db_pool_min,
+                max_size=settings.db_pool_max,
+                command_timeout=settings.db_command_timeout,
+            )
+        try:
+            _pg_replica_pool = await _retry_async(_create, "PostgreSQL replica pool")
+            logger.info("PostgreSQL replica pool created", host=replica_host)
+        except Exception as e:
+            logger.warning("Replica unavailable, using primary for reads", error=str(e))
+            return await get_pg_pool()
+    return _pg_replica_pool
+
+
 async def close_pg_pool():
-    global _pg_pool, _pg_healthy
+    global _pg_pool, _pg_replica_pool, _pg_healthy
     if _pg_pool:
         await _pg_pool.close()
         _pg_pool = None
-        _pg_healthy = False
-        logger.info("PostgreSQL pool closed")
+    if _pg_replica_pool:
+        await _pg_replica_pool.close()
+        _pg_replica_pool = None
+    _pg_healthy = False
+    logger.info("PostgreSQL pools closed")
 
 
 @asynccontextmanager
 async def get_pg_connection():
-    """Get a PostgreSQL connection from the pool."""
+    """Get a PRIMARY PostgreSQL connection (writes)."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
         yield conn
 
 
 @asynccontextmanager
+async def get_pg_replica_connection():
+    """Get a REPLICA PostgreSQL connection (reads)."""
+    pool = await get_pg_replica_pool()
+    async with pool.acquire() as conn:
+        yield conn
+
+
+@asynccontextmanager
 async def get_pg_transaction():
-    """Get a PostgreSQL connection with transaction."""
+    """Get a PRIMARY PostgreSQL connection with transaction."""
     pool = await get_pg_pool()
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -114,6 +159,7 @@ async def get_pg_transaction():
 
 
 async def pg_execute(query: str, *args) -> str:
+    """Execute write query on PRIMARY."""
     try:
         async with get_pg_connection() as conn:
             return await conn.execute(query, *args)
@@ -123,8 +169,9 @@ async def pg_execute(query: str, *args) -> str:
 
 
 async def pg_fetch(query: str, *args):
+    """Fetch from REPLICA (read-only)."""
     try:
-        async with get_pg_connection() as conn:
+        async with get_pg_replica_connection() as conn:
             return await conn.fetch(query, *args)
     except Exception as e:
         logger.error("pg_fetch failed", query=query[:100], error=str(e))
@@ -132,8 +179,9 @@ async def pg_fetch(query: str, *args):
 
 
 async def pg_fetchrow(query: str, *args):
+    """Fetch single row from REPLICA."""
     try:
-        async with get_pg_connection() as conn:
+        async with get_pg_replica_connection() as conn:
             return await conn.fetchrow(query, *args)
     except Exception as e:
         logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
@@ -141,8 +189,9 @@ async def pg_fetchrow(query: str, *args):
 
 
 async def pg_fetchval(query: str, *args) -> Any:
+    """Fetch single value from REPLICA."""
     try:
-        async with get_pg_connection() as conn:
+        async with get_pg_replica_connection() as conn:
             return await conn.fetchval(query, *args)
     except Exception as e:
         logger.error("pg_fetchval failed", query=query[:100], error=str(e))

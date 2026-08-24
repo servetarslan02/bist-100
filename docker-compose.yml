@@ -75,8 +75,11 @@ services:
         -c shared_buffers=64MB
         -c work_mem=2MB
         -c effective_cache_size=128MB
-        -c wal_level=minimal
-        -c max_wal_size=64MB
+        -c wal_level=replica
+        -c max_wal_size=256MB
+        -c max_wal_senders=3
+        -c max_replication_slots=3
+        -c hot_standby=on
         -c min_wal_size=16MB
         -c checkpoint_completion_target=0.9
         -c wal_buffers=4MB
@@ -95,6 +98,34 @@ services:
       retries: 15
       start_period: 15s
 
+  postgres-replica:
+    <<: *common
+    image: postgres:17-alpine
+    container_name: alpha-postgres-replica
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+      - ./database/replica/setup.sh:/docker-entrypoint-initdb.d/setup.sh:ro
+    environment:
+      POSTGRES_DB: alpha_bist
+      POSTGRES_USER: alpha
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      REPLICATION_PASSWORD: ${REPLICATION_PASSWORD}
+    mem_limit: 256m
+    cpus: 0.5
+    storage_opt:
+      size: '256M'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_bist"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   clickhouse:
     <<: *common
     image: clickhouse/clickhouse-server:24.3-alpine
@@ -104,6 +135,7 @@ services:
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./database/clickhouse/config/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
       - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
     environment:
       CLICKHOUSE_DB: alpha_bist
@@ -124,6 +156,61 @@ services:
       timeout: 5s
       retries: 15
       start_period: 15s
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+
+  # ZooKeeper — ClickHouse replication koordinasyonu
+  zookeeper:
+    <<: *common
+    image: zookeeper:3.9
+    container_name: alpha-zookeeper
+    ports:
+      - "2181:2181"
+    volumes:
+      - zookeeper_data:/data
+    mem_limit: 128m
+    cpus: 0.15
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc localhost 2181 | grep imok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ClickHouse Replica 2
+  clickhouse-2:
+    <<: *common
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: alpha-clickhouse-2
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - clickhouse_2_data:/var/lib/clickhouse
+      - ./database/clickhouse/config/cluster-2.xml:/etc/clickhouse-server/config.d/cluster.xml:ro
+      - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    environment:
+      CLICKHOUSE_DB: alpha_bist
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    mem_limit: 512m
+    cpus: 1.0
+    storage_opt:
+      size: '512M'
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user \"$CLICKHOUSE_USER\" --password \"$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+    depends_on:
+      zookeeper:
+        condition: service_healthy
 
   redis:
     <<: *common
@@ -679,7 +766,10 @@ services:
 
 volumes:
   postgres_data:
+  postgres_replica_data:
   clickhouse_data:
+  clickhouse_2_data:
+  zookeeper_data:
   redis_data:
   nats_data:
   prometheus_data:

@@ -1,0 +1,36 @@
+<clickhouse>
+    <!-- Cluster tanımı: 2 shard, 1 replica (her shard'ın 2 kopyası) -->
+    <remote_servers>
+        <alpha_cluster>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                </replica>
+                <replica>
+                    <host>clickhouse-2</host>
+                    <port>9000</port>
+                </replica>
+            </shard>
+        </alpha_cluster>
+    </remote_servers>
+
+    <!-- ZooKeeper entegrasyonu -->
+    <zookeeper>
+        <node>
+            <host>zookeeper</host>
+            <port>2181</port>
+        </node>
+    </zookeeper>
+
+    <!-- Macros: her instance için farklı değerler -->
+    <!-- docker-compose'da environment ile override edilir -->
+
+    <!-- Cluster ayarları -->
+    <macros>
+        <cluster>alpha_cluster</cluster>
+        <shard>01</shard>
+        <replica>replica1</replica>
+    </macros>
+</clickhouse>

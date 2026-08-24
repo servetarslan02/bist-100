@@ -46,6 +46,11 @@ class Settings(BaseSettings):
     postgres_db: str = Field(default="alpha_bist", alias="POSTGRES_DB")
     postgres_user: str = Field(default="alpha", alias="POSTGRES_USER")
     postgres_password: str = Field(default="", alias="POSTGRES_PASSWORD")
+    postgres_replica_host: Optional[str] = Field(default=None, alias="POSTGRES_REPLICA_HOST")
+    postgres_replica_port: int = Field(default=5433, alias="POSTGRES_REPLICA_PORT")
+
+    # Sharding
+    sharding_enabled: bool = Field(default=False, alias="SHARDING_ENABLED")
 
     # ClickHouse
     clickhouse_host: str = Field(default="localhost", alias="CLICKHOUSE_HOST")
