@@ -398,7 +398,7 @@ services:
     depends_on:
       - api
 
-  # === Monitoring ===
+  # === Monitoring (In-Memory RAM / Zero Disk) ===
   prometheus:
     <<: *common
     image: prom/prometheus:v3.14.0
@@ -407,7 +407,8 @@ services:
       - "9090:9090"
     volumes:
       - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
+    tmpfs:
+      - /prometheus:size=48M,mode=1777
     mem_limit: 96m
     cpus: 0.25
 
@@ -418,9 +419,10 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - grafana_data:/var/lib/grafana
       - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
       - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+    tmpfs:
+      - /var/lib/grafana:size=32M,mode=1777
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
     mem_limit: 128m
@@ -432,11 +434,11 @@ services:
     container_name: alpha-mlflow
     ports:
       - "5000:5000"
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts --workers 1
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///:memory: --default-artifact-root /tmp/mlflow --workers 1
+    tmpfs:
+      - /tmp/mlflow:size=32M,mode=1777
     mem_limit: 192m
     cpus: 0.25
-    volumes:
-      - mlflow_data:/mlflow
 
 volumes:
   postgres_data:
