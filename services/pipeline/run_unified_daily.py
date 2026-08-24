@@ -217,8 +217,9 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
 async def run_unified_daily_cycle() -> Dict[str, Any]:
     """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu."""
     now_hour = datetime.now().hour
-    # Sabah seansinda veya portfoy henuz bosken sabah yurutme dongusu calisir
-    if len(paper_orchestrator.portfolio.get_all_positions()) == 0 or now_hour < 12:
+    pending = paper_orchestrator.store.load_pending_signals()
+    # Sabah seansinda, portfoy henuz bosken VEYA geceden bekleyen emirler varsa once sabah yurutme dongusu calisir
+    if len(pending) > 0 or len(paper_orchestrator.portfolio.get_all_positions()) == 0 or now_hour < 12:
         return await run_morning_execution_cycle()
     else:
         return await run_eod_signal_cycle()
