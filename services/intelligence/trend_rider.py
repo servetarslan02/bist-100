@@ -21,7 +21,25 @@ class TrendRiderEngine:
     """Tamamen dinamik volatiliteye (ATR) ve trende dayalı kurumsal çıkış algoritması."""
 
     def __init__(self):
-        pass
+        # ATR tabanlı çıkış parametreleri
+        self.atr_period = 14              # ATR periyodu
+        self.atr_multiplier_entry = 2.0   # Giriş ATR çarpanı
+        self.atr_multiplier_trail = 2.5   # Trailing stop ATR çarpanı
+        self.atr_multiplier_target = 3.0  # Hedef fiyat ATR çarpanı
+        
+        # Trend parametreleri
+        self.fast_ma = 10                 # Hızlı hareketli ortalama
+        self.slow_ma = 30                 # Yavaş hareketli ortalama
+        self.trend_strength_threshold = 0.02  # Trend gücü eşiği
+        
+        # Çıkış kuralları
+        self.max_hold_days = 30           # Max tutma süresi (gün)
+        self.profit_lock_pct = 0.05       # Kâr kilidi eşiği %5
+        self.bear_crash_stop = 0.10       # Ayı piyasası stop %10
+        self.volume_spike_ratio = 3.0     # Hacim spike oranı
+        
+        # Durum takibi
+        self._active_positions: Dict[str, Dict] = {}
 
     def evaluate_position_exit(
         self,

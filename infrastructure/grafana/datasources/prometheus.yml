@@ -7,3 +7,42 @@ datasources:
     url: http://prometheus:9090
     isDefault: true
     editable: true
+
+  - name: Redis
+    type: redis-datasource
+    access: proxy
+    url: redis://alpha-redis:6379
+    jsonData:
+      password: ${REDIS_PASSWORD}
+      poolSize: 5
+      timeout: 10
+      pipelineWindow: 100ms
+    editable: true
+
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: alpha-postgres:5432
+    database: alpha_bist
+    user: alpha
+    secureJsonData:
+      password: ${POSTGRES_PASSWORD}
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+    editable: true
+
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    access: proxy
+    jsonData:
+      host: alpha-clickhouse
+      port: 9000
+      protocol: native
+      defaultDatabase: alpha_bist
+      username: ${CLICKHOUSE_USER}
+      secureJsonData:
+        password: ${CLICKHOUSE_PASSWORD}
+    editable: true

@@ -181,8 +181,10 @@ class InMemoryRedis:
         return None
 
     async def close(self):
-        """Baglantilari kapat."""
-        pass
+        """Baglantilari kapat ve temizle."""
+        self._pubsub_handlers.clear()
+        self._streams.clear()
+        logger.debug("InMemoryRedis closed and cleaned up")
 
     def publish_local(self, channel, event):
         """In-memory publish with loop safety."""

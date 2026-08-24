@@ -25,7 +25,29 @@ logger = logging.getLogger("alpha.scanner")
 
 class DynamicOpportunityScanner:
     def __init__(self):
-        pass
+        # Tarama parametreleri
+        self.min_volume = 1_000_000       # Min günlük hacim (TL)
+        self.min_market_cap = 500_000_000  # Min piyasa değeri (TL)
+        self.max_results = 50             # Max sonuç sayısı
+        self.momentum_window = 20         # Momentum penceresi (gün)
+        self.volatility_window = 20       # Volatilite penceresi (gün)
+        self.rsi_period = 14              # RSI periyodu
+        self.rsi_oversold = 30            # RSI aşırı satım
+        self.rsi_overbought = 70          # RSI aşırı alım
+        self.macd_fast = 12               # MACD hızlı
+        self.macd_slow = 26               # MACD yavaş
+        self.macd_signal = 9              # MACD sinyal
+        self.bollinger_period = 20        # Bollinger periyodu
+        self.bollinger_std = 2.0          # Bollinger standart sapma
+        self.breakout_threshold = 0.02    # Kırılım eşiği %2
+        self.score_weights = {
+            "momentum": 0.25,
+            "volume": 0.20,
+            "rsi": 0.15,
+            "macd": 0.15,
+            "bollinger": 0.10,
+            "breakout": 0.15,
+        }
 
     def scan_opportunities(self, limit: int = 50) -> List[Dict[str, Any]]:
         from ..ingestion.bist_universe import BISTUniverse

@@ -77,7 +77,22 @@ class CandlePatternEngine:
     """Kurumsal 10/10 Seviye Mum ve Price Action Zeka Motoru."""
 
     def __init__(self):
-        pass
+        # Mum formasyonları ve eşikleri
+        self.min_body_ratio = 0.6        # Doji için max gövde/arası oran
+        self.hammer_shadow_ratio = 2.0   # Çekiç için alt gölge/gövde oranı
+        self.engulfing_threshold = 0.01  # Yutan formasyonu min gövde farkı
+        self.star_gap_ratio = 0.005      # Sabah/Akşam yıldızı min boşluk
+        self.three_soldier_body = 0.5    # Üç asker min gövde boyu
+        self.harami_ratio = 0.5          # Harami max gövde oranı
+        self.trend_window = 20           # Trend penceresi (gün)
+        self.support_resistance_window = 50  # Destek/direnç penceresi
+        self._pattern_registry = [
+            "doji", "hammer", "inverted_hammer", "bullish_engulfing",
+            "bearish_engulfing", "morning_star", "evening_star",
+            "three_white_soldiers", "three_black_crows", "harami",
+            "piercing_line", "dark_cloud_cover", "shooting_star",
+            "hanging_man", "spinning_top", "marubozu",
+        ]
 
     def analyze_dataframe(self, df: pd.DataFrame, ticker: str = "ASSET") -> CandlePatternResult:
         """OHLCV DataFrame'ini analiz ederek tüm formasyonları çıkarır."""
