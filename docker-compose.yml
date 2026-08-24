@@ -9,8 +9,8 @@ x-common: &common
   logging:
     driver: "json-file"
     options:
-      max-size: "10m"
-      max-file: "3"
+      max-size: "2m"
+      max-file: "1"
 
 services:
   # === Data Stores ===
@@ -23,11 +23,13 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
+    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=40 -c shared_buffers=64MB -c work_mem=4MB
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     mem_limit: 256m
+    cpus: 0.5
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_bist"]
       interval: 5s
@@ -50,7 +52,8 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 768m
+    mem_limit: 512m
+    cpus: 0.75
     ulimits:
       nofile:
         soft: 262144
@@ -70,8 +73,9 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    command: redis-server --save "" --appendonly no --maxmemory 192mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     mem_limit: 256m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
@@ -92,17 +96,27 @@ services:
       - redpanda
       - start
       - --overprovisioned
-      - --smp 2
-      - --memory 384M
-      - --reserve-memory 0M
-      - --node-id 0
+      - --smp
+      - "1"
+      - --memory
+      - 256M
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
       - --check=false
-      - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:9093
-      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:9093
-      - --pandaproxy-addr internal://0.0.0.0:8082,external://0.0.0.0:8083
-      - --advertise-pandaproxy-addr internal://redpanda:8082,external://localhost:8083
-      - --schema-registry-addr internal://0.0.0.0:8081,external://0.0.0.0:8084
-    mem_limit: 512m
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:9093
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:9093
+      - --pandaproxy-addr
+      - internal://0.0.0.0:8082,external://0.0.0.0:8083
+      - --advertise-pandaproxy-addr
+      - internal://redpanda:8082,external://localhost:8083
+      - --schema-registry-addr
+      - internal://0.0.0.0:8081,external://0.0.0.0:8084
+    mem_limit: 384m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9644"]
       interval: 5s
@@ -115,10 +129,7 @@ services:
   # All other Python services reuse the resulting 'alpha-bist-base' image.
   api:
     <<: *common
-    build:
-      context: .
-      dockerfile: infrastructure/Dockerfile.api
-    image: alpha-bist-base
+    image: alpha-bist-base:latest
     container_name: alpha-api
     ports:
       - "8000:8000"
@@ -131,7 +142,8 @@ services:
       - ./config:/app/config
       - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 768m
+    mem_limit: 512m
+    cpus: 1.0
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,12 +162,8 @@ services:
     volumes:
       - ./services:/app/services
       - ./.env:/app/.env:ro
-    # NOT: Onceden 256m idi. 629 hisseyi senkron/tek-tek yfinance ile ceken
-    # market_data_loop, her cagrida yeni ThreadPoolExecutor + yeni HTTP session
-    # yarattigindan bellek tuketimi 256m limitini asip surekli OOMKilled (137)
-    # oluyordu; restart:unless-stopped da onu sonsuz crash-loop'a sokup WSL VM'ini
-    # (ve dolayisiyla tum docker komutlarini) donduruyordu. Limit yukseltildi.
-    mem_limit: 768m
+    mem_limit: 512m
+    cpus: 0.5
     depends_on:
       api:
         condition: service_started
@@ -177,7 +185,8 @@ services:
       - ./services:/app/services
       - ./ml:/app/ml
       - ./.env:/app/.env:ro
-    mem_limit: 512m
+    mem_limit: 384m
+    cpus: 0.5
     depends_on:
       api:
         condition: service_started
@@ -198,7 +207,8 @@ services:
     volumes:
       - ./services:/app/services
       - ./.env:/app/.env:ro
-    mem_limit: 256m
+    mem_limit: 192m
+    cpus: 0.25
     depends_on:
       api:
         condition: service_started
@@ -221,7 +231,8 @@ services:
       - ./ml:/app/ml
       - ./ai:/app/ai
       - ./.env:/app/.env:ro
-    mem_limit: 512m
+    mem_limit: 384m
+    cpus: 0.5
     depends_on:
       api:
         condition: service_started
@@ -243,7 +254,8 @@ services:
       - ./services:/app/services
       - ./ml:/app/ml
       - ./.env:/app/.env:ro
-    mem_limit: 512m
+    mem_limit: 384m
+    cpus: 0.5
     depends_on:
       api:
         condition: service_started
@@ -262,7 +274,8 @@ services:
     volumes:
       - ./services:/app/services
       - ./.env:/app/.env:ro
-    mem_limit: 256m
+    mem_limit: 192m
+    cpus: 0.25
     depends_on:
       api:
         condition: service_started
@@ -281,7 +294,8 @@ services:
     volumes:
       - ./services:/app/services
       - ./.env:/app/.env:ro
-    mem_limit: 256m
+    mem_limit: 192m
+    cpus: 0.25
     depends_on:
       api:
         condition: service_started
@@ -299,7 +313,8 @@ services:
       - ./services:/app/services
       - ./ml:/app/ml
       - ./.env:/app/.env:ro
-    mem_limit: 384m
+    mem_limit: 256m
+    cpus: 0.25
     depends_on:
       api:
         condition: service_started
@@ -322,6 +337,7 @@ services:
     environment:
       - API_URL=http://alpha-api:8000
     mem_limit: 256m
+    cpus: 0.5
     depends_on:
       - api
 
@@ -335,7 +351,8 @@ services:
     volumes:
       - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
-    mem_limit: 128m
+    mem_limit: 96m
+    cpus: 0.25
 
   grafana:
     <<: *common
@@ -349,7 +366,8 @@ services:
       - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    mem_limit: 192m
+    mem_limit: 128m
+    cpus: 0.25
 
   mlflow:
     <<: *common
@@ -358,7 +376,8 @@ services:
     ports:
       - "5000:5000"
     command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlflow/artifacts --workers 1
-    mem_limit: 256m
+    mem_limit: 192m
+    cpus: 0.25
     volumes:
       - mlflow_data:/mlflow
 
