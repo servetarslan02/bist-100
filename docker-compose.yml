@@ -23,12 +23,12 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database/init:/docker-entrypoint-initdb.d
-    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=40 -c shared_buffers=64MB -c work_mem=4MB
+    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=30 -c shared_buffers=32MB -c work_mem=2MB
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    mem_limit: 256m
+    mem_limit: 160m
     cpus: 0.5
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_bist"]
@@ -52,7 +52,7 @@ services:
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 512m
+    mem_limit: 384m
     cpus: 0.75
     ulimits:
       nofile:
@@ -73,8 +73,8 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --save "" --appendonly no --maxmemory 192mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
-    mem_limit: 256m
+    command: redis-server --save "" --appendonly no --maxmemory 96mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
+    mem_limit: 128m
     cpus: 0.5
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
@@ -99,7 +99,7 @@ services:
       - --smp
       - "1"
       - --memory
-      - 256M
+      - 192M
       - --reserve-memory
       - 0M
       - --node-id
@@ -115,7 +115,7 @@ services:
       - internal://redpanda:8082,external://localhost:8083
       - --schema-registry-addr
       - internal://0.0.0.0:8081,external://0.0.0.0:8084
-    mem_limit: 384m
+    mem_limit: 256m
     cpus: 0.5
     healthcheck:
       test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9644"]
@@ -142,8 +142,8 @@ services:
       - ./config:/app/config
       - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 512m
-    cpus: 1.0
+    mem_limit: 384m
+    cpus: 0.75
     depends_on:
       postgres:
         condition: service_healthy
@@ -336,7 +336,7 @@ services:
       - "3000:3000"
     environment:
       - API_URL=http://alpha-api:8000
-    mem_limit: 256m
+    mem_limit: 192m
     cpus: 0.5
     depends_on:
       - api
