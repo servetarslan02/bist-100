@@ -13,7 +13,13 @@ Kullanım:
 """
 
 import numpy as np
-from numba import jit
+try:
+    from numba import jit
+except ImportError:
+    def jit(*args, **kwargs):
+        def decorator(func):
+            return func
+        return decorator
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
