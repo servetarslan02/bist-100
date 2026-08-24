@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import logging
 logging.basicConfig(level=logging.ERROR)
 from datetime import datetime, timezone

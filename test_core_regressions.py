@@ -1,4 +1,4 @@
-﻿import sys, logging
+import sys, logging
 logging.basicConfig(level=logging.ERROR)
 
 def test_data_quality():

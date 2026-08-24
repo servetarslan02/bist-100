@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import time
 
 async def run_all_checks():

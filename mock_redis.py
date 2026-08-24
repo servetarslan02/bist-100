@@ -1,4 +1,4 @@
-﻿import json
+import json
 import redis
 from datetime import datetime
 

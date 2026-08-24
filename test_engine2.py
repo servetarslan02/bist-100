@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 from services.core.alpha_engine import AlphaEngine
 import datetime
 import pandas as pd

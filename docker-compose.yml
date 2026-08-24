@@ -1,5 +1,10 @@
 name: bist-100-main
 
+# =============================================================
+# ALPHA BIST — Minimum Stable Config
+#   CPU: i7 13th Gen | GPU: RTX 4080 | RAM: 16GB | SSD: Arızalı
+# =============================================================
+
 x-common: &common
   restart: unless-stopped
   env_file:
@@ -9,11 +14,12 @@ x-common: &common
   logging:
     driver: "json-file"
     options:
-      max-size: "2m"
+      max-size: "1m"
       max-file: "1"
 
 services:
   # === Data Stores ===
+
   postgres:
     <<: *common
     image: postgres:17-alpine
@@ -22,14 +28,26 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./database/init:/docker-entrypoint-initdb.d
-    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c max_connections=30 -c shared_buffers=32MB -c work_mem=2MB
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres
+        -c fsync=off
+        -c synchronous_commit=off
+        -c full_page_writes=off
+        -c max_connections=20
+        -c shared_buffers=64MB
+        -c work_mem=2MB
+        -c effective_cache_size=128MB
+        -c wal_level=minimal
+        -c max_wal_size=32MB
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    mem_limit: 160m
+    mem_limit: 256m
     cpus: 0.5
+    storage_opt:
+      size: '256M'
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U alpha -d alpha_bist"]
       interval: 5s
@@ -46,14 +64,16 @@ services:
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
-      - ./database/clickhouse/init:/docker-entrypoint-initdb.d
+      - ./database/clickhouse/init:/docker-entrypoint-initdb.d:ro
     environment:
       CLICKHOUSE_DB: alpha_bist
       CLICKHOUSE_USER: ${CLICKHOUSE_USER}
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    mem_limit: 384m
-    cpus: 0.75
+    mem_limit: 512m
+    cpus: 1.0
+    storage_opt:
+      size: '512M'
     ulimits:
       nofile:
         soft: 262144
@@ -75,7 +95,9 @@ services:
       - redis_data:/data
     command: redis-server --save "" --appendonly no --maxmemory 96mb --maxmemory-policy allkeys-lru --requirepass ${REDIS_PASSWORD}
     mem_limit: 128m
-    cpus: 0.5
+    cpus: 0.25
+    storage_opt:
+      size: '128M'
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
       interval: 5s
@@ -116,7 +138,9 @@ services:
       - --schema-registry-addr
       - internal://0.0.0.0:8081,external://0.0.0.0:8084
     mem_limit: 256m
-    cpus: 0.5
+    cpus: 0.25
+    storage_opt:
+      size: '256M'
     healthcheck:
       test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9644"]
       interval: 5s
@@ -125,8 +149,7 @@ services:
       start_period: 15s
 
   # === Application Services ===
-  # 'api' is the ONLY service that builds the shared image.
-  # All other Python services reuse the resulting 'alpha-bist-base' image.
+
   api:
     <<: *common
     build:
@@ -137,16 +160,28 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      - ./services:/app/services
-      - ./ml:/app/ml
-      - ./ai:/app/ai
-      - ./backtest:/app/backtest
-      - ./tests:/app/tests
-      - ./config:/app/config
+      - ./services:/app/services:ro
+      - ./ml:/app/ml:ro
+      - ./ai:/app/ai:ro
+      - ./backtest:/app/backtest:ro
+      - ./config:/app/config:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 384m
-    cpus: 0.75
+    tmpfs:
+      - /tmp:size=32M,mode=1777
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - TORCH_DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -169,10 +204,13 @@ services:
     container_name: alpha-ingestion
     command: python -m services.ingestion.main
     volumes:
-      - ./services:/app/services
+      - ./services:/app/services:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 512m
-    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    mem_limit: 256m
+    cpus: 0.25
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -197,11 +235,24 @@ services:
     container_name: alpha-feature-engine
     command: python -m services.features.main
     volumes:
-      - ./services:/app/services
-      - ./ml:/app/ml
+      - ./services:/app/services:ro
+      - ./ml:/app/ml:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 384m
-    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - TORCH_DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+    mem_limit: 256m
+    cpus: 0.25
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -226,10 +277,13 @@ services:
     container_name: alpha-market-state
     command: python -m services.market_state.main
     volumes:
-      - ./services:/app/services
+      - ./services:/app/services:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 192m
-    cpus: 0.25
+    tmpfs:
+      - /tmp:size=8M,mode=1777
+    mem_limit: 128m
+    cpus: 0.15
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -254,11 +308,24 @@ services:
     container_name: alpha-intelligence
     command: python -m services.intelligence.main
     volumes:
-      - ./services:/app/services
-      - ./ml:/app/ml
-      - ./ai:/app/ai
+      - ./services:/app/services:ro
+      - ./ml:/app/ml:ro
+      - ./ai:/app/ai:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 384m
+    tmpfs:
+      - /tmp:size=32M,mode=1777
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - TORCH_DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+    mem_limit: 512m
     cpus: 0.5
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
@@ -284,11 +351,24 @@ services:
     container_name: alpha-simulation
     command: python -m services.simulation.main
     volumes:
-      - ./services:/app/services
-      - ./ml:/app/ml
+      - ./services:/app/services:ro
+      - ./ml:/app/ml:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 384m
-    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - TORCH_DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+    mem_limit: 256m
+    cpus: 0.25
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -311,10 +391,13 @@ services:
     container_name: alpha-risk
     command: python -m services.risk.main
     volumes:
-      - ./services:/app/services
+      - ./services:/app/services:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 192m
-    cpus: 0.25
+    tmpfs:
+      - /tmp:size=8M,mode=1777
+    mem_limit: 128m
+    cpus: 0.15
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -337,10 +420,13 @@ services:
     container_name: alpha-portfolio
     command: python -m services.portfolio.main
     volumes:
-      - ./services:/app/services
+      - ./services:/app/services:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
-    mem_limit: 192m
-    cpus: 0.25
+    tmpfs:
+      - /tmp:size=8M,mode=1777
+    mem_limit: 128m
+    cpus: 0.15
     healthcheck:
       test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 15s
@@ -361,9 +447,22 @@ services:
     container_name: alpha-learning
     command: python -m services.learning.main
     volumes:
-      - ./services:/app/services
-      - ./ml:/app/ml
+      - ./services:/app/services:ro
+      - ./ml:/app/ml:ro
+      - ./data:/app/data
       - ./.env:/app/.env:ro
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - TORCH_DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
     mem_limit: 256m
     cpus: 0.25
     healthcheck:
@@ -383,6 +482,7 @@ services:
         condition: service_healthy
 
   # === Frontend ===
+
   dashboard:
     <<: *common
     build:
@@ -393,12 +493,15 @@ services:
       - "3000:3000"
     environment:
       - API_URL=http://alpha-api:8000
-    mem_limit: 192m
-    cpus: 0.5
+    tmpfs:
+      - /tmp:size=16M,mode=1777
+    mem_limit: 128m
+    cpus: 0.25
     depends_on:
       - api
 
-  # === Monitoring (In-Memory RAM / Zero Disk) ===
+  # === Monitoring ===
+
   prometheus:
     <<: *common
     image: prom/prometheus:v3.14.0
@@ -406,11 +509,11 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./infrastructure/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     tmpfs:
-      - /prometheus:size=48M,mode=1777
-    mem_limit: 96m
-    cpus: 0.25
+      - /prometheus:size=32M,mode=1777
+    mem_limit: 64m
+    cpus: 0.15
 
   grafana:
     <<: *common
@@ -419,14 +522,14 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards
-      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./infrastructure/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./infrastructure/grafana/datasources:/etc/grafana/provisioning/datasources:ro
     tmpfs:
       - /var/lib/grafana:size=32M,mode=1777
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
-    mem_limit: 128m
-    cpus: 0.25
+    mem_limit: 64m
+    cpus: 0.15
 
   mlflow:
     <<: *common
@@ -434,20 +537,17 @@ services:
     container_name: alpha-mlflow
     ports:
       - "5000:5000"
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///:memory: --default-artifact-root /tmp/mlflow --workers 1
+    command: "mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///:memory: --default-artifact-root /tmp/mlflow --workers 1"
     tmpfs:
       - /tmp/mlflow:size=32M,mode=1777
-    mem_limit: 192m
-    cpus: 0.25
+    mem_limit: 128m
+    cpus: 0.15
 
 volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
   redpanda_data:
-  prometheus_data:
-  grafana_data:
-  mlflow_data:
 
 networks:
   alpha-net:
