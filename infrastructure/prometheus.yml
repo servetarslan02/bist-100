@@ -3,6 +3,7 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
+  # === Application Services ===
   - job_name: 'alpha-api'
     static_configs:
       - targets: ['api:8000']
@@ -21,14 +22,32 @@ scrape_configs:
           - 'learning:8000'
     metrics_path: '/metrics'
 
+  # === Data Stores (via Exporters) ===
   - job_name: 'postgres'
     static_configs:
-      - targets: ['postgres:5432']
+      - targets: ['postgres-exporter:9187']
 
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis:6379']
+      - targets: ['redis-exporter:9121']
 
   - job_name: 'clickhouse'
     static_configs:
       - targets: ['clickhouse:8123']
+    metrics_path: '/metrics'
+
+  - job_name: 'clickhouse-2'
+    static_configs:
+      - targets: ['clickhouse-2:8123']
+    metrics_path: '/metrics'
+
+  # === Infrastructure ===
+  - job_name: 'nats'
+    static_configs:
+      - targets: ['nats:8222']
+    metrics_path: '/varz'
+
+  - job_name: 'traefik'
+    static_configs:
+      - targets: ['traefik:8080']
+    metrics_path: '/metrics'

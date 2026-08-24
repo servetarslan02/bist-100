@@ -1,13 +1,17 @@
-"""ALPHA BIST — Service Mesh (App-Level)
+"""ALPHA BIST — Service Discovery & Health Monitor
 
-Istio/Linkerd yerine uygulama seviyesinde service mesh.
-Docker Compose ile çalışır, Kubernetes gerektirmez.
+Docker Compose ortamında servis keşfi ve sağlık takibi.
+Traefik API Gateway ile birlikte çalışır.
 
 Özellikler:
-- mTLS: Servisler arası şifreli iletişim (self-signed CA)
-- Service Registry: Servis keşfi ve sağlık takibi
-- Traffic Management: Circuit breaker, retry, timeout
-- Observability: Distributed tracing (OpenTelemetry ile entegre)
+- Service Registry: Servis keşfi ve kayıt
+- Health Check: Periyodik sağlık kontrolü
+- Monitoring: Servis durumu metrikleri
+- SSL Context: Opsiyonel self-signed CA (geliştirme ortamı)
+
+Not: Bu bir service mesh (Istio/Linkerd) değildir.
+Gerçek mTLS, traffic splitting, fault injection için
+Kubernetes + service mesh gerekir.
 
 Kullanım:
     from services.core.service_mesh import service_mesh
@@ -15,18 +19,17 @@ Kullanım:
     # Servis kaydı
     service_mesh.register("api", "alpha-api", 8000)
 
-    # mTLS channel al
-    channel = service_mesh.get_secure_channel("ingestion")
-
     # Sağlık kontrolü
     health = service_mesh.get_health("api")
+
+    # Tüm servislerin durumu
+    all_health = service_mesh.get_all_health()
 """
 
 import os
 import ssl
 import time
 import asyncio
-import hashlib
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
@@ -64,8 +67,8 @@ class ServiceInfo:
         return self.status in (ServiceStatus.HEALTHY, ServiceStatus.DEGRADED)
 
 
-class ServiceMesh:
-    """App-level service mesh — Docker Compose ile çalışır."""
+class ServiceDiscovery:
+    """Service Discovery & Health Monitor — Docker Compose ile çalışır."""
 
     def __init__(self):
         self._services: Dict[str, ServiceInfo] = {}
@@ -74,6 +77,7 @@ class ServiceMesh:
         self._running = False
         self._ca_cert: Optional[str] = None
         self._ca_key: Optional[str] = None
+        self._health_history: Dict[str, List[bool]] = {}  # Son N sağlık durumu
 
     # =====================================================
     # Service Registry
@@ -87,11 +91,13 @@ class ServiceMesh:
             port=port,
             metadata=metadata or {},
         )
+        self._health_history[name] = []
         logger.info("Service registered", name=name, address=f"{host}:{port}")
 
     def unregister(self, name: str):
         """Servis kaydını sil."""
         self._services.pop(name, None)
+        self._health_history.pop(name, None)
         logger.info("Service unregistered", name=name)
 
     def get_service(self, name: str) -> Optional[ServiceInfo]:
@@ -105,6 +111,10 @@ class ServiceMesh:
     def get_all_services(self) -> Dict[str, ServiceInfo]:
         """Tüm servisleri al."""
         return dict(self._services)
+
+    def get_all_health(self) -> Dict[str, Dict[str, Any]]:
+        """Tüm servislerin sağlık raporu."""
+        return {name: self.get_health(name) for name in self._services}
 
     # =====================================================
     # Health Check
@@ -124,17 +134,36 @@ class ServiceMesh:
                     service.status = ServiceStatus.HEALTHY
                     service.failure_count = 0
                     service.last_heartbeat = time.time()
+                    self._record_health(name, True)
                 else:
                     service.status = ServiceStatus.DEGRADED
                     service.failure_count += 1
+                    self._record_health(name, False)
         except Exception:
             service.failure_count += 1
             if service.failure_count >= self._failure_threshold:
                 service.status = ServiceStatus.UNHEALTHY
             else:
                 service.status = ServiceStatus.DEGRADED
+            self._record_health(name, False)
 
         return service.status
+
+    def _record_health(self, name: str, healthy: bool):
+        """Sağlık durumunu geçmişe kaydet (son 100 kontrol)."""
+        if name not in self._health_history:
+            self._health_history[name] = []
+        history = self._health_history[name]
+        history.append(healthy)
+        if len(history) > 100:
+            history.pop(0)
+
+    def get_uptime_percentage(self, name: str) -> float:
+        """Servisin son kontrollerdeki uptime yüzdesi."""
+        history = self._health_history.get(name, [])
+        if not history:
+            return 0.0
+        return sum(history) / len(history) * 100
 
     async def check_all_health(self) -> Dict[str, ServiceStatus]:
         """Tüm servislerin sağlık durumunu kontrol et."""
@@ -156,6 +185,7 @@ class ServiceMesh:
             "failure_count": service.failure_count,
             "last_heartbeat": service.last_heartbeat,
             "is_alive": service.is_alive,
+            "uptime_pct": round(self.get_uptime_percentage(name), 1),
         }
 
     # =====================================================
@@ -165,7 +195,7 @@ class ServiceMesh:
     async def start_monitoring(self):
         """Arka planda servis sağlık takibi başlat."""
         self._running = True
-        logger.info("Service mesh monitoring started",
+        logger.info("Service discovery monitoring started",
                     services=len(self._services),
                     interval=self._health_check_interval)
 
@@ -187,11 +217,15 @@ class ServiceMesh:
         self._running = False
 
     # =====================================================
-    # mTLS (Self-Signed CA)
+    # SSL Context (Opsiyonel — geliştirme ortamı)
     # =====================================================
 
     def generate_ca(self, cert_dir: str = "/tmp/alpha-certs"):
-        """Self-signed CA oluştur (geliştirme ortamı için)."""
+        """Self-signed CA oluştur (geliştirme ortamı için).
+
+        Not: Production'da gerçek CA sertifikaları kullanılmalıdır.
+        Bu sadece Docker internal iletişim için basit SSL context sağlar.
+        """
         os.makedirs(cert_dir, exist_ok=True)
 
         ca_cert_path = os.path.join(cert_dir, "ca.pem")
@@ -203,7 +237,6 @@ class ServiceMesh:
             logger.info("CA certificate loaded", path=ca_cert_path)
             return
 
-        # Self-signed CA oluştur
         try:
             from cryptography import x509
             from cryptography.x509.oid import NameOID
@@ -245,7 +278,7 @@ class ServiceMesh:
             logger.info("CA certificate generated", path=ca_cert_path)
 
         except ImportError:
-            logger.warning("cryptography not installed, mTLS disabled")
+            logger.warning("cryptography not installed, SSL disabled")
 
     def get_ssl_context(self, service_name: str) -> Optional[ssl.SSLContext]:
         """Servis için SSL context oluştur."""
@@ -262,12 +295,11 @@ class ServiceMesh:
             return None
 
     # =====================================================
-    # Traffic Management
+    # Traffic Management Config
     # =====================================================
 
     def get_circuit_breaker_config(self, service_name: str) -> Dict[str, Any]:
         """Servis için circuit breaker config döndür."""
-        # Mevcut circuit_breaker.py ile entegre
         return {
             "failure_threshold": 5,
             "recovery_timeout": 30,
@@ -283,13 +315,12 @@ class ServiceMesh:
         }
 
 
-# Singleton
-service_mesh = ServiceMesh()
+# Singleton — backward compatibility için service_mesh adı korundu
+service_mesh = ServiceDiscovery()
 
 
 def init_service_mesh():
-    """Service mesh'i başlat — tüm servisleri kaydet."""
-    # Docker Compose servis isimleri
+    """Service discovery'yi başlat — tüm servisleri kaydet."""
     services = {
         "api": ("alpha-api", 8000),
         "ingestion": ("alpha-ingestion", 8000),
@@ -305,8 +336,8 @@ def init_service_mesh():
     for name, (host, port) in services.items():
         service_mesh.register(name, host, port)
 
-    # mTLS CA oluştur (opsiyonel)
+    # Opsiyonel: Self-signed CA (geliştirme ortamı)
     if os.environ.get("ENABLE_MTLS", "false").lower() == "true":
         service_mesh.generate_ca()
 
-    logger.info("Service mesh initialized", services=len(services))
+    logger.info("Service discovery initialized", services=len(services))

@@ -71,9 +71,6 @@ class Settings(BaseSettings):
     pg_pool_timeout: int = Field(default=30, alias="PG_POOL_TIMEOUT")
     pg_pool_recycle: int = Field(default=1800, alias="PG_POOL_RECYCLE")  # 30 dk
 
-    # Redpanda (Kafka-compatible)
-
-
     # NATS (yüksek throughput, düşük gecikme)
     nats_url: str = Field(default="nats://localhost:4222", alias="NATS_URL")
 

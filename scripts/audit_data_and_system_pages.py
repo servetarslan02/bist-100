@@ -21,7 +21,7 @@ def audit_data_and_system():
                 print(f"    -> {db.get('name'):<28} | Tür: {db.get('type'):<24} | Boyut: {db.get('size'):<10} | Satır: {db.get('rows_count'):<12} | Gecikme: {db.get('latency_ms')} ms")
                 for t in db.get("tables", [])[:2]:
                     print(f"       • Tablo: {t.get('name'):<22} | Satır: {t.get('rows'):<14} | Boyut: {t.get('size')}")
-            print("  ✓ Doğrulama: ClickHouse (OLAP), PostgreSQL 17 (OLTP), Redis 8.0 (In-Memory) ve Redpanda canlı disk ve tablo telemetrisi okunuyor.")
+            print("  ✓ Doğrulama: ClickHouse (OLAP), PostgreSQL 17 (OLTP), Redis 8.0 (In-Memory) ve NATS canlı disk ve tablo telemetrisi okunuyor.")
     except Exception as e:
         print(f"  ✗ Hata: {e}")
 

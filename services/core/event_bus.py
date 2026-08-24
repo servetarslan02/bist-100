@@ -4,11 +4,10 @@ Dış kaynaklardan veri PUSH ile gelir.
 İç servisler arası iletişim NATS + Redis Pub/Sub ile olur.
 Sürekli API isteği YOKTUR.
 
-Mesajlaşma Stratejisi (Tek Kaynak):
+Mesajlaşma Strateji:
 - PRIMARY: NATS (yüksek throughput, düşük gecikme, JetStream dayanıklılık)
-- SECONDARY: Redis Pub/Sub (push-based, anlık bildirim)
+- SECONDARY: Redis Pub/Sub (anlık bildirim, push-based)
 - DURABLE: Redis Streams (event ledger, at-least-once)
-- Kafka/Redpanda: KALDIRILDI (gereksiz karmaşıklık)
 """
 
 import os
@@ -210,7 +209,7 @@ event_bus = InternalEventBus()
 def publish_event(event: CanonicalEvent):
     """Publish to NATS (primary) + Redis Pub/Sub (push) + Redis Stream (durable).
 
-    v2.0: Kafka/Redpanda kaldırıldı. NATS tek kaynak mesajlaşma.
+    v2.0: Kafka/Redpanda kaldırıldı. NATS ana mesajlaşma, Redis Pub/Sub yardımcı.
     """
     # Schema validation
     missing = event.validate_payload()

@@ -18,7 +18,7 @@ def audit_containers():
     try:
         res = subprocess.run(["docker", "ps", "--format", "{{.Names}}\t{{.Status}}\t{{.Ports}}"], capture_output=True, text=True)
         lines = res.stdout.strip().split("\n")
-        expected = ["alpha-api", "alpha-dashboard", "alpha-postgres", "alpha-clickhouse", "alpha-redis", "alpha-redpanda"]
+        expected = ["alpha-api", "alpha-dashboard", "alpha-postgres", "alpha-clickhouse", "alpha-redis", "alpha-nats"]
         for exp in expected:
             found = [l for l in lines if exp in l]
             if found:

@@ -15,7 +15,7 @@
 │   • ClickHouse OLAP (30 Yıllık Tick & Bar Verileri)         │
 │   • PostgreSQL 17 (İşlemsel Kayıtlar, Portföy & Modeller)   │
 │   • Redis 8.0 (Sub-Millisecond Önbellek & Canlı Telemetri)  │
-│   • Redpanda (Yüksek Verimli Event Streaming)               │
+│   • NATS + JetStream (Yüksek Verimli Event Streaming)        │
 └────────────────────────┬────────────────────────────────────┘
                          │
                          ▼
@@ -90,7 +90,7 @@
 
 ### Docker ile Tek Komutla Başlatma (Tavsiye Edilen)
 
-Tüm servisleri (Next.js Web UI, FastAPI Backend, ClickHouse, PostgreSQL, Redis, Redpanda) ayağa kaldırmak için:
+Tüm servisleri (Next.js Web UI, FastAPI Backend, ClickHouse, PostgreSQL, Redis, NATS) ayağa kaldırmak için:
 
 ```bash
 docker compose up -d --build

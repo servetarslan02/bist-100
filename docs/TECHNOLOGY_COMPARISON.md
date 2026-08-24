@@ -1,9 +1,10 @@
 # 📊 ALPHA BIST — Teknoloji Karşılaştırma Raporu
 
 > **Tarih:** 2026-08-25  
-> **Sürüm:** v4.4  
+> **Sürüm:** v4.5  
 > **Kapsam:** Mevcut sistem bileşenleri vs zirve sistem standartları  
-> **Strateji:** Her kategoride TEK en iyi teknoloji — çift başlılık yok
+> **Strateji:** Her kategoride TEK en iyi teknoloji — çift başlılık yok  
+> **Not:** Bu rapor kod tabanı doğrulaması ile hazırlanmıştır. Her bileşen için gerçek implementasyon durumu belirtilmiştir.
 
 ---
 
@@ -37,10 +38,10 @@
 |---|---|---|
 | **NATS** | Ana mesajlaşma (yüksek throughput) | ✅ Primary |
 | **NATS JetStream** | Kalıcı mesajlama (at-least-once) | ✅ Durable |
-| **Redis Pub/Sub** | Anlık bildirim, push-based | ✅ Secondary |
+| **Redis Pub/Sub** | Anlık bildirim, push-based | ✅ Secondary (yardımcı) |
 | **Redis Streams** | Event ledger, at-least-once | ✅ Durable |
 
-**Strateji:** NATS tek kaynak mesajlaşma. JetStream ile kalıcılık. Redis sadece cache + pub/sub. Kafka/Redpanda kaldırıldı.
+**Strateji:** NATS ana mesajlaşma sistemi. JetStream ile kalıcılık. Redis Pub/Sub anlık bildirimler için yardımcı olarak kullanılır. Kafka/Redpanda kaldırıldı.
 
 ---
 
@@ -67,7 +68,7 @@
 | **PyTorch** | Deep learning | ✅ LSTM/Transformer |
 | **scikit-learn** | Preprocessing, metrics | ✅ Yardımcı |
 
-**Strateji:** 3 gradient boosting (ensemble için gerekli). PyTorch deep learning için. Gereksiz yok.
+**Strateji:** 3 gradient boosting modeli ensemble'da çeşitlilik için kullanılır. PyTorch deep learning için. Gereksiz yok.
 
 ---
 
@@ -82,13 +83,13 @@
 | **Grafana** | Dashboard | ✅ Tek dashboard |
 | **Alembic** | DB migration | ✅ Tek migration |
 
-**Strateji:** Her kategoride tek araç.
+**Strateji:** Her kategoride tek araç. Docker Compose tek sunucu deployment için uygundur.
 
 ---
 
-## 7. Zirve Sistem Bileşenleri Karşılaştırması
+## 7. Sistem Bileşenleri Karşılaştırması
 
-### ✅ Zirve Seviyede Olan (21 bileşen)
+### ✅ Zirve Seviyede Olan Bileşenler
 
 | Bileşen | Durum | Zirve Standartı |
 |---|---|---|
@@ -99,7 +100,6 @@
 | **Feature Store** | ✅ Redis-backed | ✅ Zirve |
 | **Model Registry** | ✅ Version tracking | ✅ Zirve |
 | **Backtest Engine** | ✅ Walk-forward | ✅ Zirve |
-| **Monte Carlo** | ✅ GPU destekli | ✅ Zirve |
 | **Risk Parity** | ✅ Inverse volatility | ✅ Zirve |
 | **Walk-Forward** | ✅ Rolling window | ✅ Zirve |
 | **TradingView** | ✅ Lightweight chart | ✅ Zirve |
@@ -109,21 +109,43 @@
 | **API Gateway** | ✅ Traefik, centralized routing | ✅ Zirve |
 | **Cache Warming** | ✅ Otomatik sıcak veri yükleme | ✅ Zirve |
 | **Async Task Queue** | ✅ Celery + Redis broker | ✅ Zirve |
-| **PostgreSQL Read Replica** | ✅ Streaming replica, read/write ayrımı | ✅ Zirve |
-| **ClickHouse Replication** | ✅ ReplicatedMergeTree + ZooKeeper | ✅ Zirve |
-| **Service Mesh** | ✅ App-level mTLS + service registry | ✅ Zirve |
-| **Database Sharding** | ✅ Ticker-based (A-F, G-M, N-Z) | ✅ Zirve |
 
-### ✅ Eklenen Bileşenler (v4.3 → v4.4)
+### ✅ Aktif ve Çalışan Bileşenler
 
-| # | Bileşen | Durum | Zirve Standartı |
-|---|---|---|---|
-| 1 | **PostgreSQL Read Replica** | ✅ Streaming replica, read/write ayrımı | ✅ Zirve |
-| 2 | **ClickHouse Replication** | ✅ ReplicatedMergeTree + ZooKeeper | ✅ Zirve |
-| 3 | **Service Mesh** | ✅ App-level mTLS + service registry | ✅ Zirve |
-| 4 | **Database Sharding** | ✅ Ticker-based (A-F, G-M, N-Z) | ✅ Zirve |
+| Bileşen | Durum | Açıklama |
+|---|---|---|
+| **PostgreSQL Read Replica** | ✅ Aktif | Streaming replica + read/write splitting |
+| **ClickHouse Replication** | ✅ Aktif | ReplicatedMergeTree + ZooKeeper, 2 node |
+| **Service Discovery** | ✅ Aktif | Servis keşfi + health check + monitoring |
+| **Database Sharding** | ✅ Aktif | Ticker-based (A-F, G-M, N-Z), 3 shard |
+| **Monte Carlo** | ✅ Aktif | GPU destekli (var_cvar) + CPU (advanced) |
+
+### ⚠️ Kısıtlı veya Geliştirme Aşamasında Olan Bileşenler
+
+| Bileşen | Durum | Açıklama |
+|---|---|---|
+| **Service Mesh (mTLS)** | ⚠️ Kısıtlı | Self-signed CA mevcut, per-request mTLS yok |
 
 ---
+
+## 8. Mimari Kararlar ve Gerekçeler
+
+### Neden NATS (Kafka/Redpanda Yerine)?
+- **Düşük gecikme:** NATS ~1ms, Kafka ~5-10ms
+- **Daha basit operasyonel yük:** Broker gerektirmez, tek binary
+- **JetStream ile kalıcılık:** At-least-once delivery garantisi
+- **Yeterli throughput:** 10M+ msg/s (BIST 100 için fazlasıyla yeterli)
+
+### Neden 3 Gradient Boosting Modeli?
+- **Çeşitlilik:** LightGBM (hız), XGBoost (olgunluk), CatBoost (kategorik veri)
+- **Stacking ensemble:** Farklı ağaç yapıları hata korelasyonunu azaltır
+- **Akademik destek:** 2025-2026 araştırmaları stacking ensemble'ları doğruluyor
+
+### Neden Docker Compose (Kubernetes Yerine)?
+- **Tek sunucu yeterli:** BIST 100 verisi tek makinede işlenebilir
+- **Daha basit operasyonel yük:** Kubernetes cluster yönetimi gerektirmez
+- **Maliyet etkin:** Küçük ekip için uygun
+- **Not:** Ölçeklenme gerektiğinde Kubernetes geçişi düşünülebilir
 
 ---
 
@@ -140,25 +162,7 @@
 
 ALPHA BIST sistemi, **her kategoride tek en iyi teknoloji** prensibiyle yapılandırılmıştır:
 
-### Mevcut Durum
-- **1 mesajlaşma sistemi:** NATS + JetStream (Redis pub/sub secondary)
-- **1 JSON formatı:** orjson
-- **1 RDBMS:** PostgreSQL
-- **1 OLAP:** ClickHouse
-- **1 cache:** Redis + Sentinel HA
-- **1 container orchestrator:** Docker Compose
-- **1 API Gateway:** Traefik
-- **1 task queue:** Celery
-- **1 metrik:** Prometheus
-- **1 dashboard:** Grafana
-
-### Zirve Sistem Skoru
-```
-Zirve seviyede olan:     21 bileşen ✅ (%100)
-Eksik veya zayıf olan:    0 bileşen ✅
-```
-
-### Mevcut Durum (v4.4)
+### Mevcut Durum (v4.5)
 - **1 mesajlaşma sistemi:** NATS + JetStream (Redis pub/sub secondary)
 - **1 JSON formatı:** orjson
 - **1 RDBMS:** PostgreSQL + Replica + Sharding
@@ -167,8 +171,16 @@ Eksik veya zayıf olan:    0 bileşen ✅
 - **1 container orchestrator:** Docker Compose
 - **1 API Gateway:** Traefik
 - **1 task queue:** Celery
-- **1 service mesh:** App-level mTLS + registry
-- **1 metrik:** Prometheus
-- **1 dashboard:** Grafana
+- **1 service discovery:** Health check + monitoring
+- **1 metrik:** Prometheus + Grafana
+
+### Sistem Skoru
+```
+Zirve seviyede olan:        16 bileşen ✅
+Aktif ve çalışan:            5 bileşen ✅
+Kısıtlı/geliştirme aşaması:  1 bileşen ⚠️
+Toplam:                     22 bileşen
+Başarı oranı:               %95.5
+```
 
 **Çift başlılık yok. Her teknoloji tek amaca hizmet eder.**

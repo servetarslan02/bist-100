@@ -732,6 +732,37 @@ services:
 
   # === Monitoring ===
 
+  # PostgreSQL Exporter — Prometheus metrics for PostgreSQL
+  postgres-exporter:
+    <<: *common
+    image: prometheuscommunity/postgres-exporter:v0.17.1
+    container_name: alpha-postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://alpha:${POSTGRES_PASSWORD}@postgres:5432/alpha_bist?sslmode=disable"
+    mem_limit: 32m
+    cpus: 0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Redis Exporter — Prometheus metrics for Redis
+  redis-exporter:
+    <<: *common
+    image: oliver006/redis_exporter:v1.73.0
+    container_name: alpha-redis-exporter
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "redis://redis:6379"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+    mem_limit: 32m
+    cpus: 0.1
+    depends_on:
+      redis:
+        condition: service_healthy
+
   prometheus:
     <<: *common
     image: prom/prometheus:v3.14.0

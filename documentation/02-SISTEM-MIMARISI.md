@@ -44,7 +44,7 @@ mimari ihlal sayılır ve kod incelemesinde reddedilir.
 | Zaman serisi / tick / olay depolama | ClickHouse | Kolon-tabanlı depolama, yüksek hacimli point-in-time sorgular (walk-forward, backtest replay) için gereken agregasyon hızı |
 | İşlemsel durum (portföy, ledger, kullanıcı/politika) | PostgreSQL | ACID garantisi — portföy bakiyesi/pozisyon gibi verilerde tutarlılık pazarlık konusu değildir |
 | Cache / kısa ömürlü kuyruk | Redis | Düşük gecikmeli sıralama sonucu/rejim durumu paylaşımı |
-| Olay akışı (event streaming) | Redpanda (Kafka uyumlu) | Ingestion → feature → model → karar zincirinde asenkron, tekrar-oynatılabilir (replay edilebilir) olay akışı |
+| Olay akışı (event streaming) | NATS + JetStream | Ingestion → feature → model → karar zincirinde asenkron, tekrar-oynatılabilir (replay edilebilir) olay akışı |
 | API | FastAPI | Async I/O, otomatik şema doğrulama (Pydantic), test edilebilirlik |
 | Web arayüzü | Next.js | Gerçek zamanlı dashboard (portföy, sinyaller, rejim durumu) |
 | ML | LightGBM (ranking) + rule-based fallback | Tablo verisinde güçlü, yorumlanabilir, üretimde hızlı; "kara kutu" derin öğrenme başlangıç noktası olarak tercih edilmedi çünkü yorumlanabilirlik + az veriyle sağlamlık önceliklidir |

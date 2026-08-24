@@ -113,7 +113,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     system_details = [
         {"label": "Platform Versiyonu", "value": "ALPHA BIST v3.0 (Canlı Prodüksiyon)"},
         {"label": "Veritabanı Altyapısı", "value": "PostgreSQL 17 (OLTP) + ClickHouse 24.3 (OLAP)"},
-        {"label": "Dağıtık Olay Akışı", "value": "Redpanda Kafka v25.3 (Zero Packet Drop)"},
+        {"label": "Dağıtık Olay Akışı", "value": "NATS 2.11 + JetStream (Yüksek Throughput)"},
         {"label": "Aktif Makine Öğrenmesi", "value": "Optuna-LightGBM AlphaEngine (Phase 18)"},
         {"label": "Yapay Zeka İstihbaratı", "value": "Google Gemini 3.7 Flash + Multi-Agent Quant Engine"},
         {"label": "Taranan Enstrüman Havuzu", "value": "629+ Aktif BİST Hissesi (Dinamik Otomatik Keşif)"},
@@ -139,7 +139,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
 
 @router.get("/databases")
 async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Veri Merkezi — ClickHouse, PostgreSQL, Redis ve Redpanda GERÇEK disk ve bellek istatistikleri."""
+    """Veri Merkezi — ClickHouse, PostgreSQL, Redis ve NATS GERÇEK disk ve bellek istatistikleri."""
     # 1. ClickHouse Gerçek Boyut
     ch_lat = 1.4
     ch_size = "0 B"
@@ -275,7 +275,7 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
                 "tables": redis_tables,
             },
             {
-                "name": "Redpanda (Kafka Uyumlu Olay Hattı)",
+                "name": "NATS + JetStream (Olay Hattı)",
                 "type": "Distributed Event Streaming",
                 "role": "Mikroservisler Arası Gerçek Zamanlı Veri ve Olay İletimi",
                 "size": "Canlı Akış",
