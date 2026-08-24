@@ -1,4 +1,6 @@
 port 26379
+sentinel resolve-hostnames yes
+sentinel announce-hostnames yes
 sentinel monitor alpha-master alpha-redis 6379 2
 sentinel auth-pass alpha-master ${REDIS_PASSWORD}
 sentinel down-after-milliseconds alpha-master 5000

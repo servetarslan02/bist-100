@@ -1,14 +1,10 @@
 # =============================================================
-# ALPHA BIST — Traefik API Gateway
-#
-# Merkezi routing, rate limiting, SSL termination.
-# Tüm servisler tek entry point'ten yönetilir.
+# ALPHA BIST — Traefik Static Configuration
 # =============================================================
 
-# Static configuration
 api:
   dashboard: true
-  insecure: true  # Dev ortamda, production'da kapatılmalı
+  insecure: true
 
 entryPoints:
   web:
@@ -20,38 +16,13 @@ providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
-    network: alpha-net
+    network: bist-100-main_alpha-net
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
 
-# Health check
 ping:
   entryPoint: web
 
-# Access log
 accessLog:
-  filePath: /var/log/traefik/access.log
   bufferingSize: 100
-
-# Rate limiting (global)
-http:
-  middlewares:
-    rate-limit:
-      rateLimit:
-        average: 100
-        burst: 200
-        period: 1s
-    compress:
-      compress: {}
-    cors:
-      headers:
-        accessControlAllowMethods:
-          - GET
-          - POST
-          - PUT
-          - DELETE
-          - OPTIONS
-        accessControlAllowHeaders:
-          - "*"
-        accessControlAllowOriginList:
-          - "http://localhost:3000"
-          - "http://localhost:80"
-        accessControlMaxAge: 3600

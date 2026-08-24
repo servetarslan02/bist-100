@@ -69,16 +69,16 @@ class BaseGRPCClient:
         try:
             # round_robin load balancing: birden fazla adrese bağlan,
             # her RPC çağrısında sırayla dağıtır.
-            targets = ",".join(f"{h}:{self.port}" for h in self.hosts)
             if len(self.hosts) > 1:
-                # Birden fazla hedef varsa service config ile round_robin
+                # ipv4:/// scheme ile multiple target — round_robin
+                targets = ",".join(f"{h}:{self.port}" for h in self.hosts)
                 options = [
                     ("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}'),
                     ("grpc.enable_retries", 1),
                     ("grpc.keepalive_time_ms", 10000),
                     ("grpc.keepalive_timeout_ms", 5000),
                 ]
-                self._channel = aio.insecure_channel(f"dns:///{targets}", options=options)
+                self._channel = aio.insecure_channel(f"ipv4:///{targets}", options=options)
             else:
                 # Tek hedef — basit bağlantı
                 self._channel = aio.insecure_channel(f"{self.hosts[0]}:{self.port}")

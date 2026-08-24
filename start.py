@@ -34,10 +34,15 @@ SSD_WRITE_LIMIT_BYTES = SSD_WRITE_LIMIT_MBPS * 1024 * 1024
 # Data yazan servisler (persistent volumes)
 DATA_CONTAINERS = [
     "alpha-postgres",
+    "alpha-postgres-replica",
     "alpha-clickhouse",
+    "alpha-clickhouse-2",
+    "alpha-zookeeper",
     "alpha-redis",
+    "alpha-sentinel-1",
+    "alpha-sentinel-2",
+    "alpha-sentinel-3",
     "alpha-nats",
-    "alpha-redpanda",
     "alpha-prometheus",
     "alpha-grafana",
     "alpha-mlflow",
@@ -45,6 +50,7 @@ DATA_CONTAINERS = [
 
 # Uygulama servisleri (sadece tmpfs, SSD'ye yazmaz)
 APP_CONTAINERS = [
+    "alpha-traefik",
     "alpha-api",
     "alpha-ingestion",
     "alpha-feature-engine",
@@ -54,6 +60,7 @@ APP_CONTAINERS = [
     "alpha-risk",
     "alpha-portfolio",
     "alpha-learning",
+    "alpha-celery-worker",
     "alpha-dashboard",
 ]
 
@@ -369,9 +376,10 @@ def main():
     print("  🔬 MLflow:           http://localhost:5000")
     print("  🗄️  ClickHouse:       http://localhost:8123")
     print("  🐘 PostgreSQL:       localhost:5432")
+    print("  🐘 PG Replica:       localhost:5433")
     print("  🔴 Redis:            localhost:6379")
     print("  📨 NATS:             localhost:4222")
-    print("  📦 Redpanda:         localhost:9092")
+    print("  🔷 Traefik:          http://localhost:8080")
     print("=" * 72)
 
     # 8. Browser aç

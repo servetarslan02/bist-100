@@ -1,0 +1,27 @@
+# =============================================================
+# ALPHA BIST — Traefik Dynamic Configuration (Middlewares)
+# =============================================================
+
+http:
+  middlewares:
+    rate-limit:
+      rateLimit:
+        average: 100
+        burst: 200
+        period: 1s
+    compress:
+      compress: {}
+    cors:
+      headers:
+        accessControlAllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - OPTIONS
+        accessControlAllowHeaders:
+          - "*"
+        accessControlAllowOriginList:
+          - "http://localhost:3000"
+          - "http://localhost:80"
+        accessControlMaxAge: 3600
