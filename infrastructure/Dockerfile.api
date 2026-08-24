@@ -2,9 +2,9 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps
+# System deps (healthcheck + replica + build tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libpq-dev curl && \
+    gcc libpq-dev curl netcat-openbsd gosu && \
     rm -rf /var/lib/apt/lists/*
 
 # Python deps
