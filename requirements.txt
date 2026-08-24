@@ -70,3 +70,6 @@ protobuf>=4.25.0
 nats-py>=2.7.0
 
 orjson>=3.10.0
+
+# Async Task Queue
+celery>=5.4.0

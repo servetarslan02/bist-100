@@ -36,10 +36,23 @@ logger = structlog.get_logger()
 
 
 class BaseGRPCClient:
-    """gRPC istemci taban sınıfı — generated stub'lar ile."""
+    """gRPC istemci taban sınıfı — generated stub'lar ile.
 
-    def __init__(self, host: str = "localhost", port: int = 50051):
-        self.host = host
+    Load Balancing: round_robin policy ile birden fazla gRPC instance'a
+    otomatik yük dağılımı. Tek instance varsa bile çalışır (noop).
+    """
+
+    def __init__(self, hosts: list[str] = None, port: int = 50051):
+        """
+        Args:
+            hosts: gRPC sunucu adresleri. None ise ortam değişkeninden okunur.
+            port: gRPC portu.
+        """
+        if hosts is None:
+            import os
+            raw = os.environ.get("GRPC_HOSTS", "localhost")
+            hosts = [h.strip() for h in raw.split(",") if h.strip()]
+        self.hosts = hosts
         self.port = port
         self._channel = None
         self._stub = None
@@ -54,11 +67,26 @@ class BaseGRPCClient:
             return False
 
         try:
-            self._channel = aio.insecure_channel(f"{self.host}:{self.port}")
+            # round_robin load balancing: birden fazla adrese bağlan,
+            # her RPC çağrısında sırayla dağıtır.
+            targets = ",".join(f"{h}:{self.port}" for h in self.hosts)
+            if len(self.hosts) > 1:
+                # Birden fazla hedef varsa service config ile round_robin
+                options = [
+                    ("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}'),
+                    ("grpc.enable_retries", 1),
+                    ("grpc.keepalive_time_ms", 10000),
+                    ("grpc.keepalive_timeout_ms", 5000),
+                ]
+                self._channel = aio.insecure_channel(f"dns:///{targets}", options=options)
+            else:
+                # Tek hedef — basit bağlantı
+                self._channel = aio.insecure_channel(f"{self.hosts[0]}:{self.port}")
             await self._channel.channel_ready()
+            logger.info("gRPC connected", hosts=self.hosts, lb="round_robin" if len(self.hosts) > 1 else "single")
             return True
         except Exception as e:
-            logger.warning("gRPC connection failed", host=self.host, port=self.port, error=str(e))
+            logger.warning("gRPC connection failed", hosts=self.hosts, port=self.port, error=str(e))
             return False
 
     async def close(self):

@@ -37,11 +37,12 @@ class NatsClient:
 
     def __init__(self):
         self._nc: Optional[NATS] = None
+        self._js = None  # JetStream context
         self._subscriptions: Dict[str, Any] = {}
         self._connected = False
 
     async def connect(self, servers: str = None) -> bool:
-        """NATS'a bağlan (reconnect handling ile)."""
+        """NATS'a bağlan (reconnect + JetStream handling ile)."""
         if not HAS_NATS:
             logger.debug("nats-py not installed")
             return False
@@ -73,7 +74,16 @@ class NatsClient:
                 reconnect_time_wait=2,
             )
             self._connected = True
-            logger.info("NATS connected", url=url)
+
+            # JetStream context — persistent messaging
+            try:
+                self._js = self._nc.jetstream()
+                logger.info("NATS JetStream enabled")
+            except Exception as e:
+                logger.warning("JetStream not available", error=str(e))
+                self._js = None
+
+            logger.info("NATS connected", url=url, jetstream=self._js is not None)
             return True
         except Exception as e:
             logger.debug("NATS connection failed", error=str(e))
@@ -153,6 +163,106 @@ class NatsClient:
         except Exception as e:
             logger.debug("NATS subscribe failed", subject=subject, error=str(e))
 
+    async def publish_durable(self, subject: str, data: Any, stream: str = None) -> bool:
+        """JetStream ile kalıcı mesaj yayınla.
+
+        At-least-once delivery garantisi. Mesaj disk'e yazılır.
+        Normal publish'den farkı: mesaj kaybolmaz, consumer group desteği.
+        """
+        if not self.is_connected or not self._js:
+            # Fallback: normal publish
+            return await self.publish(subject, data)
+
+        try:
+            if isinstance(data, dict):
+                payload = json.dumps(data, default=str).encode()
+            elif isinstance(data, bytes):
+                payload = data
+            elif isinstance(data, str):
+                payload = data.encode()
+            else:
+                payload = json.dumps(data, default=str).encode()
+
+            # Stream adı belirtilmemişse subject'ten türet
+            if stream is None:
+                stream = subject.replace(".", "_").upper()
+
+            # Stream yoksa otomatik oluştur
+            try:
+                await self._js.add_stream(name=stream, subjects=[subject])
+            except Exception:
+                pass  # Zaten varsa devam et
+
+            ack = await self._js.publish(subject, payload)
+            logger.debug("JetStream published", subject=subject, stream=stream,
+                        seq=ack.seq)
+            return True
+        except Exception as e:
+            logger.debug("JetStream publish failed, falling back", error=str(e))
+            return await self.publish(subject, data)
+
+    async def subscribe_durable(self, subject: str, durable_name: str,
+                                handler: Callable = None,
+                                stream: str = None) -> AsyncIterator[Dict[str, Any]]:
+        """JetStream ile kalıcı abone ol.
+
+        Durable consumer: mesajlar kaybolmaz, restart sonrası kaldığı yerden devam.
+        At-least-once: mesaj en az bir kez işlenir.
+        """
+        if not self.is_connected or not self._js:
+            # Fallback: normal subscribe
+            async for msg in self.subscribe(subject, handler=handler):
+                yield msg
+            return
+
+        try:
+            if stream is None:
+                stream = subject.replace(".", "_").upper()
+
+            # Stream yoksa otomatik oluştur
+            try:
+                await self._js.add_stream(name=stream, subjects=[subject])
+            except Exception:
+                pass
+
+            if handler:
+                # Callback mode
+                async def _msg_handler(msg):
+                    try:
+                        data = json.loads(msg.data.decode())
+                        if asyncio.iscoroutinefunction(handler):
+                            await handler(data)
+                        else:
+                            handler(data)
+                        await msg.ack()
+                    except Exception as e:
+                        logger.error("JetStream handler error", subject=subject, error=str(e))
+                        await msg.nak()
+
+                psub = await self._js.subscribe(subject, durable=durable_name,
+                                                cb=_msg_handler)
+                self._subscriptions[subject] = psub
+                logger.info("JetStream subscribed (callback)", subject=subject,
+                           durable=durable_name)
+            else:
+                # Iterator mode
+                psub = await self._js.subscribe(subject, durable=durable_name)
+                self._subscriptions[subject] = psub
+
+                async for msg in psub.messages:
+                    try:
+                        data = json.loads(msg.data.decode())
+                        yield data
+                        await msg.ack()
+                    except json.JSONDecodeError:
+                        yield {"raw": msg.data.decode()}
+                        await msg.ack()
+                    except Exception as e:
+                        logger.error("JetStream iterator error", error=str(e))
+                        await msg.nak()
+        except Exception as e:
+            logger.debug("JetStream subscribe failed", subject=subject, error=str(e))
+
     async def request(self, subject: str, data: Any, timeout: float = 5.0) -> Dict[str, Any]:
         """İstek-yanıt (request-reply pattern)."""
         if not self.is_connected:
@@ -186,7 +296,12 @@ class NatsClient:
 # =====================================================
 
 class Subjects:
-    """NATS konu tanımları — organize mesajlaşma."""
+    """NATS konu tanımları — organize mesajlaşma.
+
+    JetStream stream'leri: kalıcı mesajlaşma için.
+    Normal publish: anlık (fire-and-forget)
+    Durable publish: disk'e yazılır, restart sonrası devam eder.
+    """
     TICKS = "alpha.market.ticks"
     OHLCV = "alpha.market.ohlcv"
     SIGNALS = "alpha.signals.new"
@@ -198,6 +313,12 @@ class Subjects:
     LEARNING = "alpha.learning.update"
     DECISIONS = "alpha.decisions.created"
     ORDERS = "alpha.orders.placed"
+
+    # JetStream stream adları (kalıcı mesajlaşma)
+    STREAM_TICKS = "ALPHA_TICKS"
+    STREAM_SIGNALS = "ALPHA_SIGNALS"
+    STREAM_EVENTS = "ALPHA_EVENTS"
+    STREAM_ORDERS = "ALPHA_ORDERS"
 
 
 # =====================================================

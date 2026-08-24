@@ -50,7 +50,17 @@ async def lifespan(app: FastAPI):
 
     # Database connections başlat
     await init_databases()
-    
+
+    # Cache warming — sıcak veriyi önceden yükle
+    try:
+        from ..core.cache_warmer import cache_warmer
+        await cache_warmer.warm_all()
+        # Background'da sıcak anahtarları tazele
+        refresh_task = asyncio.create_task(cache_warmer.refresh_hot_keys())
+    except Exception as e:
+        logger.warning(f"Cache warming failed: {e}")
+        refresh_task = None
+
     try:
         from services.portfolio.main import portfolio_service
         await portfolio_service.start()
@@ -233,6 +243,8 @@ async def lifespan(app: FastAPI):
     ml_task.cancel()
     storage_task.cancel()
     paper_task.cancel()
+    if refresh_task:
+        refresh_task.cancel()
 
     # gRPC sunucusunu kapat
     if grpc_server:

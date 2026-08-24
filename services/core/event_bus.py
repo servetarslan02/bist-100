@@ -207,24 +207,7 @@ event_bus = InternalEventBus()
 # =====================================================
 
 
-async def _publish_to_nats(event: CanonicalEvent):
-    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
-    try:
-        from ..nats.client import nats_client
-        subject = f"alpha.{event.event_type}"
-        await nats_client.publish(subject, event.to_json())
-    except Exception as e:
-        logger.debug("NATS publish skipped", error=str(e))
-
-
-async def subscribe_nats(subject: str, handler: Callable):
-    """NATS konusuna abone ol."""
-    try:
-        from ..nats.client import nats_client
-        await nats_client.subscribe(subject, handler=handler)
-        logger.info("NATS subscribed", subject=subject)
-    except Exception as e:
-        logger.debug("NATS subscribe skipped", error=str(e))
+def publish_event(event: CanonicalEvent):
     """Publish to NATS (primary) + Redis Pub/Sub (push) + Redis Stream (durable).
 
     v2.0: Kafka/Redpanda kaldırıldı. NATS tek kaynak mesajlaşma.
@@ -263,6 +246,26 @@ async def subscribe_nats(subject: str, handler: Callable):
             asyncio.run(_publish_with_idempotency(event))
     except Exception as e:
         logger.debug("Redis publish handled", event_type=event.event_type, error=str(e))
+
+
+async def _publish_to_nats(event: CanonicalEvent):
+    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
+    try:
+        from ..nats.client import nats_client
+        subject = f"alpha.{event.event_type}"
+        await nats_client.publish(subject, event.to_json())
+    except Exception as e:
+        logger.debug("NATS publish skipped", error=str(e))
+
+
+async def subscribe_nats(subject: str, handler: Callable):
+    """NATS konusuna abone ol."""
+    try:
+        from ..nats.client import nats_client
+        await nats_client.subscribe(subject, handler=handler)
+        logger.info("NATS subscribed", subject=subject)
+    except Exception as e:
+        logger.debug("NATS subscribe skipped", error=str(e))
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
@@ -370,35 +373,6 @@ async def _publish_to_stream(event: CanonicalEvent):
         return
     except Exception as e:
         logger.warning("PG event ledger write failed", error=str(e))
-
-
-# =====================================================
-# NATS Integration (Yüksek throughput, düşük gecikme)
-# Tek client: services.nats.client.nats_client
-# =====================================================
-
-
-async def _publish_to_nats(event: CanonicalEvent):
-    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
-    try:
-        from ..nats.client import nats_client
-        subject = f"alpha.{event.event_type}"
-        await nats_client.publish(subject, event.to_json())
-    except Exception as e:
-        logger.debug("NATS publish skipped", error=str(e))
-
-
-async def subscribe_nats(subject: str, handler: Callable):
-    """NATS konusuna abone ol."""
-    try:
-        from ..nats.client import nats_client
-        await nats_client.subscribe(subject, handler=handler)
-        logger.info("NATS subscribed", subject=subject)
-    except Exception as e:
-        logger.debug("NATS subscribe skipped", error=str(e))
-
-
-
 
 
 # =====================================================

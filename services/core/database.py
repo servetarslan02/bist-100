@@ -214,7 +214,7 @@ def ch_query_df(query: str, parameters: Optional[Dict] = None):
 
 
 # =====================================================
-# Redis
+# Redis (Sentinel-aware HA)
 # =====================================================
 
 _redis = None
@@ -222,24 +222,38 @@ _redis_healthy = False
 
 
 async def get_redis():
+    """Redis bağlantısı — Sentinel varsa HA, yoksa direct."""
     global _redis, _redis_healthy
     if aioredis is None:
         raise RuntimeError("redis not installed")
     if _redis is None:
-        _redis = aioredis.from_url(
-            settings.redis_url,
-            decode_responses=True,
-            max_connections=20,
-        )
+        try:
+            from .redis_sentinel import get_ha_redis
+            _redis = await get_ha_redis()
+        except Exception:
+            # Fallback: direct connection
+            _redis = aioredis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                max_connections=20,
+            )
         _redis_healthy = True
-        logger.info("Redis connection created", host=settings.redis_host)
+        logger.info("Redis connection created (HA-aware)")
     return _redis
 
 
 async def close_redis():
     global _redis, _redis_healthy
     if _redis:
-        await _redis.close()
+        try:
+            from .redis_sentinel import close_ha_redis
+            await close_ha_redis()
+        except Exception:
+            pass
+        try:
+            await _redis.close()
+        except Exception:
+            pass
         _redis = None
         _redis_healthy = False
         logger.info("Redis connection closed")
