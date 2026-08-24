@@ -153,8 +153,18 @@ async def pg_fetchval(query: str, *args) -> Any:
 # ClickHouse
 # =====================================================
 
+import threading
+
 _ch_client = None
 _ch_healthy = False
+# NOT: clickhouse-connect client'i tek bir HTTP session uzerinden calisiyor ve
+# ayni client'a birden fazla thread'den es zamanli sorgu gonderilirse
+# "Attempt to execute concurrent queries within the same session" hatasi verir.
+# system.py'deki endpoint'ler artik run_in_executor ile thread pool'da paralel
+# calisabildiginden (event loop'u bloke etmemek icin), bu lock ile ClickHouse
+# cagrilarini seri hale getiriyoruz — event loop yine serbest kalir, sadece
+# executor thread'leri birbirini kisa sure bekler.
+_ch_lock = threading.Lock()
 
 
 def get_ch_client():
@@ -184,19 +194,22 @@ def close_ch_client():
 
 
 def ch_execute(query: str, parameters: Optional[Dict] = None) -> Any:
-    client = get_ch_client()
-    return client.query(query, parameters=parameters)
+    with _ch_lock:
+        client = get_ch_client()
+        return client.query(query, parameters=parameters)
 
 
 def ch_insert(table: str, data: List[List[Any]], column_names: Optional[List[str]] = None):
-    client = get_ch_client()
-    client.insert(table, data, column_names=column_names)
+    with _ch_lock:
+        client = get_ch_client()
+        client.insert(table, data, column_names=column_names)
 
 
 def ch_query_df(query: str, parameters: Optional[Dict] = None):
     import polars as pl
-    client = get_ch_client()
-    result = client.query_df(query, parameters=parameters)
+    with _ch_lock:
+        client = get_ch_client()
+        result = client.query_df(query, parameters=parameters)
     return pl.from_pandas(result)
 
 

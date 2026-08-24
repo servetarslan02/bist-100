@@ -144,20 +144,39 @@ export default function ScenarioLab() {
 
   // High-performance canvas ref
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Crosshair/imlec icin AYRI ust katman canvas — mouse hareketinde SADECE bu
+  // kucuk katman yeniden cizilir, agir statik grafik (grid, 30 patika, fan
+  // gradientleri) tekrar tekrar cizilmez. Onceki tek-canvas yapisinda her
+  // mousemove piksel hareketi TUM grafigi yeniden ciziyordu ve bu, chart
+  // uzerinde gezinirken gozle gorulur takilmaya sebep oluyordu.
+  const overlayCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number; step: number } | null>(null);
+
+  // Sunucudan gelen yaniti sirali uygulamak icin request sequence id.
+  // Kullanici slider'i surukleyip hemen bir senaryo kartina tiklarsa iki ayri
+  // istek (farkli URL oldugundan dedup edilmiyor) es zamanli ucabiliyordu;
+  // eski istek daha once giden ama sonra donen bir cevapla ekrani
+  // gecersiz/eski veriyle eziyordu. Artik sadece EN SON baslatilan istegin
+  // sonucu uygulanir.
+  const requestSeqRef = useRef(0);
 
   // Sync with Backend
   const fetchBackendSimulation = useCallback(async (horizon: number, vol: number, sc: string) => {
+    const mySeq = ++requestSeqRef.current;
     setRunning(true);
     try {
       const data: any = await api(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
+      // Bu istekten SONRA baska bir istek baslatilmissa (requestSeqRef ilerlemis),
+      // bu cevap artik gecersiz/eskidir — ekranin daha yeni bir istegin
+      // sonucuyla ezilmesini onler.
+      if (mySeq !== requestSeqRef.current) return;
       if (data && data.paths) {
         setSimResult(data);
       }
     } catch (e) {
       console.error("Simulation fetch error", e);
     } finally {
-      setRunning(false);
+      if (mySeq === requestSeqRef.current) setRunning(false);
     }
   }, []);
 
@@ -344,39 +363,75 @@ export default function ScenarioLab() {
       ctx.shadowBlur = 0;
     }
 
-    // 8. Mouse Crosshair & Tooltip Overlay
-    if (mousePos && mousePos.step >= 0 && mousePos.step <= steps) {
-      const hx = getX(mousePos.step);
-      const medianVal = fc?.p50?.[mousePos.step] || 100000;
-      const hy = getY(medianVal);
+    // 8. Mouse Crosshair & Tooltip Overlay artik burada CIZILMIYOR — ayri, hafif
+    // bir overlay canvas'a tasindi (asagidaki ikinci useEffect). Boylece
+    // mousemove'da SADECE crosshair yeniden cizilir, bu agir grafik (grid +
+    // 30 patika + fan bantlari) tekrar tekrar render edilmez.
+    // Overlay'in getX/getY hesaplayabilmesi icin gerekli olcek bilgisini sakla.
+    chartMetricsRef.current = { padL, padR, padT, padB, minVal, valRange, steps, w, h };
+  }, [simResult]);
 
-      // Vertical line
-      ctx.beginPath();
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-      ctx.lineWidth = 1;
-      ctx.moveTo(hx, padT);
-      ctx.lineTo(hx, h - padB);
-      ctx.stroke();
-      ctx.setLineDash([]);
+  // Hafif Overlay Canvas: SADECE crosshair/tooltip — mousemove'da agir grafigi
+  // yeniden cizmeden calisir. requestAnimationFrame ile UI thread'i bloklamadan
+  // pürüzsüz calisir.
+  useEffect(() => {
+    const overlay = overlayCanvasRef.current;
+    const metrics = chartMetricsRef.current;
+    if (!overlay || !metrics || !simResult) return;
 
-      // Point circle
-      ctx.beginPath();
-      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#00e5a0";
-      ctx.shadowColor = "#00e5a0";
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
+    const ctx = overlay.getContext("2d");
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = overlay.getBoundingClientRect();
+    if (overlay.width !== rect.width * dpr || overlay.height !== rect.height * dpr) {
+      overlay.width = rect.width * dpr;
+      overlay.height = rect.height * dpr;
     }
-  }, [simResult, mousePos]);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, rect.width, rect.height);
 
-  // Canvas Mouse Move Handler
+    if (!mousePos || mousePos.step < 0 || mousePos.step > metrics.steps) return;
+
+    const { padL, padT, padB, minVal, valRange, steps, w, h } = metrics;
+    const chartW = w - padL - metrics.padR;
+    const chartH = h - padT - padB;
+    const getX = (step: number) => padL + (step / steps) * chartW;
+    const getY = (val: number) => padT + chartH - ((val - minVal) / valRange) * chartH;
+
+    const fc = simResult.fan_cones;
+    const hx = getX(mousePos.step);
+    const medianVal = fc?.p50?.[mousePos.step] || 100000;
+    const hy = getY(medianVal);
+
+    // Vertical line
+    ctx.beginPath();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.lineWidth = 1;
+    ctx.moveTo(hx, padT);
+    ctx.lineTo(hx, h - padB);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Point circle
+    ctx.beginPath();
+    ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#00e5a0";
+    ctx.shadowColor = "#00e5a0";
+    ctx.shadowBlur = 10;
+    ctx.fill();
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }, [mousePos, simResult]);
+
+  // Canvas Mouse Move Handler — requestAnimationFrame ile throttlelenir, boylece
+  // hizli mouse hareketlerinde gereksiz sik state guncellemesi/render tetiklenmez.
+  const rafPendingRef = useRef<number | null>(null);
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
+    const canvas = overlayCanvasRef.current || canvasRef.current;
     if (!canvas || !simResult) return;
     const rect = canvas.getBoundingClientRect();
     const padL = 60;
@@ -385,13 +440,17 @@ export default function ScenarioLab() {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    if (mouseX >= padL && mouseX <= rect.width - padR) {
-      const stepRatio = (mouseX - padL) / chartW;
-      const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
-      setMousePos({ x: mouseX, y: mouseY, step });
-    } else {
-      setMousePos(null);
-    }
+    if (rafPendingRef.current !== null) return;
+    rafPendingRef.current = requestAnimationFrame(() => {
+      rafPendingRef.current = null;
+      if (mouseX >= padL && mouseX <= rect.width - padR) {
+        const stepRatio = (mouseX - padL) / chartW;
+        const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
+        setMousePos({ x: mouseX, y: mouseY, step });
+      } else {
+        setMousePos(null);
+      }
+    });
   };
 
   const scenariosList = useMemo(() => {

@@ -38,6 +38,7 @@ export default function RootLayout({
             className="flex-1 flex flex-col overflow-hidden"
             style={{ background: "var(--color-bg-primary)" }}
           >
+            <GlobalTelemetrySync />
             <main className="flex-1 overflow-y-auto">
               {children}
             </main>

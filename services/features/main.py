@@ -127,11 +127,14 @@ class FeatureEngineService:
                     return {}
 
             # Rename to OHLCV format (we only have close price from ticks)
-            df = df.rename({"price": "close"})
+            # NOT: calculator.compute_all() buyuk harfli Close/Open/High/Low/Volume
+            # kolon adlari bekliyor - kucuk harfle KeyError('Close') ile sessizce {}
+            # donuyor ve feature hic hesaplanmiyor (bkz. try/except).
+            df = df.rename({"price": "Close", "volume": "Volume"})
             df = df.with_columns([
-                pl.col("close").alias("open"),
-                pl.col("close").alias("high"),
-                pl.col("close").alias("low"),
+                pl.col("Close").alias("Open"),
+                pl.col("Close").alias("High"),
+                pl.col("Close").alias("Low"),
             ])
 
             # Compute features

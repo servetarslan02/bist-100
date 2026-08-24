@@ -96,7 +96,7 @@ function getInitialCachedData<T>(key: string): T | null {
       const stored = localStorage.getItem(`ALPHA_CACHE_${key}`);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.data) {
+        if (parsed && parsed.data !== undefined) {
           memoryCache.set(key, { data: parsed.data, timestamp: parsed.timestamp || Date.now() });
           return parsed.data as T;
         }
@@ -106,21 +106,28 @@ function getInitialCachedData<T>(key: string): T | null {
   return null;
 }
 
+// Public helper: bazi sayfalar (orn. Asset Intel) usePolling kullanmiyor,
+// kendi useEffect'i icinde manuel fetch yapiyor. Bu sayfalarin da anlik
+// cache'ten okuyup 0ms gosterebilmesi icin getInitialCachedData disari acildi.
+export function getCachedData<T>(key: string): T | null {
+  return getInitialCachedData<T>(key);
+}
+
 function persistCacheLocally(key: string, data: any) {
   memoryCache.set(key, { data, timestamp: Date.now() });
   notifyCacheSubscribers(key, data);
-  
+
   // Non-blocking asynchronous persistence to avoid freezing UI click events
   if (typeof window !== 'undefined') {
     const defer = typeof window.requestIdleCallback === 'function' 
       ? window.requestIdleCallback 
-      : (cb: any) => setTimeout(cb, 10);
+      : (cb: any) => setTimeout(cb, 16);
 
     defer(() => {
       try {
         if (key.length < 120) {
           const serialized = JSON.stringify({ data, timestamp: Date.now() });
-          // Only persist manageable sizes to prevent synchronous browser I/O locks
+          // Only persist manageable sizes (< 500KB) to prevent synchronous browser I/O locks
           if (serialized.length < 500000) {
             localStorage.setItem(`ALPHA_CACHE_${key}`, serialized);
           }
@@ -196,6 +203,16 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
       setError(e.message);
     } finally {
       setLoading(false);
+    }
+  }, [path]);
+
+  useEffect(() => {
+    if (data === null) {
+      const cached = getInitialCachedData<T>(path);
+      if (cached) {
+        setData(cached);
+        setLoading(false);
+      }
     }
   }, [path]);
 

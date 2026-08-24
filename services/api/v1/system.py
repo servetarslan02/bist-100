@@ -2,6 +2,7 @@
 
 import os
 import time
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Dict, Any, List
@@ -85,7 +86,13 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     # ClickHouse
     try:
         from ...core.database import ch_execute
-        res = ch_execute("SELECT 1")
+        # NOT: ch_execute senkron/blocking bir HTTP cagrisi yapiyor. Dogrudan
+        # await edilmeden (yani ana event loop'u bloke ederek) cagrilirsa
+        # ClickHouse'un yanit suresi boyunca TUM API (diger tum kullanicilar
+        # ve tum diger sayfa istekleri dahil) donuyordu — run_in_executor'a
+        # tasindi ki thread pool'da calisip event loop'u serbest biraksin.
+        loop = asyncio.get_event_loop()
+        res = await loop.run_in_executor(None, ch_execute, "SELECT 1")
         services["clickhouse"] = "healthy" if len(res.result_rows) > 0 else "unhealthy"
     except Exception as e:
         logger.warning("clickhouse_health_check_failed", error=str(e))
@@ -139,15 +146,25 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     ch_tables = []
     try:
         from ...core.database import ch_execute
+        # NOT: ch_execute blocking oldugu icin run_in_executor'a alindi — yoksa
+        # bu iki sorgu suresince (network+ClickHouse round-trip) ana event loop
+        # bloklanir ve TUM diger API istekleri (dolayisiyla siteye tiklamalar) donar.
+        loop = asyncio.get_event_loop()
         t0 = time.time()
-        res = ch_execute("SELECT formatReadableSize(sum(data_compressed_bytes)), sum(rows) FROM system.parts WHERE active")
+        res = await loop.run_in_executor(
+            None, ch_execute,
+            "SELECT formatReadableSize(sum(data_compressed_bytes)), sum(rows) FROM system.parts WHERE active"
+        )
         ch_lat = round((time.time() - t0) * 1000, 1)
         if res.result_rows and res.result_rows[0][0]:
             ch_size = str(res.result_rows[0][0])
             total_r = res.result_rows[0][1] or 0
             ch_rows = f"{total_r / 1_000_000:.1f}M Satır" if total_r > 1_000_000 else f"{total_r:,} Satır"
-            
-        t_res = ch_execute("SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) FROM system.parts WHERE active GROUP BY table")
+
+        t_res = await loop.run_in_executor(
+            None, ch_execute,
+            "SELECT table, sum(rows), formatReadableSize(sum(data_compressed_bytes)) FROM system.parts WHERE active GROUP BY table"
+        )
         for row in t_res.result_rows:
             ch_tables.append({"name": str(row[0]), "rows": f"{row[1]:,} Satır", "size": str(row[2])})
     except Exception as e:
@@ -328,7 +345,11 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     # 3. Makro / Rejim Alarmı
     try:
         from .macro import _fetch_live_macro_data
-        macro_d = _fetch_live_macro_data()
+        # NOT: _fetch_live_macro_data cache suresi (120s) doldugunda yfinance
+        # uzerinden blocking network cagrisi yapar. Dogrudan await'siz cagrilirsa
+        # bu sure boyunca event loop'u (ve dolayisiyla tum diger istekleri) bloke eder.
+        loop = asyncio.get_event_loop()
+        macro_d = await loop.run_in_executor(None, _fetch_live_macro_data)
         cds = macro_d.get("turkey_cds_5y", 268.0)
         alerts.append({
             "id": "alt-cds-status",
@@ -356,7 +377,8 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
         # ClickHouse merge
         try:
             from ...core.database import ch_execute
-            ch_execute("OPTIMIZE TABLE system.parts FINAL")
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, ch_execute, "OPTIMIZE TABLE system.parts FINAL")
         except Exception:
             pass
 

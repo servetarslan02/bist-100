@@ -38,6 +38,31 @@ function isBistOpen(): boolean {
   return minutes >= 600 && minutes < 1080; // 10:00 - 18:00
 }
 
+function TableHeader({
+  field,
+  label,
+  right,
+  sortField,
+  sortAsc,
+  onSort,
+}: {
+  field: keyof RadarRow;
+  label: string;
+  right?: boolean;
+  sortField: keyof RadarRow;
+  sortAsc: boolean;
+  onSort: (field: keyof RadarRow) => void;
+}) {
+  return (
+    <th
+      onClick={() => onSort(field)}
+      className={`py-3 px-4 cursor-pointer hover:text-zinc-100 select-none whitespace-nowrap transition-colors ${right ? "text-right" : ""}`}
+    >
+      {label}{sortField === field ? (sortAsc ? " ↑" : " ↓") : ""}
+    </th>
+  );
+}
+
 export default function MarketRadar() {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -90,15 +115,6 @@ export default function MarketRadar() {
     if (sortField === field) setSortAsc(!sortAsc);
     else { setSortField(field); setSortAsc(false); }
   };
-
-  const Th = ({ field, label, right }: { field: keyof RadarRow; label: string; right?: boolean }) => (
-    <th
-      onClick={() => handleSort(field)}
-      className={`py-3 px-4 cursor-pointer hover:text-zinc-100 select-none whitespace-nowrap ${right ? "text-right" : ""}`}
-    >
-      {label}{sortField === field ? (sortAsc ? " ↑" : " ↓") : ""}
-    </th>
-  );
 
   return (
     <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
@@ -230,14 +246,14 @@ export default function MarketRadar() {
                 style={{ background: "rgba(13, 17, 26, 0.95)" }}
               >
                 <tr>
-                  <Th field="symbol" label="Sembol" />
-                  <Th field="price" label="Fiyat" right />
-                  <Th field="change" label="Günlük %" right />
-                  <Th field="high" label="Yüksek" right />
-                  <Th field="low" label="Düşük" right />
-                  <Th field="volume" label="Hacim" right />
-                  <Th field="rsi" label="RSI 14" right />
-                  <Th field="score" label="Skor" right />
+                  <TableHeader field="symbol" label="Sembol" sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="price" label="Fiyat" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="change" label="Günlük %" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="high" label="Yüksek" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="low" label="Düşük" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="volume" label="Hacim" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="rsi" label="RSI 14" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
+                  <TableHeader field="score" label="Skor" right sortField={sortField} sortAsc={sortAsc} onSort={handleSort} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800/30">

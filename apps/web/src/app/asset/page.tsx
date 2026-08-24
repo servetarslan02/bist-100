@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
-import { api } from "@/lib/api";
+import { api, getCachedData } from "@/lib/api";
 import {
   Search, TrendingUp, TrendingDown, Sparkles,
   BarChart3, Activity, ShieldCheck, Zap, Layers,
@@ -71,8 +71,14 @@ function AssetIntelContent() {
   const [tickerInput, setTickerInput] = useState(initialTicker);
   const [activeTicker, setActiveTicker] = useState(initialTicker);
   const [timeframe, setTimeframe] = useState<TimeframeType>("1D");
-  const [asset, setAsset] = useState<LiveAssetData | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Cache'ten aninda hidrasyon (0ms) — sayfa/ticker degisiminde "Yukleniyor..." ekranina
+  // dusmeden onceki veriyi gosterip arka planda tazeler.
+  const [asset, setAsset] = useState<LiveAssetData | null>(() =>
+    getCachedData<LiveAssetData>(
+      `/market/instruments/${initialTicker}/live_intel?period=${TIMEFRAME_CONFIG["1D"].period}&interval=${TIMEFRAME_CONFIG["1D"].interval}`
+    )
+  );
+  const [loading, setLoading] = useState(() => !asset);
   const [chartLoading, setChartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [aiReport, setAiReport] = useState<string | null>(null);
@@ -91,20 +97,30 @@ function AssetIntelContent() {
   useEffect(() => {
     let isMounted = true;
     async function fetchAssetData() {
-      if (!asset) setLoading(true);
-      else setChartLoading(true);
+      const tf = TIMEFRAME_CONFIG[timeframe];
+      const cacheKey = `/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`;
+
+      // Cache'ten aninda goster (varsa), UI'i hic "loading" ekranina dusurme.
+      // Ardindan arka planda taze veriyi cek ve guncelle (stale-while-revalidate).
+      const cached = getCachedData<LiveAssetData>(cacheKey);
+      if (cached) {
+        setAsset(cached);
+        setLoading(false);
+        setChartLoading(true);
+      } else if (!asset) {
+        setLoading(true);
+      } else {
+        setChartLoading(true);
+      }
       setError(null);
 
-      const tf = TIMEFRAME_CONFIG[timeframe];
       try {
-        const data = await api<LiveAssetData>(
-          `/market/instruments/${activeTicker}/live_intel?period=${tf.period}&interval=${tf.interval}`
-        );
+        const data = await api<LiveAssetData>(cacheKey);
         if (isMounted) {
           setAsset(data);
         }
       } catch (err: any) {
-        if (isMounted) {
+        if (isMounted && !cached) {
           setError(err.message || "Veri çekme hatası");
         }
       } finally {

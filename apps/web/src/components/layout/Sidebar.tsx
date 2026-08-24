@@ -53,6 +53,39 @@ const NAV_ITEMS = [
   },
 ];
 
+import { useGlobalSyncStatus } from "@/lib/api";
+
+function LiveEnginePulse() {
+  const { secondsAgo } = useGlobalSyncStatus();
+
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={`w-2 h-2 rounded-full flex-shrink-0 ${
+          secondsAgo < 10
+            ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_#00e5a0]"
+            : secondsAgo < 25
+            ? "bg-amber-400 shadow-[0_0_8px_#ffaa00]"
+            : "bg-rose-500 shadow-[0_0_8px_#ff4466]"
+        }`}
+      />
+      <span
+        className="text-[10px] font-bold uppercase tracking-wider"
+        style={{
+          color:
+            secondsAgo < 10
+              ? "var(--color-accent-green)"
+              : secondsAgo < 25
+              ? "#ffaa00"
+              : "#ff4466",
+        }}
+      >
+        CANLI MOTOR
+      </span>
+    </div>
+  );
+}
+
 export function Sidebar() {
   const pathname = usePathname();
 
@@ -126,12 +159,7 @@ export function Sidebar() {
       </nav>
 
       <div className="px-4 py-3" style={{ borderTop: "1px solid var(--color-border-subtle)" }}>
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#00e5a0] flex-shrink-0" />
-          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--color-accent-green)" }}>
-            CANLI MOTOR
-          </span>
-        </div>
+        <LiveEnginePulse />
       </div>
     </aside>
   );
