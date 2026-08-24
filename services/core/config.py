@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     pg_pool_recycle: int = Field(default=1800, alias="PG_POOL_RECYCLE")  # 30 dk
 
     # Redpanda (Kafka-compatible)
-    redpanda_brokers: str = Field(default="localhost:9092", alias="REDPANDA_BROKERS")
+
 
     # NATS (yüksek throughput, düşük gecikme)
     nats_url: str = Field(default="nats://localhost:4222", alias="NATS_URL")

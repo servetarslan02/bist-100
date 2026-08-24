@@ -1,8 +1,14 @@
-"""ALPHA BIST - Event Bus v1.3 (Push-Based Internal Architecture)
+"""ALPHA BIST - Event Bus v2.0 (Push-Based Internal Architecture)
 
 Dış kaynaklardan veri PUSH ile gelir.
-İç servisler arası iletişim REDIS PUB/SUB ile olur.
+İç servisler arası iletişim NATS + Redis Pub/Sub ile olur.
 Sürekli API isteği YOKTUR.
+
+Mesajlaşma Stratejisi (Tek Kaynak):
+- PRIMARY: NATS (yüksek throughput, düşük gecikme, JetStream dayanıklılık)
+- SECONDARY: Redis Pub/Sub (push-based, anlık bildirim)
+- DURABLE: Redis Streams (event ledger, at-least-once)
+- Kafka/Redpanda: KALDIRILDI (gereksiz karmaşıklık)
 """
 
 import os
@@ -10,16 +16,6 @@ import json
 import asyncio
 from typing import Optional, Callable, Dict, Any, List
 import structlog
-
-try:
-    from confluent_kafka import Producer, Consumer, KafkaError
-    from confluent_kafka.admin import AdminClient, NewTopic
-except ImportError:
-    Producer = None
-    Consumer = None
-    KafkaError = None
-    AdminClient = None
-    NewTopic = None
 
 from .config import settings
 from .event_schema import CanonicalEvent, EventType
@@ -206,59 +202,32 @@ event_bus = InternalEventBus()
 
 
 # =====================================================
-# Legacy Kafka support (Redpanda varsa)
+# NATS Integration (Primary Messaging)
+# Tek client: services.nats.client.nats_client
 # =====================================================
 
-TOPICS = [
-    "market.tick", "market.trade", "market.quote", "market.orderbook",
-    "news.raw", "news.event", "kap.event", "macro.event", "social.event",
-    "feature.updated", "state.updated", "market_state.changed", "world_state.changed",
-    "signal.generated", "anomaly.detected", "regime.changed",
-    "simulation.requested", "simulation.completed",
-    "risk.changed", "risk.alert", "kill_switch.triggered",
-    "decision.created", "order.placed", "order.filled",
-    "prediction.created", "outcome.created",
-    "breadth.alert", "liquidity.alert", "regime.transition",
-    "anomaly.cluster", "sentiment.shift", "multi_tf.divergence",
-    "bar.1m", "bar.5m", "bar.15m", "bar.1h", "bar.1d",
-]
 
-_producer: Optional[Producer] = None
+async def _publish_to_nats(event: CanonicalEvent):
+    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
+    try:
+        from ..nats.client import nats_client
+        subject = f"alpha.{event.event_type}"
+        await nats_client.publish(subject, event.to_json())
+    except Exception as e:
+        logger.debug("NATS publish skipped", error=str(e))
 
 
-def get_producer():
-    """Kafka producer getir veya olustur."""
-    global _producer
-    if Producer is None:
-        return None
-    if _producer is None:
-        try:
-            _producer = Producer({
-                "bootstrap.servers": settings.redpanda_brokers,
-                "client.id": "alpha-producer",
-                "acks": "all",
-                "retries": 5,
-                "linger.ms": 5,
-                "batch.size": 16384,
-                "enable.idempotence": True,
-            })
-        except Exception as e:
-            logger.warning("Kafka producer creation failed", error=str(e))
-            return None
-    return _producer
+async def subscribe_nats(subject: str, handler: Callable):
+    """NATS konusuna abone ol."""
+    try:
+        from ..nats.client import nats_client
+        await nats_client.subscribe(subject, handler=handler)
+        logger.info("NATS subscribed", subject=subject)
+    except Exception as e:
+        logger.debug("NATS subscribe skipped", error=str(e))
+    """Publish to NATS (primary) + Redis Pub/Sub (push) + Redis Stream (durable).
 
-
-def publish_event(event: CanonicalEvent, key: Optional[str] = None):
-    """Publish to Redis Stream (primary) + Redis Pub/Sub (push) + Kafka (optional).
-
-    F-023: Redis Streams as primary transport.
-    Mevcut event volume Kafka/Redpanda gerektirmiyor.
-    Kafka sadece REDPANDA_BROKERS env var tanımlıysa kullanılır.
-
-    v2.0 düzeltmeleri:
-    - Schema validation — yanlış payload publish edilemez
-    - Event ledger (Redis Stream) — subscriber kapalıyken event kaybolmamalı
-    - Idempotency — aynı event_id tekrar publish edilmemeli
+    v2.0: Kafka/Redpanda kaldırıldı. NATS tek kaynak mesajlaşma.
     """
     # Schema validation
     missing = event.validate_payload()
@@ -267,21 +236,21 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
                       event_type=event.event_type, missing=missing)
         return
 
-    # F-023: Kafka sadece REDPANDA_BROKERS tanımlıysa kullanılır
-    if settings.redpanda_brokers and settings.redpanda_brokers != "localhost:9092":
-        producer = get_producer()
-        if producer:
-            try:
-                producer.produce(
-                    topic=event.event_type,
-                    key=key or event.event_id,
-                    value=event.to_json().encode("utf-8"),
-                )
-                producer.poll(0)
-            except Exception as e:
-                logger.error("Kafka produce failed", event_type=event.event_type, error=str(e))
+    # NATS (primary) — yüksek throughput, düşük gecikme
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
 
-    # Redis Pub/Sub (push-based) + Stream (durable ledger) — PRIMARY
+        if loop and loop.is_running():
+            loop.create_task(_publish_to_nats(event))
+        else:
+            asyncio.run(_publish_to_nats(event))
+    except Exception as e:
+        logger.debug("NATS publish skipped", error=str(e))
+
+    # Redis Pub/Sub (push-based) + Stream (durable ledger)
     try:
         try:
             loop = asyncio.get_running_loop()
@@ -291,10 +260,9 @@ def publish_event(event: CanonicalEvent, key: Optional[str] = None):
         if loop and loop.is_running():
             loop.create_task(_publish_with_idempotency(event))
         else:
-            # Senkron çalışma ortamında (event loop yokken) temiz şekilde çalıştır
             asyncio.run(_publish_with_idempotency(event))
     except Exception as e:
-        logger.debug("Redis publish handled in sync environment", event_type=event.event_type, error=str(e))
+        logger.debug("Redis publish handled", event_type=event.event_type, error=str(e))
 
 
 async def _publish_with_idempotency(event: CanonicalEvent):
@@ -430,25 +398,7 @@ async def subscribe_nats(subject: str, handler: Callable):
         logger.debug("NATS subscribe skipped", error=str(e))
 
 
-def flush_producer():
-    """Kafka producer buffer'ini bosalt."""
-    global _producer
-    if _producer:
-        _producer.flush(timeout=10)
 
-
-def ensure_topics():
-    """Kafka topic'lerinin var oldugundan emin ol."""
-    if AdminClient is None:
-        return
-    try:
-        admin = AdminClient({"bootstrap.servers": settings.redpanda_brokers})
-        existing = admin.list_topics(timeout=10).topics
-        new_topics = [NewTopic(t, num_partitions=4, replication_factor=1) for t in TOPICS if t not in existing]
-        if new_topics:
-            admin.create_topics(new_topics)
-    except Exception as e:
-        logger.warning("Failed to create Kafka topics", error=str(e))
 
 
 # =====================================================

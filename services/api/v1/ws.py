@@ -82,12 +82,10 @@ class ConnectionManager:
             self.disconnect(dead, channel)
 
     def _to_protobuf_bytes(self, message: Dict[str, Any]) -> bytes:
-        """Dict'i Protobuf binary'ye çevir (StreamMessage wrapper)."""
+        """Dict'i binary'ye çevir (orjson — fastest JSON)."""
         try:
-            # Basit Protobuf encoding: msgpack-like binary format
-            # Gerçek production'da proto/market.proto'daki StreamMessage kullanılır
-            import msgpack
-            return msgpack.packb(message, default=str)
+            import orjson
+            return orjson.dumps(message)
         except ImportError:
             # Fallback: JSON bytes
             return json.dumps(message, default=str).encode("utf-8")

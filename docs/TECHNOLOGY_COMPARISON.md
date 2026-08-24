@@ -2,65 +2,56 @@
 
 > **Tarih:** 2026-08-25  
 > **Sürüm:** v4.2  
-> **Kapsam:** Mevcut sistem bileşenleri vs endüstri standartları
+> **Kapsam:** Mevcut sistem bileşenleri vs endüstri standartları  
+> **Strateji:** Her kategoride TEK en iyi teknoloji — çift başlılık yok
 
 ---
 
 ## 1. İletişim Protokolleri
 
-| Protokol | Gecikme | Yön | Format | Tarayıcı Desteği | ALPHA BIST |
-|---|---|---|---|---|---|
-| **WebSocket** | ~1-5ms | Çift yönlü | JSON/Binary | ✅ %99 | ✅ Aktif |
-| **gRPC** | ~0.5-2ms | Çift yönlü | Protobuf | ⚠️ Proxy gerekli | ✅ Aktif |
-| **SSE** | ~5-10ms | Server→Client | Text | ✅ %99 | ✅ Aktif |
-| **HTTP/REST** | ~50-200ms | İstek-Yanıt | JSON | ✅ %100 | ✅ Aktif |
-| **MQTT** | ~1-3ms | Çift yönlü | Binary | ⚠️ Broker gerekli | ❌ Yok |
-| **WebTransport** | ~0.5-1ms | Çift yönlü | Binary | ⚠️ Yeni, %80 | ❌ Yok |
+| Protokol | Gecikme | Yön | ALPHA BIST | Amaç |
+|---|---|---|---|---|
+| **WebSocket** | ~1-5ms | Çift yönlü | ✅ Ana protokol | Gerçek zamanlı veri akışı |
+| **REST** | ~50-200ms | İstek-Yanıt | ✅ CRUD operasyonları | API endpoint'leri |
+| **gRPC** | ~0.5-2ms | Çift yönlü | ✅ Servisler arası | Internal iletişim |
+| **SSE** | ~5-10ms | Server→Client | ✅ Tek yönlü push | Bildirimler |
 
-**Değerlendirme:** WebSocket + gRPC + SSE + REST dörtlüsü ile **4 protokol aktif**. Endüstri standardının üzerinde.
+**Strateji:** 4 protokol, her biri farklı amaç için. Çift başlılık yok.
 
 ---
 
 ## 2. Veri Formatları
 
-| Format | Boyut | Hız | Okunabilirlik | ALPHA BIST |
-|---|---|---|---|---|
-| **JSON** | Büyük | Yavaş | ✅ Kolay | ✅ Ana format |
-| **orjson** | Orta | 5x hızlı | ✅ Kolay | ✅ Aktif |
-| **Protobuf** | %60-80 küçük | 10x hızlı | ❌ Binary | ✅ gRPC servisleri |
-| **MessagePack** | %30-50 küçük | 5x hızlı | ❌ Binary | ✅ Binary WebSocket |
-| **Avro** | %40-60 küçük | 8x hızlı | ❌ Binary | ❌ Yok |
+| Format | Amaç | ALPHA BIST |
+|---|---|---|
+| **orjson** | Ana JSON serializer (10x hızlı) | ✅ Tek kaynak |
+| **Protobuf** | gRPC binary iletişim | ✅ Sadece gRPC |
 
-**Değerlendirme:** JSON + orjson + Protobuf + MessagePack dörtlüsü ile **4 format aktif**. Binary format desteği tam.
+**Strateji:** orjson tek JSON kaynağı. Protobuf sadece gRPC için. MessagePack kaldırıldı.
 
 ---
 
-## 3. Mesajlaşma ve Event Streaming
+## 3. Mesajlaşma Sistemi
 
-| Sistem | Gecikme | Dayanıklılık | Throughput | ALPHA BIST |
-|---|---|---|---|---|
-| **Redis Pub/Sub** | <1ms | ❌ Kaybolur | 1M+ msg/s | ✅ Aktif |
-| **Redpanda (Kafka)** | ~2-5ms | ✅ Kalıcı | 10M+ msg/s | ✅ Aktif |
-| **NATS JetStream** | <1ms | ✅ Kalıcı | 10M+ msg/s | ✅ Aktif |
-| **RabbitMQ** | ~1-3ms | ✅ Kalıcı | 50K msg/s | ❌ Yok |
-| **ZeroMQ** | <0.1ms | ❌ Kaybolur | 5M+ msg/s | ❌ Yok |
+| Sistem | Amaç | ALPHA BIST |
+|---|---|---|
+| **NATS** | Ana mesajlaşma (yüksek throughput) | ✅ Primary |
+| **Redis Pub/Sub** | Anlık bildirim, push-based | ✅ Secondary |
+| **Redis Streams** | Event ledger, at-least-once | ✅ Durable |
 
-**Değerlendirme:** Redis + Redpanda + NATS üçlüsü ile **3 mesajlaşma sistemi aktif**. HFT hariç tüm senaryoları kapsar.
+**Strateji:** NATS tek kaynak mesajlaşma. Redis sadece cache + pub/sub. Kafka/Redpanda kaldırıldı (gereksiz karmaşıklık).
 
 ---
 
-## 4. Veritabanları ve Depolama
+## 4. Veritabanları
 
-| Sistem | Tür | Kullanım Amacı | ALPHA BIST |
-|---|---|---|---|
-| **PostgreSQL 17** | RDBMS | İşlemsel veriler, portföy, modeller | ✅ Aktif |
-| **ClickHouse** | OLAP | 30 yıllık tick/bar verileri, analitik | ✅ Aktif |
-| **Redis 8** | In-Memory | Önbellek, telemetri, pub/sub | ✅ Aktif |
-| **SQLite** | Embedded | MLflow tracking, paper trading state | ✅ Aktif |
-| **InfluxDB** | Time-Series | Özel zaman serisi | ❌ Yok |
-| **TimescaleDB** | Time-Series | PostgreSQL tabanlı zaman serisi | ❌ Yok |
+| Sistem | Amaç | ALPHA BIST |
+|---|---|---|
+| **PostgreSQL 17** | İşlemsel veriler | ✅ Tek RDBMS |
+| **ClickHouse** | OLAP, analitik | ✅ Tek OLAP |
+| **Redis 8** | Cache + pub/sub + streams | ✅ Tek cache |
 
-**Değerlendirme:** PostgreSQL + ClickHouse + Redis üçlüsü ile **3 ana depolama sistemi aktif**. Time-series için ClickHouse yeterli.
+**Strateji:** Her kategoride tek veritabanı. Çift başlılık yok.
 
 ---
 
@@ -68,91 +59,49 @@
 
 | Kütüphane | Amaç | ALPHA BIST |
 |---|---|---|
-| **LightGBM** | Gradient boosting (hızlı) | ✅ Aktif |
-| **XGBoost** | Gradient boosting (doğruluk) | ✅ Aktif |
-| **CatBoost** | Gradient boosting (kategorik) | ✅ Aktif |
-| **PyTorch** | Deep learning (LSTM, Transformer) | ✅ Aktif |
-| **scikit-learn** | Klasik ML (preprocessing, metrics) | ✅ Aktif |
-| **Stable-Baselines3** | Reinforcement learning | ✅ Aktif |
-| **HMM** | Rejim tespiti (gizli Markov) | ✅ Aktif |
-| **SHAP** | Model açıklanabilirliği | ✅ Aktif |
-| **Optuna** | Hiperparametre optimizasyonu | ✅ Aktif |
-| **MLflow** | Model tracking ve registry | ✅ Aktif |
-| **FinGPT** | Finansal LLM | ✅ Aktif |
-| **FinRL** | Finansal RL | ✅ Aktif |
+| **LightGBM** | Ana gradient boosting | ✅ Primary |
+| **XGBoost** | Ensemble alternatifi | ✅ Secondary |
+| **CatBoost** | Kategorik veri | ✅ Tertiary |
+| **PyTorch** | Deep learning | ✅ LSTM/Transformer |
+| **scikit-learn** | Preprocessing, metrics | ✅ Yardımcı |
 
-**Değerlendirme:** **12 ML kütüphanesi aktif**. Ensemble (LightGBM + XGBoost + CatBoost) + Deep Learning (PyTorch) + RL (SB3) + LLM (FinGPT) tam yığın.
+**Strateji:** 3 gradient boosting (ensemble için gerekli). PyTorch deep learning için. Gereksiz yok.
 
 ---
 
-## 6. API ve Web Framework
+## 6. Altyapı
 
 | Bileşen | Amaç | ALPHA BIST |
 |---|---|---|
-| **FastAPI** | REST API + WebSocket + SSE | ✅ Aktif |
-| **Next.js 15** | Frontend (React, SSR) | ✅ Aktif |
-| **Pydantic v2** | Veri doğrulama ve şema | ✅ Aktif |
-| **Uvicorn** | ASGI server | ✅ Aktif |
-| **gRPC (grpcio)** | Servisler arası iletişim | ✅ Aktif |
-| **TradingView** | Grafik entegrasyonu | ✅ Aktif |
+| **Docker Compose** | Container orchestration | ✅ Tek orchestrator |
+| **Prometheus** | Metrik toplama | ✅ Tek metrik |
+| **Grafana** | Dashboard | ✅ Tek dashboard |
+| **Alembic** | DB migration | ✅ Tek migration |
 
-**Değerlendirme:** FastAPI + Next.js + gRPC üçlüsü modern ve performanslı.
+**Strateji:** Her kategoride tek araç.
 
 ---
 
-## 7. Altyapı ve DevOps
+## 7. Kaldırılan Teknolojiler
 
-| Bileşen | Amaç | ALPHA BIST |
+| Teknoloji | Neden Kaldırıldı | Yerine |
 |---|---|---|
-| **Docker Compose** | Container orchestration | ✅ Aktif |
-| **Prometheus** | Metrik toplama | ✅ Aktif |
-| **Grafana** | Monitoring dashboard | ✅ Aktif |
-| **OpenTelemetry** | Distributed tracing | ✅ Aktif |
-| **Alembic** | Database migration | ✅ Aktif |
-| **pytest** | Test framework | ✅ Aktif |
-| **GitHub Actions** | CI/CD | ✅ Aktif |
-
-**Değerlendirme:** Tam DevOps yığını mevcut.
+| **Kafka/Redpanda** | Gereksiz karmaşıklık, NATS yeterli | NATS |
+| **MessagePack** | orjson daha hızlı, gereksiz | orjson |
 
 ---
 
-## 8. Genel Karşılaştırma Özeti
+## 8. Sonuç
 
-| Kategori | ALPHA BIST | Endüstri Standardı | Durum |
-|---|---|---|---|
-| **Protokol sayısı** | 4 (WS, gRPC, SSE, REST) | 2-3 | 🟢 Üstün |
-| **Veri formatı** | 4 (JSON, orjson, Protobuf, MsgPack) | 1-2 | 🟢 Üstün |
-| **Mesajlaşma** | 3 (Redis, Redpanda, NATS) | 1-2 | 🟢 Üstün |
-| **ML kütüphanesi** | 12 | 3-5 | 🟢 Üstün |
-| **Veritabanı** | 3 (PG, CH, Redis) | 2-3 | 🟢 Eşit |
-| **Monitoring** | 3 (Prometheus, Grafana, OTel) | 1-2 | 🟢 Üstün |
-| **Test kapsamı** | 47.500+ satır | 10.000-20.000 | 🟢 Üstün |
+ALPHA BIST sistemi, **her kategoride tek en iyi teknoloji** prensibiyle yapılandırılmıştır:
 
----
+- **1 mesajlaşma sistemi:** NATS (Redis pub/sub secondary)
+- **1 JSON formatı:** orjson
+- **1 RDBMS:** PostgreSQL
+- **1 OLAP:** ClickHouse
+- **1 cache:** Redis
+- **1 container orchestrator:** Docker Compose
+- **1 metrik:** Prometheus
+- **1 dashboard:** Grafana
 
-## 9. Potansiyel İyileştirmeler (Opsiyonel)
-
-| İyileştirme | Etki | Zorluk | Öncelik |
-|---|---|---|---|
-| **WebSocket + Protobuf** | 10x bant genişliği tasarrufu | Orta | 🟡 Düşük |
-| **WebTransport** | 0.5ms gecikme | Yüksek | 🔴 Çok düşük |
-| **RabbitMQ** | Mesaj dayanıklılığı | Düşük | 🟡 Düşük |
-| **TimescaleDB** | Time-series optimizasyonu | Orta | 🟡 Düşük |
-| **Go/Rust servisi** | 100x throughput | Çok yüksek | 🔴 Gereksiz |
-
-**Not:** Mevcut mimari bireysel ve kurumsal kullanım için yeterli. HFT (High Frequency Trading) hedeflenmiyorsa Go/Rust geçişi gereksiz.
-
----
-
-## 10. Sonuç
-
-ALPHA BIST sistemi, endüstri standartlarının **üzerinde** bir teknoloji yığınına sahiptir:
-
-- **4 iletişim protokolü** (WebSocket, gRPC, SSE, REST)
-- **4 veri formatı** (JSON, orjson, Protobuf, MessagePack)
-- **3 mesajlaşma sistemi** (Redis Pub/Sub, Redpanda, NATS)
-- **12 ML kütüphanesi** (LightGBM, XGBoost, CatBoost, PyTorch, SB3, HMM, SHAP, Optuna, MLflow, FinGPT, FinRL, scikit-learn)
-- **3 veritabanı** (PostgreSQL, ClickHouse, Redis)
-- **47.500+ satır test kodu**
-
-Sistem, bireysel yatırımcıdan kurumsal portföy yönetimine kadar geniş bir yelpazede çalışabilecek kapasitededir.
+**Çift başlılık yok. Her teknoloji tek amaca hizmet eder.**

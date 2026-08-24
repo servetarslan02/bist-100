@@ -136,48 +136,7 @@ services:
       retries: 10
       start_period: 5s
 
-  redpanda:
-    <<: *common
-    image: redpandadata/redpanda:v25.3.17
-    container_name: alpha-redpanda
-    ports:
-      - "9092:9092"
-      - "9644:9644"
-    volumes:
-      - redpanda_data:/var/lib/redpanda/data
-    command:
-      - redpanda
-      - start
-      - --overprovisioned
-      - --smp
-      - "1"
-      - --memory
-      - 192M
-      - --reserve-memory
-      - 0M
-      - --node-id
-      - "0"
-      - --check=false
-      - --kafka-addr
-      - internal://0.0.0.0:9092,external://0.0.0.0:9093
-      - --advertise-kafka-addr
-      - internal://redpanda:9092,external://localhost:9093
-      - --pandaproxy-addr
-      - internal://0.0.0.0:8082,external://0.0.0.0:8083
-      - --advertise-pandaproxy-addr
-      - internal://redpanda:8082,external://localhost:8083
-      - --schema-registry-addr
-      - internal://0.0.0.0:8081,external://0.0.0.0:8084
-    mem_limit: 256m
-    cpus: 0.25
-    storage_opt:
-      size: '256M'
-    healthcheck:
-      test: ["CMD", "rpk", "cluster", "health", "--api-urls", "localhost:9644"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 15s
+
 
   # === Application Services ===
 
@@ -229,8 +188,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      redpanda:
-        condition: service_healthy
       nats:
         condition: service_healthy
 
@@ -261,8 +218,6 @@ services:
       clickhouse:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      redpanda:
         condition: service_healthy
 
   feature-engine:
@@ -304,8 +259,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      redpanda:
-        condition: service_healthy
 
   market-state:
     <<: *common
@@ -334,8 +287,6 @@ services:
       clickhouse:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      redpanda:
         condition: service_healthy
 
   intelligence:
@@ -377,8 +328,6 @@ services:
       clickhouse:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      redpanda:
         condition: service_healthy
 
   simulation:
@@ -446,8 +395,6 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      redpanda:
         condition: service_healthy
 
   portfolio:
@@ -581,7 +528,6 @@ volumes:
   postgres_data:
   clickhouse_data:
   redis_data:
-  redpanda_data:
   nats_data:
   prometheus_data:
   grafana_data:

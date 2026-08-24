@@ -100,7 +100,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         services["clickhouse"] = "healthy"
 
     # Core Mikroservisler
-    services["redpanda"] = "healthy"
+    services["nats"] = "healthy"
     services["intelligence_engine"] = "healthy"
     services["risk_parity_engine"] = "healthy"
     services["scanner_pipeline"] = "healthy"
