@@ -10,6 +10,9 @@ from ...core.redis_helper import get_cached
 
 router = APIRouter()
 
+@router.get("")
+@router.get("/")
+@router.get("/status")
 @router.get("/list")
 @router.get("/registry")
 async def list_models(user=Depends(get_current_user), _=Depends(check_rate_limit)):
