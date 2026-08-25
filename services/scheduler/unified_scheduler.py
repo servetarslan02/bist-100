@@ -700,6 +700,11 @@ class UnifiedScheduler:
         # Phase callbacks
         self._phase_callbacks: Dict[str, List[Callable]] = {}
 
+        # State persistence — SQLite
+        self._state_db_path = "data/scheduler_state.db"
+        self._init_state_db()
+        self._load_state()
+
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
         """Job handler kaydet."""
         self._handlers[job_type] = handler
@@ -1087,6 +1092,80 @@ class UnifiedScheduler:
     def get_db_tracker(self) -> DBJobTracker:
         """DB job tracker'ı al."""
         return self._db_tracker
+
+    def _init_state_db(self):
+        """Scheduler state SQLite tablosunu oluştur."""
+        import sqlite3
+        from pathlib import Path
+        Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(self._state_db_path, timeout=10.0)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.executescript("""
+            CREATE TABLE IF NOT EXISTS scheduler_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS job_runs (
+                job_type TEXT PRIMARY KEY,
+                last_run_ts REAL NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+        """)
+        conn.commit()
+        conn.close()
+
+    def save_state(self):
+        """Scheduler durumunu SQLite'a kaydet."""
+        import sqlite3
+        now_iso = datetime.now(timezone.utc).isoformat()
+        try:
+            conn = sqlite3.connect(self._state_db_path, timeout=10.0)
+            conn.execute("PRAGMA journal_mode=WAL")
+            # Job run'ları kaydet
+            for job_type, ts in self._last_run.items():
+                conn.execute("""
+                    INSERT OR REPLACE INTO job_runs (job_type, last_run_ts, updated_at)
+                    VALUES (?, ?, ?)
+                """, (job_type, ts, now_iso))
+            # Genel state
+            conn.execute("""
+                INSERT OR REPLACE INTO scheduler_state (key, value, updated_at)
+                VALUES ('saved_at', ?, ?)
+            """, (now_iso, now_iso))
+            conn.execute("""
+                INSERT OR REPLACE INTO scheduler_state (key, value, updated_at)
+                VALUES ('running', ?, ?)
+            """, (str(self._running), now_iso))
+            conn.commit()
+            conn.close()
+            logger.debug("Scheduler state saved (SQLite)", last_runs=len(self._last_run))
+        except Exception as e:
+            logger.warning("Failed to save scheduler state", error=str(e))
+
+    def _load_state(self):
+        """Scheduler durumunu SQLite'dan yükle."""
+        import sqlite3
+        from pathlib import Path
+        try:
+            if not Path(self._state_db_path).exists():
+                return
+            conn = sqlite3.connect(self._state_db_path, timeout=10.0)
+            conn.row_factory = sqlite3.Row
+            # Job run'ları yükle
+            rows = conn.execute("SELECT job_type, last_run_ts FROM job_runs").fetchall()
+            self._last_run = {row["job_type"]: row["last_run_ts"] for row in rows}
+            # Saved_at bilgisini al
+            saved_row = conn.execute(
+                "SELECT value FROM scheduler_state WHERE key = 'saved_at'"
+            ).fetchone()
+            saved_at = saved_row["value"] if saved_row else "unknown"
+            conn.close()
+            logger.info("Scheduler state loaded (SQLite)",
+                       last_runs=len(self._last_run),
+                       saved_at=saved_at)
+        except Exception as e:
+            logger.warning("Failed to load scheduler state", error=str(e))
 
 
 # Singleton

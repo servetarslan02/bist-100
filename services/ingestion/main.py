@@ -15,6 +15,7 @@ from ..core.event_bus import (
     flush_producer,
 )
 from ..core.logging import setup_logging
+from ..core.connectivity import connectivity_monitor
 from .bist_universe import bist_universe, get_sector, BIST_INDICES
 
 # Dinamik hisse listesi — otomatik keşif aktif
@@ -46,6 +47,9 @@ class IngestionService:
 
         await init_databases()
         ensure_topics()
+
+        # İnternet izleyiciyi başlat
+        await connectivity_monitor.start()
 
         # Load instrument map from PostgreSQL
         await self._load_instrument_map()
@@ -94,6 +98,7 @@ class IngestionService:
     async def stop(self):
         """Stop the ingestion service."""
         self._running = False
+        await connectivity_monitor.stop()
         flush_producer()
         await close_databases()
         logger.info("Ingestion Service stopped")
@@ -173,6 +178,12 @@ class IngestionService:
         """Periodically fetch market data from yfinance."""
         while self._running:
             try:
+                # İnternet kontrolü — offline ise bekle
+                if not connectivity_monitor.is_online:
+                    logger.info("Offline mode, waiting 60s before retry...")
+                    await asyncio.sleep(60)
+                    continue
+
                 logger.info("Starting market data fetch cycle")
 
                 # NOT: Onceden bu dongu 629 hisseyi TEK TEK, senkron
@@ -263,6 +274,11 @@ class IngestionService:
         """Periodically fetch KAP disclosures."""
         while self._running:
             try:
+                # İnternet kontrolü
+                if not connectivity_monitor.is_online:
+                    await asyncio.sleep(60)
+                    continue
+
                 logger.info("Starting KAP fetch cycle")
 
                 # Fetch recent disclosures
@@ -315,6 +331,11 @@ class IngestionService:
         """Periodically fetch macro data."""
         while self._running:
             try:
+                # İnternet kontrolü
+                if not connectivity_monitor.is_online:
+                    await asyncio.sleep(60)
+                    continue
+
                 logger.info("Starting macro data fetch cycle")
 
                 # Fetch macro data from TCMB
@@ -357,6 +378,11 @@ class IngestionService:
         """Periodically fetch news."""
         while self._running:
             try:
+                # İnternet kontrolü
+                if not connectivity_monitor.is_online:
+                    await asyncio.sleep(60)
+                    continue
+
                 logger.info("Starting news fetch cycle")
 
                 # Fetch from RSS
@@ -401,6 +427,11 @@ class IngestionService:
         """Periodically fetch social media data."""
         while self._running:
             try:
+                # İnternet kontrolü
+                if not connectivity_monitor.is_online:
+                    await asyncio.sleep(300)
+                    continue
+
                 logger.info("Starting social media fetch cycle")
 
                 # Fetch from X (Twitter)

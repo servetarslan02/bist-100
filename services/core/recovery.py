@@ -87,6 +87,27 @@ class GracefulShutdown:
         # 4. State'i kaydet
         # 5. Bağlantıları kapat
 
+        # Downtime tracker'a kapanış kaydı
+        try:
+            from .downtime_tracker import downtime_tracker
+            downtime_tracker.record_shutdown()
+        except Exception as e:
+            logger.warning("Downtime tracker shutdown record failed", error=str(e))
+
+        # Scheduler state kaydet
+        try:
+            from ..scheduler.unified_scheduler import unified_scheduler
+            unified_scheduler.save_state()
+        except Exception as e:
+            logger.warning("Scheduler state save failed", error=str(e))
+
+        # Offline queue'yu flush et (mümkünse)
+        try:
+            from .offline_queue import offline_queue
+            await offline_queue.flush()
+        except Exception as e:
+            logger.warning("Offline queue flush failed", error=str(e))
+
         for handler in self._shutdown_handlers:
             try:
                 if asyncio.iscoroutinefunction(handler):
@@ -144,10 +165,32 @@ class StartupRecovery:
             results["steps"].append({"step": "event_replay", "status": "FAILED", "error": str(e)})
             results["errors"].append(str(e))
 
-        # Step 4: State validation
+        # Step 4: Downtime tracker başlat
+        try:
+            from .downtime_tracker import downtime_tracker
+            downtime_tracker.record_startup()
+            dt_status = downtime_tracker.get_status()
+            results["steps"].append({
+                "step": "downtime_tracker",
+                "status": "OK",
+                "downtime_seconds": dt_status["downtime_seconds"],
+                "catchup_level": dt_status["catchup_level"],
+            })
+        except Exception as e:
+            results["steps"].append({"step": "downtime_tracker", "status": "FAILED", "error": str(e)})
+
+        # Step 5: Connectivity monitor başlat
+        try:
+            from .connectivity import connectivity_monitor
+            await connectivity_monitor.start()
+            results["steps"].append({"step": "connectivity_monitor", "status": "OK"})
+        except Exception as e:
+            results["steps"].append({"step": "connectivity_monitor", "status": "FAILED", "error": str(e)})
+
+        # Step 6: State validation
         results["steps"].append({"step": "state_validation", "status": "OK"})
 
-        # Step 5: Service health check
+        # Step 7: Service health check
         results["steps"].append({"step": "health_check", "status": "OK"})
 
         results["success"] = len(results["errors"]) == 0

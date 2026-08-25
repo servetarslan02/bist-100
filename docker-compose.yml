@@ -13,7 +13,7 @@ name: bist-100-main
 # =============================================================
 
 x-common: &common
-  restart: always
+  restart: unless-stopped
   env_file:
     - .env
   networks:
@@ -231,6 +231,7 @@ services:
       redis-server
         --appendonly yes
         --appendfsync everysec
+        --dir /data
         --maxmemory 96mb
         --maxmemory-policy allkeys-lru
         --requirepass ${REDIS_PASSWORD}
@@ -376,7 +377,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
-      start_period: 20s
+      start_period: 60s
     depends_on:
       postgres:
         condition: service_healthy
@@ -413,7 +414,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -459,7 +460,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -495,7 +496,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -542,7 +543,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -588,7 +589,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -624,7 +625,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -658,7 +659,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -702,7 +703,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 60s
     depends_on:
       api:
         condition: service_healthy
@@ -743,7 +744,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 30s
+      start_period: 60s
     depends_on:
       redis:
         condition: service_healthy
