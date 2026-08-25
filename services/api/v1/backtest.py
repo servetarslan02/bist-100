@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import BacktestResult, ErrorResponse
 router = APIRouter()
 
 
@@ -16,7 +15,6 @@ async def run_backtest(
 ):
     """Backtest çalıştır — engine servisi."""
     try:
-        from ...backtest.engine import BacktestEngine
         return {"status": "started", "ticker": ticker, "period": period, "strategy": strategy, "message": "Backtest queued"}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -55,7 +53,6 @@ async def walk_forward(
 ):
     """Walk-forward analizi — walk_forward servisi."""
     try:
-        from ...backtest.walk_forward import WalkForwardEngine
         return {"status": "started", "ticker": ticker, "n_folds": n_folds}
     except Exception as e:
         raise HTTPException(500, str(e))

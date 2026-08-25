@@ -22,8 +22,7 @@ import hashlib
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 from .portfolio_sim import PortfolioSimulatorV3
@@ -352,7 +351,7 @@ class BacktestEngineV4:
                 try:
                     quality = self._dq.full_quality_check(df, ticker)
                     self._quality_cache.set(ticker, quality.passed, quality.quality_score)
-                except Exception as e:
+                except Exception:
                     self._quality_cache.set(ticker, True, 80.0)
 
         # Ana döngü
@@ -638,7 +637,7 @@ class BacktestEngineV4:
                 try:
                     quality = self._dq.full_quality_check(df, ticker)
                     self._quality_cache.set(ticker, quality.passed, quality.quality_score)
-                except Exception as e:
+                except Exception:
                     self._quality_cache.set(ticker, True, 80.0)
 
         # ====== PANEL PRE-COMPUTE (feature bottleneck çözümü) ======
@@ -1013,7 +1012,7 @@ class BacktestEngineV4:
             if features:
                 self._feature_cache.set(ticker, date_str, features)
             return features
-        except Exception as e:
+        except Exception:
             self._last_feature_seconds += _time.perf_counter() - _t0
             return None
 
@@ -1122,7 +1121,6 @@ class BacktestEngineV4:
                     enriched.update(fund_features)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1091")
-                pass
 
         # === HISTORICAL KAP + NEWS SENTIMENT (Motor5 — PIT-safe) ===
         if historical_adapter is not None:
@@ -1134,7 +1132,6 @@ class BacktestEngineV4:
                     enriched.update(sentiment_features)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1102")
-                pass
 
         # === HISTORICAL CATALYST (Motor6 — PIT-safe) ===
         if historical_adapter is not None:
@@ -1145,7 +1142,6 @@ class BacktestEngineV4:
                     enriched.update(catalyst_features)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1112")
-                pass
 
         # === MOTOR 1: RELATIVE STRENGTH (PIT-safe) ===
         if benchmark_close is not None and len(benchmark_close) > 20:
@@ -1164,7 +1160,6 @@ class BacktestEngineV4:
                         enriched.update(rs_feats)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1130")
-                pass
 
         # === CROSS-SECTIONAL FEATURES (PIT-safe) ===
         if len(all_day_features) >= 5:
@@ -1197,7 +1192,6 @@ class BacktestEngineV4:
                     enriched.update(season_feats)
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="engine_v4.py:1162")
-            pass
 
         # === CANONICAL ALIASES ===
         for period in [1, 5, 20, 60]:

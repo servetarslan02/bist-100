@@ -11,10 +11,9 @@ ALPHA BIST — Event Infrastructure v1.0
 - Job Queue
 """
 
-import orjson
 import hashlib
 from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import structlog
@@ -101,7 +100,6 @@ class CatalystEngine:
                     })
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="infrastructure.py:100")
-                pass
 
         return sorted(upcoming, key=lambda x: x["days_until"])
 

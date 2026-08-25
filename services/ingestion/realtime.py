@@ -104,7 +104,6 @@ class RealtimeDataProvider:
                                         logger.warning("Handler error", ticker=ticker, error=str(e))
                         except Exception as e:
                             logger.debug("Handled exception", error=str(e), ticker=ticker)
-                            pass
                     
                     # Rate limit protection between chunks
                     await asyncio.sleep(1)

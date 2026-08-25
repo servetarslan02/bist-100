@@ -400,7 +400,7 @@ class TieredScanner:
                 continue
 
             # Pozisyon limiti kontrolü
-            max_position = risk_limits.get("max_position_pct", 10.0)
+            risk_limits.get("max_position_pct", 10.0)
 
             asset.action = "BUY" if asset.ai_direction == "LONG" else "SELL" if asset.ai_direction == "SHORT" else "HOLD"
             asset.conviction = "HIGH" if asset.ai_confidence > 0.8 else "MEDIUM"

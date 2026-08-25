@@ -5,7 +5,6 @@ sector rotation detection.
 """
 import numpy as np
 from typing import Dict, List, Any, Optional
-from scipy import stats
 import structlog
 
 logger = structlog.get_logger()

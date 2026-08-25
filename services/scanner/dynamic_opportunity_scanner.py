@@ -11,13 +11,9 @@ Sinyal Türleri:
 4. GOLDEN_CROSS (SMA50 > SMA200 Kesişimi & Trend Başlangıcı)
 """
 
-import os
-import orjson
 import logging
-from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 
-import numpy as np
 import pandas as pd
 import yfinance as yf
 
@@ -84,7 +80,7 @@ class DynamicOpportunityScanner:
 
                 closes = df["Close"].dropna()
                 highs = df["High"].dropna()
-                lows = df["Low"].dropna()
+                df["Low"].dropna()
                 vols = df["Volume"].dropna() if "Volume" in df.columns else pd.Series(1, index=closes.index)
 
                 if len(closes) < 50:
@@ -226,7 +222,7 @@ class DynamicOpportunityScanner:
                     "risk_level": "LOW" if stop_pct <= 4.5 else ("MEDIUM" if stop_pct <= 6.0 else "HIGH"),
                 })
 
-            except Exception as e:
+            except Exception:
                 continue
 
         opportunities.sort(key=lambda x: x["score"], reverse=True)

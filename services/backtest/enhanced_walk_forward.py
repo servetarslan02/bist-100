@@ -13,7 +13,7 @@ Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import List, Tuple
 from dataclasses import dataclass
 import structlog
 

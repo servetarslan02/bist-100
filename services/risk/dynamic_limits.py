@@ -11,7 +11,7 @@ Kaynaklar:
 """
 
 from typing import Dict, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

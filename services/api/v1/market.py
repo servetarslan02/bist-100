@@ -1,19 +1,14 @@
 import time
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
-from typing import Optional
 
 from collections import defaultdict
 import numpy as np
-import pandas as pd
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit, get_service_orchestrator
-from ...core.event_bus import event_bus
-from .schemas import MarketStateResponse, RadarResponse, InstrumentInfo, ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -109,7 +104,7 @@ async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit
 async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Hisşe detay."""
     try:
-        orch = await get_service_orchestrator()
+        await get_service_orchestrator()
         result = {"ticker": ticker, "available": True}
         return result
     except Exception as e:
@@ -360,7 +355,7 @@ async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_
     """Feature'lar — factor_engine servisi."""
     try:
         from ...intelligence.factor_engine import FactorEngine
-        engine = FactorEngine()
+        FactorEngine()
         return {"ticker": ticker, "features_available": True, "message": "Requires historical data"}
     except Exception as e:
         raise HTTPException(500, str(e))
@@ -397,7 +392,7 @@ async def market_radar(
     _=Depends(check_rate_limit)
 ):
     """Piyasa radarı — Redis cache'den anında döner (<50ms). Cache 2dk'da bir yenilenir."""
-    from ...core.redis_helper import get_cached, set_cached
+    from ...core.redis_helper import get_cached
 
     try:
         cached = get_cached("radar:data")

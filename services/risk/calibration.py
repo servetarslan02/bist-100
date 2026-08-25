@@ -8,7 +8,7 @@ KURAL: Score != win_probability. Calibration gerekli.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass
 import structlog
 

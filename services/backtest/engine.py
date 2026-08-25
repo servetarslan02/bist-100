@@ -14,7 +14,7 @@ FAZ 12: Backtest Engine
 
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 import structlog
 from services.portfolio.portfolio_manager import CommissionModel
@@ -338,7 +338,7 @@ class BacktestEngine:
                 trade_id += 1
                 del positions[t]
                 
-            current_equity = capital + total_market_value
+            capital + total_market_value
             
             # 3. Process Signals generated at current day close -> Queue for T+1 Open Execution
             if current_date in signals_by_date:

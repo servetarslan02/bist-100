@@ -12,8 +12,8 @@ Kaynak: Quant research — pandas index alignment ile gelecek veri sızıntısı
 """
 
 from typing import Dict, List, Optional, Any
-from datetime import datetime, date, timezone
-from dataclasses import dataclass, field
+from datetime import datetime
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

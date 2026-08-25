@@ -14,7 +14,6 @@ FAZ 4.4 değişiklikleri:
 import os
 import pickle
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -308,7 +307,7 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dic
                 r, _ = spearmanr(yt[half:], yp[half:])
                 ic2 = float(r) if np.isfinite(r) else 0.0
             defaults["ic_stability"] = float(1.0 - abs(ic1 - ic2))
-        except Exception as e:
+        except Exception:
             defaults["ic_stability"] = 0.0
 
     if n >= 10:
@@ -521,7 +520,7 @@ class LightGBMTrainer:
                 for rank, idx in enumerate(sorted_indices):
                     y_rank[indices[idx]] = rank
 
-        y_train = y[train_indices]
+        y[train_indices]
         y_val = y[val_indices]
         y_rank_train = y_rank[train_indices]
         y_rank_val = y_rank[val_indices]

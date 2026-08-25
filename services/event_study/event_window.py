@@ -15,8 +15,8 @@ Calendar day kullanmanın sorunları:
 
 Çözüm: Tüm offset'ler trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
-from datetime import datetime, timedelta
-from typing import Tuple, List, Dict, Optional
+from datetime import datetime
+from typing import Tuple, Dict
 import numpy as np
 import structlog
 

@@ -7,8 +7,7 @@ Yahoo ↔ Matriks ↔ BIST resmi
 Farklılık varsa → DATA QUALITY WARNING
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 import structlog
 

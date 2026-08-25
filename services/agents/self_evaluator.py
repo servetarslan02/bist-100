@@ -13,14 +13,12 @@ Kontroller:
 FAZ 5: Self-Evaluation
 """
 
-import time
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
 
-from .agent_system import AgentRole
 from .agent_memory import AgentMemory
 
 logger = structlog.get_logger()

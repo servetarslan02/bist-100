@@ -16,9 +16,7 @@ Geçmiş versiyonla aynı finansal sonuçları üretir.
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, timedelta
-from dataclasses import dataclass, field
-from collections import defaultdict
+from dataclasses import dataclass
 import structlog
 
 from ..features.calculator import feature_calculator
@@ -466,7 +464,7 @@ class ScannerBacktestRunner:
                         )
                         if features:
                             self._feature_cache.set(ticker, date_str, features)
-                    except Exception as e:
+                    except Exception:
                         data_quality_issues += 1
                         continue
 

@@ -24,7 +24,7 @@ import orjson
 import time
 import struct
 from enum import IntEnum
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dataclasses import dataclass, field
 import structlog
 

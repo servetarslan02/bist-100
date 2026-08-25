@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from enum import Enum
 import structlog
 
-from .alert_policy import AlertPolicy, SilenceRule, VersionConflictError, PolicyDiff
+from .alert_policy import AlertPolicy, VersionConflictError
 
 logger = structlog.get_logger()
 
@@ -305,7 +305,6 @@ class EmailProvider:
     def min_severity(self) -> str: return "CRITICAL"
     async def send(self, alert: Alert) -> bool:
         try:
-            import smtplib
             from email.mime.text import MIMEText
             msg = MIMEText(
                 f"Alert: {alert.alert_type}\nSeverity: {alert.severity}\n"
@@ -445,7 +444,6 @@ class AlertingSystem:
                 break
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="alerting.py:443")
-                pass
 
     def _check_escalations(self):
         """Aktif alert'ler için escalation kontrolü (policy-based)."""
@@ -834,8 +832,8 @@ class AlertingSystem:
 
     async def _notify_all(self, alert: Alert):
         # Policy-based routing
-        channels = self._policy.get_notification_channels(alert.severity)
-        all_providers = self._router.get_all_providers()
+        self._policy.get_notification_channels(alert.severity)
+        self._router.get_all_providers()
         providers = self._router.get_providers_for_severity(alert.severity)
         for provider in providers:
             result = await self._send_with_retry(provider, alert)

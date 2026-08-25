@@ -3,14 +3,12 @@
 import asyncio
 import orjson
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import numpy as np
 import structlog
 
-from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, pg_fetchrow, pg_execute,
-    redis_get, redis_set, redis_hgetall,
+    init_databases, close_databases, pg_fetchrow, redis_set,
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
@@ -292,7 +290,7 @@ class RiskEngine:
         """Evaluate signal risk."""
         try:
             ticker = event.data.get("ticker")
-            score = event.data.get("score", 0)
+            event.data.get("score", 0)
             risk_level = event.data.get("risk_level", "MEDIUM")
 
             # Check if risk level is acceptable
@@ -637,7 +635,7 @@ def assess_portfolio_risk(
 
     # 7. Monitoring Alert Check
     try:
-        from .monitoring import risk_monitor, RiskMetricsSnapshot
+        pass
         # Basit risk skoru hesapla
         risk_score = 50.0
         if "var_cvar" in result and "error" not in result.get("var_cvar", {}):
@@ -646,7 +644,7 @@ def assess_portfolio_risk(
         if "drawdown" in result and "error" not in result.get("drawdown", {}):
             risk_score += min(20, result["drawdown"].get("current_pct", 0) * 2)
         result["risk_score"] = round(min(100, risk_score), 1)
-    except Exception as e:
+    except Exception:
         result["risk_score"] = 50.0
 
     return result

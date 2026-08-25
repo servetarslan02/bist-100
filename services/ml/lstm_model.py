@@ -4,11 +4,9 @@ PyTorch LSTM — multi-layer, bidirectional, attention mechanism,
 multi-horizon prediction, walk-forward desteği, proper training loop.
 """
 import os
-import pickle
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -38,7 +36,6 @@ class AttentionLayer:
 
     def __init__(self, hidden_size: int):
         try:
-            import torch
             import torch.nn as nn
             self.attention = nn.Linear(hidden_size, 1)
             self.softmax = nn.Softmax(dim=1)
@@ -206,7 +203,6 @@ class StockLSTM:
                     metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val[self._config.sequence_length:])[0, 1]), 4)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="lstm_model.py:207")
-                pass
 
         logger.info("lstm_trained", **metrics)
         return metrics
@@ -228,7 +224,7 @@ class StockLSTM:
                 preds = self._model(X_tensor).squeeze().numpy()
 
             return preds if isinstance(preds, np.ndarray) else np.array([preds])
-        except Exception as e:
+        except Exception:
             return np.zeros(len(X))
 
     def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

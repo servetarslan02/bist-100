@@ -6,7 +6,7 @@ brüt takas, kredili işlem yasağı ve işlem sırası durdurma bildirimlerini 
 Eğer hissenin kurumsal/seans durumu doğrulanamıyorsa fail-safe olarak NO_TRADE kuralını işletir.
 """
 
-from typing import Dict, List, Optional, Any, Set
+from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

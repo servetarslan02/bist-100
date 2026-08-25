@@ -10,7 +10,7 @@ v2.0: Async refactor + detaylı EVDS + BIST'e özgü makro göstergeler
 import asyncio
 import concurrent.futures
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 
 import yfinance as yf
 import structlog

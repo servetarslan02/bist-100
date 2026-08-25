@@ -45,7 +45,7 @@ import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
 
 import yfinance as yf
-from datetime import datetime, date, timedelta
+from datetime import date
 from dataclasses import dataclass
 import structlog
 

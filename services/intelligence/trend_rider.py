@@ -9,7 +9,7 @@ SIFIR STATİK VERİ & YÜZDE KURALI:
   kadar 1-2 aylık mega trendleri sonuna kadar sürer.
 """
 
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Tuple
 import numpy as np
 import pandas as pd
 import structlog

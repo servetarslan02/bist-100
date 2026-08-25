@@ -17,8 +17,7 @@ Ek analiz motorları:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
+from typing import Dict, List
 import structlog
 
 logger = structlog.get_logger()
@@ -267,7 +266,7 @@ class ModelRiskEngine:
 
         errors = [abs(p - a) for p, a in zip(predictions, actuals)]
         mean_error = np.mean(errors)
-        std_error = np.std(errors)
+        np.std(errors)
 
         # Reliability: düşük hata = yüksek güvenilirlik
         reliability = max(0, 1 - mean_error / (np.mean(np.abs(actuals)) + 0.001))

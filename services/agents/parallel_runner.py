@@ -10,13 +10,12 @@ FAZ 1: Paralel Çalışma
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, Optional, Any
 from dataclasses import dataclass, field
 import structlog
 
 from .agent_system import (
-    AgentRole, AgentTask, AgentResult, BaseAgent, AgentOrchestrator,
-    AIFallback,
+    AgentRole, AgentTask, AgentResult, BaseAgent, AIFallback,
 )
 from .llm_client import BaseLLMClient
 

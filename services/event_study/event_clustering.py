@@ -5,7 +5,7 @@ MacKinlay (1997) — clustered events problem.
 """
 import numpy as np
 from typing import Dict, List, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()

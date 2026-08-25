@@ -10,7 +10,7 @@ KURAL: En iyi hisseyi bul, fiyat tahmini yapma!
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Any, Tuple
 from collections import defaultdict
 import structlog
 

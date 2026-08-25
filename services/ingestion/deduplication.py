@@ -15,8 +15,7 @@ Kullanım:
 
 import hashlib
 import time
-from typing import Dict, Optional, Any
-from datetime import datetime, timedelta, timezone
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 

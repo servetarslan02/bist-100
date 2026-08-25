@@ -12,7 +12,7 @@ bilimsel mikro-yapı ve maliyet modelleriyle simüle eder:
 
 import math
 from enum import Enum
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import structlog
 

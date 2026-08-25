@@ -10,7 +10,7 @@ Deduplication ile sadece değişen veya önemli hisseler taranır.
 
 import time
 from typing import Dict, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

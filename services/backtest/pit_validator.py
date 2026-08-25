@@ -16,7 +16,6 @@ Referanslar:
 - Marcos López de Prado - "Advances in Financial Machine ML" Ch.7
 """
 
-import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field

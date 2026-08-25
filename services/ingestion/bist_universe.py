@@ -4,11 +4,9 @@ Borsa İstanbul'daki TÜM hisseleri (600+ hisse) canlı kaynaklardan dinamik ola
 Yeni halka arzlar ve değişiklikler otomatik olarak keşfedilir.
 """
 
-from typing import Dict, List, Optional, Set
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from typing import Dict, List
 import structlog
-from .providers.universe_provider import universe_updater, StockInfo
+from .providers.universe_provider import universe_updater
 
 logger = structlog.get_logger()
 

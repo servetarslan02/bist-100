@@ -23,15 +23,14 @@ from enum import Enum
 import structlog
 
 from .llm_client import (
-    BaseLLMClient, LLMClientFactory, LLMConfig, LLMResponse,
-    parse_llm_json,
+    BaseLLMClient, parse_llm_json,
 )
 from .schemas import (
-    AgentOutputSchema, Direction, RiskLevel,
-    SynthesisResultSchema, DebateArgumentSchema,
-    RiskAssessmentSchema, validate_agent_output,
-    TechnicalOutputSchema, FundamentalOutputSchema,
-    NewsOutputSchema, MacroOutputSchema,
+    Direction, RiskLevel, SynthesisResultSchema,
+    DebateArgumentSchema, RiskAssessmentSchema,
+    validate_agent_output, TechnicalOutputSchema,
+    FundamentalOutputSchema, NewsOutputSchema,
+    MacroOutputSchema,
 )
 from .prompts import PromptFactory, PROMPT_VERSION
 
@@ -603,7 +602,7 @@ def run_agent_analysis(ticker: str, features: Dict, news: list = None) -> Dict[s
 
         # Async loop varsa kullan, yoksa yeni oluştur
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # Zaten bir loop içindeyiz — task oluştur
             result["agent_available"] = True
             result["note"] = "Use async run_research_pipeline instead"

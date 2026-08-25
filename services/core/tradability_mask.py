@@ -18,7 +18,7 @@ Kaynak: Du (2026) — mask-first design tek başına +0.44 Sharpe katkısı
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
 import structlog
 

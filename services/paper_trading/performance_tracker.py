@@ -20,7 +20,6 @@ Gunluk incremental hesaplama yapar (tum veriyi her gun bastan hesaplamaz).
 
 import numpy as np
 from typing import Dict, List, Optional, Any
-from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -192,7 +191,7 @@ class PerformanceTracker:
             from scipy import stats
             corr, _ = stats.spearmanr(predictions, actuals)
             return float(corr) if not np.isnan(corr) else 0.0
-        except Exception as e:
+        except Exception:
             return 0.0
 
     def compute_icir(self, ic_series: List[float]) -> float:

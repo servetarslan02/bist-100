@@ -10,10 +10,8 @@ Tahmin sonuçlarını otomatik takip eder:
 Bu modül learning'in çalışması için KRİTİK.
 """
 
-import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from collections import deque
 import structlog
 
@@ -162,7 +160,7 @@ class OutcomeTracker:
                 entry = entry.replace(tzinfo=timezone.utc)
             now = datetime.now(timezone.utc)
             return max(0, (now - entry).days)
-        except Exception as e:
+        except Exception:
             return 0
 
     def get_pending_count(self) -> int:

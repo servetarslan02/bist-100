@@ -10,9 +10,8 @@ Makro stres testi — portfolio bazlı:
 KURAL: "USDTRY +10% olursa portföy ne olur?" sorusunu cevapla.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Any
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

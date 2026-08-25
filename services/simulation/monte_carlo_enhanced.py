@@ -12,7 +12,7 @@ Kaynaklar: Springer Data-Driven Monte Carlo (2026), LinkedIn Jump-Diffusion (202
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import structlog
 
@@ -230,7 +230,7 @@ class CorrelatedMonteCarlo:
             rng = np.random.default_rng()
 
         n_assets = len(tickers)
-        n_days = returns_matrix.shape[0]
+        returns_matrix.shape[0]
 
         # Korelasyon matrisi
         corr_matrix = np.corrcoef(returns_matrix.T)

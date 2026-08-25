@@ -6,7 +6,7 @@ ALPHA BIST — Event Priority Queue v1.0
 """
 
 import asyncio
-from typing import Dict, List, Any, Callable, Optional
+from typing import Dict, List, Callable, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

@@ -14,7 +14,7 @@ Borsa İstanbul Pay Piyasası Seans Çizelgesi ve Durum Makinesi (Official BIST 
 
 from datetime import datetime, time, timezone, timedelta
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict
 import structlog
 
 logger = structlog.get_logger()

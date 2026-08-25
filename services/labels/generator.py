@@ -21,7 +21,7 @@ Kaynak: Du (2026) — target variable design, cross-sectional ranking
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 import structlog
 

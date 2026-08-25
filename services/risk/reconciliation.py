@@ -9,7 +9,7 @@ Periyodik kontrol:
 FAZ 11: Portfolio Reconciliation
 """
 
-from typing import Dict, List, Optional, Any
+from typing import List
 from dataclasses import dataclass
 import structlog
 

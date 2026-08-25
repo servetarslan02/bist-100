@@ -4,9 +4,8 @@ Optuna Bayesian optimization — IC-based objective, regime-specific tuning,
 cross-validation within trials, multi-model support, trial history analysis.
 """
 import numpy as np
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -321,7 +320,7 @@ class HyperparameterTuner:
                 preds = model.predict(X_vl)
                 score = self._compute_objective(preds, y_vl, objective_type)
                 scores.append(score)
-            except Exception as e:
+            except Exception:
                 scores.append(0.0)
 
         return float(np.mean(scores)) if scores else 0.0
@@ -337,7 +336,7 @@ class HyperparameterTuner:
             from sklearn.metrics import roc_auc_score
             try:
                 return float(roc_auc_score(y_true, preds))
-            except Exception as e:
+            except Exception:
                 return 0.0
         elif objective_type == "directional":
             pred_dir = (preds > 0).astype(int)

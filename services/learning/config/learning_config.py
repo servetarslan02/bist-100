@@ -6,7 +6,6 @@ Hardcoded değerler YASAKTIR — hepsi buradan okunur.
 """
 
 from pydantic import BaseModel, Field
-from typing import Optional
 import os
 
 

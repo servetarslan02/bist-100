@@ -11,7 +11,7 @@ KURAL: BULL'da momentum, BEAR'da quality, SIDEWAYS'da mean reversion.
 """
 
 import numpy as np
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 from dataclasses import dataclass
 from collections import deque
 from datetime import datetime, timezone
@@ -57,8 +57,8 @@ class RegimeDetector:
 
         df = market_data[benchmark_ticker]
         close = df["Close"].values if "Close" in df.columns else np.array([])
-        high = df["High"].values if "High" in df.columns else close.copy()
-        low = df["Low"].values if "Low" in df.columns else close.copy()
+        df["High"].values if "High" in df.columns else close.copy()
+        df["Low"].values if "Low" in df.columns else close.copy()
         volume = df["Volume"].values if "Volume" in df.columns else np.ones(len(close))
 
         if len(close) < self.lookback_days:

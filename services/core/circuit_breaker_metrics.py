@@ -8,9 +8,8 @@ Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.5
 """
 
-import time
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
@@ -136,7 +135,7 @@ class CircuitBreakerMetricsCollector:
             )
 
             total_req = getattr(breaker, '_total_requests', 0)
-            total_fail = getattr(breaker, '_total_failures', 0)
+            getattr(breaker, '_total_failures', 0)
             total_succ = getattr(breaker, '_total_successes', 0)
             uptime = (total_succ / total_req * 100) if total_req > 0 else 100.0
 

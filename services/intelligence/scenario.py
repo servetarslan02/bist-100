@@ -12,7 +12,7 @@ FAZ 6.1-6.3: Scenario & Stress Test Engine
 
 import numpy as np
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

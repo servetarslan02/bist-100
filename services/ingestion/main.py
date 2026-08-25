@@ -2,18 +2,17 @@
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Dict
 import structlog
 
 from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, get_pg_pool,
-    ch_insert, get_ch_client,
+    init_databases, close_databases,
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
     ensure_topics, publish_event, EventType,
-    flush_producer, EventConsumer,
+    flush_producer,
 )
 from ..core.logging import setup_logging
 from .bist_universe import bist_universe, get_sector, BIST_INDICES
@@ -241,7 +240,7 @@ class IngestionService:
                                 },
                             )
                             publish_event(event, key=index_symbol)
-                    except Exception as e:
+                    except Exception:
                         pass  # Intentional: silent error handling
 
                 flush_producer()
@@ -420,7 +419,6 @@ class IngestionService:
                         pass
 
                 # Fetch social / community sentiment from financial feeds
-                pass
 
                 flush_producer()
                 logger.info("Social media fetch cycle completed")

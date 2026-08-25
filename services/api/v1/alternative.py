@@ -4,7 +4,6 @@ import time
 from fastapi import APIRouter, Depends, Query
 from typing import Dict, Any, List
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 
 router = APIRouter()
 
@@ -66,7 +65,7 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
         }
         _SENTIMENT_CACHE[sym] = (now, res)
         return res
-    except Exception as e:
+    except Exception:
         fallback = {
             "ticker": sym,
             "sentiment_available": True,

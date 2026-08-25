@@ -7,7 +7,7 @@ Entity → Event → Importance → World State → Impact → Affected Stocks
 Bu zincir eksiksiz olmalı.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

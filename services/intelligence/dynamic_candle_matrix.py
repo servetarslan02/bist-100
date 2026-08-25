@@ -5,8 +5,8 @@ Kayan pencere (Rolling Walk-Forward) koşullu beklenen değer (Conditional Expec
 hesaplamasını mikrosaniye hızında önbellekleyerek simülasyonu anlık hale getirir.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import structlog

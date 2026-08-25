@@ -1,8 +1,5 @@
-import orjson
-import numpy as np
 import pandas as pd
-from typing import List, Dict
-import os
+from typing import List
 
 from services.core.alpha_engine import AlphaEngine
 from services.backtest.walk_forward import WalkForwardEngine
@@ -41,7 +38,6 @@ class FeatureAblator:
             if not top_picks: continue
             
             # Eşit ağırlık (%10) ve rejim (Market Regime'i 1.0 sabitliyoruz ki ablation sadece feature'lari test etsin)
-            regime = 1.0
             
             for pick in top_picks:
                 ticker = pick["ticker"]

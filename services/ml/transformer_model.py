@@ -4,11 +4,9 @@ PyTorch Transformer — multi-head attention, positional encoding,
 multi-horizon prediction, proper training loop.
 """
 import os
-import pickle
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -52,7 +50,6 @@ class PositionalEncoding:
     def __call__(self, x):
         if self.pe is None:
             return x
-        import torch
         return x + self.pe[:, :x.size(1), :].to(x.device)
 
 
@@ -177,7 +174,6 @@ class StockTransformer:
                     metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val[self._config.sequence_length:])[0, 1]), 4)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="transformer_model.py:178")
-                pass
 
         logger.info("transformer_trained", **metrics)
         return metrics
@@ -199,7 +195,7 @@ class StockTransformer:
                 preds = self._model(X_tensor).squeeze().numpy()
 
             return preds if isinstance(preds, np.ndarray) else np.array([preds])
-        except Exception as e:
+        except Exception:
             return np.zeros(len(X))
 
     def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:

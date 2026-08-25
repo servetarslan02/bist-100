@@ -16,22 +16,21 @@ Akış:
 FAZ 6: Full Pipeline Integration
 """
 
-import asyncio
 import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
-from .agent_system import AgentRole, BaseAgent, AgentOrchestrator
-from .llm_client import BaseLLMClient, LLMClientFactory, LLMConfig
+from .agent_system import AgentRole, BaseAgent
+from .llm_client import BaseLLMClient
 from .parallel_runner import ParallelAgentRunner, ParallelRunResult
 from .conflict_detector import ConflictDetector, ConflictReport
 from .debate_engine import DebateEngine, DebateResult
 from .risk_assessor import RiskAssessor, RiskAssessment
 from .synthesis_engine import SynthesisEngine, SynthesisResult
 from .agent_memory import AgentMemory, MemoryConsolidator
-from .self_evaluator import AgentSelfEvaluator, MultiAgentEvaluator
+from .self_evaluator import MultiAgentEvaluator
 from .communication_bus import AgentCommunicationBus, ConflictResolver, Resolution
 
 logger = structlog.get_logger()

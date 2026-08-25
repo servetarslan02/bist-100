@@ -9,7 +9,7 @@ Google News: 0.50
 Sosyal medya: 0.20-0.50
 """
 
-from typing import Dict, Optional
+from typing import Dict
 from dataclasses import dataclass
 import structlog
 

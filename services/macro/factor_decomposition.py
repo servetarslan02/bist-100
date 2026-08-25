@@ -10,9 +10,8 @@ Makro faktör ayrıştırması:
 KURAL: Toplam getiri = Σ(faktör katkısı) + residual.
 """
 
-import numpy as np
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

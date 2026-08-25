@@ -24,7 +24,6 @@ Kullanım:
     table = pipeline.read_parquet("data/output.parquet")
 """
 
-import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import structlog
@@ -42,7 +41,6 @@ class ArrowPipeline:
     def from_polars(self, df) -> "pa.Table":
         """Polars DataFrame'den Arrow Table'a çevir."""
         try:
-            import pyarrow as pa
             return df.to_arrow()
         except ImportError:
             logger.error("PyArrow not installed")
@@ -100,7 +98,6 @@ class ArrowPipeline:
     def scan_parquet(self, path: str):
         """Parquet dosyasını lazy olarak tara (büyük dosyalar için)."""
         try:
-            import pyarrow.parquet as pq
             import pyarrow.dataset as ds
 
             full_path = self.base_path / path

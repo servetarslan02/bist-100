@@ -14,9 +14,8 @@ Tespit yöntemi: Her rejim için ağırlıklı skor hesapla, en yüksek skorlu r
 KURAL: Rejim değişimi smoothing ile filtrelenmeli (chatter önleme).
 """
 
-import numpy as np
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import structlog
 

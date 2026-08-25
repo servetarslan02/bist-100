@@ -7,7 +7,7 @@ Tarama sonuçlarını son kez filtreler.
 Kaynaklar: Mometic (2026), BIST kuralları
 """
 
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Any, Callable
 from dataclasses import dataclass
 import structlog
 
@@ -253,7 +253,6 @@ class CustomFilterEngine:
                         blocked += 1
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="custom_filters.py:252")
-                    pass
 
             stats[f.name] = {
                 "description": f.description,

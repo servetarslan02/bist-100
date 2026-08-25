@@ -19,8 +19,8 @@ Referanslar:
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple, Set
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Set
+from dataclasses import dataclass
 from datetime import datetime
 import structlog
 

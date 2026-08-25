@@ -13,13 +13,11 @@ Token yönetimi:
 - Default token production'da değiştirilmeli
 """
 
-import hashlib
 import hmac
 import os
 import time
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
-from functools import wraps
 import structlog
 
 logger = structlog.get_logger()
@@ -270,7 +268,6 @@ class JWTProvider(AuthProvider):
                     return self._jwks_cache[kid]
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="monitoring_security.py:268")
-                pass
 
         return self._secret
 

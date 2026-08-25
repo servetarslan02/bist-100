@@ -3,12 +3,9 @@
 Reinforcement Learning agent — PPO, A2C, DQN desteği,
 custom reward function, multi-action space, proper training.
 """
-import os
-import pickle
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from typing import Dict, Any, Optional
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -80,7 +77,6 @@ class BISTTradingEnv:
     def _make_observation_space(self):
         """Observation space oluştur."""
         try:
-            import gymnasium as gym
             from gymnasium import spaces
             return spaces.Box(low=-np.inf, high=np.inf, shape=(self.features.shape[1] + 2,), dtype=np.float32)
         except ImportError:
@@ -89,7 +85,6 @@ class BISTTradingEnv:
     def _make_action_space(self):
         """Action space oluştur."""
         try:
-            import gymnasium as gym
             from gymnasium import spaces
             if self.action_space_type == "discrete":
                 return spaces.Discrete(3)  # BUY, HOLD, SELL

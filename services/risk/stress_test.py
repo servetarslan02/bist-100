@@ -14,8 +14,8 @@ Kaynaklar:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -429,7 +429,7 @@ class StressTestEngine:
             Breaking point sonuçları
         """
         total_value = portfolio.get("total_value", 0)
-        positions = portfolio.get("positions", [])
+        portfolio.get("positions", [])
 
         # Her senaryo için breaking point kontrolü
         breaking_scenarios = []

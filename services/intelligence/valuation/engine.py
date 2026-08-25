@@ -10,9 +10,8 @@ ALPHA BIST — Valuation Engine v1.0
 FAZ 4.2-4.5: Valuation Engine
 """
 
-import math
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

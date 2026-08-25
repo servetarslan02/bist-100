@@ -9,9 +9,8 @@ ALPHA BIST — Halt Monitor
 - SPK geçici işlem yasağı
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()

@@ -42,7 +42,7 @@ def get_client():
         _redis_client.ping()
         _redis_available = True
         return _redis_client
-    except Exception as e:
+    except Exception:
         _redis_available = False
         return None
 

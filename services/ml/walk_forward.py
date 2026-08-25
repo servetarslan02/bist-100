@@ -10,8 +10,8 @@ KURAL: Gelecekten bilgi sızdırma!
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timedelta
+from typing import Dict, List, Any, Callable
+from datetime import datetime
 from dataclasses import dataclass
 import structlog
 

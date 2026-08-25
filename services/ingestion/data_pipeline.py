@@ -18,7 +18,7 @@ import time
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

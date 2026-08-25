@@ -12,7 +12,7 @@ Cross-timeframe divergence detection:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog
@@ -133,7 +133,7 @@ class MultiTimeframeEngine:
     ) -> TimeframeState:
         """Tek bir timeframe için state hesapla."""
         instruments = data.get("instruments", [])
-        features = data.get("features", {})
+        data.get("features", {})
 
         if not instruments:
             return TimeframeState(timeframe=timeframe)

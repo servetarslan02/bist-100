@@ -9,8 +9,7 @@ Bu, ALPHA'nın kalbidir.
 """
 
 import time
-import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

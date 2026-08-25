@@ -1,5 +1,4 @@
 
-import orjson
 import gc
 import pandas as pd
 from services.core.alpha_engine import AlphaEngine
@@ -27,7 +26,7 @@ def run_final():
         embargo_days=5
     )
     
-    rm = RiskManager()
+    RiskManager()
     all_signals = []
     
     folds = wf.create_folds(common_dates)

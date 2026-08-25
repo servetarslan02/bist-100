@@ -11,7 +11,7 @@ Kullanım:
 """
 
 import numpy as np
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 from dataclasses import dataclass, field
 import structlog
 
@@ -107,10 +107,10 @@ class CrossSourceReconciler:
                 growth_scores[feat] = features[feat]
 
         # 3. Sentiment consensus
-        sentiment_consensus = self._compute_consensus(sentiment_scores, "sentiment")
+        self._compute_consensus(sentiment_scores, "sentiment")
 
         # 4. Büyüme consensus
-        growth_consensus = self._compute_consensus(growth_scores, "growth")
+        self._compute_consensus(growth_scores, "growth")
 
         # 5. Genel consensus
         all_scores = {**sentiment_scores, **growth_scores}

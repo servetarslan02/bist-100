@@ -13,7 +13,6 @@ Kullanım:
 
 import os
 import asyncio
-from typing import Optional, Any, Dict
 import structlog
 
 try:

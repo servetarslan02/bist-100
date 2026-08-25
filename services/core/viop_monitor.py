@@ -7,7 +7,7 @@ Vadeli İşlem ve Opsiyon Piyasası takibi:
 - Margin call tespiti
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 

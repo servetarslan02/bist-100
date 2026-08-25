@@ -3,7 +3,7 @@
 Value, Momentum, Quality, Size, Low Vol, Dividend, Leverage, BIST-specific.
 Cross-sectional z-score normalization.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import numpy as np
 import structlog
 
@@ -79,8 +79,8 @@ def calculate_factor_scores(
             # Universe istatistikleri
             median = universe_stats.get(f"{metric}_median", universe_stats.get(f"{metric}_mean", 0))
             std = universe_stats.get(f"{metric}_std", 1)
-            p25 = universe_stats.get(f"{metric}_p25", median - std)
-            p75 = universe_stats.get(f"{metric}_p75", median + std)
+            universe_stats.get(f"{metric}_p25", median - std)
+            universe_stats.get(f"{metric}_p75", median + std)
 
             # Percentile skor
             if std > 0:

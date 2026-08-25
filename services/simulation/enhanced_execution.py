@@ -12,7 +12,7 @@ Kaynaklar: mbrenndoerfer Market Microstructure (2026), arXiv Agentic Trading (20
 """
 
 import numpy as np
-from typing import Dict, Optional, Any
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 

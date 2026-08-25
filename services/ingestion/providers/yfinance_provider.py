@@ -2,7 +2,7 @@
 
 import yfinance as yf
 import polars as pl
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import structlog
 

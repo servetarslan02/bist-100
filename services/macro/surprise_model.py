@@ -14,8 +14,8 @@ KURAL: Beklenti verisi yoksa surprise = 0 kabul et (belirsizlik = etki yok).
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Any
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import structlog
 

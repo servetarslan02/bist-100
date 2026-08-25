@@ -10,7 +10,7 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, Any, List
+from typing import List
 import structlog
 
 logger = structlog.get_logger()
@@ -81,7 +81,7 @@ class CacheWarmer:
     async def _warm_latest_prices(self) -> bool:
         """Son fiyatları yükle (radar cache)."""
         try:
-            from ..core.redis_helper import get_cached, set_cached
+            from ..core.redis_helper import get_cached
             # Mevcut radar verisi varsa tazele
             radar = get_cached("radar:data")
             if radar:

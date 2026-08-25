@@ -10,7 +10,7 @@ Kaynaklar: awesome-quant, SCANNER-NIHAI-SPEC.md
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime
 
 
 @dataclass
@@ -120,7 +120,6 @@ class ScannerInterface(ABC):
         Returns:
             ScanResult listesi (skora göre sıralı)
         """
-        pass
 
     @abstractmethod
     def get_opportunities(
@@ -139,7 +138,6 @@ class ScannerInterface(ABC):
         Returns:
             Filtrelenmiş fırsatlar
         """
-        pass
 
     @abstractmethod
     def generate_signals(
@@ -154,7 +152,6 @@ class ScannerInterface(ABC):
         Returns:
             Sinyal üretilmiş sonuçlar
         """
-        pass
 
     def scan_and_rank(
         self,

@@ -104,7 +104,6 @@ class EnsembleRegimeDetector:
 
         # GMM opsiyonel
         try:
-            from sklearn.mixture import GaussianMixture
             self._gmm_available = True
         except ImportError:
             self._gmm_available = False

@@ -10,7 +10,7 @@ P0-7 düzeltmesi:
 
 import orjson
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()

@@ -12,7 +12,7 @@ Temel altyapı:
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Callable
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
@@ -306,12 +306,10 @@ class BaseAdapter(ABC):
     @abstractmethod
     async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
         """Veri topla. Alt sınıflar implement etmeli."""
-        pass
 
     @abstractmethod
     def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
         """Feature hesapla. Alt sınıflar implement etmeli."""
-        pass
 
     async def fetch(self, ticker: str, **kwargs) -> Dict[str, float]:
         """Tam pipeline: collect → validate → compute_features.

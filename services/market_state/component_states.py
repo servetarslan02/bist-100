@@ -12,9 +12,9 @@ Piyasa bileşenlerinin ayrı ayrı state hesaplaması:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -161,7 +161,7 @@ class ComponentStateEngine:
             return "NEUTRAL"
 
         positive_count = sum(1 for m in momentums if m > 0)
-        negative_count = sum(1 for m in momentums if m < 0)
+        sum(1 for m in momentums if m < 0)
         total = len(momentums)
 
         positive_pct = positive_count / total
@@ -408,7 +408,7 @@ class ComponentStateEngine:
 
         risk_appetite = world_state.get("global_risk_appetite", 0.5)
         inflation = world_state.get("inflation_pressure", 0.5)
-        turkey_risk = world_state.get("turkey_macro_risk", 0.5)
+        world_state.get("turkey_macro_risk", 0.5)
 
         # Stagflation: yüksek enflasyon + düşük risk iştahı
         if inflation > 0.7 and risk_appetite < 0.4:

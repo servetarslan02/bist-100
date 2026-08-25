@@ -2,23 +2,22 @@
 
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, List, Any
+from typing import Dict, List
 import polars as pl
 import structlog
 
-from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, get_pg_pool,
-    ch_insert, ch_execute, redis_hset, redis_hgetall,
+    init_databases, close_databases, ch_insert,
+    redis_hset,
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
     ensure_topics, EventType,
-    EventConsumer, publish_event, flush_producer,
+    EventConsumer, publish_event,
 )
 from ..core.logging import setup_logging
 from .calculator import feature_calculator
-from .pipeline import feature_pipeline, PipelineConfig
+from .pipeline import feature_pipeline
 
 logger = structlog.get_logger()
 

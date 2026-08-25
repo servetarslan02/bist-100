@@ -168,7 +168,7 @@ class DataSourceManager:
             tickers = cache.get("tickers", [])
             if tickers:
                 return [f"{t}.IS" for t in tickers]
-        except Exception as e:
+        except Exception:
             pass
         # Fallback — cache yoksa BIST-30 alt kümesi (geçici, cache yüklenene kadar)
         # Gerçek liste UniverseAutoUpdater tarafından güncellenir
@@ -268,12 +268,12 @@ class YahooFinanceSource:
 
             stock = yf.Ticker(ticker)
 
-            print(f"FETCHING YFINANCE: {ticker} start={start_date} end={end_date}")
+            logger.debug(f"YFinance fetch: {ticker} start={start_date} end={end_date}")
             if start_date and end_date:
                 df = stock.history(start=start_date, end=end_date, interval=interval)
             else:
                 df = stock.history(period=period, interval=interval)
-            print(f"YFINANCE RETURNED: {len(df)} rows")
+            logger.debug(f"YFinance returned: {len(df)} rows")
 
             if df.empty:
                 return None

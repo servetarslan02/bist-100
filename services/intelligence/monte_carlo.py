@@ -12,8 +12,8 @@ FAZ 5.1-5.2: Monte Carlo Engine
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -101,7 +101,7 @@ class MonteCarloEngine:
 
         # Günlük parametreler
         dt = 1 / 252  # 1 iş günü
-        mu_daily = expected_return_annual * dt
+        expected_return_annual * dt
         sigma_daily = volatility_annual * np.sqrt(dt)
 
         # Simülasyon

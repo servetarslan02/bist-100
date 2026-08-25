@@ -11,7 +11,6 @@ Alternative data feature'ları için feature store entegrasyonu.
 """
 
 import orjson
-import time
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime, timezone

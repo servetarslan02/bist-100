@@ -17,10 +17,9 @@ Günlük Akış:
 Kaynaklar: BIST resmi, arXiv Agentic Trading (2026)
 """
 
-import asyncio
 from typing import Dict, Any, Optional, Callable, Awaitable, List
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -260,7 +259,7 @@ class DailyWorkflow:
         try:
             from services.core.risk_gate import risk_gate
             risk_gate.reset_daily()
-        except Exception as e:
+        except Exception:
             pass
 
 

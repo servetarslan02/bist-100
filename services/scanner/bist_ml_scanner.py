@@ -6,7 +6,6 @@ Eğitilen LightGBM + CatBoost + XGBoost modellerini yükleyip
 20G Breakout ve Dip Dönüşü sinyalleri üretir.
 """
 
-import os
 import pickle
 import numpy as np
 import pandas as pd

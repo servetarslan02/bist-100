@@ -7,7 +7,6 @@ FAZ 4 model yapısını bozmaz; DB ile ilişkilendirme sağlar.
 import orjson
 import hashlib
 from typing import Optional, Dict, Any, List
-from dataclasses import asdict
 import structlog
 
 logger = structlog.get_logger()
@@ -41,8 +40,8 @@ class ModelPersistence:
             model_versions.id veya None (DB yoksa)
         """
         try:
-            from .database import pg_fetchrow, pg_fetchval
-        except Exception as e:
+            from .database import pg_fetchval
+        except Exception:
             logger.warning("DB not available, skipping model metadata save")
             return None
 
@@ -54,11 +53,11 @@ class ModelPersistence:
         confidence_details = getattr(model_obj, 'confidence_details', {})
         target_horizon = getattr(model_obj, 'target_horizon', 5)
         train_samples = getattr(model_obj, 'train_samples', 0)
-        train_date_range = getattr(model_obj, 'train_date_range', ('', ''))
-        scaler_mean = getattr(model_obj, 'scaler_mean', None)
-        scaler_std = getattr(model_obj, 'scaler_std', None)
-        impute_values = getattr(model_obj, 'impute_values', {})
-        feature_importance = getattr(model_obj, 'feature_importance', {})
+        getattr(model_obj, 'train_date_range', ('', ''))
+        getattr(model_obj, 'scaler_mean', None)
+        getattr(model_obj, 'scaler_std', None)
+        getattr(model_obj, 'impute_values', {})
+        getattr(model_obj, 'feature_importance', {})
 
         # Feature contract hash
         contract_hash = hashlib.sha256(
@@ -117,7 +116,7 @@ class ModelPersistence:
         """Champion model metadata'sını getir."""
         try:
             from .database import pg_fetchrow
-        except Exception as e:
+        except Exception:
             return None
 
         try:
@@ -141,7 +140,7 @@ class ModelPersistence:
         """Modeli champion yap (eski champion'ı candidate'a düşür)."""
         try:
             from .database import pg_execute, pg_fetchval
-        except Exception as e:
+        except Exception:
             return False
 
         try:
@@ -177,7 +176,7 @@ class ModelPersistence:
         """Model versiyonlarını listele."""
         try:
             from .database import pg_fetch
-        except Exception as e:
+        except Exception:
             return []
 
         try:

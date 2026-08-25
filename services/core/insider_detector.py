@@ -1,5 +1,5 @@
 """ALPHA BIST — Insider Trading Detector."""
-from typing import Dict, Any, List
+from typing import Dict, List
 from dataclasses import dataclass
 import structlog
 logger = structlog.get_logger()

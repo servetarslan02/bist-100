@@ -14,7 +14,7 @@ Calendar day kullanımının sorunları:
 
 Çözüm: Tüm uzunluklar trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Tuple, Optional
 import numpy as np
 import structlog

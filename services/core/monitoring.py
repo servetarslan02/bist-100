@@ -26,7 +26,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import structlog
 
-from .db_lock import get_all_metrics, get_health_report, get_lock_metrics
+from .db_lock import get_all_metrics, get_health_report
 from .observability import prometheus_metrics, health_checker
 from .alerting import alerting
 

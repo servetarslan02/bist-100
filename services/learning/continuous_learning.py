@@ -12,12 +12,11 @@ ROADMAP v3.0 FAZ 7:
 KURAL: Sistem durmadan kendini güncellemeli, dünkü model bugünün piyasasına uymayabilir.
 """
 
-import orjson
 import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from collections import deque, defaultdict
+from datetime import datetime, timezone
+from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -122,8 +121,7 @@ class ContinuousLearningPipeline:
 
         # 2.5 Macro regime + surprise kontrolü
         try:
-            from services.macro import macro_regime_detector, macro_surprise_model
-            from services.features.macro import macro_feature_engine
+            from services.macro import macro_regime_detector
 
             # Macro features
             all_macro_features = {}

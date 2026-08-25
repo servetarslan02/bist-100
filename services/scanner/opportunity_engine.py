@@ -15,7 +15,6 @@ BIST'in tamamından en güçlü fırsatları bulur:
 FAZ 8: Opportunity Discovery Engine
 """
 
-import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -528,7 +527,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         logger.warning("Failed to load module", module="TieredScanner", error=str(e))
     try:
         from .event_queue import EventQueue
-        queue = EventQueue()
+        EventQueue()
         results.append({"engine": "event_queue", "status": "available"})
     except ImportError:
         pass

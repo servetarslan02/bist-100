@@ -1,6 +1,5 @@
 """System API — Canlı mikroservis, veritabanı deposu, telemetri ve alarm motoru (100% Gerçek Veri)."""
 
-import os
 import time
 import asyncio
 from datetime import datetime, timezone
@@ -13,7 +12,6 @@ except ImportError:
     psutil = None
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -67,7 +65,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     # PostgreSQL
     try:
         from ...core.database import pg_fetchval
-        t0 = time.time()
+        time.time()
         ok = await pg_fetchval("SELECT 1") == 1
         services["postgresql"] = "healthy" if ok else "unhealthy"
     except Exception as e:

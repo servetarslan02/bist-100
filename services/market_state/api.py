@@ -10,7 +10,6 @@ REST API endpoint'leri:
 - GET /api/market/health     — Sağlık durumu
 """
 
-from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import structlog
 

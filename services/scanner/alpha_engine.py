@@ -10,7 +10,6 @@ Tüm pipeline tek motor:
 800 hisse → data → bars → features → regime → scanner → signals
 """
 
-import asyncio
 import time
 import numpy as np
 from typing import Dict, List, Optional, Any
@@ -362,7 +361,7 @@ class AlphaEngine:
                     close_list = [x for x in df["close"].to_list() if x is not None]
                     features["price"] = close_list[-1] if close_list else 0
                     features_map[ticker] = features
-            except Exception as e:
+            except Exception:
                 pass  # Intentional: silent error handling
         return features_map
 
@@ -440,7 +439,7 @@ class AlphaEngine:
             result = self._ml_loader.predict_ensemble(features)
             # 0-100 skoruna çevir
             prediction = result.get("prediction", 0)
-            confidence = result.get("confidence", 0.3)
+            result.get("confidence", 0.3)
 
             # Prediction'ı 0-100 skoruna normalize et
             score = 50 + prediction * 10  # -5..+5 → 45..55

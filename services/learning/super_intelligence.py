@@ -16,12 +16,11 @@ SÜPER AKILLI, TAM OTOMATİK, KENDİ KENDİNİ YÖNETEN SİSTEM
 KURAL: Sistem insan müdahalesi olmadan 7/24 çalışmalı.
 """
 
-import orjson
 import time
 import numpy as np
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone, timedelta
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 from collections import deque, defaultdict
 import structlog
 import hashlib
@@ -604,7 +603,7 @@ class SuperIntelligenceEngine:
                 ic = np.corrcoef(scores, actuals)[0, 1]
                 if np.isnan(ic):
                     ic = 0
-            except Exception as e:
+            except Exception:
                 ic = 0
 
         win_rate = wins / len(returns) if returns else 0

@@ -10,7 +10,7 @@ FAZ 5.1:
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator, Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict
 import structlog
 
 try:

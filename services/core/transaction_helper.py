@@ -16,9 +16,8 @@ Referanslar:
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Callable, AsyncContextManager
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from typing import Dict, List, Optional, Any, Callable
+from dataclasses import dataclass
 from contextlib import asynccontextmanager
 import structlog
 
@@ -159,7 +158,6 @@ class TransactionHelper:
                     await tx.rollback()
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="transaction_helper.py:160")
-                    pass
             logger.error("Transaction rollback", error=str(e))
             raise
 
@@ -169,7 +167,6 @@ class TransactionHelper:
                     await self._pool.release(conn)
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="transaction_helper.py:169")
-                    pass
 
     @asynccontextmanager
     async def atomic_with_retry(
@@ -228,7 +225,7 @@ class TransactionHelper:
         try:
             yield conn
             await conn.execute(f"RELEASE SAVEPOINT {sp_name}")
-        except Exception as e:
+        except Exception:
             await conn.execute(f"ROLLBACK TO SAVEPOINT {sp_name}")
             raise
 

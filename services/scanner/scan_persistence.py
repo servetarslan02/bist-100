@@ -9,7 +9,7 @@ Kaynaklar: TradingAgents (TauricResearch 2025), Endüstri standardı
 
 import orjson
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 import structlog

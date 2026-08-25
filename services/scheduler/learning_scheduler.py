@@ -11,7 +11,6 @@ Learning cycle ve model bakım job'larını zamanlar:
 Kaynaklar: arXiv Agentic Trading (2026), Endüstri standardı
 """
 
-import asyncio
 import inspect
 from typing import Dict, Any, Optional, Callable, Awaitable
 from datetime import datetime, timezone
@@ -185,7 +184,7 @@ class LearningScheduler:
             last = datetime.fromisoformat(config.last_run)
             elapsed_hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
             return elapsed_hours >= config.interval_hours
-        except Exception as e:
+        except Exception:
             return True
 
     def get_status(self) -> Dict[str, Any]:

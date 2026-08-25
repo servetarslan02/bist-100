@@ -7,7 +7,7 @@ Auth, rate limiting, service resolution.
 
 import os
 import time
-from typing import Optional, Dict, Any
+from typing import Optional
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import structlog

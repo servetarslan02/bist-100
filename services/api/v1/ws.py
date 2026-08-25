@@ -7,9 +7,8 @@ Desteklenen formatlar:
 - Protobuf (binary frame, 10x daha küçük)
 """
 
-import asyncio
 import orjson
-from typing import Dict, Set, Any, Optional
+from typing import Dict, Set, Any
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import structlog
 from datetime import datetime, timezone
@@ -20,14 +19,13 @@ router = APIRouter()
 
 # Binary WebSocket desteği (Protobuf native)
 try:
-    from ..binary_ws import ProtobufMessage, BinaryWebSocket
+    from ..binary_ws import ProtobufMessage
     HAS_BINARY_WS = True
 except ImportError:
     HAS_BINARY_WS = False
 
 # Protobuf desteği
 try:
-    from ..grpc.generated import market_pb2
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -177,7 +175,7 @@ async def websocket_live(websocket: WebSocket):
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "live")
-    except Exception as e:
+    except Exception:
         manager.disconnect(websocket, "live")
 
 @router.websocket("/radar")
@@ -201,7 +199,7 @@ async def websocket_radar(websocket: WebSocket):
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "radar")
-    except Exception as e:
+    except Exception:
         manager.disconnect(websocket, "radar")
 
 @router.websocket("/events")
@@ -225,7 +223,7 @@ async def websocket_events(websocket: WebSocket):
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, "events")
-    except Exception as e:
+    except Exception:
         manager.disconnect(websocket, "events")
 
 

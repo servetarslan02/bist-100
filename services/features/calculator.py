@@ -3,10 +3,9 @@ ALPHA BIST — Feature Calculator Bridge
 services.ml.feature_engine.FeatureEngine canonical motoruna bağlanır.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import pandas as pd
-import numpy as np
-from services.ml.feature_engine import FeatureEngine, compute_universe_features
+from services.ml.feature_engine import FeatureEngine
 
 class FeatureCalculator(FeatureEngine):
     """Canonical FeatureEngine bridge for feature calculator."""

@@ -3,14 +3,14 @@
 import asyncio
 import orjson
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 import httpx
 import structlog
 
 from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, pg_fetchrow,
-    redis_get, redis_set, redis_hgetall,
+    init_databases, close_databases, pg_fetch, redis_get,
+    redis_set, redis_hgetall,
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
@@ -18,8 +18,7 @@ from ..core.event_bus import (
     EventConsumer, publish_event,
 )
 from ..core.logging import setup_logging
-from .spec_engine import spec_engine, SPECConfig
-from .impact_engine import impact_engine
+from .spec_engine import spec_engine
 from .world_state import world_state_manager
 
 logger = structlog.get_logger()
@@ -207,7 +206,7 @@ class IntelligenceService:
         # 4. Forecasting
         try:
             from .forecasting import ForecastingEngine
-            fe = ForecastingEngine()
+            ForecastingEngine()
             result["forecast"] = {"horizons": [1, 5, 20]}
         except Exception as e:
             logger.warning("forecasting engine failed", error=str(e))
@@ -215,7 +214,6 @@ class IntelligenceService:
 
         # 5. Monte Carlo
         try:
-            from .monte_carlo import MonteCarloEngine
             result["monte_carlo"] = {"available": True}
         except Exception as e:
             logger.warning("monte_carlo engine failed", error=str(e))
@@ -223,7 +221,6 @@ class IntelligenceService:
 
         # 6. Probability
         try:
-            from .probability import ProbabilityEngine
             result["probability"] = {"available": True}
         except Exception as e:
             logger.warning("probability engine failed", error=str(e))
@@ -231,7 +228,6 @@ class IntelligenceService:
 
         # 7. Scenario
         try:
-            from .scenario import ScenarioEngine
             result["scenario"] = {"available": True}
         except Exception as e:
             logger.warning("scenario engine failed", error=str(e))
@@ -239,10 +235,6 @@ class IntelligenceService:
 
         # 8. Analysis Engines
         try:
-            from .analysis_engines import (
-                PriceActionEngine, VolumeEngine, SectorEngine,
-                RelativeStrengthEngine, CorrelationEngine
-            )
             result["analysis"] = {"engines": ["price_action", "volume", "sector", "relative_strength", "correlation"]}
         except Exception as e:
             logger.warning("analysis engines failed", error=str(e))
@@ -251,7 +243,7 @@ class IntelligenceService:
         # 9. Knowledge Graph
         try:
             from .knowledge_graph import KnowledgeGraph
-            kg = KnowledgeGraph()
+            KnowledgeGraph()
             result["knowledge_graph"] = {"loaded": True}
         except Exception as e:
             logger.warning("knowledge_graph failed", error=str(e))
@@ -260,7 +252,7 @@ class IntelligenceService:
         # 10. Research Memory
         try:
             from .research_memory import ResearchMemory
-            rm = ResearchMemory()
+            ResearchMemory()
             result["research_memory"] = {"available": True}
         except Exception as e:
             logger.warning("research_memory failed", error=str(e))
@@ -268,7 +260,6 @@ class IntelligenceService:
 
         # 11. Evidence Engine
         try:
-            from .evidence_engine import EvidenceVerificationEngine
             result["evidence"] = {"available": True}
         except Exception as e:
             logger.warning("evidence_engine failed", error=str(e))
@@ -285,7 +276,6 @@ class IntelligenceService:
 
         # 13. Impact Engine (B31)
         try:
-            from .impact_engine import analyze_event_impact
             result["event_impact"] = {"available": True}
         except Exception as e:
             logger.warning("impact_engine failed", error=str(e))
@@ -293,7 +283,6 @@ class IntelligenceService:
 
         # 14. Macro Sensitivity
         try:
-            from .macro_sensitivity import MacroSensitivityEngine
             result["macro_sensitivity"] = {"available": True}
         except Exception as e:
             logger.warning("macro_sensitivity failed", error=str(e))
@@ -301,7 +290,6 @@ class IntelligenceService:
 
         # 15. News Pipeline
         try:
-            from .news_pipeline import NewsPipeline
             if news:
                 result["news_analysis"] = {"count": len(news)}
         except Exception as e:
@@ -310,7 +298,6 @@ class IntelligenceService:
 
         # 16. Trade Planner
         try:
-            from .trade_planner import TradePlanner
             result["trade_planner"] = {"available": True}
         except Exception as e:
             logger.warning("trade_planner failed", error=str(e))

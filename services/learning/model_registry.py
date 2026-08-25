@@ -175,7 +175,7 @@ class ModelRegistry:
             return
 
         # Champion ve shadow'ları koru
-        protected = {r.version for r in self._records if r.status in ["CHAMPION", "SHADOW"]}
+        {r.version for r in self._records if r.status in ["CHAMPION", "SHADOW"]}
         retired = [r for r in self._records if r.status == "RETIRED"]
 
         # Eski retired'ları sil

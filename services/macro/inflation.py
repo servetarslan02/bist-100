@@ -11,7 +11,7 @@ Enflasyon feature'ları:
 - inflation_regime: Enflasyon rejimi (düşük/orta/yüksek/çok yüksek)
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import structlog
 
 logger = structlog.get_logger()

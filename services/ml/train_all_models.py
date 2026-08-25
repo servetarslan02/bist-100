@@ -10,12 +10,9 @@ Tüm ML/AI modellerini gerçek feature matrisleri ve zamansal walk-forward valid
 """
 
 import os
-import orjson
 import pickle
 import numpy as np
-import pandas as pd
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List
 
 from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
 from services.ml.catboost_model import CatBoostModel, CatBoostConfig

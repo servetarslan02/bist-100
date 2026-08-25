@@ -11,11 +11,9 @@ Kullanım:
 
 import asyncio
 import time
-from typing import AsyncIterator
 import structlog
 
 try:
-    import grpc
     from grpc import aio
     HAS_GRPC = True
 except ImportError:

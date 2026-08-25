@@ -9,7 +9,7 @@ Borsa İstanbul Pay Piyasası Prosedürü Açık Artırma Algoritması:
 5. Tek Denge Fiyatından (Single Equilibrium Price) tüm eşleşen emirlerin gerçekleşmesi
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any
 from dataclasses import dataclass
 import structlog
 from services.core.bist_tick_size import round_to_bist_tick

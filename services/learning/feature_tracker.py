@@ -11,8 +11,8 @@ KURAL: Hangi feature ne kadar önemli, trend nasıl değişiyor?
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from collections import defaultdict, deque
 import structlog

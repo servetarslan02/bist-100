@@ -8,7 +8,7 @@ Sermaye Piyasası Kurulu uyumluluk:
 - Algoritmik trading bildirimi
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 

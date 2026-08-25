@@ -8,7 +8,7 @@ BIST fiyat limitleri (pazara göre):
 - Devre kesici: sadece aşağı yönlü tetiklenir
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 

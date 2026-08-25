@@ -12,11 +12,10 @@ v2.0: Async refactor + retry + rate limiter entegrasyonu
 
 import asyncio
 import concurrent.futures
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import structlog
 
-from ...core.async_http import get_client
 
 logger = structlog.get_logger()
 

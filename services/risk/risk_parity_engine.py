@@ -6,7 +6,7 @@ ALPHA BIST — Kurumsal Risk Parity & 3 Günlük Kriz Teyidi + Boğa Breakout Mo
 3. Fixed Fractional ATR Risk Sizing (%1.0 Risk / Trade, Max %10 Hisse Tavanı, Max %5 Portföy Isısı)
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd

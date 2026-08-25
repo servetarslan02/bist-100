@@ -11,7 +11,7 @@ FAZ 3.2: Regime Engine
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from enum import Enum
@@ -75,7 +75,7 @@ class RegimeEngine:
             try:
                 from .hmm_regime import HMMRegimeDetector
                 self._hmm_detector = HMMRegimeDetector(n_regimes=4, rolling_window=63)
-            except Exception as e:
+            except Exception:
                 self._hmm_detector = None
 
     def detect_regime(self, features: Dict[str, float]) -> RegimeState:
@@ -163,11 +163,10 @@ class RegimeEngine:
                             scores[target] = scores[target] * (1 - macro_weight) + macro_score * macro_weight * 100
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="regime.py:146")
-            pass
 
         # En yüksek skorlu rejimi seç
         best_regime = max(scores, key=scores.get)
-        best_score = scores[best_regime]
+        scores[best_regime]
 
         # Confidence: en yüksek skor ile ikinci arasındaki fark
         # F-013 düzeltmesi: Eşitlik durumunda daha güvenilir confidence hesaplama

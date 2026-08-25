@@ -11,9 +11,9 @@ KURAL: Yeni model doğrudan production'a alınamaz.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from typing import Dict, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from collections import deque
 import structlog
 

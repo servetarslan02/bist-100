@@ -160,7 +160,7 @@ class AuthenticationService:
             salt, hash_hex = stored_hash.split(":")
             hash_val = hashlib.pbkdf2_hmac('sha256', password.encode(), salt.encode(), 100000)
             return hmac.compare_digest(hash_val.hex(), hash_hex)
-        except Exception as e:
+        except Exception:
             return False
 
     def _find_user(self, username: str) -> Optional[User]:

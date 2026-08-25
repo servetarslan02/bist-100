@@ -180,7 +180,7 @@ class SocialProvider:
 
             try:
                 text = await client.get_text(topic_url, params=None)
-            except Exception as e:
+            except Exception:
                 return []
 
             if not text:
@@ -464,7 +464,7 @@ class SocialProvider:
                 all_items.extend(result)
 
         # Aggregate sentiment
-        sentiments = [item.get("sentiment", 0) for item in all_items if item.get("sentiment") is not None]
+        [item.get("sentiment", 0) for item in all_items if item.get("sentiment") is not None]
 
         return {
             "ticker": ticker,

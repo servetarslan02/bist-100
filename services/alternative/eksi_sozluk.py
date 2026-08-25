@@ -12,7 +12,6 @@ Features:
 - eksi_sentiment_momentum: Sentiment değişim hızı
 """
 
-import asyncio
 import re
 import numpy as np
 from typing import Dict, Any, Optional, List

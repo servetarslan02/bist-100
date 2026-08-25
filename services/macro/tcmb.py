@@ -13,10 +13,9 @@ TCMB para politikası feature'ları:
 Refactor: Config-driven, error handling, logging
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import structlog
 
-from services.macro.config.macro_config import macro_config
 
 logger = structlog.get_logger()
 

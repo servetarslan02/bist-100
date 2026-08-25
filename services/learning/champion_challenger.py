@@ -12,12 +12,11 @@ KURAL: Champion değişikliği statistical significance gerektirir.
 
 import numpy as np
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from collections import deque
 import structlog
 
-from services.learning.config.learning_config import learning_settings
 
 logger = structlog.get_logger()
 

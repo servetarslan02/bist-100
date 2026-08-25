@@ -3,12 +3,10 @@ ALPHA BIST — BIST Universe Auto-Discovery Provider v2.0
 TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfeder ve günceller.
 """
 
-import os
 import requests
-import yfinance as yf
 import orjson
 import re
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone, timedelta
 from pathlib import Path

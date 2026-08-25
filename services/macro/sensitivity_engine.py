@@ -12,11 +12,10 @@ KURAL: Sabit hassasiyet yok — her şey rolling korelasyon.
 
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
-from services.macro.config.macro_config import macro_config
 
 logger = structlog.get_logger()
 
@@ -338,7 +337,7 @@ class DynamicSensitivityEngine:
             corr = float(np.corrcoef(sr, mv)[0, 1])
             if np.isnan(corr):
                 return 0.0, 1.0
-        except Exception as e:
+        except Exception:
             return 0.0, 1.0
 
         # p-value (basitleştirilmiş — t-test)
@@ -351,7 +350,7 @@ class DynamicSensitivityEngine:
                 p_value = float(2 * stats.t.sf(abs(t_stat), n_obs - 2))
             else:
                 p_value = 1.0
-        except Exception as e:
+        except Exception:
             p_value = 1.0
 
         return round(corr, 4), round(p_value, 4)

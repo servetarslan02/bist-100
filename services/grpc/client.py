@@ -14,7 +14,7 @@ Kullanım:
 
 import asyncio
 import time
-from typing import List, AsyncIterator, Optional, Dict, Any
+from typing import List, AsyncIterator, Dict, Any
 import structlog
 
 try:

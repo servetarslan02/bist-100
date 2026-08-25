@@ -10,7 +10,6 @@ KURAL: Execute edilemeyen fiyat kullanma!
 """
 
 import copy as _copy
-import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass

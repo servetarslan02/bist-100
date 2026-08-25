@@ -11,7 +11,7 @@ ALPHA BIST — BIST Market Data Stream v1.0
 
 import asyncio
 import orjson
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Callable
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
@@ -100,7 +100,7 @@ class BISTStreamProvider:
                                 continue
 
                             last_row = td.iloc[-1]
-                            prev_row = td.iloc[-2] if len(td) > 1 else last_row
+                            td.iloc[-2] if len(td) > 1 else last_row
 
                             tick = StreamTick(
                                 ticker=ticker,
@@ -122,7 +122,7 @@ class BISTStreamProvider:
 
                             self._tick_count += 1
 
-                        except Exception as e:
+                        except Exception:
                             pass  # Intentional: silent error handling
 
                 # 60 saniye bekle (ücretsiz API limiti)
@@ -173,7 +173,7 @@ class BISTStreamProvider:
                                             await handler(tick)
                                         else:
                                             handler(tick)
-                                    except Exception as e:
+                                    except Exception:
                                         pass  # Intentional: silent error handling
 
                                 self._tick_count += 1
@@ -238,7 +238,7 @@ class BISTStreamProvider:
                                         await handler(tick)
                                     else:
                                         handler(tick)
-                                except Exception as e:
+                                except Exception:
                                     pass  # Intentional: silent error handling
 
                             self._tick_count += 1

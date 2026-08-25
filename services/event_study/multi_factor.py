@@ -4,7 +4,7 @@ Fama-French 3-Factor ve 5-Factor modeli ile expected return hesaplama.
 BIST için SMB (Small Minus Big) ve HML (High Minus Low) factor'leri.
 """
 import numpy as np
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 import structlog
 
 logger = structlog.get_logger()

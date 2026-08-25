@@ -3,7 +3,7 @@ ALPHA BIST — Real Feature Store
 Redis ve bellek üzerinden anlık canlı öznitelikleri depolar ve sorgular.
 """
 
-from typing import Dict, Any, Optional
+from typing import Dict
 import structlog
 from services.core.redis_helper import get_cached, set_cached
 

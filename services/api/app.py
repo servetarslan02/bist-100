@@ -23,7 +23,7 @@ import time
 import asyncio
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
@@ -35,7 +35,6 @@ import structlog
 from fastapi.responses import Response as FastAPIResponse
 
 from .v1 import v1_router
-from .auth import jwt_handler, Role
 from .rate_limiter import rate_limiter
 from ..core.database import init_databases, close_databases, check_db_health
 from ..core.otel import setup_telemetry, shutdown_telemetry

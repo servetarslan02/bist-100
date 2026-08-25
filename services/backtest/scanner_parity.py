@@ -14,10 +14,9 @@ Prensipler:
 
 import hashlib
 import orjson
-import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple, Callable
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Callable
+from dataclasses import dataclass
 from datetime import datetime
 import structlog
 

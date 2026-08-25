@@ -21,7 +21,7 @@ import numpy as np
 import math
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date
 try:
     from scipy.stats import norm
     _norm_cdf = norm.cdf

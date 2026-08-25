@@ -13,7 +13,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 import structlog
 
-from .agent_system import AgentRole, AgentResult, BaseAgent, AgentTask
+from .agent_system import AgentRole, AgentResult
 from .llm_client import BaseLLMClient
 from .debate_engine import DebateResult
 from .communication_bus import Resolution

@@ -21,12 +21,10 @@ Bu motor:
      Toplam Ödenen Komisyon, Aylık Getiri Matrisi ve 5-Rejim Dağılımı.
 """
 
-import os
-import orjson
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from typing import Dict, List, Any, Tuple
 import lightgbm as lgb
 from catboost import CatBoostClassifier
@@ -389,17 +387,13 @@ def run_institutional_walkforward_backtest():
             pos["days_held"] += 1
 
             should_exit = False
-            exit_reason = ""
 
             if pnl_pct <= -5.0:
                 should_exit = True
-                exit_reason = "STOP_LOSS"
             elif pnl_pct >= 12.0:
                 should_exit = True
-                exit_reason = "TAKE_PROFIT"
             elif pos["days_held"] >= 5:
                 should_exit = True
-                exit_reason = "TIME_EXIT"
 
             if should_exit:
                 trade_val = pos["shares"] * cur_price
@@ -488,7 +482,7 @@ def run_institutional_walkforward_backtest():
 
     total_return_strat = (final_strat_equity / INITIAL_CAPITAL - 1.0) * 100.0
     total_return_bench = (final_bench_equity / INITIAL_CAPITAL - 1.0) * 100.0
-    total_return_ew = (final_ew_equity / INITIAL_CAPITAL - 1.0) * 100.0
+    (final_ew_equity / INITIAL_CAPITAL - 1.0) * 100.0
 
     n_years = len(eval_dates) / 252.0
     cagr_strat = ((final_strat_equity / INITIAL_CAPITAL) ** (1.0 / n_years) - 1.0) * 100.0
@@ -504,7 +498,7 @@ def run_institutional_walkforward_backtest():
     max_dd_bench = abs(((bench_series - cummax_b) / cummax_b).min()) * 100.0
 
     cummax_ew = ew_series.cummax()
-    max_dd_ew = abs(((ew_series - cummax_ew) / cummax_ew).min()) * 100.0
+    abs(((ew_series - cummax_ew) / cummax_ew).min()) * 100.0
 
     # Sharpe (TCMB %40 Risksiz Faiz Oranına Göre)
     rf_daily = 0.40 / 252.0

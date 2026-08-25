@@ -15,7 +15,7 @@ Kullanım:
 
 import asyncio
 import orjson
-from typing import Dict, List, Set, Any, Callable
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 import structlog
 
@@ -47,7 +47,6 @@ class WebSocketConnection:
             await self.ws.close()
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="websocket.py:48")
-            pass
 
 
 class WebSocketServer:
@@ -156,7 +155,7 @@ class WebSocketServer:
                 for conn in connections:
                     try:
                         await conn.send(data)
-                    except Exception as e:
+                    except Exception:
                         dead.append(conn)
 
                 # Ölü bağlantıları temizle

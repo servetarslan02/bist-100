@@ -1,16 +1,14 @@
 """Event Study API — KAP ve Makro Olay Çalışması (100% Canlı Veri Akışı)."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import List, Dict, Any, Optional
 import numpy as np
-import pandas as pd
 import yfinance as yf
 from fastapi import APIRouter, Depends, Query
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()

@@ -10,7 +10,7 @@ Modellerin geçmiş performansından dinamik güvenilirlik puanı (Reliability /
 """
 
 import math
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

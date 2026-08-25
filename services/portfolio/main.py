@@ -9,14 +9,12 @@ v2.0: PortfolioManager v2.0 muhasebe altyapısıyla uyumlu.
 
 import asyncio
 import os
-import orjson
 from datetime import datetime, timezone, date
 from typing import Dict, List, Any, Optional
 import structlog
 
-from ..core.config import settings
 from ..core.database import pg_fetch, pg_fetchrow, pg_execute, pg_fetchval, get_pg_pool
-from ..core.db_lock import CoordinatedLock, get_lock_metrics, get_all_metrics, get_health_report, portfolio_trade_lock
+from ..core.db_lock import CoordinatedLock, get_all_metrics, get_health_report
 from ..core.config_watcher import ConfigWatcher
 from ..portfolio.portfolio_manager import (
     PortfolioManager, CommissionModel,
@@ -254,7 +252,7 @@ class PortfolioService:
                     "equity_start": float(dr.get("equity_start") or 0),
                     "equity_end": float(dr.get("equity_end") or 0),
                 })
-        except Exception as e:
+        except Exception:
             pass  # daily_pnl tablosu yoksa atla
 
         # 7. Invariant doğrula
@@ -296,7 +294,7 @@ class PortfolioService:
                 self._portfolio_id, limit
             )
             return rows
-        except Exception as e:
+        except Exception:
             return []
 
     async def _update_daily_pnl(self, realized_pnl: float, commission: float):
@@ -806,7 +804,7 @@ def get_portfolio_enhancements() -> Dict[str, Any]:
         result["multi_currency"] = MultiCurrencyHandler()
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     return result
 

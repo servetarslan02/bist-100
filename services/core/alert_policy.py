@@ -17,7 +17,7 @@ import os
 import time
 import copy
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
@@ -157,7 +157,6 @@ class SilenceRule:
 
 class VersionConflictError(Exception):
     """Optimistic locking conflict."""
-    pass
 
 
 @dataclass
@@ -500,7 +499,7 @@ class AlertPolicy:
                     loop = asyncio.new_event_loop()
                     loop.run_until_complete(self._send_webhook(url, payload))
                     loop.close()
-                except Exception as e:
+                except Exception:
                     logger.warning("Webhook notification failed (no event loop)")
 
     async def _send_webhook(self, url: str, payload: Dict[str, Any]):
@@ -625,7 +624,7 @@ class AlertPolicy:
                 for rule in removed_rules:
                     self._remove_silence_from_db(rule, db)
                 db.commit()
-            except Exception as e:
+            except Exception:
                 db.rollback()
                 # Restore in-memory
                 self.silence_rules.extend(removed_rules)

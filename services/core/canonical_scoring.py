@@ -630,7 +630,7 @@ class CanonicalScoringPipeline:
         """Yön belirle."""
         mom = vector.momentum
         technical = vector.technical
-        rs = vector.relative_strength
+        vector.relative_strength
 
         if opportunity_score < 40:
             return "SHORT"

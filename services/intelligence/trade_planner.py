@@ -12,8 +12,7 @@ Bulunan hisseler için:
 - Pozisyon büyüklüğü
 """
 
-import math
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
@@ -167,7 +166,7 @@ class TradePlanner:
         mom20 = features.get("momentum_20d", 0)
         rsi = features.get("rsi_14", 50)
         vol_z = features.get("volume_zscore", 0)
-        bb_pos = features.get("bb_position", 0.5)
+        features.get("bb_position", 0.5)
 
         # HIGH CONVICTION BUY
         if spec_category == "HIGH_CONVICTION" and mom20 > 0:
@@ -237,7 +236,7 @@ class TradePlanner:
         else:
             atr = price * 0.015
         bb_upper = features.get("bb_upper", price * 1.05)
-        sma_20 = features.get("sma_20", price)
+        features.get("sma_20", price)
         mom20 = features.get("momentum_20d", 0)
 
         # ATR bazlı hedefler
@@ -278,7 +277,7 @@ class TradePlanner:
         else:
             atr = price * 0.015
         bb_lower = features.get("bb_lower", price * 0.95)
-        support = features.get("near_20d_low", 0)
+        features.get("near_20d_low", 0)
 
         # ATR bazlı stop
         stop_atr = price - atr * 2.0

@@ -11,7 +11,7 @@ FAZ 3.3: Macro Sensitivity
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()

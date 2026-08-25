@@ -14,8 +14,8 @@ Bölüm 18: Veri / AI Gerçeklik ve Kanıt Doğrulama
 """
 
 import re
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime, timezone
 import structlog
@@ -104,7 +104,7 @@ class EvidenceVerificationEngine:
                 continue
 
             # Claim type belirle
-            claim_type = self._classify_claim(sentence)
+            self._classify_claim(sentence)
 
             claims.append(Claim(
                 claim_id=f"{ticker}-{i}",
@@ -147,7 +147,7 @@ class EvidenceVerificationEngine:
                 # Çok eski timestamp şüpheli
                 if (now - ts).days > 30:
                     contradictions.append("Timestamp is more than 30 days old")
-            except Exception as e:
+            except Exception:
                 timestamp_valid = False
 
         # 4. Cross-check

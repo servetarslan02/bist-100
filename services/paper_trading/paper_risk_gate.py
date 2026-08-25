@@ -14,7 +14,7 @@ KURAL: Risk Gate 'NO_TRADE' diyebilmeli. Sistem hicbir kosulda
 islem yapmak zorunda olmamali.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from collections import defaultdict
 import structlog
 

@@ -21,7 +21,7 @@ Kullanım:
 import asyncio
 import orjson
 import time
-from typing import AsyncIterator, Dict, Any, Optional
+from typing import AsyncIterator
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import StreamingResponse
 import structlog
@@ -59,7 +59,6 @@ async def _sse_generator(
     while retry_count < max_retries:
         try:
             now = time.time()
-            data_changed = False
 
             if channel == "ticks":
                 data = {}
@@ -73,7 +72,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: tick\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             elif channel == "signals":
                 signals = get_cached("signals:latest") or []
@@ -83,7 +81,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: signal\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             elif channel == "portfolio":
                 pf = get_cached("portfolio:state")
@@ -93,7 +90,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: portfolio\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             elif channel == "alerts":
                 alerts = get_cached("alerts:latest") or []
@@ -103,7 +99,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: alert\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             elif channel == "regime":
                 regime = get_cached("market:regime")
@@ -113,7 +108,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: regime\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             elif channel == "radar":
                 radar = get_cached("radar:data") or []
@@ -123,7 +117,6 @@ async def _sse_generator(
                     if current_hash != last_data_hash:
                         yield f"event: radar\ndata: {event_data}\n\n"
                         last_data_hash = current_hash
-                        data_changed = True
 
             # Keep-alive ping: 15 saniyede bir (bağlantıyı canlı tut)
             if now - last_ping_time >= SSE_KEEPALIVE_INTERVAL:

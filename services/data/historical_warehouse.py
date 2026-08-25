@@ -7,11 +7,10 @@ Tekrar tekrar internetten indirmeye gerek kalmadan 0.05 saniyede anında yükler
 """
 
 import os
-import sys
 import sqlite3
 import pandas as pd
 import yfinance as yf
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Tuple
 import structlog
 
 logger = structlog.get_logger()

@@ -20,8 +20,8 @@ import orjson
 import time
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Any, Callable, Tuple, Set
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any, Callable, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import structlog
@@ -447,7 +447,7 @@ class SettingsBridge:
             new_settings = config_module.Settings(**merged)
 
             # Global settings referansını güncelle (atomik swap)
-            old_ref = config_module.settings
+            config_module.settings
             config_module.settings = new_settings
 
             # modül seviyesinde de güncelle

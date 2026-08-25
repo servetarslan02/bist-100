@@ -6,8 +6,8 @@ transaction cost dahil backtest.
 """
 import numpy as np
 from typing import Dict, Any, Optional, List, Callable, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -386,7 +386,6 @@ class MLBacktestEngine:
                     holding_days.append((sell_dt - buy_dt).days)
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="ml_backtest.py:386")
-                    pass
                 del buy_dates[t.ticker]
         avg_holding = float(np.mean(holding_days)) if holding_days else 0.0
 

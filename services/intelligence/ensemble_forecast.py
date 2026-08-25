@@ -14,7 +14,7 @@ Kullanım:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, Callable, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog

@@ -5,7 +5,7 @@ rollback, multi-metric comparison, detailed reporting.
 """
 import numpy as np
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from scipy import stats
 import structlog
@@ -147,7 +147,7 @@ class ChampionChallenger:
             z_alpha = norm.ppf(1 - self.significance_level / 2)
             ncp = abs(effect_size) * np.sqrt(n_champ * n_chall / (n_champ + n_chall))
             power = 1 - norm.cdf(z_alpha - ncp) + norm.cdf(-z_alpha - ncp)
-        except Exception as e:
+        except Exception:
             power = 0.0
 
         # Winner

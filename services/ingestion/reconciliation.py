@@ -19,7 +19,6 @@ Kullanım:
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
-import numpy as np
 import structlog
 
 logger = structlog.get_logger()

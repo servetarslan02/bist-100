@@ -16,7 +16,6 @@ Kullanım:
 """
 
 import asyncio
-import time
 from typing import Dict, Any, Optional
 import aiohttp
 import structlog

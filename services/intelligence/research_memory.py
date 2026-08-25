@@ -12,7 +12,6 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from collections import deque
-import orjson
 import structlog
 
 logger = structlog.get_logger()

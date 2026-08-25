@@ -1,14 +1,12 @@
 """Learning API — Uçtan uca Model Training & Performance Learning Servisleri."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
-from typing import Optional, Dict, Any, List
+from typing import Dict, Any
 from datetime import datetime, timezone
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit
 from ...learning.learning_pipeline import LearningPipeline
-from ...learning.model_memory_store import ModelMemoryStore
-from .schemas import LearningStatus, ModelInfo, ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()

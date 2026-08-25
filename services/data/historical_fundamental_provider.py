@@ -11,9 +11,8 @@ Her snapshot için:
 PIT kuralı: available_at <= backtest_date olan snapshot kullanılır.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from datetime import datetime, timezone
-from dataclasses import dataclass
 import structlog
 
 from ..data.historical_contracts import FundamentalSnapshot
@@ -73,7 +72,6 @@ class HistoricalFundamentalProvider:
                             earnings_dates[str(idx.date())] = str(idx.date())
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="historical_fundamental_provider.py:74")
-                pass
 
             # Balance sheet (total_assets, total_equity vb. için)
             bs = t.quarterly_balance_sheet

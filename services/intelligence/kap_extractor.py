@@ -11,9 +11,8 @@ KAP bildirimlerinden yapılandırılmış veri çıkarma:
 LLM varsa kullanır, yoksa kural tabanlı çalışır.
 """
 
-import re
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

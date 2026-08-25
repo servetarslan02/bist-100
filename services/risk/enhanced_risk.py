@@ -17,7 +17,7 @@ Kaynak: Du (2026) — Ledoit-Wolf; Oxford — volatility targeting
 
 import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple, Any
 from dataclasses import dataclass
 import structlog
 
@@ -358,7 +358,7 @@ def compute_full_risk_metrics(
                 weights_array, cov_matrix, 0.95, portfolio_value, tickers
             )
             component_var = {cvr.ticker: cvr.component_var_95 for cvr in cv}
-        except Exception as e:
+        except Exception:
             pass
 
     # Risk score (0-100)

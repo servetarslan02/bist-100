@@ -20,7 +20,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 
 import aiohttp
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -69,7 +69,6 @@ class BaseLLMClient(ABC):
         max_tokens: Optional[int] = None,
     ) -> LLMResponse:
         """Chat completion."""
-        pass
 
     async def generate(
         self,

@@ -12,8 +12,8 @@ KURAL: Korelasyon zamanla değişir — rolling window ile takip et.
 
 import numpy as np
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import structlog
 
 from services.macro.config.macro_config import macro_config

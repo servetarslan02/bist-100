@@ -20,12 +20,10 @@ Endpoints:
 
 import time
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List, Dict, Any
+from fastapi import APIRouter, Depends, Query
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ScannerStatus, OpportunityInfo, ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -165,7 +163,7 @@ async def scan_status(user=Depends(get_current_user), _=Depends(check_rate_limit
     try:
         api = _get_scan_api()
         return api.get_status()
-    except Exception as e:
+    except Exception:
         return {
             "status": "active",
             "scheduler_mode": "adaptive",
@@ -182,7 +180,7 @@ async def scan_dashboard(user=Depends(get_current_user), _=Depends(check_rate_li
     try:
         api = _get_scan_api()
         return api.get_full_dashboard()
-    except Exception as e:
+    except Exception:
         return {
             "status": "active",
             "signals_count": len(_SCAN_SIGNALS_CACHE),
@@ -201,7 +199,7 @@ async def scan_results(
     try:
         api = _get_scan_api()
         return api.get_results(limit=limit)
-    except Exception as e:
+    except Exception:
         sig_resp = await scanner_signals(limit=limit)
         return sig_resp.get("signals", [])
 
@@ -212,7 +210,7 @@ async def tiers(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     try:
         api = _get_scan_api()
         return api.get_tiers()
-    except Exception as e:
+    except Exception:
         return {
             "tier_0_core_bluechip": 30,
             "tier_1_liquid_growth": 70,
@@ -234,7 +232,7 @@ async def ticker_history(
     try:
         api = _get_scan_api()
         return api.get_ticker_history(ticker, days=days)
-    except Exception as e:
+    except Exception:
         return {
             "ticker": ticker.upper(),
             "scans_count": 45,

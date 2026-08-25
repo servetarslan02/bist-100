@@ -14,7 +14,7 @@ FAZ 3: Agent Memory
 import orjson
 import time
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 import structlog

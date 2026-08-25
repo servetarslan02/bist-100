@@ -10,9 +10,8 @@ ALPHA BIST — Portfolio Enhancements v1.0
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
+from typing import Dict, List, Any
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -538,7 +537,7 @@ class TransactionCostAnalyzer:
         Returns:
             Slippage tahmini
         """
-        order_value = quantity * price
+        quantity * price
         participation = quantity / max(daily_volume, 1)
 
         # Volatilite bazlı slippage

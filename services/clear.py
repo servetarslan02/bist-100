@@ -10,7 +10,7 @@ async def run():
     await pg_execute("TRUNCATE TABLE equity_snapshots")
     await pg_execute("TRUNCATE TABLE cash_ledger")
     await pg_execute("TRUNCATE TABLE positions")
-    print("Tum DB temizlendi")
+    logger.info("Tum DB temizlendi")
 
 if __name__ == "__main__":
     asyncio.run(run())

@@ -12,8 +12,8 @@ Nature (2026) metodolojisi: Ridge meta-learner.
 - Regime-specific meta-learner
 """
 import numpy as np
-from typing import Dict, Any, Optional, List, Callable
-from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
@@ -89,7 +89,6 @@ class StackingEnsemble:
             Training metrics
         """
         from sklearn.model_selection import TimeSeriesSplit
-        from sklearn.linear_model import Ridge, LogisticRegression, LinearRegression, ElasticNet
 
         if len(self._base_models) < 2:
             return {"error": "Need at least 2 base models"}
@@ -194,7 +193,7 @@ class StackingEnsemble:
             if hasattr(meta_learner, "predict_proba"):
                 return meta_learner.predict_proba(meta_features)[:, 1]
             return meta_learner.predict(meta_features)
-        except Exception as e:
+        except Exception:
             return np.zeros(len(X))
 
     def predict_with_confidence(
@@ -225,7 +224,6 @@ class StackingEnsemble:
                 all_preds.append(preds)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:224")
-                pass
 
         if not all_preds:
             return np.zeros(len(X)), np.zeros(len(X))
@@ -271,7 +269,7 @@ class StackingEnsemble:
                 else:
                     pred = model.predict(X[:1])
                 model_preds[name] = float(pred[0]) if len(pred) > 0 else 0.5
-            except Exception as e:
+            except Exception:
                 model_preds[name] = 0.5
 
         # Weighted prediction
@@ -320,7 +318,6 @@ class StackingEnsemble:
                     }
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:318")
-            pass
 
         return self._model_weights
 
@@ -345,7 +342,7 @@ class StackingEnsemble:
                     meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
                 else:
                     meta_features[:, model_idx] = model.predict(X)
-            except Exception as e:
+            except Exception:
                 meta_features[:, model_idx] = 0.5
 
         if self._config.passthrough:
@@ -399,7 +396,6 @@ class StackingEnsemble:
                 all_preds.append((name, preds))
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:396")
-                pass
 
         if len(all_preds) < 2:
             return
@@ -449,7 +445,7 @@ class StackingEnsemble:
                         if np.isnan(ic):
                             ic = 0.0
                         regime_scores[name] = abs(ic)
-                    except Exception as e:
+                    except Exception:
                         regime_scores[name] = 0.0
 
                 # Normalize to weights
@@ -475,7 +471,7 @@ class StackingEnsemble:
         from sklearn.metrics import roc_auc_score
         try:
             auc = float(roc_auc_score(y_val, val_pred))
-        except Exception as e:
+        except Exception:
             auc = 0.0
 
         # IC
@@ -483,7 +479,7 @@ class StackingEnsemble:
             ic = float(np.corrcoef(val_pred, y_val)[0, 1])
             if np.isnan(ic):
                 ic = 0.0
-        except Exception as e:
+        except Exception:
             ic = 0.0
 
         # Directional accuracy

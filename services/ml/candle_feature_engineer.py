@@ -6,7 +6,7 @@ ALPHA BIST — Mum Formasyonları Ampirik Başarı Karnesi & ML Özellik Mühend
 modeline beslenecek yüksek değerli özellik matrislerini (Feature Vectors) üretir.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict
 import numpy as np
 import pandas as pd
 import structlog

@@ -10,14 +10,12 @@ Mesajlaşma Strateji:
 - DURABLE: Redis Streams (event ledger, at-least-once)
 """
 
-import os
-import orjson
 import asyncio
 from typing import Optional, Callable, Dict, Any, List
 import structlog
 
 from .config import settings
-from .event_schema import CanonicalEvent, EventType
+from .event_schema import CanonicalEvent
 
 logger = structlog.get_logger()
 

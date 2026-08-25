@@ -4,8 +4,8 @@ Finansal NLP sentiment analizi — transformer-based,
 multi-source (KAP, haber, sosyal medya), confidence scoring.
 """
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
@@ -67,7 +67,6 @@ class FinGPTSentiment:
         """Model yükle."""
         try:
             from transformers import AutoTokenizer, AutoModelForSequenceClassification
-            import torch
 
             if self.model_name == "FinBERT":
                 model_path = "ProsusAI/finbert"

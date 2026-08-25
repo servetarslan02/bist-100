@@ -13,9 +13,8 @@ KURAL: Backtest'te sadece o tarihte bilinen veriyi kullan.
 import orjson
 import os
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()

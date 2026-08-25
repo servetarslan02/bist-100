@@ -16,8 +16,7 @@ import numpy as np
 import structlog
 
 from .historical_contracts import (
-    HistoricalDataRepository, FundamentalSnapshot,
-    EventSnapshot, CatalystSnapshot,
+    HistoricalDataRepository,
 )
 
 logger = structlog.get_logger()

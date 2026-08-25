@@ -81,7 +81,6 @@ class CrossSectionalEventStudy:
                 result["wilcoxon_p_value"] = round(float(w_p), 4)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="cross_sectional.py:82")
-                pass
 
         return result
 

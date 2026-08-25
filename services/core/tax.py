@@ -1,5 +1,4 @@
 """ALPHA BIST — Tax Calculator."""
-from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 logger = structlog.get_logger()

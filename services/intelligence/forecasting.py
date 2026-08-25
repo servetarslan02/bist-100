@@ -9,10 +9,9 @@ ALPHA BIST — Forecasting & Ensemble v1.0
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from collections import deque
 import structlog
 
 logger = structlog.get_logger()
@@ -54,7 +53,7 @@ class ForecastingEngine:
         """Tek ufuk için tahmin."""
         # Feature-based heuristic prediction
         momentum = features.get("momentum_20d", 0)
-        vol = features.get("realized_vol_20d", 20)
+        features.get("realized_vol_20d", 20)
         rsi = features.get("rsi_14", 50)
 
         # Base return estimate
@@ -133,11 +132,6 @@ class EnsembleForecasting:
         )
 
 
-from services.intelligence.forecasting_utils import (
-    news_impact_engine,
-    news_duplication_engine,
-    event_timeline_engine,
-)
 
 # Singletons
 forecasting_engine = ForecastingEngine()

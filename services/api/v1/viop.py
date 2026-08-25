@@ -2,10 +2,8 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, List
-from datetime import date
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import OptionPrice, GreeksResult, ErrorResponse
 from ...viop.enhanced_options import (
     black_scholes,
     calculate_greeks,
@@ -17,7 +15,6 @@ from ...viop.enhanced_options import (
     futures_spot_arbitrage,
     check_put_call_parity,
     viop_risk,
-    options_backtest,
 )
 from ...viop.contract_catalog import viop_catalog
 

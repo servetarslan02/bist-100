@@ -1,12 +1,9 @@
-import os
 import pandas as pd
 import numpy as np
 import lightgbm as lgb
 import yfinance as yf
-from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Dict, List
 import structlog
-import traceback
 
 from services.ingestion.bist_universe import bist_universe
 from services.ml.feature_engine import compute_universe_features
@@ -208,7 +205,7 @@ class AlphaEngine:
         try:
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
             logger.info(f"Model trained successfully on {len(X)} samples with {train_params.get('device', 'cpu')}.")
-        except Exception as e:
+        except Exception:
             train_params.pop("device", None)
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
             logger.info(f"Model trained successfully on {len(X)} samples (CPU engine).")

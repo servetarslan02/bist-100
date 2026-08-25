@@ -26,7 +26,7 @@ import time
 from enum import Enum
 from typing import Optional, Callable, Any
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -57,7 +57,6 @@ class CircuitStats:
 
 class CircuitBreakerError(Exception):
     """Circuit breaker OPEN iken fırlatılır."""
-    pass
 
 
 class CircuitBreaker:
@@ -181,7 +180,7 @@ class CircuitBreaker:
             result = await func(*args, **kwargs)
             self.record_success()
             return result
-        except Exception as e:
+        except Exception:
             self.record_failure()
             raise
 

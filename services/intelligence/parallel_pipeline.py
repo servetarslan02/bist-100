@@ -18,7 +18,6 @@ import asyncio
 import time
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -485,7 +484,7 @@ class ParallelIntelligencePipeline:
         mod = self._modules.get("knowledge_graph")
         if not mod:
             return {}
-        kg = mod.KnowledgeGraph()
+        mod.KnowledgeGraph()
         return {"loaded": True}
 
     async def _run_research_memory(self, ticker: str) -> Dict:

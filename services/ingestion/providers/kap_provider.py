@@ -8,8 +8,6 @@ v2.0: Async refactor + detaylı KAP çekme + corporate actions parsing
 """
 
 import re
-import asyncio
-from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 import structlog
 

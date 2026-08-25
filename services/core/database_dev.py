@@ -9,27 +9,11 @@ test imports don't break.
 
 import warnings
 from .database import (
-    get_pg_pool,
-    get_pg_connection,
-    get_pg_transaction,
     pg_execute,
     pg_fetch,
     pg_fetchrow,
     pg_fetchval,
-    get_ch_client,
-    ch_execute,
-    ch_insert,
-    ch_query_df,
-    get_redis,
-    redis_get,
-    redis_set,
-    redis_delete,
-    redis_hgetall,
-    redis_hset,
-    redis_publish,
-    check_db_health,
     init_databases,
-    close_databases,
 )
 
 warnings.warn(

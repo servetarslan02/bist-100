@@ -11,12 +11,11 @@ Signal -> Order Simulation:
 """
 
 import uuid
-import math
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 import structlog
 
-from services.core.bist_tick_size import round_to_bist_tick, get_bist_tick_size
+from services.core.bist_tick_size import round_to_bist_tick
 from services.paper_trading.market_microstructure_engine import market_microstructure, MarketMicrostructureEngine
 
 logger = structlog.get_logger()
@@ -236,7 +235,7 @@ class PaperExecutionEngine:
                 },
             )
             publish_event(order_event, key=ticker)
-        except Exception as e:
+        except Exception:
             pass
 
         return order

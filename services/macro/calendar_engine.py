@@ -12,7 +12,7 @@ KURAL: Olay öncesi beklenti topla, olay sonrası surprise hesapla.
 """
 
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import structlog
 

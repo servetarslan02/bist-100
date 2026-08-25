@@ -19,7 +19,6 @@ import structlog
 
 from .agent_system import AgentRole, AgentTask, AgentResult, BaseAgent
 from .llm_client import BaseLLMClient
-from .prompts import PromptFactory
 
 logger = structlog.get_logger()
 

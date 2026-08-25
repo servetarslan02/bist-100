@@ -10,7 +10,7 @@ Kaynaklar:
 """
 
 from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime, timezone
 import structlog
@@ -243,7 +243,6 @@ class RiskMonitor:
                             continue
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="monitoring.py:244")
-                        pass
 
                 alert = Alert(
                     alert_id=f"{rule.rule_id}_{now}",

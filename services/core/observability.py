@@ -11,11 +11,8 @@ ALPHA BIST — Observability & Monitoring v1.0
 - Health Check endpoints
 """
 
-import time
 import uuid
-import hashlib
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Any
 from datetime import datetime, timezone
 from collections import defaultdict
 import structlog

@@ -15,9 +15,9 @@ Referanslar:
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple, Set
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -158,7 +158,7 @@ class LookAheadBiasDetector:
             # Bu noktanın window'u data[i-window_size:i] olmalı
             # Eğer data[i-window_size:i+1] kullanılmışsa → leakage
             window_values = data[value_col].iloc[i - window_size:i]
-            current_value = data[value_col].iloc[i]
+            data[value_col].iloc[i]
 
             # Rolling mean hesapla (sadece geçmiş veri ile)
             expected_mean = window_values.mean()

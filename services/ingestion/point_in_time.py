@@ -18,7 +18,7 @@ Kullanım:
     filtered = pit.filter_available(data, "market_price", query_ts)
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 import structlog

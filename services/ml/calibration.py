@@ -6,7 +6,7 @@ overconfidence detection, calibration monitoring.
 """
 import numpy as np
 from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 
@@ -76,13 +76,13 @@ class ModelCalibration:
         # Brier score
         try:
             brier = float(brier_score_loss(y_true, y_prob))
-        except Exception as e:
+        except Exception:
             brier = 1.0
 
         # Log loss
         try:
             ll = float(log_loss(y_true, y_prob))
-        except Exception as e:
+        except Exception:
             ll = 1.0
 
         # Calibration curve
@@ -97,7 +97,7 @@ class ModelCalibration:
                     "fraction_positive": round(float(frac), 4),
                     "gap": round(abs(float(mean_pred) - float(frac)), 4),
                 })
-        except Exception as e:
+        except Exception:
             curve = []
 
         # ECE (Expected Calibration Error)
@@ -249,7 +249,6 @@ class ModelCalibration:
                 return calibrator.predict(y_prob)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="calibration.py:236")
-                pass
 
         return y_prob
 
@@ -350,5 +349,5 @@ class ModelCalibration:
                 ece += bin_size * abs(bin_accuracy - bin_confidence)
 
             return ece
-        except Exception as e:
+        except Exception:
             return 0.0

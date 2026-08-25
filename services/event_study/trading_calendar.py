@@ -271,15 +271,14 @@ class BISTTradingCalendar:
 
         # Event günü iş günü değilse kaydır
         if isinstance(event_date, datetime):
-            event_date_dt = event_date
             event_date_d = event_date.date()
         else:
             event_date_d = event_date
-            event_date_dt = datetime.combine(event_date, datetime.min.time())
+            datetime.combine(event_date, datetime.min.time())
 
         if not self.is_trading_day(event_date_d):
             event_date_d = self.next_trading_day(event_date_d)
-            event_date_dt = datetime.combine(event_date_d, datetime.min.time())
+            datetime.combine(event_date_d, datetime.min.time())
 
         # Trading day offset'leri hesapla
         target_offsets = list(range(start_offset, end_offset + 1))

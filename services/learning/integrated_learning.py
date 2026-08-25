@@ -7,11 +7,10 @@ Regime bazlı doğruluk, feature importance, model drift tespiti.
 FAZ 10: Learning System (Güncellenmiş)
 """
 
-import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from collections import defaultdict, deque
 import structlog
 

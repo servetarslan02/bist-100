@@ -25,7 +25,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog
 
-from .circuit_breaker import CircuitBreaker, CircuitBreakerManager, CircuitBreakerError
+from .circuit_breaker import CircuitBreakerManager, CircuitBreakerError
 from .rate_limiter import RateLimiter, rate_limiter
 from .retry_policy import RetryPolicy, RetryExhaustedError, get_retry_policy
 

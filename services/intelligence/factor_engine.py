@@ -12,8 +12,7 @@ Faktör bazlı analiz:
 FAZ 10.8: Factor Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Any
 from dataclasses import dataclass
 import structlog
 

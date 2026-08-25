@@ -24,12 +24,10 @@ Kullanım:
 
 import os
 import ssl
-import time
-import asyncio
 from pathlib import Path
-from typing import Optional, Dict, Any, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from typing import Optional, Dict, Any
+from dataclasses import dataclass
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()

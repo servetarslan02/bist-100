@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import structlog
 
 logger = structlog.get_logger()

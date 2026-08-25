@@ -12,10 +12,8 @@ Features:
 - investing_technical_rating: Teknik rating
 """
 
-import asyncio
-import re
 import numpy as np
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from datetime import datetime, timezone
 import structlog
 

@@ -1,7 +1,6 @@
 """Factors API — Gerçek BIST Faktör Analiz ve Exposure Motoru."""
 
 from fastapi import APIRouter, Depends, Query
-from typing import Dict, Any, List
 from ..dependencies import get_current_user, check_rate_limit
 from ...core.redis_helper import get_cached
 
@@ -15,7 +14,7 @@ async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(c
     item = next((x for x in radar if x.get("symbol") == ticker.upper()), None)
     
     score = item.get("score", 75.0) if item else 75.0
-    price = item.get("price", 50.0) if item else 50.0
+    item.get("price", 50.0) if item else 50.0
     change = item.get("change", 1.5) if item else 1.5
     
     # Gerçek canlı faktör ayrıştırması

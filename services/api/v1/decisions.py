@@ -1,8 +1,7 @@
 """Decisions API — Gerçek servislere bağlı."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 router = APIRouter()
 
 

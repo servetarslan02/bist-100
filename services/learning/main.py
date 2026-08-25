@@ -2,24 +2,20 @@
 
 import asyncio
 import orjson
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import datetime, timezone
+from typing import Dict, Any, Optional
 import numpy as np
 import polars as pl
 import structlog
 
-from ..core.config import settings
 from ..core.database import (
     init_databases, close_databases, pg_fetch, pg_fetchrow, pg_execute,
-    ch_execute, redis_get, redis_set,
+    ch_execute,
 )
-from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
-    ensure_topics, EventType,
-    EventConsumer, publish_event,
+    ensure_topics, EventConsumer,
 )
 from ..core.logging import setup_logging
-from ..features.calculator import feature_calculator
 
 logger = structlog.get_logger()
 
@@ -253,7 +249,7 @@ class LearningService:
 
             return None
 
-        except Exception as e:
+        except Exception:
             return None
 
     async def _get_last_training_time(self) -> Optional[datetime]:

@@ -13,7 +13,6 @@ KURAL: Gelecek veriyi train'de kullanmak = ölüm.
 import numpy as np
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 import structlog
 
 logger = structlog.get_logger()
@@ -337,7 +336,7 @@ class WalkForwardEngine:
                 ic = np.corrcoef(all_scores, all_actuals)[0, 1]
                 if np.isnan(ic):
                     ic = 0
-            except Exception as e:
+            except Exception:
                 ic = 0
 
         # Deflated Sharpe (Multiple testing düzeltmesi)

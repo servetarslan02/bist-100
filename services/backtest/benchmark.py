@@ -13,9 +13,8 @@ Metrikler:
 """
 
 import numpy as np
-import pandas as pd
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Tuple
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()
@@ -106,8 +105,8 @@ class BenchmarkComparator:
 
         # Annualized returns
         years = min_len / periods_per_year
-        strategy_annual = ((1 + strategy_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
-        benchmark_annual = ((1 + benchmark_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
+        ((1 + strategy_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
+        ((1 + benchmark_total / 100) ** (1 / years) - 1) * 100 if years > 0 else 0
 
         # Daily risk-free
         daily_rf = risk_free_rate / periods_per_year

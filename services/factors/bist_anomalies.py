@@ -4,7 +4,6 @@
 KAP sentiment, yabancı yatırımcı.
 """
 from typing import Dict, Any, List, Optional
-import numpy as np
 import structlog
 
 logger = structlog.get_logger()

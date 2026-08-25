@@ -15,7 +15,6 @@ Referanslar:
 - RFC 7519 (JWT)
 """
 
-import hashlib
 import hmac
 import os
 import secrets
@@ -24,7 +23,7 @@ import base64
 import time
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 from enum import Enum
 import structlog
 
@@ -78,7 +77,6 @@ class JWTClaims:
 
 class JWTError(Exception):
     """JWT hataları."""
-    pass
 
 
 class JWTManager:

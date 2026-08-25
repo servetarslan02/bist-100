@@ -22,7 +22,6 @@ Features:
 - sat_vegetation_index: Bitki örtüsü indeksi
 """
 
-import asyncio
 import math
 from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime, timezone, timedelta
@@ -192,7 +191,7 @@ class SatelliteAdapter(BaseAdapter):
             bbox = _bbox_from_center(
                 location["lat"], location["lon"], location["radius_m"]
             )
-            wkt = _bbox_to_wkt(bbox)
+            _bbox_to_wkt(bbox)
 
             # Son 30 günün en bulutsuz görüntüsünü ara
             end_date = datetime.now(timezone.utc)

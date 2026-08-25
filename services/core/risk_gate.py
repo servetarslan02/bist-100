@@ -4,8 +4,7 @@ Merkezi risk kontrolü — order gönderilmeden önce.
 Fail-safe, fail-closed.
 """
 
-import time
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 from dataclasses import dataclass
 import structlog
 
@@ -144,7 +143,6 @@ class RiskGate:
         try:
             from services.core.short_selling import short_selling_monitor
             from services.core.halt_monitor import halt_monitor
-            from services.core.price_limits import price_limit_monitor
             from services.core.compliance import compliance_checker
 
             # Açığa satış kontrolü

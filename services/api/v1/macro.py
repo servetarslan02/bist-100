@@ -2,13 +2,12 @@
 
 import time
 import asyncio
-from fastapi import APIRouter, Depends, Query
-from typing import Dict, Any, List
+from fastapi import APIRouter, Depends
+from typing import Dict, Any
 import structlog
 import yfinance as yf
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -121,7 +120,7 @@ def _fetch_live_macro_data() -> Dict[str, Any]:
         dxy_v = result.get("dxy", 100)
         cds_v = result.get("turkey_cds_5y", 270)
         brent_v = result.get("brent_crude", 85)
-        us10_v = result.get("us10y", 4.5)
+        result.get("us10y", 4.5)
 
         commentary_parts = []
         if dxy_v > 103:

@@ -13,12 +13,11 @@ Kurumsal seviye portföy muhasebesi:
 v1.0 API'leri 100% geriye uyumlu.
 """
 
-import orjson
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, date
-from collections import defaultdict, deque
+from datetime import datetime, timezone
+from collections import defaultdict
 import structlog
 
 logger = structlog.get_logger()
@@ -966,7 +965,7 @@ class PortfolioManager:
                 from ..risk.var_cvar import var_calculator
                 var_95 = var_calculator.calculate_historical_var(returns, 0.95, total_value)
                 cvar_95 = var_calculator.calculate_historical_cvar(returns, 0.95, total_value)
-            except Exception as e:
+            except Exception:
                 # Fallback: basit percentile
                 sorted_returns = np.sort(returns)
                 idx = max(0, int(np.ceil(0.05 * len(sorted_returns))) - 1)

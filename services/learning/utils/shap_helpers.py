@@ -9,7 +9,7 @@ KURAL: Hızlı, memory-efficient, production-ready.
 
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from collections import defaultdict
 import structlog
 
@@ -68,7 +68,7 @@ class SHAPHelpers:
             # TreeExplainer (LightGBM, XGBoost için optimize)
             try:
                 explainer = shap.TreeExplainer(model)
-            except Exception as e:
+            except Exception:
                 # Fallback: KernelExplainer (yavaş ama genel)
                 logger.warning("TreeExplainer failed, falling back to KernelExplainer")
                 background = shap.sample(X_sample, min(100, len(X_sample)))

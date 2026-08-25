@@ -2,7 +2,7 @@
 
 Faktör getiri serisi hesaplama, trend analizi, mevsimsellik.
 """
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List
 import numpy as np
 from scipy import stats as scipy_stats
 import structlog

@@ -20,7 +20,7 @@ import numpy as np
 from typing import Dict, Any, Optional, List
 import structlog
 
-from .base import BaseAdapter, CircuitBreaker
+from .base import BaseAdapter
 
 logger = structlog.get_logger()
 

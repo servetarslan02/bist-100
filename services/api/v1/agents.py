@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Depends
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import ErrorResponse
 router = APIRouter()
 
 
@@ -10,7 +9,6 @@ router = APIRouter()
 async def list_agents(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Agent listesi."""
     try:
-        from ...agents.agent_system import AgentSystem
         return {"agents": ["researcher", "risk_manager", "executor", "monitor"], "count": 4}
     except Exception as e:
         return {"agents": [], "error": str(e)}

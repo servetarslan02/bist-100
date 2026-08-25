@@ -27,9 +27,7 @@ Kullanım:
     total = await shard_router.aggregate("SELECT SUM(volume) FROM prices")
 """
 
-import asyncio
-import hashlib
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, List
 import structlog
 
 try:

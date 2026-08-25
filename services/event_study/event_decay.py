@@ -4,7 +4,7 @@ Event etkisinin zamanla nasıl azaldığını analiz eder.
 Exponential decay modeli ile half-life hesaplama.
 """
 import numpy as np
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -75,7 +75,7 @@ class EventImpactDecay:
             ss_tot = np.sum((log_ar - np.mean(log_ar)) ** 2)
             r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-        except Exception as e:
+        except Exception:
             decay_rate = 0.0
             half_life = float("inf")
             r_squared = 0.0

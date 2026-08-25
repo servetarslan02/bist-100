@@ -7,7 +7,7 @@ Normal mod: 5 dakika beklemez.
 Event geldiğinde Tier 0'dan Tier 3'e atlayabilir.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from datetime import datetime, timezone
 import structlog
 

@@ -10,7 +10,7 @@ KURAL: Sample covariance = gürültü. Shrinkage = gerçek.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -113,7 +113,7 @@ class CovarianceEstimator:
         rho = np.sum((target - sample_cov) ** 2)
 
         # Gamma: Target variance
-        gamma = np.sum(target ** 2)
+        np.sum(target ** 2)
 
         # Optimal shrinkage
         if pi + rho > 0:

@@ -24,7 +24,7 @@ import signal
 import time
 from datetime import datetime, time as dt_time, timezone, timedelta, date
 from typing import Dict, Any, Optional, Callable, Awaitable, List
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 import structlog
 
@@ -581,7 +581,7 @@ class DBJobTracker:
                         timeout=3.0,
                     )
                 return [dict(r) for r in rows]
-            except Exception as e:
+            except Exception:
                 self._db_available = False
 
         # In-memory fallback
@@ -610,7 +610,7 @@ class DBJobTracker:
                 )
                 if row:
                     return dict(row)
-            except Exception as e:
+            except Exception:
                 self._db_available = False
 
         # In-memory fallback
@@ -639,7 +639,7 @@ class DBJobTracker:
             s.close()
             self._db_available = result == 0
             return self._db_available
-        except Exception as e:
+        except Exception:
             self._db_available = False
             return False
 

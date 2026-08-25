@@ -11,7 +11,6 @@ v2.0: Async refactor + batch support
 
 import asyncio
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 import structlog
 
 from ...core.async_http import get_client

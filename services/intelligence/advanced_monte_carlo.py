@@ -20,9 +20,8 @@ except ImportError:
         def decorator(func):
             return func
         return decorator
-from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from typing import Optional
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

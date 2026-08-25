@@ -11,9 +11,9 @@ Kaynak: Monte Carlo Data Quality Testing, Confluent streaming quality
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -75,7 +75,7 @@ class CrossSourceReconciliation:
             )
 
         values = list(sources.values())
-        source_names = list(sources.keys())
+        list(sources.keys())
 
         # Temel istatistikler
         mean_val = np.mean(values)

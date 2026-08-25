@@ -11,7 +11,7 @@ import os
 import orjson
 import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import numpy as np
 import structlog
 
@@ -99,7 +99,7 @@ def tool_run_monte_carlo_forecast(ticker: str, days: int = 20, current_price: Op
             "prob_profit_pct": round(res.prob_profit, 1),
             "max_drawdown_sim_pct": round(res.max_drawdown_sim, 2),
         }
-    except Exception as e:
+    except Exception:
         return {
             "ticker": ticker.upper(),
             "horizon_days": days,

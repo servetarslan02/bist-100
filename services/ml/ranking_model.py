@@ -11,12 +11,10 @@ ROADMAP v3.0 FAZ 3:
 KURAL: "En iyi %10'da mı?" sor, "yükselir mi?" sorma!
 """
 
-import orjson
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, List, Any, Tuple
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from collections import defaultdict
 import structlog
 
 logger = structlog.get_logger()
@@ -530,69 +528,69 @@ def get_ml_ensemble() -> Dict[str, Any]:
         models["xgboost"] = xgboost_model
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .lstm_model import lstm_model
         models["lstm"] = lstm_model
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .transformer_model import transformer_model
         models["transformer"] = transformer_model
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .ensemble import ensemble_model
         models["ensemble"] = ensemble_model
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .model_comparator import model_comparator
         models["comparator"] = model_comparator
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .finrl_bist import finrl_env
         models["finrl"] = finrl_env
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .fingpt import fingpt_sentiment
         models["fingpt"] = fingpt_sentiment
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .hybrid_model import hybrid_predict
         models["hybrid"] = hybrid_predict
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .rl_agent import train_rl_agent
         models["rl_agent"] = train_rl_agent
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     try:
         from .walk_forward import WalkForwardEngine
         models["walk_forward"] = WalkForwardEngine
     except ImportError:
         pass
-    except Exception as e:
+    except Exception:
         pass
     return models

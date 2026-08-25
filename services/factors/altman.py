@@ -2,7 +2,7 @@
 
 Orijinal Altman (1968) + Türkiye'ye özgü düzeltme (enflasyon, kur, sektör).
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import structlog
 
 logger = structlog.get_logger()

@@ -21,7 +21,7 @@ Kullanım:
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from collections import deque
@@ -260,7 +260,6 @@ class HMMRegimeDetector:
             sorted_indices = np.argsort(-means)
 
             name_mapping = {}
-            names = ["BULL", "BEAR", "HIGH_VOL", "LOW_VOL"]
 
             # BULL: en yüksek return
             name_mapping[sorted_indices[0]] = "BULL"
@@ -280,7 +279,7 @@ class HMMRegimeDetector:
 
             return [name_mapping.get(i, f"REGIME_{i}") for i in range(len(probabilities))]
 
-        except Exception as e:
+        except Exception:
             return self.REGIME_NAMES[:len(probabilities)]
 
     def _rule_based_fallback(

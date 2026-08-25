@@ -5,9 +5,8 @@ ALPHA BIST — 10/10 Perfect Candlestick & Price Action Intelligence Engine
 Fair Value Gap (FVG) ve Smart Money Likidite Emilimini tespit eder.
 """
 
-from typing import Dict, List, Any, Optional, Tuple
+from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 import structlog

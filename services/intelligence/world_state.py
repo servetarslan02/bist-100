@@ -5,7 +5,7 @@ Event → World State t0 → Event → World State t1 → Impact Propagation →
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import structlog

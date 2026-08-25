@@ -11,7 +11,7 @@ Başarı Kapısı:
 4. İyimser Senaryo: Yalnızca REFERANS amaçlıdır; modelin kabul/red kararı üzerinde ASLA etkisi yoktur.
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass
 import structlog
 

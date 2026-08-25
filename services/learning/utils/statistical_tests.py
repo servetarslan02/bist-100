@@ -8,7 +8,7 @@ KURAL: Tekrar kullanılabilir, test edilebilir, production-ready.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 import structlog
 
@@ -241,7 +241,7 @@ class StatisticalTests:
         cumulative_deviation = np.cumsum(data - cumulative_mean + delta)
 
         # M_t = X_t - cumulative_mean_t + delta
-        m_t = data - cumulative_mean + delta
+        data - cumulative_mean + delta
 
         # Kümülatif minimum
         cumulative_min = np.minimum.accumulate(cumulative_deviation)

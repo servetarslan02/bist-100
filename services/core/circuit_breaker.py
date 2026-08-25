@@ -11,7 +11,7 @@ FAZ 1.3-1.5: Provider Failover + Circuit Breaker + Rate Limit
 
 import time
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Dict, Optional, Any, Callable
 from enum import Enum
 from dataclasses import dataclass, field

@@ -11,12 +11,11 @@ KURAL: Bir modül çökse diğerleri çalışmaya devam etmeli.
 """
 
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from collections import deque
 import structlog
 
-from services.learning.config.learning_config import learning_settings
 
 logger = structlog.get_logger()
 
@@ -200,7 +199,7 @@ class LearningHealthMonitor:
         """Outcome tracking sağlık kontrolü."""
         try:
             from services.learning.outcome_tracker import outcome_tracker
-            stats = outcome_tracker.get_stats()
+            outcome_tracker.get_stats()
             status = "HEALTHY"
         except Exception as e:
             status = "CRITICAL"

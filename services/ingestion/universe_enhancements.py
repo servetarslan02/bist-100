@@ -82,7 +82,6 @@ class UniverseEnhancements:
                     return "SUSPENDED"
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="universe_enhancements.py:83")
-                pass
 
         return "ACTIVE"
 

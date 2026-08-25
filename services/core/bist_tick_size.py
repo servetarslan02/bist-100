@@ -8,8 +8,6 @@ BIST Pay Piyasası Fiyat Adımı Tablosu:
 - 100.00 TL ve üstü -> 0.10 TL
 """
 
-import math
-from typing import Tuple
 
 
 def get_bist_tick_size(price: float) -> float:

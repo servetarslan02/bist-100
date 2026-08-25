@@ -17,7 +17,6 @@ Features:
 - cc_contactless_ratio: Temassız ödeme oranı
 """
 
-import asyncio
 import re
 from typing import Dict, Any, Optional
 from datetime import datetime, timezone
@@ -73,7 +72,6 @@ class BKMAdapter(BaseAdapter):
         """BKM kart verileri sayfasını scrape et."""
         try:
             import aiohttp
-            from bs4 import BeautifulSoup
 
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

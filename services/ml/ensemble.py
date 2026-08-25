@@ -4,7 +4,7 @@ Ağırlıklı ortalama + stacking ensemble desteği.
 Eski weighted average korunurken, stacking_ensemble.py ile entegrasyon eklendi.
 """
 import numpy as np
-from typing import Dict, List, Callable, Optional, Any
+from typing import Dict, Callable, Optional, Any
 import structlog
 
 logger = structlog.get_logger()

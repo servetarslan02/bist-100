@@ -12,8 +12,8 @@ Kaynak: Borsa İstanbul resmi
 """
 
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, date
+from dataclasses import dataclass
+from datetime import date
 import structlog
 
 logger = structlog.get_logger()

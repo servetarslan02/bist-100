@@ -5,13 +5,12 @@ Tüm CPU çekirdeklerini ve RAM'i kullanarak 30 yıllık BIST verisi üzerinde
 saniyede yüzlerce denemeyi paralel (Multiprocessing) olarak icra eder.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
-from dataclasses import dataclass, field
+from typing import Dict, List, Tuple
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 import optuna
 import os
-import multiprocessing
 import structlog
 import warnings
 warnings.filterwarnings('ignore')

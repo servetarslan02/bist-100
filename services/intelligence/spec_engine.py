@@ -7,9 +7,8 @@ v1.2: NaN/None güvenli, _safe_float ile tüm değerler korumalı.
 """
 
 import math
-import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

@@ -14,7 +14,6 @@ Kullanım:
 """
 
 import os
-import asyncio
 from typing import Any, Dict, Optional
 import structlog
 

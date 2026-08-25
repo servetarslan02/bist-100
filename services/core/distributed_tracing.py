@@ -18,9 +18,8 @@ import uuid
 import time
 import asyncio
 import contextvars
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()

@@ -8,7 +8,6 @@ v2.1: Async support + phase metrics
 
 import importlib
 import time
-import asyncio
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 
@@ -345,7 +344,7 @@ class IntelligencePipeline:
             mod = self._modules["knowledge_graph"]
             kg = mod.KnowledgeGraph()
             # Mevcut entity'leri ara
-            entities = kg.search_entities(ticker) if hasattr(kg, 'search_entities') else []
+            kg.search_entities(ticker) if hasattr(kg, 'search_entities') else []
             output.modules_used.append("knowledge_graph")
         except Exception as e:
             output.modules_failed.append(f"knowledge_graph:{str(e)[:80]}")
@@ -483,7 +482,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 4. Forecasting
     try:
-        from .forecasting import ForecastingEngine
         result["forecasting"] = {"available": True}
     except Exception as e:
         logger.warning("forecasting failed", error=str(e))
@@ -491,7 +489,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 5. Monte Carlo
     try:
-        from .monte_carlo import MonteCarloEngine
         result["monte_carlo"] = {"available": True}
     except Exception as e:
         logger.warning("monte_carlo failed", error=str(e))
@@ -499,7 +496,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 6. Probability
     try:
-        from .probability import ProbabilityEngine
         result["probability"] = {"available": True}
     except Exception as e:
         logger.warning("probability failed", error=str(e))
@@ -507,7 +503,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 7. Scenario
     try:
-        from .scenario import ScenarioEngine
         result["scenario"] = {"available": True}
     except Exception as e:
         logger.warning("scenario failed", error=str(e))
@@ -533,7 +528,7 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
     # 9. Knowledge Graph
     try:
         from .knowledge_graph import KnowledgeGraph
-        kg = KnowledgeGraph()
+        KnowledgeGraph()
         result["knowledge_graph"] = {"loaded": True}
     except Exception as e:
         logger.warning("knowledge_graph failed", error=str(e))
@@ -541,7 +536,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 10. Research Memory
     try:
-        from .research_memory import ResearchMemory
         result["research_memory"] = {"available": True}
     except Exception as e:
         logger.warning("research_memory failed", error=str(e))
@@ -549,7 +543,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 11. Evidence
     try:
-        from .evidence_engine import EvidenceVerificationEngine
         result["evidence"] = {"available": True}
     except Exception as e:
         logger.warning("evidence_engine failed", error=str(e))
@@ -566,7 +559,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 13. Impact (B31)
     try:
-        from .impact_engine import analyze_event_impact
         result["event_impact"] = {"available": True}
     except Exception as e:
         logger.warning("impact_engine failed", error=str(e))
@@ -574,7 +566,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 14. Macro Sensitivity
     try:
-        from .macro_sensitivity import MacroSensitivityEngine
         result["macro_sensitivity"] = {"available": True}
     except Exception as e:
         logger.warning("macro_sensitivity failed", error=str(e))
@@ -582,7 +573,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 15. News Pipeline
     try:
-        from .news_pipeline import NewsPipeline
         if news:
             result["news"] = {"count": len(news)}
     except Exception as e:
@@ -591,7 +581,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 16. Prediction Layer
     try:
-        from .prediction_layer import Prediction
         result["prediction_layer"] = {"available": True}
     except Exception as e:
         logger.warning("prediction_layer failed", error=str(e))
@@ -599,7 +588,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 17. Trade Planner
     try:
-        from .trade_planner import TradePlanner
         result["trade_planner"] = {"available": True}
     except Exception as e:
         logger.warning("trade_planner failed", error=str(e))
@@ -607,7 +595,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 18. KAP LLM Extractor
     try:
-        from .kap_llm_extractor import KAPLLMExtractor
         result["kap_llm"] = {"available": True}
     except Exception as e:
         logger.warning("kap_llm_extractor failed", error=str(e))
@@ -615,11 +602,6 @@ def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None
 
     # 19. Analysis Engines
     try:
-        from .analysis_engines import (
-            PriceActionEngine, VolumeEngine, SectorEngine,
-            RelativeStrengthEngine, CorrelationEngine,
-            DrawdownEngine, PositionRiskEngine, ModelRiskEngine, DataConfidenceEngine
-        )
         result["analysis_engines"] = {"count": 9}
     except Exception as e:
         logger.warning("analysis_engines failed", error=str(e))

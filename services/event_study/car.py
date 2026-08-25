@@ -4,7 +4,7 @@ CAR[t1, t2] = Σ AR_it (t1'den t2'ye)
 MacKinlay (1997) metodolojisi.
 """
 import numpy as np
-from typing import Dict, Tuple, Optional
+from typing import Dict
 import structlog
 
 logger = structlog.get_logger()

@@ -4,8 +4,8 @@ FinGPT sentiment + RL action + ML ranking birleşimi.
 Multi-signal fusion, dynamic weighting, conflict resolution.
 """
 import numpy as np
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
+from typing import Dict, Any, List
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

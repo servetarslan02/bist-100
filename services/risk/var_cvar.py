@@ -14,8 +14,8 @@ Kaynaklar:
 
 import numpy as np
 import math
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
 from enum import Enum
 import structlog
 

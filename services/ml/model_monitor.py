@@ -5,8 +5,8 @@ auto-retrain trigger, dashboard data, alerting system.
 """
 import numpy as np
 from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()

@@ -5,7 +5,7 @@ Güçlü boğada trendi sonuna kadar sağan, krizde ise anında nakde geçen asi
 Tüm 24 CPU çekirdeğini ve RAM'i tam kapasite kullanır.
 """
 
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import numpy as np
 import pandas as pd

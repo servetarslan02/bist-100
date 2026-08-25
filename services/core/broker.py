@@ -7,7 +7,7 @@ Paper broker dahil — gerçek broker henüz bağlanmadı.
 import uuid
 import time
 from enum import Enum
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from dataclasses import dataclass, field
 import structlog
 

@@ -2,11 +2,9 @@
 
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, Dict, Any, List
-import numpy as np
+from typing import Optional, Dict, Any
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import RegimeInfo, SimulationResult, ErrorResponse
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +28,7 @@ async def get_market_regime(user=Depends(get_current_user), _=Depends(check_rate
                 "description": "BIST-100 genelinde pozitif trend eğilimi ve yüksek işlem hacmi desteği.",
             }
         return regime
-    except Exception as e:
+    except Exception:
         try:
             from ...intelligence.regime import regime_engine
             result = regime_engine.detect_regime({})

@@ -22,7 +22,7 @@ Kullanım:
 import asyncio
 import time
 import uuid
-from typing import Optional, Any, Dict, Callable
+from typing import Optional, Any, Dict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 import structlog
@@ -314,7 +314,6 @@ class DatabaseLock:
                 await self._rollback_pg()
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:316")
-            pass
         finally:
             self._acquired = False
             self._acquire_time = None
@@ -339,7 +338,6 @@ class DatabaseLock:
                     break
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="db_lock.py:340")
-                    pass
 
         try:
             self._renewal_task = asyncio.ensure_future(_renewal_loop())
@@ -405,7 +403,7 @@ class DatabaseLock:
                 await self._rollback_sqlite()
                 return True
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     async def _recover_pg(self) -> bool:
@@ -437,10 +435,9 @@ class DatabaseLock:
                         return True
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="db_lock.py:437")
-                        pass
 
             return False
-        except Exception as e:
+        except Exception:
             return False
 
     # =====================================================
@@ -461,12 +458,11 @@ class DatabaseLock:
         """SQLite: COMMIT ile lock serbest."""
         try:
             self._db.commit()
-        except Exception as e:
+        except Exception:
             try:
                 self._db.rollback()
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="db_lock.py:465")
-                pass
 
     async def _rollback_sqlite(self):
         """SQLite: ROLLBACK."""
@@ -474,7 +470,6 @@ class DatabaseLock:
             self._db.rollback()
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:472")
-            pass
 
     # =====================================================
     # POSTGRESQL IMPLEMENTATION
@@ -502,7 +497,6 @@ class DatabaseLock:
             )
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:499")
-            pass
 
     async def _rollback_pg(self):
         """PostgreSQL: ROLLBACK."""
@@ -510,7 +504,6 @@ class DatabaseLock:
             await self._db.execute("ROLLBACK")
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="db_lock.py:506")
-            pass
 
     # =====================================================
     # CONTEXT MANAGER

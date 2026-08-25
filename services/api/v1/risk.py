@@ -20,11 +20,10 @@ Endpoints:
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from typing import Optional, List, Dict, Any
+from typing import Optional, List
 import numpy as np
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import RiskOverview, VaRResult, ErrorResponse
 
 router = APIRouter()
 
@@ -250,7 +249,7 @@ async def portfolio_risk(
         VaR/CVaR, concentration (HHI), drawdown, dynamic limits
     """
     try:
-        from ...risk.main import assess_portfolio_risk
+        pass
 
         portfolio = {"total_value": portfolio_value, "weights": {}}
         try:

@@ -16,7 +16,7 @@ from datetime import datetime, timezone, timedelta
 import structlog
 
 from .historical_contracts import (
-    FundamentalSnapshot, EventSnapshot, CatalystSnapshot,
+    EventSnapshot, CatalystSnapshot,
 )
 from .persistent_repository import PersistentHistoricalRepository
 from .historical_fundamental_provider import HistoricalFundamentalProvider
@@ -225,7 +225,6 @@ class HistoricalIngestionPipeline:
         Returns:
             {ticker: event_count} veya {ticker: error_message}
         """
-        results = {}
         last_ingestion = self._repo.get_last_ingestion_time("news")
 
         if not force and last_ingestion:

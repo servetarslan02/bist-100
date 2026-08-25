@@ -3,14 +3,12 @@
 import asyncio
 import orjson
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any, Optional
 import numpy as np
 import structlog
 
-from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, pg_fetchrow, pg_execute,
-    redis_get, redis_set, ch_execute,
+    init_databases, close_databases, pg_fetch, pg_execute, ch_execute,
 )
 from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
@@ -63,7 +61,7 @@ class SimulationEngine:
         try:
             sim_type = event.data.get("simulation_type", "monte_carlo")
             ticker = event.data.get("ticker")
-            portfolio_id = event.data.get("portfolio_id")
+            event.data.get("portfolio_id")
 
             logger.info("Running simulation", type=sim_type, ticker=ticker)
 
@@ -311,7 +309,7 @@ class SimulationEngine:
 
     async def _run_stress_test(self, params: Dict) -> Dict[str, Any]:
         """Run stress test — gerçek hesaplama."""
-        portfolio_id = params.get("portfolio_id")
+        params.get("portfolio_id")
         positions = params.get("positions", [])
 
         # Stress senaryoları

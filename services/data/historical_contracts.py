@@ -9,8 +9,7 @@ KURAL: publication_date <= current_date olmayan veri KULLANILAMAZ.
 """
 
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
 
 
 @dataclass

@@ -8,7 +8,7 @@ Kaynaklar: Mometic (2026), Endüstri standardı
 """
 
 import time
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Any, Callable
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime, timezone

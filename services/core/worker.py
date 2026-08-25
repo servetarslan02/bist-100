@@ -13,7 +13,6 @@ import asyncio
 import hashlib
 import orjson
 import time
-from datetime import datetime, timezone
 from typing import Optional, Dict, Any, Callable, Awaitable
 from enum import Enum
 import structlog
@@ -130,7 +129,7 @@ class JobWorker:
                 "SELECT * FROM system_jobs WHERE id = $1", job_id
             )
             return dict(row) if row else None
-        except Exception as e:
+        except Exception:
             return None
 
     async def cancel_job(self, job_id: int) -> bool:
@@ -145,7 +144,7 @@ class JobWorker:
             if task and not task.done():
                 task.cancel()
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     async def shutdown(self, timeout: int = 30):
@@ -238,7 +237,7 @@ class JobWorker:
                 ),
                 timeout=3.0
             )
-        except Exception as e:
+        except Exception:
             return None
 
     async def _create_job(self, job_type: str, payload: Dict, priority: int,

@@ -12,7 +12,7 @@ Bu adapter:
 - Mevcut backtest API'sini bozmaz
 """
 
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import numpy as np
 import structlog
 

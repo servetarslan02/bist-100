@@ -18,7 +18,7 @@ import hashlib
 import orjson
 import time
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import structlog
 

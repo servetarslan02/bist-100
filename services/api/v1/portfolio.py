@@ -23,21 +23,14 @@ Endpoints:
 """
 
 import orjson
-import time
 import asyncio
-from typing import Optional, Dict, List, Any
+from typing import Optional, Dict, Any
 
 import numpy as np
-import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from fastapi.responses import StreamingResponse
 import structlog
 
 from ..dependencies import get_current_user, check_rate_limit
-from .schemas import (
-    PortfolioSummary, PortfolioMetrics, TradeInfo, PositionInfo,
-    RiskOverview, ErrorResponse, BaseResponse
-)
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -272,7 +265,7 @@ async def portfolio_orders_and_trades(
             "total_orders": len(orders),
             "total_trades": len(trades),
         }
-    except Exception as e:
+    except Exception:
         return {"orders": [], "trades": [], "total_orders": 0, "total_trades": 0}
 
 
@@ -337,7 +330,7 @@ async def attribution(
         Factor attribution (value/momentum/quality) + sector attribution
     """
     try:
-        from ...portfolio.enhancements import performance_attribution
+        pass
 
         pm = _get_pm()
 

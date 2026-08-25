@@ -12,7 +12,6 @@ import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
-from pathlib import Path
 import structlog
 
 from .historical_contracts import (

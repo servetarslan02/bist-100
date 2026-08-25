@@ -5,7 +5,6 @@ MacKinlay (1997) metodolojisi ile detaylı makro event study.
 """
 import numpy as np
 from typing import Dict, List, Any, Optional
-from scipy import stats
 import structlog
 
 logger = structlog.get_logger()
@@ -90,8 +89,7 @@ def analyze_tcmb_event(
     Returns:
         Dict with surprise, direction, car, sector_breakdown, fx_reaction
     """
-    from .abnormal_return import calculate_abnormal_return
-    from .car import calculate_car, calculate_car_sub_windows
+    from .car import calculate_car
     from .statistical_test import test_significance
 
     # Surprise hesapla

@@ -15,10 +15,8 @@ Features:
 - remote_ratio: Uzaktan çalışma oranı
 """
 
-import asyncio
-import re
 from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 import structlog
 
 from .base import BaseAdapter

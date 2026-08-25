@@ -8,16 +8,14 @@ Grafana dashboard'u bu metriklerden beslenir.
 """
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge, Info, REGISTRY
+    from prometheus_client import Counter, Histogram, Gauge
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
 
 import time
-from typing import Dict, Optional
 from contextlib import contextmanager
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -149,7 +147,7 @@ class IngestionMetrics:
         status = "success"
         try:
             yield
-        except Exception as e:
+        except Exception:
             status = "failure"
             raise
         finally:

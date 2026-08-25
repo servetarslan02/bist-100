@@ -11,9 +11,8 @@ import asyncio
 import aiohttp
 import feedparser
 import time
-import calendar
 import urllib.parse
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from datetime import datetime, timezone
 import structlog
 

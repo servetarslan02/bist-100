@@ -7,7 +7,7 @@ regime-aware training, SHAP feature importance.
 import os
 import pickle
 import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import structlog
@@ -53,7 +53,7 @@ class CatBoostAdjustedLoss:
     def calc_ders_range(self, approxes, targets, weights):
         """CatBoost custom loss interface — gradient + hessian."""
         try:
-            from catboost import MultiTargetCustomMetric
+            pass
         except ImportError:
             pass
 
@@ -127,7 +127,7 @@ class CatBoostModel:
             Training metrics
         """
         try:
-            from catboost import CatBoostClassifier, CatBoostRegressor, Pool
+            from catboost import Pool
         except ImportError:
             logger.warning("catboost not installed — pip install catboost")
             return {"error": "catboost not installed"}
@@ -152,7 +152,6 @@ class CatBoostModel:
                 fit_params["eval_metric"] = "RMSE"
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="catboost_model.py:152")
-                pass
 
         # Pool oluştur (daha efficient)
         train_pool = Pool(
@@ -298,7 +297,7 @@ class CatBoostModel:
                 if self._feature_names:
                     return dict(zip(self._feature_names, importance.tolist()))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
-        except Exception as e:
+        except Exception:
             return None
 
     def get_feature_interactions(self, horizon: int = 5) -> Optional[Dict[str, float]]:
@@ -318,7 +317,6 @@ class CatBoostModel:
                 return result
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="catboost_model.py:317")
-            pass
         return None
 
     def get_cat_feature_stats(self, horizon: int = 5) -> Optional[Dict[str, Any]]:
@@ -337,7 +335,7 @@ class CatBoostModel:
                     "type": "categorical",
                 }
             return stats
-        except Exception as e:
+        except Exception:
             return None
 
     def _create_model(self):
@@ -423,7 +421,6 @@ class CatBoostModel:
                     metrics["val_log_loss"] = round(float(log_loss(y_val, val_pred)), 4)
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="catboost_model.py:421")
-                    pass
             else:
                 from sklearn.metrics import mean_squared_error, mean_absolute_error
                 try:
@@ -438,7 +435,6 @@ class CatBoostModel:
                         metrics["val_ic"] = round(float(np.corrcoef(val_pred, y_val)[0, 1]), 4)
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="catboost_model.py:435")
-                    pass
 
         return metrics
 
@@ -471,7 +467,6 @@ class CatBoostModel:
                 self._feature_interactions = result
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="catboost_model.py:467")
-            pass
 
     def _check_overfitting(self, metrics: Dict[str, Any], horizon: int):
         """Overfitting kontrolü — train-val gap."""

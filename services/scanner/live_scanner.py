@@ -9,7 +9,7 @@ Pipeline:
   market.tick → state update → feature update → light scan → candidate?
 """
 
-from typing import Dict, Optional, Any
+from typing import Dict, Optional
 from datetime import datetime, timezone
 
 import numpy as np

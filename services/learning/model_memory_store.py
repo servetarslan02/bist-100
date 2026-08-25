@@ -11,7 +11,7 @@ Kalıcı model hafızası:
 import os
 import orjson
 import sqlite3
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import structlog
 
@@ -223,7 +223,7 @@ class ModelMemoryStore:
             # Roundtrip BIST işlem maliyeti (%0.074)
             cost_pct = 0.074
             trade_ret = actual_ret if pred_dir in ["UP", "LONG", "BUY"] else -actual_ret
-            net_trade_ret = trade_ret - cost_pct
+            trade_ret - cost_pct
 
             pos_val = 10000.0  # Standart lot
             gross_pnl = pos_val * (trade_ret / 100.0)

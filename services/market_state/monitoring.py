@@ -15,10 +15,9 @@ Metrikler:
 - market_state_breadth_trin (gauge) — TRIN
 """
 
-import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

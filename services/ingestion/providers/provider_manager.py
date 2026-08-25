@@ -9,7 +9,7 @@ Bir provider bozulursa ALPHA'nın gözü kapanmaz.
 
 from typing import Dict, List, Optional, Any, Callable
 from datetime import datetime, timezone
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import structlog
 
 logger = structlog.get_logger()

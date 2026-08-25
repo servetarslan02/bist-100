@@ -141,12 +141,12 @@ class ModelComparator:
                 from scipy.stats import spearmanr
                 ic_val, _ = spearmanr(preds, y_test)
                 ic = float(ic_val) if not np.isnan(ic_val) else 0.0
-            except Exception as e:
+            except Exception:
                 try:
                     ic = float(np.corrcoef(preds, y_test)[0, 1])
                     if np.isnan(ic):
                         ic = 0.0
-                except Exception as e:
+                except Exception:
                     ic = 0.0
 
         # 4. Precision@K
@@ -259,7 +259,7 @@ class ModelComparator:
         try:
             from sklearn.metrics import brier_score_loss
             return float(brier_score_loss(y_true, y_prob))
-        except Exception as e:
+        except Exception:
             return 0.5  # Varsayılan: kötü kalibrasyon
 
 

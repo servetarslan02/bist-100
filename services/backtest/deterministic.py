@@ -18,11 +18,9 @@ Referanslar:
 
 import orjson
 import hashlib
-import pickle
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 import structlog
@@ -339,7 +337,6 @@ class DeterministicRecovery:
                 })
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="deterministic.py:338")
-                pass
         return checkpoints
 
     def cleanup_old_checkpoints(self, keep_last: int = 10):

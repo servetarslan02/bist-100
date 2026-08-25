@@ -15,13 +15,12 @@ Kaynaklar:
 8. Web Scraping (5+ feature)
 """
 
-import asyncio
 import time
 from typing import Dict, Any, Optional, List
 from datetime import datetime, timezone
 import structlog
 
-from .base import adapter_registry, BaseAdapter
+from .base import adapter_registry
 from .google_trends import google_trends_adapter
 from .bkm_adapter import bkm_adapter
 from .kariyer_net import kariyer_net_adapter

@@ -22,9 +22,8 @@ import asyncio
 import hashlib
 import re
 import time
-import uuid
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
+from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
 import structlog
 
@@ -83,7 +82,6 @@ class MigrationStatus:
 
 class MigrationLockError(Exception):
     """Migration lock alınamadı."""
-    pass
 
 
 class MigrationRunner:
@@ -139,7 +137,7 @@ class MigrationRunner:
             logger.info("Migration lock acquired", owner=self._lock_id)
             self._start_heartbeat()
             return True
-        except Exception as e:
+        except Exception:
             # Lock zaten var — timeout kontrolü
             row = await self._fetchone(
                 f"SELECT owner, acquired_at, expires_at FROM {LOCK_TABLE} WHERE lock_key = ?",
@@ -173,7 +171,6 @@ class MigrationRunner:
                 logger.info("Migration lock released", owner=self._lock_id)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="runner.py:174")
-                pass
             self._lock_id = None
 
     async def _refresh_lock(self):
@@ -187,7 +184,6 @@ class MigrationRunner:
                 )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="runner.py:187")
-                pass
 
     def _start_heartbeat(self):
         """Arka planda lock süresini otomatik yenile."""
@@ -202,7 +198,6 @@ class MigrationRunner:
                     break
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="runner.py:201")
-                    pass
         try:
             self._heartbeat_task = asyncio.ensure_future(_heartbeat_loop())
         except RuntimeError:
@@ -249,7 +244,7 @@ class MigrationRunner:
                 "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version"
             )
             return {r["version"]: dict(r) for r in rows}
-        except Exception as e:
+        except Exception:
             return {}
 
     async def get_current_version(self) -> int:
@@ -391,7 +386,7 @@ class MigrationRunner:
                 m.version, m.name, m.checksum
             )
             await self._commit()
-        except Exception as e:
+        except Exception:
             await self._rollback()
             raise
 
@@ -452,7 +447,7 @@ class MigrationRunner:
                 "DELETE FROM schema_migrations WHERE version = ?", m.version
             )
             await self._commit()
-        except Exception as e:
+        except Exception:
             await self._rollback()
             raise
 

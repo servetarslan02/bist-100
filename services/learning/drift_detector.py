@@ -22,10 +22,9 @@ KURAL: En az 2 yöntem hemfikir olmalı → drift kararı.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from collections import defaultdict
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import structlog
 
 from services.learning.config.learning_config import learning_settings

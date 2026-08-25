@@ -12,7 +12,7 @@ KURAL: Walk-forward başarısızsa → retrain yapma.
 
 import numpy as np
 from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from collections import deque
 import structlog
@@ -315,7 +315,7 @@ class RetrainEngine:
         # Feature matrix hazırla (tüm veri)
         try:
             X_all = self._prepare_features(features_map, feature_fn)
-        except Exception as e:
+        except Exception:
             return None
 
         # Split indeksleri
@@ -405,7 +405,7 @@ class RetrainEngine:
             X = self._prepare_features(features_map, feature_fn)
             # Basit: ilk N satırı al (gerçek implementasyonda tarih bazlı filtreleme)
             return X[:len(dates)] if len(X) >= len(dates) else X
-        except Exception as e:
+        except Exception:
             return None
 
     def _evaluate_wf_metrics(self, metrics: WalkForwardMetrics, cfg: Any) -> tuple:

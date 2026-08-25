@@ -12,7 +12,7 @@ KURAL: confidence != win_probability. Ayri degiskenler.
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 import structlog
 
@@ -362,7 +362,7 @@ class _PositionSizerCompat(PositionSizer):
         if stop_distance <= 0:
             return _CalcResult(method="INVALID")
 
-        stop_pct = stop_distance / entry_price
+        stop_distance / entry_price
 
         # Risk bütçesi
         risk_budget = portfolio_value * (max_risk_per_trade_pct / 100)
@@ -393,7 +393,7 @@ class _PositionSizerCompat(PositionSizer):
                     )
                     shares_by_var = int(var_limit / entry_price) if entry_price > 0 else 0
                     shares = min(shares, shares_by_var)
-            except Exception as e:
+            except Exception:
                 pass  # VaR limit hesaplanamazsa mevcut shares kullan
 
         if shares <= 0:

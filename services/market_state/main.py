@@ -22,19 +22,18 @@ v2.0 Değişiklikleri:
 import asyncio
 import orjson
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Optional
 import numpy as np
 import structlog
 
 from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, get_pg_pool,
-    ch_insert, ch_execute, redis_get, redis_set,
-    redis_hgetall, redis_hset,
+    init_databases, close_databases, ch_insert,
+    redis_set,
 )
 from ..core.event_schema import CanonicalEvent, EventType
 from ..core.event_bus import (
-    ensure_topics, EventConsumer, publish_event, flush_producer,
+    ensure_topics, EventConsumer, publish_event,
 )
 from ..core.logging import setup_logging
 
@@ -47,7 +46,6 @@ from .risk_appetite import RiskAppetiteEngine
 from .multi_timeframe import MultiTimeframeEngine, MultiTimeframeResult
 from .output_formatter import MarketStateFormatter, MarketStateOutput
 from .monitoring import market_state_monitor
-from .api import register_market_state_routes
 
 logger = structlog.get_logger()
 
@@ -442,7 +440,6 @@ class MarketStateService:
                 )
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="main.py:443")
-                pass
 
             logger.info(
                 "Market state computed",
@@ -469,7 +466,6 @@ class MarketStateService:
                 prometheus_metrics.set_gauge("market_state_rsi", components.avg_rsi)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="main.py:469")
-                pass
 
         except Exception as e:
             logger.error("Market state computation error", error=str(e), exc_info=True)

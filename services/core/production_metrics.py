@@ -7,7 +7,6 @@ Prometheus bağımlılığı yok — in-memory counter/gauge/histogram.
 import time
 from typing import Dict, Any, Optional
 from collections import defaultdict
-from dataclasses import dataclass, field
 import structlog
 
 logger = structlog.get_logger()
