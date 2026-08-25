@@ -37,6 +37,7 @@ export default function EventCenterPage() {
   const filtered = useMemo(() => filter === "ALL" ? events : events.filter(e => e.type === filter), [filter, events]);
 
   return (
+    <ErrorBoundary name="events">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -80,10 +81,7 @@ export default function EventCenterPage() {
 
       {/* Loading state */}
       {loading && events.length === 0 && (
-        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2">
-          <Loader2 className="animate-spin" size={16} />
-          <span>Canlı haber ve KAP akışı yükleniyor...</span>
-        </div>
+        <SkeletonList count={6} />
       )}
 
       {/* Events List */}
@@ -135,5 +133,6 @@ export default function EventCenterPage() {
         })}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

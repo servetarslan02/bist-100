@@ -33,6 +33,7 @@ export default function ModelCenterPage() {
 
   const models: ModelRegistryItem[] = useMemo(() => modelsData?.models || [], [modelsData]);
   return (
+    <ErrorBoundary name="models">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -57,6 +58,7 @@ export default function ModelCenterPage() {
 
       {/* Model Cards Grid */}
       <div className="space-y-4">
+        {models.length === 0 && <SkeletonList count={4} />}
         {models.map((model) => {
           const isChamp = model.status === "CHAMPION";
           return (
@@ -129,7 +131,6 @@ export default function ModelCenterPage() {
         })}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
-
-

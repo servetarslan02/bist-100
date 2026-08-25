@@ -205,6 +205,7 @@ function AssetIntelContent() {
   const isPos = (asset?.change_pct ?? 0) >= 0;
 
   return (
+    <ErrorBoundary name="asset">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header & Quick Ticker Selector */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -547,17 +548,13 @@ function AssetIntelContent() {
         </>
       )}
     </div>
+    </ErrorBoundary>
   );
 }
 
 export default function AssetIntelPage() {
   return (
-    <Suspense fallback={
-      <div className="p-8 text-center text-xs text-zinc-500">
-        <RefreshCw size={20} className="mx-auto mb-2 text-emerald-400 animate-spin" />
-        Varlık verileri yükleniyor...
-      </div>
-    }>
+    <Suspense fallback={<SkeletonChart height={400} />}>
       <AssetIntelContent />
     </Suspense>
   );

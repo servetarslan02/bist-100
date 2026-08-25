@@ -281,6 +281,7 @@ export default function ScenarioLab() {
   }, [scenariosList, selectedScenario]);
 
   return (
+    <ErrorBoundary name="scenario">
     <div
       className="h-[calc(100vh-3.2rem)] max-h-[calc(100vh-3.2rem)] overflow-hidden flex flex-col justify-between p-3 gap-2.5 select-none"
       style={{ background: "var(--color-bg-primary)" }}
@@ -510,5 +511,6 @@ export default function ScenarioLab() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

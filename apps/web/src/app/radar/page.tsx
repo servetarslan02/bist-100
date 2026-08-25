@@ -140,6 +140,7 @@ export default function MarketRadar() {
   };
 
   return (
+    <ErrorBoundary name="radar">
     <div className="p-5 space-y-4 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -250,9 +251,8 @@ export default function MarketRadar() {
 
       {/* Loading */}
       {loading && allRows.length === 0 && (
-        <div className="flex items-center justify-center py-20 gap-3 text-zinc-500">
-          <Loader2 size={18} className="animate-spin" />
-          <span className="text-sm">Piyasa verileri yükleniyor...</span>
+        <div className="rounded-xl overflow-hidden" style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}>
+          <SkeletonTable rows={10} cols={8} />
         </div>
       )}
 
@@ -343,5 +343,6 @@ export default function MarketRadar() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

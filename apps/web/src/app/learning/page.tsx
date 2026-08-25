@@ -35,6 +35,7 @@ export default function LearningLabPage() {
   };
 
   return (
+    <ErrorBoundary name="learning">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -78,6 +79,11 @@ export default function LearningLabPage() {
 
       {/* Summary Drift & Metric Cards */}
       <div className="grid grid-cols-4 gap-3">
+        {!matrixData && (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        )}
         <div
           className="rounded-xl p-4 space-y-1.5"
           style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)", borderTop: "1px solid #00e5a030" }}
@@ -118,7 +124,12 @@ export default function LearningLabPage() {
       </div>
 
       {/* Main Content Areas */}
-      {activeTab === "matrix" && (
+      {activeTab === "matrix" && !matrixData && (
+        <div className="rounded-xl overflow-hidden" style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}>
+          <SkeletonTable rows={6} cols={10} />
+        </div>
+      )}
+      {activeTab === "matrix" && matrixData && (
         <div
           className="rounded-xl overflow-hidden"
           style={{ background: "var(--color-bg-card)", border: "1px solid var(--color-border-subtle)" }}
@@ -196,7 +207,7 @@ export default function LearningLabPage() {
             <h3 className="font-bold text-zinc-100 text-sm">Otonom MLOps & Performans Değerlendirme Raporu</h3>
           </div>
           <div className="whitespace-pre-wrap font-mono text-[11px] p-4 bg-zinc-950/80 rounded-lg border border-zinc-800 text-zinc-300 overflow-x-auto">
-            {reportMarkdown || "Rapor yükleniyor..."}
+            {reportMarkdown || <SkeletonList count={8} />}
           </div>
         </div>
       )}
@@ -243,5 +254,6 @@ export default function LearningLabPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

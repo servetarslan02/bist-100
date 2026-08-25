@@ -91,6 +91,7 @@ export default function AlertsPage() {
     : alerts.filter(a => a.severity === filter || a.category === filter);
 
   return (
+    <ErrorBoundary name="alerts">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -113,7 +114,10 @@ export default function AlertsPage() {
 
       {/* Alert List */}
       <div className="space-y-3">
-        {filtered.map((alert) => {
+        {!alertsData && (
+          <SkeletonList count={5} />
+        )}
+        {alertsData && filtered.map((alert) => {
           const isCrit = alert.severity === "CRITICAL";
           const isWarn = alert.severity === "WARNING";
           const borderClr = isCrit ? "#ff4466" : isWarn ? "#ffaa00" : "#00c8ff";
@@ -161,5 +165,6 @@ export default function AlertsPage() {
         })}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

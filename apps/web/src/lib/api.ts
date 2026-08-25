@@ -205,12 +205,6 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
   const [tick, setTick] = useState(0);
 
   const fetchData = useCallback(async () => {
-    // Stale-while-revalidate: show cached data immediately, fetch in background
-    const cached = getInitialCachedData<T>(path);
-    if (cached && !data) {
-      setData(cached);
-      setLoading(false);
-    }
     setIsValidating(true);
     try {
       const result = await api<T>(path);
@@ -223,16 +217,6 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
     } finally {
       setLoading(false);
       setIsValidating(false);
-    }
-  }, [path]);
-
-  useEffect(() => {
-    if (data === null) {
-      const cached = getInitialCachedData<T>(path);
-      if (cached) {
-        setData(cached);
-        setLoading(false);
-      }
     }
   }, [path]);
 

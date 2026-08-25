@@ -102,6 +102,7 @@ export default function OpportunitiesPage() {
   }, [signals, activeFilter, debouncedSearch]);
 
   return (
+    <ErrorBoundary name="opportunities">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -163,7 +164,7 @@ export default function OpportunitiesPage() {
       {/* Signal Cards Grid */}
       {filteredSignals.length === 0 ? (
         <div className="text-center py-16 text-zinc-500 text-xs rounded-xl bg-zinc-900/30 border border-zinc-800/50">
-          {loading ? "Piyasa fırsatları taranıyor..." : "Bu kriterde aktif sinyal bulunamadı."}
+          {loading ? <SkeletonList count={5} /> : "Bu kriterde aktif sinyal bulunamadı."}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -250,5 +251,6 @@ export default function OpportunitiesPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

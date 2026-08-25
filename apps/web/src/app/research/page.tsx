@@ -107,6 +107,7 @@ export default function AIResearchPage() {
   };
 
   return (
+    <ErrorBoundary name="research">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -168,10 +169,7 @@ export default function AIResearchPage() {
 
       {/* Loading state */}
       {loading && reports.length === 0 && (
-        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2">
-          <Loader2 className="animate-spin" size={16} />
-          <span>Canlı model araştırma raporları derleniyor...</span>
-        </div>
+        <SkeletonList count={5} />
       )}
 
       {/* Report View Grid */}
@@ -274,5 +272,6 @@ export default function AIResearchPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

@@ -78,6 +78,7 @@ export default function SystemHealth() {
   const pipelineStats = status?.pipeline_stats ?? PIPELINE_STATS;
 
   return (
+    <ErrorBoundary name="system">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -121,7 +122,7 @@ export default function SystemHealth() {
           </div>
           <div className="px-5 py-2">
             {Object.entries(services).length === 0 ? (
-              <p className="py-6 text-center text-sm" style={{ color: "var(--color-text-muted)" }}>Yükleniyor...</p>
+              <SkeletonList count={6} />
             ) : (
               Object.entries(services).map(([name, health]) => {
                 const ok = health === "healthy";
@@ -196,5 +197,6 @@ export default function SystemHealth() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

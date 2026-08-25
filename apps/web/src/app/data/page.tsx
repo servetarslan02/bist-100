@@ -44,6 +44,7 @@ export default function DataCenterPage() {
   };
 
   return (
+    <ErrorBoundary name="data">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -76,9 +77,8 @@ export default function DataCenterPage() {
       )}
 
       {loading && databases.length === 0 && (
-        <div className="flex items-center justify-center p-12 text-zinc-500 gap-2">
-          <Loader2 className="animate-spin" size={16} />
-          <span>Veritabanı telemetrisi okunuyor...</span>
+        <div className="grid grid-cols-2 gap-4">
+          <SkeletonCard /><SkeletonCard />
         </div>
       )}
 
@@ -164,5 +164,6 @@ export default function DataCenterPage() {
         })}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

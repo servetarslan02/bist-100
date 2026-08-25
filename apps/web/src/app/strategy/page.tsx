@@ -107,12 +107,13 @@ export default function StrategyPage() {
       <div className="p-8 text-center fade-in space-y-4 text-zinc-400">
         <AlertTriangle size={32} className="mx-auto text-red-400" />
         <p className="text-sm">Model yüklenemedi. Lütfen Redis ve API servislerini kontrol edin.</p>
-        <button onClick={() => refresh()} className="px-4 py-2 bg-zinc-800 rounded text-xs hover:bg-zinc-700">Yeniden Dene</button>
+        <button onClick={() => refetch()} className="px-4 py-2 bg-zinc-800 rounded text-xs hover:bg-zinc-700">Yeniden Dene</button>
       </div>
     );
   }
 
   return (
+    <ErrorBoundary name="strategy">
     <div className="p-5 space-y-6 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -286,5 +287,6 @@ export default function StrategyPage() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

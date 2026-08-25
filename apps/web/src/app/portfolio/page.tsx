@@ -121,6 +121,7 @@ export default function PortfolioPage() {
   };
 
   return (
+    <ErrorBoundary name="portfolio">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
 
       {/* Header */}
@@ -185,6 +186,11 @@ export default function PortfolioPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {loading && !data && (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        )}
         <MetricCard label="Toplam Portföy (NAV)" value={currentCapital} prefix="₺" color="#00c8ff" subtext="Toplam Net Varlık Değeri" />
         <MetricCard label="Yatırımdaki Tutar" value={investedValue} prefix="₺" color="#9966ff" subtext={`Hisseler (${positions.length} adet)`} />
         <MetricCard label="Alım Gücü (Nakit)" value={purchasingPower} prefix="₺" color="#ffaa00" subtext="T+2 Mahsup Dahil" />
@@ -323,7 +329,7 @@ export default function PortfolioPage() {
             </thead>
             <tbody>
               {loading && positions.length === 0 ? (
-                <tr><td colSpan={10} className="text-center py-16 text-zinc-500">Portföy verileri yükleniyor...</td></tr>
+                <tr><td colSpan={10} className="text-center py-16"><SkeletonTable rows={5} cols={10} /></td></tr>
               ) : positions.length === 0 ? (
                 <tr>
                   <td colSpan={10} className="text-center py-16">
@@ -495,5 +501,6 @@ export default function PortfolioPage() {
       </div>
 
     </div>
+    </ErrorBoundary>
   );
 }

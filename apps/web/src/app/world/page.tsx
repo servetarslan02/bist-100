@@ -70,6 +70,7 @@ export default function WorldIntelPage() {
   const usRatePressure = (world?.us_rate_pressure ?? 0.55) * 100;
 
   return (
+    <ErrorBoundary name="world">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -88,7 +89,13 @@ export default function WorldIntelPage() {
 
       {/* Global Assets Ticker Cards */}
       <div className="grid grid-cols-6 gap-3">
-        {MACRO_ASSETS.map((item) => (
+        {!world && (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        )}
+        {world && MACRO_ASSETS.map((item) => (
           <div
             key={item.name}
             className="rounded-xl p-4 space-y-1.5 select-none"
@@ -172,5 +179,6 @@ export default function WorldIntelPage() {
         </div>
       </div>
     </div>
+    </ErrorBoundary>
   );
 }
