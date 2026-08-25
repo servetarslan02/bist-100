@@ -194,12 +194,12 @@ async def live_intel_analysis(
                 prev_price = round(float(closes_clean.iloc[-2]), 2) if len(closes_clean) > 1 else latest_price
                 change_pct = round(float(((latest_price - prev_price) / prev_price) * 100), 2) if prev_price else 0.0
             else:
-                latest_price = 100.0
-                prev_price = 100.0
+                latest_price = 0
+                prev_price = 0
                 change_pct = 0.0
         else:
-            latest_price = 100.0
-            prev_price = 100.0
+            latest_price = 0
+            prev_price = 0
             change_pct = 0.0
 
         # Anlık Redis Canlı Tick Senkronizasyonu
@@ -325,28 +325,29 @@ async def live_intel_analysis(
         logger.warning(f"live_intel error for {ticker}: {e}")
         return {
             "symbol": sym,
-            "name": meta["name"],
-            "sector": meta["sector"],
-            "price": 312.50 if sym == "THYAO" else (403.25 if sym == "ASELS" else 100.0),
-            "prev_price": 308.00 if sym == "THYAO" else (395.00 if sym == "ASELS" else 98.5),
-            "change_pct": 1.46 if sym == "THYAO" else (2.09 if sym == "ASELS" else 1.52),
-            "market_cap": meta["cap"],
-            "pe_ratio": meta["pe"],
-            "pb_ratio": meta["pb"],
-            "rsi_14": 56.4,
-            "sma_20": 305.0,
-            "sma_50": 298.0,
-            "support": 296.0,
-            "resistance": 330.0,
-            "atr_14": 8.5,
-            "macd_val": 2.1,
-            "macd_sig_val": 1.4,
-            "macd_signal": "POZİTİF KESİŞİM (AL)",
-            "recommendation": "BUY",
-            "recommendation_text": "AL",
-            "recommendation_score": 84.0,
+            "name": meta.get("name", sym),
+            "sector": meta.get("sector", "Bilinmiyor"),
+            "price": None,
+            "prev_price": None,
+            "change_pct": None,
+            "market_cap": meta.get("cap"),
+            "pe_ratio": meta.get("pe"),
+            "pb_ratio": meta.get("pb"),
+            "rsi_14": None,
+            "sma_20": None,
+            "sma_50": None,
+            "support": None,
+            "resistance": None,
+            "atr_14": None,
+            "macd_val": None,
+            "macd_sig_val": None,
+            "macd_signal": None,
+            "recommendation": "UNAVAILABLE",
+            "recommendation_text": "Veri alınamadı",
+            "recommendation_score": None,
             "candles": [],
-            "is_real_data": True,
+            "is_real_data": False,
+            "error": str(e),
         }
 
 

@@ -32,81 +32,56 @@ async def learning_status(user=Depends(get_current_user), _=Depends(check_rate_l
 @router.get("/performance-matrix")
 @router.get("/metrics")
 async def performance_matrix(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Tüm modellerin 30-Yıllık ve OOS karşılaştırmalı performans matrisi."""
-    models_list = [
-        {
-            "model_id": "bist30y_lightgbm",
-            "model_version": "v3.0.0 (30Y Ensemble)",
-            "evaluated_samples": 22109,
-            "hit_rate_pct": 58.4,
-            "mean_return_pct": 2.45,
-            "net_pnl": 184520.0,
-            "annualized_sharpe": 0.94,
-            "max_drawdown_pct": -24.5,
-            "brier_score": 0.185,
-            "reliability_score": 0.924,
-            "trust_score": 92.4,
-            "recommended_fusion_weight": 0.40,
-        },
-        {
-            "model_id": "bist30y_catboost",
-            "model_version": "v3.0.0 (30Y Ensemble)",
-            "evaluated_samples": 22109,
-            "hit_rate_pct": 61.2,
-            "mean_return_pct": 2.85,
-            "net_pnl": 215300.0,
-            "annualized_sharpe": 0.98,
-            "max_drawdown_pct": -23.1,
-            "brier_score": 0.172,
-            "reliability_score": 0.941,
-            "trust_score": 94.1,
-            "recommended_fusion_weight": 0.30,
-        },
-        {
-            "model_id": "bist30y_xgboost",
-            "model_version": "v3.0.0 (30Y Ensemble)",
-            "evaluated_samples": 22109,
-            "hit_rate_pct": 56.8,
-            "mean_return_pct": 2.15,
-            "net_pnl": 142800.0,
-            "annualized_sharpe": 0.91,
-            "max_drawdown_pct": -25.2,
-            "brier_score": 0.198,
-            "reliability_score": 0.898,
-            "trust_score": 89.8,
-            "recommended_fusion_weight": 0.30,
-        },
-        {
-            "model_id": "bist30y_extratrees",
-            "model_version": "v3.0.0 (Gölge Model)",
-            "evaluated_samples": 22109,
-            "hit_rate_pct": 54.1,
-            "mean_return_pct": 1.65,
-            "net_pnl": 94200.0,
-            "annualized_sharpe": 0.82,
-            "max_drawdown_pct": -27.4,
-            "brier_score": 0.214,
-            "reliability_score": 0.865,
-            "trust_score": 86.5,
-            "recommended_fusion_weight": 0.00,
-        }
-    ]
+    """Tüm modellerin 30-Yıllık ve OOS karşılaştırmalı performans matrisi.
 
-    trust_scores = [
-        {"model_id": m["model_id"], "reliability_score": m["reliability_score"], "trust_score": m["trust_score"], "recommended_fusion_weight": m["recommended_fusion_weight"]}
-        for m in models_list
-    ]
+    Kaynak: Model registry (Redis/PostgreSQL). Veri yoksa boş döner.
+    """
+    try:
+        from ...learning.model_memory_store import ModelMemoryStore
+        store = ModelMemoryStore()
+        latest = store.get_latest_metrics_all_models()
 
+        if latest:
+            models_list = []
+            for model_id, metrics in latest.items():
+                models_list.append({
+                    "model_id": model_id,
+                    "model_version": metrics.get("version", "unknown"),
+                    "evaluated_samples": metrics.get("evaluated_samples", 0),
+                    "hit_rate_pct": metrics.get("hit_rate_pct", 0),
+                    "mean_return_pct": metrics.get("mean_return_pct", 0),
+                    "net_pnl": metrics.get("net_pnl", 0),
+                    "annualized_sharpe": metrics.get("annualized_sharpe", 0),
+                    "max_drawdown_pct": metrics.get("max_drawdown_pct", 0),
+                    "brier_score": metrics.get("brier_score", 0),
+                    "reliability_score": metrics.get("reliability_score", 0),
+                    "trust_score": metrics.get("trust_score", 0),
+                    "recommended_fusion_weight": metrics.get("fusion_weight", 0),
+                })
+
+            trust_scores = [
+                {"model_id": m["model_id"], "reliability_score": m["reliability_score"],
+                 "trust_score": m["trust_score"], "recommended_fusion_weight": m["recommended_fusion_weight"]}
+                for m in models_list
+            ]
+
+            return {
+                "success": True,
+                "models": models_list,
+                "trust_scores": trust_scores,
+                "data_source": "model_registry",
+            }
+    except Exception as e:
+        logger.warning(f"Performance matrix from registry failed: {e}")
+
+    # Registry boşsa boş dön — mock veri yok
     return {
         "success": True,
-        "models": models_list,
-        "trust_scores": trust_scores,
-        "fusion_weights": {
-            "bist30y_lightgbm": 0.40,
-            "bist30y_catboost": 0.30,
-            "bist30y_xgboost": 0.30,
-            "bist30y_extratrees": 0.00,
-        },
+        "models": [],
+        "trust_scores": [],
+        "fusion_weights": {},
+        "data_source": "empty",
+        "message": "Henüz model eğitimi tamamlanmadı. Model registry boş.",
     }
 
 

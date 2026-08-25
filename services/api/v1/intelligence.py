@@ -81,7 +81,13 @@ async def simulation(
     try:
         from ...intelligence.advanced_monte_carlo import AdvancedMonteCarloEngine
         mc = AdvancedMonteCarloEngine()
-        res = mc.gbm_sim(ticker=ticker, current_price=100.0, mu=0.25, sigma=0.30, horizon_days=horizon_days, n_sims=n_sims, seed=42)
+        # Canlı fiyat al
+        from ...core.redis_helper import get_cached
+        live_price = get_cached(f"price:{ticker}")
+        current_price = float(live_price.get("price", 0)) if live_price else 0
+        if current_price <= 0:
+            return {"error": f"{ticker} için canlı fiyat bulunamadı", "ticker": ticker}
+        res = mc.gbm_sim(ticker=ticker, current_price=current_price, mu=0.25, sigma=0.30, horizon_days=horizon_days, n_sims=n_sims, seed=42)
         return {
             "ticker": ticker,
             "horizon_days": horizon_days,

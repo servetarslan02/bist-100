@@ -1,7 +1,11 @@
-"""Backtest API — Gerçek servislere bağlı."""
+# -*- coding: utf-8 -*-
+"""Backtest API - Gerçek servislere bağlı."""
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+import structlog
 from ..dependencies import get_current_user, check_rate_limit
+
+logger = structlog.get_logger()
 router = APIRouter()
 
 
@@ -13,7 +17,7 @@ async def run_backtest(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Backtest çalıştır — engine servisi."""
+    """Backtest çalıştır - engine servisi."""
     try:
         return {"status": "started", "ticker": ticker, "period": period, "strategy": strategy, "message": "Backtest queued"}
     except Exception as e:
@@ -51,7 +55,7 @@ async def walk_forward(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Walk-forward analizi — walk_forward servisi."""
+    """Walk-forward analizi - walk_forward servisi."""
     try:
         return {"status": "started", "ticker": ticker, "n_folds": n_folds}
     except Exception as e:
@@ -66,7 +70,7 @@ async def deflated_sharpe(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """Deflated Sharpe Ratio — deflated_sharpe servisi."""
+    """Deflated Sharpe Ratio - deflated_sharpe servisi."""
     try:
         from ...backtest.deflated_sharpe import DeflatedSharpeCalculator
         calc = DeflatedSharpeCalculator()
@@ -78,29 +82,37 @@ async def deflated_sharpe(
 
 @router.get("/history_30y")
 async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """30 Yıllık Gerçekleşen Kriz ve Risk Parity Doğrulama Raporu (1997-2026)."""
+    """30 Yıllık Gerçekleşen Kriz ve Risk Parity Doğrulama Raporu (1997-2026).
+
+    Kaynak: PostgreSQL backtest_results tablosu. Veri yoksa boş döner.
+    """
+    try:
+        from ...core.database import get_pg_pool
+        pool = await get_pg_pool()
+        if pool:
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow("""
+                    SELECT * FROM backtest_results
+                    WHERE backtest_id = '30y_historical'
+                    ORDER BY created_at DESC LIMIT 1
+                """)
+                if row:
+                    import json
+                    result = json.loads(row["result_json"]) if row.get("result_json") else {}
+                    return {
+                        "summary": result.get("summary", {}),
+                        "yearly_crisis_defense": result.get("yearly_crisis_defense", []),
+                        "data_source": "postgresql",
+                    }
+    except Exception as e:
+        logger.warning(f"30Y history from DB failed: {e}")
+
+    # DB'de veri yoksa boş dön - mock veri yok
     return {
-        "summary": {
-            "period": "1997-2026 (30 Yıl)",
-            "train_period": "1997-2023",
-            "oos_period": "2024-2026 (Kilitli Kör Test)",
-            "oos_cagr_pct": 9.86,
-            "oos_profit_factor": 1.35,
-            "oos_max_drawdown_pct": -22.83,
-            "oos_sharpe": 0.60,
-            "in_sample_cagr_pct": 27.4,
-            "in_sample_profit_factor": 1.94,
-            "in_sample_max_drawdown_pct": -24.8,
-            "risk_rule": "%10 Hisse Tavanı | %1 İşlem Riski | %5 Portföy Isı Limiti | 3G Kriz Teyidi"
-        },
-        "yearly_crisis_defense": [
-            {"year": "2000 (Bankacılık)", "bist": -46.1, "system": -6.2, "alpha": 39.9, "desc": "Nakit Savunması & 3G Kriz Filtresi"},
-            {"year": "2008 (Lehman GFC)", "bist": -50.9, "system": -3.0, "alpha": 47.9, "desc": "%94 Sermaye Kaybı Önleme"},
-            {"year": "2018 (Kur Şoku)", "bist": -22.3, "system": -3.3, "alpha": 19.0, "desc": "Defansif Nakit Koruma"},
-            {"year": "2022 (BIST Boğası)", "bist": 185.9, "system": 147.7, "alpha": -38.2, "desc": "20G Breakout Lider Takibi (PF 7.98)"},
-            {"year": "2024 (Kör OOS)", "bist": 28.9, "system": 31.5, "alpha": 2.6, "desc": "Kör Test Başarısı (PF 2.62)"},
-            {"year": "2024-26 (Kilitli OOS)", "bist": 90.4, "system": 27.8, "alpha": -62.6, "desc": "Kilitli Kör Doğrulama (PF 1.35, Max DD -%22.8)"},
-        ]
+        "summary": {},
+        "yearly_crisis_defense": [],
+        "data_source": "empty",
+        "message": "30 yıllık backtest sonucu bulunamadı. Önce backtest çalıştırılmalı.",
     }
 
 
@@ -111,7 +123,7 @@ async def transaction_costs(
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
-    """İşlem maliyetleri — transaction_costs servisi."""
+    """İşlem maliyetleri - transaction_costs servisi."""
     try:
         from ...backtest.transaction_costs import BISTFeeStructure
         fees = BISTFeeStructure()

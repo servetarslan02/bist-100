@@ -82,9 +82,9 @@ async def scanner_signals(
                 ui_score = min(99, max(45, int((score + 0.05) * 1000))) if score < 1 else int(score)
                 
                 live_item = radar_by_sym.get(ticker, {})
-                price = float(live_item.get("price", 100.0))
-                chg = float(live_item.get("change", 1.5))
-                rsi_val = float(live_item.get("rsi", 54.0)) if live_item.get("rsi") else 54.0
+                price = float(live_item.get("price", 0))
+                chg = float(live_item.get("change", 0))
+                rsi_val = float(live_item.get("rsi", 0)) if live_item.get("rsi") else 0
 
                 # Sinyal kategorisi ve tipi
                 if ui_score >= 85:
