@@ -61,3 +61,6 @@ catboost_info/
 # Generated data / debug scratch (not part of source)
 scratch/
 data/ledgers/
+
+# mTLS certificates (NEVER commit private keys)
+infrastructure/mtls/certs/
