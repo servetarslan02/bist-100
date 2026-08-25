@@ -45,6 +45,53 @@ class DLQStatus(str, Enum):
     EXHAUSTED = "EXHAUSTED"
 
 
+@dataclass
+class DLQEntry:
+    """DLQ kaydı — backward compatibility için."""
+    entry_id: str
+    event_id: str
+    event_type: str
+    payload: str
+    error: str
+    retry_count: int = 0
+    max_retries: int = 3
+    status: DLQStatus = DLQStatus.PENDING
+    created_at: datetime = None
+    last_retry_at: Optional[datetime] = None
+    next_retry_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+
+    def __post_init__(self):
+        if self.created_at is None:
+            self.created_at = datetime.now(timezone.utc)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "entry_id": self.entry_id,
+            "event_id": self.event_id,
+            "event_type": self.event_type,
+            "error": self.error,
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "status": self.status.value,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "last_retry_at": self.last_retry_at.isoformat() if self.last_retry_at else None,
+            "next_retry_at": self.next_retry_at.isoformat() if self.next_retry_at else None,
+        }
+
+    @property
+    def is_retryable(self) -> bool:
+        return self.status == DLQStatus.PENDING and self.retry_count < self.max_retries
+
+    @property
+    def is_ready_for_retry(self) -> bool:
+        if not self.is_retryable:
+            return False
+        if self.next_retry_at is None:
+            return True
+        return datetime.now(timezone.utc) >= self.next_retry_at
+
+
 class PersistentDeadLetterQueue:
     """SQLite tabanlı kalıcı Dead Letter Queue.
 
