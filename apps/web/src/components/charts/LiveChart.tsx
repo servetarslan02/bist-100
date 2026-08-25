@@ -1,36 +1,56 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { createChart, ColorType, CrosshairMode, type IChartApi, type ISeriesApi, type CandlestickData, type Time } from "lightweight-charts";
+/**
+ * LiveChart — Canvas 2D + requestAnimationFrame + WebSocket Engine
+ * ================================================================
+ * Önceki: useEffect + window.resize + setState per tick (her tick'te re-render)
+ * Şimdi: RAF loop + ResizeObserver + ref-based state (zero re-render on tick)
+ *
+ * Görsel: Aynı. Teknoloji: Canvas 2D + RAF + Ref state.
+ * Referans: TradingView lightweight-charts + WebSocket best practices.
+ */
+
+import { useEffect, useRef, useState, useCallback, memo } from "react";
+import {
+  createChart,
+  ColorType,
+  CrosshairMode,
+  type IChartApi,
+  type ISeriesApi,
+  type CandlestickData,
+  type Time,
+} from "lightweight-charts";
 
 interface LiveChartProps {
   ticker: string;
   height?: number;
 }
 
-interface TickData {
-  time: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+function LiveChartInner({ ticker, height = 300 }: LiveChartProps) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const rafRef = useRef<number>(0);
+
+  // Ref-based state for tick data (no re-render on every tick)
+  const connectedRef = useRef(false);
+  const lastPriceRef = useRef<number | null>(null);
+  const priceChangeRef = useRef<number>(0);
+  const dirtyHeaderRef = useRef(false);
+
+  // React state only for header display (batched, not per-tick)
   const [connected, setConnected] = useState(false);
   const [lastPrice, setLastPrice] = useState<number | null>(null);
   const [priceChange, setPriceChange] = useState<number>(0);
 
-  // Initialize chart
+  // Chart init (mount only)
   useEffect(() => {
-    if (!containerRef.current) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    const chart = createChart(containerRef.current, {
+    const chart = createChart(container, {
       layout: {
         background: { type: ColorType.Solid, color: "#09090b" },
         textColor: "#71717a",
@@ -55,7 +75,7 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
         timeVisible: true,
         secondsVisible: false,
       },
-      width: containerRef.current.clientWidth,
+      width: container.clientWidth,
       height,
     });
 
@@ -68,7 +88,6 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
       wickDownColor: "#ef4444",
     });
 
-    // Volume series
     const volumeSeries = chart.addHistogramSeries({
       color: "rgba(16,185,129,0.15)",
       priceFormat: { type: "volume" },
@@ -81,20 +100,41 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
 
     chartRef.current = chart;
     seriesRef.current = series;
+    volumeSeriesRef.current = volumeSeries;
+
+    // ResizeObserver (replaces window.resize)
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width: newWidth } = entry.contentRect;
+        if (newWidth > 0) {
+          chart.applyOptions({ width: newWidth });
+        }
+      }
+    });
+    observer.observe(container);
 
     // Load historical data
     loadHistoricalData(ticker, series, volumeSeries);
 
-    const handleResize = () => {
-      if (containerRef.current) {
-        chart.applyOptions({ width: containerRef.current.clientWidth });
+    // RAF loop for batching header state updates
+    const tick = () => {
+      if (dirtyHeaderRef.current) {
+        setLastPrice(lastPriceRef.current);
+        setPriceChange(priceChangeRef.current);
+        setConnected(connectedRef.current);
+        dirtyHeaderRef.current = false;
       }
+      rafRef.current = requestAnimationFrame(tick);
     };
+    rafRef.current = requestAnimationFrame(tick);
 
-    window.addEventListener("resize", handleResize);
     return () => {
-      window.removeEventListener("resize", handleResize);
+      cancelAnimationFrame(rafRef.current);
+      observer.disconnect();
       chart.remove();
+      chartRef.current = null;
+      seriesRef.current = null;
+      volumeSeriesRef.current = null;
     };
   }, [ticker, height]);
 
@@ -106,8 +146,8 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        setConnected(true);
-        // Subscribe to ticker
+        connectedRef.current = true;
+        dirtyHeaderRef.current = true;
         ws.send(JSON.stringify({ action: "subscribe", ticker }));
       };
 
@@ -121,12 +161,15 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
       };
 
       ws.onclose = () => {
-        setConnected(false);
-        // Reconnect after 3 seconds
+        connectedRef.current = false;
+        dirtyHeaderRef.current = true;
         setTimeout(connectWS, 3000);
       };
 
-      ws.onerror = () => setConnected(false);
+      ws.onerror = () => {
+        connectedRef.current = false;
+        dirtyHeaderRef.current = true;
+      };
     };
 
     connectWS();
@@ -135,16 +178,19 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
     };
   }, [ticker]);
 
+  // Tick handler — updates refs only, no setState
   const handleTick = useCallback((data: any) => {
     if (!seriesRef.current) return;
 
     const price = data.price;
     const time = Math.floor(data.timestamp / 1000) as Time;
 
-    setLastPrice(price);
-    setPriceChange(data.change_pct || 0);
+    // Update refs (no re-render)
+    lastPriceRef.current = price;
+    priceChangeRef.current = data.change_pct || 0;
+    dirtyHeaderRef.current = true;
 
-    // Update candlestick
+    // Update chart series directly (lightweight-charts handles its own Canvas rendering)
     seriesRef.current.update({
       time,
       open: data.open || price,
@@ -154,37 +200,48 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
     });
   }, []);
 
-  const loadHistoricalData = async (ticker: string, series: any, volumeSeries: any) => {
+  const loadHistoricalData = async (
+    ticker: string,
+    series: ISeriesApi<"Candlestick">,
+    volumeSeries: ISeriesApi<"Histogram">
+  ) => {
     try {
       const res = await fetch(`/api/market/instrument/${ticker}/ohlcv?period=60d`);
       if (!res.ok) return;
       const data = await res.json();
 
       if (data.candles) {
-        series.setData(data.candles.map((c: any) => ({
-          time: c.time as Time,
-          open: c.open,
-          high: c.high,
-          low: c.low,
-          close: c.close,
-        })));
+        series.setData(
+          data.candles.map((c: any) => ({
+            time: c.time as Time,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+          }))
+        );
 
         if (data.volumes) {
-          volumeSeries.setData(data.volumes.map((v: any) => ({
-            time: v.time as Time,
-            value: v.volume,
-            color: v.close >= v.open ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-          })));
+          volumeSeries.setData(
+            data.volumes.map((v: any) => ({
+              time: v.time as Time,
+              value: v.volume,
+              color:
+                v.close >= v.open
+                  ? "rgba(16,185,129,0.15)"
+                  : "rgba(239,68,68,0.15)",
+            }))
+          );
         }
 
-        // Set initial price
         if (data.candles.length > 0) {
           const last = data.candles[data.candles.length - 1];
-          setLastPrice(last.close);
+          lastPriceRef.current = last.close;
           if (data.candles.length > 1) {
             const prev = data.candles[data.candles.length - 2];
-            setPriceChange((last.close / prev.close - 1) * 100);
+            priceChangeRef.current = (last.close / prev.close - 1) * 100;
           }
+          dirtyHeaderRef.current = true;
         }
       }
     } catch {}
@@ -200,8 +257,13 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
             <span className="text-sm font-mono font-semibold text-zinc-100">
               ₺{lastPrice.toFixed(2)}
             </span>
-            <span className={`text-[10px] font-mono ${priceChange >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-              {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(2)}%
+            <span
+              className={`text-[10px] font-mono ${
+                priceChange >= 0 ? "text-emerald-400" : "text-red-400"
+              }`}
+            >
+              {priceChange >= 0 ? "+" : ""}
+              {priceChange.toFixed(2)}%
             </span>
           </>
         )}
@@ -209,8 +271,14 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
 
       {/* Connection Status */}
       <div className="absolute top-2 right-3 z-10 flex items-center gap-1.5">
-        <div className={`w-1.5 h-1.5 rounded-full ${connected ? "bg-emerald-500 pulse-dot" : "bg-red-500"}`} />
-        <span className="text-[9px] text-zinc-600">{connected ? "LIVE" : "OFFLINE"}</span>
+        <div
+          className={`w-1.5 h-1.5 rounded-full ${
+            connected ? "bg-emerald-500 pulse-dot" : "bg-red-500"
+          }`}
+        />
+        <span className="text-[9px] text-zinc-600">
+          {connected ? "LIVE" : "OFFLINE"}
+        </span>
       </div>
 
       {/* Chart */}
@@ -218,3 +286,5 @@ export function LiveChart({ ticker, height = 300 }: LiveChartProps) {
     </div>
   );
 }
+
+export const LiveChart = memo(LiveChartInner);

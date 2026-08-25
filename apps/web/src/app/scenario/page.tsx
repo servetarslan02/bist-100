@@ -2,9 +2,10 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
+import { MonteCarloCanvas } from "@/components/charts/MonteCarloCanvas";
 import {
-  ShieldAlert, BarChart3, Activity, Zap, CheckCircle2, Loader2,
-  Sliders, ShieldCheck, PieChart, Layers, RefreshCw, Crosshair
+  ShieldAlert, BarChart3, Loader2,
+  Sliders, ShieldCheck, PieChart
 } from "lucide-react";
 
 interface FanCones {
@@ -175,8 +176,6 @@ export default function ScenarioLab() {
     };
   });
 
-  // High-performance canvas ref
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number; step: number } | null>(null);
   const requestSeqRef = useRef(0);
 
@@ -263,203 +262,13 @@ export default function ScenarioLab() {
     }, 150);
   };
 
-  // High-Speed Smooth HTML5 Canvas 60 FPS Renderer
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !simResult || !simResult.paths || simResult.paths.length === 0) return;
-
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) return;
-
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const w = rect.width;
-    const h = rect.height;
-    const padL = 60;
-    const padR = 25;
-    const padT = 25;
-    const padB = 30;
-
-    const chartW = Math.max(10, w - padL - padR);
-    const chartH = Math.max(10, h - padT - padB);
-
-    const allVals = simResult.paths.flat();
-    const minVal = Math.min(...allVals);
-    const maxVal = Math.max(...allVals);
-    const valRange = Math.max(1, maxVal - minVal);
-    const steps = Math.max(1, simResult.horizon_days);
-
-    const getX = (step: number) => padL + (step / steps) * chartW;
-    const getY = (val: number) => padT + chartH - ((val - minVal) / valRange) * chartH;
-
-    // 1. Clear background
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#07090e";
-    ctx.fillRect(0, 0, w, h);
-
-    // 2. Horizontal Grid Lines & Price Labels
-    const numGridLines = 5;
-    ctx.font = "10px JetBrains Mono, monospace";
-    for (let i = 0; i <= numGridLines; i++) {
-      const gy = padT + (i / numGridLines) * chartH;
-      const gVal = maxVal - (i / numGridLines) * valRange;
-
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.04)";
-      ctx.lineWidth = 1;
-      ctx.moveTo(padL, gy);
-      ctx.lineTo(w - padR, gy);
-      ctx.stroke();
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-      ctx.textAlign = "right";
-      ctx.textBaseline = "middle";
-      ctx.fillText(`₺${Math.round(gVal).toLocaleString("tr-TR")}`, padL - 8, gy);
-    }
-
-    // 3. Vertical Grid Lines (Time Steps)
-    const stepInterval = Math.max(5, Math.round(steps / 6));
-    for (let s = 0; s <= steps; s += stepInterval) {
-      const gx = getX(s);
-      ctx.beginPath();
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.03)";
-      ctx.moveTo(gx, padT);
-      ctx.lineTo(gx, h - padB);
-      ctx.stroke();
-
-      ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "top";
-      ctx.fillText(`${s}G`, gx, h - padB + 8);
-    }
-
-    // 4. Shaded Confidence Fan Bands (Quantile Clouds)
-    const fc = simResult.fan_cones;
-    if (fc && fc.p95 && fc.p05 && fc.p95.length > steps && fc.p05.length > steps) {
-      // 90% Confidence Band (p05 - p95)
-      const gradOuter = ctx.createLinearGradient(0, padT, 0, h - padB);
-      gradOuter.addColorStop(0, "rgba(0, 229, 160, 0.12)");
-      gradOuter.addColorStop(1, "rgba(255, 68, 102, 0.12)");
-
-      ctx.beginPath();
-      ctx.moveTo(getX(0), getY(fc.p95[0]));
-      for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p95[i]));
-      for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p05[i]));
-      ctx.closePath();
-      ctx.fillStyle = gradOuter;
-      ctx.fill();
-
-      // 50% Confidence Band (p25 - p75)
-      if (fc.p75 && fc.p25 && fc.p75.length > steps && fc.p25.length > steps) {
-        const gradInner = ctx.createLinearGradient(0, padT, 0, h - padB);
-        gradInner.addColorStop(0, "rgba(0, 200, 255, 0.22)");
-        gradInner.addColorStop(1, "rgba(0, 200, 255, 0.08)");
-
-        ctx.beginPath();
-        ctx.moveTo(getX(0), getY(fc.p75[0]));
-        for (let i = 1; i <= steps; i++) ctx.lineTo(getX(i), getY(fc.p75[i]));
-        for (let i = steps; i >= 0; i--) ctx.lineTo(getX(i), getY(fc.p25[i]));
-        ctx.closePath();
-        ctx.fillStyle = gradInner;
-        ctx.fill();
-      }
-    }
-
-    // 5. Baseline Reference Line (₺100,000)
-    const baseY = getY(100000);
-    ctx.beginPath();
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = "rgba(0, 200, 255, 0.75)";
-    ctx.lineWidth = 1.2;
-    ctx.moveTo(padL, baseY);
-    ctx.lineTo(w - padR, baseY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 6. Stochastic Paths
-    simResult.paths.forEach((path) => {
-      if (!path || path.length === 0) return;
-      const isPos = path[path.length - 1] >= 100000;
-      ctx.beginPath();
-      ctx.strokeStyle = isPos ? "rgba(0, 229, 160, 0.28)" : "rgba(255, 68, 102, 0.28)";
-      ctx.lineWidth = 0.9;
-      ctx.moveTo(getX(0), getY(path[0]));
-      for (let s = 1; s <= steps && s < path.length; s++) {
-        ctx.lineTo(getX(s), getY(path[s]));
-      }
-      ctx.stroke();
-    });
-
-    // 7. Median Path (p50 Glowing Line)
-    if (fc && fc.p50 && fc.p50.length > steps) {
-      ctx.beginPath();
-      ctx.strokeStyle = "#00c8ff";
-      ctx.lineWidth = 2.2;
-      ctx.shadowColor = "#00c8ff";
-      ctx.shadowBlur = 8;
-      ctx.moveTo(getX(0), getY(fc.p50[0]));
-      for (let s = 1; s <= steps; s++) {
-        ctx.lineTo(getX(s), getY(fc.p50[s]));
-      }
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-
-    // 8. Crosshair Cursor & Highlight Point
-    if (mousePos && mousePos.step >= 0 && mousePos.step <= steps) {
-      const hx = getX(mousePos.step);
-      const medianVal = fc?.p50?.[mousePos.step] || 100000;
-      const hy = getY(medianVal);
-
-      // Vertical dashed guide line
-      ctx.beginPath();
-      ctx.setLineDash([3, 3]);
-      ctx.strokeStyle = "rgba(255, 255, 255, 0.6)";
-      ctx.lineWidth = 1;
-      ctx.moveTo(hx, padT);
-      ctx.lineTo(hx, h - padB);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Point circle
-      ctx.beginPath();
-      ctx.arc(hx, hy, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = "#00e5a0";
-      ctx.shadowColor = "#00e5a0";
-      ctx.shadowBlur = 10;
-      ctx.fill();
-      ctx.strokeStyle = "#ffffff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.shadowBlur = 0;
-    }
-  }, [simResult, mousePos]);
-
-  // Canvas Mouse Move Handler
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !simResult) return;
-    const rect = canvas.getBoundingClientRect();
-    const padL = 60;
-    const padR = 25;
-    const chartW = Math.max(10, rect.width - padL - padR);
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    if (mouseX >= padL && mouseX <= rect.width - padR) {
-      const stepRatio = (mouseX - padL) / chartW;
-      const step = Math.min(simResult.horizon_days, Math.max(0, Math.round(stepRatio * simResult.horizon_days)));
-      setMousePos({ x: mouseX, y: mouseY, step });
-    } else {
-      setMousePos(null);
-    }
-  };
+  // Canvas mouse handler (called from MonteCarloCanvas)
+  const handleCanvasMouseMove = useCallback(
+    (info: { x: number; y: number; step: number } | null) => {
+      setMousePos(info);
+    },
+    []
+  );
 
   const scenariosList = useMemo(() => {
     return simResult?.all_scenarios || DEFAULT_SCENARIOS;
@@ -669,13 +478,16 @@ export default function ScenarioLab() {
             )}
           </div>
 
-          {/* Canvas Container */}
+          {/* Canvas Container — TradingView-Standard requestAnimationFrame Engine */}
           <div className="flex-1 w-full relative min-h-0 my-1 rounded-lg overflow-hidden border border-zinc-800/60 bg-zinc-950">
-            <canvas
-              ref={canvasRef}
+            <MonteCarloCanvas
+              data={simResult ? {
+                horizon_days: simResult.horizon_days,
+                paths: simResult.paths,
+                fan_cones: simResult.fan_cones,
+                histogram: simResult.histogram,
+              } : null}
               onMouseMove={handleCanvasMouseMove}
-              onMouseLeave={() => setMousePos(null)}
-              className="w-full h-full cursor-crosshair block"
             />
           </div>
 
