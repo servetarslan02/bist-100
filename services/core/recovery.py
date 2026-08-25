@@ -179,10 +179,11 @@ class StartupRecovery:
         except Exception as e:
             results["steps"].append({"step": "downtime_tracker", "status": "FAILED", "error": str(e)})
 
-        # Step 5: Connectivity monitor başlat
+        # Step 5: Connectivity monitor başlat (idempotent)
         try:
             from .connectivity import connectivity_monitor
-            await connectivity_monitor.start()
+            if not connectivity_monitor._running:
+                await connectivity_monitor.start()
             results["steps"].append({"step": "connectivity_monitor", "status": "OK"})
         except Exception as e:
             results["steps"].append({"step": "connectivity_monitor", "status": "FAILED", "error": str(e)})

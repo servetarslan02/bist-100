@@ -55,6 +55,7 @@ class CircuitBreaker:
             self.failure_count = max(0, self.failure_count - 1)
 
         self.last_success_time = datetime.now(timezone.utc)
+        self._persist_state()
 
     def record_failure(self):
         """Başarısız çağrı kaydet."""
@@ -68,6 +69,8 @@ class CircuitBreaker:
         elif self.state == CircuitState.HALF_OPEN:
             self.state = CircuitState.OPEN
             logger.warning("Circuit breaker re-OPENED (half-open failure)", name=self.name)
+
+        self._persist_state()
 
     def can_execute(self) -> bool:
         """Çağrı yapılabilir mi?"""
@@ -104,6 +107,37 @@ class CircuitBreaker:
             "last_failure": self.last_failure_time.isoformat() if self.last_failure_time else None,
             "last_success": self.last_success_time.isoformat() if self.last_success_time else None,
         }
+
+    def _persist_state(self):
+        """Durumu SQLite'a kaydet (SSD dostu — buffered)."""
+        try:
+            from .state_store import state_store
+            state_store.save_circuit_state(
+                self.name,
+                self.state.value,
+                self.failure_count,
+                self.last_failure_time.isoformat() if self.last_failure_time else None,
+                self.last_success_time.isoformat() if self.last_success_time else None,
+            )
+        except Exception:
+            pass
+
+    def restore_state(self):
+        """Durumu SQLite'dan geri yükle."""
+        try:
+            from .state_store import state_store
+            saved = state_store.load_circuit_state(self.name)
+            if saved:
+                self.state = CircuitState(saved["state"])
+                self.failure_count = saved["failure_count"]
+                if saved.get("last_failure_at"):
+                    self.last_failure_time = datetime.fromisoformat(saved["last_failure_at"])
+                if saved.get("last_success_at"):
+                    self.last_success_time = datetime.fromisoformat(saved["last_success_at"])
+                logger.info("Circuit breaker state restored",
+                           name=self.name, state=self.state.value)
+        except Exception as e:
+            logger.debug("Circuit breaker restore skipped", name=self.name, error=str(e))
 
 
 @dataclass

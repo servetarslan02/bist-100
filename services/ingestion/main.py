@@ -48,8 +48,9 @@ class IngestionService:
         await init_databases()
         ensure_topics()
 
-        # İnternet izleyiciyi başlat
-        await connectivity_monitor.start()
+        # İnternet izleyiciyi başlat (idempotent)
+        if not connectivity_monitor._running:
+            await connectivity_monitor.start()
 
         # Load instrument map from PostgreSQL
         await self._load_instrument_map()

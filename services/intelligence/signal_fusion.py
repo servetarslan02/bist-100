@@ -107,6 +107,28 @@ class SignalFusionEngine:
 
     def __init__(self):
         self._adaptive_weights: Dict[str, float] = {}
+        self._restore_weights()
+
+    def _restore_weights(self):
+        """Restart sonrası ağırlıkları SQLite'dan geri yükle."""
+        try:
+            from services.core.state_store import state_store
+            saved = state_store.load_fusion_weights()
+            if saved:
+                self._adaptive_weights = saved
+                logger.info("Fusion weights restored from SQLite",
+                           weights=len(saved))
+        except Exception as e:
+            logger.debug("Fusion weights restore skipped", error=str(e))
+
+    def _persist_weights(self):
+        """Ağırlıkları SQLite'a kaydet."""
+        try:
+            from services.core.state_store import state_store
+            if self._adaptive_weights:
+                state_store.save_fusion_weights(self._adaptive_weights)
+        except Exception:
+            pass
 
     def set_adaptive_weights(self, weights: Dict[str, float]):
         """Model Learning sisteminden gelen dinamik güvenilirlik ağırlıklarını kaydeder."""
@@ -119,6 +141,7 @@ class SignalFusionEngine:
         tot = sum(valid.values())
         if tot > 0:
             self._adaptive_weights = {k: round(v / tot, 4) for k, v in valid.items()}
+            self._persist_weights()
 
     def get_current_weights(self, market_regime: str = "RANGE") -> Dict[str, float]:
         """Aktif ağırlıkları getirir (Adaptif + Rejim harmanı)."""

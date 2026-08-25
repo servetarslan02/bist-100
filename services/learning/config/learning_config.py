@@ -125,8 +125,8 @@ class LearningSettings(BaseModel):
     # Genel ayarlar
     log_level: str = Field(default="INFO", description="Log seviyesi")
     state_persistence_path: str = Field(
-        default="data/learning_state.json",
-        description="Learning state dosya yolu"
+        default="data/central_state.db",
+        description="Learning state SQLite dosya yolu"
     )
     enable_event_bus: bool = Field(default=True, description="Event bus aktif mi")
     enable_self_healing: bool = Field(default=True, description="Self-healing aktif mi")

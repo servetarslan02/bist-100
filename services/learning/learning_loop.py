@@ -1,9 +1,11 @@
 """
-ALPHA BIST — Learning Loop v1.0
+ALPHA BIST — Learning Loop v2.0 (SQLite Persistence)
 
 Kendi kendine öğrenme döngüsü:
 Prediction → Outcome → Error → Attribution → Feature drift →
 Regime drift → Model decay → Retrain → OOS → Champion/Reject
+
+v2.0: SQLite tabanlı persistence — restart sonrası kaybolmaz
 """
 
 from typing import Dict, List, Optional
@@ -13,6 +15,7 @@ from collections import deque
 import structlog
 
 from services.learning.config.learning_config import learning_settings
+from services.core.state_store import state_store
 
 logger = structlog.get_logger()
 
@@ -42,13 +45,76 @@ class LearningState:
 
 
 class LearningLoop:
-    """Otonom öğrenme döngüsü."""
+    """Otonom öğrenme döngüsü — SQLite persistence ile."""
 
     def __init__(self):
         self._state = LearningState()
         self._prediction_history: deque = deque(maxlen=5000)
         self._outcome_history: deque = deque(maxlen=5000)
         self._accuracy_window: deque = deque(maxlen=100)  # Son 100 tahmin
+        self._restore_from_db()
+
+    def _restore_from_db(self):
+        """Restart sonrası state'i SQLite'dan geri yükle."""
+        try:
+            saved = state_store.load_learning_state()
+            if not saved:
+                return
+
+            self._state.total_predictions = int(saved.get("total_predictions", 0))
+            self._state.total_outcomes = int(saved.get("total_outcomes", 0))
+            self._state.correct_predictions = int(saved.get("correct_predictions", 0))
+            self._state.accuracy = float(saved.get("accuracy", 0))
+            self._state.recent_accuracy = float(saved.get("recent_accuracy", 0))
+            self._state.accuracy_trend = float(saved.get("accuracy_trend", 0))
+            self._state.retrain_needed = saved.get("retrain_needed", False) == "True"
+            self._state.retrain_reason = saved.get("retrain_reason", "")
+
+            regime_acc = saved.get("regime_accuracy", "{}")
+            if isinstance(regime_acc, str):
+                import orjson
+                regime_acc = orjson.loads(regime_acc)
+            self._state.regime_accuracy = regime_acc
+
+            drifted = saved.get("drifted_features", "[]")
+            if isinstance(drifted, str):
+                import orjson
+                drifted = orjson.loads(drifted)
+            self._state.drifted_features = drifted
+
+            # Son tahminleri yükle
+            recent_preds = state_store.load_recent_predictions(limit=100)
+            for pred in reversed(recent_preds):
+                self._prediction_history.appendleft(pred)
+                if pred.get("outcome"):
+                    self._accuracy_window.append(
+                        pred["predicted_direction"] == pred["outcome"].get("actual_direction")
+                    )
+
+            logger.info("Learning state restored from SQLite",
+                       predictions=self._state.total_predictions,
+                       accuracy=round(self._state.accuracy, 4))
+        except Exception as e:
+            logger.warning("Failed to restore learning state", error=str(e))
+
+    def _persist_state(self):
+        """State'i SQLite'a kaydet (SSD dostu — batched)."""
+        try:
+            state_dict = {
+                "total_predictions": self._state.total_predictions,
+                "total_outcomes": self._state.total_outcomes,
+                "correct_predictions": self._state.correct_predictions,
+                "accuracy": self._state.accuracy,
+                "recent_accuracy": self._state.recent_accuracy,
+                "accuracy_trend": self._state.accuracy_trend,
+                "retrain_needed": self._state.retrain_needed,
+                "retrain_reason": self._state.retrain_reason,
+                "regime_accuracy": self._state.regime_accuracy,
+                "drifted_features": self._state.drifted_features,
+            }
+            state_store.save_learning_state(state_dict)
+        except Exception as e:
+            logger.warning("Failed to persist learning state", error=str(e))
 
     def record_prediction(self, ticker: str, predicted_direction: str,
                          predicted_return: float, confidence: float,
@@ -66,6 +132,12 @@ class LearningLoop:
         if len(self._prediction_history) > 5000:
             self._prediction_history = self._prediction_history[-5000:]
         self._state.total_predictions += 1
+
+        # SQLite'a kaydet
+        state_store.save_prediction(
+            ticker, predicted_direction, predicted_return,
+            confidence, regime, features
+        )
 
     def record_outcome(self, ticker: str, actual_return: float,
                        actual_direction: str, timestamp: str):
@@ -117,6 +189,10 @@ class LearningLoop:
 
         # Model decay kontrolü
         self._check_model_decay()
+
+        # SQLite'a kaydet
+        state_store.update_prediction_outcome(ticker, matching["outcome"])
+        self._persist_state()
 
         logger.debug("Outcome recorded", ticker=ticker, correct=is_correct,
                     accuracy=self._state.accuracy, recent_accuracy=self._state.recent_accuracy)
