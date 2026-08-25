@@ -9,7 +9,7 @@ Kurumsal BIST Seans, Risk, Eşleşme ve T+2 Takas Entegrasyonu:
 - Tam Audit Trail ve Performans Metrikleri
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Dict, List, Optional, Any
 import structlog
 
@@ -57,6 +57,99 @@ class PaperTradingOrchestrator:
                     require_next_open=require_next_open,
                     strict_t2=strict_t2,
                     scenario=self.scenario)
+
+    def recover_from_downtime(
+        self,
+        current_date: str,
+        prices: Optional[Dict[str, float]] = None,
+    ) -> Dict[str, Any]:
+        """PC kapalıyken geçen günleri telafi et.
+
+        Yapılanlar:
+        1. Son kayıtlı tarihten bugüne kadar kaç gün geçtiğini hesaplar
+        2. Her gün için T+2 takas valör kaydırması yapar
+        3. Equity curve'deki boş günleri doldurur
+        4. Kill switch'i yeni günde otomatik resetler
+        5. Eski bekleyen sinyalleri temizler
+        6. Fiyatları günceller
+        """
+        last_date = self.store.get_config("last_cycle_date")
+        if not last_date:
+            logger.info("No previous cycle date found — first run, skipping recovery")
+            return {"status": "FIRST_RUN", "gap_days": 0}
+
+        try:
+            last_dt = datetime.fromisoformat(last_date)
+            curr_dt = datetime.fromisoformat(current_date)
+        except ValueError:
+            logger.warning("Invalid date format for recovery", last=last_date, current=current_date)
+            return {"status": "INVALID_DATE", "gap_days": 0}
+
+        gap_days = (curr_dt.date() - last_dt.date()).days
+
+        if gap_days <= 0:
+            return {"status": "NO_GAP", "gap_days": 0}
+
+        if gap_days > 30:
+            logger.warning("Gap too large, capping at 30 days", gap=gap_days)
+            gap_days = 30
+
+        logger.info("Recovering from downtime",
+                   last_date=last_date,
+                   current_date=current_date,
+                   gap_days=gap_days)
+
+        # 1. T+2 Takas: Her gün için valör kaydır
+        for i in range(gap_days):
+            self.portfolio.roll_settlement_day()
+        logger.info("T+2 settlement rolled", times=gap_days,
+                   settled=self.portfolio.settled_cash,
+                   t1=self.portfolio.unsettled_cash_t1,
+                   t2=self.portfolio.unsettled_cash_t2)
+
+        # 2. Equity curve: Boş günleri son bilinen değerle doldur
+        if self.portfolio._equity_curve:
+            last_equity = self.portfolio._equity_curve[-1]
+            for i in range(1, gap_days):
+                fill_date = (last_dt + timedelta(days=i)).strftime("%Y-%m-%d")
+                self.portfolio._equity_curve.append({
+                    "date": fill_date,
+                    "equity": last_equity["equity"],
+                    "cash": last_equity.get("cash", self.portfolio.cash),
+                    "settled_cash": last_equity.get("settled_cash", self.portfolio.settled_cash),
+                    "invested": last_equity.get("invested", 0),
+                })
+            logger.info("Equity curve gaps filled", fill_days=gap_days - 1)
+
+        # 3. Kill switch: Yeni günde otomatik reset
+        if self.risk_gate.is_kill_switch_active():
+            self.risk_gate.reset_kill_switch()
+            logger.info("Kill switch auto-reset on new day")
+
+        # 4. Eski bekleyen sinyalleri temizle (1 günden eski)
+        cleared = self.store.clear_stale_pending_signals(max_age_days=1)
+        if cleared > 0:
+            logger.info("Stale pending signals cleared", count=cleared)
+
+        # 5. Fiyatları güncelle
+        if prices:
+            self.portfolio.update_prices(prices, current_date)
+
+        # 6. Durumu kaydet
+        self.portfolio.save_to_store(current_date)
+
+        result = {
+            "status": "RECOVERED",
+            "gap_days": gap_days,
+            "last_date": last_date,
+            "current_date": current_date,
+            "t2_rolled": gap_days,
+            "equity_filled": gap_days - 1 if self.portfolio._equity_curve else 0,
+            "kill_switch_reset": True,
+            "stale_signals_cleared": cleared,
+        }
+        logger.info("Recovery complete", **result)
+        return result
 
     def process_daily_cycle(
         self,
@@ -154,6 +247,7 @@ class PaperTradingOrchestrator:
 
         # 7. Kalıcı Durumu Kaydet
         self.portfolio.save_to_store(date)
+        self.store.set_config("last_cycle_date", date)
 
         return {
             "status": "COMPLETED",

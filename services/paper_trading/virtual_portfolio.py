@@ -358,6 +358,69 @@ class VirtualPortfolio:
         except Exception:
             pass
 
+    def force_refresh_prices(self, date: str = "") -> Dict[str, float]:
+        """Açılışta tüm pozisyonların fiyatlarını zorla güncelle.
+
+        Kaynak sırası:
+        1. Redis radar cache
+        2. PostgreSQL son kapanış fiyatları
+        3. Mevcut fiyat (değişmez)
+
+        Güncellenen fiyatları döner.
+        """
+        if not self._positions:
+            return {}
+
+        updated = {}
+
+        # 1. Redis radar
+        try:
+            from services.core.redis_helper import get_cached
+            radar = get_cached("radar:data") or []
+            if radar:
+                price_map = {x["symbol"]: float(x["price"]) for x in radar
+                           if x.get("symbol") and x.get("price") and float(x.get("price")) > 0}
+                for ticker, pos in self._positions.items():
+                    if ticker in price_map:
+                        pos["current_price"] = price_map[ticker]
+                        pos["market_value"] = pos["quantity"] * price_map[ticker]
+                        updated[ticker] = price_map[ticker]
+        except Exception:
+            pass
+
+        # 2. PostgreSQL son kapanış (Redis'te olmayanlar için)
+        try:
+            from services.core.database import pg_fetch
+            import asyncio
+            missing = [t for t in self._positions if t not in updated]
+            if missing:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    # Async ortamda çalışıyorsa skip
+                    pass
+                else:
+                    for ticker in missing:
+                        rows = asyncio.run(pg_fetch(
+                            "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1",
+                            ticker
+                        ))
+                        if rows:
+                            price = float(rows[0]["close"])
+                            self._positions[ticker]["current_price"] = price
+                            self._positions[ticker]["market_value"] = self._positions[ticker]["quantity"] * price
+                            updated[ticker] = price
+        except Exception:
+            pass
+
+        if updated and date:
+            self.update_prices(updated, date, record_equity=True)
+
+        logger.info("Force price refresh completed",
+                   total_positions=len(self._positions),
+                   updated=len(updated),
+                   tickers=list(updated.keys()))
+        return updated
+
     def get_total_value(self) -> float:
         """Toplam portföy net aktif değeri (NAV = Toplam Nakit + Pozisyonlar)."""
         self._sync_live_prices()

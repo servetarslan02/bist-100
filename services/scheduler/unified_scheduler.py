@@ -80,6 +80,21 @@ class HolidayProvider:
         date(2027, 7, 15), date(2027, 8, 30), date(2027, 10, 29),
         date(2027, 3, 19), date(2027, 3, 20), date(2027, 3, 21),  # Ramazan (tahmini)
         date(2027, 5, 26), date(2027, 5, 27), date(2027, 5, 28), date(2027, 5, 29),  # Kurban (tahmini)
+        # 2028
+        date(2028, 1, 1), date(2028, 4, 23), date(2028, 5, 1), date(2028, 5, 19),
+        date(2028, 7, 15), date(2028, 8, 30), date(2028, 10, 29),
+        date(2028, 3, 8), date(2028, 3, 9), date(2028, 3, 10),  # Ramazan (tahmini)
+        date(2028, 5, 15), date(2028, 5, 16), date(2028, 5, 17), date(2028, 5, 18),  # Kurban (tahmini)
+        # 2029
+        date(2029, 1, 1), date(2029, 4, 23), date(2029, 5, 1), date(2029, 5, 19),
+        date(2029, 7, 15), date(2029, 8, 30), date(2029, 10, 29),
+        date(2029, 2, 26), date(2029, 2, 27), date(2029, 2, 28),  # Ramazan (tahmini)
+        date(2029, 5, 4), date(2029, 5, 5), date(2029, 5, 6), date(2029, 5, 7),  # Kurban (tahmini)
+        # 2030
+        date(2030, 1, 1), date(2030, 4, 23), date(2030, 5, 1), date(2030, 5, 19),
+        date(2030, 7, 15), date(2030, 8, 30), date(2030, 10, 29),
+        date(2030, 2, 15), date(2030, 2, 16), date(2030, 2, 17),  # Ramazan (tahmini)
+        date(2030, 4, 23), date(2030, 4, 24), date(2030, 4, 25), date(2030, 4, 26),  # Kurban (tahmini)
     })
 
     def __init__(self):

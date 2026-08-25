@@ -14,7 +14,7 @@ import orjson
 import os
 import sqlite3
 import shutil
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
@@ -136,7 +136,8 @@ class PaperStateStore:
                     model_version TEXT,
                     target_weight REAL,
                     json_data TEXT NOT NULL,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL
                 );
 
                 CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
@@ -350,13 +351,16 @@ class PaperStateStore:
         with self._connect() as conn:
             conn.execute("DELETE FROM pending_signals")
             now_iso = datetime.now(timezone.utc).isoformat()
+            # Sinyaller ertesi gün geçerli, 1 gün sonra expire
+            expires_dt = datetime.now(timezone.utc) + timedelta(days=1)
+            expires_iso = expires_dt.isoformat()
             for idx, sig in enumerate(signals):
                 sig_id = f"SIG_{date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
                 conn.execute("""
                     INSERT OR REPLACE INTO pending_signals (
                         signal_id, date, ticker, direction, rank, score, confidence,
-                        model_version, target_weight, json_data, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        model_version, target_weight, json_data, created_at, expires_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     sig_id,
                     date,
@@ -369,15 +373,34 @@ class PaperStateStore:
                     sig.get("target_weight", 0.10),
                     orjson.dumps(sig).decode(),
                     now_iso,
+                    expires_iso,
                 ))
             conn.commit()
-        logger.info("Saved pending signals for next session execution", count=len(signals), date=date)
+        logger.info("Saved pending signals for next session execution", count=len(signals), date=date, expires=expires_iso)
 
     def load_pending_signals(self) -> List[Dict[str, Any]]:
-        """Bekleyen sinyalleri yukle."""
+        """Bekleyen sinyalleri yukle (süresi dolmuş olanlar hariç)."""
         with self._connect() as conn:
-            rows = conn.execute("SELECT json_data FROM pending_signals ORDER BY rank ASC").fetchall()
+            now_iso = datetime.now(timezone.utc).isoformat()
+            rows = conn.execute(
+                "SELECT json_data FROM pending_signals WHERE expires_at > ? ORDER BY rank ASC",
+                (now_iso,)
+            ).fetchall()
             return [orjson.loads(r["json_data"]) for r in rows]
+
+    def clear_stale_pending_signals(self, max_age_days: int = 1) -> int:
+        """Süresi dolmuş bekleyen sinyalleri temizler. Temizlenen sayıyı döner."""
+        with self._connect() as conn:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            cursor = conn.execute(
+                "DELETE FROM pending_signals WHERE expires_at <= ?",
+                (now_iso,)
+            )
+            deleted = cursor.rowcount
+            conn.commit()
+            if deleted > 0:
+                logger.info("Cleared stale pending signals", count=deleted)
+            return deleted
 
     def clear_pending_signals(self):
         """Yurutulen bekleyen sinyalleri temizle."""

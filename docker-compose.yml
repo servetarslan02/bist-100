@@ -13,7 +13,7 @@ name: bist-100-main
 # =============================================================
 
 x-common: &common
-  restart: unless-stopped
+  restart: always
   env_file:
     - .env
   networks:
