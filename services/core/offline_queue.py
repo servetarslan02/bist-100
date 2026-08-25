@@ -32,10 +32,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any, Callable
 import structlog
 
-try:
-    import orjson
-except ImportError:
-    import json as orjson
+import orjson
 
 logger = structlog.get_logger()
 

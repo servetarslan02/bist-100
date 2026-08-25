@@ -33,10 +33,7 @@ from dataclasses import dataclass
 from enum import Enum
 import structlog
 
-try:
-    import orjson
-except ImportError:
-    import json as orjson
+import orjson
 
 logger = structlog.get_logger()
 
