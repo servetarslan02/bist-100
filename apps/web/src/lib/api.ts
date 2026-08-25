@@ -196,6 +196,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
 export function usePolling<T>(path: string, intervalMs: number = 3000) {
   const [data, setData] = useState<T | null>(() => getInitialCachedData<T>(path));
   const [loading, setLoading] = useState<boolean>(() => !memoryCache.has(path));
+  const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date>(() => {
     const c = memoryCache.get(path);
@@ -204,6 +205,13 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
   const [tick, setTick] = useState(0);
 
   const fetchData = useCallback(async () => {
+    // Stale-while-revalidate: show cached data immediately, fetch in background
+    const cached = getInitialCachedData<T>(path);
+    if (cached && !data) {
+      setData(cached);
+      setLoading(false);
+    }
+    setIsValidating(true);
     try {
       const result = await api<T>(path);
       setData(result);
@@ -214,6 +222,7 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
       setError(e.message);
     } finally {
       setLoading(false);
+      setIsValidating(false);
     }
   }, [path]);
 
@@ -247,7 +256,7 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
     };
   }, [fetchData, intervalMs, path]);
 
-  return { data, loading, error, lastUpdated, tick, refetch: fetchData };
+  return { data, loading, isValidating, error, lastUpdated, tick, refetch: fetchData };
 }
 
 // =====================================================

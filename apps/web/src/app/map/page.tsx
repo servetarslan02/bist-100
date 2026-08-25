@@ -7,6 +7,8 @@ import {
   Map, TrendingUp, TrendingDown, Layers, Filter, Search, BarChart2,
   PieChart, ArrowUpRight, ArrowDownRight, Sparkles, RefreshCw
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface SectorHeatmap {
   name: string;

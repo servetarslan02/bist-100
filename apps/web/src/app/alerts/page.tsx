@@ -7,6 +7,8 @@ import {
   Bell, AlertTriangle, AlertCircle, Info, ShieldAlert, CheckCircle2,
   Filter, Clock, Check
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface AlertItem {
   id: string;

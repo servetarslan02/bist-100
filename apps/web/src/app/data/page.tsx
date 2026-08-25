@@ -5,6 +5,8 @@ import { usePolling } from "@/lib/api";
 import {
   Database, Server, HardDrive, Radio, RefreshCw, Layers, CheckCircle2, Zap, Loader2
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface DatabaseInfo {
   name: string;

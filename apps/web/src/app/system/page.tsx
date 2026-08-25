@@ -2,6 +2,8 @@
 
 import { usePolling, type SystemStatus } from "@/lib/api";
 import { Activity, Cpu, HardDrive, MemoryStick, Server, Zap, Database, Radio, CheckCircle2, XCircle } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const RESOURCES = [
   { label: "İşlemci (CPU)", value: 34, icon: Cpu },

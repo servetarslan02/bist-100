@@ -7,6 +7,8 @@ import {
   Target, ArrowUpRight, ArrowDownRight, Flame, Eye, Star, Layers,
   TrendingUp, ShieldAlert, BarChart3, Zap, Filter, Search, RefreshCw, ExternalLink
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface OpportunitySignal {
   ticker: string;

@@ -8,6 +8,7 @@ import {
   Activity, BarChart2, Target as TargetIcon, Shield,
   Wifi, WifiOff, ChevronUp, ChevronDown, CheckCircle
 } from "lucide-react";
+import { SkeletonStat, SkeletonTable, SkeletonList } from "@/components/ui/Skeleton";
 
 // ---------------------------------------------
 // Component Helpers
@@ -124,8 +125,8 @@ export default function ClientPageRoot() {
   const router = useRouter();
   
   // Real-time polling
-  const { data: market } = usePolling<MarketState>("/market/state", 2000);
-  const { data: rawSignals } = usePolling<any>("/signals?limit=10", 2000);
+  const { data: market, loading: marketLoading } = usePolling<MarketState>("/market/state", 2000);
+  const { data: rawSignals, loading: signalsLoading } = usePolling<any>("/signals?limit=10", 2000);
   const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
@@ -184,35 +185,43 @@ export default function ClientPageRoot() {
 
       {/* ?? Stats Row ???????????????????????????????????????????? */}
       <div className="grid grid-cols-4 gap-3">
-        <StatCard
-          label="Piyasa Rejimi (Phase 18)"
-          value={market?.regime === "BULL_TREND" ? "BOĞA" : market?.regime === "BEAR_TREND" ? "AYI" : market?.regime ?? "HESAPLANIYOR"}
-          icon={Activity}
-          accent={market?.regime === "BULL_TREND" ? "#00e5a0" : "#ff4466"}
-        />
-        <StatCard
-          label="Piyasa GeniYliYi (Yükselen)"
-          value={market?.breadth_pct ?? 0}
-          suffix="%" decimals={1}
-          icon={BarChart2}
-          accent={market && market.breadth_pct > 50 ? "#00e5a0" : "#ff4466"}
-          trend={market && market.breadth_pct > 50 ? "up" : "down"}
-        />
-        <StatCard
-          label="Yükselen / Düşen"
-          value={`${market?.advancing ?? 0} / ${market?.declining ?? 0}`}
-          decimals={0}
-          icon={TrendingUp}
-          accent="#00c8ff"
-        />
-        <StatCard
-          label="Otonom Risk İştahı"
-          value={(market?.risk_appetite ?? 0) * 100}
-          suffix="%" decimals={0}
-          icon={Shield}
-          accent={market && market.risk_appetite > 0.5 ? "#00e5a0" : "#ffaa00"}
-          trend={market && market.risk_appetite > 0.5 ? "up" : "down"}
-        />
+        {marketLoading ? (
+          <>
+            <SkeletonStat /><SkeletonStat /><SkeletonStat /><SkeletonStat />
+          </>
+        ) : (
+          <>
+            <StatCard
+              label="Piyasa Rejimi (Phase 18)"
+              value={market?.regime === "BULL_TREND" ? "BOĞA" : market?.regime === "BEAR_TREND" ? "AYI" : market?.regime ?? "HESAPLANIYOR"}
+              icon={Activity}
+              accent={market?.regime === "BULL_TREND" ? "#00e5a0" : "#ff4466"}
+            />
+            <StatCard
+              label="Piyasa Genişliği (Yükselen)"
+              value={market?.breadth_pct ?? 0}
+              suffix="%" decimals={1}
+              icon={BarChart2}
+              accent={market && market.breadth_pct > 50 ? "#00e5a0" : "#ff4466"}
+              trend={market && market.breadth_pct > 50 ? "up" : "down"}
+            />
+            <StatCard
+              label="Yükselen / Düşen"
+              value={`${market?.advancing ?? 0} / ${market?.declining ?? 0}`}
+              decimals={0}
+              icon={TrendingUp}
+              accent="#00c8ff"
+            />
+            <StatCard
+              label="Otonom Risk İştahı"
+              value={(market?.risk_appetite ?? 0) * 100}
+              suffix="%" decimals={0}
+              icon={Shield}
+              accent={market && market.risk_appetite > 0.5 ? "#00e5a0" : "#ffaa00"}
+              trend={market && market.risk_appetite > 0.5 ? "up" : "down"}
+            />
+          </>
+        )}
       </div>
 
       {/* ?? Opportunity Engine ???????????????????????????????????????????? */}
@@ -227,7 +236,11 @@ export default function ClientPageRoot() {
           accent="#00e5a0"
         />
 
-        {!signals || signals.length === 0 ? (
+        {signalsLoading ? (
+          <div className="p-4">
+            <SkeletonList count={5} />
+          </div>
+        ) : !signals || signals.length === 0 ? (
           <div className="py-12 text-center" style={{ color: "var(--color-text-muted)" }}>
             <TargetIcon size={24} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm">Şu an için aktif sinyal bulunmuyor</p>

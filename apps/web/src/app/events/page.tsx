@@ -7,6 +7,8 @@ import {
   Zap, Filter, Clock, ExternalLink, Radio, CheckCircle2,
   TrendingUp, TrendingDown, AlertCircle, Loader2
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface EventItem {
   id: string;

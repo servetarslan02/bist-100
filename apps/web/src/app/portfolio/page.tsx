@@ -8,6 +8,8 @@ import {
   RefreshCw, ShieldCheck, Activity, PieChart, Layers, Clock, CheckCircle2, 
   AlertCircle, BarChart3, ArrowRight, Zap, Building2, Coins, Receipt
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 function MetricCard({ label, value, prefix = "", suffix = "", color, subtext }: {
   label: string; value?: number; prefix?: string; suffix?: string; color?: string; subtext?: string;

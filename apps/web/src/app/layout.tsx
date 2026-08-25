@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { GlobalTelemetrySync } from "@/components/providers/GlobalTelemetrySync";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -40,7 +41,9 @@ export default function RootLayout({
           >
             <GlobalTelemetrySync />
             <main className="flex-1 overflow-y-auto">
-              {children}
+              <ErrorBoundary name="page">
+                {children}
+              </ErrorBoundary>
             </main>
           </div>
         </div>

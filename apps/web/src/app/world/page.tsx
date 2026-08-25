@@ -5,6 +5,8 @@ import {
   Globe, DollarSign, TrendingUp, TrendingDown, Activity, AlertTriangle,
   Flame, BarChart2, ShieldAlert
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default function WorldIntelPage() {
   const { data: world } = usePolling<any>("/macro/world", 5000);

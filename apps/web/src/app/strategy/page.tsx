@@ -6,6 +6,8 @@ import {
   TrendingUp, ShieldCheck, Zap, ArrowUpRight, ArrowDownRight,
   Layers, CheckCircle2, RefreshCw, AlertTriangle, PieChart, BarChart3, Lock
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface AlphaSignalResponse {
   status: string;

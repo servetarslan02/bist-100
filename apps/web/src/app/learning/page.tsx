@@ -6,6 +6,8 @@ import {
   Activity, RefreshCw, Zap, TrendingUp, AlertTriangle, CheckCircle2,
   Cpu, Layers, BarChart2, ShieldCheck, Award, FileText
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default function LearningLabPage() {
   const [training, setTraining] = useState(false);

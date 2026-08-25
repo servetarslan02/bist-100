@@ -6,6 +6,8 @@ import {
   FlaskConical, Sparkles, Brain, ArrowRight, MessageSquare,
   TrendingUp, TrendingDown, CheckCircle2, ShieldCheck, Zap, Loader2
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface ResearchReport {
   id: string;

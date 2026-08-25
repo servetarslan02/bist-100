@@ -10,6 +10,8 @@ import {
   Compass, ArrowUpRight, ArrowDownRight, RefreshCw,
   Cpu, Target, CheckCircle2, Copy, Check, Flame
 } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 const TradingViewChart = dynamic(
   () => import("@/components/charts/TradingViewChart").then((mod) => mod.TradingViewChart),

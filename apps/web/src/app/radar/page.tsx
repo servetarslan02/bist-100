@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, useDebounce } from "@/lib/api";
 import { Search, ArrowUpRight, ArrowDownRight, Loader2, Wifi, WifiOff, Filter, TrendingUp, Zap, Target } from "lucide-react";
+import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 interface RadarRow {
   symbol: string;
