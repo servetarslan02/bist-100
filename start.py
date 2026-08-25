@@ -190,7 +190,17 @@ def start_docker_desktop():
         subprocess.Popen(["open", "-a", "Docker"])
 
     elif system == "Linux":
-        subprocess.Popen(["sudo", "systemctl", "start", "docker"])
+        # sudo varsa kullan, yoksa direkt systemctl
+        try:
+            subprocess.run(["sudo", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=2)
+            subprocess.Popen(["sudo", "systemctl", "start", "docker"])
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            # sudo yok — direkt systemctl dene (root olabilir)
+            try:
+                subprocess.Popen(["systemctl", "start", "docker"])
+            except FileNotFoundError:
+                print("[HATA] Docker başlatılamadı. Elle başlatın: systemctl start docker")
+                return False
 
     print("[*] Docker daemon hazır olması bekleniyor (maks 60sn)...")
     for i in range(30):
@@ -268,13 +278,23 @@ def get_block_device_id() -> str:
                 major = int(parts[0], 16)
                 minor = int(parts[1], 16)
                 return f"{major}:{minor}"
-    except Exception:
+    except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):
         pass
     return "8:0"
 
 
 def apply_ssd_write_limit():
     """Tüm data container'larına cgroup v2 ile 512 MB/s yazma limiti uygula."""
+    # Linux değilse atla
+    if platform.system() != "Linux":
+        print("[*] SSD limit: Sadece Linux'ta uygulanır, atlanıyor.")
+        return True
+
+    # cgroup v2 kontrolü
+    if not os.path.exists("/sys/fs/cgroup/io.max"):
+        print("[*] SSD limit: cgroup v2 io.max mevcut değil, atlanıyor.")
+        return True
+
     print(f"\n[*] SSD yazma hızı limiti uygulanıyor: {SSD_WRITE_LIMIT_MBPS} MB/s")
 
     device_id = get_block_device_id()
@@ -290,7 +310,7 @@ def apply_ssd_write_limit():
 
         io_max_path = find_cgroup_v2_path(pid)
         if not io_max_path:
-            failed += 1
+            skipped += 1
             continue
 
         try:
@@ -307,14 +327,14 @@ def apply_ssd_write_limit():
                 failed += 1
 
         except PermissionError:
-            print(f"  ❌ {name} → izin hatası (sudo ile çalıştırın)")
-            failed += 1
+            print(f"  ⚠️  {name} → izin hatası (sudo ile çalıştırın veya atlanıyor)")
+            skipped += 1
         except Exception as e:
-            print(f"  ❌ {name} → {e}")
-            failed += 1
+            print(f"  ⚠️  {name} → {e}")
+            skipped += 1
 
     print(f"[*] SSD limit: {applied} uygulandı, {skipped} atlandı, {failed} başarısız")
-    return failed == 0
+    return True
 
 
 # =====================================================
@@ -404,7 +424,7 @@ def setup_backup_cron():
             # Logs dizini oluştur
             (PROJECT_ROOT / "logs").mkdir(exist_ok=True)
         else:
-            print(f"[UYARI] Backup cron eklenemedi: {proc.stderr}")
+            print(f"[UYARI] Backup cron eklenemedi: {proc.stderr[:200]}")
 
     except FileNotFoundError:
         print("[UYARI] crontab bulunamadı, backup cron atlandı")
@@ -581,6 +601,12 @@ def main():
     if not is_docker_running():
         success = start_docker_desktop()
         if not success:
+            print("\n[HATA] Docker başlatılamadı.")
+            print("  Çözüm:")
+            print("    Windows: Docker Desktop'ı elle açın")
+            print("    Linux:   sudo systemctl start docker")
+            print("    Mac:     Docker Desktop'ı elle açın")
+            print("\n  Docker çalışırken tekrar deneyin: python start.py")
             sys.exit(1)
     else:
         print("[OK] Docker motoru aktif ve hazır.")
