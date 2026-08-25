@@ -159,43 +159,102 @@ async def get_pg_transaction():
 
 
 async def pg_execute(query: str, *args) -> str:
-    """Execute write query on PRIMARY."""
-    try:
-        async with get_pg_connection() as conn:
-            return await conn.execute(query, *args)
-    except Exception as e:
-        logger.error("pg_execute failed", query=query[:100], error=str(e))
-        raise
+    """Execute write query on PRIMARY — pool reconnect ile."""
+    global _pg_pool
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            async with get_pg_connection() as conn:
+                return await conn.execute(query, *args)
+        except Exception as e:
+            error_str = str(e).lower()
+            is_connection_error = any(kw in error_str for kw in [
+                'connection', 'closed', 'terminated', 'reset', 'broken',
+                'interfaceerror', 'connectiondoesnotexisterror'
+            ])
+            if attempt < max_retries and is_connection_error:
+                logger.warning(f"pg_execute connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
+                await close_pg_pool()
+                _pg_pool = None
+                await asyncio.sleep(1)
+                continue
+            logger.error("pg_execute failed", query=query[:100], error=str(e))
+            raise
 
 
 async def pg_fetch(query: str, *args):
-    """Fetch from REPLICA (read-only)."""
-    try:
-        async with get_pg_replica_connection() as conn:
-            return await conn.fetch(query, *args)
-    except Exception as e:
-        logger.error("pg_fetch failed", query=query[:100], error=str(e))
-        raise
+    """Fetch from REPLICA (read-only) — pool reconnect ile."""
+    global _pg_pool, _pg_replica_pool
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            async with get_pg_replica_connection() as conn:
+                return await conn.fetch(query, *args)
+        except Exception as e:
+            error_str = str(e).lower()
+            is_connection_error = any(kw in error_str for kw in [
+                'connection', 'closed', 'terminated', 'reset', 'broken',
+                'interfaceerror', 'connectiondoesnotexisterror'
+            ])
+            if attempt < max_retries and is_connection_error:
+                logger.warning(f"pg_fetch connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
+                await close_pg_pool()
+                _pg_pool = None
+                _pg_replica_pool = None
+                await asyncio.sleep(1)
+                continue
+            logger.error("pg_fetch failed", query=query[:100], error=str(e))
+            raise
 
 
 async def pg_fetchrow(query: str, *args):
-    """Fetch single row from REPLICA."""
-    try:
-        async with get_pg_replica_connection() as conn:
-            return await conn.fetchrow(query, *args)
-    except Exception as e:
-        logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
-        raise
+    """Fetch single row from REPLICA — pool reconnect ile."""
+    global _pg_pool, _pg_replica_pool
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            async with get_pg_replica_connection() as conn:
+                return await conn.fetchrow(query, *args)
+        except Exception as e:
+            error_str = str(e).lower()
+            is_connection_error = any(kw in error_str for kw in [
+                'connection', 'closed', 'terminated', 'reset', 'broken',
+                'interfaceerror', 'connectiondoesnotexisterror'
+            ])
+            if attempt < max_retries and is_connection_error:
+                logger.warning(f"pg_fetchrow connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
+                await close_pg_pool()
+                _pg_pool = None
+                _pg_replica_pool = None
+                await asyncio.sleep(1)
+                continue
+            logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
+            raise
 
 
 async def pg_fetchval(query: str, *args) -> Any:
-    """Fetch single value from REPLICA."""
-    try:
-        async with get_pg_replica_connection() as conn:
-            return await conn.fetchval(query, *args)
-    except Exception as e:
-        logger.error("pg_fetchval failed", query=query[:100], error=str(e))
-        raise
+    """Fetch single value from REPLICA — pool reconnect ile."""
+    global _pg_pool, _pg_replica_pool
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            async with get_pg_replica_connection() as conn:
+                return await conn.fetchval(query, *args)
+        except Exception as e:
+            error_str = str(e).lower()
+            is_connection_error = any(kw in error_str for kw in [
+                'connection', 'closed', 'terminated', 'reset', 'broken',
+                'interfaceerror', 'connectiondoesnotexisterror'
+            ])
+            if attempt < max_retries and is_connection_error:
+                logger.warning(f"pg_fetchval connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
+                await close_pg_pool()
+                _pg_pool = None
+                _pg_replica_pool = None
+                await asyncio.sleep(1)
+                continue
+            logger.error("pg_fetchval failed", query=query[:100], error=str(e))
+            raise
 
 
 # =====================================================
@@ -243,15 +302,46 @@ def close_ch_client():
 
 
 def ch_execute(query: str, parameters: Optional[Dict] = None) -> Any:
-    with _ch_lock:
-        client = get_ch_client()
-        return client.query(query, parameters=parameters)
+    """ClickHouse sorgusu — reconnect mekanizması ile."""
+    global _ch_client, _ch_healthy
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            with _ch_lock:
+                client = get_ch_client()
+                return client.query(query, parameters=parameters)
+        except Exception as e:
+            if attempt < max_retries:
+                logger.warning(f"ClickHouse query failed, reconnecting (attempt {attempt + 1})", error=str(e))
+                _ch_client = None
+                _ch_healthy = False
+                import time
+                time.sleep(1 * (attempt + 1))
+                continue
+            logger.error("ClickHouse query failed after retries", error=str(e))
+            raise
 
 
 def ch_insert(table: str, data: List[List[Any]], column_names: Optional[List[str]] = None):
-    with _ch_lock:
-        client = get_ch_client()
-        client.insert(table, data, column_names=column_names)
+    """ClickHouse insert — reconnect mekanizması ile."""
+    global _ch_client, _ch_healthy
+    max_retries = 2
+    for attempt in range(max_retries + 1):
+        try:
+            with _ch_lock:
+                client = get_ch_client()
+                client.insert(table, data, column_names=column_names)
+                return
+        except Exception as e:
+            if attempt < max_retries:
+                logger.warning(f"ClickHouse insert failed, reconnecting (attempt {attempt + 1})", error=str(e))
+                _ch_client = None
+                _ch_healthy = False
+                import time
+                time.sleep(1 * (attempt + 1))
+                continue
+            logger.error("ClickHouse insert failed after retries", error=str(e))
+            raise
 
 
 def ch_query_df(query: str, parameters: Optional[Dict] = None):

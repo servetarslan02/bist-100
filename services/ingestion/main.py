@@ -87,15 +87,6 @@ class IngestionService:
         except Exception as e:
             logger.warning("Universe refresh failed, using cached/static", error=str(e))
 
-        # Run ingestion loops
-        await asyncio.gather(
-            self._market_data_loop(),
-            self._kap_loop(),
-            self._macro_loop(),
-            self._news_loop(),
-            self._social_loop(),
-        )
-
     async def stop(self):
         """Stop the ingestion service."""
         self._running = False

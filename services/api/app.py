@@ -112,6 +112,7 @@ async def lifespan(app: FastAPI):
                                     if "low" in item: item["low"] = min(item["low"], new_p)
                             set_cached("radar:data", radar, ttl=300)
                             set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
+                    # Borsa kapalıyken fiyat güncelleme YAPMA — sadece son kapanış fiyatları gösterilir
                 
                 loop_counter += 1
             except Exception as e:
@@ -262,6 +263,22 @@ async def lifespan(app: FastAPI):
         refresh_task.cancel()
     if mesh_task:
         mesh_task.cancel()
+
+    # State store buffer'ı flush et (kritik — elektrik kesintisinde kaybolmaması için)
+    try:
+        from ..core.state_store import state_store
+        state_store.flush()
+        logger.info("State store buffer flushed on shutdown")
+    except Exception as e:
+        logger.warning(f"State store flush on shutdown failed: {e}")
+
+    # Offline queue'yu flush et
+    try:
+        from ..core.offline_queue import offline_queue
+        await offline_queue.flush()
+        logger.info("Offline queue flushed on shutdown")
+    except Exception as e:
+        logger.warning(f"Offline queue flush on shutdown failed: {e}")
 
     # gRPC sunucusunu kapat
     if grpc_server:

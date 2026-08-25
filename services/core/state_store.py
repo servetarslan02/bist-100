@@ -33,6 +33,8 @@ Kullanım:
 
 import sqlite3
 import time
+import signal
+import atexit
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,7 +57,7 @@ class CentralStateStore:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
         self._write_buffer: List[tuple] = []
-        self._buffer_size = 50
+        self._buffer_size = 10  # Küçük buffer — crash safety için
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
 
@@ -432,3 +434,29 @@ class CentralStateStore:
 
 # Singleton
 state_store = CentralStateStore()
+
+
+# =====================================================
+# GRACEFUL SHUTDOWN: Signal handler + atexit
+# Elektrik kesintisi veya SIGTERM/SIGINT'te buffer'ı flush et
+# =====================================================
+
+def _flush_on_exit():
+    try:
+        state_store.flush()
+    except Exception:
+        pass
+
+def _flush_on_signal(signum, frame):
+    try:
+        logger.info(f"Signal {signum} received, flushing state store buffer...")
+        state_store.flush()
+    except Exception:
+        pass
+
+atexit.register(_flush_on_exit)
+try:
+    signal.signal(signal.SIGTERM, _flush_on_signal)
+    signal.signal(signal.SIGINT, _flush_on_signal)
+except (ValueError, OSError):
+    pass

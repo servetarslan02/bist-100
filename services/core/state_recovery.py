@@ -77,8 +77,9 @@ class StateRecovery:
         """Snapshot + Event Replay ile state kurtar.
 
         1. Redis'ten son snapshot'ı oku
-        2. Snapshot'tan sonraki event'leri çek
-        3. Event'leri uygula
+        2. SQLite'tan son snapshot'ı oku (Redis yoksa)
+        3. Snapshot'tan sonraki event'leri çek
+        4. Event'leri uygula
         """
         try:
             # Redis'ten son state'i oku
@@ -86,9 +87,23 @@ class StateRecovery:
                 snapshot_data = await redis_client.get(f"state_snapshot:{ticker}")
                 if snapshot_data:
                     snapshot = orjson.loads(snapshot_data)
-                    logger.debug("Snapshot found", ticker=ticker,
+                    logger.debug("Snapshot found (Redis)", ticker=ticker,
                                snapshot_time=snapshot.get("timestamp"))
                     return snapshot
+
+            # SQLite'tan son snapshot'ı oku (Redis yoksa veya TTL dolmuşsa)
+            try:
+                from .state_store import state_store
+                all_state = state_store.load_learning_state()
+                sqlite_key = f"snapshot:{ticker}"
+                if sqlite_key in all_state:
+                    snapshot = all_state[sqlite_key]
+                    if isinstance(snapshot, str):
+                        snapshot = orjson.loads(snapshot)
+                    logger.debug("Snapshot found (SQLite)", ticker=ticker)
+                    return snapshot
+            except Exception as e:
+                logger.debug(f"SQLite snapshot recovery skipped for {ticker}: {e}")
 
             # DB'den son snapshot'ı oku
             if pg_pool:
@@ -162,19 +177,24 @@ class StateRecovery:
             return None
 
     async def save_snapshot(self, ticker: str, state: Dict, redis_client=None):
-        """State snapshot'ını kaydet.
-
-        Bu, bir sonraki restart için kullanılır.
-        """
+        """State snapshot'ını kaydet (Redis + SQLite — dual persistence)."""
         try:
             state["snapshot_time"] = datetime.now(timezone.utc).isoformat()
 
+            # Redis'e kaydet
             if redis_client:
                 await redis_client.set(
                     f"state_snapshot:{ticker}",
                     orjson.dumps(state, default=str).decode(),
                     ex=86400 * 7,  # 7 gün TTL
                 )
+
+            # SQLite'a da kaydet (restart-safe — elektrik kesintisinde kaybolmaz)
+            try:
+                from .state_store import state_store
+                state_store.save_learning_state({f"snapshot:{ticker}": state})
+            except Exception as e:
+                logger.debug(f"SQLite snapshot save skipped for {ticker}: {e}")
 
         except Exception as e:
             logger.warning("Snapshot save failed", ticker=ticker, error=str(e))

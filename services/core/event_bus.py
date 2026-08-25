@@ -297,11 +297,23 @@ def publish_event(event: CanonicalEvent):
 
 
 async def _publish_to_nats(event: CanonicalEvent):
-    """NATS'a publish et (yüksek throughput, düşük gecikme)."""
+    """NATS'a publish et — kritik event'ler için JetStream, diğerleri için normal publish."""
     try:
         from ..nats.client import nats_client
         subject = f"alpha.{event.event_type}"
-        await nats_client.publish(subject, event.to_json())
+
+        # Kritik event tipleri → JetStream (disk-based, persistent, restart-safe)
+        CRITICAL_EVENT_TYPES = {
+            "signal.generated", "signal.executed",
+            "portfolio.trade", "portfolio.updated",
+            "risk.alert", "risk.breach",
+            "regime.changed",
+        }
+
+        if event.event_type in CRITICAL_EVENT_TYPES:
+            await nats_client.publish_durable(subject, event.to_json())
+        else:
+            await nats_client.publish(subject, event.to_json())
     except Exception as e:
         logger.debug("NATS publish skipped", error=str(e))
 

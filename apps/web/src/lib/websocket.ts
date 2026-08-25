@@ -12,6 +12,8 @@ class WebSocketManager {
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private _connected = false;
+  private reconnectDelay = 1000;
+  private maxReconnectDelay = 30000;
 
   static getInstance(): WebSocketManager {
     if (!WebSocketManager.instance) {
@@ -32,6 +34,7 @@ class WebSocketManager {
 
     this.ws.onopen = () => {
       this._connected = true;
+      this.reconnectDelay = 1000; // Reset backoff on success
       console.log("[WS] Connected");
     };
 
@@ -53,8 +56,14 @@ class WebSocketManager {
 
     this.ws.onclose = () => {
       this._connected = false;
-      console.log("[WS] Disconnected, reconnecting...");
-      this.reconnectTimer = setTimeout(() => this.connect(), 3000);
+      console.log(`[WS] Disconnected, reconnecting in ${this.reconnectDelay}ms...`);
+      // Exponential backoff + jitter
+      const jitter = Math.random() * 1000;
+      const delay = Math.min(this.reconnectDelay + jitter, this.maxReconnectDelay);
+      this.reconnectTimer = setTimeout(() => {
+        this.connect();
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.maxReconnectDelay);
+      }, delay);
     };
 
     this.ws.onerror = () => {
