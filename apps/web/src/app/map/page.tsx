@@ -61,6 +61,7 @@ export default function MarketMapPage() {
   const decliningSectors = sectors.filter(s => s.change_pct < 0).length;
 
   return (
+    <ErrorBoundary name="map">
     <div className="p-5 space-y-5 fade-in min-h-screen" style={{ background: "var(--color-bg-primary)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -137,6 +138,12 @@ export default function MarketMapPage() {
 
       {/* Heatmap Grid */}
       <div className="grid grid-cols-3 gap-4">
+        {loading && sectors.length === 0 && (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        )}
         {filteredSectors.map((sector) => {
           const isPos = sector.change_pct >= 0;
           const borderClr = isPos ? "#00e5a0" : "#ff4466";
@@ -210,5 +217,6 @@ export default function MarketMapPage() {
         })}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

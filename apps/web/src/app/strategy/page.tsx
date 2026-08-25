@@ -142,6 +142,11 @@ export default function StrategyPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        {loading && !alphaData && (
+          <>
+            <SkeletonCard /><SkeletonCard /><SkeletonCard /><SkeletonCard />
+          </>
+        )}
         <div className="rounded-xl p-4 space-y-1.5 bg-zinc-900/60 border border-zinc-800/80">
           <span className="text-[10px] uppercase tracking-wider font-semibold text-zinc-400">
             Kör OOS Yıllık CAGR (2024–26)
