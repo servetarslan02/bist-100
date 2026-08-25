@@ -340,6 +340,7 @@ services:
       - ./config:/app/config:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=32M,mode=1777
     deploy:
@@ -358,6 +359,11 @@ services:
       - GRPC_HOSTS=alpha-api
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_SERVER_CERT=/app/certs/server.crt
+      - MTLS_SERVER_KEY=/app/certs/server.key
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.api.rule=PathPrefix(`/api`) || PathPrefix(`/health`) || PathPrefix(`/docs`)"
@@ -390,11 +396,15 @@ services:
       - ./services:/app/services:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=16M,mode=1777
     environment:
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
       - NATS_URL=nats://nats:4222
     mem_limit: 256m
     cpus: 0.25
@@ -424,6 +434,7 @@ services:
       - ./ml:/app/ml:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=16M,mode=1777
     deploy:
@@ -438,6 +449,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 256m
     cpus: 0.25
     healthcheck:
@@ -465,11 +479,15 @@ services:
       - ./services:/app/services:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=8M,mode=1777
     environment:
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 128m
     cpus: 0.15
     healthcheck:
@@ -499,6 +517,7 @@ services:
       - ./ai:/app/ai:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=32M,mode=1777
     deploy:
@@ -513,6 +532,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 512m
     cpus: 0.5
     healthcheck:
@@ -541,6 +563,7 @@ services:
       - ./ml:/app/ml:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=16M,mode=1777
     deploy:
@@ -555,6 +578,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 256m
     cpus: 0.25
     healthcheck:
@@ -582,11 +608,15 @@ services:
       - ./services:/app/services:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=8M,mode=1777
     environment:
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 128m
     cpus: 0.15
     healthcheck:
@@ -612,11 +642,15 @@ services:
       - ./services:/app/services:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=8M,mode=1777
     environment:
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 128m
     cpus: 0.15
     healthcheck:
@@ -643,6 +677,7 @@ services:
       - ./ml:/app/ml:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=16M,mode=1777
     deploy:
@@ -657,6 +692,9 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 256m
     cpus: 0.25
     healthcheck:
@@ -687,6 +725,7 @@ services:
       - ./ml:/app/ml:ro
       - ./data:/app/data
       - ./.env:/app/.env:ro
+      - ./infrastructure/mtls/certs:/app/certs:ro
     tmpfs:
       - /tmp:size=16M,mode=1777
     environment:
@@ -694,6 +733,9 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD}
       - REDIS_SENTINEL_HOSTS=alpha-sentinel-1:26379,alpha-sentinel-2:26379,alpha-sentinel-3:26379
       - REDIS_SENTINEL_MASTER=alpha-master
+      - MTLS_CA_CERT=/app/certs/ca.crt
+      - MTLS_CLIENT_CERT=/app/certs/client.crt
+      - MTLS_CLIENT_KEY=/app/certs/client.key
     mem_limit: 256m
     cpus: 0.25
     healthcheck:

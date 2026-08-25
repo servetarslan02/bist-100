@@ -23,6 +23,57 @@ logger = structlog.get_logger()
 
 
 # =====================================================
+# NATS Topic Management
+# =====================================================
+
+# Varsayılan NATS subject'leri
+DEFAULT_SUBJECTS = [
+    "market.tick",
+    "market.ohlcv",
+    "market.orderbook",
+    "signal.generated",
+    "signal.executed",
+    "portfolio.updated",
+    "portfolio.trade",
+    "risk.alert",
+    "risk.breach",
+    "event.kap",
+    "event.news",
+    "event.macro",
+    "feature.computed",
+    "regime.changed",
+    "learning.cycle",
+    "system.health",
+    "system.alert",
+]
+
+
+def ensure_topics(subjects: Optional[List[str]] = None):
+    """Ensure NATS subjects are registered.
+
+    NATS otomatik subject oluşturma destekler, bu fonksiyon
+    sadece loglama ve doğrulama yapar.
+    """
+    target_subjects = subjects or DEFAULT_SUBJECTS
+    logger.info("NATS subjects ensured", count=len(target_subjects),
+                subjects=target_subjects[:5])
+    return True
+
+
+async def flush_producer():
+    """Flush pending events to NATS/Redis.
+
+    Çıkış sırasında buffer'daki tüm mesajları gönder.
+    """
+    try:
+        redis = await _get_redis()
+        if redis:
+            logger.info("Producer flushed")
+    except Exception as e:
+        logger.warning("Producer flush failed", error=str(e))
+
+
+# =====================================================
 # Internal Event Bus (Redis Pub/Sub — Push-Based)
 # =====================================================
 

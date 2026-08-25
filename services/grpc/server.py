@@ -291,10 +291,29 @@ async def start_grpc_server(host: str = "0.0.0.0", port: int = 50051):
     except Exception as e:
         logger.debug("gRPC reflection not registered", error=str(e))
 
-    server.add_insecure_port(f"{host}:{port}")
-    await server.start()
-    logger.info("gRPC server started with Protobuf", host=host, port=port,
-                services=["MarketService", "SignalService", "PortfolioService", "RiskService"])
+    # mTLS desteği — sertifikalar varsa TLS ile başlat
+    try:
+        from ..core.mtls import get_grpc_server_credentials
+        server_credentials = get_grpc_server_credentials()
+        if server_credentials:
+            server.add_secure_port(f"{host}:{port}", server_credentials)
+            logger.info("gRPC server started with mTLS", host=host, port=port,
+                        services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+                        tls="mTLS")
+        else:
+            server.add_insecure_port(f"{host}:{port}")
+            logger.info("gRPC server started (insecure)", host=host, port=port,
+                        services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+                        tls="none")
+    except ImportError:
+        server.add_insecure_port(f"{host}:{port}")
+        logger.info("gRPC server started (insecure)", host=host, port=port,
+                    services=["MarketService", "SignalService", "PortfolioService", "RiskService"],
+                    tls="none")
+    except Exception as e:
+        server.add_insecure_port(f"{host}:{port}")
+        logger.warning("gRPC mTLS setup failed, using insecure", error=str(e))
+
     return server
 
 

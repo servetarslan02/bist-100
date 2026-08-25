@@ -387,6 +387,14 @@ def create_app() -> FastAPI:
     from .v1.ws import router as root_ws_router
     app.include_router(root_ws_router, prefix="/ws", tags=["WebSockets (Root)"])
 
+    # mTLS health endpoint
+    try:
+        from ..core.mtls import create_mtls_health_endpoint
+        app.include_router(create_mtls_health_endpoint(), tags=["mTLS"])
+        logger.info("mTLS health endpoint registered")
+    except Exception as e:
+        logger.debug("mTLS health endpoint not registered", error=str(e))
+
     # Root endpoints & Web UI Dashboard
     @app.get("/", response_class=FastAPIResponse)
     @app.get("/dashboard", response_class=FastAPIResponse)
@@ -421,8 +429,17 @@ def create_app() -> FastAPI:
         except Exception:
             pass
 
-        all_services = {**db_health, "nats": nats_status, "grpc": grpc_status}
-        all_healthy = all(v == "healthy" for v in all_services.values())
+        # mTLS sağlık kontrolü
+        mtls_status = "unavailable"
+        try:
+            from ..core.mtls import get_mtls_status
+            mtls_info = get_mtls_status()
+            mtls_status = "healthy" if mtls_info.get("enabled") else "disabled"
+        except Exception:
+            pass
+
+        all_services = {**db_health, "nats": nats_status, "grpc": grpc_status, "mtls": mtls_status}
+        all_healthy = all(v in ("healthy", "disabled") for v in all_services.values())
         return {
             "status": "healthy" if all_healthy else "degraded",
             "timestamp": datetime.now(timezone.utc).isoformat(),

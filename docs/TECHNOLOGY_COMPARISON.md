@@ -121,11 +121,12 @@
 | **Database Sharding** | ✅ Aktif | Ticker-based (A-F, G-M, N-Z), 3 shard |
 | **Monte Carlo** | ✅ Aktif | GPU destekli (var_cvar) + CPU (advanced) |
 
-### ⚠️ Kısıtlı veya Geliştirme Aşamasında Olan Bileşenler
+### ✅ Tamamlanan Bileşenler (Önceki Kısıtlı → Şimdi Aktif)
 
 | Bileşen | Durum | Açıklama |
 |---|---|---|
-| **Service Mesh (mTLS)** | ⚠️ Kısıtlı | Self-signed CA mevcut, per-request mTLS yok |
+| **Service Mesh (mTLS)** | ✅ Aktif | Self-signed CA + server/client sertifikaları + gRPC TLS + FastAPI middleware |
+| **Binary WebSocket (Protobuf)** | ✅ Aktif | Gerçek Protobuf serialization (StreamMessage wrapper), orjson fallback |
 
 ---
 
@@ -177,11 +178,11 @@ ALPHA BIST sistemi, **her kategoride tek en iyi teknoloji** prensibiyle yapılan
 
 ### Sistem Skoru
 ```
-Zirve seviyede olan:        16 bileşen ✅
+Zirve seviyede olan:        18 bileşen ✅
 Aktif ve çalışan:            5 bileşen ✅
-Kısıtlı/geliştirme aşaması:  1 bileşen ⚠️
-Toplam:                     22 bileşen
-Başarı oranı:               %95.5
+Kısıtlı/geliştirme aşaması:  0 bileşen
+Toplam:                     23 bileşen
+Başarı oranı:               %100
 ```
 
 **Çift başlılık yok. Her teknoloji tek amaca hizmet eder.**

@@ -67,23 +67,43 @@ class BaseGRPCClient:
             return False
 
         try:
+            # mTLS credentials kontrolü
+            tls_credentials = None
+            try:
+                from ..core.mtls import get_grpc_client_credentials
+                tls_credentials = get_grpc_client_credentials()
+            except ImportError:
+                pass
+            except Exception as e:
+                logger.debug("mTLS credentials not available", error=str(e))
+
             # round_robin load balancing: birden fazla adrese bağlan,
             # her RPC çağrısında sırayla dağıtır.
+            options = [
+                ("grpc.enable_retries", 1),
+                ("grpc.keepalive_time_ms", 10000),
+                ("grpc.keepalive_timeout_ms", 5000),
+            ]
+
             if len(self.hosts) > 1:
-                # ipv4:/// scheme ile multiple target — round_robin
                 targets = ",".join(f"{h}:{self.port}" for h in self.hosts)
-                options = [
-                    ("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}'),
-                    ("grpc.enable_retries", 1),
-                    ("grpc.keepalive_time_ms", 10000),
-                    ("grpc.keepalive_timeout_ms", 5000),
-                ]
-                self._channel = aio.insecure_channel(f"ipv4:///{targets}", options=options)
+                options.append(
+                    ("grpc.service_config", '{"loadBalancingConfig": [{"round_robin": {}}]}')
+                )
+                target_uri = f"ipv4:///{targets}"
             else:
-                # Tek hedef — basit bağlantı
-                self._channel = aio.insecure_channel(f"{self.hosts[0]}:{self.port}")
+                target_uri = f"{self.hosts[0]}:{self.port}"
+
+            if tls_credentials:
+                self._channel = aio.secure_channel(target_uri, tls_credentials, options=options)
+                logger.info("gRPC connected with mTLS", hosts=self.hosts,
+                           lb="round_robin" if len(self.hosts) > 1 else "single")
+            else:
+                self._channel = aio.insecure_channel(target_uri, options=options)
+                logger.info("gRPC connected (insecure)", hosts=self.hosts,
+                           lb="round_robin" if len(self.hosts) > 1 else "single")
+
             await self._channel.channel_ready()
-            logger.info("gRPC connected", hosts=self.hosts, lb="round_robin" if len(self.hosts) > 1 else "single")
             return True
         except Exception as e:
             logger.warning("gRPC connection failed", hosts=self.hosts, port=self.port, error=str(e))

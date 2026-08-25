@@ -18,16 +18,16 @@ logger = structlog.get_logger()
 
 router = APIRouter()
 
-# Binary WebSocket desteği
+# Binary WebSocket desteği (Protobuf native)
 try:
-    from ..binary_ws import BinaryMessage
+    from ..binary_ws import ProtobufMessage, BinaryWebSocket
     HAS_BINARY_WS = True
 except ImportError:
     HAS_BINARY_WS = False
 
-# Protobuf desteği (opsiyonel)
+# Protobuf desteği
 try:
-    from google.protobuf import orjson_format
+    from ..grpc.generated import market_pb2
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False
@@ -82,12 +82,68 @@ class ConnectionManager:
             self.disconnect(dead, channel)
 
     def _to_protobuf_bytes(self, message: Dict[str, Any]) -> bytes:
-        """Dict'i binary'ye çevir (orjson — fastest JSON)."""
+        """Dict'i Protobuf binary'ye çevir.
+        
+        StreamMessage wrapper kullanarak gerçek Protobuf serialization.
+        Protobuf yoksa orjson fallback.
+        """
+        if not HAS_PROTOBUF or not HAS_BINARY_WS:
+            return orjson.dumps(message, default=str)
+        
+        msg_type = message.get("type", "")
+        
         try:
-            import orjson
-            return orjson.dumps(message).decode()
-        except ImportError:
-            # Fallback: JSON bytes
+            if msg_type == "tick":
+                return ProtobufMessage.encode_tick(
+                    ticker=message.get("ticker", ""),
+                    price=float(message.get("price", 0)),
+                    change=float(message.get("change", 0)),
+                    change_pct=float(message.get("change_pct", 0)),
+                    volume=int(message.get("volume", 0)),
+                    bid=float(message.get("bid", 0)),
+                    ask=float(message.get("ask", 0)),
+                )
+            elif msg_type == "ohlcv":
+                return ProtobufMessage.encode_ohlcv(
+                    ticker=message.get("ticker", ""),
+                    open_p=float(message.get("open", 0)),
+                    high=float(message.get("high", 0)),
+                    low=float(message.get("low", 0)),
+                    close=float(message.get("close", 0)),
+                    volume=int(message.get("volume", 0)),
+                    timeframe=message.get("timeframe", "1m"),
+                )
+            elif msg_type == "signal":
+                return ProtobufMessage.encode_signal(
+                    ticker=message.get("ticker", ""),
+                    direction=message.get("direction", "HOLD"),
+                    confidence=float(message.get("confidence", 0)),
+                    target_price=float(message.get("target_price", 0)),
+                    stop_loss=float(message.get("stop_loss", 0)),
+                    reason=message.get("reason", ""),
+                )
+            elif msg_type == "portfolio_update":
+                return ProtobufMessage.encode_portfolio(
+                    total_value=float(message.get("equity", 0)),
+                    cash=float(message.get("cash", 0)),
+                    daily_pnl=float(message.get("pnl", 0)),
+                    daily_pnl_pct=float(message.get("pnl_pct", 0)),
+                    positions=message.get("positions", []),
+                )
+            elif msg_type == "risk_alert":
+                return ProtobufMessage.encode_alert(
+                    alert_type=message.get("alert_type", "RISK"),
+                    ticker=message.get("ticker", ""),
+                    message_text=message.get("message", ""),
+                    severity=message.get("severity", "WARNING"),
+                )
+            elif msg_type == "system_status":
+                return ProtobufMessage.encode_heartbeat()
+            else:
+                # Bilinmeyen tip → orjson fallback
+                return orjson.dumps(message, default=str)
+        except Exception as e:
+            logger.warning("Protobuf encode failed, using orjson", error=str(e))
             return orjson.dumps(message, default=str)
 
 manager = ConnectionManager()
@@ -189,23 +245,24 @@ async def websocket_binary(websocket: WebSocket):
         return
 
     await websocket.accept()
-    logger.debug("Binary WS client connected")
+    protocol = "protobuf" if HAS_PROTOBUF else "orjson-fallback"
+    logger.info("Binary WS client connected", protocol=protocol)
 
     try:
-        # Heartbeat gönder
-        heartbeat = BinaryMessage.encode_heartbeat()
+        # Heartbeat gönder (Protobuf StreamMessage)
+        heartbeat = ProtobufMessage.encode_heartbeat()
         await websocket.send_bytes(heartbeat)
 
         while True:
             data = await websocket.receive_bytes()
             if data:
-                decoded = BinaryMessage.decode(data)
+                decoded = ProtobufMessage.decode(data)
                 msg_type = decoded.get("type", "unknown")
 
                 if msg_type == "heartbeat":
-                    await websocket.send_bytes(BinaryMessage.encode_heartbeat())
+                    await websocket.send_bytes(ProtobufMessage.encode_heartbeat())
                 elif msg_type == "ping":
-                    await websocket.send_bytes(BinaryMessage.encode_heartbeat())
+                    await websocket.send_bytes(ProtobufMessage.encode_heartbeat())
                 else:
                     logger.debug("Binary WS message", type=msg_type)
     except WebSocketDisconnect:
