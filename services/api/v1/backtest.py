@@ -97,8 +97,8 @@ async def get_30y_history(user=Depends(get_current_user), _=Depends(check_rate_l
                     ORDER BY created_at DESC LIMIT 1
                 """)
                 if row:
-                    import json
-                    result = json.loads(row["result_json"]) if row.get("result_json") else {}
+                    import orjson
+                    result = orjson.loads(row["result_json"]) if row.get("result_json") else {}
                     return {
                         "summary": result.get("summary", {}),
                         "yearly_crisis_defense": result.get("yearly_crisis_defense", []),
