@@ -12,6 +12,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from collections import defaultdict, deque
+from pathlib import Path
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -374,6 +376,51 @@ class IntegratedLearningSystem:
         """Yeniden eğitim önerisi."""
         drift = self.check_model_drift()
         return drift.get("drift_detected", False)
+
+    def save(self, path: str = "data/integrated_learning.json"):
+        """Learning state'i dosyaya kaydet."""
+        data = {
+            "predictions": [
+                {"prediction_id": p.prediction_id, "ticker": p.ticker,
+                 "timestamp": p.timestamp.isoformat(), "regime": p.regime,
+                 "predicted_direction": p.predicted_direction, "confidence": p.confidence,
+                 "horizon": p.horizon, "model_version": p.model_version}
+                for p in self._predictions
+            ],
+            "outcomes": [
+                {"prediction_id": o.prediction_id, "actual_return": o.actual_return,
+                 "actual_direction": o.actual_direction, "correct": o.correct,
+                 "regime": o.regime, "timestamp": o.timestamp.isoformat()}
+                for o in self._outcomes
+            ],
+            "regime_accuracy": dict(self._regime_accuracy),
+            "model_versions": self._model_versions,
+        }
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
+        logger.info("Integrated learning saved", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes))
+
+    def load(self, path: str = "data/integrated_learning.json"):
+        """Learning state'i dosyadan yükle."""
+        if not Path(path).exists():
+            return
+        try:
+            with open(path) as f:
+                data = orjson.loads(f.read())
+            for p in data.get("predictions", []):
+                p["timestamp"] = datetime.fromisoformat(p["timestamp"])
+                self._predictions.append(Prediction(**p))
+            for o in data.get("outcomes", []):
+                o["timestamp"] = datetime.fromisoformat(o["timestamp"])
+                self._outcomes.append(Outcome(**o))
+            for regime, acc in data.get("regime_accuracy", {}).items():
+                self._regime_accuracy[regime] = acc
+            if data.get("model_versions"):
+                self._model_versions = data["model_versions"]
+            logger.info("Integrated learning loaded", path=path, predictions=len(self._predictions), outcomes=len(self._outcomes))
+        except Exception as e:
+            logger.warning("Failed to load integrated learning", path=path, error=str(e))
 
 # Singleton
 learning_system = IntegratedLearningSystem()

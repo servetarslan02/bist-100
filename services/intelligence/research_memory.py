@@ -12,6 +12,8 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from collections import deque
+from pathlib import Path
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -140,6 +142,40 @@ class ResearchMemory:
             confidence=confidence,
         )
         return record
+
+    def save(self, path: str = "data/research_memory.json"):
+        """Memory'yi dosyaya kaydet."""
+        data = {
+            "records": [
+                {"record_id": r.record_id, "ticker": r.ticker, "date": r.date,
+                 "thesis": r.thesis, "evidence": r.evidence, "risks": r.risks,
+                 "prediction": r.prediction, "outcome": r.outcome,
+                 "model_version": r.model_version, "confidence": r.confidence}
+                for r in self._records
+            ],
+        }
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
+        logger.info("Research memory saved", path=path, records=len(self._records))
+
+    def load(self, path: str = "data/research_memory.json"):
+        """Memory'yi dosyadan yükle."""
+        if not Path(path).exists():
+            return
+        try:
+            with open(path) as f:
+                data = orjson.loads(f.read())
+            for r in data.get("records", []):
+                record = ResearchRecord(**r)
+                self._records.append(record)
+                if record.ticker not in self._ticker_index:
+                    self._ticker_index[record.ticker] = []
+                self._ticker_index[record.ticker].append(record)
+            logger.info("Research memory loaded", path=path, records=len(self._records))
+        except Exception as e:
+            logger.warning("Failed to load research memory", path=path, error=str(e))
+
 
 class ResearchContextEngine:
     """AI'ya ilgili context oluşturma."""

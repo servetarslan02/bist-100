@@ -15,6 +15,8 @@ FAZ 10.1: Knowledge Graph
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from collections import deque
+from pathlib import Path
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -199,6 +201,40 @@ class KnowledgeGraph:
         logger.info("BIST defaults loaded",
                    entities=len(self._entities),
                    relations=len(self._relations))
+
+    def save(self, path: str = "data/knowledge_graph.json"):
+        """Graph'u dosyaya kaydet."""
+        data = {
+            "entities": [
+                {"entity_id": e.entity_id, "entity_type": e.entity_type, "name": e.name,
+                 "aliases": e.aliases, "properties": e.properties}
+                for e in self._entities.values()
+            ],
+            "relations": [
+                {"source_id": r.source_id, "target_id": r.target_id,
+                 "relation_type": r.relation_type, "strength": r.strength, "properties": r.properties}
+                for r in self._relations
+            ],
+        }
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2).decode())
+        logger.info("Knowledge graph saved", path=path, entities=len(self._entities), relations=len(self._relations))
+
+    def load(self, path: str = "data/knowledge_graph.json"):
+        """Graph'u dosyadan yükle."""
+        if not Path(path).exists():
+            return
+        try:
+            with open(path) as f:
+                data = orjson.loads(f.read())
+            for e in data.get("entities", []):
+                self.add_entity(Entity(**e))
+            for r in data.get("relations", []):
+                self.add_relation(Relation(**r))
+            logger.info("Knowledge graph loaded", path=path, entities=len(self._entities), relations=len(self._relations))
+        except Exception as e:
+            logger.warning("Failed to load knowledge graph", path=path, error=str(e))
 
     def get_stats(self) -> Dict[str, Any]:
         """Graph istatistikleri."""
