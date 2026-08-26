@@ -6,9 +6,10 @@ import lightgbm as lgb
 import yfinance as yf
 from typing import Dict, List
 from pathlib import Path
-import pickle
 import hashlib
 import structlog
+
+from services.core.safe_pickle import safe_pickle_dump, safe_pickle_load
 
 from services.ingestion.bist_universe import bist_universe
 from services.ml.feature_engine import compute_universe_features
@@ -273,8 +274,7 @@ class AlphaEngine:
                     "|".join(sorted(self.features)).encode()
                 ).hexdigest()[:16],
             }
-            with open(path, "wb") as f:
-                pickle.dump(payload, f)
+            safe_pickle_dump(payload, path)
             logger.info("AlphaEngine model saved", path=path, features=len(self.features))
         except Exception as e:
             logger.warning("Failed to save AlphaEngine model", error=str(e))
@@ -284,8 +284,7 @@ class AlphaEngine:
         if not Path(path).exists():
             return False
         try:
-            with open(path, "rb") as f:
-                payload = pickle.load(f)
+            payload = safe_pickle_load(path)
             # Yaş kontrolü
             trained_at = datetime.datetime.fromisoformat(payload["trained_at"])
             if trained_at.tzinfo is None:
