@@ -39,12 +39,12 @@ class MaskResult:
 class TradabilityMask:
     """Execute edilemeyen fiyatları tespit eden mask."""
 
-    # BIST limit-up/down eşiği (%10 ana pazar, %20 alt pazar)
+    # BIST limit-up/down eşiği (Eylül 2025 sonrası: tüm pazarlarda %10)
     LIMIT_UP_PCT = 0.10
     LIMIT_DOWN_PCT = 0.10
-    # Küçük hisseler için
-    LIMIT_UP_SMALL_PCT = 0.20
-    LIMIT_DOWN_SMALL_PCT = 0.20
+    # Alt pazar da artık %10 (Eylül 2025 güncel)
+    LIMIT_UP_SMALL_PCT = 0.10
+    LIMIT_DOWN_SMALL_PCT = 0.10
 
     # Devre kesici eşiği (BIST: %5, %10, %15, %20)
     CIRCUIT_BREAKER_PCTS = [0.05, 0.10, 0.15, 0.20]

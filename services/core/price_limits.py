@@ -1,11 +1,13 @@
 """
-ALPHA BIST — Price Limits
+ALPHA BIST — Price Limits (Eylül 2025 Güncel)
 
-BIST fiyat limitleri (pazara göre):
-- Yıldız Pazar: ±%20
-- Ana Pazar: ±%15
+BIST fiyat limitleri (Eylül 2025 sonrası — tüm pazarlarda standart):
+- Yıldız Pazar: ±%10
+- Ana Pazar: ±%10
 - Alt Pazar: ±%10
-- Devre kesici: sadece aşağı yönlü tetiklenir
+- Devre kesici sonrası: Marj daraltılır
+
+Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
 from typing import Dict, Any
@@ -40,22 +42,46 @@ class PriceLimitResult:
 
 
 class PriceLimitMonitor:
-    """BIST fiyat limitleri kontrolü."""
+    """BIST fiyat limitleri kontrolü (Eylül 2025 güncel)."""
 
-    # Varsayılan limitler (BIST standardı: ±%10)
-    DEFAULT_LIMIT = 10.0    # %10 (Standart BIST Fiyat Marjı)
-    YILDIZ_LIMIT = 10.0     # %10 (Yıldız Pazar)
-    ANA_LIMIT = 10.0        # %10 (Ana Pazar)
-    ALT_LIMIT = 10.0        # %10 (Alt Pazar)
-    VOLATILE_LIMIT = 5.0    # %5 (devre kesici sonrası)
-    WIDE_LIMIT = 20.0       # %20
+    # Eylül 2025 sonrası: Tüm pazarlarda standart ±%10
+    DEFAULT_LIMIT = 10.0        # %10 (tüm pazarlar standart)
+    YILDIZ_LIMIT = 10.0         # %10 (Yıldız Pazar)
+    ANA_LIMIT = 10.0            # %10 (Ana Pazar)
+    ALT_LIMIT = 10.0            # %10 (Alt Pazar)
+
+    # Devre kesici sonrası marj daraltma
+    POST_CB_LIMIT = 5.0         # %5 (devre kesici sonrası daraltma)
+
+    # Eski değerler (artık geçerli değil ama referans için korundu)
+    # WIDE_LIMIT = 20.0  # KALDIRILDI: Eylül 2025 sonrası tüm pazarlarda %10
 
     def __init__(self):
         self._custom_limits: Dict[str, float] = {}
+        self._post_cb_tickers: Dict[str, float] = {}  # Devre kesici sonrası daraltılmış marj
 
     def set_custom_limit(self, ticker: str, limit_pct: float):
         """Özel limit ata (volatil hisseler)."""
         self._custom_limits[ticker] = limit_pct
+
+    def set_post_circuit_breaker_limit(self, ticker: str):
+        """Devre kesici sonrası marj daraltma uygula."""
+        self._post_cb_tickers[ticker] = self.POST_CB_LIMIT
+        logger.info("Post-CB margin tightened", ticker=ticker, new_limit=self.POST_CB_LIMIT)
+
+    def clear_post_circuit_breaker_limit(self, ticker: str):
+        """Devre kesici sonrası marj daraltmayı kaldır."""
+        self._post_cb_tickers.pop(ticker, None)
+
+    def get_effective_limit(self, ticker: str) -> float:
+        """Hisseye uygulanan efektif limiti döndür."""
+        # Önce devre kesici sonrası daraltma kontrolü
+        if ticker in self._post_cb_tickers:
+            return self._post_cb_tickers[ticker]
+        # Özel limit kontrolü
+        if ticker in self._custom_limits:
+            return self._custom_limits[ticker]
+        return self.DEFAULT_LIMIT
 
     def check_price_limit(
         self,
@@ -73,8 +99,8 @@ class PriceLimitMonitor:
         if reference_price <= 0 or current_price <= 0:
             return PriceLimitResult(limit_hit=False)
 
-        # Limit belirle
-        limit = self._custom_limits.get(ticker, self.DEFAULT_LIMIT)
+        # Efektif limit belirle
+        limit = self.get_effective_limit(ticker)
 
         # Değişim hesapla
         change_pct = ((current_price / reference_price) - 1) * 100

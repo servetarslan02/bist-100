@@ -21,6 +21,7 @@ class RiskParityParameters:
     risk_per_trade_pct: float = 0.010       # Her işlemde portföyün en fazla %1.0'ı riske atılır
     max_position_size_pct: float = 0.10     # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
     max_portfolio_heat_pct: float = 0.05    # Portföy açık risk tavanı: %5.0
+    max_sector_concentration_pct: float = 0.30  # Tek sektörde max %30 yoğunlaşma
     
     # Teknik Eşikler
     min_buyer_pressure: float = 50.0
@@ -60,9 +61,10 @@ class RiskAuditResult:
 class RiskParityEngine:
     """Kurumsal Risk Parity ve Teyitli Kriz Kontrol Motoru."""
 
-    def __init__(self, bm_df: pd.DataFrame, stock_dict: Dict[str, pd.DataFrame]):
+    def __init__(self, bm_df: pd.DataFrame, stock_dict: Dict[str, pd.DataFrame], sector_map: Dict[str, str] = None):
         self.bm_df = bm_df
         self.stock_dict = stock_dict
+        self.sector_map = sector_map or {}  # {ticker: sector_name}
         self._precompute_technicals()
 
     def _precompute_technicals(self):
@@ -120,6 +122,15 @@ class RiskParityEngine:
                 "high_20d": high_20d,
                 "dates": df.index
             }
+
+    def _get_sector_exposure(self, positions: Dict, total_equity: float) -> Dict[str, float]:
+        """Mevcut pozisyonların sektör bazlı yoğunlaşmasını hesapla."""
+        sector_values: Dict[str, float] = {}
+        for ticker, pos in positions.items():
+            sector = self.sector_map.get(ticker.split(".")[0], "unknown")
+            pos_value = pos["shares"] * pos["entry_price"]
+            sector_values[sector] = sector_values.get(sector, 0.0) + pos_value
+        return {s: v / max(total_equity, 1.0) for s, v in sector_values.items()}
 
     def simulate(self, params: RiskParityParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0) -> RiskAuditResult:
         """Risk Parity & 3 Günlük Kriz Teyidi + Breakout Destekli Simülasyon."""
@@ -309,8 +320,26 @@ class RiskParityEngine:
 
                 candidates.sort(key=lambda x: x["score"], reverse=True)
                 available = max_pos - active_cnt
-                for cand in candidates[:available]:
-                    pending_buy_orders.append({"ticker": cand["ticker"]})
+
+                # Sektör yoğunlaşma kontrolü
+                sector_exposure = self._get_sector_exposure(positions, total_equity)
+
+                for cand in candidates[:available * 2]:  # Fazla aday al, filtrele
+                    if len(pending_buy_orders) >= available:
+                        break
+                    ticker = cand["ticker"]
+                    sector = self.sector_map.get(ticker.split(".")[0], "unknown")
+                    sector_pct = sector_exposure.get(sector, 0.0)
+
+                    # Sektör yoğunlaşma limiti kontrolü
+                    if sector_pct >= params.max_sector_concentration_pct:
+                        logger.debug("Sektör yoğunlaşma limiti", ticker=ticker,
+                                   sector=sector, pct=f"{sector_pct:.1%}")
+                        continue
+
+                    pending_buy_orders.append({"ticker": ticker})
+                    # Sektör exposure güncelle
+                    sector_exposure[sector] = sector_pct + (1.0 / max(total_equity, 1.0))
 
             equity_curve.append(total_equity)
 
