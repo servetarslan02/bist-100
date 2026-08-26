@@ -11,6 +11,7 @@ Mesajlaşma Strateji:
 """
 
 import asyncio
+from collections import defaultdict
 from typing import Optional, Callable, Dict, Any, List
 import structlog
 

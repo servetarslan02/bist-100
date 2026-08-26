@@ -85,17 +85,64 @@ class RiskManager:
     def get_market_regime(self, bm_df: pl.DataFrame, target_date: pl.Series) -> float:
         """
         BIST100'un durumuna gore pazar rejimini dondurur.
+        Çoklu rejim tespiti: trend + volatilite + momentum.
         1.0 = Tamamen Bull (100% yatirim)
-        0.5 = Ayi Piyasasi (50% yatirim, 50% nakit)
+        0.0 = Tamamen Bear (100% nakit)
+        0.25-0.75 = Ara rejimler (kısmi yatirim)
         """
         sub_bm = bm_df[bm_df.index <= target_date]
         if len(sub_bm) < 200:
             return 1.0
-            
-        current_close = sub_bm["Close"][-1]
-        ma_200 = sub_bm["Close"].rolling(200).mean()[-1]
-        
-        # 200 gunluk ortalamanin altindaysa %50 nakde gec
-        if current_close < ma_200:
-            return 0.0
-        return 1.0
+
+        closes = sub_bm["Close"]
+        current_close = closes[-1]
+        ma_50 = closes.rolling(50).mean()[-1]
+        ma_200 = closes.rolling(200).mean()[-1]
+
+        # Volatilite (20 günlük)
+        if len(closes) > 20:
+            returns = closes.pct_change().drop_nulls()
+            vol_20d = float(returns.tail(20).std()) if len(returns) >= 20 else 0.20
+        else:
+            vol_20d = 0.20
+
+        # Momentum (20 günlük getiri)
+        if len(closes) > 20:
+            momentum_20d = (current_close / closes[-21] - 1) if closes[-21] > 0 else 0
+        else:
+            momentum_20d = 0
+
+        # Trend skoru (0-1)
+        trend_score = 0.5
+        if current_close > ma_200:
+            trend_score += 0.3
+        else:
+            trend_score -= 0.3
+        if current_close > ma_50:
+            trend_score += 0.2
+        else:
+            trend_score -= 0.2
+
+        # Volatilite ayarlaması (yüksek vol → risk azalt)
+        vol_factor = 1.0
+        if vol_20d > 0.35:      # Çok yüksek volatilite
+            vol_factor = 0.5
+        elif vol_20d > 0.25:    # Yüksek volatilite
+            vol_factor = 0.7
+        elif vol_20d < 0.15:    # Düşük volatilite
+            vol_factor = 1.1
+
+        # Momentum ayarlaması
+        momentum_factor = 1.0
+        if momentum_20d > 0.10:     # Güçlü yukarı momentum
+            momentum_factor = 1.15
+        elif momentum_20d > 0.03:   # Hafif yukarı
+            momentum_factor = 1.05
+        elif momentum_20d < -0.10:  # Güçlü aşağı momentum
+            momentum_factor = 0.6
+        elif momentum_20d < -0.03:  # Hafif aşağı
+            momentum_factor = 0.8
+
+        # Final skor
+        regime_score = max(0.0, min(1.0, trend_score * vol_factor * momentum_factor))
+        return round(regime_score, 2)

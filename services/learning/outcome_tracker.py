@@ -10,7 +10,7 @@ Tahmin sonuçlarını otomatik takip eder:
 Bu modül learning'in çalışması için KRİTİK.
 """
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime, timezone, timedelta
 from collections import deque
 import structlog
@@ -64,16 +64,41 @@ class OutcomeTracker:
                      ticker=ticker, prediction_id=prediction_id,
                      check_after=f"{wait_days} days")
 
-    async def check_pending_outcomes(self, learning_system, price_fetcher) -> List[Dict]:
+    async def _default_price_fetcher(self, ticker: str) -> Optional[float]:
+        """Varsayılan fiyat çekici — ingestion katmanından fiyat çeker."""
+        try:
+            from services.ingestion.providers.yfinance_provider import YFinanceProvider
+            provider = YFinanceProvider()
+            data = await provider.get_latest_price(ticker)
+            if data and data > 0:
+                return float(data)
+        except Exception as e:
+            logger.debug("Default price fetcher failed", ticker=ticker, error=str(e))
+
+        # Fallback: Redis cache'den dene
+        try:
+            from services.core.database import redis_get
+            cached = await redis_get(f"price:latest:{ticker}")
+            if cached:
+                return float(cached)
+        except Exception:
+            pass
+
+        return None
+
+    async def check_pending_outcomes(self, learning_system, price_fetcher: Optional[Callable] = None) -> List[Dict]:
         """Bekleyen tahminleri kontrol et ve outcome kaydet.
 
         Args:
             learning_system: IntegratedLearningSystem instance
-            price_fetcher: async def get_price(ticker) -> float
+            price_fetcher: async def get_price(ticker) -> float (opsiyonel, varsayılan kullanılır)
 
         Returns:
             Kaydedilen outcome'lar
         """
+        if price_fetcher is None:
+            price_fetcher = self._default_price_fetcher
+
         now = datetime.now(timezone.utc)
         results = []
 
@@ -176,6 +201,19 @@ class OutcomeTracker:
             "checked": checked,
             "pending": total - checked,
         }
+
+
+    async def run_pending_check(self) -> List[Dict]:
+        """Scheduler'dan çağrılabilir — learning_system ve price_fetcher otomatik bağlanır."""
+        learning_system = None
+        try:
+            from services.learning.integrated_learning import integrated_learning_system
+            learning_system = integrated_learning_system
+        except Exception as e:
+            logger.debug("Learning system not available for outcome check", error=str(e))
+            return []
+
+        return await self.check_pending_outcomes(learning_system)
 
 
 # Singleton

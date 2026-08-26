@@ -59,11 +59,11 @@ class PositionSizer:
     ) -> List[PositionSize]:
         """Tum pozisyon buyukluklerini hesapla."""
 
-        logger.info("debug_output", message=f"\n[POSITION SIZING v4.0] opportunities={len(opportunities)}, portfolio={portfolio_value:,.0f}, regime={regime}")
+        logger.debug("debug_output", message=f"\n[POSITION SIZING v4.0] opportunities={len(opportunities)}, portfolio={portfolio_value:,.0f}, regime={regime}")
 
         # Volatilite targeting kaldirac orani
         leverage = self._volatility_leverage(current_volatility)
-        logger.info("debug_output", message=f"  leverage={leverage:.4f} (target_vol={self.target_volatility}, current_vol={current_volatility:.4f})")
+        logger.debug("debug_output", message=f"  leverage={leverage:.4f} (target_vol={self.target_volatility}, current_vol={current_volatility:.4f})")
 
         # Rejim bazli ayarlar
         if regime == "BEAR":
@@ -75,13 +75,13 @@ class PositionSizer:
         else:
             max_pos = self.max_position_pct
 
-        logger.info("debug_output", message=f"  max_pos={max_pos:.4f}, leverage_after_regime={leverage:.4f}")
+        logger.debug("debug_output", message=f"  max_pos={max_pos:.4f}, leverage_after_regime={leverage:.4f}")
 
         # Historical OOS avg_win/avg_loss (varsa)
         hist_avg_win, hist_avg_loss = (0.05, 0.05)
         if calibrator:
             hist_avg_win, hist_avg_loss = calibrator.get_avg_win_loss()
-            logger.info("debug_output", message=f"  historical_avg_win={hist_avg_win:.4f}, historical_avg_loss={hist_avg_loss:.4f}")
+            logger.debug("debug_output", message=f"  historical_avg_win={hist_avg_win:.4f}, historical_avg_loss={hist_avg_loss:.4f}")
 
         positions = []
         total_weight = 0
@@ -93,11 +93,11 @@ class PositionSizer:
             expected_return = opp.get("expected_return", 0)
             volatility = opp.get("volatility", 0.2)
 
-            logger.info("debug_output", message=f"\n  [{ticker}] score={score:.4f}, conf={confidence:.4f}, exp_ret={expected_return:.4f}, vol={volatility:.4f}")
+            logger.debug("debug_output", message=f"\n  [{ticker}] score={score:.4f}, conf={confidence:.4f}, exp_ret={expected_return:.4f}, vol={volatility:.4f}")
 
             # NaN/Inf/Zero kontrolu
             if not self._is_valid(score) or not self._is_valid(confidence) or not self._is_valid(volatility):
-                logger.info("debug_output", message=f"    -> SKIP: invalid input")
+                logger.debug("debug_output", message=f"    -> SKIP: invalid input")
                 continue
 
             # === CALIBRATION: score -> win_probability ===
@@ -111,7 +111,7 @@ class PositionSizer:
                 win_prob = 1.0 / (1.0 + np.exp(-0.08 * (score - 50)))
                 win_prob = float(np.clip(win_prob, 0.05, 0.95))
 
-            logger.info("debug_output", message=f"    win_probability={win_prob:.4f} (calibrated from score={score:.4f})")
+            logger.debug("debug_output", message=f"    win_probability={win_prob:.4f} (calibrated from score={score:.4f})")
 
             # === HISTORICAL OOS: avg_win, avg_loss ===
             # Ticker-spesifik historical performance (varsa)
@@ -122,21 +122,21 @@ class PositionSizer:
             if expected_return > 0:
                 ticker_avg_win = max(expected_return, hist_avg_win)
 
-            logger.info("debug_output", message=f"    avg_win={ticker_avg_win:.4f}, avg_loss={ticker_avg_loss:.4f}")
+            logger.debug("debug_output", message=f"    avg_win={ticker_avg_win:.4f}, avg_loss={ticker_avg_loss:.4f}")
 
             # === COLD-START POLICY ===
             # Historical OOS trade yoksa Kelly devre disi, score-based weight kullan
             has_history = calibrator is not None and calibrator._fitted
-            logger.info("debug_output", message=f"    has_history={has_history}")
+            logger.debug("debug_output", message=f"    has_history={has_history}")
 
             if has_history:
                 # === FRACTIONAL KELLY (historical data varsa) ===
                 # Regime-conditioned: fraction rejime göre değişir
                 kelly = self._fractional_kelly(win_prob, ticker_avg_win, ticker_avg_loss, regime=regime)
-                logger.info("debug_output", message=f"    kelly={kelly:.4f} (regime={regime})")
+                logger.debug("debug_output", message=f"    kelly={kelly:.4f} (regime={regime})")
 
                 if kelly <= 0:
-                    logger.info("debug_output", message=f"    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
+                    logger.debug("debug_output", message=f"    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
                     continue
 
                 base_weight = kelly
@@ -144,35 +144,35 @@ class PositionSizer:
                 # Cold-start: Kelly devre disi
                 # Negatif expected_return → NO TRADE
                 if expected_return < 0:
-                    logger.info("debug_output", message=f"    -> SKIP: expected_return<0 (NO TRADE)")
+                    logger.debug("debug_output", message=f"    -> SKIP: expected_return<0 (NO TRADE)")
                     continue
 
-                logger.info("debug_output", message=f"    COLD-START: Kelly disabled, using score-based weight")
+                logger.debug("debug_output", message=f"    COLD-START: Kelly disabled, using score-based weight")
                 # Score semantigi: yuksek = iyi. En iyi score = 1.0, en kotu = 0.1
                 base_weight = max(0.1, min(1.0, score / 20.0))
                 kelly = 0.0  # Kelly uygulanmadi
-                logger.info("debug_output", message=f"    base_weight={base_weight:.4f}")
+                logger.debug("debug_output", message=f"    base_weight={base_weight:.4f}")
 
             # === SCORE WEIGHT ===
             # Score semantigi: yuksek = iyi (ranking_model ile tutarli)
             score_weight = max(0.1, score / 100.0)  # score=100 -> 1.0, score=0 -> 0.1
-            logger.info("debug_output", message=f"    score_weight={score_weight:.4f}")
+            logger.debug("debug_output", message=f"    score_weight={score_weight:.4f}")
 
             # === VOLATILITY ADJUSTMENT ===
             vol_adj = self.target_volatility / max(volatility, 0.01)
             vol_adj = min(vol_adj, 3.0)  # Cap at 3x
-            logger.info("debug_output", message=f"    vol_adjustment={vol_adj:.4f}")
+            logger.debug("debug_output", message=f"    vol_adjustment={vol_adj:.4f}")
 
             # === FINAL WEIGHT ===
             weight = base_weight * score_weight * vol_adj * leverage
-            logger.info("debug_output", message=f"    weight_raw={weight:.6f}")
+            logger.debug("debug_output", message=f"    weight_raw={weight:.6f}")
 
             weight = min(weight, max_pos)
             weight = max(0, weight)
-            logger.info("debug_output", message=f"    weight_clamped={weight:.6f} (max_pos={max_pos})")
+            logger.debug("debug_output", message=f"    weight_clamped={weight:.6f} (max_pos={max_pos})")
 
             if weight <= 0.001:
-                logger.info("debug_output", message=f"    -> SKIP: weight too small")
+                logger.debug("debug_output", message=f"    -> SKIP: weight too small")
                 continue
 
             # Risk yuzdesi
@@ -194,19 +194,19 @@ class PositionSizer:
 
             total_weight += weight
 
-        logger.info("debug_output", message=f"\n  total_weight={total_weight:.4f}, positions={len(positions)}")
+        logger.debug("debug_output", message=f"\n  total_weight={total_weight:.4f}, positions={len(positions)}")
 
         # Normalize
         if total_weight > self.max_total_exposure:
             scale = self.max_total_exposure / total_weight
-            logger.info("debug_output", message=f"  NORMALIZE: scale={scale:.4f}")
+            logger.debug("debug_output", message=f"  NORMALIZE: scale={scale:.4f}")
             for pos in positions:
                 pos.weight = round(pos.weight * scale, 4)
                 pos.notional = round(pos.weight * portfolio_value, 2)
                 pos.risk_pct = round(pos.risk_pct * scale, 2)
 
         if not positions:
-            logger.info("debug_output", message=f"  WARNING: 0 pozisyon uretildi!")
+            logger.debug("debug_output", message=f"  WARNING: 0 pozisyon uretildi!")
 
         return positions
 
@@ -233,26 +233,26 @@ class PositionSizer:
         Regime-conditioned: fraction rejime göre değişir.
         SSRN Regime-Conditioned Kelly (2026) araştırmasına dayalı.
         """
-        logger.info("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}")
+        logger.debug("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}")
 
         if avg_loss <= 0:
-            logger.info("debug_output", message=f"      -> avg_loss<=0, kelly=0")
+            logger.debug("debug_output", message=f"      -> avg_loss<=0, kelly=0")
             return 0.0
         if win_prob <= 0 or win_prob >= 1:
-            logger.info("debug_output", message=f"      -> win_prob out of range, kelly=0")
+            logger.debug("debug_output", message=f"      -> win_prob out of range, kelly=0")
             return 0.0
 
         q = 1 - win_prob
         b = avg_win / avg_loss  # Odds
 
-        logger.info("debug_output", message=f"      [KELLY] q={q:.4f}, b={b:.4f}")
+        logger.debug("debug_output", message=f"      [KELLY] q={q:.4f}, b={b:.4f}")
 
         raw_kelly = (win_prob * b - q) / b
-        logger.info("debug_output", message=f"      [KELLY] raw_kelly={raw_kelly:.4f}")
+        logger.debug("debug_output", message=f"      [KELLY] raw_kelly={raw_kelly:.4f}")
 
         # raw_kelly negatifse expectation negatif -> NO TRADE (dogru davranis)
         if raw_kelly <= 0:
-            logger.info("debug_output", message=f"      -> raw_kelly<=0 (negative expectation, NO TRADE)")
+            logger.debug("debug_output", message=f"      -> raw_kelly<=0 (negative expectation, NO TRADE)")
             return 0.0
 
         kelly = max(0, min(1, raw_kelly))
@@ -260,7 +260,7 @@ class PositionSizer:
         # Regime-conditioned fraction (SSRN 2026)
         regime_fraction = self.REGIME_KELLY_FRACTIONS.get(regime, self.kelly_fraction)
         fractional = kelly * regime_fraction
-        logger.info("debug_output", message=f"      [KELLY] clamped={kelly:.4f}, regime_fraction={regime_fraction}, fractional={fractional:.4f}")
+        logger.debug("debug_output", message=f"      [KELLY] clamped={kelly:.4f}, regime_fraction={regime_fraction}, fractional={fractional:.4f}")
 
         return fractional
 

@@ -63,7 +63,7 @@ class TrendRiderEngine:
         # Zirve fiyatı güncelle
         if p_high > peak_price:
             peak_price = p_high
-            pos = pos.with_columns(pl.lit(peak_price).alias('peak_price'))
+            pos['peak_price'] = peak_price
 
         # -------------------------------------------------------------
         # 1. 100% Dinamik Volatilite (ATR-14) Hesabı
@@ -88,8 +88,8 @@ class TrendRiderEngine:
         is_tavan = (p_close >= p_open * 1.090) and (upper_wick / candle_range <= 0.08)
 
         if is_tavan:
-            pos = pos.with_columns(pl.lit(True).alias('is_in_tavan_run'))
-            pos = pos.with_columns(pl.lit(pos.get("tavan_count", 0) + 1).alias('tavan_count'))
+            pos['is_in_tavan_run'] = True
+            pos['tavan_count'] = pos.get('tavan_count', 0) + 1
             # Tavan serisi bozulmadığı sürece pozisyon kesinlikle korunur
             return False, 0.0, "TAVAN_SERISI_KORUMA"
 
@@ -116,7 +116,7 @@ class TrendRiderEngine:
         elif (2.0 * atr14) <= gain_from_entry < (5.0 * atr14):
             # Kârı koruma stopu: Zirvenin 2.5x ATR altı veya Giriş + 0.5x ATR
             breakeven_dynamic_stop = max(entry_price + (0.5 * atr14), peak_price - (2.5 * atr14))
-            pos = pos.with_columns(pl.lit(max(pos.get("stop_loss", 0), breakeven_dynamic_stop)).alias('stop_loss'))
+            pos['stop_loss'] = max(pos.get('stop_loss', 0), breakeven_dynamic_stop)
             if p_low <= pos["stop_loss"]:
                 return True, pos["stop_loss"], f"DINAMIK_BASABAŞ_IZLEYEN_STOP (+%{gain_now_pct:.1f})"
 
@@ -132,7 +132,7 @@ class TrendRiderEngine:
 
             # Parabolik trend takibi: Zirvenin 3.0x ATR altı veya 20-SMA kırılımı
             parabolic_atr_stop = max(peak_price - (3.0 * atr14), sma20 * 0.985)
-            pos = pos.with_columns(pl.lit(max(pos.get("stop_loss", 0), parabolic_atr_stop)).alias('stop_loss'))
+            pos['stop_loss'] = max(pos.get('stop_loss', 0), parabolic_atr_stop)
             if p_low <= pos["stop_loss"]:
                 return True, pos["stop_loss"], f"MEGA_TREND_PARABOLIK_STOP (+%{gain_now_pct:.1f})"
 

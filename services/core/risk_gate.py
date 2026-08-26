@@ -227,7 +227,9 @@ class RiskGate:
             if failed == 0:
                 passed += 1
         except Exception as e:
-            logger.warning("BIST compliance check skipped due to error", error=str(e))
+            logger.error("BIST compliance check FAILED — blocking order (fail-closed)", error=str(e))
+            failed += 1
+            reasons.append(f"BIST compliance check error: {e}")
 
         return passed, failed, details
 

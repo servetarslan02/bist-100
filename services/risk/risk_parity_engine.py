@@ -256,15 +256,15 @@ class RiskParityEngine:
                 atr_val = max(cdata["atr14"][d_idx], close_p * 0.01)
 
                 if high_p > pos["peak_price"]:
-                    pos = pos.with_columns(pl.lit(high_p).alias('peak_price'))
+                    pos['peak_price'] = high_p
 
                 # Breakeven kontrolü
                 if close_p >= pos["entry_price"] + (atr_val * params.atr_breakeven_mult):
-                    pos = pos.with_columns(pl.lit(True).alias('breakeven_hit'))
+                    pos['breakeven_hit'] = True
 
                 if pos["breakeven_hit"]:
                     new_stop = pos["peak_price"] - (atr_val * trailing_mult)
-                    pos = pos.with_columns(pl.lit(max(pos["stop_loss"], new_stop, pos["entry_price"])).alias('stop_loss'))
+                    pos['stop_loss'] = max(pos['stop_loss'], new_stop, pos['entry_price'])
 
                 # Kalan açık risk hesabı
                 if not pos["breakeven_hit"]:

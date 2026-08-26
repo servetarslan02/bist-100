@@ -1225,26 +1225,15 @@ class PortfolioManager:
     def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
         """Otonom portfoy yeniden dengeleme (Kelly Kriteri + Yüksek Skorlu BİST Liderleri)."""
         if not signals:
-            try:
-                from services.core.holy_grail_strategy import HolyGrailStrategy
-                st = HolyGrailStrategy()
-                alpha = st.get_latest_signals()
-                signals = []
-                for item in alpha.get("top_selected_stocks", []):
-                    p = float(item["price"])
-                    signals.append({
-                        "ticker": item["symbol"],
-                        "price": p,
-                        "score": float(item.get("score", 90)),
-                        "stop_loss": round(p * 0.95, 2),
-                        "target": round(p * 1.15, 2),
-                        "sector": "BIST"
-                    })
-            except Exception:
-                logger.warning("Caught Exception in execute_auto_rebalance", exc_info=True)
-            
-            if not signals:
-                signals = []
+            logger.info("No signals provided for auto-rebalance, skipping")
+            return {
+                "success": True,
+                "rebalanced_count": 0,
+                "trades": [],
+                "cash_remaining": round(self._cash, 2),
+                "total_equity": round(self._cash + sum(p.market_value for p in self._positions.values()), 2),
+                "positions_total": len(self._positions),
+            }
 
         executed = []
         total_equity = self._cash + sum(p.market_value for p in self._positions.values())
