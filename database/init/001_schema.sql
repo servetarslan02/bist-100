@@ -888,3 +888,317 @@ WITH (m = 16, ef_construction = 200);
 -- ON knowledge_entities
 -- USING ivfflat (embedding vector_cosine_ops)
 -- WITH (lists = 100);
+
+-- =====================================================
+-- PERFORMANS İYİLEŞTİRMELERİ v2.0
+-- =====================================================
+
+-- =====================================================
+-- COMPOSITE INDEXES (Sorgu performansı için kritik)
+-- =====================================================
+
+-- Portföy sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_positions_portfolio_status ON positions(portfolio_id, status);
+CREATE INDEX IF NOT EXISTS idx_positions_portfolio_instrument ON positions(portfolio_id, instrument_id);
+
+-- Sinyal sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_signals_instrument_status ON signals(instrument_id, status);
+CREATE INDEX IF NOT EXISTS idx_signals_strategy_status ON signals(strategy_id, status);
+CREATE INDEX IF NOT EXISTS idx_signals_created_status ON signals(created_at DESC, status);
+
+-- Emir sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_orders_portfolio_status ON orders(portfolio_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_instrument_status ON orders(instrument_id, status);
+CREATE INDEX IF NOT EXISTS idx_orders_placed_status ON orders(placed_at DESC, status);
+
+-- Model tahmin sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_predictions_instrument_date ON model_predictions(instrument_id, prediction_date DESC);
+CREATE INDEX IF NOT EXISTS idx_predictions_model_date ON model_predictions(model_version_id, prediction_date DESC);
+
+-- Alert sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_alerts_type_severity ON alerts(alert_type, severity);
+CREATE INDEX IF NOT EXISTS idx_alerts_created_ack ON alerts(created_at DESC, acknowledged);
+
+-- Audit log sorguları için composite index
+CREATE INDEX IF NOT EXISTS idx_audit_entity_action ON audit_logs(entity_type, entity_id, action);
+CREATE INDEX IF NOT EXISTS idx_audit_created_action ON audit_logs(created_at DESC, action);
+
+-- Scan results için composite index
+CREATE INDEX IF NOT EXISTS idx_scan_ticker_score ON scan_results(ticker, score DESC);
+CREATE INDEX IF NOT EXISTS idx_scan_type_signal ON scan_results(scan_type, signal);
+
+-- Paper trades için composite index
+CREATE INDEX IF NOT EXISTS idx_paper_ticker_date ON paper_trades(ticker, date DESC);
+
+-- Position history için composite index
+CREATE INDEX IF NOT EXISTS idx_poshist_portfolio_ticker ON position_history(portfolio_id, ticker);
+CREATE INDEX IF NOT EXISTS idx_poshist_action_date ON position_history(action, created_at DESC);
+
+-- Daily P&L için composite index
+CREATE INDEX IF NOT EXISTS idx_dailypnl_portfolio_date ON daily_pnl(portfolio_id, pnl_date DESC);
+
+-- Equity snapshots için composite index
+CREATE INDEX IF NOT EXISTS idx_eqsnap_portfolio_date ON equity_snapshots(portfolio_id, snapshot_date DESC);
+
+-- Knowledge graph için composite index
+CREATE INDEX IF NOT EXISTS idx_knowledge_entity_type ON knowledge_entities(entity_type, name);
+
+-- =====================================================
+-- PARTITIONING (Büyük tablolar için)
+-- =====================================================
+
+-- Model predictions tablosu zaten TimescaleDB hypertable
+-- Scan results tablosu zaten TimescaleDB hypertable
+
+-- =====================================================
+-- VACUUM & ANALYZE AYARLARI (Otomatik bakım)
+-- =====================================================
+
+-- Autovacuum ayarlarını tablo bazında optimize et
+ALTER TABLE positions SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE orders SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE signals SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE alerts SET (autovacuum_vacuum_scale_factor = 0.1);
+ALTER TABLE audit_logs SET (autovacuum_vacuum_scale_factor = 0.1);
+ALTER TABLE scan_results SET (autovacuum_vacuum_scale_factor = 0.05);
+ALTER TABLE model_predictions SET (autovacuum_vacuum_scale_factor = 0.05);
+
+-- =====================================================
+-- MATERIALIZED VIEW'lar (Önceden hesaplanmış聚合)
+-- =====================================================
+
+-- Son 30 günlük performans özeti
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_recent_performance AS
+SELECT
+    dp.portfolio_id,
+    dp.pnl_date,
+    dp.net_pnl,
+    dp.equity_end,
+    dp.commission,
+    LAG(dp.equity_end) OVER (PARTITION BY dp.portfolio_id ORDER BY dp.pnl_date) as prev_equity,
+    CASE
+        WHEN LAG(dp.equity_end) OVER (PARTITION BY dp.portfolio_id ORDER BY dp.pnl_date) > 0
+        THEN (dp.equity_end - LAG(dp.equity_end) OVER (PARTITION BY dp.portfolio_id ORDER BY dp.pnl_date))
+             / LAG(dp.equity_end) OVER (PARTITION BY dp.portfolio_id ORDER BY dp.pnl_date) * 100
+        ELSE 0
+    END as daily_return_pct
+FROM daily_pnl dp
+WHERE dp.pnl_date >= CURRENT_DATE - INTERVAL '30 days'
+WITH DATA;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_recent_perf ON mv_recent_performance(portfolio_id, pnl_date);
+
+-- Aktif pozisyonlar özeti
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_active_positions AS
+SELECT
+    p.portfolio_id,
+    p.instrument_id,
+    i.symbol as ticker,
+    p.quantity,
+    p.avg_cost,
+    p.current_price,
+    p.market_value,
+    p.unrealized_pnl,
+    p.unrealized_pnl_pct,
+    p.weight_pct,
+    p.entry_date,
+    c.name as company_name,
+    s.name as sector_name
+FROM positions p
+JOIN instruments i ON p.instrument_id = i.id
+JOIN companies c ON i.company_id = c.id
+LEFT JOIN sectors s ON c.sector_id = s.id
+WHERE p.status = 'OPEN'
+WITH DATA;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_active_pos ON mv_active_positions(portfolio_id, instrument_id);
+
+-- Sektör bazlı pozisyon dağılımı
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_sector_allocation AS
+SELECT
+    p.portfolio_id,
+    s.name as sector_name,
+    COUNT(*) as position_count,
+    SUM(p.market_value) as total_value,
+    SUM(p.weight_pct) as total_weight,
+    AVG(p.unrealized_pnl_pct) as avg_pnl_pct
+FROM positions p
+JOIN instruments i ON p.instrument_id = i.id
+JOIN companies c ON i.company_id = c.id
+LEFT JOIN sectors s ON c.sector_id = s.id
+WHERE p.status = 'OPEN'
+GROUP BY p.portfolio_id, s.name
+WITH DATA;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_sector_alloc ON mv_sector_allocation(portfolio_id, sector_name);
+
+-- =====================================================
+-- FONKSİYONLAR (Yardımcı hesaplamalar)
+-- =====================================================
+
+-- Sharpe Ratio hesaplama fonksiyonu
+CREATE OR REPLACE FUNCTION calculate_sharpe_ratio(
+    p_portfolio_id INTEGER,
+    p_days INTEGER DEFAULT 30,
+    p_risk_free_rate DECIMAL DEFAULT 0.15
+) RETURNS DECIMAL AS $$
+DECLARE
+    v_avg_return DECIMAL;
+    v_std_return DECIMAL;
+    v_annualized_sharpe DECIMAL;
+BEGIN
+    SELECT
+        AVG(daily_return_pct),
+        STDDEV(daily_return_pct)
+    INTO v_avg_return, v_std_return
+    FROM (
+        SELECT
+            CASE
+                WHEN LAG(equity_end) OVER (ORDER BY pnl_date) > 0
+                THEN (equity_end - LAG(equity_end) OVER (ORDER BY pnl_date))
+                     / LAG(equity_end) OVER (ORDER BY pnl_date) * 100
+                ELSE 0
+            END as daily_return_pct
+        FROM daily_pnl
+        WHERE portfolio_id = p_portfolio_id
+          AND pnl_date >= CURRENT_DATE - INTERVAL '1 day' * p_days
+    ) sub;
+
+    IF v_std_return IS NULL OR v_std_return = 0 THEN
+        RETURN 0;
+    END IF;
+
+    -- Yıllık Sharpe (252 işlem günü)
+    v_annualized_sharpe := (v_avg_return - p_risk_free_rate / 252) / v_std_return * SQRT(252);
+
+    RETURN ROUND(v_annualized_sharpe, 4);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Maximum Drawdown hesaplama fonksiyonu
+CREATE OR REPLACE FUNCTION calculate_max_drawdown(
+    p_portfolio_id INTEGER,
+    p_days INTEGER DEFAULT 30
+) RETURNS DECIMAL AS $$
+DECLARE
+    v_max_drawdown DECIMAL := 0;
+    v_peak DECIMAL := 0;
+    v_current DECIMAL;
+    rec RECORD;
+BEGIN
+    FOR rec IN
+        SELECT equity_end
+        FROM daily_pnl
+        WHERE portfolio_id = p_portfolio_id
+          AND pnl_date >= CURRENT_DATE - INTERVAL '1 day' * p_days
+        ORDER BY pnl_date
+    LOOP
+        v_current := rec.equity_end;
+        IF v_current > v_peak THEN
+            v_peak := v_current;
+        END IF;
+        IF v_peak > 0 AND (v_peak - v_current) / v_peak * 100 > v_max_drawdown THEN
+            v_max_drawdown := (v_peak - v_current) / v_peak * 100;
+        END IF;
+    END LOOP;
+
+    RETURN ROUND(v_max_drawdown, 4);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Win Rate hesaplama fonksiyonu
+CREATE OR REPLACE FUNCTION calculate_win_rate(
+    p_portfolio_id INTEGER,
+    p_days INTEGER DEFAULT 30
+) RETURNS DECIMAL AS $$
+DECLARE
+    v_total_trades INTEGER;
+    v_winning_trades INTEGER;
+BEGIN
+    SELECT
+        COUNT(*),
+        COUNT(CASE WHEN realized_pnl > 0 THEN 1 END)
+    INTO v_total_trades, v_winning_trades
+    FROM position_history
+    WHERE portfolio_id = p_portfolio_id
+      AND action = 'CLOSE'
+      AND created_at >= CURRENT_DATE - INTERVAL '1 day' * p_days;
+
+    IF v_total_trades = 0 THEN
+        RETURN 0;
+    END IF;
+
+    RETURN ROUND(v_winning_trades::DECIMAL / v_total_trades * 100, 2);
+END;
+$$ LANGUAGE plpgsql;
+
+-- =====================================================
+-- PG_STAT_STATEMENTS VIEW (Sorgu performans analizi)
+-- =====================================================
+
+CREATE OR REPLACE VIEW v_slow_queries AS
+SELECT
+    query,
+    calls,
+    total_exec_time as total_time,
+    mean_exec_time as mean_time,
+    stddev_exec_time as stddev_time,
+    rows,
+    100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+FROM pg_stat_statements
+WHERE calls > 5
+ORDER BY mean_exec_time DESC
+LIMIT 50;
+
+-- =====================================================
+-- TABLO BOYUTLARI VIEW
+-- =====================================================
+
+CREATE OR REPLACE VIEW v_table_sizes AS
+SELECT
+    schemaname,
+    tablename,
+    pg_size_pretty(pg_total_relation_size(schemaname||'.'||tablename)) as total_size,
+    pg_size_pretty(pg_relation_size(schemaname||'.'||tablename)) as table_size,
+    pg_size_pretty(pg_indexes_size(schemaname||'.'||tablename)) as index_size,
+    n_live_tup as row_count,
+    n_dead_tup as dead_rows,
+    last_vacuum,
+    last_autovacuum,
+    last_analyze,
+    last_autoanalyze
+FROM pg_stat_user_tables
+ORDER BY pg_total_relation_size(schemaname||'.'||tablename) DESC;
+
+-- =====================================================
+-- INDEX KULLANIM VIEW
+-- =====================================================
+
+CREATE OR REPLACE VIEW v_index_usage AS
+SELECT
+    schemaname,
+    tablename,
+    indexname,
+    idx_scan as index_scans,
+    idx_tup_read as tuples_read,
+    idx_tup_fetch as tuples_fetched,
+    pg_size_pretty(pg_relation_size(indexrelid)) as index_size
+FROM pg_stat_user_indexes
+ORDER BY idx_scan DESC;
+
+-- =====================================================
+-- BAŞLANGIÇ VERİLERİ (Refresh fonksiyonu)
+-- =====================================================
+
+-- Materialized view'ları yenileme fonksiyonu
+CREATE OR REPLACE FUNCTION refresh_materialized_views()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_recent_performance;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_active_positions;
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mv_sector_allocation;
+END;
+$$ LANGUAGE plpgsql;
+
+-- pg_cron ile otomatik yenileme (eğer pg_cron kuruluysa)
+-- SELECT cron.schedule('refresh-mviews', '*/5 * * * *', 'SELECT refresh_materialized_views()');

@@ -293,6 +293,72 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
 _ALERTS_CACHE = None
 _ALERTS_CACHE_TIME = 0.0
 
+@router.get("/db-performance")
+async def get_db_performance(user=Depends(get_current_user), _=Depends(check_rate_limit)):
+    """Veritabanı Performans Metrikleri — Cache hit ratio, bağlantı istatistikleri, yavaş sorgular."""
+    result = {
+        "cache_hit_ratio": None,
+        "connections": None,
+        "slow_queries": [],
+        "table_sizes": [],
+        "index_usage": [],
+    }
+
+    try:
+        from ...core.database import pg_fetch, pg_fetchrow
+
+        # Cache hit ratio
+        ratio = await pg_fetchrow("""
+            SELECT ROUND(
+                100.0 * sum(blks_hit) / NULLIF(sum(blks_hit) + sum(blks_read), 0), 2
+            ) as cache_hit_pct
+            FROM pg_stat_database WHERE datname = current_database()
+        """)
+        result["cache_hit_ratio"] = float(ratio["cache_hit_pct"] or 0)
+
+        # Bağlantı istatistikleri
+        conn_stats = await pg_fetchrow("""
+            SELECT
+                (SELECT count(*) FROM pg_stat_activity) as total,
+                (SELECT count(*) FROM pg_stat_activity WHERE state = 'active') as active,
+                (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle') as idle,
+                (SELECT count(*) FROM pg_stat_activity WHERE state = 'idle in transaction') as idle_in_tx,
+                (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_conn
+        """)
+        result["connections"] = dict(conn_stats)
+
+        # Tablo boyutları
+        tables = await pg_fetch("""
+            SELECT tablename,
+                   pg_size_pretty(pg_total_relation_size('public.'||tablename)) as total_size,
+                   n_live_tup as row_count, n_dead_tup as dead_rows
+            FROM pg_stat_user_tables
+            ORDER BY pg_total_relation_size('public.'||tablename) DESC LIMIT 15
+        """)
+        result["table_sizes"] = [dict(t) for t in tables]
+
+        # Yavaş sorgular (pg_stat_statements)
+        try:
+            slow = await pg_fetch("""
+                SELECT query, calls,
+                       ROUND(mean_exec_time::numeric, 2) as mean_ms,
+                       ROUND(total_exec_time::numeric, 2) as total_ms, rows
+                FROM pg_stat_statements WHERE calls > 3
+                ORDER BY mean_exec_time DESC LIMIT 10
+            """)
+            result["slow_queries"] = [dict(q) for q in slow]
+        except Exception:
+            result["slow_queries"] = [{"note": "pg_stat_statements extension gerekli"}]
+
+    except Exception as e:
+        logger.debug("db_performance_query_failed", error=str(e))
+
+    return result
+
+
+_ALERTS_CACHE = None
+_ALERTS_CACHE_TIME = 0.0
+
 @router.get("/alerts")
 async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Alarm & Risk Bildirim Merkezi — Canlı piyasa, model sinyalleri, volatilite ve risk alarmları (Hızlı Önbellekli)."""
