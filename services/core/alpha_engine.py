@@ -55,9 +55,31 @@ class AlphaEngine:
         ]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
-    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None) -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
+    def _get_universe_tickers(self, universe: str) -> List[str]:
+        """Evren ticker listesini döndür."""
+        universe = (universe or "bist100").lower()
+        if universe == "bist30":
+            tickers = bist_universe.BIST_30_TICKERS
+        elif universe == "bist50":
+            tickers = bist_universe.BIST_50_TICKERS
+        elif universe == "bist100":
+            tickers = bist_universe.BIST_100_TICKERS
+        elif universe == "all":
+            tickers = bist_universe.BIST_ALL_TICKERS
+        else:
+            tickers = bist_universe.BIST_100_TICKERS
+        if not tickers:
+            tickers = bist_universe.BIST_ALL_TICKERS[:100]
+        return tickers
+
+    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None, universe: str = "bist100") -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
+        """Veri çek.
+
+        Args:
+            universe: "bist30", "bist50", "bist100", "all"
+        """
         if tickers is None:
-            tickers = bist_universe.BIST_100_TICKERS if hasattr(bist_universe, 'BIST_100_TICKERS') and bist_universe.BIST_100_TICKERS else bist_universe.BIST_ALL_TICKERS[:100]
+            tickers = self._get_universe_tickers(universe)
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
         
         market_data = {}
@@ -251,23 +273,81 @@ class AlphaEngine:
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
 
-    def run_daily_pipeline(self, date: str):
-        """Run daily production logic"""
+    def run_daily_pipeline(self, date: str, universe: str = "bist100"):
+        """Run daily production logic for a specific universe.
+
+        Args:
+            date: İşlem tarihi
+            universe: "bist30", "bist50", "bist100"
+        """
         end_date_dt = pd.Timestamp(date)
-        start_date_dt = end_date_dt - pd.Timedelta(days=400)  # Match exactly TRAIN_DAYS=252 from validation
-        
+        start_date_dt = end_date_dt - pd.Timedelta(days=400)
+
         market_data, bm_df, sector_map = self.fetch_data(
-            start_date_dt.strftime('%Y-%m-%d'), 
-            end_date_dt.strftime('%Y-%m-%d')
+            start_date_dt.strftime('%Y-%m-%d'),
+            end_date_dt.strftime('%Y-%m-%d'),
+            universe=universe,
         )
-        
+
         success = self.train(
-            market_data, bm_df, sector_map, 
-            start_date_dt.strftime('%Y-%m-%d'), 
+            market_data, bm_df, sector_map,
+            start_date_dt.strftime('%Y-%m-%d'),
             date
         )
         if not success:
             return None
-            
+
         top_picks = self.predict(market_data, bm_df, sector_map, date)
         return top_picks
+
+    def run_multi_index_pipeline(self, date: str, universes: List[str] = None) -> Dict[str, Any]:
+        """Tüm endeksler için günlük pipeline çalıştır.
+
+        BIST-30, BIST-50 ve BIST-100 için ayrı ayrı tahmin üretir.
+        Her endeks için en iyi hisseleri döndürür.
+
+        Args:
+            date: İşlem tarihi
+            universes: Çalıştırılacak endeksler. None ise ["bist30", "bist50", "bist100"]
+
+        Returns:
+            {"bist30": [...], "bist50": [...], "bist100": [...], "combined": [...]}
+        """
+        if universes is None:
+            universes = ["bist30", "bist50", "bist100"]
+
+        results = {}
+        all_predictions = []
+
+        for universe in universes:
+            logger.info(f"Running pipeline for {universe}", date=date)
+            try:
+                predictions = self.run_daily_pipeline(date, universe=universe)
+                if predictions:
+                    results[universe] = predictions
+                    for p in predictions[:5]:
+                        p["source_index"] = universe
+                        all_predictions.append(p)
+                    logger.info(f"{universe} completed", count=len(predictions))
+                else:
+                    results[universe] = []
+                    logger.warning(f"{universe} returned no predictions")
+            except Exception as e:
+                logger.error(f"{universe} pipeline failed", error=str(e))
+                results[universe] = []
+
+        all_predictions.sort(key=lambda x: x["score"], reverse=True)
+        results["combined"] = all_predictions
+        results["summary"] = {
+            "date": date,
+            "universes_processed": len(universes),
+            "total_predictions": len(all_predictions),
+            "per_index": {u: len(r) for u, r in results.items() if u not in ("combined", "summary")},
+        }
+
+        logger.info("Multi-index pipeline completed",
+                    date=date,
+                    total=len(all_predictions),
+                    per_index=results["summary"]["per_index"])
+
+        return results
