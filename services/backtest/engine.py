@@ -126,6 +126,137 @@ class BacktestEngine:
             return True, max_shares  # Kısmi execution
         return True, quantity
 
+    def _execute_pending_orders(self, pending_orders, positions, capital, trades, trade_id, day_prices, _cm, slippage_pct, dump_ledger, trades_writer):
+        """T+1 bekleyen emirleri execute et."""
+        for order in pending_orders:
+            ticker = order["ticker"]
+            action = order["action"]
+            signal_price = order["signal_price"]
+            signal_date = order["signal_date"]
+            weight = order["weight"]
+            regime_mult = order["market_regime"]
+
+            if ticker in day_prices:
+                exec_price = day_prices[ticker].get("open", day_prices[ticker].get("close", signal_price))
+                signal_volume = day_prices[ticker].get("volume", 0)
+            else:
+                exec_price = signal_price
+                signal_volume = 0
+
+            if exec_price <= 0:
+                continue
+
+            effective_slippage = self._compute_dynamic_slippage(exec_price, signal_volume if signal_volume > 0 else 100000, 100, slippage_pct)
+
+            if action == "BUY" and ticker not in positions:
+                fill_price = exec_price * (1 + effective_slippage / 100)
+                adjusted_weight = weight * regime_mult
+                position_value = (capital + sum(p["qty"] * day_prices.get(t, {}).get("open", p["avg_cost"]) for t, p in positions.items())) * adjusted_weight
+                shares = int(position_value / fill_price)
+                if signal_volume > 0:
+                    shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
+                if shares > 0:
+                    cost = shares * fill_price
+                    commission = _cm.calculate(cost)
+                    if capital >= (cost + commission):
+                        cash_before = capital
+                        capital -= (cost + commission)
+                        positions[ticker] = {"qty": shares, "avg_cost": fill_price, "entry_date": order["signal_date"], "peak_price": fill_price, "commission": commission}
+                        if dump_ledger:
+                            trades_writer.writerow([trade_id, ticker, 'BUY', signal_date, order["signal_date"], signal_price, fill_price, shares, cost, effective_slippage, commission, 0.0, cash_before, capital, capital + cost, capital + cost, '0', 'T+1_OPEN_SIGNAL', ''])
+
+            elif action == "SELL" and ticker in positions:
+                fill_price = exec_price * (1 - effective_slippage / 100)
+                pos = positions[ticker]
+                revenue = pos["qty"] * fill_price
+                commission = _cm.calculate(revenue)
+                capital += (revenue - commission)
+                pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
+                pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
+                trade_id += 1
+                try:
+                    _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
+                    _d2 = datetime.strptime(order["signal_date"], "%Y-%m-%d")
+                    _holding = max(1, (_d2 - _d1).days)
+                except Exception:
+                    _holding = 1
+                trades.append(BacktestTrade(trade_id=trade_id, ticker=ticker, side="BUY-SELL", entry_date=pos["entry_date"], exit_date=order["signal_date"], entry_price=pos["avg_cost"], exit_price=fill_price, quantity=pos["qty"], pnl=round(pnl, 2), pnl_pct=round(pnl_pct, 2), holding_days=_holding, commission=round(pos["commission"] + commission, 2)))
+                del positions[ticker]
+                if dump_ledger:
+                    trades_writer.writerow([trade_id, ticker, 'SELL', signal_date, order["signal_date"], signal_price, fill_price, pos["qty"], revenue, effective_slippage, commission, 0.0, capital - revenue, capital, capital, capital, '0', 'T+1_OPEN_SIGNAL', 'EXIT'])
+
+        return capital, trade_id
+
+    def _check_stops_and_sell(self, positions, capital, trades, trade_id, day_prices, _cm, stop_loss_pct, trailing_stop_pct, current_date, all_dates):
+        """Stop-loss ve trailing stop kontrolü, satışlar."""
+        total_market_value = 0.0
+        to_sell = []
+
+        for t, p in positions.items():
+            close_price = day_prices.get(t, {}).get("close", p["avg_cost"])
+            low_price = day_prices.get(t, {}).get("low", close_price)
+            high_price = day_prices.get(t, {}).get("high", close_price)
+            p["peak_price"] = max(p.get("peak_price", high_price), high_price)
+
+            is_stop_loss = low_price <= p["avg_cost"] * (1 - stop_loss_pct)
+            is_trailing_stop = low_price <= p["peak_price"] * (1 - trailing_stop_pct)
+
+            if is_stop_loss or is_trailing_stop:
+                stop_level = min(close_price, p["avg_cost"] * (1 - stop_loss_pct) if is_stop_loss else p["peak_price"] * (1 - trailing_stop_pct))
+                to_sell.append((t, stop_level))
+            else:
+                total_market_value += p["qty"] * close_price
+
+        for t, exit_price in to_sell:
+            p = positions[t]
+            qty = p["qty"]
+            gross = qty * exit_price
+            comm = _cm.calculate(gross)
+            capital += (gross - comm)
+            trades.append(BacktestTrade(trade_id=trade_id, ticker=t, side="STOP_SELL", entry_date=p["entry_date"], exit_date=current_date, entry_price=p["avg_cost"], exit_price=exit_price, quantity=qty, pnl=(gross - comm) - (qty * p["avg_cost"]), pnl_pct=(exit_price / p["avg_cost"]) - 1.0, holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]), commission=comm))
+            trade_id += 1
+            del positions[t]
+
+        return capital, trade_id, total_market_value
+
+    def _queue_day_signals(self, current_date, signals_by_date, day_prices, pending_orders, market_regime):
+        """Gün sonu sinyallerini T+1 kuyruğuna ekle."""
+        if current_date not in signals_by_date:
+            return
+        day_sigs = sorted(signals_by_date[current_date], key=lambda x: 0 if x.get("action") == "SELL" else 1)
+        for signal in day_sigs:
+            action = signal.get("action", "HOLD")
+            if action in ["BUY", "SELL"]:
+                pending_orders.append({
+                    "ticker": signal.get("ticker", ""),
+                    "action": action,
+                    "signal_price": signal.get("price", day_prices.get(signal.get("ticker", ""), {}).get("close", 0.0)),
+                    "signal_date": current_date,
+                    "weight": signal.get("weight", 0.10),
+                    "market_regime": market_regime,
+                })
+
+    def _end_of_day_accounting(self, positions, day_prices, capital, peak_equity, prev_equity, equity_curve, exposure_history, dump_ledger, daily_writer, current_date):
+        """Gün sonu muhasebeleştirme."""
+        total_market_value = 0.0
+        for t, p in positions.items():
+            current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
+            total_market_value += p["qty"] * current_price
+
+        end_of_day_equity = capital + total_market_value
+        if end_of_day_equity > peak_equity:
+            peak_equity = end_of_day_equity
+
+        drawdown = (peak_equity - end_of_day_equity) / peak_equity if peak_equity > 0 else 0.0
+        daily_return = (end_of_day_equity / prev_equity - 1.0) if prev_equity > 0 else 0.0
+
+        if dump_ledger:
+            daily_writer.writerow([current_date, capital, total_market_value, total_market_value, total_market_value, end_of_day_equity, daily_return, drawdown, '0'])
+
+        equity_curve.append(end_of_day_equity)
+        exposure_history.append(total_market_value / end_of_day_equity if end_of_day_equity > 0 else 0)
+        return capital, peak_equity, end_of_day_equity
+
     def run_backtest(
         self,
         strategy_name: str,
@@ -205,177 +336,30 @@ class BacktestEngine:
         peak_equity = initial_capital
         prev_equity = initial_capital
 
-        for current_date in all_dates:
-            day_prices = price_lookup.get(current_date, {})
-            
         pending_orders = []
 
         for current_date in all_dates:
             day_prices = price_lookup.get(current_date, {})
-            
-            # 1. T+1 Pending Orders Execution at Market OPEN
-            if pending_orders:
-                for order in pending_orders:
-                    ticker = order["ticker"]
-                    action = order["action"]
-                    signal_price = order["signal_price"]
-                    signal_date = order["signal_date"]
-                    weight = order["weight"]
-                    regime_mult = order["market_regime"]
 
-                    if ticker in day_prices:
-                        exec_price = day_prices[ticker].get("open", day_prices[ticker].get("close", signal_price))
-                        signal_volume = day_prices[ticker].get("volume", 0)
-                    else:
-                        exec_price = signal_price
-                        signal_volume = 0
+            capital, trade_id = self._execute_pending_orders(
+                pending_orders, positions, capital, trades, trade_id,
+                day_prices, _cm, slippage_pct, dump_ledger, trades_writer,
+            )
+            pending_orders = []
 
-                    if exec_price <= 0:
-                        continue
+            capital, trade_id, total_market_value = self._check_stops_and_sell(
+                positions, capital, trades, trade_id, day_prices, _cm,
+                stop_loss_pct, trailing_stop_pct, current_date, all_dates,
+            )
 
-                    effective_slippage = self._compute_dynamic_slippage(exec_price, signal_volume if signal_volume > 0 else 100000, 100, slippage_pct)
+            self._queue_day_signals(
+                current_date, signals_by_date, day_prices, pending_orders, market_regime,
+            )
 
-                    if action == "BUY" and ticker not in positions:
-                        fill_price = exec_price * (1 + effective_slippage / 100)
-                        adjusted_weight = weight * regime_mult
-                        position_value = (capital + sum([p["qty"] * day_prices.get(t, {}).get("open", p["avg_cost"]) for t, p in positions.items()])) * adjusted_weight
-                        shares = int(position_value / fill_price)
-                        if signal_volume > 0:
-                            shares = self._check_liquidity_constraint(fill_price, signal_volume, shares)[1]
-
-                        if shares > 0:
-                            cost = shares * fill_price
-                            commission = _cm.calculate(cost)
-                            if capital >= (cost + commission):
-                                cash_before = capital
-                                capital -= (cost + commission)
-                                positions[ticker] = {
-                                    "qty": shares,
-                                    "avg_cost": fill_price,
-                                    "entry_date": current_date,
-                                    "peak_price": fill_price,
-                                    "commission": commission,
-                                }
-                                if dump_ledger:
-                                    trades_writer.writerow([
-                                        trade_id, ticker, 'BUY', signal_date, current_date, signal_price, fill_price,
-                                        shares, cost, effective_slippage, commission, 0.0, cash_before, capital,
-                                        capital + cost, capital + cost, '0', 'T+1_OPEN_SIGNAL', ''
-                                    ])
-
-                    elif action == "SELL" and ticker in positions:
-                        fill_price = exec_price * (1 - effective_slippage / 100)
-                        pos = positions[ticker]
-                        revenue = pos["qty"] * fill_price
-                        commission = _cm.calculate(revenue)
-                        capital += (revenue - commission)
-
-                        pnl = (fill_price - pos["avg_cost"]) * pos["qty"] - pos["commission"] - commission
-                        pnl_pct = (fill_price / pos["avg_cost"] - 1) * 100
-                        trade_id += 1
-
-                        try:
-                            _d1 = datetime.strptime(pos["entry_date"], "%Y-%m-%d")
-                            _d2 = datetime.strptime(current_date, "%Y-%m-%d")
-                            _holding = max(1, (_d2 - _d1).days)
-                        except Exception:
-                            _holding = 1
-
-                        trades.append(BacktestTrade(
-                            trade_id=trade_id, ticker=ticker, side="BUY-SELL", entry_date=pos["entry_date"], exit_date=current_date,
-                            entry_price=pos["avg_cost"], exit_price=fill_price, quantity=pos["qty"], pnl=round(pnl, 2),
-                            pnl_pct=round(pnl_pct, 2), holding_days=_holding, commission=round(pos["commission"] + commission, 2),
-                        ))
-                        del positions[ticker]
-                        if dump_ledger:
-                            trades_writer.writerow([
-                                trade_id, ticker, 'SELL', signal_date, current_date, signal_price, fill_price,
-                                pos["qty"], revenue, effective_slippage, commission, 0.0, capital - revenue, capital,
-                                capital, capital, '0', 'T+1_OPEN_SIGNAL', 'EXIT'
-                            ])
-
-                pending_orders = []
-
-            # 2. Intraday Stop-Loss & Trailing Stop Checks (using intraday Low / High)
-            total_market_value = 0.0
-            to_sell_due_to_stop = []
-            
-            for t, p in positions.items():
-                close_price = day_prices.get(t, {}).get("close", p["avg_cost"])
-                low_price = day_prices.get(t, {}).get("low", close_price)
-                high_price = day_prices.get(t, {}).get("high", close_price)
-                
-                # Update peak price with intraday High
-                p["peak_price"] = max(p.get("peak_price", high_price), high_price)
-                
-                # Check stops using intraday Low
-                is_stop_loss = low_price <= p["avg_cost"] * (1 - stop_loss_pct)
-                is_trailing_stop = low_price <= p["peak_price"] * (1 - trailing_stop_pct)
-                
-                if is_stop_loss or is_trailing_stop:
-                    # Executed at stop price (or low if gap down)
-                    stop_level = min(close_price, p["avg_cost"] * (1 - stop_loss_pct) if is_stop_loss else p["peak_price"] * (1 - trailing_stop_pct))
-                    to_sell_due_to_stop.append((t, stop_level))
-                else:
-                    total_market_value += p["qty"] * close_price
-            
-            # Execute stop sells
-            for t, exit_price in to_sell_due_to_stop:
-                p = positions[t]
-                qty = p["qty"]
-                gross = qty * exit_price
-                comm = _cm.calculate(gross)
-                capital += (gross - comm)
-                
-                trades.append(BacktestTrade(
-                    trade_id=trade_id, ticker=t, side="STOP_SELL", entry_date=p["entry_date"],
-                    exit_date=current_date, entry_price=p["avg_cost"], exit_price=exit_price,
-                    quantity=qty, pnl=(gross - comm) - (qty * p["avg_cost"]),
-                    pnl_pct=(exit_price / p["avg_cost"]) - 1.0,
-                    holding_days=len([d for d in all_dates if p["entry_date"] <= d <= current_date]),
-                    commission=comm
-                ))
-                trade_id += 1
-                del positions[t]
-                
-            capital + total_market_value
-            
-            # 3. Process Signals generated at current day close -> Queue for T+1 Open Execution
-            if current_date in signals_by_date:
-                day_sigs = sorted(signals_by_date[current_date], key=lambda x: 0 if x.get("action") == "SELL" else 1)
-                for signal in day_sigs:
-                    action = signal.get("action", "HOLD")
-                    if action in ["BUY", "SELL"]:
-                        pending_orders.append({
-                            "ticker": signal.get("ticker", ""),
-                            "action": action,
-                            "signal_price": signal.get("price", day_prices.get(signal.get("ticker", ""), {}).get("close", 0.0)),
-                            "signal_date": current_date,
-                            "weight": signal.get("weight", 0.10),
-                            "market_regime": market_regime,
-                        })
-
-            # End of Day Accounting
-            total_market_value = 0.0
-            for t, p in positions.items():
-                current_price = day_prices.get(t, {}).get("close", p["avg_cost"])
-                total_market_value += p["qty"] * current_price
-            
-            end_of_day_equity = capital + total_market_value
-            if end_of_day_equity > peak_equity:
-                peak_equity = end_of_day_equity
-            
-            drawdown = (peak_equity - end_of_day_equity) / peak_equity if peak_equity > 0 else 0.0
-            daily_return = (end_of_day_equity / prev_equity - 1.0) if prev_equity > 0 else 0.0
-            
-            if dump_ledger:
-                daily_writer.writerow([
-                    current_date, capital, total_market_value, total_market_value, total_market_value, end_of_day_equity, daily_return, drawdown, '0'
-                ])
-            
-            equity_curve.append(end_of_day_equity)
-            exposure_history.append(total_market_value / end_of_day_equity if end_of_day_equity > 0 else 0)
-            prev_equity = end_of_day_equity
+            capital, peak_equity, prev_equity = self._end_of_day_accounting(
+                positions, day_prices, capital, peak_equity, prev_equity,
+                equity_curve, exposure_history, dump_ledger, daily_writer, current_date,
+            )
 
         if dump_ledger:
             trades_file.close()
