@@ -213,14 +213,14 @@ class BacktestScannerParity:
 
         # Feature parity
         for ticker in test_tickers[:5]:  # İlk 5 hisse
-            ticker_data = test_data.filter(pl.col('test_data') ticker ==) if "ticker" in test_data.columns else test_data
+            ticker_data = test_data.filter(pl.col('ticker') == ticker) if "ticker" in test_data.columns else test_data
             result = self.verify_feature_parity(ticker_data, ticker, test_timestamp)
             checks.append(result)
 
         # Signal parity
         if self._feature_engine and self._signal_engine:
             for ticker in test_tickers[:5]:
-                ticker_data = test_data.filter(pl.col('test_data') ticker ==) if "ticker" in test_data.columns else test_data
+                ticker_data = test_data.filter(pl.col('ticker') == ticker) if "ticker" in test_data.columns else test_data
                 features = self._feature_engine(ticker_data, ticker, test_timestamp)
                 result = self.verify_signal_parity(features, ticker)
                 checks.append(result)

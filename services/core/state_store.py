@@ -1,7 +1,7 @@
 """
 ALPHA BIST — Central State Store v1.0
 
-Tüm in-memory state'lerin SQLite tabanlı persistansı.
+Tüm in-memory state'lerin DuckDB tabanlı persistansı.
 Restart sonrası kaybolan tüm kritik state'ler burada saklanır.
 
 Kapsanan bileşenler:
@@ -50,7 +50,7 @@ logger = structlog.get_logger()
 
 
 class CentralStateStore:
-    """Merkezi state store — tüm in-memory state'ler için SQLite."""
+    """Merkezi state store — tüm in-memory state'ler için DuckDB."""
 
     def __init__(self, db_path: str = "data/central_state.db"):
         self._db_path = Path(db_path)

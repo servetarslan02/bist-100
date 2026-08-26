@@ -1,4 +1,5 @@
 import datetime
+import pandas as pd
 import polars as pl
 import numpy as np
 import lightgbm as lgb
@@ -77,8 +78,7 @@ class AlphaEngine:
                 for t in tickers:
                     tick_sym = f"{t}.IS"
                     try:
-                        if isinstance(raw.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+                        if isinstance(raw.columns, pd.MultiIndex):
                             if tick_sym in raw.columns.levels[0]:
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if not df_t.empty and len(df_t) >= 10:
@@ -95,8 +95,7 @@ class AlphaEngine:
         # Load benchmark
         try:
             bm_df = yf.download("XU100.IS", start=start_date, end=end_date, auto_adjust=True, progress=False)
-            if isinstance(bm_df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+            if isinstance(bm_df.columns, pd.MultiIndex):
                 bm_df = bm_df.xs("XU100.IS", level=0, axis=1) if "XU100.IS" in bm_df.columns.levels[0] else bm_df
             bm_df = _tz_naive(bm_df.dropna(how="all"))
         except Exception as e:

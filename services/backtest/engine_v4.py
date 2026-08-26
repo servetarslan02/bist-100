@@ -323,7 +323,7 @@ class BacktestEngineV4:
 
         # Ortak tarih aralığı
         all_dates = set()
-        for df in market_data.to_numpy()():
+        for df in market_data.values():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -341,7 +341,7 @@ class BacktestEngineV4:
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.filter(idx, 'Close'])
+                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
             if 'Close' in benchmark_data.columns:
                 benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
 
@@ -424,7 +424,7 @@ class BacktestEngineV4:
                 total_scans += 1
                 score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
-                    price = float(df.filter(next_date, 'Open'])
+                    price = float(df.loc[next_date, 'Open'])
                     sim.execute_sell(ticker, price, date_str)
                     signals_count += 1
 
@@ -484,7 +484,7 @@ class BacktestEngineV4:
                 df = market_data[ticker]
                 if next_date not in df.index:
                     continue
-                price = float(df.filter(next_date, 'Open'])
+                price = float(df.loc[next_date, 'Open'])
                 atr = 2.0
                 if 'day_features' in locals() and ticker in locals().get('day_features', {}):
                     atr = day_features[ticker].get('atr_pct', 2.0)
@@ -496,7 +496,7 @@ class BacktestEngineV4:
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = float(market_data[ticker].filter(current_date, 'Close'])
+                    prices[ticker] = float(market_data[ticker].loc[current_date, 'Close'])
             sim.update_equity(prices, date_str, bench_price)
 
         elapsed = _time.time() - start_time
@@ -556,7 +556,7 @@ class BacktestEngineV4:
 
         # Ortak tarih aralığı (legacy ile aynı)
         all_dates = set()
-        for df in market_data.to_numpy()():
+        for df in market_data.values():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -574,7 +574,7 @@ class BacktestEngineV4:
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.filter(idx, 'Close'])
+                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
             if 'Close' in benchmark_data.columns:
                 benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
 

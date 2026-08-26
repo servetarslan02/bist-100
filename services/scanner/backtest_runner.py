@@ -396,7 +396,7 @@ class ScannerBacktestRunner:
 
         # Ortak tarih aralığı
         all_dates = set()
-        for df in market_data.to_numpy()():
+        for df in market_data.values():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -492,21 +492,21 @@ class ScannerBacktestRunner:
             # Satışlar önce
             for sig in sells:
                 if sig.ticker in market_data and next_date in market_data[sig.ticker].index:
-                    price = market_data[sig.ticker].filter(next_date, 'Open']
+                    price = market_data[sig.ticker].loc[next_date, 'Open']
                     sim.execute_sell(sig.ticker, price, date_str)
 
             # Alımlar
             for sig in buys:
                 if sig.ticker not in sim._positions and sig.ticker in market_data:
                     if next_date in market_data[sig.ticker].index:
-                        price = market_data[sig.ticker].filter(next_date, 'Open']
+                        price = market_data[sig.ticker].loc[next_date, 'Open']
                         sim.execute_buy(sig.ticker, price, date_str)
 
             # Equity güncelle
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = market_data[ticker].filter(current_date, 'Close']
+                    prices[ticker] = market_data[ticker].loc[current_date, 'Close']
             sim.update_equity(prices, date_str)
 
         elapsed = _time.time() - start_time

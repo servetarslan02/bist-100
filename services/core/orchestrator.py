@@ -156,11 +156,11 @@ class MasterOrchestrator:
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
             from services.agents.agent_pipeline import AgentPipelineOrchestrator
-            self._services = self._services.with_columns(pl.lit(AgentPipelineOrchestrator().alias('agent_pipeline'))
+            self._services = self._services.with_columns(pl.lit(AgentPipelineOrchestrator(
                 enable_debate=True,
                 enable_memory=True,
                 enable_self_eval=True,
-            )
+            )).alias('agent_pipeline'))
             logger.info("Agent pipeline loaded")
         except Exception as e:
             logger.warning("Agent pipeline not available", error=str(e))
@@ -274,7 +274,7 @@ class MasterOrchestrator:
                     "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
                 })
                 ohlcv_df = ohlcv_df.dropna(subset=["Close"])
-                ohlcv_df = ohlcv_df.filter(pl.col('ohlcv_df') Close >)
+                ohlcv_df = ohlcv_df.filter(pl.col('Close') > 0)
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))
@@ -652,7 +652,7 @@ class MasterOrchestrator:
             if not decision.get("llm_narrative"):
                 try:
                     from services.intelligence.llm_agent import llm_agent
-                    decision = decision.with_columns(pl.lit(llm_agent.generate_decision_narrative().alias('llm_narrative'))
+                    decision["llm_narrative"] = llm_agent.generate_decision_narrative(
                         ticker=ticker,
                         decision=decision,
                         features=features,
@@ -1008,7 +1008,7 @@ class MasterOrchestrator:
                 errors.append(f"{ticker}: {e}")
 
         total = len(market_data)
-        failed = sum(1 for r in per_ticker_results.to_numpy()() if r["error"] is not None)
+        failed = sum(1 for r in per_ticker_results.values() if r["error"] is not None)
         # Sağlık durumu gerçek başarısızlık oranına dayanır — uydurulmuş
         # bir "her zaman HEALTHY" değeri değildir.
         if total == 0 or failed == total:

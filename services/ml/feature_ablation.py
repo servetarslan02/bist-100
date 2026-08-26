@@ -25,7 +25,7 @@ class FeatureAblator:
         
         for fold in target_folds:
             # AlphaEngine'e sadece aktif feature'lari kullanmasi icin kanca atiyoruz
-            self.engine.params = self.engine.params.with_columns(pl.lit(1.0 # Ablasyonda fraction kullanilmaz).alias('feature_fraction'))
+            self.engine.params = self.engine.params.with_columns(pl.lit(1.0).alias('feature_fraction'))  # Ablasyonda fraction kullanilmaz
             
             success = self.engine.train(
                 market_data, bm_df, sector_map,

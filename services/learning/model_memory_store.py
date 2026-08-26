@@ -1,7 +1,7 @@
 """ALPHA BIST — Persistent Model Memory Store v2.0
 
 Kalıcı model hafızası:
-- SQLite tabanlı atomik ve WAL modunda veri saklama
+- DuckDB tabanlı atomik ve WAL modunda veri saklama
 - Prediction -> Outcome eşleşme tablosu
 - Model versiyonları ve anlık metrik snapshots
 - Sinyal ağırlık geçmişi (Weight history audit trail)

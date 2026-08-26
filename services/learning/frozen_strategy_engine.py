@@ -113,7 +113,7 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     completed_wins = {m: 0 for m in MODELS}
     completed_totals = {m: 0 for m in MODELS}
 
-    start_xu100 = float(xu100_close.filter(eval_dates[0]]) if eval_dates[0] in xu100_close.index else float(xu100_close[0])
+    start_xu100 = float(xu100_close[eval_dates[0]]) if eval_dates[0] in xu100_close.index else float(xu100_close.iloc[0])
     equity_xu100 = []
     daily_rets_xu100 = []
     equity_ew = []
@@ -137,13 +137,13 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
         # 1. RETRAINING (Genişleyen pencere, 5 gün embargo)
         if step_i % FROZEN_PARAMS["retraining_freq"] == 0:
             current_fold += 1
-            train_rows = [fdf.filter(:current_date - timedelta(days=7)] for fdf in features_by_ticker.to_numpy()()]
+            train_rows = [fdf.filter(pl.col("timestamp") <= current_date - timedelta(days=7)) for fdf in features_by_ticker.values() if fdf.height > 0]
             comb_train = pl.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(comb_train)
 
         # 2. REJIM TESPİTİ (V2: V-Dip Override Dahil)
         current_regime = detect_market_regime_v2(xu100_close, current_date)
-        hist_xu = xu100_close.filter(:current_date]
+        hist_xu = xu100_close.filter(xu100_close.index <= current_date)
         ret_5d_xu = (hist_xu[-1] / hist_xu[-5] - 1.0) * 100.0 if len(hist_xu) >= 5 else 0.0
         is_v_dip = (current_regime == "BULL_TREND" and ret_5d_xu > 3.5)
         regime_tag = "V_DIP_RECOVERY" if is_v_dip else current_regime
@@ -162,11 +162,11 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
             else:
                 trust = 0.50
             weights[m] = max(0.05, min(0.35, trust))
-        norm_w = {m: w / sum(weights.to_numpy()()) for m, w in weights.items()}
+        norm_w = {m: w / sum(weights.values()) for m, w in weights.items()}
 
         # 4. SİNYAL FUSION
         day_tickers = list(features_by_ticker.keys())
-        day_rows = [features_by_ticker[tk].filter(current_date] for tk in day_tickers]
+        day_rows = [features_by_ticker[tk].filter(pl.col("timestamp") == current_date).row(0, named=True) if features_by_ticker[tk].filter(pl.col("timestamp") == current_date).height > 0 else {} for tk in day_tickers]
         batch_sigs = trainer.predict_batch_day(day_tickers, day_rows)
 
         cand = []
@@ -196,10 +196,10 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
         # 5. POZİSYON ÇIKIŞLARI (ATR Trailing + Hard Stop + Min Hold)
         closed_tickers = []
         for tk, pos in list(positions.items()):
-            cur_p = float(features_by_ticker[tk].filter(current_date]["close"])
+            cur_p = float(features_by_ticker[tk].filter(pl.col("timestamp") == current_date)["close"][0])
             pnl_pct = (cur_p / pos["entry_price"] - 1.0) * 100.0
             pos["days_held"] += 1
-            pos = pos.with_columns(pl.lit(max(pos.get("highest_price", pos["entry_price"]), cur_p)).alias('highest_price'))
+            pos["highest_price"] = max(pos.get("highest_price", pos["entry_price"]), cur_p)
 
             atr_buffer = max(
                 FROZEN_PARAMS["min_atr_pct"],
@@ -252,7 +252,7 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
         if slots > 0 and len(top_cand) > 0 and portfolio_cash > FROZEN_PARAMS["min_cash_to_open"]:
             tot_val = portfolio_cash + sum(
-                p["shares"] * float(features_by_ticker[t].filter(current_date]["close"])
+                p["shares"] * float(features_by_ticker[t].filter(pl.col("timestamp") == current_date)["close"][0])
                 for t, p in positions.items()
             )
             for rank_idx, c in enumerate(top_cand[:slots]):
@@ -280,24 +280,25 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
 
         # 7. GÜNLÜK EQUITY
         cur_eq = portfolio_cash + sum(
-            p["shares"] * float(features_by_ticker[t].filter(current_date]["close"])
+            p["shares"] * float(features_by_ticker[t].filter(pl.col("timestamp") == current_date)["close"][0])
             for t, p in positions.items()
         )
         equity_curve.append(cur_eq)
 
         invested = sum(
-            p["shares"] * float(features_by_ticker[t].filter(current_date]["close"])
+            p["shares"] * float(features_by_ticker[t].filter(pl.col("timestamp") == current_date)["close"][0])
             for t, p in positions.items()
         )
         daily_exposures.append((invested / cur_eq * 100.0) if cur_eq > 0 else 0.0)
 
-        cur_xu = float(xu100_close.filter(current_date]) if current_date in xu100_close.index else start_xu100
+        cur_xu = float(xu100_close[current_date]) if current_date in xu100_close.index else start_xu100
         eq_xu = initial_capital * (cur_xu / start_xu100)
         equity_xu100.append(eq_xu)
 
         eq_ew = initial_capital * np.mean([
-            float(fdf.filter(current_date]["close"]) / float(fdf.filter(eval_dates[0]]["close"])
-            for fdf in features_by_ticker.to_numpy()()
+            float(fdf.filter(pl.col("timestamp") == current_date)["close"][0]) / float(fdf.filter(pl.col("timestamp") == eval_dates[0])["close"][0])
+            for fdf in features_by_ticker.values()
+            if fdf.filter(pl.col("timestamp") == current_date).height > 0 and fdf.filter(pl.col("timestamp") == eval_dates[0]).height > 0
         ])
         equity_ew.append(eq_ew)
 
@@ -440,7 +441,7 @@ if __name__ == "__main__":
         if len(fdf) >= 120:
             features_by_ticker[tk] = fdf
 
-    common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.to_numpy()()])))
+    common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     val_dates = common_dates[120:280]
 
     trainer = ModelTrainer(feature_cols)

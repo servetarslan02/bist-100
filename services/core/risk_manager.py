@@ -75,7 +75,7 @@ class RiskManager:
             raise ValueError(f"Unknown weight method: {method}")
             
         # Normalize weights to sum to 1.0 if they were capped
-        total_w = sum(weights.to_numpy()())
+        total_w = sum(weights.values())
         if total_w > 0:
             for t in weights:
                 weights[t] = weights[t] / total_w

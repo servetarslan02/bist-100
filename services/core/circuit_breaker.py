@@ -109,7 +109,7 @@ class CircuitBreaker:
         }
 
     def _persist_state(self):
-        """Durumu SQLite'a kaydet (SSD dostu — buffered)."""
+        """Durumu DuckDB'ye kaydet (SSD dostu — buffered)."""
         try:
             from .state_store import state_store
             state_store.save_circuit_state(
@@ -123,7 +123,7 @@ class CircuitBreaker:
             logger.warning("Caught Exception in _persist_state", exc_info=True)
 
     def restore_state(self):
-        """Durumu SQLite'dan geri yükle."""
+        """Durumu DuckDB'den geri yükle."""
         try:
             from .state_store import state_store
             saved = state_store.load_circuit_state(self.name)

@@ -22,6 +22,7 @@ FEATURE GRUPLARI:
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import polars as pl
 from typing import Dict, List, Optional
 import structlog
@@ -72,8 +73,7 @@ class FeatureEngine:
         if df is None or df.empty:
             return df
         df = df.copy()
-        if isinstance(df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+        if isinstance(df.columns, pd.MultiIndex):
             df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
         idx = pl.Series(df.index)
         if getattr(idx, 'tz', None) is not None:
@@ -198,9 +198,9 @@ class FeatureEngine:
         # Kısa dönem mean reversion potansiyeli
         if n > 20:
             std = close.pct_change().rolling(20).std()[-1]
-            f = f.with_columns(pl.lit(_safe_float().alias('zscore_vs_sma20'))
+            f = f.with_columns(pl.lit(_safe_float(
                 (close[-1] - close.rolling(20).mean()[-1]) / (std * close.rolling(20).mean()[-1] + 1e-9)
-            )
+            )).alias('zscore_vs_sma20'))
 
         return f
 
@@ -277,7 +277,7 @@ class FeatureEngine:
             if sma20 > sma50:  alignment += 1
             if sma50 > sma200: alignment += 1
             if close[-1] > sma20: alignment += 1
-            f = f.with_columns(pl.lit(float(alignment)  # 0-3).alias('sma_alignment'))
+            f = f.with_columns(pl.lit(float(alignment)).alias('sma_alignment'))  # 0-3
 
         # Higher highs / Higher lows (trend integrity)
         if n >= 20:
@@ -330,10 +330,10 @@ class FeatureEngine:
             price_change = close.pct_change(5)[-1]
             vol_change   = volume.rolling(5).mean().pct_change(5)[-1]
             if not np.isnan(price_change) and not np.isnan(vol_change):
-                f = f.with_columns(pl.lit(float().alias('price_vol_divergence'))
+                f = f.with_columns(pl.lit(float(
                     1 if (price_change > 0 and vol_change < -0.2) else
                     (-1 if (price_change < 0 and vol_change > 0.2) else 0)
-                )
+                )).alias('price_vol_divergence'))
 
         # On-Balance Volume direction
         if n >= 20:
@@ -385,7 +385,7 @@ class FeatureEngine:
         universe_returns: Dict[str, float],
     ) -> Dict:
         f = {}
-        all_rets = list(universe_returns.to_numpy()())
+        all_rets = list(universe_returns.values())
         if len(all_rets) < 5:
             return f
 
@@ -419,15 +419,15 @@ class FeatureEngine:
             ret_6m  = float(close.pct_change(120)[-1])
             ret_1m  = float(close.pct_change(20)[-1])
             # 6 aylık güçlü + son ay zayıf = orta dönem momentum devam edebilir
-            f = f.with_columns(pl.lit(float().alias('momentum_reversal_risk'))
+            f = f.with_columns(pl.lit(float(
                 1 if (ret_6m > 0.15 and ret_1m < -0.05) else
                 (-1 if (ret_6m < -0.15 and ret_1m > 0.05) else 0)
-            )
+            )).alias('momentum_reversal_risk'))
 
         # Liquidity score (yüksek hacim = işlem yapılabilirlik)
         if not volume.empty and n >= 20:
             avg_vol = volume.rolling(20).mean()[-1]
-            f = f.with_columns(pl.lit(float(min(1.0, np.log1p(avg_vol) / 15))  # normalize log scale).alias('liquidity_score'))
+            f = f.with_columns(pl.lit(float(min(1.0, np.log1p(avg_vol) / 15))).alias('liquidity_score'))  # normalize log scale
 
         return f
 
@@ -519,6 +519,6 @@ def compute_universe_features(
     logger.info(
         "Universe features computed",
         tickers=len(result),
-        avg_features=np.mean([len(v) for v in result.to_numpy()()]) if result else 0,
+        avg_features=np.mean([len(v) for v in result.values()]) if result else 0,
     )
     return result

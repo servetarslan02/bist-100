@@ -22,6 +22,7 @@ Bu motor:
 """
 
 import numpy as np
+import pandas as pd
 import polars as pl
 import yfinance as yf
 from datetime import timedelta
@@ -50,8 +51,7 @@ def load_all_market_data() -> Tuple[Dict[str, pl.DataFrame], pl.Series]:
     for ticker in BIST_TICKERS:
         try:
             df = yf.download(ticker, period="2y", progress=False, interval="1d")
-            if isinstance(df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+            if isinstance(df.columns, pd.MultiIndex):
                 df.columns = df.columns.get_level_values(0)
             if len(df) >= 150:
                 clean_tk = ticker.replace(".IS", "")
@@ -61,8 +61,7 @@ def load_all_market_data() -> Tuple[Dict[str, pl.DataFrame], pl.Series]:
 
     # XU100 Benchmark
     xu100_df = yf.download("XU100.IS", period="2y", progress=False, interval="1d")
-    if isinstance(xu100_df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+    if isinstance(xu100_df.columns, pd.MultiIndex):
         xu100_df.columns = xu100_df.columns.get_level_values(0)
     xu100_close = xu100_df["Close"].dropna()
 
@@ -114,7 +113,7 @@ def extract_point_in_time_features(df: pl.DataFrame) -> pl.DataFrame:
 
 def detect_market_regime(xu100_series: pl.Series, current_date: pl.Series) -> str:
     """T anına kadar olan XU100 verisiyle piyasa rejimini tespit eder."""
-    hist = xu100_series.filter(:current_date]
+    hist = xu100_series.filter(xu100_series <= current_date)
     if len(hist) < 20:
         return "SIDEWAYS_RANGE"
     
@@ -256,7 +255,7 @@ def run_institutional_walkforward_backtest():
         if len(fdf) >= 120:
             features_by_ticker[tk] = fdf
 
-    common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.to_numpy()()])))
+    common_dates = sorted(list(set.intersection(*[set(fdf.index) for fdf in features_by_ticker.values()])))
     warmup_days = 120
     eval_dates = common_dates[warmup_days:-5]  # Son 5 gün kapanmamış trade'ler hariç
 
@@ -282,7 +281,7 @@ def run_institutional_walkforward_backtest():
     gross_losses = 0.0
     daily_returns_strategy = []
 
-    start_xu100 = xu100_close.filter(eval_dates[0]] if eval_dates[0] in xu100_close.index else xu100_close[0]
+    start_xu100 = xu100_close[eval_dates[0]] if eval_dates[0] in xu100_close.index else xu100_close.iloc[0]
     
     trainer = ModelTrainer(feature_cols)
     retrain_freq = 20  # Her 20 işlem gününde bir (yaklaşık ayda bir) gerçek retraining
@@ -328,7 +327,7 @@ def run_institutional_walkforward_backtest():
             current_fold += 1
             train_rows = []
             for tk, fdf in features_by_ticker.items():
-                hist_df = fdf.filter(:current_date - timedelta(days=7)]
+                hist_df = fdf.filter(pl.col("timestamp") <= current_date - timedelta(days=7))
                 train_rows.append(hist_df)
             combined_train = pl.concat(train_rows, axis=0).dropna(subset=["target_5d_ret"])
             trainer.retrain_fold(combined_train)
@@ -350,12 +349,12 @@ def run_institutional_walkforward_backtest():
             weights[m] = max(0.05, min(0.35, trust_score))
 
         # Normalize weights
-        total_w = sum(weights.to_numpy()())
+        total_w = sum(weights.values())
         norm_weights = {m: w / total_w for m, w in weights.items()}
 
         # 4. TÜM HİSSELER İÇİN SİNYAL FUSION & SKORLAMA (Batch)
         day_tickers = list(features_by_ticker.keys())
-        day_rows = [features_by_ticker[tk].filter(current_date] for tk in day_tickers]
+        day_rows = [features_by_ticker[tk].filter(pl.col("timestamp") == current_date).row(0, named=True) if features_by_ticker[tk].filter(pl.col("timestamp") == current_date).height > 0 else {} for tk in day_tickers]
         batch_signals = trainer.predict_batch_day(day_tickers, day_rows)
 
         candidate_scores = []
@@ -387,7 +386,7 @@ def run_institutional_walkforward_backtest():
         # 5. MEVCUT POZİSYONLARIN GÜNCELLENMESİ, STOP-LOSS / TAKE-PROFIT / TIME-EXIT KONTROLÜ
         closed_tickers = []
         for tk, pos in list(positions.items()):
-            cur_price = float(features_by_ticker[tk].filter(current_date]["close"])
+            cur_price = float(features_by_ticker[tk].filter(pl.col("timestamp") == current_date)["close"][0])
             entry_p = pos["entry_price"]
             pnl_pct = (cur_price / entry_p - 1.0) * 100.0
             pos["days_held"] += 1
@@ -433,7 +432,7 @@ def run_institutional_walkforward_backtest():
         max_positions = 5
         open_slots = max_positions - len(positions)
         if open_slots > 0 and len(top_candidates) > 0 and portfolio_cash > 200_000:
-            target_alloc_per_slot = min(portfolio_cash / open_slots, (portfolio_cash + sum(p["shares"] * features_by_ticker[t].filter(current_date]["close"] for t, p in positions.items())) * 0.20)
+            target_alloc_per_slot = min(portfolio_cash / open_slots, (portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].filter(pl.col("timestamp") == current_date)["close"][0]) for t, p in positions.items())) * 0.20)
             for cand in top_candidates[:open_slots]:
                 cur_p = cand["close_price"]
                 alloc = target_alloc_per_slot * (1.0 - TOTAL_FRICTION)
@@ -453,16 +452,16 @@ def run_institutional_walkforward_backtest():
                     }
 
         # 7. GÜNLÜK PORTFÖY DEĞERİ VE BENCHMARK HESAPLAMA
-        current_equity = portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].filter(current_date]["close"]) for t, p in positions.items())
+        current_equity = portfolio_cash + sum(p["shares"] * float(features_by_ticker[t].filter(pl.col("timestamp") == current_date)["close"][0]) for t, p in positions.items())
         portfolio_equity_curve.append({"date": date_str, "equity": current_equity})
 
         # Benchmark Değerleri
-        cur_xu100 = float(xu100_close.filter(current_date]) if current_date in xu100_close.index else start_xu100
+        cur_xu100 = float(xu100_close[current_date]) if current_date in xu100_close.index else start_xu100
         xu100_equity = INITIAL_CAPITAL * (cur_xu100 / start_xu100)
         benchmark_equity_curve.append({"date": date_str, "equity": xu100_equity})
 
         # Equal-Weight 20 hisse
-        ew_eq = INITIAL_CAPITAL * np.mean([float(fdf.filter(current_date]["close"]) / float(fdf.filter(eval_dates[0]]["close"]) for fdf in features_by_ticker.to_numpy()()])
+        ew_eq = INITIAL_CAPITAL * np.mean([float(fdf.filter(pl.col("timestamp") == current_date)["close"][0]) / float(fdf.filter(pl.col("timestamp") == eval_dates[0])["close"][0]) for fdf in features_by_ticker.values() if fdf.filter(pl.col("timestamp") == current_date).height > 0 and fdf.filter(pl.col("timestamp") == eval_dates[0]).height > 0])
         equal_weight_equity_curve.append({"date": date_str, "equity": ew_eq})
 
         # Günlük Getiriler

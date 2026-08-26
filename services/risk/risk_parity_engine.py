@@ -357,10 +357,10 @@ class RiskParityEngine:
 
         df_t = pl.DataFrame(trade_logs)
         t_cnt = len(df_t)
-        w_cnt = len(df_t.filter(pl.col('df_t') pnl >)) if t_cnt > 0 else 0
+        w_cnt = len(df_t.filter(pl.col('pnl') > 0)) if t_cnt > 0 else 0
         w_rate = (w_cnt / t_cnt * 100.0) if t_cnt > 0 else 0.0
-        w_sum = df_t.filter(pl.col('df_t') pnl >)["pnl"].sum() if t_cnt > 0 else 0.0
-        l_sum = abs(df_t.filter(pl.col('df_t') pnl <)["pnl"].sum()) if t_cnt > 0 else 1e-9
+        w_sum = df_t.filter(pl.col('pnl') > 0)["pnl"].sum() if t_cnt > 0 else 0.0
+        l_sum = abs(df_t.filter(pl.col('pnl') < 0)["pnl"].sum()) if t_cnt > 0 else 1e-9
         pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
 
         returns = df_eq.pct_change().dropna()

@@ -1,7 +1,7 @@
 """ALPHA BIST — Dead Letter Queue (Başarısız Event'ler İçin Kalıcı Kuyruk)
 
 v2.0: Artık PersistentDeadLetterQueue kullanılıyor — restart sonrası kaybolmaz.
-In-memory DLQ yerine SQLite tabanlı persistent DLQ.
+In-memory DLQ yerine DuckDB tabanlı persistent DLQ.
 """
 
 import structlog

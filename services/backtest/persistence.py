@@ -1,7 +1,7 @@
 """
 ALPHA BIST — Backtest Persistence Layer v1.0
 
-SQLite-based persistence for backtest results:
+DuckDB-based persistence for backtest results:
 - Run metadata
 - Trades
 - Equity curve
@@ -22,7 +22,7 @@ DB_PATH = "data/backtest_results.db"
 
 
 class BacktestPersistence:
-    """Backtest sonuçlarını SQLite'a persist eder."""
+    """Backtest sonuçlarını DuckDB'ye persist eder."""
 
     def __init__(self, db_path: str = DB_PATH):
         self._db_path = db_path

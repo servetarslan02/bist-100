@@ -1,7 +1,7 @@
 """
 ALPHA BIST — Persistent Historical Repository
 
-SQLite tabanlı historical veri deposu.
+DuckDB tabanlı historical veri deposu.
 
 Mevcut proje altyapısındaki persistence yapısını kullanır.
 Incremental ingestion, deduplication, PIT-safe sorgulama destekler.

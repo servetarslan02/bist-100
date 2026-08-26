@@ -1,11 +1,11 @@
 """
 ALPHA BIST — Persistent Dead Letter Queue v1.0
 
-SQLite tabanlı DLQ — restart sonrası kaybolmaz.
+DuckDB tabanlı DLQ — restart sonrası kaybolmaz.
 In-memory DLQ'nun dayanıklı versiyonu.
 
 Özellikler:
-- SQLite WAL mode (crash-safe)
+- DuckDB WAL mode (crash-safe)
 - Atomic write
 - Retry with exponential backoff
 - Max retry limiti

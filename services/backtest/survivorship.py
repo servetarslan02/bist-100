@@ -165,7 +165,7 @@ class SurvivorshipBiasHandler:
             if mask.any():
                 if delist.reason == "bankruptcy" and delist.recovery_rate is not None:
                     # İflas durumunda son fiyat × recovery_rate
-                    corrected.filter(mask, return_col] = -1 + delist.recovery_rate
+                    corrected.loc[mask, return_col] = -1 + delist.recovery_rate
                     logger.info("Applied bankruptcy correction",
                                ticker=delist.ticker,
                                recovery=delist.recovery_rate)

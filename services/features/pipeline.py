@@ -133,15 +133,15 @@ class FeaturePipeline:
 
             # Seans fazı features
             phase = bist_session_fsm.get_phase(ticker=ticker)
-            bist = bist.with_columns(pl.lit(1.0 if phase in {).alias('is_opening_auction'))
+            bist = bist.with_columns(pl.lit(1.0 if phase in {
                 BISTMarketPhase.OPENING_AUCTION_COLLECTION,
                 BISTMarketPhase.OPENING_AUCTION_DETERMINATION
-            } else 0.0
-            bist = bist.with_columns(pl.lit(1.0 if phase in {).alias('is_closing_auction'))
+            } else 0.0).alias('is_opening_auction'))
+            bist = bist.with_columns(pl.lit(1.0 if phase in {
                 BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
                 BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
                 BISTMarketPhase.CLOSING_PRICE_TRADING
-            } else 0.0
+            } else 0.0).alias('is_closing_auction'))
             bist = bist.with_columns(pl.lit(1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0).alias('is_continuous_auction'))
 
             # Devre kesici features
@@ -152,7 +152,7 @@ class FeaturePipeline:
 
             # EBDKS'ye mesafe
             bist100_change = cb_status.get("bist100_change_pct", 0)
-            bist = bist.with_columns(pl.lit(float(bist100_change + 6.0)  # %6 eşiğine mesafe).alias('bist100_distance_to_ebdks'))
+            bist = bist.with_columns(pl.lit(float(bist100_change + 6.0)).alias('bist100_distance_to_ebdks'))  # %6 eşiğine mesafe
 
             # Uptick rule
             bist = bist.with_columns(pl.lit(1.0 if short_selling_monitor._uptick_rule_active else 0.0).alias('uptick_rule_active'))

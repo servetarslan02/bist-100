@@ -128,7 +128,7 @@ class WalkForwardBacktestRunner:
         """
         # Global tarih listesi (engine ile aynı semantik, date-string)
         all_dates = set()
-        for df in market_data.to_numpy()():
+        for df in market_data.values():
             if df is not None and not df.empty:
                 for ts in df.index:
                     all_dates.add(str(ts.date()) if hasattr(ts, "date") else str(ts))
@@ -260,7 +260,7 @@ class WalkForwardBacktestRunner:
         ts_end = pl.Series(train_end)
         for ticker, df in pit_data.items():
             mask = (df.index >= ts_start) & (df.index <= ts_end)
-            df_train = df.filter(mask]
+            df_train = df[mask]
             if len(df_train) >= self.MIN_BARS_FOR_FEATURES:
                 train_data[ticker] = df_train
 
@@ -354,7 +354,7 @@ class WalkForwardBacktestRunner:
                 features_map, date_groups, base_features
             )
             # CS feature isimlerini topla
-            sample_feats = list(features_map.to_numpy()())[0] if features_map else {}
+            sample_feats = list(features_map.values())[0] if features_map else {}
             cs_feature_names = sorted([k for k in sample_feats.keys() if k.endswith('_cs_zscore')])
             # Feature listesini güncelle (orijinal + CS)
             all_feature_names = feature_names + cs_feature_names
@@ -381,7 +381,7 @@ class WalkForwardBacktestRunner:
             effective_purge = max(self.FORWARD_DAYS, horizon)
 
             # Bu horizon için yeterli tarih var mı?
-            unique_dates_sorted = sorted(set(date_groups.to_numpy()()))
+            unique_dates_sorted = sorted(set(date_groups.values()))
             n_dates = len(unique_dates_sorted)
             val_date_count = max(2, int(n_dates * 0.2))
             train_date_end_idx = n_dates - val_date_count - effective_purge

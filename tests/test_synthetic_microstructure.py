@@ -218,7 +218,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertTrue(any("INSUFFICIENT_HISTORICAL_BARS" in a.get("reason", "") for a in audit_log))
 
         # 2. DataFrame'de tarih bulunamadığında asla iloc[-1] (geleceğe bakış) kullanılmaz -> Kesin NO_TRADE
-        dates = pl.date_range(date(2024, 01, 10), date(2024, 01, 10) + timedelta(days=10), timedelta(days=1), eager=True).head(5)
+        dates = pl.date_range(date(2024, 1, 10), date(2024, 1, 10) + timedelta(days=10), timedelta(days=1), eager=True).head(5)
         df = pl.DataFrame({
             'Open': [100]*5, 'High': [102]*5, 'Low': [98]*5, 'Close': [101]*5, 'Volume': [1000000]*5
         })

@@ -108,7 +108,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
                     tick = p["ticker"]
                     if tick in market_data:
                         df = market_data[tick]
-                        df_past = df.filter(df.index <= signal_date]
+                        df_past = df[df.index <= signal_date]
                         if len(df_past) >= 10:
                             avg_vol = df_past['Volume'].tail(20).mean() if len(df_past) >= 20 else df_past['Volume'].mean()
                             avg_close = df_past['Close'].tail(20).mean() if len(df_past) >= 20 else df_past['Close'].mean()

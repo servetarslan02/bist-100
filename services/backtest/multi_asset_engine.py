@@ -278,8 +278,8 @@ class MultiAssetBacktestEngine:
 
         for date in dates:
             # Current day data
-            day_market = market_data.filter(pl.col('market_data') date ==)
-            day_signals = signal_data.filter(pl.col('signal_data') date ==) if signal_data is not None else pl.DataFrame()
+            day_market = market_data.filter(pl.col('date') == target_date)
+            day_signals = signal_data.filter(pl.col('date') == target_date) if signal_data is not None else pl.DataFrame()
 
             if day_market.empty:
                 continue
@@ -338,7 +338,7 @@ class MultiAssetBacktestEngine:
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
             next_date = next_date_map.get(date)
             if not day_signals.empty and next_date is not None:
-                sell_signals = day_signals.filter(pl.col('day_signals') score <)  # Düşük skor = sat
+                sell_signals = day_signals.filter(pl.col('score') < 0)  # Düşük skor = sat
                 for _, sig in sell_signals.iterrows():
                     ticker = sig["ticker"]
                     if ticker in positions:

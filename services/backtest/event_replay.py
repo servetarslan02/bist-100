@@ -207,7 +207,7 @@ class EnhancedReplayEngine:
         positions = state["positions"]
 
         # Get day's market data
-        day_data = market_data.filter(pl.col('market_data') date ==)
+        day_data = market_data.filter(pl.col('date') == target_date)
 
         if day_data.empty:
             logger.warning("No market data for date", date=target_date.isoformat())
@@ -268,7 +268,7 @@ class EnhancedReplayEngine:
 
                     # Execute trades based on decisions
                     if decision.action == "BUY" and decision.score >= 70:
-                        price = day_data.filter(pl.col('day_data') ticker ==)["close"][0]
+                        price = day_data.filter(pl.col('ticker') == ticker)["close"][0]
                         quantity = self._calculate_position_size(
                             cash, price, decision.confidence
                         )
@@ -296,7 +296,7 @@ class EnhancedReplayEngine:
                             )
 
                     elif decision.action == "SELL" and ticker in positions:
-                        price = day_data.filter(pl.col('day_data') ticker ==)["close"][0]
+                        price = day_data.filter(pl.col('ticker') == ticker)["close"][0]
                         pos = positions[ticker]
                         trade = {
                             "date": str(target_date),
@@ -329,9 +329,9 @@ class EnhancedReplayEngine:
                 "cash": cash,
                 "positions": len(positions),
                 "equity": cash + sum(
-                    p["quantity"] * day_data.filter(pl.col('day_data') ticker ==)["close"][0]
+                    p["quantity"] * day_data.filter(pl.col('ticker') == ticker)["close"][0]
                     for t, p in positions.items()
-                    if not day_data.filter(pl.col('day_data') ticker ==).empty
+                    if not day_data.filter(pl.col('ticker') == ticker).empty
                 ),
             },
         )

@@ -108,7 +108,7 @@ class DataSourceManager:
                     # NaN ve 0 fiyatlı geçersiz satırları temizle
                     if "Close" in df.columns:
                         df = df.dropna(subset=["Close"])
-                        df = df.filter(pl.col('df') Close >)
+                        df = df.filter(pl.col('Close') > 0)
                     if df.empty:
                         continue
 
@@ -210,7 +210,7 @@ class DataSourceManager:
                 df = pl.read_csv(cache_file, index_col=0, parse_dates=True)
             if df is not None and not df.empty and "Close" in df.columns:
                 df = df.dropna(subset=["Close"])
-                df = df.filter(pl.col('df') Close >)
+                df = df.filter(pl.col('Close') > 0)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
         except Exception as e:

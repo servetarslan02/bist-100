@@ -380,9 +380,9 @@ class PointInTimeValidator:
 
     def get_registry_stats(self) -> Dict[str, Any]:
         """Kayıt istatistikleri."""
-        total_records = sum(len(records) for records in self._registry.to_numpy()())
+        total_records = sum(len(records) for records in self._registry.values())
         by_type = {}
-        for records in self._registry.to_numpy()():
+        for records in self._registry.values():
             for r in records:
                 by_type[r.data_type] = by_type.get(r.data_type, 0) + 1
 

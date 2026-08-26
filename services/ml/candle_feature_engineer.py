@@ -64,8 +64,8 @@ class CandleFeatureEngineer:
             win_rate = (grp["is_win"].sum() / count) * 100
             avg_ret = grp["fwd_ret"].mean()
             
-            wins = grp.filter(pl.col('grp') fwd_ret >)["fwd_ret"]
-            losses = abs(grp.filter(pl.col('grp') fwd_ret <)["fwd_ret"])
+            wins = grp.filter(pl.col('fwd_ret') > 0)["fwd_ret"]
+            losses = abs(grp.filter(pl.col('fwd_ret') < 0)["fwd_ret"])
             
             avg_win = wins.mean() if len(wins) > 0 else 0.0
             avg_loss = losses.mean() if len(losses) > 0 else 1e-9

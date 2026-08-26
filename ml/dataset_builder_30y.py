@@ -163,8 +163,8 @@ class DatasetBuilder30Y:
         logger.info(f"Toplam {len(full_df):,} seans satırı üretildi.")
 
         # Train (1997-2023) ve OOS (2024-2026) Ayrımı
-        train_df = full_df.filter(pl.col('full_df') year <=).copy()
-        oos_df = full_df.filter(pl.col('full_df') year >=).copy()
+        train_df = full_df.filter(pl.col('year') <= 2023)
+        oos_df = full_df.filter(pl.col('year') >= 2024)
 
         logger.info(f"Train Seti: {len(train_df):,} satır (1997-2023)")
         logger.info(f"OOS Holdout Seti: {len(oos_df):,} satır (2024-2026)")

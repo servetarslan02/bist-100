@@ -1,12 +1,13 @@
 """
-ALPHA BIST — 30-Yıllık Yerel Tarihsel Veri Deposu (SQLite & Compressed Store)
+ALPHA BIST — 30-Yıllık Yerel Tarihsel Veri Deposu (DuckDB & Compressed Store)
 =============================================================================
 Borsa İstanbul'un 1997 - 2026 arasındaki tüm 30 yıllık gerçek seans verilerini
-yerel SQLite / HDF5 veri tabanında saklar.
+yerel DuckDB veri tabanında saklar.
 Tekrar tekrar internetten indirmeye gerek kalmadan 0.05 saniyede anında yükler.
 """
 
 import os
+import pandas as pd
 import duckdb
 import polars as pl
 import yfinance as yf
@@ -32,7 +33,7 @@ BENCHMARK_TICKER = "XU100.IS"
 
 
 class HistoricalDataWarehouse:
-    """30 yıllık BIST tarihsel verisini yerel SQLite diskte tutan ve anında sunan depo."""
+    """30 yıllık BIST tarihsel verisini yerel DuckDB diskte tutan ve anında sunan depo."""
 
     def __init__(self):
         os.makedirs(DATA_DIR, exist_ok=True)
@@ -51,7 +52,7 @@ class HistoricalDataWarehouse:
             return False
 
     def download_and_save_warehouse(self, force_refresh: bool = False) -> Tuple[int, int]:
-        """Tüm 30 yıllık veriyi indirip yerel SQLite veri tabanına kalıcı olarak kaydeder."""
+        """Tüm 30 yıllık veriyi indirip yerel DuckDB veri tabanına kalıcı olarak kaydeder."""
         if self.is_cached() and not force_refresh:
             logger.info("30 yıllık yerel veri deposu zaten mevcut.")
             return len(BIST_ALL_KEY_TICKERS), 7277
@@ -60,8 +61,7 @@ class HistoricalDataWarehouse:
         
         # 1. BIST-100 Endeksi
         bm_df = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
-        if isinstance(bm_df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+        if isinstance(bm_df.columns, pd.MultiIndex):
             bm_df.columns = [c[0] for c in bm_df.columns]
 
         with duckdb.connect(DB_FILE) as conn:
@@ -74,8 +74,7 @@ class HistoricalDataWarehouse:
         for t in BIST_ALL_KEY_TICKERS:
             if t in stocks_raw.columns.get_level_values(0):
                 df_t = stocks_raw[t].dropna().copy()
-                if isinstance(df_t.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
-# pd.MultiIndex):
+                if isinstance(df_t.columns, pd.MultiIndex):
                     df_t.columns = [c[0] for c in df_t.columns]
                 if len(df_t) > 30:
                     sym = t.replace(".IS", "")

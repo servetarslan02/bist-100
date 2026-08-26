@@ -10,6 +10,7 @@ KURAL: Execute edilemeyen fiyat kullanma!
 """
 
 import copy as _copy
+import pandas as pd
 import polars as pl
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
@@ -155,7 +156,7 @@ class DataQualityEngine:
 
     def get_untradable_count(self) -> int:
         """Tradable olmayan hisse sayısı."""
-        return sum(1 for m in self._masks.to_numpy()() if not m.is_tradable)
+        return sum(1 for m in self._masks.values() if not m.is_tradable)
 
     def get_mask_stats(self) -> Dict[str, Any]:
         """Mask istatistikleri."""
@@ -171,7 +172,7 @@ class DataQualityEngine:
     def _get_reasons_breakdown(self) -> Dict[str, int]:
         """Nedenlerin dağılımı."""
         reasons = {}
-        for mask in self._masks.to_numpy()():
+        for mask in self._masks.values():
             for reason in mask.reasons:
                 if reason != "OK":
                     reasons[reason] = reasons.get(reason, 0) + 1
@@ -215,8 +216,7 @@ class DataQualityChecker:
             return QualityReport(ticker, 0, [], 0, False)
 
         # F-017: Timestamp index kontrolü
-        if isinstance(df.index, # [POLARS] # [POLARS] pd. → needs manual review: pd.DatetimeIndex not applicable
-# pd.DatetimeIndex):
+        if isinstance(df.index, pd.DatetimeIndex):
             # Duplicate timestamp kontrolü
             dup_count = df.index.duplicated().sum()
             if dup_count > 0:

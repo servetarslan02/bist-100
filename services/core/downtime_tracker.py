@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Downtime Tracker v2.0 (SQLite)
+ALPHA BIST — Downtime Tracker v2.0 (DuckDB)
 
 Sistem downtime süresini takip eder.
 Kişisel PC senaryosu için kritik:
@@ -8,7 +8,7 @@ Kişisel PC senaryosu için kritik:
 - Açılışta ne kadar kapalı kaldığını hesaplar
 - Catch-up modunu tetikler
 - Downtime istatistiklerini tutar
-- SQLite tabanlı — restart sonrası kaybolmaz
+- DuckDB tabanlı — restart sonrası kaybolmaz
 
 Kullanım:
     from services.core.downtime_tracker import downtime_tracker
@@ -34,7 +34,7 @@ logger = structlog.get_logger()
 
 
 class DowntimeTracker:
-    """Sistem downtime takipçisi — SQLite tabanlı.
+    """Sistem downtime takipçisi — DuckDB tabanlı.
 
     Özellikler:
     - Graceful shutdown kaydı
@@ -59,7 +59,7 @@ class DowntimeTracker:
         self._init_db()
 
     def _init_db(self):
-        """SQLite tablolarını oluştur."""
+        """DuckDB tablolarını oluştur."""
         with self._connect() as conn:
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS shutdown_events (
