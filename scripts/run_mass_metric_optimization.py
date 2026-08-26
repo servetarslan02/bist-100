@@ -11,7 +11,7 @@ ALPHA BIST — Asimetrik Rejim & Ralli Kilidi 30-Yıllık Kitlesel Optimizasyon 
 import sys
 import os
 import time
-import pandas as pd
+import polars as pl
 import numpy as np
 
 # Windows UTF-8 Terminal desteği
@@ -127,7 +127,7 @@ def main():
     print("🔒 AŞAMA 4: KİLİTLENMİŞ PARAMETRELERLE TAM KÖR HOLDOUT TESTİ (2024 - 2026 OOS)")
     print("=" * 95)
     holdout_res = optimizer.simulate_fast(best_params, start_year=2024, end_year=2026)
-    bm_holdout = bm_df[bm_df.index >= pd.Timestamp("2024-01-01")]
+    bm_holdout = bm_df[bm_df.index >= pl.Date("2024-01-01")]
     bm_ret = ((bm_holdout["Close"].iloc[-1] - bm_holdout["Close"].iloc[0]) / bm_holdout["Close"].iloc[0]) * 100
 
     print(f"  • 2024-2026 Kör Getiri   : %{holdout_res.total_return_pct:+,.1f} (BIST-100 Endeksi: %{bm_ret:+,.1f})")

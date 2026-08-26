@@ -11,7 +11,7 @@ Sentetik veri, ayırt edilebilir (round olmayan) sayılarla kuruluyor ki
 "tesadüfen doğru çıktı" ihtimali olmasın.
 """
 
-import pandas as pd
+import polars as pl
 import pytest
 
 from services.backtest.multi_asset_engine import (
@@ -21,8 +21,8 @@ from services.backtest.multi_asset_engine import (
 
 def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1"):
     """D günü sinyal üretilir (score=80 → BUY), D+1 günü execution olur."""
-    dates = pd.to_datetime(["2024-01-01", "2024-01-02"])
-    market_data = pd.DataFrame([
+    dates = pl.Series(["2024-01-01", "2024-01-02"])
+    market_data = pl.DataFrame([
         {"date": dates[0], "ticker": ticker, "open": d0_close * 0.99,
          "high": d0_close * 1.01, "low": d0_close * 0.98,
          "close": d0_close, "volume": d0_volume},
@@ -30,7 +30,7 @@ def _make_two_day_data(d0_close, d0_volume, d1_open, d1_volume, ticker="TEST1"):
          "high": d1_open * 1.01, "low": d1_open * 0.98,
          "close": d1_open, "volume": d1_volume},
     ])
-    signal_data = pd.DataFrame([
+    signal_data = pl.DataFrame([
         {"date": dates[0], "ticker": ticker, "score": 80.0, "confidence": 0.8},
         {"date": dates[1], "ticker": ticker, "score": 50.0, "confidence": 0.5},
     ])

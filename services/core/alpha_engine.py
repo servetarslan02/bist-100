@@ -1,4 +1,5 @@
-import pandas as pd
+import datetime
+import polars as pl
 import numpy as np
 import lightgbm as lgb
 import yfinance as yf
@@ -10,10 +11,10 @@ from services.ml.feature_engine import compute_universe_features
 
 logger = structlog.get_logger()
 
-def _tz_naive(df: pd.DataFrame) -> pd.DataFrame:
+def _tz_naive(df: pl.DataFrame) -> pl.DataFrame:
     if df is None or df.empty: return df
     df = df.copy()
-    idx = pd.to_datetime(df.index)
+    idx = pl.Series(df.index)
     df.index = idx.tz_convert(None) if getattr(idx, 'tz', None) is not None else idx
     return df
 
@@ -55,7 +56,7 @@ class AlphaEngine:
         ]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
-    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None) -> tuple[Dict[str, pd.DataFrame], pd.DataFrame, Dict[str, str]]:
+    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None) -> tuple[Dict[str, pl.DataFrame], pl.DataFrame, Dict[str, str]]:
         if tickers is None:
             tickers = bist_universe.BIST_100_TICKERS if hasattr(bist_universe, 'BIST_100_TICKERS') and bist_universe.BIST_100_TICKERS else bist_universe.BIST_ALL_TICKERS[:100]
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
@@ -76,7 +77,8 @@ class AlphaEngine:
                 for t in tickers:
                     tick_sym = f"{t}.IS"
                     try:
-                        if isinstance(raw.columns, pd.MultiIndex):
+                        if isinstance(raw.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
+# pd.MultiIndex):
                             if tick_sym in raw.columns.levels[0]:
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if not df_t.empty and len(df_t) >= 10:
@@ -93,22 +95,23 @@ class AlphaEngine:
         # Load benchmark
         try:
             bm_df = yf.download("XU100.IS", start=start_date, end=end_date, auto_adjust=True, progress=False)
-            if isinstance(bm_df.columns, pd.MultiIndex):
+            if isinstance(bm_df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
+# pd.MultiIndex):
                 bm_df = bm_df.xs("XU100.IS", level=0, axis=1) if "XU100.IS" in bm_df.columns.levels[0] else bm_df
             bm_df = _tz_naive(bm_df.dropna(how="all"))
         except Exception as e:
             logger.warning(f"Benchmark download warning: {e}")
-            bm_df = pd.DataFrame()
+            bm_df = pl.DataFrame()
         
         return market_data, bm_df, sector_map
 
     def generate_training_samples(
         self,
-        market_data: Dict[str, pd.DataFrame],
-        bm_df: pd.DataFrame,
+        market_data: Dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
         sector_map: Dict[str, str],
-        train_start: pd.Timestamp,
-        train_end: pd.Timestamp,
+        train_start: pl.Series,
+        train_end: pl.Series,
         snapshot_offsets: List[int] = [20, 40, 60, 80],
         forward_days: int = 20
     ):
@@ -117,8 +120,8 @@ class AlphaEngine:
         all_keys = []
         
         for offset in snapshot_offsets:
-            t_snap = train_end - pd.Timedelta(days=int(offset))
-            t_fwd  = t_snap + pd.Timedelta(days=int(forward_days))
+            t_snap = train_end - datetime.timedelta(days=int(offset))
+            t_fwd  = t_snap + datetime.timedelta(days=int(forward_days))
             
             if t_snap < train_start:
                 continue
@@ -153,10 +156,10 @@ class AlphaEngine:
                 bm_close = bm_fwd["Close"].squeeze() if hasattr(bm_fwd["Close"], 'squeeze') else bm_fwd["Close"]
                 
                 try:
-                    p_0 = float(p_close.iloc[0])
-                    p_1 = float(p_close.iloc[-1])
-                    b_0 = float(bm_close.iloc[0])
-                    b_1 = float(bm_close.iloc[-1])
+                    p_0 = float(p_close[0])
+                    p_1 = float(p_close[-1])
+                    b_0 = float(bm_close[0])
+                    b_1 = float(bm_close[-1])
                 except Exception:
                     continue
                 
@@ -178,8 +181,8 @@ class AlphaEngine:
         return X, y, all_keys
 
     def train(self, market_data, bm_df, sector_map, train_start_str: str, train_end_str: str, optimize: bool = True):
-        t_start = pd.Timestamp(train_start_str)
-        t_end = pd.Timestamp(train_end_str)
+        t_start = pl.Series(train_start_str)
+        t_end = pl.Series(train_end_str)
         X, y, feature_names = self.generate_training_samples(market_data, bm_df, sector_map, t_start, t_end)
         
         if len(X) == 0:
@@ -201,7 +204,7 @@ class AlphaEngine:
         train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         train_params = dict(self.params)
         if self.has_gpu:
-            train_params["device"] = "gpu"
+            train_params = train_params.with_columns(pl.lit("gpu").alias('device'))
         try:
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
             logger.info(f"Model trained successfully on {len(X)} samples with {train_params.get('device', 'cpu')}.")
@@ -215,8 +218,8 @@ class AlphaEngine:
         if not self.model:
             raise ValueError("Model not trained")
             
-        target_date = pd.Timestamp(target_date_str)
-        start_date_dt = target_date - pd.Timedelta(days=400)
+        target_date = pl.Series(target_date_str)
+        start_date_dt = target_date - datetime.timedelta(days=400)
         
         snap_md = {}
         for t, df in market_data.items():
@@ -253,8 +256,8 @@ class AlphaEngine:
 
     def run_daily_pipeline(self, date: str):
         """Run daily production logic"""
-        end_date_dt = pd.Timestamp(date)
-        start_date_dt = end_date_dt - pd.Timedelta(days=400)  # Match exactly TRAIN_DAYS=252 from validation
+        end_date_dt = pl.Series(date)
+        start_date_dt = end_date_dt - datetime.timedelta(days=400)  # Match exactly TRAIN_DAYS=252 from validation
         
         market_data, bm_df, sector_map = self.fetch_data(
             start_date_dt.strftime('%Y-%m-%d'), 

@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import time
 import orjson
 import asyncio
-import pandas as pd
+import polars as pl
 from datetime import datetime, date, timezone
 
 print('=================================================================')
@@ -23,7 +23,7 @@ async def main():
     print(f' -> Universe loaded: {len(universe)} BIST-100 tickers')
     
     end_date = date.today().strftime('%Y-%m-%d')
-    start_date = (pd.to_datetime(end_date) - pd.Timedelta(days=400)).strftime('%Y-%m-%d')
+    start_date = (pl.Series(end_date) - datetime.timedelta(days=400)).strftime('%Y-%m-%d')
     
     market_data, bm_df, sector_map = engine.fetch_data(start_date, end_date, universe)
     print(f' -> Market data fetched for {len(market_data)} tickers')

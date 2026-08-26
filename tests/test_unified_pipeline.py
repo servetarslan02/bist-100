@@ -5,9 +5,9 @@ UNIFIED BIST PIPELINE INTEGRATION TESTS
 """
 
 import unittest
-import pandas as pd
+import polars as pl
 import numpy as np
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 from services.paper_trading.state_store import PaperStateStore
@@ -34,13 +34,13 @@ class TestUnifiedPipeline(unittest.TestCase):
         market_data = {}
         for t in tickers:
             prices = 100.0 + np.cumsum(np.random.randn(len(dates)) * 1.5)
-            df = pd.DataFrame({
+            df = pl.DataFrame({
                 'Open': prices * 0.995,
                 'High': prices * 1.015,
                 'Low': prices * 0.985,
                 'Close': prices,
                 'Volume': np.random.randint(1_000_000, 5_000_000, len(dates)),
-            }, index=pd.to_datetime(dates))
+            }.Series(dates))
             market_data[t] = df
         return market_data
 
@@ -70,7 +70,7 @@ class TestUnifiedPipeline(unittest.TestCase):
 
     def test_morning_execution_with_microstructure_and_t2_settlement(self):
         """09:55 Sabah açılışında bekleyen emirler T+1 açılış fiyatları ve mikro-yapı ile yürütülür."""
-        dates = pd.date_range("2024-01-01", periods=5, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 15), timedelta(days=1), eager=True).head(5)
         market_data = self._make_mock_history(["THYAO", "GARAN"], dates)
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik"}
 
@@ -113,7 +113,7 @@ class TestUnifiedPipeline(unittest.TestCase):
         self.orch.portfolio.cash = 0.0
         self.orch.portfolio.settled_cash = 0.0
 
-        dates = pd.date_range("2024-01-01", periods=5, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 15), timedelta(days=1), eager=True).head(5)
         market_data = self._make_mock_history(["THYAO"], dates)
 
         report = self.orch.execute_pending_signals(
@@ -128,13 +128,13 @@ class TestUnifiedPipeline(unittest.TestCase):
     def test_friday_eod_to_monday_morning_open_execution(self):
         """Cuma akşamı üretilen sinyal Pazartesi sabahı Pazartesi açılış fiyatıyla yürütülmelidir."""
         # Cuma (2024-01-05) ve Pazartesi (2024-01-08)
-        dates = pd.date_range("2024-01-01", periods=10, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 20), timedelta(days=1), eager=True).head(10)
         # 2024-01-05 Cuma = index 4, 2024-01-08 Pazartesi = index 5
         market_data = self._make_mock_history(["THYAO"], dates)
         
         # Pazartesi açılış fiyatını belirgin bir değere sabitleyelim
         df = market_data["THYAO"]
-        pazartesi_ts = pd.to_datetime("2024-01-08")
+        pazartesi_ts = pl.Series("2024-01-08")
         df.loc[pazartesi_ts, "Open"] = 285.50
         df.loc[pazartesi_ts, "Close"] = 290.00
 

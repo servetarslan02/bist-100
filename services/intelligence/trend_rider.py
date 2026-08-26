@@ -11,7 +11,7 @@ SIFIR STATİK VERİ & YÜZDE KURALI:
 
 from typing import Dict, Any, Tuple
 import numpy as np
-import pandas as pd
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -44,8 +44,8 @@ class TrendRiderEngine:
     def evaluate_position_exit(
         self,
         pos: Dict[str, Any],
-        current_candle: pd.Series,
-        history_df: pd.DataFrame,
+        current_candle: pl.Series,
+        history_df: pl.DataFrame,
         is_bear_crash: bool = False
     ) -> Tuple[bool, float, str]:
         """
@@ -63,14 +63,14 @@ class TrendRiderEngine:
         # Zirve fiyatı güncelle
         if p_high > peak_price:
             peak_price = p_high
-            pos["peak_price"] = peak_price
+            pos = pos.with_columns(pl.lit(peak_price).alias('peak_price'))
 
         # -------------------------------------------------------------
         # 1. 100% Dinamik Volatilite (ATR-14) Hesabı
         # -------------------------------------------------------------
-        closes = history_df["Close"].values
-        highs = history_df["High"].values
-        lows = history_df["Low"].values
+        closes = history_df["Close"].to_numpy()
+        highs = history_df["High"].to_numpy()
+        lows = history_df["Low"].to_numpy()
         n = len(closes)
 
         if n >= 15:
@@ -88,8 +88,8 @@ class TrendRiderEngine:
         is_tavan = (p_close >= p_open * 1.090) and (upper_wick / candle_range <= 0.08)
 
         if is_tavan:
-            pos["is_in_tavan_run"] = True
-            pos["tavan_count"] = pos.get("tavan_count", 0) + 1
+            pos = pos.with_columns(pl.lit(True).alias('is_in_tavan_run'))
+            pos = pos.with_columns(pl.lit(pos.get("tavan_count", 0) + 1).alias('tavan_count'))
             # Tavan serisi bozulmadığı sürece pozisyon kesinlikle korunur
             return False, 0.0, "TAVAN_SERISI_KORUMA"
 
@@ -97,7 +97,7 @@ class TrendRiderEngine:
         # 3. Dinamik Trend Göstergeleri (9-EMA & 20-SMA)
         # -------------------------------------------------------------
         sma20 = float(np.mean(closes[-20:])) if n >= 20 else p_close
-        ema9 = float(pd.Series(closes).ewm(span=9, adjust=False).mean().iloc[-1]) if n >= 9 else p_close
+        ema9 = float(pl.Series(closes).ewm(span=9, adjust=False).mean()[-1]) if n >= 9 else p_close
 
         gain_from_entry = (peak_price - entry_price)
         gain_now_pct = ((p_close - entry_price) / entry_price) * 100
@@ -116,14 +116,14 @@ class TrendRiderEngine:
         elif (2.0 * atr14) <= gain_from_entry < (5.0 * atr14):
             # Kârı koruma stopu: Zirvenin 2.5x ATR altı veya Giriş + 0.5x ATR
             breakeven_dynamic_stop = max(entry_price + (0.5 * atr14), peak_price - (2.5 * atr14))
-            pos["stop_loss"] = max(pos.get("stop_loss", 0), breakeven_dynamic_stop)
+            pos = pos.with_columns(pl.lit(max(pos.get("stop_loss", 0), breakeven_dynamic_stop)).alias('stop_loss'))
             if p_low <= pos["stop_loss"]:
                 return True, pos["stop_loss"], f"DINAMIK_BASABAŞ_IZLEYEN_STOP (+%{gain_now_pct:.1f})"
 
         # C) Mega Trend Aşaması (Kazanç >= 5.0x ATR): Trendi 9-EMA ve Tepe Dağıtım Mumuyla Sür
         else:
             # Tepe dağıtım mumu teyidi (Zirvede Kayan Yıldız veya Yutan Ayı)
-            is_bear_engulfing = (p_close < p_open) and (n >= 2 and p_close < closes[-2] and (p_open - p_close) > (closes[-2] - float(history_df["Open"].iloc[-2])))
+            is_bear_engulfing = (p_close < p_open) and (n >= 2 and p_close < closes[-2] and (p_open - p_close) > (closes[-2] - float(history_df["Open"][-2])))
             is_shooting_star = (p_high - max(p_open, p_close)) >= (max(p_open, p_close) - min(p_open, p_close)) * 2.0 and p_close < p_high * 0.97
 
             # Tepe dönüş mumu ve 9-EMA altına sarkma varsa kârı realize et
@@ -132,7 +132,7 @@ class TrendRiderEngine:
 
             # Parabolik trend takibi: Zirvenin 3.0x ATR altı veya 20-SMA kırılımı
             parabolic_atr_stop = max(peak_price - (3.0 * atr14), sma20 * 0.985)
-            pos["stop_loss"] = max(pos.get("stop_loss", 0), parabolic_atr_stop)
+            pos = pos.with_columns(pl.lit(max(pos.get("stop_loss", 0), parabolic_atr_stop)).alias('stop_loss'))
             if p_low <= pos["stop_loss"]:
                 return True, pos["stop_loss"], f"MEGA_TREND_PARABOLIK_STOP (+%{gain_now_pct:.1f})"
 

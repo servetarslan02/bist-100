@@ -18,7 +18,7 @@ Referanslar:
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
 from datetime import datetime
@@ -133,12 +133,12 @@ class SurvivorshipBiasHandler:
 
     def apply_survivorship_correction(
         self,
-        returns: pd.DataFrame,
+        returns: pl.DataFrame,
         delistings: List[DelistingEvent],
         ticker_col: str = "ticker",
         date_col: str = "date",
         return_col: str = "return",
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
         Survivorship bias düzeltmesi uygula.
 
@@ -165,7 +165,7 @@ class SurvivorshipBiasHandler:
             if mask.any():
                 if delist.reason == "bankruptcy" and delist.recovery_rate is not None:
                     # İflas durumunda son fiyat × recovery_rate
-                    corrected.loc[mask, return_col] = -1 + delist.recovery_rate
+                    corrected.filter(mask, return_col] = -1 + delist.recovery_rate
                     logger.info("Applied bankruptcy correction",
                                ticker=delist.ticker,
                                recovery=delist.recovery_rate)
@@ -180,8 +180,8 @@ class SurvivorshipBiasHandler:
 
     def calculate_survivorship_bias_magnitude(
         self,
-        full_returns: pd.DataFrame,
-        survivor_only_returns: pd.DataFrame,
+        full_returns: pl.DataFrame,
+        survivor_only_returns: pl.DataFrame,
     ) -> Dict[str, float]:
         """
         Survivorship bias büyüklüğünü hesapla.
@@ -245,7 +245,7 @@ class SurvivorshipBiasHandler:
                 delisted_count=len(delisted),
             ))
 
-            current = current + pd.Timedelta(days=interval_days)
+            current = current + datetime.timedelta(days=interval_days)
 
         return snapshots
 
@@ -267,12 +267,12 @@ class BISTSurvivorshipDataLoader:
     @staticmethod
     def load_from_csv(filepath: str) -> List[DelistingEvent]:
         """CSV'den delisting verisi yükle."""
-        df = pd.read_csv(filepath)
+        df = pl.read_csv(filepath)
         events = []
         for _, row in df.iterrows():
             events.append(DelistingEvent(
                 ticker=row["ticker"],
-                delisting_date=pd.to_datetime(row["delisting_date"]),
+                delisting_date=pl.Series(row["delisting_date"]),
                 reason=row.get("reason", "unknown"),
                 final_price=row.get("final_price"),
                 recovery_rate=row.get("recovery_rate"),

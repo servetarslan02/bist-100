@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-import pandas as pd
+import polars as pl
 import requests
 import structlog
 
@@ -60,7 +60,7 @@ class DataSourceManager:
         period: str = "2y",
         interval: str = "1d",
         source_priority: list[str] = ["warehouse", "local", "yahoo", "bist"],
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """Hisse verisini getir (cache-aware, multi-source).
 
         Args:
@@ -108,7 +108,7 @@ class DataSourceManager:
                     # NaN ve 0 fiyatlı geçersiz satırları temizle
                     if "Close" in df.columns:
                         df = df.dropna(subset=["Close"])
-                        df = df[df["Close"] > 0]
+                        df = df.filter(pl.col('df') Close >)
                     if df.empty:
                         continue
 
@@ -126,14 +126,14 @@ class DataSourceManager:
                 continue
 
         logger.error("All sources failed", ticker=ticker)
-        return pd.DataFrame()
+        return pl.DataFrame()
 
     def get_multiple_stocks(
         self,
         tickers: list[str],
         max_workers: int = 8,
         **kwargs,
-    ) -> dict[str, pd.DataFrame]:
+    ) -> dict[str, pl.DataFrame]:
         """Çoklu hisse verisi getir (paralel).
 
         Args:
@@ -183,11 +183,11 @@ class DataSourceManager:
         self,
         benchmark: str = "XU100.IS",
         **kwargs,
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """Benchmark verisini getir."""
         return self.get_stock_data(benchmark, **kwargs)
 
-    def _load_from_cache(self, ticker: str, interval: str) -> pd.DataFrame | None:
+    def _load_from_cache(self, ticker: str, interval: str) -> pl.DataFrame | None:
         """Cache'den veri yukle (Parquet > CSV)."""
         # Parquet cache (tercih)
         parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
@@ -205,24 +205,24 @@ class DataSourceManager:
 
         try:
             if cache_file.suffix == ".parquet":
-                df = pd.read_parquet(cache_file)
+                df = pl.read_parquet(cache_file)
             else:
-                df = pd.read_csv(cache_file, index_col=0, parse_dates=True)
+                df = pl.read_csv(cache_file, index_col=0, parse_dates=True)
             if df is not None and not df.empty and "Close" in df.columns:
                 df = df.dropna(subset=["Close"])
-                df = df[df["Close"] > 0]
+                df = df.filter(pl.col('df') Close >)
             logger.info("Cache hit", ticker=ticker, rows=len(df))
             return df
         except Exception as e:
             logger.warning("Cache read failed", ticker=ticker, error=str(e))
             return None
 
-    def _save_to_cache(self, ticker: str, df: pd.DataFrame, interval: str):
+    def _save_to_cache(self, ticker: str, df: pl.DataFrame, interval: str):
         """Veriyi cache'e kaydet (Parquet — CSV'den ~10x hızlı)."""
         parquet_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
         try:
-            df.to_parquet(parquet_file, engine="pyarrow")
+            df.write_parquet(parquet_file, engine="pyarrow")
             logger.info("Cache saved", ticker=ticker, rows=len(df))
         except Exception as e:
             logger.warning("Cache save failed", ticker=ticker, error=str(e))
@@ -257,7 +257,7 @@ class YahooFinanceSource:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> pd.DataFrame | None:
+    ) -> pl.DataFrame | None:
         """Yahoo Finance'ten veri çek."""
         try:
             import yfinance as yf
@@ -314,7 +314,7 @@ class BISTSource:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> pd.DataFrame | None:
+    ) -> pl.DataFrame | None:
         """Borsa Istanbul'dan veri cek.
 
         Strateji:
@@ -346,16 +346,16 @@ class BISTSource:
         logger.warning("BIST source failed for ticker", ticker=ticker_clean)
         return None
 
-    def _fetch_from_api(self, ticker: str, start_date: str | None, end_date: str | None) -> pd.DataFrame | None:
+    def _fetch_from_api(self, ticker: str, start_date: str | None, end_date: str | None) -> pl.DataFrame | None:
         """BIST API'den tarihsel veri cek."""
         # Borsa Istanbul'un hisse detay API'si
         url = f"{self.API_URL}/stock/{ticker}/history"
 
         params = {}
         if start_date:
-            params["from"] = start_date
+            params = params.with_columns(pl.lit(start_date).alias('from'))
         if end_date:
-            params["to"] = end_date
+            params = params.with_columns(pl.lit(end_date).alias('to'))
 
         resp = self.session.get(url, params=params, timeout=self.timeout)
         if resp.status_code != 200:
@@ -368,7 +368,7 @@ class BISTSource:
         rows = []
         for item in data.get("data", []):
             rows.append({
-                "Date": pd.to_datetime(item.get("date", "")),
+                "Date": pl.Series(item.get("date", "")),
                 "Open": float(item.get("open", 0)),
                 "High": float(item.get("high", 0)),
                 "Low": float(item.get("low", 0)),
@@ -379,12 +379,12 @@ class BISTSource:
         if not rows:
             return None
 
-        df = pd.DataFrame(rows)
-        df.set_index("Date", inplace=True)
+        df = pl.DataFrame(rows)
+        df
         df.sort_index(inplace=True)
         return df
 
-    def _fetch_from_web(self, ticker: str) -> pd.DataFrame | None:
+    def _fetch_from_web(self, ticker: str) -> pl.DataFrame | None:
         """BIST web sitesinden son fiyat bilgisi cek."""
         url = f"{self.BASE_URL}/tr/hisse/{ticker}"
         resp = self.session.get(url, timeout=self.timeout)
@@ -457,8 +457,8 @@ class BISTSource:
         prev_close = close / (1 + change / 100) if change != 0 else close
 
         # Tek gunluk DataFrame olustur
-        today = pd.Timestamp.now().normalize()
-        df = pd.DataFrame({
+        today = pl.Series.now().normalize()
+        df = pl.DataFrame({
             "Open": [prev_close],
             "High": [max(close, prev_close)],
             "Low": [min(close, prev_close)],
@@ -468,7 +468,7 @@ class BISTSource:
 
         return df
 
-    def fetch_index_data(self, index_code: str = "XU100") -> pd.DataFrame | None:
+    def fetch_index_data(self, index_code: str = "XU100") -> pl.DataFrame | None:
         """Endeks verisi cek."""
         try:
             url = f"{self.API_URL}/index/{index_code}"
@@ -477,8 +477,8 @@ class BISTSource:
             if resp.status_code == 200:
                 data = resp.json()
                 if data:
-                    today = pd.Timestamp.now().normalize()
-                    df = pd.DataFrame({
+                    today = pl.Series.now().normalize()
+                    df = pl.DataFrame({
                         "Open": [float(data.get("open", 0))],
                         "High": [float(data.get("high", 0))],
                         "Low": [float(data.get("low", 0))],
@@ -505,7 +505,7 @@ class LocalParquetSource:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> pd.DataFrame | None:
+    ) -> pl.DataFrame | None:
         """Yerel parquet'ten veri çek."""
         cache_file = self.cache_dir / f"{ticker}_{interval}.parquet"
 
@@ -513,7 +513,7 @@ class LocalParquetSource:
             return None
 
         try:
-            df = pd.read_parquet(cache_file)
+            df = pl.read_parquet(cache_file)
 
             # Tarih filtresi
             if start_date:
@@ -540,28 +540,28 @@ class WarehouseSource:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-    ) -> pd.DataFrame | None:
+    ) -> pl.DataFrame | None:
         if not self.db_path.exists():
             return None
-        import sqlite3
+        import duckdb
         sym = ticker.upper().replace(".IS", "").strip()
         try:
-            conn = sqlite3.connect(str(self.db_path))
+            conn = duckdb.connect(str(self.db_path))
             tbl = "benchmark_data" if sym in ["XU100", "^XU100", "BIST100"] else "stock_data"
             
             if tbl == "benchmark_data":
                 query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM benchmark_data"
-                df = pd.read_sql_query(query, conn)
+                df = pl.read_database(query, conn)
             else:
                 query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM stock_data WHERE symbol = ? OR symbol = ?"
-                df = pd.read_sql_query(query, conn, params=(sym, f"{sym}.IS"))
+                df = pl.read_database(query, conn, params=(sym, f"{sym}.IS"))
             conn.close()
 
             if df.empty:
                 return None
 
-            df["Date"] = pd.to_datetime(df["date"])
-            df.set_index("Date", inplace=True)
+            df = df.with_columns(pl.lit(pl.Series(df["date"])).alias('Date'))
+            df
             df.drop(columns=["date"], errors="ignore", inplace=True)
             df.sort_index(inplace=True)
 

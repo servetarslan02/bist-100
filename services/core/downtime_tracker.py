@@ -22,7 +22,7 @@ Kullanım:
         await backfill_manager.backfill_all(...)
 """
 
-import sqlite3
+import duckdb
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
@@ -61,33 +61,30 @@ class DowntimeTracker:
     def _init_db(self):
         """SQLite tablolarını oluştur."""
         with self._connect() as conn:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS shutdown_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     shutdown_at TEXT NOT NULL,
                     shutdown_timestamp REAL NOT NULL,
                     startup_at TEXT,
                     startup_timestamp REAL,
                     downtime_seconds REAL DEFAULT 0,
                     catchup_level TEXT DEFAULT 'none'
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS downtime_config (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_shutdown_at ON shutdown_events(shutdown_at);
+                )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_shutdown_at ON shutdown_events(shutdown_at)")
             conn.commit()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self._db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        conn = duckdb.connect(str(self._db_path))
         try:
             yield conn
         finally:

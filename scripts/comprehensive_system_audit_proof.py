@@ -1,7 +1,7 @@
 import sys
 import os
 import orjson
-import sqlite3
+import duckdb
 import pickle
 import numpy as np
 import urllib.request
@@ -34,7 +34,7 @@ def audit_warehouse():
     wh_path = "data/bist_30y_warehouse.db"
     if os.path.exists(wh_path):
         size_mb = os.path.getsize(wh_path) / (1024 * 1024)
-        conn = sqlite3.connect(wh_path)
+        conn = duckdb.connect(wh_path)
         cur = conn.cursor()
         cur.execute("SELECT COUNT(DISTINCT symbol), COUNT(*), MIN(date), MAX(date) FROM stock_candles")
         n_stocks, n_candles, min_s, max_s = cur.fetchone()

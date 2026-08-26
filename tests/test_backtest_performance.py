@@ -17,8 +17,8 @@ import sys
 import os
 import time
 import numpy as np
-import pandas as pd
-from datetime import datetime
+import polars as pl
+from datetime import datetime, timedelta
 
 from services.scanner.backtest_runner import (
     ScannerBacktestRunner, PortfolioSimulator, FeatureCache, QualityCache,
@@ -33,15 +33,15 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
     for ticker in tickers:
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
-        dates = pd.date_range(end=datetime.now(), periods=n_days, freq='B')
+        dates = pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
         close = 100 * np.exp(np.cumsum(np.random.randn(n_days) * vol + trend))
         high = close * (1 + np.abs(np.random.randn(n_days) * 0.008))
         low = close * (1 - np.abs(np.random.randn(n_days) * 0.008))
         volume = np.random.randint(50000, 500000, n_days).astype(float)
-        market[ticker] = pd.DataFrame({
+        market[ticker] = pl.DataFrame({
             'Open': close * (1 + np.random.randn(n_days) * 0.002),
             'High': high, 'Low': low, 'Close': close, 'Volume': volume
-        }, index=dates)
+        })
     return market
 
 

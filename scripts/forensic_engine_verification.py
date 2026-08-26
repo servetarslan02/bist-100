@@ -9,8 +9,9 @@ VBTS kısıtlarını ve mikro-yapı defterini matematiksel olarak kanıtlar.
 
 import sys
 import os
-import pandas as pd
+import polars as pl
 import numpy as np
+from datetime import datetime, timedelta, date
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
@@ -43,19 +44,19 @@ def run_forensic_proof():
     )
 
     tickers = ["THYAO", "AKBNK", "GARAN", "KCHOL", "BIMAS", "TUPRS", "SISE", "EREGL", "ASELS", "SAHOL"]
-    dates = pd.date_range("2024-01-05", periods=6, freq='B') # Cuma -> Cuma
+    dates = pl.date_range(date(2024, 1, 5), date(2024, 1, 15), timedelta(days=1), eager=True).head(6) # Cuma -> Cuma
     date_strs = [d.strftime("%Y-%m-%d") for d in dates]
 
     # Mock market data dataframe'leri
     market_data = {}
     for t in tickers:
-        df = pd.DataFrame({
+        df = pl.DataFrame({
             "Open": [100.0, 102.0, 101.5, 105.0, 98.0, 99.0],
             "High": [103.0, 104.0, 106.0, 107.0, 100.0, 101.0],
             "Low":  [99.0,  100.5, 100.0, 103.0, 96.0,  97.5],
             "Close":[102.0, 101.5, 105.0, 98.0,  99.0,  100.5],
             "Volume":[5_000_000] * 6,
-        }, index=dates)
+        })
         market_data[t] = df
 
     sector_map = {

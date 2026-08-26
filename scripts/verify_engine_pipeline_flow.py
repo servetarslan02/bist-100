@@ -11,7 +11,7 @@ import sys
 import os
 import orjson
 import numpy as np
-import pandas as pd
+import polars as pl
 import yfinance as yf
 from datetime import datetime, timezone, timedelta
 

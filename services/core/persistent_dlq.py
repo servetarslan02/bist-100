@@ -23,7 +23,7 @@ Kullanım:
 import asyncio
 import hashlib
 import os
-import sqlite3
+import duckdb
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
@@ -116,7 +116,7 @@ class PersistentDeadLetterQueue:
     def _init_db(self):
         """SQLite tablolarını oluştur."""
         with self._connect() as conn:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS dlq_entries (
                     entry_id TEXT PRIMARY KEY,
                     event_id TEXT NOT NULL,
@@ -130,26 +130,23 @@ class PersistentDeadLetterQueue:
                     last_retry_at TEXT,
                     next_retry_at TEXT,
                     resolved_at TEXT
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_dlq_status ON dlq_entries(status);
-                CREATE INDEX IF NOT EXISTS idx_dlq_type ON dlq_entries(event_type);
-                CREATE INDEX IF NOT EXISTS idx_dlq_created ON dlq_entries(created_at);
-                CREATE INDEX IF NOT EXISTS idx_dlq_next_retry ON dlq_entries(next_retry_at);
-
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_dlq_status ON dlq_entries(status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_dlq_type ON dlq_entries(event_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_dlq_created ON dlq_entries(created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_dlq_next_retry ON dlq_entries(next_retry_at)")
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS dlq_stats (
                     key TEXT PRIMARY KEY,
                     value INTEGER DEFAULT 0
-                );
+                )
             """)
             conn.commit()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
         finally:

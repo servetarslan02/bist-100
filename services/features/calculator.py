@@ -4,7 +4,7 @@ services.ml.feature_engine.FeatureEngine canonical motoruna bağlanır.
 """
 
 from typing import Dict, Any
-import pandas as pd
+import polars as pl
 from services.ml.feature_engine import FeatureEngine
 
 class FeatureCalculator(FeatureEngine):
@@ -16,7 +16,7 @@ class FeatureCalculator(FeatureEngine):
             return {}
         if hasattr(df, "to_pandas"):
             pdf = df.to_pandas()
-        elif isinstance(df, pd.DataFrame):
+        elif isinstance(df, pl.DataFrame):
             pdf = df
         else:
             return {}

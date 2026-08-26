@@ -183,11 +183,10 @@ async def test_acknowledge_stops_escalation():
 
 async def test_alert_db_persistence():
     """Alert DB'ye persist edilmeli."""
-    import sqlite3
+    import duckdb
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
 
     alerting = AlertingSystem(db=db, dialect="sqlite")
     await alerting.init_db()
@@ -210,11 +209,10 @@ async def test_alert_db_persistence():
 
 async def test_alert_restart_recovery():
     """Restart sonrası alert'ler geri yüklenmeli."""
-    import sqlite3
+    import duckdb
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
 
     # İlk instance — alert oluştur ve persist et
     alerting1 = AlertingSystem(db=db, dialect="sqlite")

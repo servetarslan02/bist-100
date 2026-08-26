@@ -16,7 +16,7 @@ Kullanım:
 
 import time
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -93,7 +93,7 @@ class DataPipeline:
         self._require_passing = require_passing
         self._audit_log: List[Dict[str, Any]] = []
 
-    def process(self, market_data: Dict[str, pd.DataFrame]) -> PipelineReport:
+    def process(self, market_data: Dict[str, pl.DataFrame]) -> PipelineReport:
         """Tüm market verisini işle."""
         start = time.time()
         results = []
@@ -118,7 +118,7 @@ class DataPipeline:
             elapsed_s=elapsed,
         )
 
-    def _process_single(self, ticker: str, df: pd.DataFrame) -> PipelineResult:
+    def _process_single(self, ticker: str, df: pl.DataFrame) -> PipelineResult:
         """Tek hisseyi işle."""
         start = time.time()
 
@@ -149,8 +149,8 @@ class DataPipeline:
         # 3. Feature hesaplama
         try:
             mask = self._tm.compute_mask(
-                ticker, df['Open'].values, df['High'].values,
-                df['Low'].values, df['Close'].values, df['Volume'].values,
+                ticker, df['Open'].to_numpy(), df['High'].to_numpy(),
+                df['Low'].to_numpy(), df['Close'].to_numpy(), df['Volume'].to_numpy(),
             )
             features = self._calc.compute_all_features(df, mask=mask.mask, ticker=ticker)
 

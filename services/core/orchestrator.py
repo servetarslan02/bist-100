@@ -156,7 +156,7 @@ class MasterOrchestrator:
         # === AGENT SYSTEM (Nihai Mimari) ===
         try:
             from services.agents.agent_pipeline import AgentPipelineOrchestrator
-            self._services["agent_pipeline"] = AgentPipelineOrchestrator(
+            self._services = self._services.with_columns(pl.lit(AgentPipelineOrchestrator().alias('agent_pipeline'))
                 enable_debate=True,
                 enable_memory=True,
                 enable_self_eval=True,
@@ -265,8 +265,8 @@ class MasterOrchestrator:
         try:
             calc = self._services.get("feature_calculator")
             if calc:
-                import pandas as _pd
-                ohlcv_df = _pd.DataFrame({
+                import polars as _pl
+                ohlcv_df = _pl.DataFrame({
                     "Open": market_data.get("opens", raw_prices),
                     "High": market_data.get("highs", raw_prices),
                     "Low": market_data.get("lows", raw_prices),
@@ -274,7 +274,7 @@ class MasterOrchestrator:
                     "Volume": market_data.get("volumes", [1.0] * len(raw_prices)),
                 })
                 ohlcv_df = ohlcv_df.dropna(subset=["Close"])
-                ohlcv_df = ohlcv_df[ohlcv_df["Close"] > 0]
+                ohlcv_df = ohlcv_df.filter(pl.col('ohlcv_df') Close >)
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))
@@ -301,7 +301,7 @@ class MasterOrchestrator:
             if hasattr(surprise, 'compute_surprise') and market_data.get("macro"):
                 surprise_result = surprise.compute_surprise(market_data["macro"])
                 if surprise_result:
-                    features["macro_surprise"] = surprise_result
+                    features = features.with_columns(pl.lit(surprise_result).alias('macro_surprise'))
         except Exception as e:
             logger.debug("macro_surprise_failed", ticker=ticker, error=str(e))
 
@@ -313,10 +313,10 @@ class MasterOrchestrator:
                 for raw_item in market_data["news"]:
                     processed = news_pipe.process(raw_item)
                     if processed and hasattr(processed, "sentiment"):
-                        features["news_sentiment"] = processed.sentiment
-                        features["news_importance"] = getattr(processed, "importance", 0.5)
+                        features = features.with_columns(pl.lit(processed.sentiment).alias('news_sentiment'))
+                        features = features.with_columns(pl.lit(getattr(processed, "importance", 0.5)).alias('news_importance'))
                         if hasattr(processed, "key_insight") and processed.key_insight:
-                            features["news_key_insight"] = processed.key_insight
+                            features = features.with_columns(pl.lit(processed.key_insight).alias('news_key_insight'))
         except Exception as e:
             logger.debug("news_sentiment_failed", ticker=ticker, error=str(e))
 
@@ -368,10 +368,10 @@ class MasterOrchestrator:
         try:
             fe = self._services.get("forecasting")
             if fe:
-                import pandas as _pd
+                import polars as _pl
                 hist_returns = []
                 if len(prices) > 1:
-                    _closes = _pd.Series(prices)
+                    _closes = _pl.Series(prices)
                     hist_returns = _closes.pct_change().dropna().tolist()
                 forecasts = fe.compute_forecasts(
                     ticker=ticker,
@@ -652,7 +652,7 @@ class MasterOrchestrator:
             if not decision.get("llm_narrative"):
                 try:
                     from services.intelligence.llm_agent import llm_agent
-                    decision["llm_narrative"] = llm_agent.generate_decision_narrative(
+                    decision = decision.with_columns(pl.lit(llm_agent.generate_decision_narrative().alias('llm_narrative'))
                         ticker=ticker,
                         decision=decision,
                         features=features,
@@ -693,8 +693,8 @@ class MasterOrchestrator:
             if ls and hasattr(ls, 'get_regime_accuracy'):
                 regime_acc = ls.get_regime_accuracy(regime)
                 if regime_acc and regime_acc < 0.4 and decision.get("confidence", 0) > 0:
-                    decision["confidence"] = decision["confidence"] * 0.8
-                    decision["learning_adjustment"] = f"Low regime accuracy ({regime_acc:.2f})"
+                    decision = decision.with_columns(pl.lit(decision["confidence"] * 0.8).alias('confidence'))
+                    decision = decision.with_columns(pl.lit(f"Low regime accuracy ({regime_acc:.2f})").alias('learning_adjustment'))
         except Exception as e:
             logger.debug("learning_feedback_failed", error=str(e))
 
@@ -766,10 +766,10 @@ class MasterOrchestrator:
         try:
             kg = self._services.get("knowledge_graph")
             if kg:
-                context["knowledge"] = "available"
+                context = context.with_columns(pl.lit("available").alias('knowledge'))
             rm = self._services.get("research_memory")
             if rm:
-                context["memory"] = "available"
+                context = context.with_columns(pl.lit("available").alias('memory'))
         except Exception as e:
             logger.warning("Pipeline step failed", step="knowledge_graph", error=str(e))
         return context
@@ -818,57 +818,57 @@ class MasterOrchestrator:
         # 1. Veri hazırlama
         raw_prices, prices, error = self._prepare_prices(market_data)
         if error:
-            result["error"] = error
+            result = result.with_columns(pl.lit(error).alias('error'))
             return result
 
         # 2. Özellik hesaplama
         features = self._compute_features(ticker, market_data, raw_prices)
         self._compute_macro_features(features, market_data, ticker)
         self._compute_news_sentiment(features, market_data, ticker)
-        result["features"] = features
+        result = result.with_columns(pl.lit(features).alias('features'))
 
         # 3. Dünya durumu ve rejim
         world_state = self._compute_world_state()
-        result["world_state"] = world_state
+        result = result.with_columns(pl.lit(world_state).alias('world_state'))
         regime = self._detect_regime(features)
-        result["regime"] = regime
+        result = result.with_columns(pl.lit(regime).alias('regime'))
 
         # 4. Analiz motorları
-        result["analysis"] = self._run_analysis_engines(features)
+        result = result.with_columns(pl.lit(self._run_analysis_engines(features)).alias('analysis'))
 
         # 5. Tahmin ve simülasyon
         forecast = self._compute_forecast(ticker, features, prices)
-        result["forecast"] = forecast
+        result = result.with_columns(pl.lit(forecast).alias('forecast'))
         monte_carlo = self._run_monte_carlo(ticker, prices, features)
-        result["monte_carlo"] = monte_carlo
-        result["intelligence_pipeline"] = self._run_intelligence_pipeline(ticker, features, regime)
+        result = result.with_columns(pl.lit(monte_carlo).alias('monte_carlo'))
+        result = result.with_columns(pl.lit(self._run_intelligence_pipeline(ticker, features, regime)).alias('intelligence_pipeline'))
 
         # 6. Spec ve faktörler
         spec = self._compute_spec(ticker, features, world_state)
-        result["spec"] = spec
+        result = result.with_columns(pl.lit(spec).alias('spec'))
         factors = self._compute_factors(market_data)
-        result["factors"] = factors
+        result = result.with_columns(pl.lit(factors).alias('factors'))
 
         # 7. Agent pipeline
         agent_result = self._run_agent_pipeline(ticker, features, sector_map, regime, prices)
-        result["agent"] = agent_result
+        result = result.with_columns(pl.lit(agent_result).alias('agent'))
         self._publish_agent_event(ticker, agent_result)
 
         # 8. Sinyal füzyonu ve karar
         fused_signal = self._fuse_signals(ticker, features, regime, factors, spec, agent_result, monte_carlo, world_state)
-        result["signal"] = fused_signal
+        result = result.with_columns(pl.lit(fused_signal).alias('signal'))
         decision = self._make_decision(ticker, prices, features, fused_signal, agent_result, regime, monte_carlo, forecast, spec, world_state)
         self._apply_learning_feedback(decision, regime)
-        result["decision"] = decision
+        result = result.with_columns(pl.lit(decision).alias('decision'))
 
         # 9. İşlem planı ve risk
         trade_plan = self._create_trade_plan(ticker, decision, prices, features, spec)
-        result["trade_plan"] = trade_plan
-        result["risk"] = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
-        result["compliance"] = self._check_compliance(ticker, decision, trade_plan, prices)
+        result = result.with_columns(pl.lit(trade_plan).alias('trade_plan'))
+        result = result.with_columns(pl.lit(self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)).alias('risk'))
+        result = result.with_columns(pl.lit(self._check_compliance(ticker, decision, trade_plan, prices)).alias('compliance'))
 
         # 10. Bağlam ve öğrenme
-        result["context"] = self._build_context()
+        result = result.with_columns(pl.lit(self._build_context()).alias('context'))
         self._record_prediction(ticker, decision, features)
 
         return result
@@ -938,7 +938,7 @@ class MasterOrchestrator:
             mfd = MacroFactorDecomposition()
             if hasattr(mfd, 'decompose'):
                 factor_result = mfd.decompose(macro_data)
-                macro_analysis["factor_decomposition"] = factor_result
+                macro_analysis = macro_analysis.with_columns(pl.lit(factor_result).alias('factor_decomposition'))
         except Exception as e:
             logger.debug("macro_factor_decomposition_failed", error=str(e))
 
@@ -948,7 +948,7 @@ class MasterOrchestrator:
             mct = MacroCorrelationTracker()
             if hasattr(mct, 'get_current_regime'):
                 corr_regime = mct.get_current_regime()
-                macro_analysis["correlation_regime"] = corr_regime
+                macro_analysis = macro_analysis.with_columns(pl.lit(corr_regime).alias('correlation_regime'))
         except Exception as e:
             logger.debug("macro_correlation_tracker_failed", error=str(e))
 
@@ -966,7 +966,7 @@ class MasterOrchestrator:
                     sector = sector_map.get(ticker, "OTHER")
                     try:
                         impact = macro_impact_analyzer.compute_cumulative_impact(ticker, sector)
-                        features["macro_cumulative_impact"] = impact.get("cumulative_impact", 0)
+                        features = features.with_columns(pl.lit(impact.get("cumulative_impact", 0)).alias('macro_cumulative_impact'))
                     except Exception as e:
                         logger.debug("Handled exception", error=str(e), context="orchestrator.py:614")
 
@@ -1008,7 +1008,7 @@ class MasterOrchestrator:
                 errors.append(f"{ticker}: {e}")
 
         total = len(market_data)
-        failed = sum(1 for r in per_ticker_results.values() if r["error"] is not None)
+        failed = sum(1 for r in per_ticker_results.to_numpy()() if r["error"] is not None)
         # Sağlık durumu gerçek başarısızlık oranına dayanır — uydurulmuş
         # bir "her zaman HEALTHY" değeri değildir.
         if total == 0 or failed == total:
@@ -1043,7 +1043,7 @@ class MasterOrchestrator:
         # Score'a göre sırala
         top_opportunities.sort(key=lambda x: x["score"], reverse=True)
         for i, opp in enumerate(top_opportunities[:20], 1):
-            opp["rank"] = i
+            opp = opp.with_columns(pl.lit(i).alias('rank'))
 
         # Learning status (audit #12)
         learning_status = {}

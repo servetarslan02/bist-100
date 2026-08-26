@@ -1,8 +1,8 @@
-import sqlite3
+import duckdb
 import structlog
 
 logger = structlog.get_logger(__name__)
-conn = sqlite3.connect("data/paper_trading_state.db")
+conn = duckdb.connect("data/paper_trading_state.db")
 cur = conn.cursor()
 cur.execute("SELECT * FROM pending_signals")
 cols = [d[0] for d in cur.description]

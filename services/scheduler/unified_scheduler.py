@@ -1088,33 +1088,33 @@ class UnifiedScheduler:
 
     def _init_state_db(self):
         """Scheduler state SQLite tablosunu oluştur."""
-        import sqlite3
+        import duckdb
         from pathlib import Path
         Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self._state_db_path, timeout=10.0)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.executescript("""
+        conn = duckdb.connect(self._state_db_path)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS scheduler_state (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
-            );
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS job_runs (
                 job_type TEXT PRIMARY KEY,
                 last_run_ts REAL NOT NULL,
                 updated_at TEXT NOT NULL
-            );
+            )
         """)
         conn.commit()
         conn.close()
 
     def save_state(self):
         """Scheduler durumunu SQLite'a kaydet."""
-        import sqlite3
+        import duckdb
         now_iso = datetime.now(timezone.utc).isoformat()
         try:
-            conn = sqlite3.connect(self._state_db_path, timeout=10.0)
-            conn.execute("PRAGMA journal_mode=WAL")
+            conn = duckdb.connect(self._state_db_path)
             # Job run'ları kaydet
             for job_type, ts in self._last_run.items():
                 conn.execute("""
@@ -1138,13 +1138,12 @@ class UnifiedScheduler:
 
     def _load_state(self):
         """Scheduler durumunu SQLite'dan yükle."""
-        import sqlite3
+        import duckdb
         from pathlib import Path
         try:
             if not Path(self._state_db_path).exists():
                 return
-            conn = sqlite3.connect(self._state_db_path, timeout=10.0)
-            conn.row_factory = sqlite3.Row
+            conn = duckdb.connect(self._state_db_path)
             # Job run'ları yükle
             rows = conn.execute("SELECT job_type, last_run_ts FROM job_runs").fetchall()
             self._last_run = {row["job_type"]: row["last_run_ts"] for row in rows}

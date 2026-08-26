@@ -14,7 +14,7 @@ Referanslar:
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -86,7 +86,7 @@ class LookAheadBiasDetector:
 
     def validate_feature_timestamps(
         self,
-        feature_df: pd.DataFrame,
+        feature_df: pl.DataFrame,
         feature_name: str,
         decision_timestamp: datetime,
         timestamp_col: str = "timestamp",
@@ -134,7 +134,7 @@ class LookAheadBiasDetector:
 
     def validate_rolling_window(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         window_size: int,
         feature_name: str,
         value_col: str = "close",
@@ -152,27 +152,27 @@ class LookAheadBiasDetector:
         if len(data) < window_size + 1:
             return report
 
-        data = data.sort_values(timestamp_col).reset_index(drop=True)
+        data = data.sort(timestamp_col)
 
         for i in range(window_size, len(data)):
             # Bu noktanın window'u data[i-window_size:i] olmalı
             # Eğer data[i-window_size:i+1] kullanılmışsa → leakage
-            window_values = data[value_col].iloc[i - window_size:i]
-            data[value_col].iloc[i]
+            window_values = data[value_col][i - window_size:i]
+            data[value_col][i]
 
             # Rolling mean hesapla (sadece geçmiş veri ile)
             expected_mean = window_values.mean()
 
             # Gerçek rolling değeri kontrol et
             if "rolling_mean" in data.columns:
-                actual_mean = data["rolling_mean"].iloc[i]
+                actual_mean = data["rolling_mean"][i]
                 if not np.isnan(actual_mean) and not np.isnan(expected_mean):
                     diff = abs(actual_mean - expected_mean)
                     if diff > 1e-10:
                         report.add_violation(BiasViolation(
                             violation_type="look_ahead",
                             severity="critical",
-                            timestamp=data[timestamp_col].iloc[i],
+                            timestamp=data[timestamp_col][i],
                             feature_name=feature_name,
                             description=f"Rolling window at index {i} uses future data. "
                                        f"Expected: {expected_mean:.4f}, Got: {actual_mean:.4f}",
@@ -278,7 +278,7 @@ class LookAheadBiasDetector:
 
     def validate_data_revision_integrity(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         report_date_col: str = "report_date",
         revision_col: Optional[str] = "revision_version",
     ) -> BiasReport:
@@ -298,7 +298,7 @@ class LookAheadBiasDetector:
 
         if revision_col and revision_col in data.columns:
             # Birden fazla revizyon varsa, sadece ilki kullanılmalı
-            for name, group in data.groupby(report_date_col):
+            for name, group in data.group_by(report_date_col):
                 if len(group) > 1:
                     report.add_violation(BiasViolation(
                         violation_type="look_ahead",
@@ -345,7 +345,7 @@ class BiasDetectorMiddleware:
 
     def pre_scan_check(
         self,
-        available_data: pd.DataFrame,
+        available_data: pl.DataFrame,
         decision_timestamp: datetime,
         label_horizon_days: int = 5,
         feature_window_days: int = 20,

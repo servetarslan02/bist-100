@@ -4,7 +4,7 @@ ALPHA BIST — Strategy Replay
 Strateji replay motoru.
 """
 
-import pandas as pd
+import polars as pl
 import numpy as np
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List
@@ -99,7 +99,7 @@ class StrategyReplay:
                 result.equity_curve.append(equity)
 
         if result.equity_curve:
-            returns = pd.Series(result.equity_curve).pct_change().dropna()
+            returns = pl.Series(result.equity_curve).pct_change().dropna()
             if len(returns) > 1:
                 result.sharpe_ratio = float(returns.mean() / returns.std() * np.sqrt(252)) if returns.std() > 0 else 0
                 cumulative = (1 + returns).cumprod()

@@ -8,7 +8,7 @@ saniyede yüzlerce denemeyi paralel (Multiprocessing) olarak icra eder.
 from typing import Dict, List, Tuple
 from dataclasses import dataclass
 import numpy as np
-import pandas as pd
+import polars as pl
 import optuna
 import os
 import structlog
@@ -63,7 +63,7 @@ class OptimizationTrialResult:
 class BayesianMetricOptimizer:
     """Tüm CPU çekirdeklerini kullanan yüksek hızlı optimizasyon motoru."""
 
-    def __init__(self, bm_df: pd.DataFrame, stock_dict: Dict[str, pd.DataFrame]):
+    def __init__(self, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame]):
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
@@ -74,11 +74,11 @@ class BayesianMetricOptimizer:
         for ticker, df in self.stock_dict.items():
             if len(df) < 50:
                 continue
-            closes = df["Close"].values.astype(np.float64)
-            opens = df["Open"].values.astype(np.float64)
-            highs = df["High"].values.astype(np.float64)
-            lows = df["Low"].values.astype(np.float64)
-            volumes = df["Volume"].values.astype(np.float64)
+            closes = df["Close"].to_numpy().astype(np.float64)
+            opens = df["Open"].to_numpy().astype(np.float64)
+            highs = df["High"].to_numpy().astype(np.float64)
+            lows = df["Low"].to_numpy().astype(np.float64)
+            volumes = df["Volume"].to_numpy().astype(np.float64)
 
             # ATR 14
             tr1 = highs[1:] - lows[1:]
@@ -136,7 +136,7 @@ class BayesianMetricOptimizer:
         trade_logs = []
         equity_curve = []
 
-        bm_closes = self.bm_df["Close"].values
+        bm_closes = self.bm_df["Close"].to_numpy()
         bm_dates = self.bm_df.index
 
         for day_idx in range(len(trading_dates)):
@@ -207,14 +207,14 @@ class BayesianMetricOptimizer:
                 atr_val = cdata["atr14"][d_idx]
 
                 if high_p > pos["peak_price"]:
-                    pos["peak_price"] = high_p
+                    pos = pos.with_columns(pl.lit(high_p).alias('peak_price'))
 
                 if close_p >= pos["entry_price"] + (atr_val * params.atr_breakeven_mult):
-                    pos["breakeven_hit"] = True
+                    pos = pos.with_columns(pl.lit(True).alias('breakeven_hit'))
 
                 if pos["breakeven_hit"]:
                     new_stop = pos["peak_price"] - (atr_val * params.atr_trailing_mult)
-                    pos["stop_loss"] = max(pos["stop_loss"], new_stop, pos["entry_price"])
+                    pos = pos.with_columns(pl.lit(max(pos["stop_loss"], new_stop, pos["entry_price"])).alias('stop_loss'))
 
                 if close_p <= pos["stop_loss"] or is_crisis:
                     pending_sell_orders.append({"ticker": ticker})
@@ -268,17 +268,17 @@ class BayesianMetricOptimizer:
         total_ret = ((final_eq - initial_capital) / initial_capital) * 100
 
         # Metrikler
-        df_eq = pd.Series(equity_curve)
+        df_eq = pl.Series(equity_curve)
         peak = df_eq.cummax()
         dd = (df_eq - peak) / peak * 100
         max_dd = float(dd.min()) if len(dd) > 0 else 0.0
 
-        df_t = pd.DataFrame(trade_logs)
+        df_t = pl.DataFrame(trade_logs)
         t_cnt = len(df_t)
-        w_cnt = len(df_t[df_t["pnl"] > 0]) if t_cnt > 0 else 0
+        w_cnt = len(df_t.filter(pl.col('df_t') pnl >)) if t_cnt > 0 else 0
         w_rate = (w_cnt / t_cnt * 100) if t_cnt > 0 else 0.0
-        w_sum = df_t[df_t["pnl"] > 0]["pnl"].sum() if t_cnt > 0 else 0
-        l_sum = abs(df_t[df_t["pnl"] < 0]["pnl"].sum()) if t_cnt > 0 else 1e-9
+        w_sum = df_t.filter(pl.col('df_t') pnl >)["pnl"].sum() if t_cnt > 0 else 0
+        l_sum = abs(df_t.filter(pl.col('df_t') pnl <)["pnl"].sum()) if t_cnt > 0 else 1e-9
         pf = round(float(w_sum / max(l_sum, 1e-9)), 2)
 
         returns = df_eq.pct_change().dropna()

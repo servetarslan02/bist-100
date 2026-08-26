@@ -7,7 +7,7 @@ import sys
 import os
 import orjson
 import numpy as np
-import pandas as pd
+import polars as pl
 
 sys.path.insert(0, os.path.abspath("."))
 

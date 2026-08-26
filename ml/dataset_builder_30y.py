@@ -13,7 +13,7 @@ ALPHA BIST — 30-Yıllık ML Feature Matrix & Dataset Builder
 import os
 import sys
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Tuple, List
 import structlog
 
@@ -29,20 +29,20 @@ class DatasetBuilder30Y:
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 
-    def build_feature_matrix(self) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    def build_feature_matrix(self) -> Tuple[pl.DataFrame, pl.DataFrame]:
         """
         Train (1997-2023) ve OOS (2024-2026) feature matrislerini üretir.
         """
         logger.info("30 yıllık veri üzerinde ML feature mühendisliği başlatılıyor...")
         
-        bm_closes = self.bm_df["Close"].values
+        bm_closes = self.bm_df["Close"].to_numpy()
         bm_dates = self.bm_df.index
         
         # BIST-100 Rejim Göstergeleri
-        bm_sma50 = pd.Series(bm_closes, index=bm_dates).rolling(50).mean().values
-        bm_sma200 = pd.Series(bm_closes, index=bm_dates).rolling(200).mean().values
-        bm_returns_5d = pd.Series(bm_closes, index=bm_dates).pct_change(5).values * 100.0
-        bm_vol_20d = pd.Series(bm_closes, index=bm_dates).pct_change().rolling(20).std().values * np.sqrt(252) * 100.0
+        bm_sma50 = pl.Series(bm_closes, index=bm_dates).rolling(50).mean().to_numpy()
+        bm_sma200 = pl.Series(bm_closes, index=bm_dates).rolling(200).mean().to_numpy()
+        bm_returns_5d = pl.Series(bm_closes, index=bm_dates).pct_change(5).to_numpy() * 100.0
+        bm_vol_20d = pl.Series(bm_closes, index=bm_dates).pct_change().rolling(20).std().to_numpy() * np.sqrt(252) * 100.0
 
         all_rows = []
 
@@ -51,11 +51,11 @@ class DatasetBuilder30Y:
                 continue
             
             df = df.sort_index()
-            closes = df["Close"].values.astype(np.float64)
-            opens = df["Open"].values.astype(np.float64)
-            highs = df["High"].values.astype(np.float64)
-            lows = df["Low"].values.astype(np.float64)
-            volumes = df["Volume"].values.astype(np.float64)
+            closes = df["Close"].to_numpy().astype(np.float64)
+            opens = df["Open"].to_numpy().astype(np.float64)
+            highs = df["High"].to_numpy().astype(np.float64)
+            lows = df["Low"].to_numpy().astype(np.float64)
+            volumes = df["Volume"].to_numpy().astype(np.float64)
             dates = df.index
 
             # ATR 14
@@ -159,12 +159,12 @@ class DatasetBuilder30Y:
                 }
                 all_rows.append(row)
 
-        full_df = pd.DataFrame(all_rows)
+        full_df = pl.DataFrame(all_rows)
         logger.info(f"Toplam {len(full_df):,} seans satırı üretildi.")
 
         # Train (1997-2023) ve OOS (2024-2026) Ayrımı
-        train_df = full_df[full_df["year"] <= 2023].copy()
-        oos_df = full_df[full_df["year"] >= 2024].copy()
+        train_df = full_df.filter(pl.col('full_df') year <=).copy()
+        oos_df = full_df.filter(pl.col('full_df') year >=).copy()
 
         logger.info(f"Train Seti: {len(train_df):,} satır (1997-2023)")
         logger.info(f"OOS Holdout Seti: {len(oos_df):,} satır (2024-2026)")

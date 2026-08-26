@@ -1,9 +1,9 @@
-import sqlite3
+import duckdb
 import os
 
 db_path = "data/alpha_dev.db"
 if os.path.exists(db_path):
-    conn = sqlite3.connect(db_path)
+    conn = duckdb.connect(db_path)
     cur = conn.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
     tables = [r[0] for r in cur.fetchall()]

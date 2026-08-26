@@ -14,7 +14,7 @@ Geçmiş versiyonla aynı finansal sonuçları üretir.
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 import structlog
@@ -374,11 +374,11 @@ class ScannerBacktestRunner:
 
     def run(
         self,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         lookback_days: int = 120,
         universe_at_date: Optional[List[str]] = None,
         signal_threshold: float = 60.0,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
     ) -> BacktestResult:
         """Optimize edilmiş backtest."""
         import time as _time
@@ -396,7 +396,7 @@ class ScannerBacktestRunner:
 
         # Ortak tarih aralığı
         all_dates = set()
-        for df in market_data.values():
+        for df in market_data.to_numpy()():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -452,12 +452,12 @@ class ScannerBacktestRunner:
                 if cached_features is not None:
                     features = cached_features
                 else:
-                    df_lookback = df_until.iloc[-effective_lookback:]
+                    df_lookback = df_until[-effective_lookback:]
                     try:
                         mask = self._tm.compute_mask(
-                            ticker, df_lookback['Open'].values,
-                            df_lookback['High'].values, df_lookback['Low'].values,
-                            df_lookback['Close'].values, df_lookback['Volume'].values,
+                            ticker, df_lookback['Open'].to_numpy(),
+                            df_lookback['High'].to_numpy(), df_lookback['Low'].to_numpy(),
+                            df_lookback['Close'].to_numpy(), df_lookback['Volume'].to_numpy(),
                         )
                         features = self._calc.compute_all_features(
                             df_lookback, mask=mask.mask, ticker=ticker
@@ -492,21 +492,21 @@ class ScannerBacktestRunner:
             # Satışlar önce
             for sig in sells:
                 if sig.ticker in market_data and next_date in market_data[sig.ticker].index:
-                    price = market_data[sig.ticker].loc[next_date, 'Open']
+                    price = market_data[sig.ticker].filter(next_date, 'Open']
                     sim.execute_sell(sig.ticker, price, date_str)
 
             # Alımlar
             for sig in buys:
                 if sig.ticker not in sim._positions and sig.ticker in market_data:
                     if next_date in market_data[sig.ticker].index:
-                        price = market_data[sig.ticker].loc[next_date, 'Open']
+                        price = market_data[sig.ticker].filter(next_date, 'Open']
                         sim.execute_buy(sig.ticker, price, date_str)
 
             # Equity güncelle
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = market_data[ticker].loc[current_date, 'Close']
+                    prices[ticker] = market_data[ticker].filter(current_date, 'Close']
             sim.update_equity(prices, date_str)
 
         elapsed = _time.time() - start_time

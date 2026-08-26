@@ -11,7 +11,7 @@ Recovery: restart sonrası eksiksiz veri yükler.
 """
 
 import orjson
-import sqlite3
+import duckdb
 from typing import Dict, Any, List, Optional
 from pathlib import Path
 import structlog
@@ -31,9 +31,9 @@ class BacktestPersistence:
     def _ensure_db(self):
         """DB ve tabloları oluştur."""
         Path(self._db_path).parent.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_runs (
                     run_id TEXT PRIMARY KEY,
                     start_date TEXT NOT NULL,
@@ -47,10 +47,11 @@ class BacktestPersistence:
                     config_json TEXT,
                     metrics_json TEXT,
                     created_at TEXT DEFAULT CURRENT_TIMESTAMP
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_trades (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     run_id TEXT NOT NULL,
                     trade_id INTEGER,
                     ticker TEXT,
@@ -64,10 +65,11 @@ class BacktestPersistence:
                     pnl_pct REAL,
                     holding_days INTEGER,
                     FOREIGN KEY (run_id) REFERENCES backtest_runs(run_id)
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_equity (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     run_id TEXT NOT NULL,
                     date TEXT NOT NULL,
                     equity REAL,
@@ -77,12 +79,11 @@ class BacktestPersistence:
                     drawdown REAL,
                     daily_return REAL,
                     FOREIGN KEY (run_id) REFERENCES backtest_runs(run_id)
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_trades_run ON backtest_trades(run_id);
-                CREATE INDEX IF NOT EXISTS idx_equity_run ON backtest_equity(run_id);
-                CREATE INDEX IF NOT EXISTS idx_equity_date ON backtest_equity(run_id, date);
+                )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_run ON backtest_trades(run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_equity_run ON backtest_equity(run_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_equity_date ON backtest_equity(run_id, date)")
             conn.commit()
         finally:
             conn.close()
@@ -97,7 +98,7 @@ class BacktestPersistence:
         config: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Run metadata kaydet."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
             conn.execute(
                 """INSERT OR REPLACE INTO backtest_runs
@@ -125,7 +126,7 @@ class BacktestPersistence:
         """Trade'leri kaydet."""
         if not trades:
             return
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
             conn.executemany(
                 """INSERT INTO backtest_trades
@@ -153,7 +154,7 @@ class BacktestPersistence:
         """Equity curve kaydet."""
         if not curve:
             return
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
             conn.executemany(
                 """INSERT INTO backtest_equity
@@ -176,9 +177,8 @@ class BacktestPersistence:
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
         """Run metadata getir."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
-            conn.row_factory = sqlite3.Row
             row = conn.execute(
                 "SELECT * FROM backtest_runs WHERE run_id = ?", (run_id,)
             ).fetchone()
@@ -195,9 +195,8 @@ class BacktestPersistence:
 
     def get_trades(self, run_id: str) -> List[Dict[str, Any]]:
         """Trade'leri getir."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
-            conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM backtest_trades WHERE run_id = ? ORDER BY id",
                 (run_id,),
@@ -208,9 +207,8 @@ class BacktestPersistence:
 
     def get_equity_curve(self, run_id: str) -> List[Dict[str, Any]]:
         """Equity curve getir."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
-            conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM backtest_equity WHERE run_id = ? ORDER BY id",
                 (run_id,),
@@ -221,9 +219,8 @@ class BacktestPersistence:
 
     def list_runs(self, limit: int = 50) -> List[Dict[str, Any]]:
         """Son run'ları listele."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
-            conn.row_factory = sqlite3.Row
             rows = conn.execute(
                 "SELECT * FROM backtest_runs ORDER BY created_at DESC LIMIT ?",
                 (limit,),
@@ -234,7 +231,7 @@ class BacktestPersistence:
 
     def delete_run(self, run_id: str) -> None:
         """Run ve ilgili verileri sil."""
-        conn = sqlite3.connect(self._db_path)
+        conn = duckdb.connect(self._db_path)
         try:
             conn.execute("DELETE FROM backtest_equity WHERE run_id = ?", (run_id,))
             conn.execute("DELETE FROM backtest_trades WHERE run_id = ?", (run_id,))

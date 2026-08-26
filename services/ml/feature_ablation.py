@@ -1,4 +1,4 @@
-import pandas as pd
+import polars as pl
 from typing import List
 
 from services.core.alpha_engine import AlphaEngine
@@ -25,7 +25,7 @@ class FeatureAblator:
         
         for fold in target_folds:
             # AlphaEngine'e sadece aktif feature'lari kullanmasi icin kanca atiyoruz
-            self.engine.params["feature_fraction"] = 1.0 # Ablasyonda fraction kullanilmaz
+            self.engine.params = self.engine.params.with_columns(pl.lit(1.0 # Ablasyonda fraction kullanilmaz).alias('feature_fraction'))
             
             success = self.engine.train(
                 market_data, bm_df, sector_map,
@@ -44,8 +44,8 @@ class FeatureAblator:
                 adj_weight = 0.10 # Equal weight
                 
                 df_t = market_data.get(ticker)
-                t_start = pd.Timestamp(fold['test_start'])
-                t_end = pd.Timestamp(fold['test_end'])
+                t_start = pl.Series(fold['test_start'])
+                t_end = pl.Series(fold['test_end'])
                 df_test = df_t[(df_t.index >= t_start) & (df_t.index <= t_end)]
                 if df_test.empty: continue
                 

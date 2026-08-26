@@ -31,7 +31,7 @@ Kullanım:
     weights = state_store.load_fusion_weights()
 """
 
-import sqlite3
+import duckdb
 import time
 import signal
 import atexit
@@ -64,7 +64,7 @@ class CentralStateStore:
     def _init_db(self):
         """Tabloları oluştur."""
         with self._connect() as conn:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS circuit_breakers (
                     name TEXT PRIMARY KEY,
                     state TEXT NOT NULL,
@@ -72,30 +72,34 @@ class CentralStateStore:
                     last_failure_at TEXT,
                     last_success_at TEXT,
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS provider_reliability (
                     name TEXT PRIMARY KEY,
                     total_calls INTEGER DEFAULT 0,
                     total_failures INTEGER DEFAULT 0,
                     recent_results TEXT DEFAULT '[]',
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS rate_limiters (
                     name TEXT PRIMARY KEY,
                     tokens REAL NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS learning_state (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS learning_predictions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     ticker TEXT NOT NULL,
                     predicted_direction TEXT,
                     predicted_return REAL,
@@ -104,40 +108,38 @@ class CentralStateStore:
                     features TEXT,
                     outcome TEXT,
                     created_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS fusion_weights (
                     key TEXT PRIMARY KEY,
                     weights TEXT NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS correlation_history (
                     var1 TEXT NOT NULL,
                     var2 TEXT NOT NULL,
                     corr_values TEXT NOT NULL,
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY (var1, var2)
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS champion_history (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     data TEXT NOT NULL,
                     created_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_pred_ticker ON learning_predictions(ticker);
-                CREATE INDEX IF NOT EXISTS idx_pred_created ON learning_predictions(created_at);
+                )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_ticker ON learning_predictions(ticker)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_created ON learning_predictions(created_at)")
             conn.commit()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self._db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
-        conn.execute("PRAGMA cache_size=-8000")  # 8MB cache
+        conn = duckdb.connect(str(self._db_path))
         try:
             yield conn
         finally:
@@ -322,12 +324,11 @@ class CentralStateStore:
 
     def cleanup_old_predictions(self, keep_days: int = 30):
         """Eski tahminleri temizle (SSD dostu)."""
-        cutoff = datetime.now(timezone.utc).isoformat()
         with self._connect() as conn:
             conn.execute("""
                 DELETE FROM learning_predictions
-                WHERE created_at < datetime('now', ?)
-            """, (f'-{keep_days} days',))
+                WHERE created_at < (current_date - INTERVAL '1 day' * ?)
+            """, (keep_days,))
             conn.commit()
 
     # ===================== SIGNAL FUSION =====================

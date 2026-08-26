@@ -17,7 +17,7 @@ Referanslar:
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -159,10 +159,10 @@ class MultiAssetBacktestEngine:
 
     def run(
         self,
-        market_data: pd.DataFrame,
-        signal_data: pd.DataFrame,
+        market_data: pl.DataFrame,
+        signal_data: pl.DataFrame,
         sector_mapping: Dict[str, str],
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
         universe_tickers: Optional[Set[str]] = None,
     ) -> MultiAssetResult:
         """
@@ -278,8 +278,8 @@ class MultiAssetBacktestEngine:
 
         for date in dates:
             # Current day data
-            day_market = market_data[market_data["date"] == date]
-            day_signals = signal_data[signal_data["date"] == date] if signal_data is not None else pd.DataFrame()
+            day_market = market_data.filter(pl.col('market_data') date ==)
+            day_signals = signal_data.filter(pl.col('signal_data') date ==) if signal_data is not None else pl.DataFrame()
 
             if day_market.empty:
                 continue
@@ -338,7 +338,7 @@ class MultiAssetBacktestEngine:
             # T+1: signal 'date' gününe ait, execution fiyatı D+1 açılışı
             next_date = next_date_map.get(date)
             if not day_signals.empty and next_date is not None:
-                sell_signals = day_signals[day_signals["score"] < 40]  # Düşük skor = sat
+                sell_signals = day_signals.filter(pl.col('day_signals') score <)  # Düşük skor = sat
                 for _, sig in sell_signals.iterrows():
                     ticker = sig["ticker"]
                     if ticker in positions:
@@ -419,7 +419,7 @@ class MultiAssetBacktestEngine:
                 buy_signals = day_signals[
                     (day_signals["score"] >= 70) &  # Yüksek skor = al
                     (~day_signals["ticker"].isin(positions.keys()))
-                ].sort_values("score", ascending=False)
+                ].sort("score", ascending=False)
 
                 for _, sig in buy_signals.iterrows():
                     if len(positions) >= cfg.max_positions:

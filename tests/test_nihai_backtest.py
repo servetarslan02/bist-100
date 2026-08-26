@@ -13,9 +13,9 @@ Tüm yeni modüller için kapsamlı testler:
 """
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, List, Any
 
 # Import modules
@@ -64,22 +64,22 @@ class TestLookAheadBiasDetector:
 
     def test_validate_feature_timestamps_no_leakage(self):
         """Feature'larda gelecek veri yoksa temiz rapor dönmeli."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2024-01-01", periods=10),
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True),
             "feature_1": np.random.randn(10),
         })
-        decision_time = pd.Timestamp("2024-01-10")
+        decision_time = pl.Date("2024-01-10")
         report = self.detector.validate_feature_timestamps(df, "feature_1", decision_time)
         assert report.critical_count == 0
         assert report.is_clean
 
     def test_validate_feature_timestamps_with_leakage(self):
         """Feature'larda gelecek veri varsa critical ihlal bulmalı."""
-        df = pd.DataFrame({
-            "timestamp": pd.date_range("2024-01-01", periods=20),
+        df = pl.DataFrame({
+            "timestamp": pl.date_range(date(2024, 1, 1), date(2024, 1, 20), timedelta(days=1), eager=True),
             "feature_1": np.random.randn(20),
         })
-        decision_time = pd.Timestamp("2024-01-10")  # 10 gün sonra veri var
+        decision_time = pl.Date("2024-01-10")  # 10 gün sonra veri var
         report = self.detector.validate_feature_timestamps(df, "feature_1", decision_time)
         assert report.critical_count > 0
         assert not report.is_clean
@@ -130,7 +130,7 @@ class TestBiasDetectorMiddleware:
         middleware = BiasDetectorMiddleware(strict_mode=True)
         middleware.enabled = False
         is_safe, report = middleware.pre_scan_check(
-            pd.DataFrame({"timestamp": [datetime.now()]}),
+            pl.DataFrame({"timestamp": [datetime.now()]}),
             datetime.now(),
         )
         assert is_safe
@@ -172,8 +172,8 @@ class TestSurvivorshipBiasHandler:
 
     def test_survivorship_bias_magnitude(self):
         """Bias büyüklüğü doğru hesaplanmalı."""
-        full_returns = pd.DataFrame({"return": [0.01, -0.02, 0.03, -0.01, 0.02]})
-        survivor_returns = pd.DataFrame({"return": [0.01, 0.03, 0.02, 0.01, 0.03]})
+        full_returns = pl.DataFrame({"return": [0.01, -0.02, 0.03, -0.01, 0.02]})
+        survivor_returns = pl.DataFrame({"return": [0.01, 0.03, 0.02, 0.01, 0.03]})
 
         result = self.handler.calculate_survivorship_bias_magnitude(
             full_returns, survivor_returns
@@ -333,7 +333,7 @@ class TestMultiAssetBacktestEngine:
     def test_basic_run(self):
         """Temel çalıştırma testi."""
         # Create sample data
-        dates = pd.date_range("2024-01-01", periods=100)
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 1) + timedelta(days=100), timedelta(days=1), eager=True)
         tickers = ["HISSE1", "HISSE2", "HISSE3"]
 
         market_data = []
@@ -358,8 +358,8 @@ class TestMultiAssetBacktestEngine:
                     "confidence": np.random.uniform(0.3, 0.9),
                 })
 
-        market_df = pd.DataFrame(market_data)
-        signal_df = pd.DataFrame(signal_data)
+        market_df = pl.DataFrame(market_data)
+        signal_df = pl.DataFrame(signal_data)
         sector_map = {t: "test_sector" for t in tickers}
 
         config = MultiAssetConfig(
@@ -596,7 +596,7 @@ class TestBacktestScannerParity:
             signal_engine=lambda f, t: 75.0,
         )
 
-        data = pd.DataFrame({"close": [100, 101, 102]})
+        data = pl.DataFrame({"close": [100, 101, 102]})
         result = self.parity.verify_feature_parity(
             data, "TEST", datetime.now()
         )
@@ -615,7 +615,7 @@ class TestBacktestScannerParity:
             signal_engine=mock_signal_engine,
         )
 
-        data = pd.DataFrame({
+        data = pl.DataFrame({
             "ticker": ["TEST1"] * 5,
             "close": [100, 101, 102, 103, 104],
         })

@@ -10,7 +10,7 @@ Kilitli Başarı Kriterleri:
 
 import sys
 import os
-import pandas as pd
+import polars as pl
 import numpy as np
 
 # Windows UTF-8 Terminal desteği

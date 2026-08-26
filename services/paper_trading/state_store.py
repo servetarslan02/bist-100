@@ -12,7 +12,7 @@ Mevcut services.core.audit_log.AuditLog'i extend eder.
 
 import orjson
 import os
-import sqlite3
+import duckdb
 import shutil
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -35,7 +35,7 @@ class PaperStateStore:
     def _init_db(self):
         """SQLite tablolarini olustur."""
         with self._connect() as conn:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS portfolio_state (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     date TEXT NOT NULL,
@@ -43,8 +43,9 @@ class PaperStateStore:
                     initial_capital REAL NOT NULL,
                     last_updated TEXT NOT NULL,
                     json_data TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS positions (
                     ticker TEXT PRIMARY KEY,
                     quantity INTEGER NOT NULL,
@@ -54,8 +55,9 @@ class PaperStateStore:
                     entry_date TEXT,
                     last_update TEXT NOT NULL,
                     json_data TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS trades (
                     trade_id TEXT PRIMARY KEY,
                     date TEXT NOT NULL,
@@ -68,8 +70,9 @@ class PaperStateStore:
                     commission REAL NOT NULL,
                     reason TEXT,
                     json_data TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
                     order_id TEXT PRIMARY KEY,
                     date TEXT NOT NULL,
@@ -83,18 +86,20 @@ class PaperStateStore:
                     status TEXT NOT NULL,
                     rejection_reason TEXT,
                     json_data TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS audit_log (
-                    entry_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    entry_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     timestamp TEXT NOT NULL,
                     date TEXT NOT NULL,
                     entry_type TEXT NOT NULL,
                     ticker TEXT,
                     json_data TEXT NOT NULL,
                     entry_hash TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS daily_performance (
                     date TEXT PRIMARY KEY,
                     portfolio_value REAL NOT NULL,
@@ -109,22 +114,25 @@ class PaperStateStore:
                     num_positions INTEGER NOT NULL,
                     num_trades INTEGER NOT NULL,
                     json_data TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS equity_curve (
                     date TEXT PRIMARY KEY,
                     equity REAL NOT NULL,
                     cash REAL NOT NULL,
                     invested REAL NOT NULL,
                     benchmark_equity REAL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS config (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL,
                     updated_at TEXT NOT NULL
-                );
-
+                )
+            """)
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS pending_signals (
                     signal_id TEXT PRIMARY KEY,
                     date TEXT NOT NULL,
@@ -138,22 +146,18 @@ class PaperStateStore:
                     json_data TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     expires_at TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date);
-                CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date);
-                CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date);
-                CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_log(entry_type);
-                CREATE INDEX IF NOT EXISTS idx_pending_signals_date ON pending_signals(date);
+                )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_date ON trades(date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_orders_date ON orders(date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_date ON audit_log(date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_type ON audit_log(entry_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pending_signals_date ON pending_signals(date)")
             conn.commit()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")  # Atomic write + crash safety
-        conn.execute("PRAGMA synchronous=NORMAL")  # WAL ile birlikte güvenli
+        conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
         finally:
@@ -437,16 +441,14 @@ class PaperStateStore:
     def reset_all(self):
         """Tum state'i sifirla (DANGER)."""
         with self._connect() as conn:
-            conn.executescript("""
-                DELETE FROM portfolio_state;
-                DELETE FROM positions;
-                DELETE FROM trades;
-                DELETE FROM orders;
-                DELETE FROM audit_log;
-                DELETE FROM daily_performance;
-                DELETE FROM equity_curve;
-                DELETE FROM config;
-            """)
+            conn.execute("DELETE FROM portfolio_state")
+            conn.execute("DELETE FROM positions")
+            conn.execute("DELETE FROM trades")
+            conn.execute("DELETE FROM orders")
+            conn.execute("DELETE FROM audit_log")
+            conn.execute("DELETE FROM daily_performance")
+            conn.execute("DELETE FROM equity_curve")
+            conn.execute("DELETE FROM config")
             conn.commit()
         logger.warning("PaperStateStore RESET — all data cleared")
 

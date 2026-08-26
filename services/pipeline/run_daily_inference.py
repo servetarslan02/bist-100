@@ -4,7 +4,7 @@ def run_alpha_engine_sync():
     from services.core.risk_manager import RiskManager
     import asyncio
     import orjson
-    import pandas as pd
+    import polars as pl
     from datetime import datetime
     
     engine = AlphaEngine()
@@ -12,7 +12,7 @@ def run_alpha_engine_sync():
     
     # 1. Veri Cek (Son 1 yili alalim yeterli)
     today = datetime.now()
-    start_date = (today - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+    start_date = (today - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
     end_date = today.strftime("%Y-%m-%d")
     
     market_data, bm_df, sector_map = engine.fetch_data(start_date, end_date)
@@ -45,7 +45,7 @@ def run_alpha_engine_sync():
     top_picks = preds[:10]
     
     # Makro Rejim Kontrolu
-    t_date = pd.Timestamp(target_date)
+    t_date = pl.Series(target_date)
     regime = rm.get_market_regime(bm_df, t_date)
     is_cash = regime < 1.0
     

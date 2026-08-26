@@ -10,8 +10,8 @@ import os
 import orjson
 import traceback
 import numpy as np
-import pandas as pd
-from datetime import datetime, timezone, timedelta
+import polars as pl
+from datetime import datetime, timezone, timedelta, date
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
@@ -249,7 +249,7 @@ def audit_live_data(report: AuditReport):
                     break
 
             # Gelecek timestamp kontrolü (tz-aware-safe)
-            now_ts = pd.Timestamp.now(tz=df.index.tz) if df.index.tz else pd.Timestamp.now()
+            now_ts = pl.Date.now(tz=df.index.tz) if df.index.tz else pl.Date.now()
             future_dates = df.index[df.index > now_ts]
             if len(future_dates) > 0:
                 issues.append(AuditIssue(
@@ -266,7 +266,7 @@ def audit_live_data(report: AuditReport):
                 last_date_utc = last_date.tz_convert('UTC').tz_localize(None)
             else:
                 last_date_utc = last_date
-            days_stale = (pd.Timestamp.now() - last_date_utc).days
+            days_stale = (pl.Date.now() - last_date_utc).days
             if days_stale > 5:
                 issues.append(AuditIssue(
                     module="Data", severity="P2", category="DATA BUG",
@@ -534,17 +534,17 @@ def audit_features(report: AuditReport):
         # Sentetik veri oluştur (bilinen sonuçlarla)
         np.random.seed(42)
         n = 120
-        dates = pd.date_range(end=datetime.now(), periods=n, freq='B')
+        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         close = 100 + np.cumsum(np.random.randn(n) * 0.5)
         high = close + np.abs(np.random.randn(n) * 0.5)
         low = close - np.abs(np.random.randn(n) * 0.5)
         open_ = close + np.random.randn(n) * 0.2
         volume = np.random.randint(10000, 1000000, n).astype(float)
 
-        df = pd.DataFrame({
+        df = pl.DataFrame({
             'Open': open_, 'High': high, 'Low': low,
             'Close': close, 'Volume': volume
-        }, index=dates)
+        })
 
         tm = TradabilityMask()
         mask = tm.compute_mask(
@@ -780,13 +780,13 @@ def audit_regime(report: AuditReport):
         # BULL market sentetik veri
         np.random.seed(42)
         n = 120
-        dates = pd.date_range(end=datetime.now(), periods=n, freq='B')
+        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         bull_close = 100 + np.arange(n) * 0.5 + np.random.randn(n) * 0.5
-        bull_df = pd.DataFrame({
+        bull_df = pl.DataFrame({
             'Open': bull_close - 0.5, 'High': bull_close + 1,
             'Low': bull_close - 1, 'Close': bull_close,
             'Volume': np.random.randint(100000, 1000000, n)
-        }, index=dates)
+        })
 
         bull_data = {"XU100": bull_df}
         regime = rd.detect_regime(bull_data)
@@ -803,11 +803,11 @@ def audit_regime(report: AuditReport):
 
         # BEAR market
         bear_close = 100 - np.arange(n) * 0.5 + np.random.randn(n) * 0.5
-        bear_df = pd.DataFrame({
+        bear_df = pl.DataFrame({
             'Open': bear_close + 0.5, 'High': bear_close + 1,
             'Low': bear_close - 1, 'Close': bear_close,
             'Volume': np.random.randint(100000, 1000000, n)
-        }, index=dates)
+        })
 
         bear_data = {"XU100": bear_df}
         regime = rd.detect_regime(bear_data)
@@ -824,11 +824,11 @@ def audit_regime(report: AuditReport):
 
         # SIDEWAYS
         sideways_close = 100 + np.random.randn(n) * 1
-        sideways_df = pd.DataFrame({
+        sideways_df = pl.DataFrame({
             'Open': sideways_close - 0.1, 'High': sideways_close + 0.5,
             'Low': sideways_close - 0.5, 'Close': sideways_close,
             'Volume': np.random.randint(100000, 1000000, n)
-        }, index=dates)
+        })
 
         sideways_data = {"XU100": sideways_df}
         regime = rd.detect_regime(sideways_data)
@@ -1468,7 +1468,7 @@ def audit_walk_forward(report: AuditReport):
         wf = WalkForwardValidation(train_size=252, test_size=63, purge_size=5, embargo_size=5)
 
         # Sentetik tarih listesi
-        dates = list(pd.date_range('2020-01-01', periods=1000, freq='B'))
+        dates = pl.date_range(date(2020, 1, 1), date(2020, 1, 1) + timedelta(days=2000), timedelta(days=1), eager=True).head(1000).to_list()
 
         splits = wf.generate_splits(dates)
         details_lines.append(f"  Fold sayısı: {len(splits)}")
@@ -1775,13 +1775,13 @@ def audit_lookahead(report: AuditReport):
         # Sentetik veri oluştur
         np.random.seed(42)
         n = 60
-        dates = pd.date_range(end=datetime.now(), periods=n, freq='B')
+        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         close = 100 + np.cumsum(np.random.randn(n) * 0.5)
-        df = pd.DataFrame({
+        df = pl.DataFrame({
             'Open': close - 0.5, 'High': close + 1,
             'Low': close - 1, 'Close': close,
             'Volume': np.random.randint(10000, 100000, n)
-        }, index=dates)
+        })
 
         # Feature'ları hesapla
         from services.core.tradability_mask import TradabilityMask

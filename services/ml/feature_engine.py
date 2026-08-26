@@ -22,7 +22,7 @@ FEATURE GRUPLARI:
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional
 import structlog
 
@@ -33,7 +33,7 @@ def _safe_float(v) -> float:
     if v is None:
         return np.nan
     if hasattr(v, 'iloc'):
-        v = v.iloc[-1] if len(v) > 0 else np.nan
+        v = v[-1] if len(v) > 0 else np.nan
     try:
         val = float(v)
         return np.nan if np.isnan(val) else val
@@ -67,14 +67,15 @@ class FeatureEngine:
         "annual": 252,
     }
 
-    def _normalize_index(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _normalize_index(self, df: pl.DataFrame) -> pl.DataFrame:
         """Tüm DataFrame index'lerini timezone-naive'e dönüştür ve MultiIndex sütunları düzleştir."""
         if df is None or df.empty:
             return df
         df = df.copy()
-        if isinstance(df.columns, pd.MultiIndex):
+        if isinstance(df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
+# pd.MultiIndex):
             df.columns = [c[0] if isinstance(c, tuple) else c for c in df.columns]
-        idx = pd.to_datetime(df.index)
+        idx = pl.Series(df.index)
         if getattr(idx, 'tz', None) is not None:
             idx = idx.tz_convert(None)
         df.index = idx
@@ -83,9 +84,9 @@ class FeatureEngine:
     def compute_all(
         self,
         ticker: str,
-        df: pd.DataFrame,
-        benchmark_df: Optional[pd.DataFrame] = None,
-        sector_returns: Optional[pd.Series] = None,     # günlük sektör return serisi
+        df: pl.DataFrame,
+        benchmark_df: Optional[pl.DataFrame] = None,
+        sector_returns: Optional[pl.Series] = None,     # günlük sektör return serisi
         universe_returns: Optional[Dict[str, float]] = None,  # {ticker: son_gün_return}
     ) -> Dict[str, float]:
         """
@@ -102,7 +103,7 @@ class FeatureEngine:
             benchmark_df = self._normalize_index(benchmark_df)
 
         if sector_returns is not None and hasattr(sector_returns, 'index'):
-            idx = pd.to_datetime(sector_returns.index)
+            idx = pl.Series(sector_returns.index)
             if getattr(idx, 'tz', None) is not None:
                 idx = idx.tz_convert(None)
             sector_returns = sector_returns.copy()
@@ -111,7 +112,7 @@ class FeatureEngine:
         close_raw = df["Close"]
         close = (close_raw.squeeze() if hasattr(close_raw, 'squeeze') else close_raw).astype(float)
         
-        vol_raw = df["Volume"] if "Volume" in df else pd.Series(dtype=float)
+        vol_raw = df["Volume"] if "Volume" in df else pl.Series(dtype=float)
         volume = (vol_raw.squeeze() if hasattr(vol_raw, 'squeeze') else vol_raw).astype(float)
         
         high_raw = df["High"] if "High" in df else close
@@ -159,27 +160,27 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # A) Price Context
     # ------------------------------------------------------------------ #
-    def _price_context(self, close: pd.Series, high: pd.Series, low: pd.Series) -> Dict:
+    def _price_context(self, close: pl.Series, high: pl.Series, low: pl.Series) -> Dict:
         f = {}
         n = len(close)
 
         # Getiri / momentum
         for label, w in [("5d", 5), ("20d", 20), ("60d", 60), ("120d", 120)]:
             if n > w:
-                f[f"roc_{label}"] = _safe_float(close.pct_change(w).iloc[-1])
+                f[f"roc_{label}"] = _safe_float(close.pct_change(w)[-1])
 
         # SMA uzaklık
         for label, w in [("sma20", 20), ("sma50", 50), ("sma200", 200)]:
             if n > w:
-                sma = close.rolling(w).mean().iloc[-1]
-                f[f"dist_{label}"] = _safe_float((close.iloc[-1] / sma) - 1)
+                sma = close.rolling(w).mean()[-1]
+                f[f"dist_{label}"] = _safe_float((close[-1] / sma) - 1)
 
         # 52-haftalık yüksekten uzaklık
         if n > 100:
-            high_52w = high.rolling(252).max().iloc[-1] if n >= 252 else high.max()
-            low_52w  = low.rolling(252).min().iloc[-1]  if n >= 252 else low.min()
-            f["pct_from_52w_high"] = _safe_float((close.iloc[-1] / high_52w) - 1)
-            f["pct_from_52w_low"]  = _safe_float((close.iloc[-1] / low_52w) - 1)
+            high_52w = high.rolling(252).max()[-1] if n >= 252 else high.max()
+            low_52w  = low.rolling(252).min()[-1]  if n >= 252 else low.min()
+            f = f.with_columns(pl.lit(_safe_float((close[-1] / high_52w) - 1)).alias('pct_from_52w_high'))
+            f = f.with_columns(pl.lit(_safe_float((close[-1] / low_52w) - 1)).alias('pct_from_52w_low'))
 
         # RSI-14
         if n > 20:
@@ -187,18 +188,18 @@ class FeatureEngine:
             gain = delta.clip(lower=0).rolling(14).mean()
             loss = (-delta.clip(upper=0)).rolling(14).mean()
             rs = gain / loss.replace(0, np.nan)
-            rsi = (100 - 100 / (1 + rs)).iloc[-1]
-            f["rsi_14"] = _safe_float(rsi)
+            rsi = (100 - 100 / (1 + rs))[-1]
+            f = f.with_columns(pl.lit(_safe_float(rsi)).alias('rsi_14'))
 
         # Momentum acceleration (roc_5 vs roc_20 farkı — trend ivmesi)
         if "roc_5d" in f and "roc_20d" in f:
-            f["momentum_accel"] = f["roc_5d"] - f["roc_20d"] / 4
+            f = f.with_columns(pl.lit(f["roc_5d"] - f["roc_20d"] / 4).alias('momentum_accel'))
 
         # Kısa dönem mean reversion potansiyeli
         if n > 20:
-            std = close.pct_change().rolling(20).std().iloc[-1]
-            f["zscore_vs_sma20"] = _safe_float(
-                (close.iloc[-1] - close.rolling(20).mean().iloc[-1]) / (std * close.rolling(20).mean().iloc[-1] + 1e-9)
+            std = close.pct_change().rolling(20).std()[-1]
+            f = f.with_columns(pl.lit(_safe_float().alias('zscore_vs_sma20'))
+                (close[-1] - close.rolling(20).mean()[-1]) / (std * close.rolling(20).mean()[-1] + 1e-9)
             )
 
         return f
@@ -206,7 +207,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # B) Relative Strength
     # ------------------------------------------------------------------ #
-    def _relative_strength_vs_bm(self, close: pd.Series, bm_close: pd.Series) -> Dict:
+    def _relative_strength_vs_bm(self, close: pl.Series, bm_close: pl.Series) -> Dict:
         f = {}
         stock_ret = close.pct_change()
         bm_ret    = bm_close.pct_change()
@@ -223,11 +224,11 @@ class FeatureEngine:
         if len(stock_ret) > 25:
             rs_series = stock_ret - bm_ret
             rs_5d = rs_series.rolling(5).sum()
-            f["rs_trend_5d"] = _safe_float(rs_5d.diff(5).iloc[-1]) if len(rs_5d) > 5 else np.nan
+            f = f.with_columns(pl.lit(_safe_float(rs_5d.diff(5)[-1]) if len(rs_5d) > 5 else np.nan).alias('rs_trend_5d'))
 
         return f
 
-    def _relative_strength_vs_sector(self, close: pd.Series, sect: pd.Series) -> Dict:
+    def _relative_strength_vs_sector(self, close: pl.Series, sect: pl.Series) -> Dict:
         f = {}
         stock_ret = close.pct_change()
         sect_ret  = sect
@@ -245,7 +246,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # C) Trend Quality
     # ------------------------------------------------------------------ #
-    def _trend_quality(self, close: pd.Series) -> Dict:
+    def _trend_quality(self, close: pl.Series) -> Dict:
         f = {}
         n = len(close)
         if n < 20:
@@ -254,7 +255,7 @@ class FeatureEngine:
         # Linear regression slope + R² (20 günlük)
         for label, w in [("20d", 20), ("60d", 60)]:
             if n > w:
-                y = close.values[-w:]
+                y = close.to_numpy()[-w:]
                 x = np.arange(w)
                 try:
                     slope, intercept = np.polyfit(x, y, 1)
@@ -262,45 +263,45 @@ class FeatureEngine:
                     ss_res = np.sum((y - y_pred) ** 2)
                     ss_tot = np.sum((y - y.mean()) ** 2)
                     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0
-                    f[f"trend_slope_{label}"] = float(slope / close.iloc[-w])  # normalize
+                    f[f"trend_slope_{label}"] = float(slope / close[-w])  # normalize
                     f[f"trend_r2_{label}"]    = float(r2)
                 except Exception:
                     logger.warning("Caught Exception in _trend_quality", exc_info=True)
 
         # SMA alignment score (SMA20 > SMA50 > SMA200)
         if n >= 200:
-            sma20  = close.rolling(20).mean().iloc[-1]
-            sma50  = close.rolling(50).mean().iloc[-1]
-            sma200 = close.rolling(200).mean().iloc[-1]
+            sma20  = close.rolling(20).mean()[-1]
+            sma50  = close.rolling(50).mean()[-1]
+            sma200 = close.rolling(200).mean()[-1]
             alignment = 0
             if sma20 > sma50:  alignment += 1
             if sma50 > sma200: alignment += 1
-            if close.iloc[-1] > sma20: alignment += 1
-            f["sma_alignment"] = float(alignment)  # 0-3
+            if close[-1] > sma20: alignment += 1
+            f = f.with_columns(pl.lit(float(alignment)  # 0-3).alias('sma_alignment'))
 
         # Higher highs / Higher lows (trend integrity)
         if n >= 20:
             highs = close.rolling(5).max().dropna()
             lows  = close.rolling(5).min().dropna()
             if len(highs) >= 4:
-                f["higher_highs"] = float(int(highs.iloc[-1] > highs.iloc[-3]))
-                f["higher_lows"]  = float(int(lows.iloc[-1]  > lows.iloc[-3]))
+                f = f.with_columns(pl.lit(float(int(highs[-1] > highs[-3]))).alias('higher_highs'))
+                f = f.with_columns(pl.lit(float(int(lows[-1]  > lows[-3]))).alias('higher_lows'))
 
         # Drawdown from recent peak
         if n >= 20:
-            peak = close.rolling(20).max().iloc[-1]
-            f["drawdown_20d"] = float((close.iloc[-1] / peak) - 1)
+            peak = close.rolling(20).max()[-1]
+            f = f.with_columns(pl.lit(float((close[-1] / peak) - 1)).alias('drawdown_20d'))
 
         if n >= 60:
-            peak60 = close.rolling(60).max().iloc[-1]
-            f["drawdown_60d"] = float((close.iloc[-1] / peak60) - 1)
+            peak60 = close.rolling(60).max()[-1]
+            f = f.with_columns(pl.lit(float((close[-1] / peak60) - 1)).alias('drawdown_60d'))
 
         return f
 
     # ------------------------------------------------------------------ #
     # D) Volume
     # ------------------------------------------------------------------ #
-    def _volume_features(self, close: pd.Series, volume: pd.Series) -> Dict:
+    def _volume_features(self, close: pl.Series, volume: pl.Series) -> Dict:
         f = {}
         n = len(volume)
         if n < 20:
@@ -310,26 +311,26 @@ class FeatureEngine:
         vol_std  = volume.rolling(20).std()
 
         # Z-score
-        z = (volume.iloc[-1] - vol_mean.iloc[-1]) / (vol_std.iloc[-1] + 1)
-        f["volume_zscore_20d"] = float(z)
+        z = (volume[-1] - vol_mean[-1]) / (vol_std[-1] + 1)
+        f = f.with_columns(pl.lit(float(z)).alias('volume_zscore_20d'))
 
         # Percentile (yıllık)
         if n >= 60:
-            pct = (volume.rolling(min(n, 252)).rank() / min(n, 252)).iloc[-1]
-            f["volume_percentile"] = float(pct)
+            pct = (volume.rolling(min(n, 252)).rank() / min(n, 252))[-1]
+            f = f.with_columns(pl.lit(float(pct)).alias('volume_percentile'))
 
         # Volume trend (son 5 gün ortalaması / son 20 gün ortalaması)
         if n >= 20:
-            short_avg = volume.rolling(5).mean().iloc[-1]
-            long_avg  = volume.rolling(20).mean().iloc[-1]
-            f["volume_trend_ratio"] = float(short_avg / (long_avg + 1))
+            short_avg = volume.rolling(5).mean()[-1]
+            long_avg  = volume.rolling(20).mean()[-1]
+            f = f.with_columns(pl.lit(float(short_avg / (long_avg + 1))).alias('volume_trend_ratio'))
 
         # Price-volume divergence (fiyat yükselirken hacim düşüyor mu?)
         if n >= 10:
-            price_change = close.pct_change(5).iloc[-1]
-            vol_change   = volume.rolling(5).mean().pct_change(5).iloc[-1]
+            price_change = close.pct_change(5)[-1]
+            vol_change   = volume.rolling(5).mean().pct_change(5)[-1]
             if not np.isnan(price_change) and not np.isnan(vol_change):
-                f["price_vol_divergence"] = float(
+                f = f.with_columns(pl.lit(float().alias('price_vol_divergence'))
                     1 if (price_change > 0 and vol_change < -0.2) else
                     (-1 if (price_change < 0 and vol_change > 0.2) else 0)
                 )
@@ -338,39 +339,39 @@ class FeatureEngine:
         if n >= 20:
             direction = (close.diff() > 0).astype(float) * 2 - 1
             obv = (volume * direction).cumsum()
-            obv_20d_change = (obv.iloc[-1] - obv.iloc[-21]) / (abs(obv.iloc[-21]) + 1)
-            f["obv_trend_20d"] = float(obv_20d_change)
+            obv_20d_change = (obv[-1] - obv[-21]) / (abs(obv[-21]) + 1)
+            f = f.with_columns(pl.lit(float(obv_20d_change)).alias('obv_trend_20d'))
 
         return f
 
     # ------------------------------------------------------------------ #
     # E) Risk
     # ------------------------------------------------------------------ #
-    def _risk_features(self, close: pd.Series, high: pd.Series, low: pd.Series) -> Dict:
+    def _risk_features(self, close: pl.Series, high: pl.Series, low: pl.Series) -> Dict:
         f = {}
         n = len(close)
         returns = close.pct_change().dropna()
 
         if len(returns) >= 20:
-            f["volatility_20d"] = float(returns.rolling(20).std().iloc[-1] * np.sqrt(252))
+            f = f.with_columns(pl.lit(float(returns.rolling(20).std()[-1] * np.sqrt(252))).alias('volatility_20d'))
         if len(returns) >= 60:
-            f["volatility_60d"] = float(returns.rolling(60).std().iloc[-1] * np.sqrt(252))
+            f = f.with_columns(pl.lit(float(returns.rolling(60).std()[-1] * np.sqrt(252))).alias('volatility_60d'))
 
         # ATR %
         if n >= 14 and not high.empty and not low.empty:
-            tr = pd.concat([
+            tr = pl.concat([
                 high - low,
                 (high - close.shift()).abs(),
                 (low - close.shift()).abs()
             ], axis=1).max(axis=1)
-            atr_pct = (tr.rolling(14).mean() / close).iloc[-1]
-            f["atr_pct"] = float(atr_pct)
+            atr_pct = (tr.rolling(14).mean() / close)[-1]
+            f = f.with_columns(pl.lit(float(atr_pct)).alias('atr_pct'))
 
         # Downside volatility
         if len(returns) >= 20:
             downside = returns[returns < 0].rolling(20, min_periods=5).std()
             if len(downside.dropna()) > 0:
-                f["downside_vol_20d"] = float(downside.iloc[-1] * np.sqrt(252))
+                f = f.with_columns(pl.lit(float(downside[-1] * np.sqrt(252))).alias('downside_vol_20d'))
 
         # Beta approximation needs benchmark — skipped here, done in RS section
         return f
@@ -380,11 +381,11 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     def _cross_sectional(
         self, ticker: str,
-        close: pd.Series,
+        close: pl.Series,
         universe_returns: Dict[str, float],
     ) -> Dict:
         f = {}
-        all_rets = list(universe_returns.values())
+        all_rets = list(universe_returns.to_numpy()())
         if len(all_rets) < 5:
             return f
 
@@ -397,36 +398,36 @@ class FeatureEngine:
         std  = arr.std()
 
         if std > 1e-9:
-            f["cs_zscore_ret_1d"] = float((this_ret - mean) / std)
+            f = f.with_columns(pl.lit(float((this_ret - mean) / std)).alias('cs_zscore_ret_1d'))
 
         # Percentile rank
         rank = float(np.mean(arr <= this_ret))
-        f["cs_rank_ret_1d"] = rank
+        f = f.with_columns(pl.lit(rank).alias('cs_rank_ret_1d'))
 
         return f
 
     # ------------------------------------------------------------------ #
     # G) Fundamental Proxy (fiyat bazlı, bilanço verisi gerektirmez)
     # ------------------------------------------------------------------ #
-    def _fundamental_proxy(self, close: pd.Series, volume: pd.Series) -> Dict:
+    def _fundamental_proxy(self, close: pl.Series, volume: pl.Series) -> Dict:
         f = {}
         n = len(close)
 
         # Price momentum persistency (kazananlar kazanmaya devam eder mi?)
         # Basit fikir: 6 aylık getirinin son 1 aylık getirisini ne kadar tahmin ettiği
         if n >= 130:
-            ret_6m  = float(close.pct_change(120).iloc[-1])
-            ret_1m  = float(close.pct_change(20).iloc[-1])
+            ret_6m  = float(close.pct_change(120)[-1])
+            ret_1m  = float(close.pct_change(20)[-1])
             # 6 aylık güçlü + son ay zayıf = orta dönem momentum devam edebilir
-            f["momentum_reversal_risk"] = float(
+            f = f.with_columns(pl.lit(float().alias('momentum_reversal_risk'))
                 1 if (ret_6m > 0.15 and ret_1m < -0.05) else
                 (-1 if (ret_6m < -0.15 and ret_1m > 0.05) else 0)
             )
 
         # Liquidity score (yüksek hacim = işlem yapılabilirlik)
         if not volume.empty and n >= 20:
-            avg_vol = volume.rolling(20).mean().iloc[-1]
-            f["liquidity_score"] = float(min(1.0, np.log1p(avg_vol) / 15))  # normalize log scale
+            avg_vol = volume.rolling(20).mean()[-1]
+            f = f.with_columns(pl.lit(float(min(1.0, np.log1p(avg_vol) / 15))  # normalize log scale).alias('liquidity_score'))
 
         return f
 
@@ -435,8 +436,8 @@ class FeatureEngine:
 # Helper: Tüm evreni tek seferde hesapla
 # ------------------------------------------------------------------ #
 def compute_universe_features(
-    market_data: Dict[str, pd.DataFrame],
-    benchmark_df: pd.DataFrame,
+    market_data: Dict[str, pl.DataFrame],
+    benchmark_df: pl.DataFrame,
     sector_map: Dict[str, str],  # ticker -> sektör adı
 ) -> Dict[str, Dict[str, float]]:
     """
@@ -449,7 +450,7 @@ def compute_universe_features(
     engine = FeatureEngine()
 
     # 0. Tüm DataFrame'lerin index'ini timezone-naive'e normalize et
-    normalized_data: Dict[str, pd.DataFrame] = {}
+    normalized_data: Dict[str, pl.DataFrame] = {}
     for ticker, df in market_data.items():
         if df is not None and not df.empty:
             normalized_data[ticker] = engine._normalize_index(df)
@@ -463,14 +464,14 @@ def compute_universe_features(
     for ticker, df in market_data.items():
         if df is not None and len(df) >= 2:
             try:
-                ret = float(df["Close"].pct_change().iloc[-1])
+                ret = float(df["Close"].pct_change()[-1])
                 if not np.isnan(ret):
                     universe_returns[ticker] = ret
             except Exception:
                 logger.warning("Caught Exception in compute_universe_features", exc_info=True)
 
     # 2. Sektör bazlı ortalama return serisi (tz-naive)
-    sector_series: Dict[str, pd.Series] = {}
+    sector_series: Dict[str, pl.Series] = {}
     if sector_map:
         sector_dfs: Dict[str, List] = {}
         for ticker, df in market_data.items():
@@ -488,7 +489,7 @@ def compute_universe_features(
         for sect, series_list in sector_dfs.items():
             if series_list:
                 try:
-                    combined = pd.concat(series_list, axis=1)
+                    combined = pl.concat(series_list, axis=1)
                     sector_series[sect] = combined.mean(axis=1)
                 except Exception:
                     logger.warning("Caught Exception in compute_universe_features", exc_info=True)
@@ -518,6 +519,6 @@ def compute_universe_features(
     logger.info(
         "Universe features computed",
         tickers=len(result),
-        avg_features=np.mean([len(v) for v in result.values()]) if result else 0,
+        avg_features=np.mean([len(v) for v in result.to_numpy()()]) if result else 0,
     )
     return result

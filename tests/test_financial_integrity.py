@@ -15,7 +15,7 @@ Kapsam:
 import sys
 import os
 import asyncio
-import sqlite3
+import duckdb
 
 from services.portfolio.portfolio_manager import (
     PortfolioManager, MAX_TRADES, MAX_CASH_LEDGER,

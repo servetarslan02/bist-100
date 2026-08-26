@@ -1,4 +1,5 @@
-import pandas as pd
+import datetime
+import polars as pl
 import numpy as np
 import lightgbm as lgb
 from typing import Dict, List, Any
@@ -27,11 +28,11 @@ class LightGBMPipeline:
 
     def generate_samples(
         self,
-        market_data: Dict[str, pd.DataFrame],
-        bm_df: pd.DataFrame,
+        market_data: Dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
         sector_map: Dict[str, str],
-        train_start: pd.Timestamp,
-        train_end: pd.Timestamp,
+        train_start: pl.Series,
+        train_end: pl.Series,
         snapshot_offsets: List[int] = [20, 40, 60, 80],
         forward_days: int = 20
     ):
@@ -40,8 +41,8 @@ class LightGBMPipeline:
         all_keys = []
         
         for offset in snapshot_offsets:
-            t_snap = train_end - pd.Timedelta(days=int(offset))
-            t_fwd  = t_snap + pd.Timedelta(days=int(forward_days))
+            t_snap = train_end - datetime.timedelta(days=int(offset))
+            t_fwd  = t_snap + datetime.timedelta(days=int(forward_days))
             
             if t_snap < train_start:
                 continue
@@ -68,10 +69,10 @@ class LightGBMPipeline:
                 if len(df_fwd) < 2 or len(bm_fwd) < 2:
                     continue
                     
-                p_0 = df_fwd["Close"].iloc[0]
-                p_1 = df_fwd["Close"].iloc[-1]
-                b_0 = bm_fwd["Close"].iloc[0]
-                b_1 = bm_fwd["Close"].iloc[-1]
+                p_0 = df_fwd["Close"][0]
+                p_1 = df_fwd["Close"][-1]
+                b_0 = bm_fwd["Close"][0]
+                b_1 = bm_fwd["Close"][-1]
                 
                 if p_0 <= 0 or b_0 <= 0:
                     continue
@@ -96,11 +97,11 @@ class LightGBMPipeline:
 
     def train(
         self,
-        market_data: Dict[str, pd.DataFrame],
-        bm_df: pd.DataFrame,
+        market_data: Dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
         sector_map: Dict[str, str],
-        train_start: pd.Timestamp,
-        train_end: pd.Timestamp
+        train_start: pl.Series,
+        train_end: pl.Series
     ):
         X, y, feature_names = self.generate_samples(
             market_data, bm_df, sector_map, train_start, train_end
@@ -117,10 +118,10 @@ class LightGBMPipeline:
 
     def predict(
         self,
-        market_data: Dict[str, pd.DataFrame],
-        bm_df: pd.DataFrame,
+        market_data: Dict[str, pl.DataFrame],
+        bm_df: pl.DataFrame,
         sector_map: Dict[str, str],
-        target_date: pd.Timestamp
+        target_date: pl.Series
     ) -> List[Dict[str, Any]]:
         if not self.model:
             return []

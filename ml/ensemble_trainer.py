@@ -12,7 +12,7 @@ import sys
 import orjson
 import pickle
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, List, Tuple
 from pathlib import Path
 import structlog
@@ -42,7 +42,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 class BistEnsembleTrainer:
     """Alpha BIST için LightGBM + XGBoost + CatBoost Ensemble Eğitici."""
 
-    def __init__(self, train_df: pd.DataFrame, oos_df: pd.DataFrame):
+    def __init__(self, train_df: pl.DataFrame, oos_df: pl.DataFrame):
         self.train_df = train_df
         self.oos_df = oos_df
         self.feature_cols = [
@@ -59,11 +59,11 @@ class BistEnsembleTrainer:
         """Tüm modelleri eğitir, test eder ve ensemble üretir."""
         logger.info(f"Model eğitimi başlatılıyor (Özellik sayısı: {len(self.feature_cols)})...")
         
-        X_train = self.train_df[self.feature_cols].values
-        y_train = self.train_df[self.target_col].values
+        X_train = self.train_df[self.feature_cols].to_numpy()
+        y_train = self.train_df[self.target_col].to_numpy()
         
-        X_oos = self.oos_df[self.feature_cols].values
-        y_oos = self.oos_df[self.target_col].values
+        X_oos = self.oos_df[self.feature_cols].to_numpy()
+        y_oos = self.oos_df[self.target_col].to_numpy()
 
         results = {}
 
@@ -87,8 +87,8 @@ class BistEnsembleTrainer:
             lgb_r2 = r2_score(y_oos, lgb_oos_pred)
             lgb_ic = float(np.corrcoef(y_oos, lgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
             
-            self.models["lightgbm"] = lgb_model
-            results["lightgbm"] = {
+            self.models = self.models.with_columns(pl.lit(lgb_model).alias('lightgbm'))
+            results = results.with_columns(pl.lit({).alias('lightgbm'))
                 "r2": round(float(lgb_r2), 4),
                 "ic": round(float(lgb_ic), 4),
                 "feature_importances": {
@@ -117,8 +117,8 @@ class BistEnsembleTrainer:
             xgb_r2 = r2_score(y_oos, xgb_oos_pred)
             xgb_ic = float(np.corrcoef(y_oos, xgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
             
-            self.models["xgboost"] = xgb_model
-            results["xgboost"] = {
+            self.models = self.models.with_columns(pl.lit(xgb_model).alias('xgboost'))
+            results = results.with_columns(pl.lit({).alias('xgboost'))
                 "r2": round(float(xgb_r2), 4),
                 "ic": round(float(xgb_ic), 4),
                 "feature_importances": {
@@ -146,8 +146,8 @@ class BistEnsembleTrainer:
             cb_r2 = r2_score(y_oos, cb_oos_pred)
             cb_ic = float(np.corrcoef(y_oos, cb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
             
-            self.models["catboost"] = cb_model
-            results["catboost"] = {
+            self.models = self.models.with_columns(pl.lit(cb_model).alias('catboost'))
+            results = results.with_columns(pl.lit({).alias('catboost'))
                 "r2": round(float(cb_r2), 4),
                 "ic": round(float(cb_ic), 4),
                 "feature_importances": {
@@ -163,7 +163,7 @@ class BistEnsembleTrainer:
         et_model = ExtraTreesRegressor(n_estimators=200, max_depth=8, n_jobs=-1, random_state=42)
         et_model.fit(X_train, y_train)
         et_oos_pred = et_model.predict(X_oos)
-        self.models["extratrees"] = et_model
+        self.models = self.models.with_columns(pl.lit(et_model).alias('extratrees'))
         with open(self.save_dir / "extratrees_model.pkl", "wb") as f:
             pickle.dump(et_model, f)
 

@@ -9,7 +9,7 @@ ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Test
 import sys
 import os
 import yfinance as yf
-import pandas as pd
+import polars as pl
 import numpy as np
 import lightgbm as lgb
 from datetime import datetime
@@ -41,7 +41,7 @@ def main():
     print("=" * 85)
     
     bm_df = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
-    if isinstance(bm_df.columns, pd.MultiIndex):
+    if isinstance(bm_df.columns, list):
         bm_df.columns = [c[0] for c in bm_df.columns]
 
     stocks_raw = yf.download(BIST_CORE_STOCKS, start="1997-01-01", end="2026-08-23", progress=False, group_by="ticker")
@@ -49,7 +49,7 @@ def main():
     for ticker in BIST_CORE_STOCKS:
         if ticker in stocks_raw.columns.get_level_values(0):
             df_t = stocks_raw[ticker].dropna()
-            if isinstance(df_t.columns, pd.MultiIndex):
+            if isinstance(df_t.columns, list):
                 df_t.columns = [c[0] for c in df_t.columns]
             if len(df_t) > 50:
                 stock_dict[ticker] = df_t
@@ -114,8 +114,8 @@ def main():
 
     # Özellik Ağırlıkları (Feature Importance)
     imp = model.feature_importance(importance_type="gain")
-    df_imp = pd.DataFrame({"Özellik (Mum/Price Action)": feature_names, "Öğrenilen Model Ağırlığı (Gain)": imp})
-    df_imp = df_imp.sort_values(by="Öğrenilen Model Ağırlığı (Gain)", reverse=True)
+    df_imp = pl.DataFrame({"Özellik (Mum/Price Action)": feature_names, "Öğrenilen Model Ağırlığı (Gain)": imp})
+    df_imp = df_imp.sort(by="Öğrenilen Model Ağırlığı (Gain)", reverse=True)
     
     print("🧠 Model Tarafından Öğrenilen Mum Özellik Ağırlıkları (Feature Importance):")
     print(df_imp.to_string(index=False))
@@ -282,17 +282,17 @@ def main():
     final_bm = benchmark_history[-1]["bm_equity"]
     total_bm_ret = ((final_bm - 100000.0) / 100000.0) * 100
 
-    df_eq = pd.DataFrame(equity_history)
+    df_eq = pl.DataFrame(equity_history)
     df_eq["peak"] = df_eq["equity"].cummax()
     df_eq["drawdown"] = (df_eq["equity"] - df_eq["peak"]) / df_eq["peak"] * 100
     max_dd_engine = df_eq["drawdown"].min()
 
-    df_bm = pd.DataFrame(benchmark_history)
+    df_bm = pl.DataFrame(benchmark_history)
     df_bm["peak"] = df_bm["bm_equity"].cummax()
     df_bm["drawdown"] = (df_bm["bm_equity"] - df_bm["peak"]) / df_bm["peak"] * 100
     max_dd_bm = df_bm["drawdown"].min()
 
-    df_trades = pd.DataFrame(trade_logs)
+    df_trades = pl.DataFrame(trade_logs)
     total_trades = len(df_trades)
     win_trades = len(df_trades[df_trades["pnl"] > 0]) if total_trades > 0 else 0
     win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
@@ -302,7 +302,7 @@ def main():
 
     # Mega Trend İşlemleri (+%50 ve üzeri kârla kapatılanlar)
     mega_winners = df_trades[df_trades["ret_pct"] >= 50]
-    best_trade = df_trades.sort_values(by="ret_pct", reverse=True).iloc[0] if total_trades > 0 else None
+    best_trade = df_trades.sort(by="ret_pct", reverse=True).iloc[0] if total_trades > 0 else None
 
     print("\n" + "=" * 85)
     print("🏆 30 YILLIK SAF HİSSE & TREND RIDER KURUMSAL PERFORMANSI")

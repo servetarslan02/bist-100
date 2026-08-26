@@ -15,7 +15,7 @@ import sys
 import os
 import orjson
 import asyncio
-import sqlite3
+import duckdb
 import time
 from aiohttp import web
 import aiohttp
@@ -461,7 +461,7 @@ async def test_batch_transaction_rollback():
     # Hatalı DB (commit çalışmasın)
     class BrokenDB:
         def execute(self, *args): pass
-        def commit(self): raise sqlite3.OperationalError("disk full")
+        def commit(self): raise duckdb.OperationalError("disk full")
         def rollback(self): pass
 
     policy = AlertPolicy()

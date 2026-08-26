@@ -8,7 +8,7 @@ hesaplamasını mikrosaniye hızında önbellekleyerek simülasyonu anlık hale 
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 import numpy as np
-import pandas as pd
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -33,16 +33,16 @@ class DynamicCandleMatrix:
         self.lookback_window = lookback_window
         self._cache_events: Dict[str, List[Dict[str, Any]]] = {}
 
-    def precompute_stock_patterns(self, ticker: str, df: pd.DataFrame, forward_days: int = 5):
+    def precompute_stock_patterns(self, ticker: str, df: pl.DataFrame, forward_days: int = 5):
         """Hisse verisindeki tüm formasyon olaylarını bir kez hesaplayıp önbelleğe alır."""
         from .candle_patterns import candle_engine
 
-        closes = df["Close"].values
+        closes = df["Close"].to_numpy()
         n = len(df)
         events = []
 
         for i in range(15, n - forward_days):
-            sub_slice = df.iloc[max(0, i-20):i+1]
+            sub_slice = df[max(0, i-20):i+1]
             c_res = candle_engine.analyze_dataframe(sub_slice, ticker)
             p_entry = float(closes[i])
             p_exit = float(closes[i + forward_days])
@@ -61,7 +61,7 @@ class DynamicCandleMatrix:
         self,
         ticker: str,
         current_date_idx: int,
-        df_history: Optional[pd.DataFrame] = None,
+        df_history: Optional[pl.DataFrame] = None,
         forward_days: int = 5
     ) -> Dict[str, DynamicPatternMetrics]:
         """

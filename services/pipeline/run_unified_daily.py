@@ -22,7 +22,7 @@ import asyncio
 import orjson
 import structlog
 from datetime import datetime, date
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, Optional
 
 from services.core.database import pg_fetch, pg_execute, init_databases
@@ -57,7 +57,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
-    today_dt = pd.to_datetime(today_str).date()
+    today_dt = pl.Series(today_str).date()
     logger.info("EOD Signal Cycle Started", date=today_str)
 
     current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
@@ -73,7 +73,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
                 logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
 
     engine = AlphaEngine()
-    start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+    start_date = (today_dt - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
 
     if bm_df.empty or not market_data:
@@ -83,7 +83,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
     current_prices = {}
     for ticker, df in market_data.items():
         if not df.empty:
-            current_prices[ticker] = float(df['Close'].iloc[-1])
+            current_prices[ticker] = float(df['Close'][-1])
 
     # 1. Mevcut portföy Mark-to-Market değerlemesi
     mtm_summary = paper_orchestrator.mark_to_market_cycle(current_prices, today_str)
@@ -108,7 +108,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
                     tick = p["ticker"]
                     if tick in market_data:
                         df = market_data[tick]
-                        df_past = df.loc[df.index <= signal_date]
+                        df_past = df.filter(df.index <= signal_date]
                         if len(df_past) >= 10:
                             avg_vol = df_past['Volume'].tail(20).mean() if len(df_past) >= 20 else df_past['Volume'].mean()
                             avg_close = df_past['Close'].tail(20).mean() if len(df_past) >= 20 else df_past['Close'].mean()
@@ -182,7 +182,7 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
     """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
-    today_dt = pd.to_datetime(today_str).date()
+    today_dt = pl.Series(today_str).date()
     logger.info("Morning Execution Cycle Started", date=today_str)
 
     # Eger bekleyen sinyal yoksa ve portfoy bossa, aninda sinyal uretimini bootstrap et
@@ -192,12 +192,12 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
         await run_eod_signal_cycle(target_date=today_str, force_rebalance=True)
 
     engine = AlphaEngine()
-    start_date = (today_dt - pd.Timedelta(days=400)).strftime("%Y-%m-%d")
+    start_date = (today_dt - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
     market_data, bm_df, sector_map = engine.fetch_data(start_date, today_str)
 
     bm_ret = 0.0
     if not bm_df.empty and len(bm_df) >= 2:
-        bm_ret = float((bm_df['Close'].iloc[-1] / bm_df['Close'].iloc[-2] - 1.0) * 100)
+        bm_ret = float((bm_df['Close'][-1] / bm_df['Close'][-2] - 1.0) * 100)
 
     # Bekleyen sinyalleri T+1 açılış fiyatları, KAP kısıtları ve sentetik derinlikle yürüt
     report = paper_orchestrator.execute_pending_signals(

@@ -51,14 +51,14 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: postgres:17-alpine
+    image: timescale/timescaledb:latest-pg17
     container_name: alpha-postgres
     ports:
     - 5432:5432
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=20\n  -c\
+    command: "postgres\n  -c shared_preload_libraries=timescaledb\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=20\n  -c\
       \ shared_buffers=64MB\n  -c work_mem=2MB\n  -c effective_cache_size=128MB\n  -c wal_level=replica\n  -c max_wal_size=256MB\n\
       \  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c min_wal_size=16MB\n  -c checkpoint_completion_target=0.9\n\
       \  -c wal_buffers=4MB\n"
@@ -84,7 +84,7 @@ services:
     env_file: *id001
     networks: *id002
     logging: *id003
-    image: postgres:17-alpine
+    image: timescale/timescaledb:latest-pg17
     container_name: alpha-postgres-replica
     ports:
     - 5433:5432
@@ -1022,6 +1022,34 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+  questdb:
+    restart: unless-stopped
+    stop_grace_period: 10s
+    networks: *id002
+    logging: *id003
+    image: questdb/questdb:8.2.3
+    container_name: alpha-questdb
+    ports:
+    - 9009:9009
+    - 8812:8812
+    - 9000:9000
+    volumes:
+    - questdb_data:/var/lib/questdb
+    environment:
+      QDB_PG_NET_ENABLED: "true"
+      QDB_HTTP_ENABLED: "true"
+      QDB_LINE_TCP_ENABLED: "true"
+      QDB_LINE_TCP_NET_BIND_TO: "0.0.0.0:9009"
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - wget --no-verbose --tries=1 --spider http://localhost:9000/status || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
   autoheal:
     image: willfarrell/autoheal
     restart: always
@@ -1046,6 +1074,7 @@ volumes:
   prometheus_data: null
   grafana_data: null
   mlflow_data: null
+  questdb_data: null
   sentinel_1_data: null
   sentinel_2_data: null
   sentinel_3_data: null

@@ -7,21 +7,21 @@ ML Training Dataset kalite kontrolü testleri.
 import sys
 import os
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
+import polars as pl
+from datetime import datetime, timedelta, date
 
 
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):
     rng = np.random.RandomState(seed)
-    dates = pd.bdate_range(start="2022-01-03", periods=n_days, freq="B")
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
     close = start_price + np.cumsum(rng.randn(n_days) * 1.5)
     close = np.maximum(close, 1.0)
     high = close * (1 + rng.uniform(0, 0.03, n_days))
     low = close * (1 - rng.uniform(0, 0.03, n_days))
     open_ = close * (1 + rng.uniform(-0.01, 0.01, n_days))
     volume = rng.randint(100000, 5000000, n_days).astype(float)
-    return pd.DataFrame({
+    return pl.DataFrame({
         "Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume
     }, index=dates)
 
@@ -263,7 +263,7 @@ def test_target_distribution():
     features_map = {}
     returns = {}
     date_groups = {}
-    dates = pd.bdate_range(start="2022-01-03", periods=200, freq="B")
+    dates = pl.date_range(date(2022, 1, 3), date(2022, 1, 3) + timedelta(days=400), timedelta(days=1), eager=True).head(200)
     for i in range(200):
         ticker = f"SYM{i%10:02d}"
         date_str = str(dates[i].date())

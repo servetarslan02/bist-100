@@ -14,8 +14,8 @@ Kural: Bu test Gercek veri ile calisir. Mock yok.
 import sys
 import os
 
-import pandas as pd
-from datetime import datetime, timezone
+import polars as pl
+from datetime import datetime, timezone, date, timedelta
 
 
 def test_yahoo_finance_fetch():
@@ -117,7 +117,7 @@ def test_walk_forward_folds():
     from services.backtest.walk_forward import WalkForwardEngine
 
     wf = WalkForwardEngine(train_days=20, test_days=5, step_days=5)
-    dates = pd.date_range("2023-01-01", "2023-03-01", freq="B").strftime("%Y-%m-%d").tolist()
+    dates = pl.date_range(date(2023, 1, 1), date(2023, 3, 1), timedelta(days=1), eager=True).cast(pl.Utf8).to_list()
     folds = wf.create_folds(dates)
 
     assert len(folds) > 0, "Fold olusmadi!"

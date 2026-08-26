@@ -8,7 +8,7 @@ PIT-safe historical fundamental, KAP, news, catalyst testleri.
 import sys
 import os
 import numpy as np
-import pandas as pd
+import polars as pl
 from datetime import datetime, timedelta
 
 

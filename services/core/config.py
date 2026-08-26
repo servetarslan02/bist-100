@@ -60,6 +60,12 @@ class Settings(BaseSettings):
     clickhouse_user: str = Field(default="default", alias="CLICKHOUSE_USER")
     clickhouse_password: str = Field(default="", alias="CLICKHOUSE_PASSWORD")
 
+    # QuestDB (tick verisi için)
+    questdb_host: str = Field(default="localhost", alias="QUESTDB_HOST")
+    questdb_http_port: int = Field(default=9009, alias="QUESTDB_HTTP_PORT")
+    questdb_pg_port: int = Field(default=8812, alias="QUESTDB_PG_PORT")
+    questdb_ilp_port: int = Field(default=9009, alias="QUESTDB_ILP_PORT")
+
     # Redis
     redis_host: str = Field(default="localhost", alias="REDIS_HOST")
     redis_port: int = Field(default=6379, alias="REDIS_PORT")

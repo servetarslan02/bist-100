@@ -457,7 +457,7 @@ class MigrationRunner:
 
     async def _begin_transaction(self):
         if self._dialect == "sqlite":
-            pass  # SQLite auto-transaction; executescript manages its own
+            pass  # DuckDB auto-transaction
         else:
             await self._db.execute("BEGIN")
 
@@ -581,8 +581,11 @@ class MigrationRunner:
                 # Parametreli sorgular tek statement olmalı
                 cursor = self._db.execute(sql, args)
             else:
-                # Parametresiz: executescript kullan (multi-statement destekli)
-                self._db.executescript(sql)
+                # Parametresiz: statement'ları ayrı ayrı çalıştır
+                for stmt in self._split_statements(sql):
+                    stmt = stmt.strip()
+                    if stmt:
+                        self._db.execute(stmt)
                 cursor = None
             self._db.commit()
             return cursor

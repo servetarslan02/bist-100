@@ -7,8 +7,8 @@ Tekrar tekrar internetten indirmeye gerek kalmadan 0.05 saniyede anında yükler
 """
 
 import os
-import sqlite3
-import pandas as pd
+import duckdb
+import polars as pl
 import yfinance as yf
 from typing import Dict, Tuple
 import structlog
@@ -42,9 +42,9 @@ class HistoricalDataWarehouse:
         if not os.path.exists(DB_FILE) or os.path.getsize(DB_FILE) < 10000:
             return False
         try:
-            with sqlite3.connect(DB_FILE) as conn:
+            with duckdb.connect(DB_FILE) as conn:
                 cur = conn.cursor()
-                cur.execute("SELECT count(*) FROM sqlite_master WHERE type='table'")
+                cur.execute("SELECT count(*) FROM information_schema.tables WHERE table_schema = 'main'")
                 count = cur.fetchone()[0]
                 return count >= 2
         except Exception:
@@ -60,10 +60,11 @@ class HistoricalDataWarehouse:
         
         # 1. BIST-100 Endeksi
         bm_df = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
-        if isinstance(bm_df.columns, pd.MultiIndex):
+        if isinstance(bm_df.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
+# pd.MultiIndex):
             bm_df.columns = [c[0] for c in bm_df.columns]
 
-        with sqlite3.connect(DB_FILE) as conn:
+        with duckdb.connect(DB_FILE) as conn:
             bm_df.to_sql("benchmark_xu100", conn, if_exists="replace", index=True)
 
         # 2. Hisseler
@@ -73,23 +74,24 @@ class HistoricalDataWarehouse:
         for t in BIST_ALL_KEY_TICKERS:
             if t in stocks_raw.columns.get_level_values(0):
                 df_t = stocks_raw[t].dropna().copy()
-                if isinstance(df_t.columns, pd.MultiIndex):
+                if isinstance(df_t.columns, # [POLARS] # [POLARS] pd. → needs manual review: pd.MultiIndex not applicable
+# pd.MultiIndex):
                     df_t.columns = [c[0] for c in df_t.columns]
                 if len(df_t) > 30:
                     sym = t.replace(".IS", "")
-                    df_t["symbol"] = sym
+                    df_t = df_t.with_columns(pl.lit(sym).alias('symbol'))
                     all_dfs.append(df_t)
 
         if all_dfs:
-            comb_df = pd.concat(all_dfs, axis=0)
-            with sqlite3.connect(DB_FILE) as conn:
+            comb_df = pl.concat(all_dfs, axis=0)
+            with duckdb.connect(DB_FILE) as conn:
                 comb_df.to_sql("stock_candles", conn, if_exists="replace", index=True)
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_sym_date ON stock_candles(symbol, Date)")
 
         logger.info(f"Yerel depo başarıyla kaydedildi: {DB_FILE}")
         return len(all_dfs), len(bm_df)
 
-    def load_30y_data(self) -> Tuple[pd.DataFrame, Dict[str, pd.DataFrame]]:
+    def load_30y_data(self) -> Tuple[pl.DataFrame, Dict[str, pl.DataFrame]]:
         """
         Yerel diskten 30 yıllık veriyi 0.05 saniyede hafızaya yükler.
         İnternet bağlantısı gerektirmez.
@@ -97,12 +99,12 @@ class HistoricalDataWarehouse:
         if not self.is_cached():
             self.download_and_save_warehouse()
 
-        with sqlite3.connect(DB_FILE) as conn:
-            bm_df = pd.read_sql("SELECT * FROM benchmark_xu100", conn, index_col="Date", parse_dates=["Date"])
-            comb_df = pd.read_sql("SELECT * FROM stock_candles", conn, index_col="Date", parse_dates=["Date"])
+        with duckdb.connect(DB_FILE) as conn:
+            bm_df = pl.read_database("SELECT * FROM benchmark_xu100", conn, index_col="Date", parse_dates=["Date"])
+            comb_df = pl.read_database("SELECT * FROM stock_candles", conn, index_col="Date", parse_dates=["Date"])
 
         stock_dict = {}
-        for sym, grp in comb_df.groupby("symbol"):
+        for sym, grp in comb_df.group_by("symbol"):
             df_sym = grp.drop(columns=["symbol"], errors="ignore").sort_index()
             canonical_ticker = sym if sym.endswith(".IS") else f"{sym}.IS"
             stock_dict[canonical_ticker] = df_sym

@@ -8,7 +8,7 @@ Eğitilen LightGBM + CatBoost + XGBoost modellerini yükleyip
 
 import pickle
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import List, Dict, Any
 from pathlib import Path
 import structlog
@@ -44,13 +44,13 @@ class BistMLScanner:
         if not self.stock_dict:
             self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 
-        bm_closes = self.bm_df["Close"].values
+        bm_closes = self.bm_df["Close"].to_numpy()
         bm_now = bm_closes[-1] if len(bm_closes) > 0 else 10000.0
         bm_sma50 = float(np.mean(bm_closes[-50:])) if len(bm_closes) >= 50 else bm_now
         bm_sma200 = float(np.mean(bm_closes[-200:])) if len(bm_closes) >= 200 else bm_now
         is_bull = bm_now >= bm_sma50
         bm_dist_sma200 = ((bm_now - bm_sma200) / max(bm_sma200, 1.0)) * 100.0
-        bm_vol_20d = float(pd.Series(bm_closes).pct_change().tail(20).std() * np.sqrt(252) * 100.0)
+        bm_vol_20d = float(pl.Series(bm_closes).pct_change().tail(20).std() * np.sqrt(252) * 100.0)
         bm_ret_5d = float(((bm_now - bm_closes[-5]) / bm_closes[-5]) * 100.0) if len(bm_closes) >= 5 else 0.0
 
         candidates = []
@@ -59,11 +59,11 @@ class BistMLScanner:
             if len(df) < 35:
                 continue
             sym = raw_sym.replace(".IS", "").strip()
-            closes = df["Close"].values
-            opens = df["Open"].values
-            highs = df["High"].values
-            lows = df["Low"].values
-            volumes = df["Volume"].values
+            closes = df["Close"].to_numpy()
+            opens = df["Open"].to_numpy()
+            highs = df["High"].to_numpy()
+            lows = df["Low"].to_numpy()
+            volumes = df["Volume"].to_numpy()
 
             latest_p = float(closes[-1])
             prev_p = float(closes[-2]) if len(closes) > 1 else latest_p

@@ -8,7 +8,7 @@ Walk-forward sisteminin canonical scoring pipeline ile entegrasyon testleri.
 import sys
 import os
 import numpy as np
-import pandas as pd
+import polars as pl
 import tempfile
 from datetime import datetime, timedelta
 
@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 def _make_market_data(n_stocks=8, n_days=380, seed=42):
     np.random.seed(seed)
     market = {}
-    dates = pd.date_range(end=datetime.now(), periods=n_days, freq='B')
+    dates = pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
     for i in range(n_stocks):
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
@@ -25,10 +25,10 @@ def _make_market_data(n_stocks=8, n_days=380, seed=42):
         high = close * (1 + np.abs(np.random.randn(n_days)) * 0.008)
         low = close * (1 - np.abs(np.random.randn(n_days)) * 0.008)
         volume = np.random.randint(50000, 500000, n_days).astype(float)
-        market[f"STOCK{i:04d}"] = pd.DataFrame({
+        market[f"STOCK{i:04d}"] = pl.DataFrame({
             'Open': close * (1 + np.random.randn(n_days) * 0.002),
             'High': high, 'Low': low, 'Close': close, 'Volume': volume
-        }, index=dates)
+        })
     return market
 
 
@@ -37,10 +37,10 @@ def _make_benchmark(market, seed=99):
     dates = sorted(set(d for df in market.values() for d in df.index))
     n = len(dates)
     close = 1000 * np.exp(np.cumsum(np.random.randn(n) * 0.008))
-    return pd.DataFrame({
+    return pl.DataFrame({
         'Open': close, 'High': close * 1.005, 'Low': close * 0.995,
         'Close': close, 'Volume': np.full(n, 1000000.0)
-    }, index=dates)
+    })
 
 
 def _make_historical_repo():

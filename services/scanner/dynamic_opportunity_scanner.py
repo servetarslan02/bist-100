@@ -14,7 +14,7 @@ Sinyal Türleri:
 import logging
 from typing import Dict, List, Any
 
-import pandas as pd
+import polars as pl
 import yfinance as yf
 
 logger = logging.getLogger("alpha.scanner")
@@ -81,21 +81,21 @@ class DynamicOpportunityScanner:
                 closes = df["Close"].dropna()
                 highs = df["High"].dropna()
                 df["Low"].dropna()
-                vols = df["Volume"].dropna() if "Volume" in df.columns else pd.Series(1, index=closes.index)
+                vols = df["Volume"].dropna() if "Volume" in df.columns else pl.Series(1, index=closes.index)
 
                 if len(closes) < 50:
                     continue
 
-                p_now = float(closes.iloc[-1])
-                p_prev = float(closes.iloc[-2])
+                p_now = float(closes[-1])
+                p_prev = float(closes[-2])
                 change_pct = round((p_now - p_prev) / p_prev * 100, 2) if p_prev else 0
 
                 # İndikatörler
-                sma20 = float(closes.rolling(20).mean().iloc[-1])
-                sma50 = float(closes.rolling(50).mean().iloc[-1])
-                high20 = float(highs.rolling(20).max().iloc[-2]) if len(highs) >= 21 else p_now
-                vol_avg20 = float(vols.rolling(20).mean().iloc[-1]) if len(vols) >= 20 else 1.0
-                vol_now = float(vols.iloc[-1]) if len(vols) >= 1 else 1.0
+                sma20 = float(closes.rolling(20).mean()[-1])
+                sma50 = float(closes.rolling(50).mean()[-1])
+                high20 = float(highs.rolling(20).max()[-2]) if len(highs) >= 21 else p_now
+                vol_avg20 = float(vols.rolling(20).mean()[-1]) if len(vols) >= 20 else 1.0
+                vol_now = float(vols[-1]) if len(vols) >= 1 else 1.0
                 vol_ratio = round(vol_now / (vol_avg20 + 1e-6), 2)
 
                 # RSI 14
@@ -103,11 +103,11 @@ class DynamicOpportunityScanner:
                 gains = deltas.clip(lower=0).rolling(14).mean()
                 losses = (-deltas.clip(upper=0)).rolling(14).mean()
                 rs = gains / (losses + 1e-9)
-                rsi = float(100 - (100 / (1 + rs)).iloc[-1])
+                rsi = float(100 - (100 / (1 + rs))[-1])
 
                 # Momentum (1M ve 3M)
-                mom_1m = (p_now / float(closes.iloc[-21]) - 1.0) * 100 if len(closes) >= 22 else 0
-                mom_3m = (p_now / float(closes.iloc[-63]) - 1.0) * 100 if len(closes) >= 64 else 0
+                mom_1m = (p_now / float(closes[-21]) - 1.0) * 100 if len(closes) >= 22 else 0
+                mom_3m = (p_now / float(closes[-63]) - 1.0) * 100 if len(closes) >= 64 else 0
 
                 # 10/10 Gelişmiş Mum ve Price Action Analizi
                 from ..intelligence.candle_patterns import candle_engine
@@ -178,7 +178,7 @@ class DynamicOpportunityScanner:
                     stop_pct = 6.0
 
                 # 7. Erken Trend Başlangıcı
-                elif p_now > sma20 and p_now > sma50 and closes.iloc[-10] <= sma50:
+                elif p_now > sma20 and p_now > sma50 and closes[-10] <= sma50:
                     score = 84
                     signal_type = "EARLY_TREND"
                     category = "CANDIDATE"

@@ -4,7 +4,7 @@ Microsoft Qlib ile BIST verisi entegrasyonu.
 Feature store, data handler, model integration.
 """
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 import structlog
@@ -42,7 +42,7 @@ class QlibBIST:
 
     def __init__(self, config: Optional[QlibConfig] = None):
         self.config = config or QlibConfig()
-        self._data_cache: Dict[str, pd.DataFrame] = {}
+        self._data_cache: Dict[str, pl.DataFrame] = {}
         self._feature_store: Dict[str, np.ndarray] = {}
         self._is_initialized = False
 

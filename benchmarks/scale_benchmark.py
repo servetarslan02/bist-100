@@ -22,12 +22,12 @@ import os
 import orjson
 import time
 import resource
-from datetime import datetime
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
-import pandas as pd
+import polars as pl
 import psutil
 
 from services.backtest.engine_v4 import BacktestEngineV4, BacktestConfig
@@ -41,7 +41,7 @@ LEGACY_MAX_SCALE = 100  # legacy yol yalnızca bu ölçeğe kadar gerçek çalı
 def make_aligned_market(n_stocks, n_days, seed=42):
     """Gerçek BIST gibi: tüm hisseler aynı işlem takvimini paylaşır."""
     rng = np.random.RandomState(seed)
-    dates = pd.date_range(end=datetime(2026, 8, 14), periods=n_days, freq='B')
+    dates = pl.date_range(datetime(2026, 8, 14) - timedelta(days=n_days*2), datetime(2026, 8, 14), timedelta(days=1), eager=True).tail(n_days)
     market = {}
     for i in range(n_stocks):
         trend = rng.uniform(-0.001, 0.002)
@@ -50,10 +50,10 @@ def make_aligned_market(n_stocks, n_days, seed=42):
         high = close * (1 + np.abs(rng.randn(n_days) * 0.008))
         low = close * (1 - np.abs(rng.randn(n_days) * 0.008))
         volume = rng.randint(50000, 500000, n_days).astype(float)
-        market[f"STOCK{i:04d}"] = pd.DataFrame({
+        market[f"STOCK{i:04d}"] = pl.DataFrame({
             'Open': close * (1 + rng.randn(n_days) * 0.002),
             'High': high, 'Low': low, 'Close': close, 'Volume': volume,
-        }, index=dates)
+        })
     return market
 
 

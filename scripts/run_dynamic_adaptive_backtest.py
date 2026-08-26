@@ -16,9 +16,9 @@ import sys
 import os
 from typing import Dict, List, Any, Tuple, Optional
 import yfinance as yf
-import pandas as pd
+import polars as pl
 import numpy as np
-from datetime import datetime
+from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -62,7 +62,7 @@ def load_bist_historical_data():
     return bm_df, stock_dict
 
 
-def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df: pd.DataFrame, stock_dict: Dict[str, pd.DataFrame], initial_capital: float = 100000.0):
+def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame], initial_capital: float = 100000.0):
     """Belirli bir zaman dilimi için Next-Bar Open icralı dinamik simülasyon koşturur."""
     print(f"\n>> {stage_name} ({start_year} - {end_year}) SİMÜLASYONU BAŞLATILIYOR...")
 
@@ -273,17 +273,17 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
     final_bm = benchmark_history[-1]["bm_equity"]
     total_bm_ret = ((final_bm - initial_capital) / initial_capital) * 100
 
-    df_eq = pd.DataFrame(equity_history)
+    df_eq = pl.DataFrame(equity_history)
     df_eq["peak"] = df_eq["equity"].cummax()
     df_eq["drawdown"] = (df_eq["equity"] - df_eq["peak"]) / df_eq["peak"] * 100
     max_dd_engine = df_eq["drawdown"].min()
 
-    df_bm = pd.DataFrame(benchmark_history)
+    df_bm = pl.DataFrame(benchmark_history)
     df_bm["peak"] = df_bm["bm_equity"].cummax()
     df_bm["drawdown"] = (df_bm["bm_equity"] - df_bm["peak"]) / df_bm["peak"] * 100
     max_dd_bm = df_bm["drawdown"].min()
 
-    df_trades = pd.DataFrame(trade_logs)
+    df_trades = pl.DataFrame(trade_logs)
     total_trades = len(df_trades)
     win_trades = len(df_trades[df_trades["pnl"] > 0]) if total_trades > 0 else 0
     win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0

@@ -16,7 +16,7 @@ import sys
 import os
 import orjson
 import asyncio
-import sqlite3
+import duckdb
 import time
 
 from services.core.alert_policy import (
@@ -331,8 +331,7 @@ async def test_batch_add_silences():
     """Toplu susturma ekleme çalışmalı."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""CREATE TABLE alert_silences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         alert_type TEXT, fingerprint TEXT,
@@ -374,8 +373,7 @@ async def test_batch_remove_silences():
     """Toplu susturma kaldırma çalışmalı."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""CREATE TABLE alert_silences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         alert_type TEXT, fingerprint TEXT,
@@ -412,8 +410,7 @@ async def test_batch_silence_transaction():
     """Batch işlemi transaction kullanmalı."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""CREATE TABLE alert_silences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         alert_type TEXT, fingerprint TEXT,

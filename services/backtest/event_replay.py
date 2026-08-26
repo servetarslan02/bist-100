@@ -21,7 +21,7 @@ Referanslar:
 
 import orjson
 import hashlib
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Callable, Tuple
 from dataclasses import dataclass
 from datetime import datetime
@@ -166,7 +166,7 @@ class EnhancedReplayEngine:
     def replay_day(
         self,
         target_date: datetime,
-        market_data: pd.DataFrame,
+        market_data: pl.DataFrame,
         initial_state: SystemState,
         feature_engine: Optional[Callable] = None,
         signal_engine: Optional[Callable] = None,
@@ -207,7 +207,7 @@ class EnhancedReplayEngine:
         positions = state["positions"]
 
         # Get day's market data
-        day_data = market_data[market_data["date"] == target_date]
+        day_data = market_data.filter(pl.col('market_data') date ==)
 
         if day_data.empty:
             logger.warning("No market data for date", date=target_date.isoformat())
@@ -268,7 +268,7 @@ class EnhancedReplayEngine:
 
                     # Execute trades based on decisions
                     if decision.action == "BUY" and decision.score >= 70:
-                        price = day_data[day_data["ticker"] == ticker]["close"].iloc[0]
+                        price = day_data.filter(pl.col('day_data') ticker ==)["close"][0]
                         quantity = self._calculate_position_size(
                             cash, price, decision.confidence
                         )
@@ -296,7 +296,7 @@ class EnhancedReplayEngine:
                             )
 
                     elif decision.action == "SELL" and ticker in positions:
-                        price = day_data[day_data["ticker"] == ticker]["close"].iloc[0]
+                        price = day_data.filter(pl.col('day_data') ticker ==)["close"][0]
                         pos = positions[ticker]
                         trade = {
                             "date": str(target_date),
@@ -329,9 +329,9 @@ class EnhancedReplayEngine:
                 "cash": cash,
                 "positions": len(positions),
                 "equity": cash + sum(
-                    p["quantity"] * day_data[day_data["ticker"] == t]["close"].iloc[0]
+                    p["quantity"] * day_data.filter(pl.col('day_data') ticker ==)["close"][0]
                     for t, p in positions.items()
-                    if not day_data[day_data["ticker"] == t].empty
+                    if not day_data.filter(pl.col('day_data') ticker ==).empty
                 ),
             },
         )

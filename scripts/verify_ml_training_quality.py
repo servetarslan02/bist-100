@@ -10,8 +10,8 @@ ALPHA BIST — MODEL VE MOTOR EĞİTİM KALİTESİ, VERİ YETERLİLİĞİ VE ENT
 import sys
 import os
 import numpy as np
-import pandas as pd
-from datetime import datetime, timezone
+import polars as pl
+from datetime import datetime, timezone, date, timedelta
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -27,7 +27,7 @@ print("=" * 85)
 # -------------------------------------------------------------------------
 from services.ml.training_validator import TrainingDatasetValidator
 validator = TrainingDatasetValidator()
-dates = pd.date_range("2024-01-01", periods=150, freq="B")
+dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 1) + timedelta(days=300), timedelta(days=1), eager=True).head(150)
 tickers = ["THYAO", "ASELS", "GARAN", "BIMAS"]
 rows = []
 for d in dates:
@@ -40,7 +40,7 @@ for d in dates:
             "volume_zscore": float(np.random.normal(0, 1)),
             "target_return_5d": float(np.random.normal(0.5, 3)),
         })
-df_train = pd.DataFrame(rows)
+df_train = pl.DataFrame(rows)
 
 features_map = {}
 returns = {}

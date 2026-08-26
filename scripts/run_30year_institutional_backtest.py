@@ -13,7 +13,7 @@ ALPHA BIST — 30-YILLIK KURUMSAL GERÇEK PİYASA BACKTEST MOTORU (1997 - 2026)
 import sys
 import os
 import yfinance as yf
-import pandas as pd
+import polars as pl
 import numpy as np
 from datetime import datetime, timezone
 import warnings
@@ -54,7 +54,7 @@ def download_30y_data():
     if bm_df.empty:
         raise ValueError("XU100 verisi indirilemedi!")
 
-    if isinstance(bm_df.columns, pd.MultiIndex):
+    if isinstance(bm_df.columns, list):
         bm_df.columns = [c[0] for c in bm_df.columns]
 
     print(f"    ✓ BIST-100: {len(bm_df)} işlem günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})")
@@ -67,7 +67,7 @@ def download_30y_data():
         try:
             if ticker in stocks_raw.columns.get_level_values(0):
                 df_t = stocks_raw[ticker].dropna()
-                if isinstance(df_t.columns, pd.MultiIndex):
+                if isinstance(df_t.columns, list):
                     df_t.columns = [c[0] for c in df_t.columns]
                 if len(df_t) > 30:
                     stock_dict[ticker] = df_t
@@ -302,12 +302,12 @@ def run_30year_backtest():
     cagr_engine = (((final_equity / initial_capital) ** (1 / total_years)) - 1) * 100
     cagr_bm = (((final_bm_equity / 100000.0) ** (1 / total_years)) - 1) * 100
 
-    df_eq = pd.DataFrame(equity_history)
+    df_eq = pl.DataFrame(equity_history)
     df_eq["peak"] = df_eq["equity"].cummax()
     df_eq["drawdown"] = (df_eq["equity"] - df_eq["peak"]) / df_eq["peak"] * 100
     max_dd_engine = df_eq["drawdown"].min()
 
-    df_bm = pd.DataFrame(benchmark_history)
+    df_bm = pl.DataFrame(benchmark_history)
     df_bm["peak"] = df_bm["bm_equity"].cummax()
     df_bm["drawdown"] = (df_bm["bm_equity"] - df_bm["peak"]) / df_bm["peak"] * 100
     max_dd_bm = df_bm["drawdown"].min()
@@ -320,7 +320,7 @@ def run_30year_backtest():
     sharpe_bm = (df_bm["daily_ret"].mean() / (df_bm["daily_ret"].std() + 1e-9)) * np.sqrt(252)
 
     # İşlem İstatistikleri
-    df_trades = pd.DataFrame(trade_logs)
+    df_trades = pl.DataFrame(trade_logs)
     total_trades = len(df_trades)
     winning_trades = len(df_trades[df_trades["pnl"] > 0]) if total_trades > 0 else 0
     win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0

@@ -8,7 +8,7 @@ Fair Value Gap (FVG) ve Smart Money Likidite Emilimini tespit eder.
 from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
 import numpy as np
-import pandas as pd
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -93,7 +93,7 @@ class CandlePatternEngine:
             "hanging_man", "spinning_top", "marubozu",
         ]
 
-    def analyze_dataframe(self, df: pd.DataFrame, ticker: str = "ASSET") -> CandlePatternResult:
+    def analyze_dataframe(self, df: pl.DataFrame, ticker: str = "ASSET") -> CandlePatternResult:
         """OHLCV DataFrame'ini analiz ederek tüm formasyonları çıkarır."""
         result = CandlePatternResult(ticker=ticker)
         if df is None or len(df) < 3:
@@ -104,11 +104,11 @@ class CandlePatternEngine:
         if not all(col in df.columns for col in required_cols):
             return result
 
-        closes = df["Close"].values
-        opens = df["Open"].values
-        highs = df["High"].values
-        lows = df["Low"].values
-        vols = df["Volume"].values if "Volume" in df.columns else np.ones(len(df))
+        closes = df["Close"].to_numpy()
+        opens = df["Open"].to_numpy()
+        highs = df["High"].to_numpy()
+        lows = df["Low"].to_numpy()
+        vols = df["Volume"].to_numpy() if "Volume" in df.columns else np.ones(len(df))
 
         n = len(df)
         c0 = CandleMetrics(opens[-1], highs[-1], lows[-1], closes[-1], vols[-1])

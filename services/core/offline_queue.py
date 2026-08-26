@@ -24,7 +24,7 @@ Kullanım:
 import asyncio
 import hashlib
 import os
-import sqlite3
+import duckdb
 import time
 from contextlib import contextmanager
 from datetime import datetime, timezone, timedelta
@@ -68,7 +68,7 @@ class OfflineQueue:
     def _init_db(self):
         """SQLite tablolarını oluştur."""
         with self._connect() as conn:
-            conn.executescript("""
+            conn.execute("""
                 CREATE TABLE IF NOT EXISTS offline_queue (
                     entry_id TEXT PRIMARY KEY,
                     event_type TEXT NOT NULL,
@@ -79,21 +79,17 @@ class OfflineQueue:
                     expires_at TEXT NOT NULL,
                     attempts INTEGER DEFAULT 0,
                     last_error TEXT
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_oq_created ON offline_queue(created_at);
-                CREATE INDEX IF NOT EXISTS idx_oq_expires ON offline_queue(expires_at);
-                CREATE INDEX IF NOT EXISTS idx_oq_type ON offline_queue(event_type);
-                CREATE INDEX IF NOT EXISTS idx_oq_priority ON offline_queue(priority);
+                )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_oq_created ON offline_queue(created_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_oq_expires ON offline_queue(expires_at)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_oq_type ON offline_queue(event_type)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_oq_priority ON offline_queue(priority)")
             conn.commit()
 
     @contextmanager
     def _connect(self):
-        conn = sqlite3.connect(str(self.db_path), timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA synchronous=NORMAL")
+        conn = duckdb.connect(str(self.db_path))
         try:
             yield conn
         finally:

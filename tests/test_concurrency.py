@@ -14,7 +14,7 @@ Test kapsamı:
 import sys
 import os
 import asyncio
-import sqlite3
+import duckdb
 import time
 
 from services.core.migrations.runner import MigrationRunner, MigrationLockError
@@ -27,9 +27,7 @@ logger = structlog.get_logger(__name__)
 
 
 def fresh_db():
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys=ON")
+    db = duckdb.connect(":memory:")
     return db
 
 

@@ -15,7 +15,7 @@ import os
 import orjson
 import asyncio
 import time
-import sqlite3
+import duckdb
 import tempfile
 
 from services.core.alert_policy import AlertPolicy, SilenceRule, FALLBACK_ESCALATION_TIMEOUT_S
@@ -214,8 +214,7 @@ async def test_silence_db_persist():
     """Silence DB'ye persist edilmeli."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""
         CREATE TABLE alert_silences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -249,8 +248,7 @@ async def test_silence_db_load():
     """Silence DB'den yüklenmeli."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""
         CREATE TABLE alert_silences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -287,8 +285,7 @@ async def test_silence_db_remove():
     """Silence DB'den silinmeli."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""
         CREATE TABLE alert_silences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -322,8 +319,7 @@ async def test_silence_db_load_only_active():
     """Sadece aktif silence'lar yüklenmeli."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""
         CREATE TABLE alert_silences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -531,8 +527,7 @@ async def test_alerting_with_policy_and_silence():
     """Alerting + policy + silence entegrasyonu."""
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""
         CREATE TABLE alert_silences (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

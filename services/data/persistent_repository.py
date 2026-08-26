@@ -7,7 +7,7 @@ Mevcut proje altyapısındaki persistence yapısını kullanır.
 Incremental ingestion, deduplication, PIT-safe sorgulama destekler.
 """
 
-import sqlite3
+import duckdb
 import orjson
 import hashlib
 from typing import Dict, List, Optional, Any
@@ -30,19 +30,17 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
         self._conn = None
         self._init_db()
 
-    def _get_conn(self) -> sqlite3.Connection:
+    def _get_conn(self) -> duckdb.DuckDBPyConnection:
         if self._conn is None:
-            self._conn = sqlite3.connect(self._db_path)
-            self._conn.row_factory = sqlite3.Row
-            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn = duckdb.connect(self._db_path)
         return self._conn
 
     def _init_db(self):
         """Tabloları oluştur."""
         conn = self._get_conn()
-        conn.executescript("""
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS fundamental_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 ticker TEXT NOT NULL,
                 period_end TEXT NOT NULL,
                 available_at TEXT NOT NULL,
@@ -52,10 +50,11 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 fetched_at TEXT NOT NULL,
                 checksum TEXT,
                 UNIQUE(ticker, period_end, available_at)
-            );
-
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS event_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 event_id TEXT NOT NULL,
                 ticker TEXT NOT NULL,
                 published_at TEXT NOT NULL,
@@ -68,10 +67,11 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 fetched_at TEXT NOT NULL,
                 checksum TEXT,
                 UNIQUE(event_id)
-            );
-
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS catalyst_snapshots (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 event_id TEXT NOT NULL,
                 ticker TEXT NOT NULL,
                 announcement_date TEXT NOT NULL,
@@ -82,21 +82,18 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
                 fetched_at TEXT NOT NULL,
                 checksum TEXT,
                 UNIQUE(event_id)
-            );
-
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS ingestion_state (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
                 updated_at TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_fund_ticker_date
-                ON fundamental_snapshots(ticker, available_at);
-            CREATE INDEX IF NOT EXISTS idx_event_ticker_date
-                ON event_snapshots(ticker, published_at);
-            CREATE INDEX IF NOT EXISTS idx_catalyst_ticker_date
-                ON catalyst_snapshots(ticker, announcement_date);
+            )
         """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_fund_ticker_date ON fundamental_snapshots(ticker, available_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_event_ticker_date ON event_snapshots(ticker, published_at)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_catalyst_ticker_date ON catalyst_snapshots(ticker, announcement_date)")
         conn.commit()
 
     # === QUERY METHODS ===

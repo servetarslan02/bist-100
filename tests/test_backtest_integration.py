@@ -15,8 +15,8 @@ NIHAI-SPEC doğrultusunda entegrasyon testleri:
 import sys
 import os
 import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
+import polars as pl
+from datetime import datetime, timedelta, date
 from pathlib import Path
 
 # Add project root to path
@@ -28,19 +28,19 @@ import pytest
 # FIXTURES
 # =====================================================
 
-def _make_ohlcv(n_days: int = 300, base_price: float = 100.0, seed: int = 42) -> pd.DataFrame:
+def _make_ohlcv(n_days: int = 300, base_price: float = 100.0, seed: int = 42) -> pl.DataFrame:
     """Sentetik OHLCV veri üret."""
     rng = np.random.RandomState(seed)
-    dates = pd.bdate_range(start="2023-01-01", periods=n_days)
+    dates = pl.date_range(date(2023, 1, 1), date(2023, 1, 1) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
     returns = rng.normal(0.0003, 0.02, n_days)
     close = base_price * np.cumprod(1 + returns)
     high = close * (1 + rng.uniform(0, 0.02, n_days))
     low = close * (1 - rng.uniform(0, 0.02, n_days))
     open_ = close * (1 + rng.normal(0, 0.005, n_days))
     volume = rng.randint(100_000, 10_000_000, n_days).astype(float)
-    df = pd.DataFrame({
+    df = pl.DataFrame({
         "Open": open_, "High": high, "Low": low, "Close": close, "Volume": volume
-    }, index=dates)
+    })
     return df
 
 

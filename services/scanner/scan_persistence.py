@@ -67,13 +67,13 @@ class ScanPersistence:
             return
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS scan_results (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                     scan_id TEXT NOT NULL,
                     scan_type TEXT NOT NULL,
                     ticker TEXT NOT NULL,
@@ -126,8 +126,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cursor.execute("""
@@ -216,9 +216,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
-            conn.row_factory = sqlite3.Row
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -257,8 +256,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -320,8 +319,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -387,8 +386,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
@@ -430,8 +429,8 @@ class ScanPersistence:
         self._ensure_table()
 
         try:
-            import sqlite3
-            conn = sqlite3.connect(self._db_path)
+            import duckdb
+            conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
             cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()

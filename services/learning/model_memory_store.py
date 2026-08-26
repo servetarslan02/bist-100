@@ -10,7 +10,7 @@ Kalıcı model hafızası:
 
 import os
 import orjson
-import sqlite3
+import duckdb
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
 import structlog
@@ -26,16 +26,13 @@ class ModelMemoryStore:
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         self._init_tables()
 
-    def _get_conn(self) -> sqlite3.Connection:
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.row_factory = sqlite3.Row
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
+    def _get_conn(self) -> duckdb.DuckDBPyConnection:
+        conn = duckdb.connect(self.db_path)
         return conn
 
     def _init_tables(self):
         with self._get_conn() as conn:
-            conn.executescript("""
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS predictions (
                 prediction_id TEXT PRIMARY KEY,
                 model_id TEXT NOT NULL,
@@ -49,8 +46,9 @@ class ModelMemoryStore:
                 entry_price REAL NOT NULL,
                 features_json TEXT,
                 status TEXT DEFAULT 'PENDING'
-            );
-
+            )
+            """)
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS outcomes (
                 prediction_id TEXT PRIMARY KEY,
                 model_id TEXT NOT NULL,
@@ -66,10 +64,11 @@ class ModelMemoryStore:
                 net_pnl REAL NOT NULL,
                 transaction_cost REAL NOT NULL,
                 FOREIGN KEY(prediction_id) REFERENCES predictions(prediction_id)
-            );
-
+            )
+            """)
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS model_metrics_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 model_id TEXT NOT NULL,
                 model_version TEXT NOT NULL,
                 evaluated_at TEXT NOT NULL,
@@ -84,18 +83,18 @@ class ModelMemoryStore:
                 reliability_score REAL NOT NULL,
                 fusion_weight REAL NOT NULL,
                 metrics_json TEXT
-            );
-
+            )
+            """)
+            conn.execute("""
             CREATE TABLE IF NOT EXISTS fusion_weights_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
                 timestamp TEXT NOT NULL,
                 market_regime TEXT NOT NULL,
                 weights_json TEXT NOT NULL
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_pred_model ON predictions(model_id, status);
-            CREATE INDEX IF NOT EXISTS idx_outcome_model ON outcomes(model_id, evaluated_at);
+            )
             """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pred_model ON predictions(model_id, status)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_outcome_model ON outcomes(model_id, evaluated_at)")
 
     def save_prediction(
         self,

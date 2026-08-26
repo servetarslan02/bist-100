@@ -18,16 +18,14 @@ import os
 import hashlib
 
 import asyncio
-import sqlite3
+import duckdb
 from pathlib import Path
 from services.core.migrations.runner import MigrationRunner, MigrationFile
 
 
 def fresh_db():
     """Yeni bir in-memory SQLite DB oluştur."""
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys=ON")
+    db = duckdb.connect(":memory:")
     return db
 
 
@@ -59,7 +57,7 @@ async def test_clean_migration():
             issues.append(f"Tablo eksik: {t}")
 
     # positions.entry_commission var mı?
-    cols = await runner._fetchall("PRAGMA table_info(positions)")
+    cols = await runner._fetchall("SELECT column_name FROM information_schema.columns WHERE table_name = 'positions'")
     col_names = [c["name"] for c in cols]
     if "entry_commission" not in col_names:
         issues.append("entry_commission sütunu eksik")
@@ -236,7 +234,7 @@ async def test_data_preservation():
         return "Data Preservation", False, ["Pozisyon verisi bulunamadı"]
 
     # entry_commission sütunu var mı? (v003)
-    if "entry_commission" not in [c["name"] for c in await runner._fetchall("PRAGMA table_info(positions)")]:
+    if "entry_commission" not in [c["name"] for c in await runner._fetchall("SELECT column_name FROM information_schema.columns WHERE table_name = 'positions'")]:
         return "Data Preservation", False, ["entry_commission sütunu yok"]
 
     # Veri hâlâ orada

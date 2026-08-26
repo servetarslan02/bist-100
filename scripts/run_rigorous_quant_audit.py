@@ -10,7 +10,7 @@ ALPHA BIST — Kurumsal Düzey Kapsamlı Kantitatif Denetim ve Doğrulama Motoru
 import sys
 import os
 import time
-import pandas as pd
+import polars as pl
 import numpy as np
 
 # Windows UTF-8 Terminal desteği

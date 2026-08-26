@@ -278,7 +278,7 @@ class PaperTradingOrchestrator:
         is_morning_execution: bool = False,
     ) -> Dict[str, Any]:
         """Test/Replay ve Canlı için ortak günlük döngü arayüzü."""
-        import pandas as pd
+        import polars as pl
 
         sig_list = champion_signals if champion_signals is not None else (signals or [])
         price_dict = dict(prices or {})
@@ -302,7 +302,7 @@ class PaperTradingOrchestrator:
                                     return r[k]
                             return default
 
-                        dt_lookup = pd.to_datetime(date)
+                        dt_lookup = pl.Series(date)
                         df_idx = df.index
                         if getattr(df_idx, 'tz', None) is not None:
                             df_idx = df_idx.tz_convert(None)
@@ -311,16 +311,16 @@ class PaperTradingOrchestrator:
                             curr_idx = df_idx.get_loc(dt_lookup)
                             if isinstance(curr_idx, slice):
                                 curr_idx = curr_idx.start
-                            row = df.iloc[curr_idx]
+                            row = df[curr_idx]
                         elif date in df.index:
                             curr_idx = df.index.get_loc(date)
                             if isinstance(curr_idx, slice):
                                 curr_idx = curr_idx.start
-                            row = df.iloc[curr_idx]
+                            row = df[curr_idx]
                         else:
                             # Canlı/Paper trading modunda piyasanın en son mevcut barını kullan
                             curr_idx = len(df) - 1
-                            row = df.iloc[-1]
+                            row = df[-1]
 
                         price_dict[ticker] = float(_get_val(row, "close", "Close", "price", "Price", default=0.0))
                         vol_dict[ticker] = int(_get_val(row, "volume", "Volume", default=1_000_000))
@@ -333,15 +333,15 @@ class PaperTradingOrchestrator:
 
                             # Likidite tahmini: YALNIZCA dün ve öncesine (T-1) ait geçmiş barlar kullanılır
                             if isinstance(curr_idx, int) and curr_idx >= 1:
-                                hist_slice = df.iloc[max(0, curr_idx - 20) : curr_idx]
-                                prev_1 = df.iloc[curr_idx - 1]
-                                prev_2 = df.iloc[curr_idx - 2] if curr_idx >= 2 else prev_1
+                                hist_slice = df[max(0, curr_idx - 20) : curr_idx]
+                                prev_1 = df[curr_idx - 1]
+                                prev_2 = df[curr_idx - 2] if curr_idx >= 2 else prev_1
                                 high_c = float(_get_val(prev_1, "high", "High", default=0.0))
                                 low_c = float(_get_val(prev_1, "low", "Low", default=0.0))
                                 high_p = float(_get_val(prev_2, "high", "High", default=0.0))
                                 low_p = float(_get_val(prev_2, "low", "Low", default=0.0))
                             else:
-                                hist_slice = df.iloc[:1]
+                                hist_slice = df[:1]
                                 high_c = float(_get_val(row, "high", "High", default=0.0))
                                 low_c = float(_get_val(row, "low", "Low", default=0.0))
                                 high_p = high_c
@@ -358,19 +358,19 @@ class PaperTradingOrchestrator:
                             low_p = 0.0
 
                             if isinstance(curr_idx, int) and curr_idx >= 1:
-                                prev_row = df.iloc[curr_idx - 1]
+                                prev_row = df[curr_idx - 1]
                                 high_p = float(_get_val(prev_row, "high", "High", default=0.0))
                                 low_p = float(_get_val(prev_row, "low", "Low", default=0.0))
 
                             start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
-                            hist_slice = df.iloc[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
+                            hist_slice = df[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
                             
                             highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
                             lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
                             vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
 
                             if isinstance(curr_idx, int) and curr_idx + 1 < len(df):
-                                next_row = df.iloc[curr_idx + 1]
+                                next_row = df[curr_idx + 1]
                                 next_open_dict[ticker] = float(_get_val(next_row, "open", "Open", "close", "Close", default=0.0))
 
                         if not hasattr(self, "_history_cache"):

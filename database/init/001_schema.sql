@@ -5,6 +5,8 @@
 
 -- Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "vector";       -- pgvector: vektör araması
+CREATE EXTENSION IF NOT EXISTS "timescaledb";   -- TimescaleDB: zaman serisi optimizasyonu
 
 -- =====================================================
 -- REFERENCE DATA
@@ -731,3 +733,158 @@ INSERT INTO system_config (config_key, config_value, description) VALUES
     ('risk.daily_loss_limit_pct', '5', 'Günlük zarar limiti (%)'),
     ('ml.retrain_interval_hours', '168', 'Yeniden eğitim aralığı (saat)'),
     ('llm.context_size', '8192', 'LLM context boyutu');
+
+-- =====================================================
+-- TIMESCALEDB HYPERTABLES (Zaman serisi optimizasyonu)
+-- =====================================================
+
+-- Model predictions → hypertable
+SELECT create_hypertable('model_predictions', 'prediction_date',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Daily performance → hypertable
+SELECT create_hypertable('daily_performance', 'date',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Equity curve → hypertable
+SELECT create_hypertable('equity_curve', 'date',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Daily P&L → hypertable
+SELECT create_hypertable('daily_pnl', 'pnl_date',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Equity snapshots → hypertable
+SELECT create_hypertable('equity_snapshots', 'snapshot_date',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Scan results → hypertable
+SELECT create_hypertable('scan_results', 'timestamp',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Alerts → hypertable
+SELECT create_hypertable('alerts', 'created_at',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Audit logs → hypertable
+SELECT create_hypertable('audit_logs', 'created_at',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- System events → hypertable
+SELECT create_hypertable('system_events', 'created_at',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Paper trades → hypertable
+SELECT create_hypertable('paper_trades', 'created_at',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- Backtest runs → hypertable
+SELECT create_hypertable('backtest_runs', 'created_at',
+    if_not_exists => TRUE,
+    migrate_data => TRUE
+);
+
+-- =====================================================
+-- TIMESCALEDB COMPRESSION (Otomatik sıkıştırma)
+-- =====================================================
+
+ALTER TABLE model_predictions SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'instrument_id',
+    timescaledb.compress_orderby = 'prediction_date DESC'
+);
+SELECT add_compression_policy('model_predictions', INTERVAL '30 days', if_not_exists => TRUE);
+
+ALTER TABLE daily_performance SET (
+    timescaledb.compress,
+    timescaledb.compress_orderby = 'date DESC'
+);
+SELECT add_compression_policy('daily_performance', INTERVAL '90 days', if_not_exists => TRUE);
+
+ALTER TABLE scan_results SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'ticker',
+    timescaledb.compress_orderby = 'timestamp DESC'
+);
+SELECT add_compression_policy('scan_results', INTERVAL '7 days', if_not_exists => TRUE);
+
+ALTER TABLE alerts SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'alert_type',
+    timescaledb.compress_orderby = 'created_at DESC'
+);
+SELECT add_compression_policy('alerts', INTERVAL '30 days', if_not_exists => TRUE);
+
+ALTER TABLE audit_logs SET (
+    timescaledb.compress,
+    timescaledb.compress_segmentby = 'action',
+    timescaledb.compress_orderby = 'created_at DESC'
+);
+SELECT add_compression_policy('audit_logs', INTERVAL '30 days', if_not_exists => TRUE);
+
+-- =====================================================
+-- TIMESCALEDB CONTINUOUS AGGREGATES (Otomatik聚合)
+-- =====================================================
+
+-- Günlük performans özeti
+CREATE MATERIALIZED VIEW IF NOT EXISTS daily_perf_summary
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('1 day', pnl_date) AS day,
+    portfolio_id,
+    AVG(net_pnl) AS avg_daily_pnl,
+    SUM(net_pnl) AS total_pnl,
+    COUNT(*) AS trade_count
+FROM daily_pnl
+GROUP BY time_bucket('1 day', pnl_date), portfolio_id
+WITH NO DATA;
+
+-- Haftalık scan sonuçları
+CREATE MATERIALIZED VIEW IF NOT EXISTS weekly_scan_summary
+WITH (timescaledb.continuous) AS
+SELECT
+    time_bucket('7 days', timestamp) AS week,
+    ticker,
+    AVG(score) AS avg_score,
+    MAX(score) AS max_score,
+    COUNT(*) AS scan_count
+FROM scan_results
+GROUP BY time_bucket('7 days', timestamp), ticker
+WITH NO DATA;
+
+-- =====================================================
+-- PGVECTOR HNSW INDEX (Vektör araması — 10x hızlı)
+-- =====================================================
+
+-- knowledge_entities.embedding için HNSW index
+-- cosine distance: benzerlik araması için
+CREATE INDEX IF NOT EXISTS idx_knowledge_entities_embedding_hnsw
+ON knowledge_entities
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 200);
+
+-- IVFFlat index (fallback, daha az bellek)
+-- CREATE INDEX IF NOT EXISTS idx_knowledge_entities_embedding_ivfflat
+-- ON knowledge_entities
+-- USING ivfflat (embedding vector_cosine_ops)
+-- WITH (lists = 100);

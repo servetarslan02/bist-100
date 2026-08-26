@@ -16,7 +16,7 @@ Referanslar:
 - Marcos López de Prado - "Advances in Financial Machine ML" Ch.7
 """
 
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -287,7 +287,7 @@ class PointInTimeValidator:
 
     def validate_feature_set(
         self,
-        feature_df: pd.DataFrame,
+        feature_df: pl.DataFrame,
         ticker: str,
         decision_time: datetime,
         feature_cols: List[str],
@@ -380,9 +380,9 @@ class PointInTimeValidator:
 
     def get_registry_stats(self) -> Dict[str, Any]:
         """Kayıt istatistikleri."""
-        total_records = sum(len(records) for records in self._registry.values())
+        total_records = sum(len(records) for records in self._registry.to_numpy()())
         by_type = {}
-        for records in self._registry.values():
+        for records in self._registry.to_numpy()():
             for r in records:
                 by_type[r.data_type] = by_type.get(r.data_type, 0) + 1
 
@@ -403,7 +403,7 @@ class PITDataAdapter:
 
     @staticmethod
     def adapt_fundamental_data(
-        df: pd.DataFrame,
+        df: pl.DataFrame,
         ticker_col: str = "ticker",
         report_date_col: str = "report_date",
         publish_date_col: str = "publish_date",
@@ -414,15 +414,15 @@ class PITDataAdapter:
             records.append(PITRecord(
                 data_id=f"{row[ticker_col]}_{row[report_date_col]}",
                 ticker=row[ticker_col],
-                report_date=pd.to_datetime(row[report_date_col]),
-                publish_date=pd.to_datetime(row.get(publish_date_col, row[report_date_col])),
+                report_date=pl.Series(row[report_date_col]),
+                publish_date=pl.Series(row.get(publish_date_col, row[report_date_col])),
                 data_type="fundamental",
             ))
         return records
 
     @staticmethod
     def adapt_price_data(
-        df: pd.DataFrame,
+        df: pl.DataFrame,
         ticker_col: str = "ticker",
         date_col: str = "date",
     ) -> List[PITRecord]:
@@ -430,7 +430,7 @@ class PITDataAdapter:
         records = []
         for _, row in df.iterrows():
             # Fiyat verisi genellikle aynı gün bilinebilir
-            date = pd.to_datetime(row[date_col])
+            date = pl.Series(row[date_col])
             records.append(PITRecord(
                 data_id=f"{row[ticker_col]}_price_{date.strftime('%Y%m%d')}",
                 ticker=row[ticker_col],

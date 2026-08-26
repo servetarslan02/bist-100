@@ -8,7 +8,7 @@ B) Yeni 10/10 Sistem: Japon Mum Formasyonları + Price Action + FVG + Alıcı G�
 import sys
 import os
 import yfinance as yf
-import pandas as pd
+import polars as pl
 import numpy as np
 from datetime import datetime
 
@@ -102,7 +102,7 @@ def run_benchmark():
     def calc_stats(trades):
         if not trades:
             return {"count": 0, "win_rate": 0, "avg_ret": 0, "profit_factor": 0, "total_ret": 0}
-        df_t = pd.DataFrame(trades)
+        df_t = pl.DataFrame(trades)
         win_rate = (df_t["is_win"].sum() / len(df_t)) * 100
         avg_ret = df_t["return_pct"].mean()
         wins = df_t[df_t["return_pct"] > 0]["return_pct"].sum()

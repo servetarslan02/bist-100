@@ -69,12 +69,12 @@ def benchmark_dataframe():
     """Polars vs Pandas — DataFrame işlem hız karşılaştırması."""
     try:
         import polars as pl
-        import pandas as pd
         import numpy as np
+        from datetime import datetime, timedelta
 
         # Test data — BIST benzeri OHLCV verisi
         n_rows = 100_000
-        dates = pd.date_range("2020-01-01", periods=n_rows, freq="min")
+        dates = pl.datetime_range(datetime(2020, 1, 1), datetime(2020, 1, 1) + timedelta(minutes=n_rows-1), timedelta(minutes=1), eager=True)
         np.random.seed(42)
         data = {
             "date": dates,
@@ -89,8 +89,8 @@ def benchmark_dataframe():
         # Pandas benchmark
         start = time.perf_counter()
         for _ in range(10):
-            df_pd = pd.DataFrame(data)
-            result_pd = df_pd.groupby("ticker").agg(
+            df_pd = pl.DataFrame(data)
+            result_pd = df_pd.group_by("ticker").agg(
                 {"close": "mean", "volume": "sum", "high": "max", "low": "min"}
             )
         pandas_time = time.perf_counter() - start

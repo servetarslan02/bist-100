@@ -1,5 +1,5 @@
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import List, Dict, Any
 
 class RiskManager:
@@ -44,7 +44,7 @@ class RiskManager:
             inv_vols = []
             for p in predictions:
                 vol = p.get("features", {}).get("volatility_20d", 0.0)
-                if vol <= 0 or pd.isna(vol):
+                if vol <= 0 or pl.Expr.is_null(vol):
                     vol = 0.40 # default
                 inv_vols.append(1.0 / vol)
                 
@@ -75,14 +75,14 @@ class RiskManager:
             raise ValueError(f"Unknown weight method: {method}")
             
         # Normalize weights to sum to 1.0 if they were capped
-        total_w = sum(weights.values())
+        total_w = sum(weights.to_numpy()())
         if total_w > 0:
             for t in weights:
                 weights[t] = weights[t] / total_w
                 
         return weights
 
-    def get_market_regime(self, bm_df: pd.DataFrame, target_date: pd.Timestamp) -> float:
+    def get_market_regime(self, bm_df: pl.DataFrame, target_date: pl.Series) -> float:
         """
         BIST100'un durumuna gore pazar rejimini dondurur.
         1.0 = Tamamen Bull (100% yatirim)
@@ -92,8 +92,8 @@ class RiskManager:
         if len(sub_bm) < 200:
             return 1.0
             
-        current_close = sub_bm["Close"].iloc[-1]
-        ma_200 = sub_bm["Close"].rolling(200).mean().iloc[-1]
+        current_close = sub_bm["Close"][-1]
+        ma_200 = sub_bm["Close"].rolling(200).mean()[-1]
         
         # 200 gunluk ortalamanin altindaysa %50 nakde gec
         if current_close < ma_200:

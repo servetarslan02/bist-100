@@ -20,7 +20,7 @@ Optimizasyonlar:
 import time as _time
 import hashlib
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 import structlog
@@ -255,9 +255,9 @@ class BacktestEngineV4:
 
     def run(
         self,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
         run_id: Optional[str] = None,
         persist: bool = True,
         trade_start: Optional[str] = None,
@@ -288,9 +288,9 @@ class BacktestEngineV4:
 
     def _run_legacy(
         self,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
         run_id: Optional[str] = None,
         persist: bool = True,
         trade_start: Optional[str] = None,
@@ -323,7 +323,7 @@ class BacktestEngineV4:
 
         # Ortak tarih aralığı
         all_dates = set()
-        for df in market_data.values():
+        for df in market_data.to_numpy()():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -341,9 +341,9 @@ class BacktestEngineV4:
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
+                benchmark_prices[date_str] = float(benchmark_data.filter(idx, 'Close'])
             if 'Close' in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data['Close'].values.astype(float)
+                benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
 
         # Pre-compute quality cache
         for ticker, df in market_data.items():
@@ -424,7 +424,7 @@ class BacktestEngineV4:
                 total_scans += 1
                 score = self._compute_score(features, ticker=ticker, all_day_features=day_features, date_str=date_str)
                 if score <= (100 - cfg.signal_threshold):
-                    price = float(df.loc[next_date, 'Open'])
+                    price = float(df.filter(next_date, 'Open'])
                     sim.execute_sell(ticker, price, date_str)
                     signals_count += 1
 
@@ -484,7 +484,7 @@ class BacktestEngineV4:
                 df = market_data[ticker]
                 if next_date not in df.index:
                     continue
-                price = float(df.loc[next_date, 'Open'])
+                price = float(df.filter(next_date, 'Open'])
                 atr = 2.0
                 if 'day_features' in locals() and ticker in locals().get('day_features', {}):
                     atr = day_features[ticker].get('atr_pct', 2.0)
@@ -496,7 +496,7 @@ class BacktestEngineV4:
             prices = {}
             for ticker in sim._positions:
                 if ticker in market_data and current_date in market_data[ticker].index:
-                    prices[ticker] = float(market_data[ticker].loc[current_date, 'Close'])
+                    prices[ticker] = float(market_data[ticker].filter(current_date, 'Close'])
             sim.update_equity(prices, date_str, bench_price)
 
         elapsed = _time.time() - start_time
@@ -517,9 +517,9 @@ class BacktestEngineV4:
 
     def _run_fast(
         self,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
         run_id: Optional[str] = None,
         persist: bool = True,
         trade_start: Optional[str] = None,
@@ -556,7 +556,7 @@ class BacktestEngineV4:
 
         # Ortak tarih aralığı (legacy ile aynı)
         all_dates = set()
-        for df in market_data.values():
+        for df in market_data.to_numpy()():
             if df is not None and not df.empty:
                 all_dates.update(df.index)
         sorted_dates = sorted(all_dates)
@@ -574,9 +574,9 @@ class BacktestEngineV4:
         if benchmark_data is not None and not benchmark_data.empty:
             for idx in benchmark_data.index:
                 date_str = str(idx.date()) if hasattr(idx, 'date') else str(idx)
-                benchmark_prices[date_str] = float(benchmark_data.loc[idx, 'Close'])
+                benchmark_prices[date_str] = float(benchmark_data.filter(idx, 'Close'])
             if 'Close' in benchmark_data.columns:
-                benchmark_close_arr = benchmark_data['Close'].values.astype(float)
+                benchmark_close_arr = benchmark_data['Close'].to_numpy().astype(float)
 
         # Pre-compute quality cache (legacy ile aynı)
         for ticker, df in market_data.items():
@@ -600,8 +600,8 @@ class BacktestEngineV4:
         for ticker, df in market_data.items():
             if df is None or df.empty:
                 continue
-            open_arr = df["Open"].values if "Open" in df.columns else df["Close"].values
-            tinfo[ticker] = (df.index, open_arr, df["Close"].values)
+            open_arr = df["Open"].to_numpy() if "Open" in df.columns else df["Close"].to_numpy()
+            tinfo[ticker] = (df.index, open_arr, df["Close"].to_numpy())
 
         # Ana döngü (legacy kontrol akışının birebir aynası)
         signals_count = 0
@@ -772,7 +772,7 @@ class BacktestEngineV4:
         date_str: str,
         pos: int,
         panels: Dict[str, Any],
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         lookback: int,
         cfg: BacktestConfig,
     ) -> Optional[Dict[str, Any]]:
@@ -800,7 +800,7 @@ class BacktestEngineV4:
 
         if use_scalar:
             self._last_scalar_fallbacks += 1
-            df_until = market_data[ticker].iloc[: pos + 1]
+            df_until = market_data[ticker][: pos + 1]
             feats = self._get_features(ticker, date_str, df_until, lookback, cfg)
 
         return feats
@@ -837,7 +837,7 @@ class BacktestEngineV4:
         tie_members: List[int],
         day_scores: Dict[str, Tuple[float, int]],
         date_str: str,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         lookback: int,
         cfg: BacktestConfig,
         all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
@@ -847,7 +847,7 @@ class BacktestEngineV4:
         for i in tie_members:
             ticker = buy_candidates[i][0]
             pos = day_scores[ticker][1]
-            df_until = market_data[ticker].iloc[: pos + 1]
+            df_until = market_data[ticker][: pos + 1]
             feats = self._get_features(ticker, date_str, df_until, lookback, cfg)
             if feats:
                 rescored[ticker] = self._compute_score(feats, ticker=ticker, all_day_features=all_day_features, date_str=date_str)
@@ -931,7 +931,7 @@ class BacktestEngineV4:
         self,
         ticker: str,
         date_str: str,
-        df_until: pd.DataFrame,
+        df_until: pl.DataFrame,
         lookback: int,
         cfg: BacktestConfig,
     ) -> Optional[Dict[str, Any]]:
@@ -940,16 +940,16 @@ class BacktestEngineV4:
         if cached is not None:
             return cached
 
-        df_lookback = df_until.iloc[-lookback:]
+        df_lookback = df_until[-lookback:]
         _t0 = _time.perf_counter()
         try:
             mask = self._tm.compute_mask(
                 ticker,
-                df_lookback['Open'].values,
-                df_lookback['High'].values,
-                df_lookback['Low'].values,
-                df_lookback['Close'].values,
-                df_lookback['Volume'].values,
+                df_lookback['Open'].to_numpy(),
+                df_lookback['High'].to_numpy(),
+                df_lookback['Low'].to_numpy(),
+                df_lookback['Close'].to_numpy(),
+                df_lookback['Volume'].to_numpy(),
             )
             mask_arr = mask.mask if hasattr(mask, 'mask') else mask
             features = self._calc.compute_all_features(
@@ -1040,7 +1040,7 @@ class BacktestEngineV4:
         features: Dict[str, Any],
         date_str: str,
         all_day_features: Dict[str, Dict[str, Any]],
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         current_date,
         benchmark_close: Optional[np.ndarray] = None,
         historical_adapter=None,
@@ -1097,7 +1097,7 @@ class BacktestEngineV4:
                 df = market_data.get(ticker)
                 if df is not None:
                     mask_arr = df.index <= current_date
-                    stock_close = df['Close'].values[mask_arr]
+                    stock_close = df['Close'].to_numpy()[mask_arr]
                     bench_slice = benchmark_close[:len(stock_close)]
                     if len(stock_close) > 20 and len(bench_slice) == len(stock_close):
                         rs_motor = RelativeStrengthMotor()
@@ -1129,7 +1129,7 @@ class BacktestEngineV4:
                 dates_list = [str(d.date()) if hasattr(d, 'date') else str(d)
                              for d in df.index[mask_arr]]
             if len(dates_list) >= 252:
-                close_arr = df['Close'].values[mask_arr] if df is not None else None
+                close_arr = df['Close'].to_numpy()[mask_arr] if df is not None else None
                 if close_arr is not None and len(close_arr) >= 252:
                     from services.features.seven_motors import SeasonalityMotor
                     season_motor = SeasonalityMotor()
@@ -1149,7 +1149,7 @@ class BacktestEngineV4:
 
         return enriched
 
-    def _generate_run_id(self, market_data: Dict[str, pd.DataFrame]) -> str:
+    def _generate_run_id(self, market_data: Dict[str, pl.DataFrame]) -> str:
         """Deterministic run ID üret."""
         tickers = sorted(market_data.keys())
         hash_input = f"{','.join(tickers)}_{self._config.to_dict()}"

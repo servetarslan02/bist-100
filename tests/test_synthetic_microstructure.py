@@ -3,6 +3,7 @@ ALPHA BIST — Synthetic Microstructure & Multi-Scenario Liquidity Tests
 """
 
 import unittest
+from datetime import datetime, timedelta, date
 from services.paper_trading.synthetic_liquidity import (
     SyntheticLiquidityEstimator,
     SyntheticOrderBookBuilder,
@@ -193,7 +194,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
     def test_missing_bars_and_date_mismatch_failsafe(self):
         """Eksik bar veya tarih uyuşmazlığında sıfır sentetik varsayım ve kesin NO_TRADE testi."""
         from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
-        import pandas as pd
+        import polars as pl
 
         orch = PaperTradingOrchestrator(
             champion_version="LambdaRank_v3_LOCKED",
@@ -217,10 +218,10 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertTrue(any("INSUFFICIENT_HISTORICAL_BARS" in a.get("reason", "") for a in audit_log))
 
         # 2. DataFrame'de tarih bulunamadığında asla iloc[-1] (geleceğe bakış) kullanılmaz -> Kesin NO_TRADE
-        dates = pd.date_range("2024-01-10", periods=5, freq='B')
-        df = pd.DataFrame({
+        dates = pl.date_range(date(2024, 01, 10), date(2024, 01, 10) + timedelta(days=10), timedelta(days=1), eager=True).head(5)
+        df = pl.DataFrame({
             'Open': [100]*5, 'High': [102]*5, 'Low': [98]*5, 'Close': [101]*5, 'Volume': [1000000]*5
-        }, index=dates)
+        })
 
         res_date_mismatch = orch.run_daily_cycle(
             date="2024-01-01", # Veri 2024-01-10'dan başlıyor, bu tarih yok

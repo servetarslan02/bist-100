@@ -18,7 +18,7 @@ KURAL: Tahmin modeli / skor formülü DEĞİŞTİRİLMEZ — engine ne üretiyor
 
 import hashlib
 import numpy as np
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 import structlog
@@ -82,7 +82,7 @@ class WalkForwardBacktestResult:
 
     def to_dict(self) -> Dict[str, Any]:
         d = {k: v for k, v in self.__dict__.items() if k != "folds"}
-        d["folds"] = [f.to_dict() for f in self.folds]
+        d = d.with_columns(pl.lit([f.to_dict() for f in self.folds]).alias('folds'))
         return d
 
 
@@ -111,9 +111,9 @@ class WalkForwardBacktestRunner:
 
     def run(
         self,
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pd.DataFrame] = None,
+        benchmark_data: Optional[pl.DataFrame] = None,
         run_id: Optional[str] = None,
         persist: bool = True,
     ) -> WalkForwardBacktestResult:
@@ -128,7 +128,7 @@ class WalkForwardBacktestRunner:
         """
         # Global tarih listesi (engine ile aynı semantik, date-string)
         all_dates = set()
-        for df in market_data.values():
+        for df in market_data.to_numpy()():
             if df is not None and not df.empty:
                 for ts in df.index:
                     all_dates.add(str(ts.date()) if hasattr(ts, "date") else str(ts))
@@ -230,7 +230,7 @@ class WalkForwardBacktestRunner:
 
     def _train_fold_model(
         self,
-        pit_data: Dict[str, pd.DataFrame],
+        pit_data: Dict[str, pl.DataFrame],
         train_start: str,
         train_end: str,
         benchmark_data=None,
@@ -255,12 +255,12 @@ class WalkForwardBacktestRunner:
             return None
 
         # 1) Train window verisini kes
-        train_data: Dict[str, pd.DataFrame] = {}
-        ts_start = pd.Timestamp(train_start)
-        ts_end = pd.Timestamp(train_end)
+        train_data: Dict[str, pl.DataFrame] = {}
+        ts_start = pl.Series(train_start)
+        ts_end = pl.Series(train_end)
         for ticker, df in pit_data.items():
             mask = (df.index >= ts_start) & (df.index <= ts_end)
-            df_train = df.loc[mask]
+            df_train = df.filter(mask]
             if len(df_train) >= self.MIN_BARS_FOR_FEATURES:
                 train_data[ticker] = df_train
 
@@ -284,10 +284,10 @@ class WalkForwardBacktestRunner:
             if last_feature_idx < first_feature_idx:
                 continue
 
-            close_all = df['Close'].values
+            close_all = df['Close'].to_numpy()
 
             for idx in range(first_feature_idx, last_feature_idx + 1):
-                df_slice = df.iloc[:idx + 1]
+                df_slice = df[:idx + 1]
                 feats = calc.compute_all_features(df_slice, ticker=ticker)
                 if not feats:
                     continue
@@ -354,7 +354,7 @@ class WalkForwardBacktestRunner:
                 features_map, date_groups, base_features
             )
             # CS feature isimlerini topla
-            sample_feats = list(features_map.values())[0] if features_map else {}
+            sample_feats = list(features_map.to_numpy()())[0] if features_map else {}
             cs_feature_names = sorted([k for k in sample_feats.keys() if k.endswith('_cs_zscore')])
             # Feature listesini güncelle (orijinal + CS)
             all_feature_names = feature_names + cs_feature_names
@@ -381,7 +381,7 @@ class WalkForwardBacktestRunner:
             effective_purge = max(self.FORWARD_DAYS, horizon)
 
             # Bu horizon için yeterli tarih var mı?
-            unique_dates_sorted = sorted(set(date_groups.values()))
+            unique_dates_sorted = sorted(set(date_groups.to_numpy()()))
             n_dates = len(unique_dates_sorted)
             val_date_count = max(2, int(n_dates * 0.2))
             train_date_end_idx = n_dates - val_date_count - effective_purge
@@ -394,7 +394,7 @@ class WalkForwardBacktestRunner:
             # Bu horizon için target hesapla (sadece features_map'teki sample'lar için)
             horizon_returns: Dict[str, float] = {}
             for ticker, df in train_data.items():
-                close_all = df['Close'].values
+                close_all = df['Close'].to_numpy()
                 n = len(df)
                 first_idx = self.MIN_BARS_FOR_FEATURES - 1
                 last_idx = n - horizon - 1
@@ -502,11 +502,11 @@ class WalkForwardBacktestRunner:
 
     @staticmethod
     def _truncate(
-        market_data: Dict[str, pd.DataFrame],
+        market_data: Dict[str, pl.DataFrame],
         test_end: str,
-    ) -> Dict[str, pd.DataFrame]:
+    ) -> Dict[str, pl.DataFrame]:
         """Veriyi test_end'e kadar kes (point-in-time)."""
-        end_ts = pd.Timestamp(test_end)
+        end_ts = pl.Series(test_end)
         pit = {}
         for ticker, df in market_data.items():
             if df is None or df.empty:
@@ -516,7 +516,7 @@ class WalkForwardBacktestRunner:
             mask = df.index <= end_ts
             if df.index.has_duplicates is False and df.index.is_monotonic_increasing:
                 cut = df.index.searchsorted(end_ts, side="right")
-                sliced = df.iloc[:cut]
+                sliced = df[:cut]
             else:
                 sliced = df[mask]
             # date-string seviyesinde de garanti
@@ -524,7 +524,7 @@ class WalkForwardBacktestRunner:
                 last = sliced.index[-1]
                 last_str = str(last.date()) if hasattr(last, "date") else str(last)
                 if last_str > test_end:
-                    sliced = sliced.iloc[:-1]
+                    sliced = sliced[:-1]
             if not sliced.empty:
                 pit[ticker] = sliced
         return pit
@@ -533,7 +533,7 @@ class WalkForwardBacktestRunner:
     def _verify_fold(
         fold: Dict[str, Any],
         result: BacktestResultV4,
-        pit_data: Dict[str, pd.DataFrame],
+        pit_data: Dict[str, pl.DataFrame],
         test_end: str,
     ) -> tuple:
         """Fold leakage doğrulaması.
@@ -631,7 +631,7 @@ class WalkForwardBacktestRunner:
             },
         )
 
-    def _base_run_id(self, market_data: Dict[str, pd.DataFrame]) -> str:
+    def _base_run_id(self, market_data: Dict[str, pl.DataFrame]) -> str:
         tickers = sorted(market_data.keys())
         wf_cfg = (self._wf.purge_days, self._wf.embargo_days, self._wf.train_days,
                   self._wf.test_days, self._wf.step_days)

@@ -19,11 +19,11 @@ import sys
 import orjson
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, date
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
+import polars as pl
 
 # Add parent to path
 
@@ -331,18 +331,18 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         data = {}
         for t in tickers:
             prices = 100 + np.cumsum(np.random.randn(len(dates)) * 2)
-            df = pd.DataFrame({
+            df = pl.DataFrame({
                 'Open': prices * 0.99,
                 'High': prices * 1.02,
                 'Low': prices * 0.98,
                 'Close': prices,
                 'Volume': np.random.randint(1_000_000, 10_000_000, len(dates)),
-            }, index=pd.to_datetime(dates))
+            }.Series(dates))
             data[t] = df
         return data
 
     def test_daily_cycle_no_signals(self):
-        dates = pd.date_range("2024-01-01", periods=3, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True).head(3)
         market_data = self._make_market_data(["THYAO", "GARAN"], dates)
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik"}
 
@@ -355,7 +355,7 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertEqual(report["status"], "NO_TRADE")
 
     def test_daily_cycle_with_signals(self):
-        dates = pd.date_range("2024-01-01", periods=3, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True).head(3)
         market_data = self._make_market_data(["THYAO", "GARAN"], dates)
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik"}
 
@@ -374,7 +374,7 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertGreater(report["num_orders"], 0)
 
     def test_champion_protection(self):
-        dates = pd.date_range("2024-01-01", periods=3, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 10), timedelta(days=1), eager=True).head(3)
         market_data = self._make_market_data(["THYAO"], dates)
         sector_map = {"THYAO": "Havacilik"}
 
@@ -392,7 +392,7 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertEqual(report["status"], "NO_TRADE")
 
     def test_replay_mode(self):
-        dates = pd.date_range("2024-01-01", periods=5, freq='B')
+        dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 15), timedelta(days=1), eager=True).head(5)
         date_strs = [d.strftime("%Y-%m-%d") for d in dates]
         market_data = self._make_market_data(["THYAO", "GARAN", "ASELS"], dates)
         sector_map = {"THYAO": "Havacilik", "GARAN": "Bankacilik", "ASELS": "Savunma"}

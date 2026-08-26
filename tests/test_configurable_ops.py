@@ -267,11 +267,10 @@ async def test_silence_remove():
 
 async def test_silence_persistence():
     """Susturma durumu DB'ye kaydedilebilmeli ve yüklenebilmeli."""
-    import sqlite3
+    import duckdb
     issues = []
 
-    db = sqlite3.connect(":memory:")
-    db.row_factory = sqlite3.Row
+    db = duckdb.connect(":memory:")
     db.execute("""CREATE TABLE alert_silences (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         alert_type TEXT, fingerprint TEXT,

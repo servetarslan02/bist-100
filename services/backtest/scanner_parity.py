@@ -14,7 +14,7 @@ Prensipler:
 
 import hashlib
 import orjson
-import pandas as pd
+import polars as pl
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -112,7 +112,7 @@ class BacktestScannerParity:
 
     def verify_feature_parity(
         self,
-        data: pd.DataFrame,
+        data: pl.DataFrame,
         ticker: str,
         timestamp: datetime,
         expected_features: Optional[Dict[str, float]] = None,
@@ -200,7 +200,7 @@ class BacktestScannerParity:
 
     def run_full_parity_check(
         self,
-        test_data: pd.DataFrame,
+        test_data: pl.DataFrame,
         test_tickers: List[str],
         test_timestamp: datetime,
     ) -> ParityReport:
@@ -213,14 +213,14 @@ class BacktestScannerParity:
 
         # Feature parity
         for ticker in test_tickers[:5]:  # İlk 5 hisse
-            ticker_data = test_data[test_data["ticker"] == ticker] if "ticker" in test_data.columns else test_data
+            ticker_data = test_data.filter(pl.col('test_data') ticker ==) if "ticker" in test_data.columns else test_data
             result = self.verify_feature_parity(ticker_data, ticker, test_timestamp)
             checks.append(result)
 
         # Signal parity
         if self._feature_engine and self._signal_engine:
             for ticker in test_tickers[:5]:
-                ticker_data = test_data[test_data["ticker"] == ticker] if "ticker" in test_data.columns else test_data
+                ticker_data = test_data.filter(pl.col('test_data') ticker ==) if "ticker" in test_data.columns else test_data
                 features = self._feature_engine(ticker_data, ticker, test_timestamp)
                 result = self.verify_signal_parity(features, ticker)
                 checks.append(result)

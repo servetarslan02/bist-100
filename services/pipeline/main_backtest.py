@@ -1,6 +1,6 @@
 
 import gc
-import pandas as pd
+import polars as pl
 from services.core.alpha_engine import AlphaEngine
 from services.backtest.walk_forward import WalkForwardEngine
 from services.backtest.engine import BacktestEngine
@@ -58,8 +58,8 @@ def run_final():
                     df_t = market_data.get(ticker)
                     if df_t is None: continue
                     
-                    t_start = pd.Timestamp(fold['test_start'])
-                    t_end = pd.Timestamp(fold['test_end'])
+                    t_start = pl.Series(fold['test_start'])
+                    t_end = pl.Series(fold['test_end'])
                     df_test = df_t[(df_t.index >= t_start) & (df_t.index <= t_end)]
                     
                     if not df_test.empty:

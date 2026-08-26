@@ -1,7 +1,7 @@
 import sys
 import os
 import orjson
-import sqlite3
+import duckdb
 import urllib.request
 from datetime import datetime
 
@@ -14,14 +14,14 @@ def run_proof():
     print("\n[1] TARIHSEL VERI DEPOSU (Warehouse & SQLite)")
     wh_path = "data/bist_30y_warehouse.db"
     if os.path.exists(wh_path):
-        conn = sqlite3.connect(wh_path)
+        conn = duckdb.connect(wh_path)
         cur = conn.cursor()
         cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
         tables = [r[0] for r in cur.fetchall()]
         print(f"  [OK] Depo Tablolari: {tables}")
         for t in tables:
-            cur.execute(f"PRAGMA table_info({t})")
-            cols = [c[1] for c in cur.fetchall()]
+            cols_info = conn.execute(f"DESCRIBE {t}").fetchall()
+            cols = [c[0] for c in cols_info]
             sym_col = "symbol" if "symbol" in cols else ("ticker" if "ticker" in cols else None)
             date_col = "timestamp" if "timestamp" in cols else ("date" if "date" in cols else cols[0])
             if sym_col:

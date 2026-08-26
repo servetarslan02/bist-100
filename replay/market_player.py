@@ -4,7 +4,7 @@ ALPHA BIST — Market Player
 Geçmiş piyasa verilerini "canlı gibi" oynatan motor.
 """
 
-import pandas as pd
+import polars as pl
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Generator, Callable
 from dataclasses import dataclass
@@ -47,7 +47,7 @@ class MarketPlayer:
     """Geçmiş piyasa verisini oynatan motor."""
 
     def __init__(self):
-        self._data: Optional[pd.DataFrame] = None
+        self._data: Optional[pl.DataFrame] = None
         self._tickers: List[str] = []
         self._is_playing: bool = False
         self._is_paused: bool = False
@@ -91,28 +91,29 @@ class MarketPlayer:
                     for t in tickers:
                         tick_sym = f"{t}.IS"
                         try:
-                            if isinstance(raw.columns, pd.MultiIndex) and tick_sym in raw.columns.levels[0]:
+                            if isinstance(raw.columns, # [POLARS] # [POLARS] pl. → needs manual review: None  # MultiIndex not applicable
+# None  # MultiIndex) and tick_sym in raw.columns.levels[0]:
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if not df_t.empty:
                                     df_t = df_t.copy()
-                                    df_t["ticker"] = t
+                                    df_t = df_t.with_columns(pl.lit(t).alias('ticker'))
                                     frames.append(df_t)
                         except Exception:
                             continue
 
                     if frames:
-                        self._data = pd.concat(frames).sort_index()
+                        self._data = pl.concat(frames).sort_index()
                         self._total_ticks = len(self._data)
-                        result["status"] = "ok"
-                        result["tickers_loaded"] = len(frames)
-                        result["total_ticks"] = self._total_ticks
+                        result = result.with_columns(pl.lit("ok").alias('status'))
+                        result = result.with_columns(pl.lit(len(frames)).alias('tickers_loaded'))
+                        result = result.with_columns(pl.lit(self._total_ticks).alias('total_ticks'))
                     else:
-                        result["status"] = "empty"
+                        result = result.with_columns(pl.lit("empty").alias('status'))
                 else:
-                    result["status"] = "empty"
+                    result = result.with_columns(pl.lit("empty").alias('status'))
         except Exception as e:
-            result["status"] = "failed"
-            result["error"] = str(e)
+            result = result.with_columns(pl.lit("failed").alias('status'))
+            result = result.with_columns(pl.lit(str(e)).alias('error'))
 
         return result
 
@@ -141,7 +142,7 @@ class MarketPlayer:
                     if not self._is_playing:
                         break
 
-                row = self._data.iloc[idx]
+                row = self._data[idx]
                 ticker = row.get("ticker", "UNKNOWN")
                 ts = self._data.index[idx]
                 if hasattr(ts, 'to_pydatetime'):

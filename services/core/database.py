@@ -29,6 +29,7 @@ except ImportError:
     aioredis = None
 
 from .config import settings
+from .questdb_client import questdb_client
 
 logger = structlog.get_logger()
 
@@ -434,7 +435,7 @@ async def redis_publish(channel: str, message: str):
 
 async def check_db_health() -> Dict[str, Any]:
     """Check health of all database connections."""
-    health = {"postgres": "unavailable", "clickhouse": "unavailable", "redis": "unavailable"}
+    health = {"postgres": "unavailable", "clickhouse": "unavailable", "redis": "unavailable", "questdb": "unavailable"}
 
     # PostgreSQL
     try:
@@ -462,6 +463,15 @@ async def check_db_health() -> Dict[str, Any]:
             health["redis"] = "healthy"
     except Exception as e:
         health["redis"] = f"error: {str(e)[:100]}"
+
+    # QuestDB
+    try:
+        if questdb_client._connected:
+            health["questdb"] = "healthy"
+        else:
+            health["questdb"] = "disconnected"
+    except Exception as e:
+        health["questdb"] = f"error: {str(e)[:100]}"
 
     return health
 
@@ -492,6 +502,13 @@ async def init_databases():
         _redis_healthy = False
         logger.warning(f"Redis not available: {e}")
 
+    # QuestDB
+    try:
+        await questdb_client.connect()
+        await questdb_client.ensure_tables()
+    except Exception as e:
+        logger.warning(f"QuestDB not available: {e}")
+
     health = await check_db_health()
     for svc, status in health.items():
         if status == "healthy":
@@ -506,4 +523,5 @@ async def close_databases():
     await close_pg_pool()
     close_ch_client()
     await close_redis()
+    questdb_client.close()
     logger.info("All database connections closed")

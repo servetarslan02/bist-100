@@ -10,7 +10,7 @@ ALPHA BIST — Risk Parity & Volatiliteye Dayalı Dinamik Pozisyon Boyutlandırm
 import sys
 import os
 import time
-import pandas as pd
+import polars as pl
 import numpy as np
 
 # Windows UTF-8 Terminal desteği
@@ -65,7 +65,7 @@ def main():
     print("🔒 1. 2024 - 2026 KİLİTLİ KÖR HOLDOUT TESTİ (RİSK PARİTY İLE)")
     print("=" * 105)
     oos_res = engine.simulate(params, start_year=2024, end_year=2026)
-    bm_holdout = bm_df[bm_df.index >= pd.Timestamp("2024-01-01")]
+    bm_holdout = bm_df[bm_df.index >= pl.Date("2024-01-01")]
     bm_ret = ((bm_holdout["Close"].iloc[-1] - bm_holdout["Close"].iloc[0]) / bm_holdout["Close"].iloc[0]) * 100.0
 
     print(f"  • Kümülatif Net Getiri   : %{oos_res.total_return_pct:+,.1f} (BIST-100 Endeksi: %{bm_ret:+,.1f})")

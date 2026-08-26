@@ -63,6 +63,7 @@ DATA_CONTAINERS = [
     "alpha-prometheus",
     "alpha-grafana",
     "alpha-mlflow",
+    "alpha-questdb",
 ]
 
 # Uygulama servisleri (sadece tmpfs, SSD'ye yazmaz)
