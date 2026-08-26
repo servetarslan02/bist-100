@@ -1,7 +1,7 @@
 """
 ALPHA BIST — 30-Yıllık ML Feature Matrix & Dataset Builder
 ===========================================================
-30 yıllık yerel SQLite veri tabanından (1997-2026) tüm hisseler için:
+30 yıllık yerel DuckDB veri tabanından (1997-2026) tüm hisseler için:
 - Teknik indikatörler (RSI, MACD, ATR%, Volatilite, Hacim Patlaması)
 - 30 Yıllık Dinamik Mum Beklenti Puanları (Conditional Expectancy)
 - 20 Günlük Zirve Breakout Sinyalleri

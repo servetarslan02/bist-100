@@ -41,7 +41,7 @@ def audit_warehouse():
         cur.execute("SELECT COUNT(*), MIN(date), MAX(date) FROM benchmark_xu100")
         n_bm, min_b, max_b = cur.fetchone()
         conn.close()
-        print(f"  [OK] SQLite Ambar Dosyasi   : {wh_path} ({size_mb:.2f} MB)")
+        print(f"  [OK] DuckDB Ambar Dosyasi   : {wh_path} ({size_mb:.2f} MB)")
         print(f"  [OK] BIST Hisse Mum Verisi  : {n_stocks} Hisse | {n_candles:,} Gunluk Bar ({min_s[:10]} -> {max_s[:10]})")
         print(f"  [OK] XU100 Benchmark Verisi : {n_bm:,} Gunluk Bar ({min_b[:10]} -> {max_b[:10]})")
     else:

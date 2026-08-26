@@ -14,7 +14,7 @@ Optimizasyonlar:
 - Feature cache korunuyor
 - Quality cache korunuyor
 - Portfolio simulator v3.0 (audit + invariant)
-- SQLite persistence
+- DuckDB persistence
 """
 
 import time as _time

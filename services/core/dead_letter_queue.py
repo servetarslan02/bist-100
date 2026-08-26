@@ -17,7 +17,7 @@ try:
         pass
 
     dead_letter_queue = DeadLetterQueue()
-    logger.info("DeadLetterQueue: Using PersistentDeadLetterQueue (SQLite-backed)")
+    logger.info("DeadLetterQueue: Using PersistentDeadLetterQueue (DuckDB-backed)")
 except Exception as e:
     logger.warning(f"PersistentDLQ unavailable, falling back to in-memory: {e}")
 

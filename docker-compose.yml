@@ -1006,8 +1006,13 @@ services:
     - 5000:5000
     volumes:
     - mlflow_data:/mlflow
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow/mlflow.db --default-artifact-root
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alpha_bist} --default-artifact-root
       /mlflow/artifacts --workers 1
+    environment:
+      MLFLOW_BACKEND_STORE_URI: postgresql://${POSTGRES_USER:-alpha}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-alpha_bist}
+    depends_on:
+      postgres:
+        condition: service_healthy
     mem_limit: 128m
     cpus: 0.15
     healthcheck:

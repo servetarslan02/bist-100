@@ -1,6 +1,6 @@
 """
 ALPHA BIST — MLflow Model Experiment & Metrics Tracker Sync
-Logs all active quant, ML and LLM models directly into MLflow backend SQLite database.
+Logs all active quant, ML and LLM models directly into MLflow backend PostgreSQL database.
 """
 
 import os
@@ -8,7 +8,7 @@ os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 import mlflow
 
 # Direct local tracking URI
-mlflow.set_tracking_uri("sqlite:///mlflow.db")
+mlflow.set_tracking_uri(os.environ.get("MLFLOW_BACKEND_STORE_URI", "postgresql://alpha:alpha@localhost:5432/alpha_bist"))
 
 MODELS = [
     {
@@ -169,7 +169,7 @@ MODELS = [
 ]
 
 def sync_to_mlflow():
-    print("Writing models directly into MLflow database (sqlite:///mlflow.db)...")
+    print("Writing models directly into MLflow database (PostgreSQL)...")
     for item in MODELS:
         exp_name = item["experiment_name"]
         mlflow.set_experiment(exp_name)

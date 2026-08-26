@@ -122,7 +122,7 @@ def run_large_scale_simulation():
                 "evaluated_at": eval_time.isoformat(),
             })
 
-    print("Saving batch records atomically into SQLite Model Memory Store...")
+    print("Saving batch records atomically into DuckDB Model Memory Store...")
     store.save_batch_records(all_batch_records)
 
     print("Running Master Learning Cycle over 6,000+ historical evaluations...")

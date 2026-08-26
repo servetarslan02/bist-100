@@ -11,12 +11,12 @@ def run_proof():
     print("=" * 72)
 
     # 1. VERI TABANI & TARIHSEL DEPO
-    print("\n[1] TARIHSEL VERI DEPOSU (Warehouse & SQLite)")
+    print("\n[1] TARIHSEL VERI DEPOSU (Warehouse & DuckDB)")
     wh_path = "data/bist_30y_warehouse.db"
     if os.path.exists(wh_path):
         conn = duckdb.connect(wh_path)
         cur = conn.cursor()
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'")
         tables = [r[0] for r in cur.fetchall()]
         print(f"  [OK] Depo Tablolari: {tables}")
         for t in tables:
