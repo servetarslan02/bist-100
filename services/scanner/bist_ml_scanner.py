@@ -6,7 +6,6 @@ Eğitilen LightGBM + CatBoost + XGBoost modellerini yükleyip
 20G Breakout ve Dip Dönüşü sinyalleri üretir.
 """
 
-import pickle
 import numpy as np
 import polars as pl
 from typing import List, Dict, Any
@@ -28,13 +27,13 @@ class BistMLScanner:
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 
     def _load_models(self):
-        """Kayıtlı modelleri RAM'e yükler."""
+        """Kayıtlı modelleri RAM'e yükler (SHA256 doğrulamalı)."""
+        from services.core.safe_pickle import safe_pickle_load
         for m_name in ["lightgbm", "xgboost", "catboost", "extratrees"]:
             pkl_path = self.models_dir / f"{m_name}_model.pkl"
             if pkl_path.exists():
                 try:
-                    with open(pkl_path, "rb") as f:
-                        self.models[m_name] = pickle.load(f)
+                    self.models[m_name] = safe_pickle_load(str(pkl_path))
                     logger.info(f"Model yüklendi: {m_name}")
                 except Exception as e:
                     logger.warning(f"Model yüklenemedi: {m_name}, hata: {e}")

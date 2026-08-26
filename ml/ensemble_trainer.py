@@ -97,8 +97,8 @@ class BistEnsembleTrainer:
                     for feat, imp in zip(self.feature_cols, lgb_model.feature_importances_)
                 }
             }
-            with open(self.save_dir / "lightgbm_model.pkl", "wb") as f:
-                pickle.dump(lgb_model, f)
+            from services.core.safe_pickle import safe_pickle_dump
+            safe_pickle_dump(lgb_model, str(self.save_dir / "lightgbm_model.pkl"))
             logger.info(f"LightGBM Eğitildi -> OOS IC: {lgb_ic:.4f}, R2: {lgb_r2:.4f}")
 
         # 2. XGBoost Modeli
@@ -127,8 +127,7 @@ class BistEnsembleTrainer:
                     for feat, imp in zip(self.feature_cols, xgb_model.feature_importances_)
                 }
             }
-            with open(self.save_dir / "xgboost_model.pkl", "wb") as f:
-                pickle.dump(xgb_model, f)
+            safe_pickle_dump(xgb_model, str(self.save_dir / "xgboost_model.pkl"))
             logger.info(f"XGBoost Eğitildi -> OOS IC: {xgb_ic:.4f}, R2: {xgb_r2:.4f}")
 
         # 3. CatBoost Modeli
@@ -156,8 +155,7 @@ class BistEnsembleTrainer:
                     for feat, imp in zip(self.feature_cols, cb_model.get_feature_importance())
                 }
             }
-            with open(self.save_dir / "catboost_model.pkl", "wb") as f:
-                pickle.dump(cb_model, f)
+            safe_pickle_dump(cb_model, str(self.save_dir / "catboost_model.pkl"))
             logger.info(f"CatBoost Eğitildi -> OOS IC: {cb_ic:.4f}, R2: {cb_r2:.4f}")
 
         # 4. ExtraTrees & GradientBoosting Destekli Ensemble
@@ -165,8 +163,7 @@ class BistEnsembleTrainer:
         et_model.fit(X_train, y_train)
         et_oos_pred = et_model.predict(X_oos)
         self.models['extratrees'] = et_model
-        with open(self.save_dir / "extratrees_model.pkl", "wb") as f:
-            pickle.dump(et_model, f)
+        safe_pickle_dump(et_model, str(self.save_dir / "extratrees_model.pkl"))
 
         # 5. Ensemble Tahmini (Ağırlıklı Ortalama — ExtraTrees dahil)
         preds = []

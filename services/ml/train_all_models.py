@@ -86,8 +86,8 @@ def train_all_models():
         logger.info(f"  • Validasyon Skoru (RMSE): {trained_lgb.validation_score:.4f}")
         logger.info(f"  • Yön Doğruluğu: %{trained_lgb.validation_metrics.get('directional_accuracy', 0.68) * 100:.1f}")
         logger.info(f"  • Information Coefficient (IC): {trained_lgb.validation_metrics.get('ic', 0.14):.4f}")
-        with open("models/lightgbm_lambdarank.pkl", "wb") as f:
-            pickle.dump(trained_lgb, f)
+        from services.core.safe_pickle import safe_pickle_dump
+        safe_pickle_dump(trained_lgb, "models/lightgbm_lambdarank.pkl")
         logger.info("  • Model Kaydedildi: models/lightgbm_lambdarank.pkl")
 
     # 3. CatBoost Eğitimi
@@ -104,8 +104,7 @@ def train_all_models():
     logger.info(f"  ✅ CatBoost Eğitimi Başarılı!")
     logger.info(f"  • ROC-AUC Skoru: {cat_metrics.get('val_auc', 0.74):.4f}")
     logger.info(f"  • Direction Accuracy: %{cat_metrics.get('val_accuracy', 0.67) * 100:.1f}")
-    with open("models/catboost_classifier.pkl", "wb") as f:
-        pickle.dump(cat_model, f)
+    safe_pickle_dump(cat_model, "models/catboost_classifier.pkl")
     logger.info("  • Model Kaydedildi: models/catboost_classifier.pkl")
 
     # 4. XGBoost Eğitimi
@@ -115,8 +114,7 @@ def train_all_models():
     logger.info(f"  ✅ XGBoost Eğitimi Başarılı!")
     logger.info(f"  • ROC-AUC Skoru: {xgb_metrics.get('val_auc', 0.72):.4f}")
     logger.info(f"  • Direction Accuracy: %{xgb_metrics.get('val_accuracy', 0.65) * 100:.1f}")
-    with open("models/xgboost_model.pkl", "wb") as f:
-        pickle.dump(xgb_model, f)
+    safe_pickle_dump(xgb_model, "models/xgboost_model.pkl")
     logger.info("  • Model Kaydedildi: models/xgboost_model.pkl")
 
     # 5. Ranking Model (Ensemble LambdaRank + Adjusted-MSE)

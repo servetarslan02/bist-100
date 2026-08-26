@@ -473,27 +473,27 @@ class XGBoostModel:
         if not self._models:
             return False
         try:
+            from services.core.safe_pickle import safe_pickle_dump
             os.makedirs(os.path.dirname(path) if os.path.dirname(path) else ".", exist_ok=True)
-            with open(path, "wb") as f:
-                pickle.dump({
-                    "models": self._models,
-                    "config": self._config,
-                    "metrics": self._training_metrics,
-                    "feature_names": self._feature_names,
-                    "shap_values": self._shap_values,
-                    "feature_importance_cache": self._feature_importance_cache,
-                    "saved_at": datetime.now(timezone.utc).isoformat(),
-                }, f)
+            safe_pickle_dump({
+                "models": self._models,
+                "config": self._config,
+                "metrics": self._training_metrics,
+                "feature_names": self._feature_names,
+                "shap_values": self._shap_values,
+                "feature_importance_cache": self._feature_importance_cache,
+                "saved_at": datetime.now(timezone.utc).isoformat(),
+            }, path)
             return True
         except Exception as e:
             logger.error("xgboost_save_failed", error=str(e))
             return False
 
     def load(self, path: str) -> bool:
-        """Modeli yükle."""
+        """Modeli yükle (SHA256 doğrulamalı)."""
         try:
-            with open(path, "rb") as f:
-                data = pickle.load(f)
+            from services.core.safe_pickle import safe_pickle_load
+            data = safe_pickle_load(path)
             self._models = data.get("models", {})
             self._config = data.get("config", self._config)
             self._training_metrics = data.get("metrics", {})

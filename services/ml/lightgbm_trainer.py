@@ -113,14 +113,14 @@ class TrainedModel:
         return arr.tolist()
 
     def save(self, path: str):
+        from services.core.safe_pickle import safe_pickle_dump
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(self, f)
+        safe_pickle_dump(self, path)
 
     @classmethod
     def load(cls, path: str) -> "TrainedModel":
-        with open(path, "rb") as f:
-            return pickle.load(f)
+        from services.core.safe_pickle import safe_pickle_load
+        return safe_pickle_load(path)
 
 
 @dataclass

@@ -358,21 +358,21 @@ class ModelRegistry:
         return f"v{max(versions) + 1}"
 
     def _save_model(self, key: str, model: Any):
-        """Model'i diske kaydet."""
+        """Model'i diske kaydet (SHA256 hash ile)."""
         try:
+            from services.core.safe_pickle import safe_pickle_dump
             path = os.path.join(self._registry_path, f"{key.replace(':', '_')}.pkl")
-            with open(path, "wb") as f:
-                pickle.dump(model, f)
+            safe_pickle_dump(model, path)
         except Exception as e:
             logger.error("model_save_failed", key=key, error=str(e))
 
     def _load_model(self, key: str) -> Optional[Any]:
-        """Model'i diskten yükle."""
+        """Model'i diskten yükle (SHA256 doğrulamalı)."""
         try:
+            from services.core.safe_pickle import safe_pickle_load
             path = os.path.join(self._registry_path, f"{key.replace(':', '_')}.pkl")
             if os.path.exists(path):
-                with open(path, "rb") as f:
-                    return pickle.load(f)
+                return safe_pickle_load(path)
         except Exception as e:
             logger.error("model_load_failed", key=key, error=str(e))
         return None
