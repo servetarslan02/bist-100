@@ -451,13 +451,26 @@ class VaRCalculator:
 
         MVaR_i = (Σw)_i / σ_p × z_α × portfolio_value
         """
-        from scipy.stats import norm
+        try:
+            from scipy.stats import norm
+            z_alpha = float(norm.ppf(confidence))
+        except ImportError:
+            # Fallback: invert normal CDF via math.erf
+            # z = sqrt(2) * erfinv(2*p - 1), erfinv approximated by series
+            p = confidence
+            # Rational approximation (Abramowitz & Stegun 26.2.23)
+            if p <= 0 or p >= 1:
+                z_alpha = 0.0
+            else:
+                t = math.sqrt(-2.0 * math.log(1.0 - p))
+                c0, c1, c2 = 2.515517, 0.802853, 0.010328
+                d1, d2, d3 = 1.432788, 0.189269, 0.001308
+                z_alpha = t - (c0 + c1*t + c2*t*t) / (1.0 + d1*t + d2*t*t + d3*t*t*t)
 
         portfolio_vol = np.sqrt(weights @ cov_matrix @ weights)
         if portfolio_vol <= 0:
             return np.zeros(len(weights))
 
-        z_alpha = norm.ppf(confidence)
         return cov_matrix @ weights / portfolio_vol * z_alpha * portfolio_value
 
     # =====================================================
