@@ -13,6 +13,13 @@ import orjson
 from pathlib import Path
 import structlog
 
+# LabelGenerator entegrasyonu — gelişmiş label'lar için
+try:
+    from services.labels.generator import LabelGenerator, label_generator
+    HAS_LABEL_GENERATOR = True
+except ImportError:
+    HAS_LABEL_GENERATOR = False
+
 logger = structlog.get_logger()
 
 

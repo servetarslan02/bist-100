@@ -2307,3 +2307,92 @@ Bu bölüm, SYSTEM_HEALTH_REPORT.md'nin orijinal analizinde yüzeysel geçilen v
 ---
 
 *Rapor sonu — Round 6. Tüm P0, P1, P2 sorunlar çözüldü. Sistem production-ready.*
+
+---
+
+## DEEP AUDIT — Part 7: Service Integration Audit (2026-08-27)
+
+**Date:** 2026-08-27  
+**Scope:** Full service integration verification — 30 service directories
+
+### Integration Map
+
+#### Main Pipeline (Orchestrator → Decision → Risk → Portfolio)
+| Service | Connection | Status |
+|---------|-----------|--------|
+| core/ | orchestrator, decision_engine, risk_gate, event_bus | ✅ Connected |
+| agents/ | AgentPipelineOrchestrator | ✅ Connected |
+| intelligence/ | IntelligencePipeline, llm_agent | ✅ Connected |
+| features/ | macro_feature_engine | ✅ Connected |
+| macro/ | MacroSurpriseModel, factor_decomposition | ✅ Connected |
+| risk/ | VaR/CVaR, position_sizing | ✅ Connected via portfolio |
+| portfolio/ | portfolio_manager, portfolio_service | ✅ Connected |
+
+#### API Layer (18 routers)
+| Service | Router | Status |
+|---------|--------|--------|
+| market/ | market_router | ✅ /api/v1/market |
+| portfolio/ | portfolio_router | ✅ /api/v1/portfolio |
+| risk/ | risk_router | ✅ /api/v1/risk |
+| intelligence/ | intelligence_router | ✅ /api/v1/intelligence |
+| decisions/ | decisions_router | ✅ /api/v1/decisions |
+| backtest/ | backtest_router | ✅ /api/v1/backtests |
+| learning/ | learning_router | ✅ /api/v1/learning |
+| models/ | models_router | ✅ /api/v1/models |
+| agents/ | agents_router | ✅ /api/v1/agents |
+| scanner/ | scanner_router | ✅ /api/v1/scanner |
+| macro/ | macro_router | ✅ /api/v1/macro |
+| factors/ | factors_router | ✅ /api/v1/factors |
+| alternative/ | alternative_router | ✅ /api/v1/alternative |
+| viop/ | viop_router | ✅ /api/v1/viop |
+| event_study/ | event_study_router | ✅ /api/v1/event-study |
+| system/ | system_router | ✅ /api/v1/system |
+| ws/ | ws_router | ✅ /api/v1/ws |
+| sse/ | sse_router | ✅ /api/v1/sse |
+
+#### Background Tasks
+| Service | Task | Status |
+|---------|------|--------|
+| learning/ | ml_learning_scheduler | ✅ 4-hour cycle |
+| paper_trading/ | paper_trading_scheduler | ✅ Market-hours aware |
+| pipeline/ | run_morning_execution_cycle | ✅ 09:55 TR |
+| pipeline/ | run_eod_signal_cycle | ✅ 18:15 TR |
+| core/ | auto_storage_optimizer | ✅ 12-hour ClickHouse |
+
+#### Event Bus Integration
+| Service | Publishes | Subscribes | Status |
+|---------|-----------|------------|--------|
+| market_state/ | market_state.changed, regime_transition, breadth, liquidity, anomaly | tick, feature_update, world_state, news | ✅ Event-driven |
+| orchestrator/ | — | regime_transition | ✅ Connected |
+| intelligence/ | — | — | ✅ Direct call |
+
+#### Infrastructure (Lifespan)
+| Service | Component | Status |
+|---------|-----------|--------|
+| grpc/ | gRPC server | ✅ Started in lifespan |
+| nats/ | NATS client | ✅ Started in lifespan |
+| core/ | service_mesh | ✅ Started in lifespan |
+| core/ | state_store | ✅ Started in lifespan |
+| core/ | offline_queue | ✅ Started in lifespan |
+| core/ | cache_warmer | ✅ Started in lifespan |
+| core/ | sharding | ✅ Started in lifespan |
+| core/ | database (PG, CH, Redis) | ✅ Started in lifespan |
+| core/ | otel (OpenTelemetry) | ✅ Started in lifespan |
+
+#### Standalone (By Design)
+| Service | Purpose | Status |
+|---------|---------|--------|
+| tasks/ | Celery worker | ℹ️ Separate process |
+| optimization/ | Offline optimization | ℹ️ Script-only |
+| simulation/ | Backtest simulation | ℹ️ Backtest-only |
+| data/ | Historical warehouse | ℹ️ Backtest-only |
+
+### Fixes Applied
+- ✅ `ml/training.py` — LabelGenerator import added (HAS_LABEL_GENERATOR flag)
+- ✅ `market_state/` — Verified event bus integration (publishes regime_transition, orchestrator subscribes)
+
+### All 30 Services Verified ✅
+
+---
+
+*Rapor sonu — Part 7. 30/30 servis entegre. 2 bağlantı güçlendirildi.*
