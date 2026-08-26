@@ -14,13 +14,11 @@ Roller:
 import os
 import time
 import orjson
-import base64
-import hashlib
-import hmac
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
 import structlog
+import jwt
 
 from services.core.security import Role
 
@@ -59,11 +57,7 @@ class TokenPayload:
 
 
 class JWTHandler:
-    """JWT token oluşturma ve doğrulama.
-
-    Not: Gerçek production'da PyJWT veya python-jose kullanılır.
-    Bu implementasyon basit HMAC-SHA256 tabanlıdır.
-    """
+    """JWT token oluşturma ve doğrulama (PyJWT ile)."""
 
     def __init__(self, secret_key: str = None):
         self.secret_key = secret_key or os.environ.get("JWT_SECRET")
@@ -79,7 +73,6 @@ class JWTHandler:
         expires_hours: int = 24,
     ) -> str:
         """JWT token oluştur."""
-
         now = time.time()
         payload = {
             "sub": user_id,
@@ -89,66 +82,17 @@ class JWTHandler:
             "exp": now + (expires_hours * 3600),
             "iat": now,
         }
-
-        # Header
-        header = base64.urlsafe_b64encode(
-            orjson.dumps({"alg": self.algorithm, "typ": "JWT"}).decode()
-        ).decode().rstrip("=")
-
-        # Payload
-        payload_b64 = base64.urlsafe_b64encode(
-            orjson.dumps(payload).decode()
-        ).decode().rstrip("=")
-
-        # Signature
-        message = f"{header}.{payload_b64}"
-        signature = hmac.new(
-            self.secret_key.encode(),
-            message.encode(),
-            hashlib.sha256
-        ).digest()
-        signature_b64 = base64.urlsafe_b64encode(signature).decode().rstrip("=")
-
-        return f"{header}.{payload_b64}.{signature_b64}"
+        return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
     def verify_token(self, token: str) -> Optional[TokenPayload]:
         """JWT token doğrula."""
-
         try:
-            parts = token.split(".")
-            if len(parts) != 3:
-                return None
-
-            header_b64, payload_b64, signature_b64 = parts
-
-            # Signature doğrula
-            message = f"{header_b64}.{payload_b64}"
-            expected_sig = hmac.new(
-                self.secret_key.encode(),
-                message.encode(),
-                hashlib.sha256
-            ).digest()
-            expected_b64 = base64.urlsafe_b64encode(expected_sig).decode().rstrip("=")
-
-            if not hmac.compare_digest(signature_b64, expected_b64):
-                logger.warning("Invalid JWT signature")
-                return None
-
-            # Payload decode
-            padding = 4 - len(payload_b64) % 4
-            if padding != 4:
-                payload_b64 += "=" * padding
-
-            payload = orjson.loads(base64.urlsafe_b64decode(payload_b64))
-
-            # Expiration kontrolü
-            if payload.get("exp", 0) < time.time():
-                logger.warning("JWT token expired")
-                return None
-
+            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             return TokenPayload(**payload)
-
-        except Exception as e:
+        except jwt.ExpiredSignatureError:
+            logger.warning("JWT token expired")
+            return None
+        except jwt.InvalidTokenError as e:
             logger.warning("JWT verification failed", error=str(e))
             return None
 

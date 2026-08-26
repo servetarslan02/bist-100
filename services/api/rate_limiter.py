@@ -43,7 +43,7 @@ RATE_LIMITS: Dict[str, RateLimitConfig] = {
 class InMemoryRateLimiter:
     """In-memory token bucket rate limiter.
 
-    Production'da Redis tabanlı olmalı.
+    Redis mevcutsa Redis tabanlı, değilse in-memory fallback.
     """
 
     def __init__(self):

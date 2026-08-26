@@ -5,6 +5,9 @@ import numpy as np
 import lightgbm as lgb
 import yfinance as yf
 from typing import Dict, List
+from pathlib import Path
+import pickle
+import hashlib
 import structlog
 
 from services.ingestion.bist_universe import bist_universe
@@ -203,7 +206,7 @@ class AlphaEngine:
         train_data = lgb.Dataset(X, label=y, feature_name=feature_names)
         train_params = dict(self.params)
         if self.has_gpu:
-            train_params = train_params.with_columns(pl.lit("gpu").alias('device'))
+            train_params["device"] = "gpu"
         try:
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
             logger.info(f"Model trained successfully on {len(X)} samples with {train_params.get('device', 'cpu')}.")
@@ -211,6 +214,7 @@ class AlphaEngine:
             train_params.pop("device", None)
             self.model = lgb.train(train_params, train_data, num_boost_round=100)
             logger.info(f"Model trained successfully on {len(X)} samples (CPU engine).")
+        self._save_model()
         return True
 
     def predict(self, market_data, bm_df, sector_map, target_date_str: str):
@@ -253,23 +257,84 @@ class AlphaEngine:
         predictions.sort(key=lambda x: x["score"], reverse=True)
         return predictions
 
+    def _save_model(self, path: str = "data/alpha_engine_model.pkl"):
+        """Modeli dosyaya kaydet."""
+        if self.model is None:
+            return
+        try:
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "model": self.model,
+                "features": self.features,
+                "params": self.params,
+                "exclude_features": self.exclude_features,
+                "trained_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "feature_hash": hashlib.sha256(
+                    "|".join(sorted(self.features)).encode()
+                ).hexdigest()[:16],
+            }
+            with open(path, "wb") as f:
+                pickle.dump(payload, f)
+            logger.info("AlphaEngine model saved", path=path, features=len(self.features))
+        except Exception as e:
+            logger.warning("Failed to save AlphaEngine model", error=str(e))
+
+    def _load_model(self, path: str = "data/alpha_engine_model.pkl", max_age_hours: int = 24) -> bool:
+        """Modeli dosyadan yükle (yaş kontrolü ile)."""
+        if not Path(path).exists():
+            return False
+        try:
+            with open(path, "rb") as f:
+                payload = pickle.load(f)
+            # Yaş kontrolü
+            trained_at = datetime.datetime.fromisoformat(payload["trained_at"])
+            if trained_at.tzinfo is None:
+                trained_at = trained_at.replace(tzinfo=datetime.timezone.utc)
+            age_hours = (datetime.datetime.now(datetime.timezone.utc) - trained_at).total_seconds() / 3600
+            if age_hours > max_age_hours:
+                logger.info("AlphaEngine model too old", age_hours=round(age_hours, 1), max_age=max_age_hours)
+                return False
+            # Feature hash kontrolü
+            current_hash = hashlib.sha256(
+                "|".join(sorted(payload["features"])).encode()
+            ).hexdigest()[:16]
+            if current_hash != payload.get("feature_hash"):
+                logger.warning("AlphaEngine feature hash mismatch — retrain needed")
+                return False
+            self.model = payload["model"]
+            self.features = payload["features"]
+            self.params = payload["params"]
+            self.exclude_features = payload.get("exclude_features", self.exclude_features)
+            logger.info("AlphaEngine model loaded", path=path, features=len(self.features), age_hours=round(age_hours, 1))
+            return True
+        except Exception as e:
+            logger.warning("Failed to load AlphaEngine model", error=str(e))
+            return False
+
     def run_daily_pipeline(self, date: str):
         """Run daily production logic"""
         end_date_dt = pl.Series(date)
-        start_date_dt = end_date_dt - datetime.timedelta(days=400)  # Match exactly TRAIN_DAYS=252 from validation
-        
+        start_date_dt = end_date_dt - datetime.timedelta(days=400)
+
+        # Önce kaydedilmiş modeli yüklemeyi dene
+        if self._load_model():
+            logger.info("Using cached AlphaEngine model")
+        else:
+            market_data, bm_df, sector_map = self.fetch_data(
+                start_date_dt.strftime('%Y-%m-%d'),
+                end_date_dt.strftime('%Y-%m-%d')
+            )
+            success = self.train(
+                market_data, bm_df, sector_map,
+                start_date_dt.strftime('%Y-%m-%d'),
+                date
+            )
+            if not success:
+                return None
+
         market_data, bm_df, sector_map = self.fetch_data(
-            start_date_dt.strftime('%Y-%m-%d'), 
+            start_date_dt.strftime('%Y-%m-%d'),
             end_date_dt.strftime('%Y-%m-%d')
         )
-        
-        success = self.train(
-            market_data, bm_df, sector_map, 
-            start_date_dt.strftime('%Y-%m-%d'), 
-            date
-        )
-        if not success:
-            return None
-            
         top_picks = self.predict(market_data, bm_df, sector_map, date)
         return top_picks

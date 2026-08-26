@@ -599,13 +599,23 @@ class VaRCalculator:
         Returns:
             Maksimum pozisyon değeri (TL)
         """
-        from scipy.stats import norm
+        try:
+            from scipy.stats import norm
+            z_alpha = float(norm.ppf(confidence))
+        except ImportError:
+            p = confidence
+            if p <= 0 or p >= 1:
+                z_alpha = 0.0
+            else:
+                t = math.sqrt(-2.0 * math.log(1.0 - p))
+                c0, c1, c2 = 2.515517, 0.802853, 0.010328
+                d1, d2, d3 = 1.432788, 0.189269, 0.001308
+                z_alpha = t - (c0 + c1*t + c2*t*t) / (1.0 + d1*t + d2*t*t + d3*t*t*t)
 
         sigma = np.std(returns, ddof=1)
         if sigma <= 0:
             return portfolio_value * (max_var_pct / 100)
 
-        z_alpha = norm.ppf(confidence)
         max_loss_pct = max_var_pct / 100
         max_position_pct = max_loss_pct / (sigma * z_alpha)
         max_position_pct = min(max_position_pct, 1.0)  # Max %100
