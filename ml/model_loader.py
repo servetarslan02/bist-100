@@ -38,6 +38,17 @@ class MLModelLoader:
         for model_file in model_path.glob("*/model.pkl"):
             model_name = model_file.parent.name
             try:
+                # Hash doğrulama (pickle deserilization güvenliği)
+                hash_file = model_file.parent / "model.pkl.sha256"
+                if hash_file.exists():
+                    import hashlib
+                    expected_hash = hash_file.read_text().strip()
+                    actual_hash = hashlib.sha256(model_file.read_bytes()).hexdigest()
+                    if actual_hash != expected_hash:
+                        logger.error("Model hash MISMATCH — possible tampering",
+                                   name=model_name, expected=expected_hash[:16], actual=actual_hash[:16])
+                        continue
+
                 with open(model_file, "rb") as f:
                     model = pickle.load(f)
                 self._models[model_name] = model

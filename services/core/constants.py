@@ -90,7 +90,7 @@ SMA_TREND = 200
 DEFAULT_WACC = 0.20                 # %20 (Türkiye risk primi)
 DEFAULT_TAX_RATE = 0.23             # %23 kurumlar vergisi
 DEFAULT_TERMINAL_GROWTH = 0.03      # %3 (enflasyon + reel)
-DEFAULT_RISK_FREE_RATE = 0.15       # %15 (TCMB politika faizi)
+DEFAULT_RISK_FREE_RATE = 0.15       # %15 (TCMB politika faizi — güncellenmeli: config/risk_free_rate.json veya TCMB API)
 
 # =====================================================
 # VERİ KALİTESİ SABİTLERİ

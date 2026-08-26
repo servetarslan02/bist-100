@@ -582,11 +582,21 @@ class DecisionEngine:
                 action = "HOLD"  # Çok riskli — pozisyon açma
                 direction = "NEUTRAL"
 
-        # Stop ve Target hesaplama (price verilmişse)
+        # Stop ve Target hesaplama (price verilmişse — ATR bazlı)
         stop_price = 0.0
         target_price = 0.0
         if price > 0 and action in ("BUY", "SELL"):
-            stop_pct = self.DEFAULT_STOP_FALLBACK
+            # ATR varsa kullan, yoksa fallback
+            atr = score.vector.__dict__.get("atr", 0) if hasattr(score.vector, "__dict__") else 0
+            atr_pct = score.vector.__dict__.get("atr_pct", 0) if hasattr(score.vector, "__dict__") else 0
+            if atr and atr > 0:
+                stop_distance = atr * 2.5
+                stop_pct = (stop_distance / price) * 100
+            elif atr_pct and atr_pct > 0:
+                stop_pct = atr_pct * 1.5
+            else:
+                stop_pct = self.DEFAULT_STOP_FALLBACK
+            stop_pct = max(4.0, min(10.0, stop_pct))
             target_pct = stop_pct * 2.0
             if direction == "LONG":
                 stop_price = round(price * (1 - stop_pct / 100), 2)

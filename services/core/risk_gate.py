@@ -63,6 +63,8 @@ class RiskGate:
         mc_cvar_95: float = 0.0,
     ) -> RiskDecision:
         """Order risk kontrolü."""
+        # Otomatik günlük P&L senkronizasyonu
+        self.sync_daily_pnl()
         # 1. Devre kesici ve temel kontroller
         early_exit = self._check_circuit_breakers(circuit_open, ticker, details={})
         if early_exit:
@@ -268,6 +270,21 @@ class RiskGate:
 
     def update_daily_pnl(self, pnl: float):
         self._daily_pnl = pnl
+
+    def sync_daily_pnl(self):
+        """PortfolioManager'dan günlük P&L otomatik çek."""
+        try:
+            from services.portfolio.portfolio_manager import portfolio_manager
+            if portfolio_manager:
+                snapshots = portfolio_manager.get_equity_snapshots(limit=2)
+                if len(snapshots) >= 2:
+                    today_equity = snapshots[-1]["total_equity"]
+                    yesterday_equity = snapshots[-2]["total_equity"]
+                    self._daily_pnl = today_equity - yesterday_equity
+                else:
+                    self._daily_pnl = 0.0
+        except Exception as e:
+            logger.debug("Daily PnL sync skipped", error=str(e))
 
     def reset_daily(self):
         self._daily_pnl = 0.0

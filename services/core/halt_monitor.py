@@ -36,10 +36,11 @@ class HaltStatus:
 
 
 class HaltMonitor:
-    """Şirket bazlı durdurma takibi."""
+    """Şirket bazlı durdurma takibi — SQLite persistence ile."""
 
     def __init__(self):
         self._halted_tickers: Dict[str, HaltStatus] = {}
+        self._restore_state()
 
     def add_halt(
         self,
@@ -56,12 +57,14 @@ class HaltMonitor:
             expected_resume=expected_resume,
             action="WAIT",
         )
+        self._persist_state(ticker)
         logger.info("Halt added", ticker=ticker, reason=reason, type=halt_type)
 
     def remove_halt(self, ticker: str):
         """Hisse durdurma kaldır."""
         if ticker in self._halted_tickers:
             del self._halted_tickers[ticker]
+            self._remove_persisted(ticker)
             logger.info("Halt removed", ticker=ticker)
 
     def check_halt(self, ticker: str) -> HaltStatus:
@@ -78,6 +81,59 @@ class HaltMonitor:
     def is_halted(self, ticker: str) -> bool:
         """Hisse durdurulmuş mu?"""
         return ticker in self._halted_tickers
+
+
+    def _persist_state(self, ticker: str):
+        """Halt durumunu SQLite'a kaydet."""
+        try:
+            from .state_store import state_store
+            status = self._halted_tickers.get(ticker)
+            if status:
+                with state_store._connect() as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO halt_states (ticker, reason, halt_type, expected_resume, action, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+                        (ticker, status.reason, status.halt_type, status.expected_resume, status.action, datetime.now(timezone.utc).isoformat())
+                    )
+        except Exception as e:
+            logger.debug("Halt persist skipped", ticker=ticker, error=str(e))
+
+    def _remove_persisted(self, ticker: str):
+        """Halt durumunu SQLite'dan sil."""
+        try:
+            from .state_store import state_store
+            with state_store._connect() as conn:
+                conn.execute("DELETE FROM halt_states WHERE ticker = ?", (ticker,))
+        except Exception as e:
+            logger.debug("Halt remove persist skipped", ticker=ticker, error=str(e))
+
+    def _restore_state(self):
+        """Halt durumunu SQLite'dan geri yükle."""
+        try:
+            from .state_store import state_store
+            with state_store._connect() as conn:
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS halt_states (
+                        ticker TEXT PRIMARY KEY,
+                        reason TEXT,
+                        halt_type TEXT,
+                        expected_resume TEXT,
+                        action TEXT,
+                        updated_at TEXT
+                    )
+                """)
+                rows = conn.execute("SELECT ticker, reason, halt_type, expected_resume, action FROM halt_states").fetchall()
+                for row in rows:
+                    self._halted_tickers[row[0]] = HaltStatus(
+                        halted=True,
+                        reason=row[1],
+                        halt_type=row[2],
+                        expected_resume=row[3],
+                        action=row[4],
+                    )
+                if rows:
+                    logger.info("Halt states restored", count=len(rows))
+        except Exception as e:
+            logger.debug("Halt restore skipped", error=str(e))
 
 
 # Singleton

@@ -13,6 +13,11 @@ from pathlib import Path
 logger = structlog.get_logger()
 
 
+class SecurityError(Exception):
+    """Güvenlik doğrulama hatası."""
+    pass
+
+
 @dataclass
 class ModelConfig:
     """Configuration for an ML model."""
@@ -193,10 +198,36 @@ class AlphaModel:
                 "is_trained": self.is_trained,
             }, f)
 
+        # Hash dosyası oluştur (pickle deserilization güvenliği)
+        try:
+            import hashlib
+            with open(path, "rb") as hf:
+                file_hash = hashlib.sha256(hf.read()).hexdigest()
+            hash_path = path + ".sha256"
+            with open(hash_path, "w") as hf:
+                hf.write(file_hash)
+        except Exception:
+            logger.debug("Hash generation skipped", path=path)
+
         logger.info("Model saved", path=path, name=self.config.name)
 
     def load(self, path: str):
         """Load model from disk."""
+        # Hash doğrulama
+        hash_path = path + ".sha256"
+        try:
+            import hashlib
+            import os
+            if os.path.exists(hash_path):
+                expected_hash = open(hash_path).read().strip()
+                actual_hash = hashlib.sha256(open(path, "rb").read()).hexdigest()
+                if actual_hash != expected_hash:
+                    raise SecurityError(f"Model hash mismatch — possible tampering: {path}")
+        except SecurityError:
+            raise
+        except Exception:
+            pass  # Hash dosyası yoksa doğrulama atlanır
+
         with open(path, "rb") as f:
             data = pickle.load(f)
 
