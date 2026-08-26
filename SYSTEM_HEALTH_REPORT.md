@@ -624,6 +624,282 @@ The BIST-100 ALPHA system is an **impressively ambitious** algorithmic trading p
 
 ---
 
+## DEEP AUDIT — Part 3: Line-by-Line Code Review (All Critical Files)
+
+**Date:** 2026-08-27
+**Method:** Every critical file read in full, cross-referenced, logic traced end-to-end
+**Files Read:** decision_engine.py, risk_gate.py, orchestrator.py, risk_manager.py, compliance.py, circuit_breaker.py, event_bus.py, short_selling.py, halt_monitor.py, outcome_tracker.py, learning_loop.py, portfolio_manager.py, price_limits.py, settlement.py, gross_settlement.py, tradability_mask.py, manipulation_detector.py, insider_detector.py, fee_calculator.py, tax.py, config.py, auth.py, app.py
+
+---
+
+### 🔴 CRITICAL ISSUES (Verified by Code Reading)
+
+#### CRITICAL-1: Orchestrator Hardcoded Portfolio Value — CONFIRMED
+**File:** `services/core/orchestrator.py` lines ~450-470
+**Code:**
+```python
+risk_result = rg.check_order(
+    ...
+    portfolio_value=100000,  # ← HARDCODED
+    current_positions={},     # ← EMPTY
+    ...
+)
+```
+**Also in `_check_compliance()`:**
+```python
+compliance = comp.check_spk_compliance(
+    ..., 100000, 0  # ← HARDCODED portfolio_value, 0 position_pct
+)
+```
+**Impact:** Risk gate and SPK compliance checks are MEANINGLESS. Every order passes because:
+- Position limits are checked against empty positions → always passes
+- Portfolio exposure is checked against ₺100,000 → always passes
+- SPK compliance checks against ₺100,000 → always passes
+**Fix:** Wire up actual `PortfolioManager` state
+
+---
+
+#### CRITICAL-2: Learning Loop Never Closes — CONFIRMED
+**File:** `services/learning/outcome_tracker.py` line ~60
+**Code:**
+```python
+async def check_pending_outcomes(self, learning_system, price_fetcher) -> List[Dict]:
+```
+**Issue:** `price_fetcher` parameter is never wired up in production. The orchestrator records predictions via `_record_prediction()` but never calls `check_pending_outcomes()`. The `LearningLoop._check_model_decay()` only sets `retrain_needed = True` but never triggers actual retrain.
+**Impact:** Predictions are recorded but outcomes are NEVER resolved → learning system has zero feedback → models never improve.
+**Fix:** Wire up price fetcher in scheduler, add automatic retrain trigger
+
+---
+
+#### CRITICAL-3: RiskManager Binary Regime — CONFIRMED
+**File:** `services/core/risk_manager.py` line ~75
+**Code:**
+```python
+def get_market_regime(self, bm_df, target_date) -> float:
+    ...
+    if current_close < ma_200:
+        return 0.0  # ← ALL CASH
+    return 1.0      # ← ALL IN
+```
+**Impact:** No nuance for sideways, high-volatility, transitional regimes. Portfolio either goes 100% invested or 100% cash based solely on 200-day MA.
+**Fix:** Use `intelligence/regime.py` or `market_state/ensemble_regime.py` which have sophisticated HMM + score + GMM detection
+
+---
+
+#### CRITICAL-4: Missing Import in Circuit Breaker — CONFIRMED
+**File:** `services/core/circuit_breaker.py` line ~175
+**Code:**
+```python
+def get_delay(self, attempt: int) -> float:
+    ...
+    jitter = delay * 0.1 * (2 * random.random() - 1)  # ← random not imported
+```
+**Impact:** `RetryPolicy.get_delay()` will crash with `NameError: name 'random' is not defined` at runtime
+**Fix:** Add `import random` at top of file
+
+---
+
+#### CRITICAL-5: Missing Import in Event Bus — CONFIRMED
+**File:** `services/core/event_bus.py` line ~120
+**Code:**
+```python
+class InMemoryRedis:
+    def __init__(self):
+        ...
+        self._streams = defaultdict(list)  # ← defaultdict not imported
+```
+**Impact:** `InMemoryRedis` will crash with `NameError: name 'defaultdict' is not defined` when Redis is unavailable
+**Fix:** Add `from collections import defaultdict` at top of file
+
+---
+
+#### CRITICAL-6: Risk Gate Fail-Open on BIST Rules Error — NEW
+**File:** `services/core/risk_gate.py` line ~120
+**Code:**
+```python
+try:
+    from services.core.short_selling import short_selling_monitor
+    ...
+except Exception as e:
+    logger.warning("BIST compliance check skipped due to error", error=str(e))
+    # ← Continues without checking! Order proceeds!
+```
+**Impact:** If short_selling, halt_monitor, or compliance imports fail, the order proceeds UNCHECKED. This is fail-open behavior — the opposite of what a trading system should do.
+**Fix:** Return `RiskDecision(False, "BIST compliance check failed")` on exception
+
+---
+
+#### CRITICAL-7: Portfolio Manager Imports Non-Existent Module — NEW
+**File:** `services/portfolio/portfolio_manager.py` line ~520
+**Code:**
+```python
+def execute_auto_rebalance(self, signals=None):
+    if not signals:
+        try:
+            from services.core.holy_grail_strategy import HolyGrailStrategy
+```
+**Impact:** `HolyGrailStrategy` doesn't exist in the codebase. If `execute_auto_rebalance()` is called without signals, it silently fails and returns empty results.
+**Fix:** Remove dead import or implement HolyGrailStrategy
+
+---
+
+#### CRITICAL-8: Orchestrator Creates New IntelligencePipeline Every Call — NEW
+**File:** `services/core/orchestrator.py` line ~350
+**Code:**
+```python
+def _run_intelligence_pipeline(self, ticker, features, regime):
+    from services.intelligence.pipeline import IntelligencePipeline
+    ip = IntelligencePipeline()  # ← NEW INSTANCE EVERY CALL
+```
+**Impact:** Wasted computation, no state persistence between calls, potential memory leaks
+**Fix:** Cache instance in `self._services`
+
+---
+
+### 🟡 WARNINGS (Verified by Code Reading)
+
+#### WARN-1: Halt Monitor In-Memory Only — CONFIRMED
+**File:** `services/core/halt_monitor.py`
+**Code:** `self._halted_tickers: Dict[str, HaltStatus] = {}` — no persistence
+**Impact:** All halt state lost on restart
+
+#### WARN-2: Manipulation Detector Too Simplistic — CONFIRMED
+**File:** `services/core/manipulation_detector.py`
+**Code:** Wash trading only checks adjacent trades (price==price and volume==volume), spoofing is just cancel_count > 5
+**Impact:** Sophisticated manipulation goes undetected
+
+#### WARN-3: Insider Detector Too Simplistic — CONFIRMED
+**File:** `services/core/insider_detector.py`
+**Code:** Only checks volume > avg_volume * 3 before KAP event
+**Impact:** No statistical significance testing, no pattern detection
+
+#### WARN-4: Custom JWT Implementation — CONFIRMED
+**File:** `services/api/auth.py`
+**Code:** Custom HMAC-SHA256 JWT instead of PyJWT
+**Impact:** No algorithm flexibility, potential edge case vulnerabilities
+
+#### WARN-5: API CORS Configuration — CORRECTED
+**File:** `services/api/app.py` line ~80
+**Code:**
+```python
+allowed_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+if not allowed_origins or allowed_origins == [""]:
+    allowed_origins = ["http://localhost:3000"]  # Default: sadece local dev
+```
+**Previous audit said `allow_origins=["*"]` — THIS IS WRONG.** The actual code defaults to localhost only. CORS is properly configured.
+
+#### WARN-6: Decision Engine `decide_from_canonical()` Uses Fallback Stop — NEW
+**File:** `services/core/decision_engine.py` line ~280
+**Code:** `stop_pct = self.DEFAULT_STOP_FALLBACK` instead of ATR-based
+**Impact:** Inconsistent with main `decide()` path which uses ATR-based stops
+
+#### WARN-7: `_calculate_composite_score()` Weights Don't Sum to 1.0 — NEW
+**File:** `services/core/decision_engine.py`
+**Weights:** 0.20 + 0.12 + 0.16 + 0.12 + 0.07 + 0.07 + 0.09 + 0.09 + 0.08 = 1.00 ✅ (Actually correct!)
+**Status:** FALSE ALARM — weights DO sum to 1.0
+
+#### WARN-8: Risk Manager `calculate_weights()` Re-Normalizes After Capping — NEW
+**File:** `services/core/risk_manager.py` line ~50
+**Code:** After capping at `max_weight`, weights are re-normalized to sum to 1.0
+**Impact:** If all weights are capped, they're re-normalized which may exceed per-position limits
+
+#### WARN-9: `_daily_pnl` Never Automatically Updated — CONFIRMED
+**File:** `services/core/risk_gate.py`
+**Code:** `self._daily_pnl = 0.0` — requires manual `update_daily_pnl()` calls
+**Impact:** Daily loss limit check always passes (0 < 5%)
+
+#### WARN-10: `DEFAULT_RISK_FREE_RATE = 0.15` — NEW
+**File:** `services/core/constants.py`
+**Impact:** 15% risk-free rate is TCMB policy rate — should be updated as rates change
+
+---
+
+### ✅ WHAT'S WORKING WELL (Verified)
+
+1. **BIST Session FSM** (`market_session_fsm.py`) — Excellent implementation, single source of truth, half-day support, EBDKS
+2. **Price Limits** (`price_limits.py`) — All markets ±10% (Sept 2025), IPO no-limit, post-CB tightening
+3. **Settlement** (`settlement.py`) — T+2 normal, T+0 gross, proper trading day calculation
+4. **Fee Calculator** (`fee_calculator.py`) — Accurate BIST fees (broker + BIST + MKK + BSMV), minimum commission
+5. **Tax Calculator** (`tax.py`) — Correct 2025-2026 brackets, 180-day long-term holding advantage
+6. **Tradability Mask** (`tradability_mask.py`) — Mask-first design, circuit breaker + limit-up/down + halt + zero volume
+7. **Short Selling** (`short_selling.py`) — BIST-50 restriction, uptick rule (Sept 2025), gross settlement check
+8. **Gross Settlement** (`gross_settlement.py`) — Proper brüt takas rules
+9. **Config Security** (`config.py`) — Production validation, minimum secret length, no insecure defaults
+10. **Portfolio Accounting** (`portfolio_manager.py`) — Weighted average cost, realized/unrealized P&L, cash ledger, audit trail, accounting invariants
+11. **Decision Engine** (`decision_engine.py`) — Symmetric thresholds, ATR-based stops, regime-aware dynamic thresholds
+12. **Event Bus** (`event_bus.py`) — NATS + Redis Pub/Sub + Redis Streams, idempotency, DLQ
+
+---
+
+### 📊 CROSS-MODULE DEPENDENCY ANALYSIS
+
+| Source Module | Depends On | Status |
+|---|---|---|
+| orchestrator → decision_engine | ✅ Correct |
+| orchestrator → risk_gate | ⚠️ Hardcoded values |
+| orchestrator → portfolio_manager | ❌ Not wired (hardcoded 100k) |
+| orchestrator → outcome_tracker | ❌ Never calls check_pending |
+| orchestrator → intelligence_pipeline | ⚠️ New instance every call |
+| risk_gate → short_selling | ✅ Correct |
+| risk_gate → halt_monitor | ✅ Correct (but in-memory) |
+| risk_gate → compliance | ✅ Correct |
+| risk_gate → auto_circuit_breaker | ✅ Correct |
+| portfolio_manager → fee_calculator | ✅ Correct |
+| portfolio_manager → holy_grail_strategy | ❌ Module doesn't exist |
+| learning_loop → state_store | ✅ Correct (SQLite persistence) |
+| outcome_tracker → learning_system | ⚠️ Wired but price_fetcher missing |
+| decision_engine → canonical_scoring | ✅ Correct |
+| short_selling → bist_universe | ⚠️ Falls back to BIST-30 |
+
+---
+
+### 🗑️ DEAD CODE (Confirmed)
+
+1. **`alpha_v4/`** — 4 files, never imported anywhere
+2. **`services/core/holy_grail_strategy`** — Referenced but doesn't exist
+3. **`run_baseline_test.py`** — Calls non-existent backtest functions
+4. **`test_engine.py`, `test_engine2.py`, `test_len.py`** — Superficial tests with no assertions
+
+---
+
+### 🔒 SECURITY ASSESSMENT
+
+| Area | Status | Details |
+|---|---|---|
+| JWT | ⚠️ Custom impl | HMAC-SHA256, not PyJWT |
+| CORS | ✅ Secure | Defaults to localhost only |
+| Config validation | ✅ Strong | Production blocks insecure defaults |
+| Secret length | ✅ Enforced | Min 16 chars in production |
+| Rate limiting | ⚠️ In-memory | Doesn't work across instances |
+| SQL injection | ✅ Safe | Uses parameterized queries (asyncpg) |
+| Pickle deserilization | ⚠️ Risk | 7 locations use pickle.load() |
+| mTLS | ✅ Supported | Optional mutual TLS |
+
+---
+
+### 📋 UPDATED RECOMMENDATIONS
+
+| Priority | Issue | Fix | Effort |
+|---|---|---|---|
+| **P0** | Orchestrator hardcoded portfolio | Wire PortfolioManager | 2h |
+| **P0** | Learning loop never closes | Wire price_fetcher + auto-retrain | 4h |
+| **P0** | Risk gate fail-open on error | Return False on exception | 30min |
+| **P0** | Missing imports (random, defaultdict) | Add imports | 5min |
+| **P0** | Binary regime in RiskManager | Use ensemble_regime | 2h |
+| **P1** | HolyGrailStrategy dead import | Remove or implement | 30min |
+| **P1** | IntelligencePipeline new instance | Cache in services | 30min |
+| **P1** | Halt monitor persistence | Add SQLite persistence | 2h |
+| **P1** | Daily PnL auto-update | Wire from PortfolioManager | 1h |
+| **P1** | Pickle deserilization risk | Use JSON/msgpack | 4h |
+| **P2** | Manipulation detector | Add statistical tests | 8h |
+| **P2** | Custom JWT → PyJWT | Replace implementation | 2h |
+| **P2** | Decision engine canonical stop | Use ATR-based | 1h |
+
+**Estimated total P0 effort:** ~1 day
+**Estimated total P0+P1 effort:** ~3 days
+
+---
+
 ## Conclusion
 
 The BIST-100 ALPHA system is a **well-architected, comprehensive algorithmic trading platform** with strong foundations in BIST market rules, risk management, and observability. The codebase shows evidence of iterative improvement (v2.0, v2.1 fixes) and academic rigor (MacKinlay, Fama-French, Kelly criterion, deflated Sharpe).
