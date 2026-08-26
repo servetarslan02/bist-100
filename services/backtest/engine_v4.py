@@ -500,64 +500,11 @@ class BacktestEngineV4:
             sim.update_equity(prices, date_str, bench_price)
 
         elapsed = _time.time() - start_time
-        metrics_dict = sim.compute_metrics()
-
-        # Metrics objesi
-        metrics = BacktestMetrics(**{k: v for k, v in metrics_dict.items()
-                                     if k in BacktestMetrics.__dataclass_fields__})
-
-        # Result
-        start_date = str(sorted_dates[effective_lookback].date()) if sorted_dates else ""
-        end_date = str(sorted_dates[-1].date()) if sorted_dates else ""
-
-        result = BacktestResultV4(
-            run_id=run_id,
-            start_date=start_date,
-            end_date=end_date,
-            config=cfg,
-            metrics=metrics,
-            total_scans=total_scans,
-            signals_generated=signals_count,
-            trades_executed=len(sim.get_trades()),
-            look_ahead_violations=look_ahead_violations,
-            survivorship_violations=survivorship_violations,
-            data_quality_issues=data_quality_issues,
-            elapsed_seconds=elapsed,
-            scans_per_second=total_scans / max(elapsed, 0.001),
-            equity_curve=[s.to_dict() for s in sim.get_equity_curve()],
-            trades=[t.to_dict() for t in sim.get_trades()],
+        return self._finalize_run(
+            run_id, sorted_dates, effective_lookback, cfg, sim,
+            total_scans, signals_count, look_ahead_violations,
+            survivorship_violations, data_quality_issues, elapsed, persist,
         )
-
-        # Invariant check
-        ok, errors = sim.check_invariants()
-        if not ok:
-            logger.error("Invariant violations detected", errors=errors)
-            result.metrics.max_drawdown_pct = -1  # Flag
-
-        # Persist
-        if persist:
-            try:
-                backtest_persistence.save_run(
-                    run_id=run_id,
-                    start_date=start_date,
-                    end_date=end_date,
-                    initial_capital=cfg.initial_capital,
-                    metrics=metrics_dict,
-                    config=cfg.to_dict(),
-                )
-                backtest_persistence.save_trades(run_id, result.trades)
-                backtest_persistence.save_equity_curve(run_id, result.equity_curve)
-                result.persisted = True
-            except Exception as e:
-                logger.error("Persistence failed", error=str(e))
-
-        logger.info("Backtest completed",
-                   run_id=run_id,
-                   trades=result.trades_executed,
-                   return_pct=metrics.total_return_pct,
-                   elapsed=f"{elapsed:.1f}s")
-
-        return result
 
     # ===================== FAST PATH (PANEL) =====================
 
