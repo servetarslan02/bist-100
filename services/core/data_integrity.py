@@ -221,7 +221,7 @@ class DataIntegrityValidator:
                         result["has_issues"] = True
                         result["issues"].append(f"{null_count} instruments with NULL symbol")
                 except Exception:
-                    pass
+                    logger.warning("Caught Exception in _check_postgres_consistency", exc_info=True)
 
         except Exception as e:
             result["has_issues"] = True

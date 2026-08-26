@@ -31,6 +31,10 @@ from services.alternative import (
     compute_web_features,
 )
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 
 # =====================================================
 # HELPERS
@@ -121,7 +125,7 @@ class TestFaz0_RateLimiter:
         try:
             await asyncio.wait_for(limiter.acquire(), timeout=0.5)
         except asyncio.TimeoutError:
-            pass  # Expected
+            logger.warning("Timeout in test_acquire_respects_limit", exc_info=True)
 
 
 class TestFaz0_CircuitBreaker:
@@ -677,6 +681,7 @@ class TestBugFixes:
     def test_clamp_none_handling(self):
         """_clamp(None) crash yapmamalı."""
         from services.alternative.social import _clamp
+
         assert _clamp(None, -1, 1) == 0.0
         assert _clamp(0.5, -1, 1) == 0.5
         assert _clamp(2.0, -1, 1) == 1.0

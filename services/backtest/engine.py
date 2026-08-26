@@ -502,49 +502,49 @@ def get_backtest_systems() -> Dict[str, Any]:
         from .engine_v4 import BacktestEngineV4
         systems["engine_v4"] = BacktestEngineV4
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="BacktestEngineV4", error=str(e))
     try:
         from .enhanced_walk_forward import PurgeEmbargoWalkForward
         systems["enhanced_wf"] = PurgeEmbargoWalkForward
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="PurgeEmbargoWalkForward", error=str(e))
     try:
         from .portfolio_sim import PortfolioSimulator
         systems["portfolio_sim"] = PortfolioSimulator
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="PortfolioSimulator", error=str(e))
     try:
         from .walk_forward import WalkForwardEngine
         systems["walk_forward"] = WalkForwardEngine
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="WalkForwardEngine", error=str(e))
     try:
         from .walk_forward_runner import WalkForwardRunner
         systems["wf_runner"] = WalkForwardRunner
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="WalkForwardRunner", error=str(e))
     try:
         from .canonical_adapter import CanonicalBacktestAdapter
         systems["canonical_adapter"] = CanonicalBacktestAdapter
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="CanonicalBacktestAdapter", error=str(e))
     try:
         from .persistence import BacktestPersistence
         systems["persistence"] = BacktestPersistence
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_backtest_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="BacktestPersistence", error=str(e))
     return systems

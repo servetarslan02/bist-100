@@ -64,7 +64,7 @@ class HistoricalDataAdapter:
                     features[key] = float_val
                     features[f"raw_{key}"] = float_val
                 except (TypeError, ValueError):
-                    pass
+                    logger.warning("Error in get_fundamental_features: (TypeError, ValueError)", exc_info=True)
 
         # === DERIVED FEATURES (Motor4 ile uyumlu) ===
 

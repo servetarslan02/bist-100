@@ -43,29 +43,23 @@ logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan — DB lifecycle dahil."""
-    logger.info("ALPHA BIST API starting (canonical production server)")
-
-    # Database connections başlat
+async def _startup_services() -> Optional[asyncio.Task]:
+    """Servisleri başlat, refresh task döndür."""
     await init_databases()
 
-    # Sharding başlat (opsiyonel)
     try:
         from ..core.sharding import init_sharding
         await init_sharding()
     except Exception as e:
         logger.warning(f"Sharding not started: {e}")
 
-    # Cache warming — sıcak veriyi önceden yükle
+    refresh_task = None
     try:
         from ..core.cache_warmer import cache_warmer
         await cache_warmer.warm_all()
-        # Background'da sıcak anahtarları tazele
         refresh_task = asyncio.create_task(cache_warmer.refresh_hot_keys())
     except Exception as e:
         logger.warning(f"Cache warming failed: {e}")
-        refresh_task = None
 
     try:
         from services.portfolio.main import portfolio_service
@@ -74,197 +68,68 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"PortfolioService baslatilamadi: {e}")
 
-    # OpenTelemetry başlat
     otel_endpoint = os.getenv("OTEL_ENDPOINT")
     setup_telemetry(service_name="alpha-api", endpoint=otel_endpoint)
+    return refresh_task
 
-    # Canlı Borsa Mikro-Yapı ve Anlık Fiyat Akış Motoru (Real-Time Live Ticks)
-    async def _radar_cache_refresher():
-        """BIST hisselerini TradingView'den çeker ve 2 saniyede bir gerçek borsa gibi canlı mikro-tick üretir."""
-        await asyncio.sleep(2)
-        loop_counter = 0
-        while True:
-            try:
-                from ..core.redis_helper import get_cached, set_cached
-                import random
-                
-                # Her 15 saniyede bir TradingView canlı taramasını tazele
-                if loop_counter % 7 == 0:
-                    from .v1.market import _fetch_radar_fresh
-                    await _fetch_radar_fresh(limit=1000)
-                else:
-                    # Canlı piyasa mikro-tick akışı: SADECE borsa açıkken (CONTINUOUS_AUCTION vb.) kademe dalgalandır
-                    from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
-                    current_phase = bist_session_fsm.get_phase()
-                    
-                    if current_phase != BISTMarketPhase.CLOSED:
-                        radar = get_cached("radar:data") or []
-                        if radar:
-                            for item in radar:
-                                if random.random() < 0.40:
-                                    p = float(item.get("price", 10.0))
-                                    tick_size = 0.01 if p < 20 else (0.02 if p < 50 else (0.05 if p < 100 else 0.10))
-                                    step = random.choice([-1, -1, 0, 1, 1, 2]) * tick_size
-                                    new_p = round(max(0.1, p + step), 2)
-                                    item["price"] = new_p
-                                    item["volume"] = int(item.get("volume", 100000)) + random.randint(200, 10000)
-                                    if "high" in item: item["high"] = max(item["high"], new_p)
-                                    if "low" in item: item["low"] = min(item["low"], new_p)
-                            set_cached("radar:data", radar, ttl=300)
-                            set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
-                    # Borsa kapalıyken fiyat güncelleme YAPMA — sadece son kapanış fiyatları gösterilir
-                
-                loop_counter += 1
-            except Exception as e:
-                logger.warning(f"radar_live_ticker error: {e}")
-            await asyncio.sleep(2)
 
-    # Model Öğrenme & Telafi (Catch-Up) Arka Plan Görevi
-    async def _ml_learning_scheduler():
-        """PC kapalı kaldığında kaçırılan eğitimleri anında tamamlar ve 4 saatte bir otonom öğrenir."""
-        await asyncio.sleep(15)  # API ve veritabanı tam hazır olana kadar bekle
-        
-        # 1. Başlangıç Telafi Kontrolü
-        try:
-            from ..learning.learning_pipeline import LearningPipeline
-            pipeline = LearningPipeline()
-            loop = asyncio.get_event_loop()
-            logger.info("ml_scheduler: Başlangıç eksik eğitim/veri telafi kontrolü yapılıyor...")
-            await loop.run_in_executor(None, pipeline.check_and_catchup_if_needed)
-            logger.info("ml_scheduler: Başlangıç telafi kontrolü tamamlandı.")
-        except Exception as e:
-            logger.warning(f"ml_scheduler startup catchup error: {e}")
-            
-        # 2. Düzenli Otonom Öğrenme Döngüsü (Her 4 saatte bir)
-        while True:
-            await asyncio.sleep(4 * 3600)
-            try:
-                from ..learning.learning_pipeline import LearningPipeline
-                pipeline = LearningPipeline()
-                loop = asyncio.get_event_loop()
-                logger.info("ml_scheduler: Periyodik öğrenme döngüsü başlatılıyor...")
-                await loop.run_in_executor(None, pipeline.run_learning_cycle)
-                logger.info("ml_scheduler: Periyodik öğrenme başarıyla tamamlandı.")
-            except Exception as e:
-                logger.warning(f"ml_scheduler periodic error: {e}")
+def _start_background_tasks(refresh_task) -> dict:
+    """Arka plan görevlerini başlat."""
+    from .background_tasks import (
+        radar_cache_refresher, ml_learning_scheduler,
+        auto_storage_optimizer, paper_trading_scheduler,
+    )
+    return {
+        "radar": asyncio.create_task(radar_cache_refresher()),
+        "ml": asyncio.create_task(ml_learning_scheduler()),
+        "storage": asyncio.create_task(auto_storage_optimizer()),
+        "paper": asyncio.create_task(paper_trading_scheduler()),
+    }
 
-    # Otonom Veri Sıkıştırma ve Disk Koruma Arka Plan Görevi (Her 12 saatte bir)
-    async def _auto_storage_optimizer():
-        """Arka planda otomatik ClickHouse ZSTD sıkıştırma ve önbellek temizliği yapar."""
-        while True:
-            await asyncio.sleep(12 * 3600)
-            try:
-                from ..core.database import ch_execute
-                ch_execute("OPTIMIZE TABLE bist_ticks FINAL")
-                logger.info("auto_storage_optimizer: Periyodik ZSTD disk sıkıştırması ve temizliği tamamlandı.")
-            except Exception as e:
-                logger.warning(f"auto_storage_optimizer: {e}")
 
-    async def _paper_trading_scheduler():
-        """BIST seans takvimine gore calisir: 18:15 EOD sinyal uretimi & 09:55 sabah acilisi yurutme.
-
-        NOT: Container'lar genelde UTC calisir (dockerd.log dogrulandi: TZ=UTC).
-        datetime.now() ONCEDEN UTC dondugunden, 09:55/18:15 hedefleri gercekte
-        BIST/Turkiye saatinde (UTC+3) 12:55 ve 21:15'e denk geliyordu — yani
-        "sabah acilisi" gercek acilistan (10:00 TR) 2.5 saat SONRA, "EOD" da
-        gercek kapanistan (18:00 TR) 3 saat SONRA (piyasa çoktan kapanmisken)
-        tetikleniyordu. Bu satirlar TR_TZ (UTC+3) ile hesaplaniyor.
-        """
-        TR_TZ = timezone(timedelta(hours=3))
-        
-        # 1. Başlangıçta eğer portföyde hiç pozisyon yoksa veya bekleyen emir varsa hemen otonom bootstrap yap
-        await asyncio.sleep(5)
-        try:
-            from services.paper_trading.paper_orchestrator import paper_orchestrator
-            from services.pipeline.run_unified_daily import run_morning_execution_cycle
-            cur_pos = paper_orchestrator.portfolio.get_all_positions()
-            pending = paper_orchestrator.store.load_pending_signals()
-            now_tr = datetime.now(TR_TZ)
-            if now_tr.weekday() < 5 and (len(cur_pos) == 0 or len(pending) > 0):
-                logger.info("paper_trading_scheduler: Başlangıç otonom portföy başlatma/telafi döngüsü çalıştırılıyor...", positions=len(cur_pos), pending=len(pending))
-                await run_morning_execution_cycle()
-        except Exception as e:
-            logger.warning(f"paper_trading_scheduler startup catchup error: {e}")
-
-        while True:
-            now = datetime.now(TR_TZ)
-            # Gunluk hedefler: 09:55 ve 18:15 (Turkiye/BIST saatiyle)
-            t_morning = now.replace(hour=9, minute=55, second=0, microsecond=0)
-            t_eod = now.replace(hour=18, minute=15, second=0, microsecond=0)
-
-            upcoming = []
-            if now < t_morning:
-                upcoming.append((t_morning, "MORNING"))
-            if now < t_eod:
-                upcoming.append((t_eod, "EOD"))
-            if not upcoming:
-                # Ertesi gunun 09:55'ine ayarla
-                upcoming.append((t_morning + timedelta(days=1), "MORNING"))
-
-            target_time, phase = min(upcoming, key=lambda x: x[0])
-            sleep_seconds = (target_time - now).total_seconds()
-            logger.info(f"paper_trading_scheduler: {sleep_seconds:.1f} sn sonra ({phase} - {target_time.strftime('%H:%M')} TR) tetiklenecek.")
-            await asyncio.sleep(sleep_seconds)
-
-            # Sadece hafta ici calissin (TR saatine gore)
-            if datetime.now(TR_TZ).weekday() < 5:
-                try:
-                    from services.pipeline.run_unified_daily import run_eod_signal_cycle, run_morning_execution_cycle
-                    if phase == "MORNING":
-                        logger.info("paper_trading_scheduler: Sabah acilisi yurutme dongusu basliyor...")
-                        await run_morning_execution_cycle()
-                    else:
-                        logger.info("paper_trading_scheduler: EOD sinyal uretim ve MTM dongusu basliyor...")
-                        await run_eod_signal_cycle()
-                except Exception as e:
-                    logger.error(f"paper_trading_scheduler error in {phase}: {e}")
-                finally:
-                    await asyncio.sleep(60)
-
-    task = asyncio.create_task(_radar_cache_refresher())
-    ml_task = asyncio.create_task(_ml_learning_scheduler())
-    storage_task = asyncio.create_task(_auto_storage_optimizer())
-    paper_task = asyncio.create_task(_paper_trading_scheduler())
-
-    # gRPC sunucusunu başlat (servisler arası hızlı iletişim)
-    grpc_server = None
+async def _start_grpc():
+    """gRPC sunucusunu başlat."""
     try:
         from ..grpc.server import start_grpc_server
         grpc_port = int(os.environ.get("GRPC_PORT", "50051"))
-        grpc_server = await start_grpc_server(port=grpc_port)
-        if grpc_server:
+        server = await start_grpc_server(port=grpc_port)
+        if server:
             logger.info("gRPC server started", port=grpc_port)
+        return server
     except Exception as e:
         logger.warning("gRPC server not started", error=str(e))
+        return None
 
-    # NATS bağlantısını başlat (tek client)
+
+async def _start_nats():
+    """NATS bağlantısını başlat."""
     try:
         from ..nats.client import nats_client
         await nats_client.connect()
     except Exception as e:
         logger.warning("NATS not connected", error=str(e))
 
-    # Service mesh başlat
-    mesh_task = None
+
+async def _start_service_mesh():
+    """Service mesh başlat."""
     try:
         from ..core.service_mesh import service_mesh, init_service_mesh
         init_service_mesh()
-        mesh_task = asyncio.create_task(service_mesh.start_monitoring())
+        return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
         logger.warning(f"Service mesh not started: {e}")
+        return None
 
-    yield
 
-    task.cancel()
-    ml_task.cancel()
-    storage_task.cancel()
-    paper_task.cancel()
+async def _shutdown(background_tasks: dict, refresh_task, mesh_task, grpc_server):
+    """Tüm servisleri düzgün şekilde kapat."""
+    for task in background_tasks.values():
+        task.cancel()
     if refresh_task:
         refresh_task.cancel()
     if mesh_task:
         mesh_task.cancel()
 
-    # State store buffer'ı flush et (kritik — elektrik kesintisinde kaybolmaması için)
     try:
         from ..core.state_store import state_store
         state_store.flush()
@@ -272,7 +137,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"State store flush on shutdown failed: {e}")
 
-    # Offline queue'yu flush et
     try:
         from ..core.offline_queue import offline_queue
         await offline_queue.flush()
@@ -280,7 +144,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Offline queue flush on shutdown failed: {e}")
 
-    # gRPC sunucusunu kapat
     if grpc_server:
         try:
             await grpc_server.stop(grace=5)
@@ -288,46 +151,28 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             logger.warning("gRPC stop error", error=str(e))
 
-    # NATS bağlantısını kapat
     try:
         from ..nats.client import nats_client
         await nats_client.close()
     except Exception:
-        pass
+        logger.warning("Caught Exception in _shutdown", exc_info=True)
 
-    # OpenTelemetry kapat
-    shutdown_telemetry()
-
-    # Database connections kapat
-    try:
-        from ..core.sharding import close_sharding
-        await close_sharding()
-    except Exception:
-        pass
-    await close_databases()
-    logger.info("ALPHA BIST API stopped")
+    logger.info("ALPHA BIST API shutdown complete")
 
 
-class ORJSONResponse(FastAPIResponse):
-    """ORJSON tabanlı response — json'dan daha hızlı ve 100% güvenli."""
-    media_type = "application/json"
+async def lifespan(app: FastAPI):
+    """Application lifespan — DB lifecycle dahil."""
+    logger.info("ALPHA BIST API starting (canonical production server)")
 
-    def render(self, content: any) -> bytes:
-        if isinstance(content, bytes):
-            return content
-        try:
-            if hasattr(orjson, "OPT_NON_STR_KEYS"):
-                res = orjson.dumps(content, default=str, option=orjson.OPT_NON_STR_KEYS).decode()
-            else:
-                res = orjson.dumps(content, default=str).decode()
-        except Exception:
-            import orjson
-            res = orjson.dumps(content, default=str).decode()
+    refresh_task = await _startup_services()
+    background_tasks = _start_background_tasks(refresh_task)
+    grpc_server = await _start_grpc()
+    await _start_nats()
+    mesh_task = await _start_service_mesh()
 
-        if isinstance(res, str):
-            return res.encode("utf-8")
-        return res
+    yield
 
+    await _shutdown(background_tasks, refresh_task, mesh_task, grpc_server)
 
 def create_app() -> FastAPI:
     """FastAPI uygulaması oluştur."""
@@ -435,7 +280,7 @@ def create_app() -> FastAPI:
             if nats_client.is_connected:
                 nats_status = "healthy"
         except Exception:
-            pass
+            logger.warning("Caught Exception in health", exc_info=True)
 
         # gRPC sağlık kontrolü
         grpc_status = "unavailable"
@@ -443,7 +288,7 @@ def create_app() -> FastAPI:
             from ..grpc.server import HAS_GRPC
             grpc_status = "healthy" if HAS_GRPC else "unavailable"
         except Exception:
-            pass
+            logger.warning("Caught Exception in health", exc_info=True)
 
         # mTLS sağlık kontrolü
         mtls_status = "unavailable"
@@ -452,7 +297,7 @@ def create_app() -> FastAPI:
             mtls_info = get_mtls_status()
             mtls_status = "healthy" if mtls_info.get("enabled") else "disabled"
         except Exception:
-            pass
+            logger.warning("Caught Exception in health", exc_info=True)
 
         all_services = {**db_health, "nats": nats_status, "grpc": grpc_status, "mtls": mtls_status}
         all_healthy = all(v in ("healthy", "disabled") for v in all_services.values())

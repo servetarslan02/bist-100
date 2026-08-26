@@ -768,7 +768,7 @@ class UnifiedScheduler:
             try:
                 loop.add_signal_handler(sig, self._signal_handler, sig)
             except NotImplementedError:
-                pass
+                logger.warning("Error in start: NotImplementedError", exc_info=True)
 
         logger.info("=== UNIFIED SCHEDULER STARTING ===",
                     phase=self._market.current_phase().value)

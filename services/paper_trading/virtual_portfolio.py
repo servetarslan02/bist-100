@@ -356,7 +356,7 @@ class VirtualPortfolio:
                         pos["current_price"] = live_p
                         pos["market_value"] = pos["quantity"] * live_p
         except Exception:
-            pass
+            logger.warning("Caught Exception in _sync_live_prices", exc_info=True)
 
     def force_refresh_prices(self, date: str = "") -> Dict[str, float]:
         """Açılışta tüm pozisyonların fiyatlarını zorla güncelle.
@@ -386,7 +386,7 @@ class VirtualPortfolio:
                         pos["market_value"] = pos["quantity"] * price_map[ticker]
                         updated[ticker] = price_map[ticker]
         except Exception:
-            pass
+            logger.warning("Caught Exception in force_refresh_prices", exc_info=True)
 
         # 2. PostgreSQL son kapanış (Redis'te olmayanlar için)
         try:
@@ -410,7 +410,7 @@ class VirtualPortfolio:
                             self._positions[ticker]["market_value"] = self._positions[ticker]["quantity"] * price
                             updated[ticker] = price
         except Exception:
-            pass
+            logger.warning("Caught Exception in force_refresh_prices", exc_info=True)
 
         if updated and date:
             self.update_prices(updated, date, record_equity=True)
@@ -556,7 +556,7 @@ class VirtualPortfolio:
             try:
                 return self._state_store.load_equity_curve()
             except Exception:
-                pass
+                logger.warning("Caught Exception in get_equity_curve", exc_info=True)
         return []
 
     def get_max_drawdown(self) -> float:

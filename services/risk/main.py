@@ -96,7 +96,7 @@ class RiskEngine:
                     );
                 """)
             except Exception:
-                pass
+                logger.warning("Caught Exception in _load_risk_limits", exc_info=True)
 
             rows = None
             try:
@@ -117,7 +117,7 @@ class RiskEngine:
                             ON CONFLICT (config_key) DO NOTHING
                         """, f"risk.{k}", orjson.dumps(v).decode(), f"Risk limit {k}")
                     except Exception:
-                        pass
+                        logger.warning("Caught Exception in _load_risk_limits", exc_info=True)
                 try:
                     rows = await pg_fetch("""
                         SELECT config_key, config_value FROM system_config
@@ -135,12 +135,12 @@ class RiskEngine:
                         try:
                             value = orjson.loads(value)
                         except Exception:
-                            pass
+                            logger.warning("Caught Exception in _load_risk_limits", exc_info=True)
                     if value is not None:
                         try:
                             self._risk_limits[key] = float(value)
                         except (ValueError, TypeError):
-                            pass
+                            logger.warning("Error in _load_risk_limits: (ValueError, TypeError)", exc_info=True)
 
             self._risk_limits_loaded = True
             logger.info("Risk limits loaded successfully", limits=self._risk_limits)

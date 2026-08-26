@@ -25,6 +25,10 @@ from services.core.alert_policy import (
     MAX_BATCH_SILENCE_SIZE, WEBHOOK_RETRY_COUNT,
 )
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 
 # =====================================================
 # MOCK WEBHOOK SERVER
@@ -171,7 +175,7 @@ async def test_parallel_edits_version_conflict():
                       actor="user2", expected_version=1)
         issues.append("Conflict yakalanmadı")
     except VersionConflictError:
-        pass
+        logger.warning("Error in test_parallel_edits_version_conflict: VersionConflictError", exc_info=True)
 
     # Değer user1'in olmalı
     if policy.get_escalation_timeout("cash_negative") != 100:

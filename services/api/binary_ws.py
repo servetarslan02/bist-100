@@ -505,7 +505,7 @@ class BinaryWebSocket:
                         data = orjson.loads(message)
                         logger.debug("JSON fallback message", type=data.get("type"))
                     except Exception:
-                        pass
+                        logger.warning("Caught Exception in handler", exc_info=True)
         except Exception as e:
             logger.debug("WebSocket client disconnected",
                          client_id=client_id, error=str(e))
@@ -630,7 +630,7 @@ class BinaryWebSocket:
             try:
                 await client.close()
             except Exception:
-                pass
+                logger.warning("Caught Exception in stop", exc_info=True)
         self._clients.clear()
 
     def get_stats(self) -> Dict[str, Any]:

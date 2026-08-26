@@ -112,7 +112,7 @@ class WebSocketServer:
                     data = orjson.loads(message)
                     await self._handle_client_message(conn, data)
                 except orjson.JSONDecodeError:
-                    pass
+                    logger.warning("JSON parse error in _handle_connection", exc_info=True)
         except Exception as e:
             logger.debug("WebSocket disconnected", client=client_id, error=str(e))
         finally:

@@ -293,7 +293,7 @@ def get_settings() -> Settings:
                             value = value.split(" #", 1)[0].rstrip()
                         os.environ.setdefault(k.strip(), value.strip('"').strip("'"))
         except Exception:
-            pass
+            logger.warning("Caught Exception in get_settings", exc_info=True)
 
     try:
         s = Settings()

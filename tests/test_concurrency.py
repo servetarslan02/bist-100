@@ -21,6 +21,10 @@ from services.core.migrations.runner import MigrationRunner, MigrationLockError
 from services.portfolio.main import PortfolioService
 from services.core.database_dev import dev_db
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 
 def fresh_db():
     db = sqlite3.connect(":memory:")
@@ -94,7 +98,7 @@ async def test_migration_lock_with_run():
         await runner.run_pending()
         issues.append("Lock varken run_pending çalıştı (hata vermeli)")
     except MigrationLockError:
-        pass  # Beklenen
+        logger.debug("MigrationLockError raised as expected in test_lock_timeout_recovery")
     except Exception as e:
         issues.append(f"Yanlış exception: {type(e).__name__}: {e}")
     finally:
@@ -223,7 +227,7 @@ async def test_portfolio_invariant_check():
         # Gerçek ihlal: pozisyon maliyeti cash'ten düşülmeden pozisyon açılmış
         # Bu zaten execute_buy tarafından engelleniyor
     except RuntimeError:
-        pass
+        logger.warning("Runtime error in test_portfolio_invariant_check", exc_info=True)
 
     svc._pm._cash = original_cash  # Geri al
 

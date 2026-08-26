@@ -24,6 +24,9 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 from services.intelligence.candle_patterns import candle_engine
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 # 30 Yıllık Tarihçesi Olan Temel BIST Lokomotif Hisseleri
 BIST_30Y_CORE_TICKERS = [
@@ -69,7 +72,7 @@ def download_30y_data():
                 if len(df_t) > 30:
                     stock_dict[ticker] = df_t
         except Exception:
-            pass
+            logger.warning("Caught Exception in download_30y_data", exc_info=True)
 
     print(f"    ✓ {len(stock_dict)} hissenin 30 yıllık geçmişi başarıyla hazırlandı.\n")
 

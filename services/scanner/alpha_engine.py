@@ -362,7 +362,7 @@ class AlphaEngine:
                     features["price"] = close_list[-1] if close_list else 0
                     features_map[ticker] = features
             except Exception:
-                pass  # Intentional: silent error handling
+                logger.warning("Caught Exception in _compute_all_features", exc_info=True)
         return features_map
 
     def _detect_regime(self) -> tuple:

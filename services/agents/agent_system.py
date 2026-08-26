@@ -238,7 +238,7 @@ class AIOutputValidator:
                 if dt.year > datetime.now().year + 1:
                     errors.append(f"Future date too far: {date_str}")
             except (ValueError, TypeError):
-                pass  # Tarih parse edilemiyorsa diğer validasyonlar yakalar
+                logger.warning("Caught (ValueError, TypeError) in validate", exc_info=True)
 
         valid = len(errors) == 0
         return {"valid": valid, "parsed": parsed, "errors": errors}

@@ -30,6 +30,10 @@ from services.learning.institutional_walkforward_engine import (
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 
 # ============================================================
 # FROZEN STRATEGY PARAMETERS — C_Max_Sustainable_Alpha

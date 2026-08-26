@@ -405,11 +405,11 @@ for file_path, name in CONFIG_FILES:
     full_path = PROJECT_ROOT / file_path
     if full_path.exists():
         try:
-            import json
-            with open(full_path) as f:
-                data = json.load(f)
+            import orjson
+            with open(full_path, 'rb') as f:
+                data = orjson.loads(f.read())
             check(f"Config: {name}", "PASS", f"Geçerli JSON ({len(data)} key)")
-        except json.JSONDecodeError as e:
+        except orjson.JSONDecodeError as e:
             check(f"Config: {name}", "FAIL", f"Geçersiz JSON: {e}")
         except Exception as e:
             check(f"Config: {name}", "WARN", str(e)[:80])

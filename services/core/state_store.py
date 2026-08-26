@@ -445,18 +445,18 @@ def _flush_on_exit():
     try:
         state_store.flush()
     except Exception:
-        pass
+        logger.warning("Caught Exception in _flush_on_exit", exc_info=True)
 
 def _flush_on_signal(signum, frame):
     try:
         logger.info(f"Signal {signum} received, flushing state store buffer...")
         state_store.flush()
     except Exception:
-        pass
+        logger.warning("Caught Exception in _flush_on_signal", exc_info=True)
 
 atexit.register(_flush_on_exit)
 try:
     signal.signal(signal.SIGTERM, _flush_on_signal)
     signal.signal(signal.SIGINT, _flush_on_signal)
 except (ValueError, OSError):
-    pass
+    logger.warning("Error in _flush_on_signal: (ValueError, OSError)", exc_info=True)

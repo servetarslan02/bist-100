@@ -123,7 +123,7 @@ class ShardRouter:
             try:
                 await pool.close()
             except Exception:
-                pass
+                logger.warning("Caught Exception in close", exc_info=True)
         self._pools.clear()
         self._enabled = False
         logger.info("Shard pools closed")

@@ -253,7 +253,7 @@ class PortfolioService:
                     "equity_end": float(dr.get("equity_end") or 0),
                 })
         except Exception:
-            pass  # daily_pnl tablosu yoksa atla
+            logger.warning("Caught Exception in _load_state", exc_info=True)
 
         # 7. Invariant doğrula
         acc = self._pm.get_accounting_summary()
@@ -803,9 +803,9 @@ def get_portfolio_enhancements() -> Dict[str, Any]:
         result["performance_attribution"] = PerformanceAttribution()
         result["multi_currency"] = MultiCurrencyHandler()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_portfolio_enhancements", exc_info=True)
     except Exception:
-        pass
+        logger.warning("Caught Exception in get_portfolio_enhancements", exc_info=True)
     return result
 
 async def main():

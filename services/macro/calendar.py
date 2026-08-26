@@ -122,7 +122,7 @@ def get_upcoming_events(days: int = 7) -> List[Dict[str, Any]]:
                     "days_until": (cpi_date.date() - now.date()).days,
                 })
         except ValueError:
-            pass
+            logger.warning("Data error in get_upcoming_events: ValueError", exc_info=True)
 
     return sorted(upcoming, key=lambda x: x["days_until"])
 

@@ -30,6 +30,10 @@ import lightgbm as lgb
 from catboost import CatBoostClassifier
 import xgboost as xgb
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 
 BIST_TICKERS = [
     "THYAO.IS", "ASELS.IS", "GARAN.IS", "KCHOL.IS", "TUPRS.IS",

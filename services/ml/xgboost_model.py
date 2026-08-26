@@ -438,7 +438,7 @@ class XGBoostModel:
             else:
                 self._shap_values = {f"f{i}": float(v) for i, v in enumerate(mean_shap)}
         except ImportError:
-            pass
+            logger.debug("Optional import not available in _compute_shap", exc_info=True)
         except Exception as e:
             logger.debug("xgboost_shap_failed", error=str(e))
 

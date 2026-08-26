@@ -534,7 +534,7 @@ class TrainingDatasetValidator:
                         if np.isfinite(fv):
                             vals.append(fv)
                     except (TypeError, ValueError):
-                        pass
+                        logger.warning("Error in clean_features: (TypeError, ValueError)", exc_info=True)
             if len(vals) >= 20:
                 arr = np.array(vals)
                 mean = np.mean(arr)
@@ -644,7 +644,7 @@ class CrossSectionalNormalizer:
                                 vals.append(fv)
                                 valid_keys.append(key)
                         except (TypeError, ValueError):
-                            pass
+                            logger.warning("Error in normalize_zscore_by_date: (TypeError, ValueError)", exc_info=True)
 
                 if len(vals) < 2:
                     continue
@@ -665,7 +665,7 @@ class CrossSectionalNormalizer:
                                 z = (fv - mean) / std
                                 normalized[key][f"{fname}_cs_zscore"] = round(z, 4)
                         except (TypeError, ValueError):
-                            pass
+                            logger.warning("Error in normalize_zscore_by_date: (TypeError, ValueError)", exc_info=True)
 
         # Normalize edilmemiş sample'ları kopyala
         for key in features_map:
@@ -708,7 +708,7 @@ class CrossSectionalNormalizer:
                             if np.isfinite(fv):
                                 vals.append((key, fv))
                         except (TypeError, ValueError):
-                            pass
+                            logger.warning("Error in normalize_rank_by_date: (TypeError, ValueError)", exc_info=True)
 
                 if len(vals) < 2:
                     continue

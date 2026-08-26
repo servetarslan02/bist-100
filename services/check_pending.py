@@ -1,4 +1,7 @@
 import sqlite3
+import structlog
+
+logger = structlog.get_logger(__name__)
 conn = sqlite3.connect("data/paper_trading_state.db")
 cur = conn.cursor()
 cur.execute("SELECT * FROM pending_signals")

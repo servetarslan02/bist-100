@@ -1,5 +1,8 @@
 import asyncio
 from services.core.database import init_databases, pg_execute
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 async def run():
     await init_databases()

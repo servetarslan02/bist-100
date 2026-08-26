@@ -63,92 +63,34 @@ class RiskGate:
         mc_cvar_95: float = 0.0,
     ) -> RiskDecision:
         """Order risk kontrolü."""
-        checks_passed = 0
-        checks_failed = 0
-        details = {}
-        reasons = []
+        # 1. Devre kesici ve temel kontroller
+        early_exit = self._check_circuit_breakers(circuit_open, ticker, details={})
+        if early_exit:
+            return early_exit
 
-        # 1. Circuit breaker (hem manuel hem otomatik)
-        if circuit_open:
-            return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
-
-        # 1b. Otomatik devre kesici kontrolü
-        try:
-            from services.core.auto_circuit_breaker import auto_circuit_breaker
-            if auto_circuit_breaker.get_status().get("ebdks_active", False):
-                return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
-        except Exception:
-            pass
-
-        # 1c. Fiyat limiti kontrolü
-        try:
-            from services.core.price_limits import price_limit_monitor
-            limit = price_limit_monitor.get_effective_limit(ticker)
-            if limit == 0.0:
-                # IPO günü — limit yok, ama dikkatli ol
-                details["ipo_no_limit"] = True
-        except Exception:
-            pass
-
-        # 2. Market session
         if not market_open:
             return RiskDecision(False, "Market closed", 0, 1, {"market": "closed"})
-
-        # 3. Data validity
         if not data_valid:
             return RiskDecision(False, "Invalid/stale data", 0, 1, {"data": "invalid"})
-
-        # 3b. Order quantity and price validation
         if quantity <= 0 or price <= 0:
             return RiskDecision(False, f"Invalid order quantity ({quantity}) or price ({price})", 0, 1, {"order": "invalid_parameters"})
 
-        checks_passed += 3
-
-        # 4. Portfolio exposure
-        current_exposure = sum(
-            p.get("qty", 0) * p.get("avg_cost", 0)
-            for p in current_positions.values()
-        )
-        exposure_pct = (current_exposure / portfolio_value * 100) if portfolio_value > 0 else 100
-        if exposure_pct > self.max_portfolio_exposure_pct:
-            checks_failed += 1
-            reasons.append(f"Portfolio exposure {exposure_pct:.1f}% > {self.max_portfolio_exposure_pct}%")
-        else:
-            checks_passed += 1
-        details["exposure_pct"] = round(exposure_pct, 2)
-
-        # 5. Single order size
+        checks_passed = 3
+        checks_failed = 0
+        details = {}
+        reasons = []
         order_value = quantity * price
-        order_pct = (order_value / portfolio_value * 100) if portfolio_value > 0 else 100
-        if order_pct > self.max_single_order_pct:
-            checks_failed += 1
-            reasons.append(f"Order size {order_pct:.1f}% > {self.max_single_order_pct}%")
-        else:
-            checks_passed += 1
-        details["order_pct"] = round(order_pct, 2)
 
-        # 6. Position concentration
-        pos = current_positions.get(ticker, {})
-        existing_qty = pos.get("qty", 0)
-        new_qty = existing_qty + quantity if side == "BUY" else existing_qty - quantity
-        position_value = new_qty * price
-        position_pct = (position_value / portfolio_value * 100) if portfolio_value > 0 else 100
-        if position_pct > self.max_position_pct:
-            checks_failed += 1
-            reasons.append(f"Position {position_pct:.1f}% > {self.max_position_pct}%")
-        else:
-            checks_passed += 1
-        details["position_pct"] = round(position_pct, 2)
+        # 2. Pozisyon ve boyut kontrolleri
+        cp, cf, det, rea = self._check_position_limits(
+            ticker, side, quantity, price, portfolio_value, current_positions, model_confidence
+        )
+        checks_passed += cp
+        checks_failed += cf
+        details.update(det)
+        reasons.extend(rea)
 
-        # 7. Model confidence
-        if model_confidence < self.min_confidence:
-            checks_failed += 1
-            reasons.append(f"Confidence {model_confidence:.2f} < {self.min_confidence}")
-        else:
-            checks_passed += 1
-        details["confidence"] = round(model_confidence, 4)
-
-        # 8. Daily loss limit
+        # 3. Günlük zarar limiti
         daily_loss_pct = abs(self._daily_pnl / portfolio_value * 100) if portfolio_value > 0 else 0
         if self._daily_pnl < 0 and daily_loss_pct > self.daily_loss_limit_pct:
             checks_failed += 1
@@ -156,60 +98,24 @@ class RiskGate:
         else:
             checks_passed += 1
 
-        # 9. BIST Kuralları entegrasyonu
-        _checks_failed_before_bist = checks_failed
-        try:
-            from services.core.short_selling import short_selling_monitor
-            from services.core.halt_monitor import halt_monitor
-            from services.core.compliance import compliance_checker
+        # 4. BIST kuralları
+        cp, cf, det = self._check_bist_rules(ticker, side, price, order_value, portfolio_value, current_positions)
+        checks_passed += cp
+        checks_failed += cf
+        details.update(det)
+        reasons.extend([r for r in [det.get("spk_notification")] if r])
 
-            # Açığa satış kontrolü
-            if side == "SELL" and ticker not in current_positions:
-                ss = short_selling_monitor.can_short_sell(ticker, price, last_trade_price=price)
-                if not ss.allowed:
-                    checks_failed += 1
-                    reasons.append(f"Short selling: {ss.reason}")
-
-            # Halt kontrolü
-            halt = halt_monitor.check_halt(ticker)
-            if halt.halted:
-                checks_failed += 1
-                reasons.append(f"Halted: {halt.reason}")
-
-            # SPK uyumluluk
-            current_pos_pct = 0
-            if ticker in current_positions:
-                pos_val = current_positions[ticker].get("qty", 0) * current_positions[ticker].get("avg_cost", 0)
-                current_pos_pct = pos_val / portfolio_value if portfolio_value > 0 else 0
-            comp = compliance_checker.check_spk_compliance(side, ticker, order_value, portfolio_value, current_pos_pct)
-            if comp.action == "BLOCK":
-                checks_failed += 1
-                reasons.append(f"SPK: {comp.reason}")
-            elif comp.notification_required:
-                details["spk_notification"] = comp.reason
-        except Exception as e:
-            logger.warning("BIST compliance check skipped due to error", error=str(e))
-        else:
-            # Yalnızca bu blok içinde hiçbir alt-kontrol başarısız olmadıysa
-            # "geçti" say (önceki hali, içeride bir kural reddetse bile
-            # istisna fırlatılmadığı için her zaman checks_passed'i artırıyordu)
-            if checks_failed == _checks_failed_before_bist:
-                checks_passed += 1
-
-        # 10. Monte Carlo VaR/CVaR kontrolü
-        mc_var_warning_threshold = 15.0  # %15 VaR eşiği
+        # 5. Monte Carlo VaR
+        cp, cf, rea = self._check_monte_carlo_var(mc_var_95, mc_cvar_95)
+        checks_passed += cp
+        checks_failed += cf
+        reasons.extend(rea)
         if mc_var_95 != 0:
-            var_abs = abs(mc_var_95)
-            if var_abs > mc_var_warning_threshold:
-                reasons.append(f"MC VaR %{var_abs:.1f} > %{mc_var_warning_threshold:.0f} eşik (risk yüksek)")
-                checks_failed += 1
-            else:
-                checks_passed += 1
             details["mc_var_95"] = round(mc_var_95, 2)
         if mc_cvar_95 != 0:
             details["mc_cvar_95"] = round(mc_cvar_95, 2)
 
-        # 11. Macro stress test kontrolü
+        # 6. Macro stress test
         if self._macro_stress_result:
             worst_impact = self._macro_stress_result.get("worst_scenario", {}).get("impact_pct", 0)
             if worst_impact < self.macro_stress_threshold_pct:
@@ -221,8 +127,125 @@ class RiskGate:
 
         allowed = checks_failed == 0
         reason = "; ".join(reasons) if reasons else "All checks passed"
-
         return RiskDecision(allowed, reason, checks_passed, checks_failed, details)
+
+    def _check_circuit_breakers(self, circuit_open: bool, ticker: str, details: dict):
+        """Devre kesici ve fiyat limiti kontrolleri."""
+        if circuit_open:
+            return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
+        try:
+            from services.core.auto_circuit_breaker import auto_circuit_breaker
+            if auto_circuit_breaker.get_status().get("ebdks_active", False):
+                return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
+        except Exception:
+            logger.warning("Circuit breaker check failed", exc_info=True)
+        try:
+            from services.core.price_limits import price_limit_monitor
+            if price_limit_monitor.get_effective_limit(ticker) == 0.0:
+                details["ipo_no_limit"] = True
+        except Exception:
+            logger.warning("Price limit check failed", exc_info=True)
+        return None
+
+    def _check_position_limits(self, ticker, side, quantity, price, portfolio_value, current_positions, model_confidence):
+        """Pozisyon boyutu ve confidence kontrolleri."""
+        passed = failed = 0
+        details = {}
+        reasons = []
+
+        current_exposure = sum(p.get("qty", 0) * p.get("avg_cost", 0) for p in current_positions.values())
+        exposure_pct = (current_exposure / portfolio_value * 100) if portfolio_value > 0 else 100
+        if exposure_pct > self.max_portfolio_exposure_pct:
+            failed += 1
+            reasons.append(f"Portfolio exposure {exposure_pct:.1f}% > {self.max_portfolio_exposure_pct}%")
+        else:
+            passed += 1
+        details["exposure_pct"] = round(exposure_pct, 2)
+
+        order_pct = (quantity * price / portfolio_value * 100) if portfolio_value > 0 else 100
+        if order_pct > self.max_single_order_pct:
+            failed += 1
+            reasons.append(f"Order size {order_pct:.1f}% > {self.max_single_order_pct}%")
+        else:
+            passed += 1
+        details["order_pct"] = round(order_pct, 2)
+
+        pos = current_positions.get(ticker, {})
+        existing_qty = pos.get("qty", 0)
+        new_qty = existing_qty + quantity if side == "BUY" else existing_qty - quantity
+        position_pct = (new_qty * price / portfolio_value * 100) if portfolio_value > 0 else 100
+        if position_pct > self.max_position_pct:
+            failed += 1
+            reasons.append(f"Position {position_pct:.1f}% > {self.max_position_pct}%")
+        else:
+            passed += 1
+        details["position_pct"] = round(position_pct, 2)
+
+        if model_confidence < self.min_confidence:
+            failed += 1
+            reasons.append(f"Confidence {model_confidence:.2f} < {self.min_confidence}")
+        else:
+            passed += 1
+        details["confidence"] = round(model_confidence, 4)
+
+        return passed, failed, details, reasons
+
+    def _check_bist_rules(self, ticker, side, price, order_value, portfolio_value, current_positions):
+        """BIST kuralları: açığa satış, halt, SPK uyumluluk."""
+        passed = failed = 0
+        details = {}
+        reasons = []
+        failed_before = 0  # local counter not needed, track via return
+
+        try:
+            from services.core.short_selling import short_selling_monitor
+            from services.core.halt_monitor import halt_monitor
+            from services.core.compliance import compliance_checker
+
+            if side == "SELL" and ticker not in current_positions:
+                ss = short_selling_monitor.can_short_sell(ticker, price, last_trade_price=price)
+                if not ss.allowed:
+                    failed += 1
+                    reasons.append(f"Short selling: {ss.reason}")
+
+            halt = halt_monitor.check_halt(ticker)
+            if halt.halted:
+                failed += 1
+                reasons.append(f"Halted: {halt.reason}")
+
+            current_pos_pct = 0
+            if ticker in current_positions:
+                pos_val = current_positions[ticker].get("qty", 0) * current_positions[ticker].get("avg_cost", 0)
+                current_pos_pct = pos_val / portfolio_value if portfolio_value > 0 else 0
+            comp = compliance_checker.check_spk_compliance(side, ticker, order_value, portfolio_value, current_pos_pct)
+            if comp.action == "BLOCK":
+                failed += 1
+                reasons.append(f"SPK: {comp.reason}")
+            elif comp.notification_required:
+                details["spk_notification"] = comp.reason
+
+            if failed == 0:
+                passed += 1
+        except Exception as e:
+            logger.warning("BIST compliance check skipped due to error", error=str(e))
+
+        return passed, failed, details
+
+    def _check_monte_carlo_var(self, mc_var_95, mc_cvar_95):
+        """Monte Carlo VaR/CVaR kontrolü."""
+        passed = failed = 0
+        reasons = []
+        threshold = 15.0
+
+        if mc_var_95 != 0:
+            var_abs = abs(mc_var_95)
+            if var_abs > threshold:
+                reasons.append(f"MC VaR %{var_abs:.1f} > %{threshold:.0f} eşik (risk yüksek)")
+                failed += 1
+            else:
+                passed += 1
+
+        return passed, failed, reasons
 
     def set_macro_stress_result(self, stress_result: Dict[str, Any]):
         """Macro stres testi sonucunu risk gate'e besle."""

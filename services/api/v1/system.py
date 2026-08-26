@@ -386,7 +386,7 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, ch_execute, "OPTIMIZE TABLE system.parts FINAL")
         except Exception:
-            pass
+            logger.warning("Caught Exception in optimize_storage", exc_info=True)
 
         return {
             "status": "success",

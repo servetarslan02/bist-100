@@ -96,7 +96,7 @@ class NatsClient:
             try:
                 await self._nc.close()
             except Exception:
-                pass
+                logger.warning("Caught Exception in close", exc_info=True)
             self._nc = None
             self._connected = False
 
@@ -191,7 +191,7 @@ class NatsClient:
             try:
                 await self._js.add_stream(name=stream, subjects=[subject])
             except Exception:
-                pass  # Zaten varsa devam et
+                logger.warning("Caught Exception in publish_durable", exc_info=True)
 
             ack = await self._js.publish(subject, payload)
             logger.debug("JetStream published", subject=subject, stream=stream,
@@ -223,7 +223,7 @@ class NatsClient:
             try:
                 await self._js.add_stream(name=stream, subjects=[subject])
             except Exception:
-                pass
+                logger.warning("Caught Exception in subscribe_durable", exc_info=True)
 
             if handler:
                 # Callback mode
@@ -287,7 +287,7 @@ class NatsClient:
             try:
                 await self._subscriptions[subject].unsubscribe()
             except Exception:
-                pass
+                logger.warning("Caught Exception in unsubscribe", exc_info=True)
             del self._subscriptions[subject]
 
 

@@ -342,7 +342,7 @@ class DatabaseLock:
         try:
             self._renewal_task = asyncio.ensure_future(_renewal_loop())
         except RuntimeError:
-            pass  # Event loop yoksa
+            logger.warning("Runtime error in _renewal_loop", exc_info=True)
 
     def _stop_renewal(self):
         """Renewal durdur."""

@@ -81,7 +81,7 @@ class ConfigWatcher:
         try:
             self._task = asyncio.ensure_future(self._watch_loop())
         except RuntimeError:
-            pass
+            logger.warning("Runtime error in start", exc_info=True)
         logger.info("Config watcher started", path=self._config_path)
 
     def stop(self):

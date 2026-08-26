@@ -78,7 +78,7 @@ class LLMClient:
                                     os.environ["GEMINI_API_KEY"] = key
                                     return key
                 except Exception:
-                    pass
+                    logger.warning("Caught Exception in _load_api_key", exc_info=True)
 
         # 3. Config settings
         try:
@@ -90,7 +90,7 @@ class LLMClient:
                     key_str = key_str.replace("AIzaSyAQ.", "AQ.")
                 return key_str
         except Exception:
-            pass
+            logger.warning("Caught Exception in _load_api_key", exc_info=True)
 
         return None
 

@@ -20,7 +20,7 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        pass
+        logger.warning("Caught Exception in module_level", exc_info=True)
 
 # Proje kök dizini
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -28,6 +28,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from services.data.historical_warehouse import HistoricalDataWarehouse
 from services.optimization.asymmetric_optimizer import AsymmetricBayesianOptimizer, StrategyParameters
 from services.optimization.robustness_tester import RobustnessTester
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 def main():

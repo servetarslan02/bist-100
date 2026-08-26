@@ -23,6 +23,9 @@ from services.core.alert_policy import (
     AlertPolicy, PolicyDiff, VersionConflictError, SilenceRule,
 )
 from services.core.alerting import AlertingSystem
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 # =====================================================
@@ -272,7 +275,7 @@ async def test_concurrent_policy_update():
                       actor="user2", expected_version=1)
         issues.append("Concurrent update yakalanmadı")
     except VersionConflictError:
-        pass  # Beklenen
+        logger.debug("Version conflict (expected) in test_concurrent_policy_update", exc_info=True)
 
     # Değer user1'in güncellemesi olmalı
     if policy.get_escalation_timeout("cash_negative") != 100:
@@ -543,7 +546,7 @@ async def test_full_policy_workflow():
                       actor="user", expected_version=1)
         issues.append("Conflict yakalanmadı")
     except VersionConflictError:
-        pass
+        logger.warning("Error in test_full_policy_workflow: VersionConflictError", exc_info=True)
 
     # Rollback to v1
     rb = policy.rollback(target_version=1, actor="admin")

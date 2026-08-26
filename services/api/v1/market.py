@@ -127,6 +127,75 @@ async def ohlcv(ticker: str, period: str = "6mo", interval: str = "1d", user=Dep
         raise HTTPException(500, str(e))
 
 
+_KNOWN_COMPANIES = {
+    "THYAO": {"name": "Türk Hava Yolları A.O.", "sector": "Havacılık & Ulaştırma", "pe": 4.8, "pb": 0.95, "cap": "415.0 Milyar ₺"},
+    "ASELS": {"name": "Aselsan Elektronik Sanayi", "sector": "Savunma Sanayi", "pe": 11.2, "pb": 2.40, "cap": "152.0 Milyar ₺"},
+    "GARAN": {"name": "Garanti BBVA", "sector": "Bankacılık", "pe": 3.8, "pb": 0.82, "cap": "510.0 Milyar ₺"},
+    "AKBNK": {"name": "Akbank T.A.Ş.", "sector": "Bankacılık", "pe": 3.6, "pb": 0.78, "cap": "318.0 Milyar ₺"},
+    "ISCTR": {"name": "Türkiye İş Bankası", "sector": "Bankacılık", "pe": 3.4, "pb": 0.75, "cap": "325.0 Milyar ₺"},
+    "YKBNK": {"name": "Yapı ve Kredi Bankası", "sector": "Bankacılık", "pe": 3.5, "pb": 0.80, "cap": "260.0 Milyar ₺"},
+    "KCHOL": {"name": "Koç Holding", "sector": "Holding", "pe": 5.2, "pb": 1.10, "cap": "550.0 Milyar ₺"},
+    "SAHOL": {"name": "Sabancı Holding", "sector": "Holding", "pe": 4.6, "pb": 0.88, "cap": "210.0 Milyar ₺"},
+    "TUPRS": {"name": "Tüpraş Türkiye Petrol Rafinerileri", "sector": "Enerji & Petrol", "pe": 5.8, "pb": 1.45, "cap": "335.0 Milyar ₺"},
+    "EREGL": {"name": "Ereğli Demir ve Çelik Fabrikaları", "sector": "Demir & Çelik", "pe": 9.4, "pb": 0.92, "cap": "182.0 Milyar ₺"},
+    "BIMAS": {"name": "BİM Birleşik Mağazalar", "sector": "Perakende Ticaret", "pe": 14.2, "pb": 4.10, "cap": "328.0 Milyar ₺"},
+    "MGROS": {"name": "Migros Ticaret", "sector": "Perakende Ticaret", "pe": 11.5, "pb": 3.20, "cap": "95.0 Milyar ₺"},
+    "FROTO": {"name": "Ford Otosan", "sector": "Otomotiv", "pe": 8.4, "pb": 3.80, "cap": "395.0 Milyar ₺"},
+    "TOASO": {"name": "Tofaş Türk Otomobil Fabrikası", "sector": "Otomotiv", "pe": 7.8, "pb": 2.90, "cap": "125.0 Milyar ₺"},
+    "PGSUS": {"name": "Pegasus Hava Taşımacılığı", "sector": "Havacılık & Ulaştırma", "pe": 6.2, "pb": 1.80, "cap": "124.0 Milyar ₺"},
+    "SISE": {"name": "Türkiye Şişe ve Cam Fabrikaları", "sector": "Cam & Sanayi", "pe": 7.4, "pb": 1.05, "cap": "144.0 Milyar ₺"},
+    "TCELL": {"name": "Turkcell İletişim Hizmetleri", "sector": "Telekomünikasyon", "pe": 8.9, "pb": 1.65, "cap": "215.0 Milyar ₺"},
+    "TTKOM": {"name": "Türk Telekomünikasyon", "sector": "Telekomünikasyon", "pe": 9.2, "pb": 1.70, "cap": "178.0 Milyar ₺"},
+    "ASTOR": {"name": "Astor Enerji", "sector": "Elektrik & Enerji", "pe": 12.8, "pb": 3.60, "cap": "98.0 Milyar ₺"},
+    "ENJSA": {"name": "Enerjisa Enerji", "sector": "Elektrik & Enerji", "pe": 8.1, "pb": 1.85, "cap": "72.0 Milyar ₺"},
+}
+
+
+def _calc_rsi(df, period: int = 14) -> float:
+    """RSI hesapla."""
+    try:
+        delta = df['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+        rs = gain / (loss + 1e-9)
+        rsi_series = 100 - (100 / (1 + rs))
+        return round(float(rsi_series.dropna().iloc[-1]), 1) if not rsi_series.dropna().empty else 52.4
+    except Exception:
+        return 52.4
+
+
+def _calc_sma(df) -> tuple:
+    """SMA20 ve SMA50 hesapla."""
+    try:
+        closes = df['Close'].dropna()
+        sma_20 = round(float(closes.tail(20).mean()), 2)
+        sma_50 = round(float(closes.tail(50).mean()), 2) if len(closes) >= 50 else sma_20
+        return sma_20, sma_50
+    except Exception:
+        return 0.0, 0.0
+
+
+def _calc_support_resistance(df, latest_price: float) -> tuple:
+    """Destek ve direnç seviyeleri (20 gün)."""
+    try:
+        support = round(float(df['Low'].dropna().tail(20).min()), 2)
+        resistance = round(float(df['High'].dropna().tail(20).max()), 2)
+        return support, resistance
+    except Exception:
+        return round(latest_price * 0.94, 2), round(latest_price * 1.08, 2)
+
+
+def _get_recommendation(rsi_14: float, latest_price: float, sma_20: float, support: float) -> tuple:
+    """Al/sat/tut önerisi oluştur."""
+    if rsi_14 < 38 and latest_price >= support:
+        return "STRONG_BUY", "GÜÇLÜ AL", 88.5
+    elif latest_price > sma_20:
+        return "BUY", "AL", 81.0
+    elif rsi_14 > 72:
+        return "SELL", "SAT", 35.0
+    return "HOLD", "TUT", 55.0
+
+
 @router.get("/instruments/{ticker}/live_intel")
 @router.get("/instruments/{ticker}/full")
 async def live_intel_analysis(
@@ -140,31 +209,7 @@ async def live_intel_analysis(
     sym = ticker.upper().replace(".IS", "").strip()
     yf_ticker = f"{sym}.IS"
 
-    # Known company metadata
-    KNOWN_COMPANIES = {
-        "THYAO": {"name": "Türk Hava Yolları A.O.", "sector": "Havacılık & Ulaştırma", "pe": 4.8, "pb": 0.95, "cap": "415.0 Milyar ₺"},
-        "ASELS": {"name": "Aselsan Elektronik Sanayi", "sector": "Savunma Sanayi", "pe": 11.2, "pb": 2.40, "cap": "152.0 Milyar ₺"},
-        "GARAN": {"name": "Garanti BBVA", "sector": "Bankacılık", "pe": 3.8, "pb": 0.82, "cap": "510.0 Milyar ₺"},
-        "AKBNK": {"name": "Akbank T.A.Ş.", "sector": "Bankacılık", "pe": 3.6, "pb": 0.78, "cap": "318.0 Milyar ₺"},
-        "ISCTR": {"name": "Türkiye İş Bankası", "sector": "Bankacılık", "pe": 3.4, "pb": 0.75, "cap": "325.0 Milyar ₺"},
-        "YKBNK": {"name": "Yapı ve Kredi Bankası", "sector": "Bankacılık", "pe": 3.5, "pb": 0.80, "cap": "260.0 Milyar ₺"},
-        "KCHOL": {"name": "Koç Holding", "sector": "Holding", "pe": 5.2, "pb": 1.10, "cap": "550.0 Milyar ₺"},
-        "SAHOL": {"name": "Sabancı Holding", "sector": "Holding", "pe": 4.6, "pb": 0.88, "cap": "210.0 Milyar ₺"},
-        "TUPRS": {"name": "Tüpraş Türkiye Petrol Rafinerileri", "sector": "Enerji & Petrol", "pe": 5.8, "pb": 1.45, "cap": "335.0 Milyar ₺"},
-        "EREGL": {"name": "Ereğli Demir ve Çelik Fabrikaları", "sector": "Demir & Çelik", "pe": 9.4, "pb": 0.92, "cap": "182.0 Milyar ₺"},
-        "BIMAS": {"name": "BİM Birleşik Mağazalar", "sector": "Perakende Ticaret", "pe": 14.2, "pb": 4.10, "cap": "328.0 Milyar ₺"},
-        "MGROS": {"name": "Migros Ticaret", "sector": "Perakende Ticaret", "pe": 11.5, "pb": 3.20, "cap": "95.0 Milyar ₺"},
-        "FROTO": {"name": "Ford Otosan", "sector": "Otomotiv", "pe": 8.4, "pb": 3.80, "cap": "395.0 Milyar ₺"},
-        "TOASO": {"name": "Tofaş Türk Otomobil Fabrikası", "sector": "Otomotiv", "pe": 7.8, "pb": 2.90, "cap": "125.0 Milyar ₺"},
-        "PGSUS": {"name": "Pegasus Hava Taşımacılığı", "sector": "Havacılık & Ulaştırma", "pe": 6.2, "pb": 1.80, "cap": "124.0 Milyar ₺"},
-        "SISE": {"name": "Türkiye Şişe ve Cam Fabrikaları", "sector": "Cam & Sanayi", "pe": 7.4, "pb": 1.05, "cap": "144.0 Milyar ₺"},
-        "TCELL": {"name": "Turkcell İletişim Hizmetleri", "sector": "Telekomünikasyon", "pe": 8.9, "pb": 1.65, "cap": "215.0 Milyar ₺"},
-        "TTKOM": {"name": "Türk Telekomünikasyon", "sector": "Telekomünikasyon", "pe": 9.2, "pb": 1.70, "cap": "178.0 Milyar ₺"},
-        "ASTOR": {"name": "Astor Enerji", "sector": "Elektrik & Enerji", "pe": 12.8, "pb": 3.60, "cap": "98.0 Milyar ₺"},
-        "ENJSA": {"name": "Enerjisa Enerji", "sector": "Elektrik & Enerji", "pe": 8.1, "pb": 1.85, "cap": "72.0 Milyar ₺"},
-    }
-
-    meta = KNOWN_COMPANIES.get(sym, {
+    meta = _KNOWN_COMPANIES.get(sym, {
         "name": f"{sym} Şirket Grubu",
         "sector": "BIST Sanayi & Ticaret",
         "pe": 8.5,
@@ -212,60 +257,16 @@ async def live_intel_analysis(
                 if "change" in live_item:
                     change_pct = round(float(live_item["change"]), 2)
         except Exception:
-            pass
+            logger.warning("Caught Exception in live_intel_analysis", exc_info=True)
 
-        # Real 14-day RSI
-        try:
-            delta = df['Close'].diff()
-            gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-            loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-            rs = gain / (loss + 1e-9)
-            rsi_series = 100 - (100 / (1 + rs))
-            rsi_14 = round(float(rsi_series.dropna().iloc[-1]), 1) if not rsi_series.dropna().empty else 52.4
-        except Exception:
-            rsi_14 = 52.4
-
-        # Moving Averages
-        try:
-            sma_20 = round(float(df['Close'].dropna().tail(20).mean()), 2)
-            sma_50 = round(float(df['Close'].dropna().tail(50).mean()), 2) if len(df['Close'].dropna()) >= 50 else sma_20
-        except Exception:
-            sma_20 = round(latest_price * 0.98, 2)
-            sma_50 = round(latest_price * 0.95, 2)
-
-        # Support & Resistance (20-day bounds)
-        try:
-            support = round(float(df['Low'].dropna().tail(20).min()), 2)
-            resistance = round(float(df['High'].dropna().tail(20).max()), 2)
-        except Exception:
-            support = round(latest_price * 0.94, 2)
-            resistance = round(latest_price * 1.08, 2)
-
-        # ATR 14
+        rsi_14 = _calc_rsi(df)
+        sma_20, sma_50 = _calc_sma(df)
+        support, resistance = _calc_support_resistance(df, latest_price)
         atr_14 = round(latest_price * 0.028, 2)
-
-        # MACD
         macd_val = 1.45
         sig_val = 0.92
         macd_signal = "POZİTİF KESİŞİM (AL)"
-
-        # Recommendation Logic
-        if rsi_14 < 38 and latest_price >= support:
-            recommendation = "STRONG_BUY"
-            rec_text = "GÜÇLÜ AL"
-            rec_score = 88.5
-        elif latest_price > sma_20:
-            recommendation = "BUY"
-            rec_text = "AL"
-            rec_score = 81.0
-        elif rsi_14 > 72:
-            recommendation = "SELL"
-            rec_text = "SAT"
-            rec_score = 35.0
-        else:
-            recommendation = "HOLD"
-            rec_text = "TUT"
-            rec_score = 55.0
+        recommendation, rec_text, rec_score = _get_recommendation(rsi_14, latest_price, sma_20, support)
 
         # Format candlesticks for TradingView Lightweight Charts (Strict Ascending & Unique Dates)
         target_df = df_chart if df_chart is not None and not df_chart.empty else df

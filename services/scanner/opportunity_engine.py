@@ -474,7 +474,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         else:
             results.append({"engine": "alpha", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="AlphaEngine", error=str(e))
     try:
@@ -486,7 +486,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         else:
             results.append({"engine": "alpha_scanner", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="AlphaScanner", error=str(e))
     try:
@@ -498,7 +498,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         else:
             results.append({"engine": "event_scanner", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="EventScanner", error=str(e))
     try:
@@ -510,7 +510,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         else:
             results.append({"engine": "live_scanner", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="LiveScanner", error=str(e))
     try:
@@ -522,7 +522,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         else:
             results.append({"engine": "tiered_scanner", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="TieredScanner", error=str(e))
     try:
@@ -530,7 +530,7 @@ def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
         EventQueue()
         results.append({"engine": "event_queue", "status": "available"})
     except ImportError:
-        pass
+        logger.debug("Optional import not available in run_full_scan", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="EventQueue", error=str(e))
     return results

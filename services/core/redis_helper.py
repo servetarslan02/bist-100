@@ -16,7 +16,7 @@ def _load_cache():
             with open(_CACHE_FILE, "r") as f:
                 return orjson.loads(f.read())
         except Exception:
-            pass
+            logger.warning("Caught Exception in _load_cache", exc_info=True)
     return {}
 
 def _save_cache(data):
@@ -24,7 +24,7 @@ def _save_cache(data):
         with open(_CACHE_FILE, "w") as f:
             f.write(orjson.dumps(data).decode())
     except Exception:
-        pass
+        logger.warning("Caught Exception in _save_cache", exc_info=True)
 
 def get_client():
     global _redis_client, _redis_available
@@ -58,7 +58,7 @@ def get_cached(key: str) -> Optional[Any]:
         if data:
             return orjson.loads(data)
     except Exception:
-        pass
+        logger.warning("Caught Exception in get_cached", exc_info=True)
     return None
 
 def set_cached(key: str, data: Any, ttl: int = 300) -> bool:

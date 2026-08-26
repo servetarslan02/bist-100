@@ -128,7 +128,7 @@ class SignalFusionEngine:
             if self._adaptive_weights:
                 state_store.save_fusion_weights(self._adaptive_weights)
         except Exception:
-            pass
+            logger.warning("Caught Exception in _persist_weights", exc_info=True)
 
     def set_adaptive_weights(self, weights: Dict[str, float]):
         """Model Learning sisteminden gelen dinamik güvenilirlik ağırlıklarını kaydeder."""

@@ -440,7 +440,7 @@ def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
     try:
         return orjson.loads(content)
     except orjson.JSONDecodeError:
-        pass
+        logger.warning("JSON parse error in parse_llm_json", exc_info=True)
 
     # 2. ```json ... ``` bloğu
     json_block = re.search(r'```json\s*(\{.*?\})\s*```', content, re.DOTALL)
@@ -448,7 +448,7 @@ def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
         try:
             return orjson.loads(json_block.group(1))
         except orjson.JSONDecodeError:
-            pass
+            logger.warning("JSON parse error in parse_llm_json", exc_info=True)
 
     # 3. İlk { ... }
     json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', content, re.DOTALL)
@@ -456,7 +456,7 @@ def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
         try:
             return orjson.loads(json_match.group())
         except orjson.JSONDecodeError:
-            pass
+            logger.warning("JSON parse error in parse_llm_json", exc_info=True)
 
     # 4. Metinden fallback extraction
     return _extract_from_text(content)

@@ -426,7 +426,7 @@ class AlertingSystem:
             try:
                 self._escalation_task = asyncio.ensure_future(self._escalation_loop())
             except RuntimeError:
-                pass
+                logger.warning("Runtime error in start", exc_info=True)
 
     def stop(self):
         """Escalation monitor'ı durdur."""
@@ -470,7 +470,7 @@ class AlertingSystem:
                     if loop.is_running():
                         asyncio.ensure_future(self._notify_all(alert))
                 except RuntimeError:
-                    pass
+                    logger.warning("Runtime error in _check_escalations", exc_info=True)
 
     # =====================================================
     # PROVIDER MANAGEMENT
@@ -807,7 +807,7 @@ class AlertingSystem:
             if loop.is_running():
                 asyncio.ensure_future(self.persist_alert(alert))
         except RuntimeError:
-            pass
+            logger.warning("Runtime error in _add_alert", exc_info=True)
 
         # Notify — policy routing ile
         channels = self._policy.get_notification_channels(alert.severity)
@@ -817,7 +817,7 @@ class AlertingSystem:
                 if loop.is_running():
                     asyncio.ensure_future(self._notify_all(alert))
             except RuntimeError:
-                pass
+                logger.warning("Runtime error in _add_alert", exc_info=True)
 
     def _is_duplicate(self, alert: Alert) -> bool:
         fp = alert.fingerprint

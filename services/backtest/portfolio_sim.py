@@ -461,7 +461,7 @@ class PortfolioSimulatorV3:
                 if dd_duration > self._max_drawdown_duration_days:
                     self._max_drawdown_duration_days = dd_duration
             except Exception:
-                pass
+                logger.warning("Caught Exception in update_equity", exc_info=True)
 
         # Daily return
         daily_return = (equity / self._prev_equity - 1) if self._prev_equity > 0 else 0

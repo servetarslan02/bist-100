@@ -232,7 +232,7 @@ class BackfillManager:
                 if result.result_rows and result.result_rows[0][0]:
                     return result.result_rows[0][0]
             except Exception:
-                pass
+                logger.warning("Caught Exception in _get_last_recorded_date", exc_info=True)
 
         # PostgreSQL'den dene
         if pg_pool:
@@ -245,7 +245,7 @@ class BackfillManager:
                     if row and row["last_ts"]:
                         return row["last_ts"]
             except Exception:
-                pass
+                logger.warning("Caught Exception in _get_last_recorded_date", exc_info=True)
 
         return None
 

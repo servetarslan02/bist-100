@@ -242,7 +242,7 @@ class LLMContextBuilder:
                     "category": getattr(result, "category", "WATCH"),
                 }
         except (ImportError, AttributeError):
-            pass
+            logger.warning("Error in _fetch_spec_score: (ImportError, AttributeError)", exc_info=True)
         return {"spec_score": None, "category": None}
 
     def to_prompt_text(self, context: Dict[str, Any]) -> str:

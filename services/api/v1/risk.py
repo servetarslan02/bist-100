@@ -25,6 +25,10 @@ import numpy as np
 
 from ..dependencies import get_current_user, check_rate_limit
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 router = APIRouter()
 
 
@@ -897,7 +901,7 @@ def _get_historical_returns():
             _cached_daily_returns = np.diff(closes) / closes[:-1]
             return _cached_daily_returns
     except Exception:
-        pass
+        logger.warning("Caught Exception in _get_historical_returns", exc_info=True)
     _cached_daily_returns = np.random.normal(0.0012, 0.018, 5000)
     return _cached_daily_returns
 

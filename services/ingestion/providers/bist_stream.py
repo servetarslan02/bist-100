@@ -123,7 +123,7 @@ class BISTStreamProvider:
                             self._tick_count += 1
 
                         except Exception:
-                            pass  # Intentional: silent error handling
+                            logger.warning("Caught Exception in _stream_yfinance", exc_info=True)
 
                 # 60 saniye bekle (ücretsiz API limiti)
                 await asyncio.sleep(60)
@@ -174,7 +174,7 @@ class BISTStreamProvider:
                                         else:
                                             handler(tick)
                                     except Exception:
-                                        pass  # Intentional: silent error handling
+                                        logger.warning("Caught Exception in _stream_investing", exc_info=True)
 
                                 self._tick_count += 1
 
@@ -239,7 +239,7 @@ class BISTStreamProvider:
                                     else:
                                         handler(tick)
                                 except Exception:
-                                    pass  # Intentional: silent error handling
+                                    logger.warning("Caught Exception in _stream_websocket", exc_info=True)
 
                             self._tick_count += 1
 

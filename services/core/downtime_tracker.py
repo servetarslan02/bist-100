@@ -171,7 +171,7 @@ class DowntimeTracker:
             try:
                 return time.time() - float(shutdown_ts)
             except (ValueError, TypeError):
-                pass
+                logger.warning("Error in _calculate_downtime: (ValueError, TypeError)", exc_info=True)
 
         # 2. DB'den son shutdown'ı al
         with self._connect() as conn:

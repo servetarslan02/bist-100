@@ -47,26 +47,41 @@ class RegimeDetector:
         benchmark_ticker: str = "XU100",
     ) -> RegimeState:
         """Piyasa rejimini tespit et."""
-
         if benchmark_ticker not in market_data:
-            # İlk hisseyi benchmark olarak kullan
             benchmark_ticker = list(market_data.keys())[0] if market_data else None
-
         if not benchmark_ticker:
             return RegimeState("UNKNOWN", 0, 0, {}, {})
 
         df = market_data[benchmark_ticker]
         close = df["Close"].values if "Close" in df.columns else np.array([])
-        df["High"].values if "High" in df.columns else close.copy()
-        df["Low"].values if "Low" in df.columns else close.copy()
         volume = df["Volume"].values if "Volume" in df.columns else np.ones(len(close))
 
         if len(close) < self.lookback_days:
             return RegimeState("UNKNOWN", 0, 0, {}, {})
 
         factors = {}
+        factors["trend_score"] = self._calc_trend_score(close)
+        factors.update(self._calc_volatility_factors(close))
+        factors["momentum_score"] = self._calc_momentum_score(close)
+        factors.update(self._calc_breadth_factors(market_data))
+        avg_corr = self._calc_correlation(market_data)
+        factors["avg_correlation"] = round(avg_corr, 4)
+        factors["dispersion_score"] = round((1 - avg_corr) * 100, 2)
+        factors["volume_trend"] = self._calc_volume_trend(volume)
 
-        # 1. TREND FAKTÖRÜ (Kısa Geçmişli/Halka Arz Uyumlu Dinamik Puanlama)
+        regime, confidence = self._decide_regime(factors, avg_corr)
+        self._update_regime_state(regime, confidence, factors)
+
+        return RegimeState(
+            regime=regime,
+            confidence=round(confidence, 4),
+            duration_days=self._regime_duration,
+            transition_probability=self._estimate_transition_probability(regime),
+            factors=factors,
+        )
+
+    def _calc_trend_score(self, close) -> int:
+        """Trend faktörünü hesapla (0-100)."""
         has_200 = len(close) >= 200
         has_50 = len(close) >= 50
         has_60 = len(close) >= 60
@@ -75,102 +90,95 @@ class RegimeDetector:
         sma50 = np.mean(close[-50:]) if has_50 else sma20
         sma200 = np.mean(close[-200:]) if has_200 else sma50
 
-        trend_score = 0
-        points_possible = 0
+        score = 0
+        points = 0
 
-        # Close > SMA20
-        points_possible += 20
+        points += 20
         if close[-1] > sma20:
-            trend_score += 20
+            score += 20
 
-        # SMA20 > SMA50
         if has_50:
-            points_possible += 20
+            points += 20
             if sma20 > sma50:
-                trend_score += 20
+                score += 20
 
-        # SMA50 > SMA200 (veya kısa geçmiş için Close > SMA50)
         if has_200:
-            points_possible += 20
+            points += 20
             if sma50 > sma200:
-                trend_score += 20
+                score += 20
         elif has_50:
-            points_possible += 20
+            points += 20
             if close[-1] > sma50:
-                trend_score += 20
+                score += 20
 
-        # Close > Close[-20]
-        points_possible += 20
+        points += 20
         if close[-1] > close[-20]:
-            trend_score += 20
+            score += 20
 
-        # Close > Close[-60]
         if has_60:
-            points_possible += 20
+            points += 20
             if close[-1] > close[-60]:
-                trend_score += 20
+                score += 20
 
-        # 0-100 Skalasına normalize et
-        if points_possible > 0:
-            trend_score = int(round((trend_score / points_possible) * 100))
+        return int(round((score / points) * 100)) if points > 0 else 0
 
-        factors["trend_score"] = trend_score
-
-        # 2. VOLATİLİTE FAKTÖRÜ
+    def _calc_volatility_factors(self, close) -> dict:
+        """Volatilite faktörlerini hesapla."""
         returns = np.diff(close[-60:]) / close[-60:-1]
         vol_20d = np.std(returns[-20:]) * np.sqrt(252) if len(returns) >= 20 else 0
         vol_60d = np.std(returns) * np.sqrt(252) if len(returns) >= 60 else 0
 
         vol_score = 0
-        if vol_20d > 0.25:  # Yüksek volatilite
+        if vol_20d > 0.25:
             vol_score = 100
         elif vol_20d > 0.15:
             vol_score = 50
-        elif vol_20d < 0.10:  # Düşük volatilite
+        elif vol_20d < 0.10:
             vol_score = -50
 
-        factors["volatility_score"] = vol_score
-        factors["vol_20d_annual"] = round(vol_20d * 100, 2)
-        factors["vol_60d_annual"] = round(vol_60d * 100, 2)
+        return {
+            "volatility_score": vol_score,
+            "vol_20d_annual": round(vol_20d * 100, 2),
+            "vol_60d_annual": round(vol_60d * 100, 2),
+        }
 
-        # 3. MOMENTUM FAKTÖRÜ
+    def _calc_momentum_score(self, close) -> int:
+        """Momentum faktörünü hesapla."""
         roc_20d = (close[-1] / close[-20] - 1) * 100 if len(close) >= 20 else 0
         roc_60d = (close[-1] / close[-60] - 1) * 100 if len(close) >= 60 else 0
 
-        momentum_score = 0
+        score = 0
         if roc_20d > 5:
-            momentum_score += 50
+            score += 50
         elif roc_20d < -5:
-            momentum_score -= 50
+            score -= 50
         if roc_60d > 10:
-            momentum_score += 50
+            score += 50
         elif roc_60d < -10:
-            momentum_score -= 50
+            score -= 50
+        return score
 
-        factors["momentum_score"] = momentum_score
-
-        # 4. BREADTH FAKTÖRÜ
-        # Tüm hisselerin yükselen/düşen sayısı
+    def _calc_breadth_factors(self, market_data) -> dict:
+        """Breadth (piyasa genişliği) faktörlerini hesapla."""
         advancing = 0
-        declining = 0
         total = 0
         for ticker, tdf in market_data.items():
             if len(tdf) >= 2:
                 tclose = tdf["Close"].values
                 if tclose[-1] > tclose[-2]:
                     advancing += 1
-                elif tclose[-1] < tclose[-2]:
-                    declining += 1
                 total += 1
 
         breadth = advancing / total if total > 0 else 0.5
-        factors["breadth_score"] = round((breadth - 0.5) * 200, 2)
-        factors["advancing_ratio"] = round(breadth, 4)
+        return {
+            "breadth_score": round((breadth - 0.5) * 200, 2),
+            "advancing_ratio": round(breadth, 4),
+        }
 
-        # 5. KORELASYON FAKTÖRÜ
-        # Hisse-hisse korelasyonu (düşük = dispersiyon yüksek)
+    def _calc_correlation(self, market_data) -> float:
+        """Hisse-hisse ortalama korelasyonu hesapla."""
         correlations = []
-        tickers = list(market_data.keys())[:20]  # İlk 20 hisse
+        tickers = list(market_data.keys())[:20]
         for i, t1 in enumerate(tickers):
             for t2 in tickers[i+1:]:
                 if t1 in market_data and t2 in market_data:
@@ -183,94 +191,69 @@ class RegimeDetector:
                             corr = np.corrcoef(r1, r2)[0, 1]
                             if not np.isnan(corr):
                                 correlations.append(corr)
+        return np.mean(correlations) if correlations else 0.5
 
-        avg_corr = np.mean(correlations) if correlations else 0.5
-        factors["avg_correlation"] = round(avg_corr, 4)
-        factors["dispersion_score"] = round((1 - avg_corr) * 100, 2)
+    def _calc_volume_trend(self, volume) -> float:
+        """Hacim trendini hesapla."""
+        if len(volume) < 20:
+            return 0.0
+        vol_recent = np.mean(volume[-5:])
+        vol_prev = np.mean(volume[-20:-5])
+        return round(((vol_recent / vol_prev - 1) * 100) if vol_prev > 0 else 0.0, 2)
 
-        # 6. VOLUME FAKTÖRÜ
-        vol_trend = 0
-        if len(volume) >= 20:
-            vol_recent = np.mean(volume[-5:])
-            vol_prev = np.mean(volume[-20:-5])
-            if vol_prev > 0:
-                vol_trend = (vol_recent / vol_prev - 1) * 100
+    def _decide_regime(self, factors: dict, avg_corr: float) -> tuple:
+        """Çok faktörlü skorlamaya göre rejim kararı."""
+        bull = bear = sideways = high_vol = low_vol = 0
 
-        factors["volume_trend"] = round(vol_trend, 2)
-
-        # === REJİM KARARI ===
-        # Çok faktörlü skorlama
-        bull_score = 0
-        bear_score = 0
-        sideways_score = 0
-        high_vol_score = 0
-        low_vol_score = 0
-
-        # Trend
-        if trend_score > 60:
-            bull_score += 40
-        elif trend_score < 30:
-            bear_score += 40
+        ts = factors.get("trend_score", 50)
+        if ts > 60:
+            bull += 40
+        elif ts < 30:
+            bear += 40
         else:
-            sideways_score += 30
+            sideways += 30
 
-        # Momentum
-        if momentum_score > 30:
-            bull_score += 30
-        elif momentum_score < -30:
-            bear_score += 30
+        ms = factors.get("momentum_score", 0)
+        if ms > 30:
+            bull += 30
+        elif ms < -30:
+            bear += 30
 
-        # Volatilite
-        if vol_score > 50:
-            high_vol_score += 50
-        elif vol_score < -30:
-            sideways_score += 20
-            low_vol_score += 40
+        vs = factors.get("volatility_score", 0)
+        if vs > 50:
+            high_vol += 50
+        elif vs < -30:
+            sideways += 20
+            low_vol += 40
 
-        # Breadth
-        if factors["breadth_score"] > 30:
-            bull_score += 20
-        elif factors["breadth_score"] < -30:
-            bear_score += 20
+        bs = factors.get("breadth_score", 0)
+        if bs > 30:
+            bull += 20
+        elif bs < -30:
+            bear += 20
 
-        # Korelasyon
         if avg_corr > 0.8:
-            bear_score += 10  # Yüksek korelasyon = panik
+            bear += 10
         elif avg_corr < 0.3:
-            bull_score += 10  # Düşük korelasyon = seçicilik
+            bull += 10
 
-        # Volume
-        if vol_trend > 50:
-            high_vol_score += 20
+        if factors.get("volume_trend", 0) > 50:
+            high_vol += 20
 
         scores = {
-            "BULL": bull_score,
-            "BEAR": bear_score,
-            "SIDEWAYS": sideways_score,
-            "HIGH_VOL": high_vol_score,
-            "LOW_VOL": low_vol_score,
+            "BULL": bull, "BEAR": bear, "SIDEWAYS": sideways,
+            "HIGH_VOL": high_vol, "LOW_VOL": low_vol,
         }
-
         regime = max(scores, key=scores.get)
-        confidence = scores[regime] / 100
+        return regime, scores[regime] / 100
 
-        # Regime değişimi
+    def _update_regime_state(self, regime: str, confidence: float, factors: dict) -> None:
+        """Rejim durumunu güncelle ve geçmişe kaydet."""
         if regime != self._current_regime:
             self._regime_duration = 0
             self._current_regime = regime
         else:
             self._regime_duration += 1
-
-        # Transition probability (basit Markov)
-        transition_prob = self._estimate_transition_probability(regime)
-
-        state = RegimeState(
-            regime=regime,
-            confidence=round(confidence, 4),
-            duration_days=self._regime_duration,
-            transition_probability=transition_prob,
-            factors=factors,
-        )
 
         self._regime_history.append({
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -283,8 +266,6 @@ class RegimeDetector:
 
         logger.info("Regime detected", regime=regime, confidence=round(confidence, 4),
                    duration=self._regime_duration)
-
-        return state
 
     def _estimate_transition_probability(self, current_regime: str) -> Dict[str, float]:
         """Rejim geçiş olasılıklarını tahmin et."""

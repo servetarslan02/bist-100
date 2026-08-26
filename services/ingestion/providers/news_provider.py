@@ -289,7 +289,7 @@ class NewsProvider:
                                     dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
-                                    pass
+                                    logger.warning("Caught Exception in _fetch_single_feed", exc_info=True)
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
@@ -348,7 +348,7 @@ class NewsProvider:
                                     dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
-                                    pass
+                                    logger.warning("Caught Exception in fetch_official_kap_disclosures", exc_info=True)
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
@@ -395,7 +395,7 @@ class NewsProvider:
                                     dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
-                                    pass
+                                    logger.warning("Caught Exception in fetch_official_tcmb_news", exc_info=True)
                             if not pub_str:
                                 pub_str = entry.get("published", "") or entry.get("updated", "")
 
@@ -492,7 +492,7 @@ class NewsProvider:
                     if len(tokens[0]) >= 4 and tokens[0] in text_lower:
                         return True
         except Exception:
-            pass
+            logger.warning("Caught Exception in match_news_to_ticker", exc_info=True)
 
         # 4. COMPANY_NAME_MAP eşleşmesi
         company_alias = self.COMPANY_NAME_MAP.get(ticker_lower, "")

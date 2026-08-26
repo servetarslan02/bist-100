@@ -169,7 +169,7 @@ class DataSourceManager:
             if tickers:
                 return [f"{t}.IS" for t in tickers]
         except Exception:
-            pass
+            logger.warning("Caught Exception in get_bist100_universe", exc_info=True)
         # Fallback — cache yoksa BIST-30 alt kümesi (geçici, cache yüklenene kadar)
         # Gerçek liste UniverseAutoUpdater tarafından güncellenir
         return [

@@ -58,7 +58,7 @@ class ResearchMemory:
                 try:
                     self._ticker_index[old_record.ticker].remove(old_record)
                 except ValueError:
-                    pass
+                    logger.warning("Data error in add_record: ValueError", exc_info=True)
 
         self._records.append(record)
         if record.ticker not in self._ticker_index:

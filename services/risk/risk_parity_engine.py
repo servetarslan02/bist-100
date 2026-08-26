@@ -132,11 +132,11 @@ class RiskParityEngine:
             sector_values[sector] = sector_values.get(sector, 0.0) + pos_value
         return {s: v / max(total_equity, 1.0) for s, v in sector_values.items()}
 
+    COMMISSION_RATE = 0.0015
+    SLIPPAGE_RATE = 0.0010
+
     def simulate(self, params: RiskParityParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0) -> RiskAuditResult:
         """Risk Parity & 3 Günlük Kriz Teyidi + Breakout Destekli Simülasyon."""
-        COMMISSION_RATE = 0.0015
-        SLIPPAGE_RATE = 0.0010
-
         trading_dates = [d for d in self.bm_df.index if start_year <= d.year <= end_year]
         if len(trading_dates) < 30:
             return RiskAuditResult()
@@ -343,10 +343,13 @@ class RiskParityEngine:
 
             equity_curve.append(total_equity)
 
+        return self._compute_sim_result(equity_curve, trade_logs, initial_capital, trading_dates)
+
+    def _compute_sim_result(self, equity_curve, trade_logs, initial_capital, trading_dates) -> RiskAuditResult:
+        """Simülasyon metriklerini hesapla."""
         final_eq = equity_curve[-1] if equity_curve else initial_capital
         total_ret = ((final_eq - initial_capital) / initial_capital) * 100.0
 
-        # Metrik Hesaplamaları
         df_eq = pd.Series(equity_curve)
         peak = df_eq.cummax()
         dd = (df_eq - peak) / peak * 100.0

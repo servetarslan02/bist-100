@@ -388,11 +388,11 @@ async def close_redis():
             from .redis_sentinel import close_ha_redis
             await close_ha_redis()
         except Exception:
-            pass
+            logger.warning("Caught Exception in close_redis", exc_info=True)
         try:
             await _redis.close()
         except Exception:
-            pass
+            logger.warning("Caught Exception in close_redis", exc_info=True)
         _redis = None
         _redis_healthy = False
         logger.info("Redis connection closed")

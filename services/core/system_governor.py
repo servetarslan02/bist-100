@@ -199,7 +199,7 @@ class SystemStateGovernor:
             loop.create_task(self._notify_callbacks(old_state, new_state, reason))
         except RuntimeError:
             # No running event loop — schedule for later or skip
-            pass
+            logger.warning("Runtime error in transition", exc_info=True)
 
         return True
 

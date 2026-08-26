@@ -350,7 +350,7 @@ class ModelRegistry:
             try:
                 versions.append(int(v.replace("v", "")))
             except ValueError:
-                pass
+                logger.warning("Data error in _next_version: ValueError", exc_info=True)
 
         if not versions:
             return "v1"

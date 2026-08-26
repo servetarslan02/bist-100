@@ -267,8 +267,8 @@ class ConnectionManager:
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except:
-                pass
+            except Exception:
+                logger.error("Unexpected error in broadcast", exc_info=True)
 
 manager = ConnectionManager()
 

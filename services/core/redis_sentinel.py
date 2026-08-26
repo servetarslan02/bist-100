@@ -132,7 +132,7 @@ async def close_ha_redis():
         try:
             await _ha_redis.close()
         except Exception:
-            pass
+            logger.warning("Caught Exception in close_ha_redis", exc_info=True)
         _ha_redis = None
         _ha_loop = None
         logger.info("HA Redis closed")

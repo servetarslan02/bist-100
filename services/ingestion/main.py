@@ -244,7 +244,7 @@ class IngestionService:
                             )
                             publish_event(event, key=index_symbol)
                     except Exception:
-                        pass  # Intentional: silent error handling
+                        logger.warning("Caught Exception in _market_data_loop", exc_info=True)
 
                 flush_producer()
                 import gc
@@ -399,7 +399,7 @@ class IngestionService:
                         )
                         publish_event(event, key="news_kap")
                 except Exception:
-                    pass
+                    logger.warning("Caught Exception in _news_loop", exc_info=True)
 
                 flush_producer()
                 logger.info("News fetch cycle completed", count=len(rss_articles) if rss_articles else 0)
@@ -439,7 +439,7 @@ class IngestionService:
                             )
                             publish_event(event, key="social")
                     except Exception:
-                        pass
+                        logger.warning("Caught Exception in _social_loop", exc_info=True)
 
                 # Fetch social / community sentiment from financial feeds
 

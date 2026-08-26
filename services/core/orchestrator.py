@@ -246,36 +246,21 @@ class MasterOrchestrator:
         except RuntimeError:
             return _asyncio.run(coro)
 
-    def run_pipeline(self, ticker: str, market_data: dict[str, Any]) -> dict[str, Any]:
-        """Tek hisse için tam pipeline çalıştır.
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # PIPELINE STEPS — run_pipeline'ın parçalara ayrılmış halleri
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-        Args:
-            ticker: Hisse kodu
-            market_data: {
-                "prices": np.ndarray, "highs": np.ndarray, "lows": np.ndarray,
-                "closes": np.ndarray, "volumes": np.ndarray,
-                "fundamentals": dict, "news": list, "macro": dict
-            }
-        """
-        if not self._initialized:
-            try:
-                asyncio.run(self.initialize())
-            except RuntimeError:
-                pass
-
-        result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
-
-        # sector_map: market_data'dan veya varsayılan olarak
-        sector_map = market_data.get("sector_map", {})
-
+    def _prepare_prices(self, market_data: dict) -> tuple:
+        """Fiyat verisini hazırla ve doğrula. Returns (raw_prices, prices, error)."""
         raw_prices = np.asarray(market_data.get("prices", []), dtype=float)
         valid_idx = ~np.isnan(raw_prices) & (raw_prices > 0)
         prices = raw_prices[valid_idx]
         if len(prices) < 20:
-            result["error"] = "Insufficient data"
-            return result
+            return raw_prices, prices, "Insufficient data"
+        return raw_prices, prices, None
 
-        # ━━━ 1. FEATURES ━━━
+    def _compute_features(self, ticker: str, market_data: dict, raw_prices) -> dict:
+        """Teknik ve temel özellikleri hesapla."""
         features = {}
         try:
             calc = self._services.get("feature_calculator")
@@ -293,9 +278,10 @@ class MasterOrchestrator:
                 features = calc.compute_all_features(ohlcv_df, ticker=ticker)
         except Exception as e:
             logger.warning("Feature computation failed", error=str(e))
-        result["features"] = features
+        return features
 
-        # ━━━ 2. MACRO FEATURES (B28) ━━━
+    def _compute_macro_features(self, features: dict, market_data: dict, ticker: str) -> None:
+        """Makro özellikleri features sözlüğüne ekle (in-place)."""
         try:
             macro_fn = self._services.get("macro_features")
             if macro_fn and market_data.get("macro"):
@@ -309,7 +295,6 @@ class MasterOrchestrator:
         except Exception as e:
             logger.warning("Pipeline step failed", step="macro_features", error=str(e))
 
-        # Macro surprise model
         try:
             from services.macro.surprise_model import MacroSurpriseModel
             surprise = MacroSurpriseModel()
@@ -320,7 +305,8 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("macro_surprise_failed", ticker=ticker, error=str(e))
 
-        # ━━━ 2.5. NEWS & KAP SENTIMENT INTEGRATION ━━━
+    def _compute_news_sentiment(self, features: dict, market_data: dict, ticker: str) -> None:
+        """Haber sentiment özelliklerini features'a ekle (in-place)."""
         try:
             news_pipe = self._services.get("news_pipeline")
             if news_pipe and market_data.get("news"):
@@ -334,7 +320,8 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("news_sentiment_failed", ticker=ticker, error=str(e))
 
-        # ━━━ 3. WORLD STATE ━━━
+    def _compute_world_state(self) -> dict:
+        """Küresel piyasa durumunu al."""
         world_state = {}
         try:
             ws = self._services.get("world_state")
@@ -342,9 +329,10 @@ class MasterOrchestrator:
                 world_state = ws.get_state_dict() if hasattr(ws, "get_state_dict") else {}
         except Exception as e:
             logger.warning("Pipeline step failed", step="world_state", error=str(e))
-        result["world_state"] = world_state
+        return world_state
 
-        # ━━━ 4. REGIME ━━━
+    def _detect_regime(self, features: dict) -> str:
+        """Piyasa rejimini tespit et."""
         regime = "UNKNOWN"
         try:
             re = self._services.get("regime")
@@ -353,57 +341,30 @@ class MasterOrchestrator:
                 regime = regime_result.regime if hasattr(regime_result, "regime") else str(regime_result)
         except Exception as e:
             logger.warning("Pipeline step failed", step="regime", error=str(e))
-        result["regime"] = regime
+        return regime
 
-        # ━━━ 5. ANALYSIS ENGINES ━━━
+    def _run_analysis_engines(self, features: dict) -> dict:
+        """Fiyat, hacim, sektör ve göreceli güç analizlerini çalıştır."""
         analysis = {}
-        try:
-            pa = self._services.get("price_action")
-            if pa:
-                try:
-                    analysis["price_action"] = pa.analyze(features) if hasattr(pa, 'analyze') else "available"
-                except Exception as e:
-                    logger.debug("price_action_analysis_failed", error=str(e))
-                    analysis["price_action"] = "error"
-            ve = self._services.get("volume_engine")
-            if ve:
-                try:
-                    analysis["volume"] = ve.analyze(features) if hasattr(ve, 'analyze') else "available"
-                except Exception as e:
-                    logger.debug("volume_analysis_failed", error=str(e))
-                    analysis["volume"] = "error"
-            se = self._services.get("sector_engine")
-            if se:
-                try:
-                    analysis["sector"] = se.analyze(features) if hasattr(se, 'analyze') else "available"
-                except Exception as e:
-                    logger.debug("sector_analysis_failed", error=str(e))
-                    analysis["sector"] = "error"
-            rs = self._services.get("relative_strength")
-            if rs:
-                try:
-                    analysis["relative_strength"] = rs.analyze(features) if hasattr(rs, 'analyze') else "available"
-                except Exception as e:
-                    logger.debug("relative_strength_analysis_failed", error=str(e))
-                    analysis["relative_strength"] = "error"
-        except Exception as e:
-            logger.warning("Pipeline step failed", step="analysis_engines", error=str(e))
-        result["analysis"] = analysis
+        engines = [
+            ("price_action", "price_action_analysis_failed"),
+            ("volume_engine", "volume_analysis_failed"),
+            ("sector_engine", "sector_analysis_failed"),
+            ("relative_strength", "relative_strength_analysis_failed"),
+        ]
+        for service_key, error_label in engines:
+            try:
+                eng = self._services.get(service_key)
+                if eng:
+                    analysis[service_key] = eng.analyze(features) if hasattr(eng, 'analyze') else "available"
+            except Exception as e:
+                logger.debug(error_label, error=str(e))
+                analysis[service_key] = "error"
+        return analysis
 
-        # ━━━ 6. FORECASTING + PROBABILITY ━━━
+    def _compute_forecast(self, ticker: str, features: dict, prices) -> dict:
+        """Tahmin ve olasılık hesapla."""
         forecast = {}
-        # Champion/challenger model seçimi (audit #26)
-        champion_model = None
-        try:
-            from services.learning.champion_challenger import ChampionChallengerEngine
-            cc = ChampionChallengerEngine()
-            champion = cc.get_champion()
-            if champion:
-                champion_model = champion.model_id
-                logger.debug("Champion model selected", model=champion_model)
-        except Exception as e:
-            logger.debug("champion_model_selection_failed", error=str(e))
-
         try:
             fe = self._services.get("forecasting")
             if fe:
@@ -437,23 +398,21 @@ class MasterOrchestrator:
                 else:
                     forecast = {"horizons": [1, 5, 20], "predicted_return": 0, "probability_positive": 0}
         except Exception as e:
-            logger.warning("Pipeline step failed", step="forecasting_+_probability", error=str(e))
-        result["forecast"] = forecast
+            logger.warning("Pipeline step failed", step="forecasting", error=str(e))
+        return forecast
 
-        # ━━━ 7. MONTE CARLO ━━━
+    def _run_monte_carlo(self, ticker: str, prices, features: dict) -> dict:
+        """Monte Carlo simülasyonu çalıştır."""
         monte_carlo = {}
         try:
             mc = self._services.get("monte_carlo")
             if mc:
-                # Fiyat ve volatilite bilgilerini topla
                 mc_price = float(prices[-1]) if len(prices) > 0 else 100.0
                 vol_20d = features.get("volatility_20d", 20)
-                # vol_20d yüzde olarak geliyorsa (örn 25.3) float'a çevir
                 if vol_20d is not None and float(vol_20d) > 1:
                     vol_annual = float(vol_20d) / 100.0
                 else:
                     vol_annual = float(vol_20d) if vol_20d else 0.20
-                # Cache'den MC sonucu varsa kullan
                 cached_mc = getattr(self, '_simulation_results', {}).get(ticker)
                 if cached_mc:
                     mc_result = cached_mc
@@ -489,14 +448,15 @@ class MasterOrchestrator:
                     }
         except Exception as e:
             logger.warning("Pipeline step failed", step="monte_carlo", error=str(e))
-        result["monte_carlo"] = monte_carlo
+        return monte_carlo
 
-        # ━━━ 7.5. INTELLIGENCE PIPELINE (audit #13) ━━━
+    def _run_intelligence_pipeline(self, ticker: str, features: dict, regime: str) -> dict:
+        """Intelligence pipeline çalıştır."""
         try:
             from services.intelligence.pipeline import IntelligencePipeline
             ip = IntelligencePipeline()
             ip_result = ip.run(ticker, features, regime=regime)
-            result["intelligence_pipeline"] = {
+            return {
                 "fused_direction": ip_result.fused_direction,
                 "fused_confidence": ip_result.fused_confidence,
                 "mc_var_95": ip_result.mc_var_95,
@@ -507,8 +467,10 @@ class MasterOrchestrator:
             }
         except Exception as e:
             logger.warning("Intelligence pipeline failed", error=str(e))
+            return {}
 
-        # ━━━ 8. SPEC ENGINE ━━━
+    def _compute_spec(self, ticker: str, features: dict, world_state: dict) -> dict:
+        """Spec motorunu çalıştır."""
         spec = {}
         try:
             se = self._services.get("spec_engine")
@@ -518,19 +480,21 @@ class MasterOrchestrator:
                     spec = spec.__dict__
         except Exception as e:
             logger.warning("Pipeline step failed", step="spec_engine", error=str(e))
-        result["spec"] = spec
+        return spec
 
-        # ━━━ 9. FACTORS (B30) ━━━
+    def _compute_factors(self, market_data: dict) -> dict:
+        """Finansal skorları hesapla."""
         factors = {}
         try:
             fs_fn = self._services.get("financial_scores")
             if fs_fn and market_data.get("fundamentals"):
                 factors = fs_fn(market_data["fundamentals"])
         except Exception as e:
-            logger.warning("Pipeline step failed", step="factors_(b30)", error=str(e))
-        result["factors"] = factors
+            logger.warning("Pipeline step failed", step="factors", error=str(e))
+        return factors
 
-        # ━━━ 9.5. AGENT PIPELINE (Nihai Mimari) ━━━
+    def _run_agent_pipeline(self, ticker: str, features: dict, sector_map: dict, regime: str, prices) -> dict:
+        """Agent pipeline çalıştır."""
         agent_result = {}
         try:
             agent_pipe = self._services.get("agent_pipeline")
@@ -544,7 +508,6 @@ class MasterOrchestrator:
                         price=float(prices[-1]) if len(prices) > 0 else 0,
                     )
                 )
-
                 agent_result = {
                     "direction": agent_pipeline_result.direction,
                     "confidence": agent_pipeline_result.confidence,
@@ -563,167 +526,168 @@ class MasterOrchestrator:
                            confidence=agent_result["confidence"])
         except Exception as e:
             logger.warning("Agent pipeline failed", ticker=ticker, error=str(e))
-        result["agent"] = agent_result
+        return agent_result
 
-        # Agent event publish
-        if agent_result and agent_result.get("direction"):
-            try:
-                eb = self._services.get("event_bus")
-                if eb:
-                    from services.core.event_schema import CanonicalEvent, EventType
-                    event = CanonicalEvent(
-                        event_type=EventType.AGENT_ANALYSIS_COMPLETED,
-                        payload={
-                            "ticker": ticker,
-                            "direction": agent_result.get("direction"),
-                            "confidence": agent_result.get("confidence"),
-                            "score": agent_result.get("score"),
-                            "consensus": agent_result.get("consensus"),
-                            "debate_occurred": agent_result.get("debate_occurred"),
-                        },
-                    )
-                    with contextlib.suppress(RuntimeError):
-                        _publish_event_async(event, key=ticker)
-            except ImportError:
-                pass
-            except Exception as e:
-                logger.warning("Pipeline step failed", step="agent_event_publish", error=str(e))
+    def _publish_agent_event(self, ticker: str, agent_result: dict) -> None:
+        """Agent analiz sonucunu event bus'a yayınla."""
+        if not agent_result or not agent_result.get("direction"):
+            return
+        try:
+            eb = self._services.get("event_bus")
+            if eb:
+                from services.core.event_schema import CanonicalEvent, EventType
+                event = CanonicalEvent(
+                    event_type=EventType.AGENT_ANALYSIS_COMPLETED,
+                    payload={
+                        "ticker": ticker,
+                        "direction": agent_result.get("direction"),
+                        "confidence": agent_result.get("confidence"),
+                        "score": agent_result.get("score"),
+                        "consensus": agent_result.get("consensus"),
+                        "debate_occurred": agent_result.get("debate_occurred"),
+                    },
+                )
+                with contextlib.suppress(RuntimeError):
+                    _publish_event_async(event, key=ticker)
+        except ImportError:
+            logger.debug("Optional import not available in _publish_agent_event", exc_info=True)
+        except Exception as e:
+            logger.warning("Agent event publish failed", step="agent_event_publish", error=str(e))
 
-        # ━━━ 10. SIGNAL FUSION (Agent sonuçları dahil) ━━━
+    def _fuse_signals(self, ticker: str, features: dict, regime: str, factors: dict,
+                      spec: dict, agent_result: dict, monte_carlo: dict, world_state: dict) -> dict:
+        """Sinyalleri füzyonla."""
         fused_signal = {}
         try:
             sf = self._services.get("signal_fusion")
-            if sf:
-                # Fundamental: factor_engine sonucu veya features'dan
-                fund_score = 50.0
-                if factors and isinstance(factors, dict):
-                    fund_score = factors.get("composite_score", factors.get("financial_score", 50))
-                elif features.get("fundamental_score"):
-                    fund_score = float(features["fundamental_score"])
-                fund_dir = "LONG" if fund_score > 55 else ("SHORT" if fund_score < 45 else "NEUTRAL")
+            if not sf:
+                return fused_signal
 
-                # Macro: regime sonucu veya macro features'dan
-                macro_score = 50.0
-                macro_dir = "NEUTRAL"
-                if features.get("macro_regime_score"):
-                    macro_score = float(features["macro_regime_score"])
-                elif features.get("macro_cumulative_impact"):
-                    impact = float(features["macro_cumulative_impact"])
-                    macro_score = min(max(50 + impact * 100, 0), 100)
-                if regime in ("BULL", "BULL_VOLATILE", "RECOVERY"):
-                    macro_dir = "LONG"
-                    macro_score = max(macro_score, 60)
-                elif regime in ("BEAR", "BEAR_VOLATILE", "CRASH"):
-                    macro_dir = "SHORT"
-                    macro_score = min(macro_score, 40)
+            fund_score = 50.0
+            if factors and isinstance(factors, dict):
+                fund_score = factors.get("composite_score", factors.get("financial_score", 50))
+            elif features.get("fundamental_score"):
+                fund_score = float(features["fundamental_score"])
+            fund_dir = "LONG" if fund_score > 55 else ("SHORT" if fund_score < 45 else "NEUTRAL")
 
-                # Valuation: spec_engine sonucu veya features'dan
-                val_score = 50.0
-                if spec and isinstance(spec, dict):
-                    val_score = spec.get("spec_score", 50)
-                elif features.get("pe_ratio"):
-                    pe = float(features["pe_ratio"])
-                    val_score = max(0, min(100, 80 - pe * 2))  # Düşük PE = yüksek skor
-                val_dir = "LONG" if val_score > 55 else ("SHORT" if val_score < 45 else "NEUTRAL")
+            macro_score = 50.0
+            macro_dir = "NEUTRAL"
+            if features.get("macro_regime_score"):
+                macro_score = float(features["macro_regime_score"])
+            elif features.get("macro_cumulative_impact"):
+                impact = float(features["macro_cumulative_impact"])
+                macro_score = min(max(50 + impact * 100, 0), 100)
+            if regime in ("BULL", "BULL_VOLATILE", "RECOVERY"):
+                macro_dir = "LONG"
+                macro_score = max(macro_score, 60)
+            elif regime in ("BEAR", "BEAR_VOLATILE", "CRASH"):
+                macro_dir = "SHORT"
+                macro_score = min(macro_score, 40)
 
-                signals = {
-                    "technical": {"direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT", "score": features.get("rsi_14", 50)},
-                    "fundamental": {"direction": fund_dir, "score": fund_score},
-                    "momentum": {"direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT", "score": min(max(features.get("roc_20d", 0) + 50, 0), 100)},
-                    "macro": {"direction": macro_dir, "score": macro_score},
-                    "valuation": {"direction": val_dir, "score": val_score},
-                    "ai": {
-                        "direction": agent_result.get("direction", "NEUTRAL"),
-                        "score": agent_result.get("score", 50),
-                    },
-                    "monte_carlo": {
-                        "direction": "LONG" if monte_carlo.get("prob_positive", 0) > 0.55 else ("SHORT" if monte_carlo.get("prob_positive", 0) < 0.45 else "NEUTRAL"),
-                        "score": min(max(monte_carlo.get("expected_return", 0) * 5 + 50, 0), 100) if monte_carlo.get("simulated") else 50,
-                    },
-                }
-                fused = sf.fuse_signals(ticker, signals, regime)
-                fused_signal = fused.__dict__ if hasattr(fused, "__dict__") else {}
+            val_score = 50.0
+            if spec and isinstance(spec, dict):
+                val_score = spec.get("spec_score", 50)
+            elif features.get("pe_ratio"):
+                pe = float(features["pe_ratio"])
+                val_score = max(0, min(100, 80 - pe * 2))
+            val_dir = "LONG" if val_score > 55 else ("SHORT" if val_score < 45 else "NEUTRAL")
+
+            signals = {
+                "technical": {"direction": "LONG" if features.get("rsi_14", 50) > 55 else "SHORT", "score": features.get("rsi_14", 50)},
+                "fundamental": {"direction": fund_dir, "score": fund_score},
+                "momentum": {"direction": "LONG" if features.get("momentum_20d", 0) > 0 else "SHORT", "score": min(max(features.get("roc_20d", 0) + 50, 0), 100)},
+                "macro": {"direction": macro_dir, "score": macro_score},
+                "valuation": {"direction": val_dir, "score": val_score},
+                "ai": {
+                    "direction": agent_result.get("direction", "NEUTRAL"),
+                    "score": agent_result.get("score", 50),
+                },
+                "monte_carlo": {
+                    "direction": "LONG" if monte_carlo.get("prob_positive", 0) > 0.55 else ("SHORT" if monte_carlo.get("prob_positive", 0) < 0.45 else "NEUTRAL"),
+                    "score": min(max(monte_carlo.get("expected_return", 0) * 5 + 50, 0), 100) if monte_carlo.get("simulated") else 50,
+                },
+            }
+            fused = sf.fuse_signals(ticker, signals, regime)
+            fused_signal = fused.__dict__ if hasattr(fused, "__dict__") else {}
         except Exception as e:
             logger.warning("Pipeline step failed", step="signal_fusion", error=str(e))
-        result["signal"] = fused_signal
+        return fused_signal
 
-        # ━━━ 11. DECISION ━━━
+    def _make_decision(self, ticker: str, prices, features: dict, fused_signal: dict,
+                       agent_result: dict, regime: str, monte_carlo: dict, forecast: dict,
+                       spec: dict, world_state: dict) -> dict:
+        """Karar motorunu çalıştır."""
         decision = {}
         try:
             de = self._services.get("decision_engine")
-            if de:
-                from services.core.decision_engine import DecisionInput
-                inp = DecisionInput(
-                    ticker=ticker,
-                    price=float(prices[-1]) if len(prices) > 0 else 0,
-                    features=features,
-                    ml_score=fused_signal.get("fused_score", 50),
-                    ml_confidence=fused_signal.get("fused_confidence", 0.5),
-                    atr=features.get("atr_14", 0),
-                    atr_pct=features.get("atr_pct", 0),
-                    # Agent sistemi
-                    agent_direction=agent_result.get("direction", "NEUTRAL"),
-                    agent_confidence=agent_result.get("confidence", 0.0),
-                    agent_score=agent_result.get("score", 50.0),
-                    # Macro sistemi (audit #10)
-                    macro_regime=regime,
-                    macro_stance=1.0 if regime in ("BULL", "RECOVERY") else (-1.0 if regime in ("BEAR", "CRASH") else 0.0),
-                    macro_confidence=0.7 if regime != "UNKNOWN" else 0.3,
-                    macro_impact=features.get("macro_cumulative_impact", 0),
-                    # Monte Carlo simülasyon sonuçları
-                    sim_var_95=monte_carlo.get("var_95", 0),
-                    sim_expected_return=monte_carlo.get("expected_return", 0),
-                    sim_prob_positive=monte_carlo.get("prob_positive", 0),
-                    # Forecast
-                    ml_return_5d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 5 else 0,
-                    ml_return_20d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 20 else 0,
-                    # Spec
-                    spec_score=spec.get("spec_score", 50) if isinstance(spec, dict) else 50,
-                    world_alignment=world_state.get("global_risk_appetite", 0.5) if isinstance(world_state, dict) else 0.5,
-                )
-                d = de.decide(inp)
-                decision = d.__dict__ if hasattr(d, "__dict__") else {}
+            if not de:
+                return decision
+            from services.core.decision_engine import DecisionInput
+            inp = DecisionInput(
+                ticker=ticker,
+                price=float(prices[-1]) if len(prices) > 0 else 0,
+                features=features,
+                ml_score=fused_signal.get("fused_score", 50),
+                ml_confidence=fused_signal.get("fused_confidence", 0.5),
+                atr=features.get("atr_14", 0),
+                atr_pct=features.get("atr_pct", 0),
+                agent_direction=agent_result.get("direction", "NEUTRAL"),
+                agent_confidence=agent_result.get("confidence", 0.0),
+                agent_score=agent_result.get("score", 50.0),
+                macro_regime=regime,
+                macro_stance=1.0 if regime in ("BULL", "RECOVERY") else (-1.0 if regime in ("BEAR", "CRASH") else 0.0),
+                macro_confidence=0.7 if regime != "UNKNOWN" else 0.3,
+                macro_impact=features.get("macro_cumulative_impact", 0),
+                sim_var_95=monte_carlo.get("var_95", 0),
+                sim_expected_return=monte_carlo.get("expected_return", 0),
+                sim_prob_positive=monte_carlo.get("prob_positive", 0),
+                ml_return_5d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 5 else 0,
+                ml_return_20d=forecast.get("predicted_return", 0) if forecast.get("horizon_days", 0) == 20 else 0,
+                spec_score=spec.get("spec_score", 50) if isinstance(spec, dict) else 50,
+                world_alignment=world_state.get("global_risk_appetite", 0.5) if isinstance(world_state, dict) else 0.5,
+            )
+            d = de.decide(inp)
+            decision = d.__dict__ if hasattr(d, "__dict__") else {}
 
-                # LLM Ajan Türkçe Karar Açıklaması
-                if not decision.get("llm_narrative"):
-                    try:
-                        from services.intelligence.llm_agent import llm_agent
-                        decision["llm_narrative"] = llm_agent.generate_decision_narrative(
-                            ticker=ticker,
-                            decision=decision,
-                            features=features,
-                            price=float(prices[-1]) if len(prices) > 0 else 0,
-                        )
-                    except Exception as exc:
-                        logger.debug("LLM narrative skipped", ticker=ticker, error=str(exc))
-
-                # DECISION_CREATED event publish (audit #3)
+            if not decision.get("llm_narrative"):
                 try:
-                    eb = self._services.get("event_bus")
-                    if eb and decision.get("action"):
-                        from services.core.event_schema import CanonicalEvent
-                        from services.core.event_schema import EventType as ET
-                        dec_event = CanonicalEvent(
-                            event_type=ET.DECISION_CREATED,
-                            payload={
-                                "ticker": ticker,
-                                "action": decision.get("action"),
-                                "direction": decision.get("direction"),
-                                "confidence": decision.get("confidence"),
-                                "score": decision.get("score"),
-                            },
-                        )
-                        with contextlib.suppress(RuntimeError):
-                            _publish_event_async(dec_event, key=ticker)
-                except Exception as e:
-                    logger.debug("decision_event_publish_failed", ticker=ticker, error=str(e))
+                    from services.intelligence.llm_agent import llm_agent
+                    decision["llm_narrative"] = llm_agent.generate_decision_narrative(
+                        ticker=ticker,
+                        decision=decision,
+                        features=features,
+                        price=float(prices[-1]) if len(prices) > 0 else 0,
+                    )
+                except Exception as exc:
+                    logger.debug("LLM narrative skipped", ticker=ticker, error=str(exc))
+
+            try:
+                eb = self._services.get("event_bus")
+                if eb and decision.get("action"):
+                    from services.core.event_schema import CanonicalEvent
+                    from services.core.event_schema import EventType as ET
+                    dec_event = CanonicalEvent(
+                        event_type=ET.DECISION_CREATED,
+                        payload={
+                            "ticker": ticker,
+                            "action": decision.get("action"),
+                            "direction": decision.get("direction"),
+                            "confidence": decision.get("confidence"),
+                            "score": decision.get("score"),
+                        },
+                    )
+                    with contextlib.suppress(RuntimeError):
+                        _publish_event_async(dec_event, key=ticker)
+            except Exception as e:
+                logger.debug("decision_event_publish_failed", ticker=ticker, error=str(e))
         except ImportError:
-            pass
+            logger.debug("Optional import not available in _make_decision", exc_info=True)
         except Exception as e:
             logger.warning("Pipeline step failed", step="decision", error=str(e))
-        result["decision"] = decision
+        return decision
 
-        # ━━━ 11.5. LEARNING FEEDBACK — Regime Accuracy (audit #25) ━━━
+    def _apply_learning_feedback(self, decision: dict, regime: str) -> None:
+        """Öğrenme geri bildirimini uygula (in-place)."""
         try:
             ls = self._services.get("learning")
             if ls and hasattr(ls, 'get_regime_accuracy'):
@@ -734,7 +698,8 @@ class MasterOrchestrator:
         except Exception as e:
             logger.debug("learning_feedback_failed", error=str(e))
 
-        # ━━━ 12. TRADE PLAN ━━━
+    def _create_trade_plan(self, ticker: str, decision: dict, prices, features: dict, spec: dict) -> dict:
+        """İşlem planı oluştur."""
         trade_plan = {}
         try:
             tp = self._services.get("trade_planner")
@@ -750,9 +715,11 @@ class MasterOrchestrator:
                     trade_plan = trade_plan.__dict__
         except Exception as e:
             logger.warning("Pipeline step failed", step="trade_plan", error=str(e))
-        result["trade_plan"] = trade_plan
+        return trade_plan
 
-        # ━━━ 13. RISK CHECK ━━━
+    def _check_risk(self, ticker: str, decision: dict, trade_plan: dict, prices,
+                    fused_signal: dict, monte_carlo: dict) -> dict:
+        """Risk kontrolü yap."""
         risk_check = {"allowed": False}
         try:
             rg = self._services.get("risk_gate")
@@ -776,9 +743,10 @@ class MasterOrchestrator:
                     risk_check = {"allowed": False, "reason": "Invalid risk result format"}
         except Exception as e:
             logger.warning("Pipeline step failed", step="risk_check", error=str(e))
-        result["risk"] = risk_check
+        return risk_check
 
-        # ━━━ 14. COMPLIANCE (B27) ━━━
+    def _check_compliance(self, ticker: str, decision: dict, trade_plan: dict, prices) -> dict:
+        """SPK uyumluluk kontrolü."""
         compliance = {}
         try:
             comp = self._services.get("compliance")
@@ -790,20 +758,24 @@ class MasterOrchestrator:
                 ).to_dict()
         except Exception as e:
             logger.warning("Pipeline step failed", step="compliance", error=str(e))
-        result["compliance"] = compliance
+        return compliance
 
-        # ━━━ 15. KNOWLEDGE GRAPH + RESEARCH MEMORY ━━━
+    def _build_context(self) -> dict:
+        """Bilgi grafiği ve araştırma belleği bağlamını oluştur."""
         context = {}
         try:
             kg = self._services.get("knowledge_graph")
-            if kg: context["knowledge"] = "available"
+            if kg:
+                context["knowledge"] = "available"
             rm = self._services.get("research_memory")
-            if rm: context["memory"] = "available"
+            if rm:
+                context["memory"] = "available"
         except Exception as e:
-            logger.warning("Pipeline step failed", step="knowledge_graph_+_research_memory", error=str(e))
-        result["context"] = context
+            logger.warning("Pipeline step failed", step="knowledge_graph", error=str(e))
+        return context
 
-        # ━━━ 16. LEARNING — Prediction Kaydet (audit #24) ━━━
+    def _record_prediction(self, ticker: str, decision: dict, features: dict) -> None:
+        """Tahmin sonucunu öğrenme sistemine kaydet."""
         try:
             ot = self._services.get("outcome_tracker")
             if ot and decision.get("action") in ("BUY", "SELL"):
@@ -818,6 +790,86 @@ class MasterOrchestrator:
                 logger.debug("Prediction recorded", ticker=ticker, action=decision.get("action"))
         except Exception as e:
             logger.debug("Learning prediction recording skipped", error=str(e))
+
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    # PIPELINE ORKESTRASYONU
+    # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+    def run_pipeline(self, ticker: str, market_data: dict[str, Any]) -> dict[str, Any]:
+        """Tek hisse için tam pipeline çalıştır.
+
+        Args:
+            ticker: Hisse kodu
+            market_data: {
+                "prices": np.ndarray, "highs": np.ndarray, "lows": np.ndarray,
+                "closes": np.ndarray, "volumes": np.ndarray,
+                "fundamentals": dict, "news": list, "macro": dict
+            }
+        """
+        if not self._initialized:
+            try:
+                asyncio.run(self.initialize())
+            except RuntimeError:
+                logger.warning("Runtime error in run_pipeline", exc_info=True)
+
+        result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
+        sector_map = market_data.get("sector_map", {})
+
+        # 1. Veri hazırlama
+        raw_prices, prices, error = self._prepare_prices(market_data)
+        if error:
+            result["error"] = error
+            return result
+
+        # 2. Özellik hesaplama
+        features = self._compute_features(ticker, market_data, raw_prices)
+        self._compute_macro_features(features, market_data, ticker)
+        self._compute_news_sentiment(features, market_data, ticker)
+        result["features"] = features
+
+        # 3. Dünya durumu ve rejim
+        world_state = self._compute_world_state()
+        result["world_state"] = world_state
+        regime = self._detect_regime(features)
+        result["regime"] = regime
+
+        # 4. Analiz motorları
+        result["analysis"] = self._run_analysis_engines(features)
+
+        # 5. Tahmin ve simülasyon
+        forecast = self._compute_forecast(ticker, features, prices)
+        result["forecast"] = forecast
+        monte_carlo = self._run_monte_carlo(ticker, prices, features)
+        result["monte_carlo"] = monte_carlo
+        result["intelligence_pipeline"] = self._run_intelligence_pipeline(ticker, features, regime)
+
+        # 6. Spec ve faktörler
+        spec = self._compute_spec(ticker, features, world_state)
+        result["spec"] = spec
+        factors = self._compute_factors(market_data)
+        result["factors"] = factors
+
+        # 7. Agent pipeline
+        agent_result = self._run_agent_pipeline(ticker, features, sector_map, regime, prices)
+        result["agent"] = agent_result
+        self._publish_agent_event(ticker, agent_result)
+
+        # 8. Sinyal füzyonu ve karar
+        fused_signal = self._fuse_signals(ticker, features, regime, factors, spec, agent_result, monte_carlo, world_state)
+        result["signal"] = fused_signal
+        decision = self._make_decision(ticker, prices, features, fused_signal, agent_result, regime, monte_carlo, forecast, spec, world_state)
+        self._apply_learning_feedback(decision, regime)
+        result["decision"] = decision
+
+        # 9. İşlem planı ve risk
+        trade_plan = self._create_trade_plan(ticker, decision, prices, features, spec)
+        result["trade_plan"] = trade_plan
+        result["risk"] = self._check_risk(ticker, decision, trade_plan, prices, fused_signal, monte_carlo)
+        result["compliance"] = self._check_compliance(ticker, decision, trade_plan, prices)
+
+        # 10. Bağlam ve öğrenme
+        result["context"] = self._build_context()
+        self._record_prediction(ticker, decision, features)
 
         return result
 

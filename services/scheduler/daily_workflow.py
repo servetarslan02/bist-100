@@ -219,7 +219,7 @@ class DailyWorkflow:
             from services.core.risk_gate import risk_gate
             risk_gate.reset_daily()
         except Exception:
-            pass
+            logger.warning("Caught Exception in reset_daily_counters", exc_info=True)
 
 
 # Singleton

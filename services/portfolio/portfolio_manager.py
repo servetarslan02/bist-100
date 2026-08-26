@@ -1241,7 +1241,7 @@ class PortfolioManager:
                         "sector": "BIST"
                     })
             except Exception:
-                pass
+                logger.warning("Caught Exception in execute_auto_rebalance", exc_info=True)
             
             if not signals:
                 signals = []

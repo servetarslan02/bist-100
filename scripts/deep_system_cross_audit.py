@@ -8,6 +8,9 @@ import re
 import sys
 import glob
 import ast
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -70,7 +73,7 @@ for filepath in all_files:
                         findings["unrealistic_execution_assumptions"].append((filepath, i, line.strip()))
 
     except Exception as e:
-        pass
+        logger.warning("Caught Exception in module_level", exc_info=True)
 
 # Raporla
 print("\n1. 🔍 GELECEĞİ GÖRME & LOOK-AHEAD BİAS ŞÜPHELERİ:")

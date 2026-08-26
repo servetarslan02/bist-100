@@ -153,7 +153,7 @@ class ConnectivityMonitor:
             try:
                 await self._monitor_task
             except asyncio.CancelledError:
-                pass
+                logger.warning("Timeout/cancellation in stop", exc_info=True)
         logger.info("Connectivity monitor stopped",
                     total_offline_seconds=round(self._total_offline_seconds, 1))
 

@@ -106,7 +106,7 @@ class FeaturePipeline:
                         if len(closes) >= 21 and closes[-21] > 0:
                             targets["return_20d"] = float((current_close / closes[-21]) - 1.0)
         except Exception:
-            pass
+            logger.warning("Caught Exception in _compute_target_features", exc_info=True)
 
         # Fallback sentetik / model target kolonları
         for h in self.config.target_horizons:

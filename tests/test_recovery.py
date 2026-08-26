@@ -12,7 +12,6 @@ Bu test şunları doğrular:
 
 import os
 import sys
-import json
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path

@@ -160,17 +160,17 @@ class ConfigLoader:
         try:
             return int(value)
         except ValueError:
-            pass
+            logger.warning("Data error in _convert_value: ValueError", exc_info=True)
         try:
             return float(value)
         except ValueError:
-            pass
+            logger.warning("Data error in _convert_value: ValueError", exc_info=True)
         # JSON array/object
         if value.startswith(("[", "{")):
             try:
                 return orjson.loads(value)
             except orjson.JSONDecodeError:
-                pass
+                logger.warning("JSON parse error in _convert_value", exc_info=True)
         return value
 
     def _set_nested(self, key: str, value: Any):

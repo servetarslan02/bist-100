@@ -83,7 +83,7 @@ class BISTTradingCalendar:
                 try:
                     self._fixed_holidays.add(date(year, month, day))
                 except ValueError:
-                    pass
+                    logger.warning("Data error in _load_fixed_holidays: ValueError", exc_info=True)
 
     def _load_variable_holidays(self, path: str):
         """holidays.json'dan değişken tatilleri yükle."""

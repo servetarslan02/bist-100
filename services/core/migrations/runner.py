@@ -201,7 +201,7 @@ class MigrationRunner:
         try:
             self._heartbeat_task = asyncio.ensure_future(_heartbeat_loop())
         except RuntimeError:
-            pass  # Event loop yoksa (sync context)
+            logger.warning("Runtime error in _heartbeat_loop", exc_info=True)
 
     def _stop_heartbeat(self):
         """Heartbeat durdur."""

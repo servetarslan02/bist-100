@@ -47,6 +47,61 @@ class PaperExecutionEngine:
         """Açık artırma havuzundaki emirleri BIST denge fiyatıyla eşleştirir."""
         return self.microstructure.execute_call_auction(ticker=ticker, reference_price=reference_price)
 
+    def _create_order_dict(self, order_id, date, ticker, side, quantity, signal_price) -> dict:
+        """Sipariş sözlüğü oluştur."""
+        return {
+            "order_id": order_id,
+            "date": date,
+            "ticker": ticker,
+            "side": side,
+            "quantity": quantity,
+            "signal_price": signal_price,
+            "execution_price": 0.0,
+            "commission": 0.0,
+            "slippage_pct": 0.0,
+            "status": "CREATED",
+            "rejection_reason": None,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    def _validate_order(self, ticker, date, side, is_halted, market_phase, order_type, limit_price) -> Optional[str]:
+        """Sipariş validasyonu. Reddedilirse red nedeni döner, None ise geçti."""
+        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry as kap_registry
+
+        is_eligible, kap_reason = kap_registry.validate_trading_eligibility(ticker, date, side)
+        if not is_eligible:
+            logger.warning("Order rejected by KAP Registry", ticker=ticker, reason=kap_reason)
+            return kap_reason
+
+        if is_halted:
+            return "MARKET_HALTED: instrument is not tradable"
+
+        if market_phase.upper() not in {"OPENING_AUCTION", "CONTINUOUS", "CLOSING_AUCTION"}:
+            return f"MARKET_CLOSED_OR_HALTED: {market_phase}"
+
+        if order_type.upper() not in {"MARKET", "LIMIT", "STOP_LIMIT", "KIE", "KPY", "GIE", "TRADE_AT_CLOSE"}:
+            return f"UNSUPPORTED_ORDER_TYPE: {order_type}"
+
+        return None
+
+    def _check_bist_price_limits(self, ticker, side, execution_price, ref_price, price_limit_pct) -> Optional[str]:
+        """BIST tavan/taban ve devre kesici kilit kontrolü. Reddedilirse neden döner."""
+        if ref_price <= 0:
+            return None
+
+        price_change_pct = ((execution_price / ref_price) - 1.0) * 100.0
+        lock_threshold = price_limit_pct - 0.10
+
+        if side == "SELL" and price_change_pct <= -lock_threshold:
+            logger.warning("Order rejected: Limit Down Locked", ticker=ticker, change_pct=price_change_pct)
+            return f"BIST_LIMIT_DOWN_LOCKED: {ticker} taban fiyatta (%{price_change_pct:.2f}). Satış kuyruğunda likidite yok."
+
+        if side == "BUY" and price_change_pct >= lock_threshold:
+            logger.warning("Order rejected: Limit Up Locked", ticker=ticker, change_pct=price_change_pct)
+            return f"BIST_LIMIT_UP_LOCKED: {ticker} tavan fiyatta (%{price_change_pct:.2f}). Tavanda satıcı yok."
+
+        return None
+
     def execute_signal(
         self,
         date: str,
@@ -76,55 +131,19 @@ class PaperExecutionEngine:
         Bu look-ahead bias'i onler.
         """
         order_id = f"ORD_{date}_{ticker}_{side}_{uuid.uuid4().hex[:6]}"
+        order = self._create_order_dict(order_id, date, ticker, side, quantity, signal_price)
 
-        order = {
-            "order_id": order_id,
-            "date": date,
-            "ticker": ticker,
-            "side": side,
-            "quantity": quantity,
-            "signal_price": signal_price,
-            "execution_price": 0.0,
-            "commission": 0.0,
-            "slippage_pct": 0.0,
-            "status": "CREATED",
-            "rejection_reason": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-        }
-
-        # === KAP KURUMSAL VE VBTS TEDBİR DENETİMİ ===
-        from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry as kap_registry
-        from services.paper_trading.synthetic_liquidity import SyntheticOrderBookBuilder, LiquidityScenario
-
-        is_eligible, kap_reason = kap_registry.validate_trading_eligibility(ticker, date, side)
-        if not is_eligible:
+        # Validasyon
+        rejection = self._validate_order(ticker, date, side, is_halted, market_phase, order_type, limit_price)
+        if rejection:
             order["status"] = "REJECTED"
-            order["rejection_reason"] = kap_reason
-            logger.warning("Order rejected by KAP Registry", ticker=ticker, reason=kap_reason)
+            order["rejection_reason"] = rejection
             return order
 
-        if is_halted:
-            order["status"] = "REJECTED"
-            order["rejection_reason"] = "MARKET_HALTED: instrument is not tradable"
-            return order
-
-        market_phase = market_phase.upper()
-        if market_phase not in {"OPENING_AUCTION", "CONTINUOUS", "CLOSING_AUCTION"}:
-            order["status"] = "REJECTED"
-            order["rejection_reason"] = f"MARKET_CLOSED_OR_HALTED: {market_phase}"
-            return order
-
-        order_type = order_type.upper()
-        if order_type not in {"MARKET", "LIMIT", "STOP_LIMIT", "KIE", "KPY", "GIE", "TRADE_AT_CLOSE"}:
-            order["status"] = "REJECTED"
-            order["rejection_reason"] = f"UNSUPPORTED_ORDER_TYPE: {order_type}"
-            return order
-
-        # === EXECUTION PRICE ===
         execution_price = market_price
 
         # Limit emir kontrolü
-        if order_type in {"LIMIT", "STOP_LIMIT"}:
+        if order_type.upper() in {"LIMIT", "STOP_LIMIT"}:
             if not limit_price or limit_price <= 0:
                 order["status"] = "REJECTED"
                 order["rejection_reason"] = "LIMIT_PRICE_REQUIRED"
@@ -134,28 +153,16 @@ class PaperExecutionEngine:
                 order["rejection_reason"] = "LIMIT_NOT_REACHED"
                 return order
 
-        # === BIST TAVAN / TABAN & DEVRE KESİCİ KİLİT KONTROLÜ ===
+        # BIST tavan/taban kontrolü
         ref_price = reference_price if reference_price and reference_price > 0 else signal_price
         limit_up_price = ref_price * (1.0 + price_limit_pct / 100.0) if ref_price > 0 else float("inf")
         limit_down_price = ref_price * (1.0 - price_limit_pct / 100.0) if ref_price > 0 else 0.0
 
-        if ref_price > 0:
-            price_change_pct = ((execution_price / ref_price) - 1.0) * 100.0
-
-            # Taban Kilidi Kontrolü: Taban fiyatta satıcı kuyruğu kilitlidir
-            lock_threshold = price_limit_pct - 0.10
-            if side == "SELL" and price_change_pct <= -lock_threshold:
-                order["status"] = "REJECTED"
-                order["rejection_reason"] = f"BIST_LIMIT_DOWN_LOCKED: {ticker} taban fiyatta (%{price_change_pct:.2f}). Satış kuyruğunda likidite yok, işlem gerçekleşmedi."
-                logger.warning("Order rejected: Limit Down Locked", ticker=ticker, change_pct=price_change_pct)
-                return order
-
-            # Tavan Kilidi Kontrolü: Tavan fiyatta alıcı kuyruğu kilitlidir
-            if side == "BUY" and price_change_pct >= lock_threshold:
-                order["status"] = "REJECTED"
-                order["rejection_reason"] = f"BIST_LIMIT_UP_LOCKED: {ticker} tavan fiyatta (%{price_change_pct:.2f}). Tavanda satıcı yok, alış emri gerçekleşmedi."
-                logger.warning("Order rejected: Limit Up Locked", ticker=ticker, change_pct=price_change_pct)
-                return order
+        bist_rejection = self._check_bist_price_limits(ticker, side, execution_price, ref_price, price_limit_pct)
+        if bist_rejection:
+            order["status"] = "REJECTED"
+            order["rejection_reason"] = bist_rejection
+            return order
 
         # === SENTETİK DEFTER & WALK-THE-BOOK EŞLEŞTİRME ===
         scenario_enum = LiquidityScenario(scenario) if isinstance(scenario, str) else scenario
@@ -236,7 +243,7 @@ class PaperExecutionEngine:
             )
             publish_event(order_event, key=ticker)
         except Exception:
-            pass
+            logger.warning("Caught Exception in execute_signal", exc_info=True)
 
         return order
 

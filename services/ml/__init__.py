@@ -8,7 +8,7 @@ Champion-Challenger, Hyperparameter Tuning, Calibration, Feature Drift, Monitori
 try:
     from .catboost_model import CatBoostModel, CatBoostConfig
 except ImportError:
-    pass
+    logger.debug("Optional import not available in module_level", exc_info=True)
 from .lightgbm_trainer import MLModelConfig, LightGBMTrainer
 from .xgboost_model import XGBoostModel, XGBoostConfig
 
@@ -51,6 +51,9 @@ from .hybrid_model import hybrid_predict, HybridModel, HybridSignal
 from .finrl_bist import BISTTradingEnv, BISTEnvConfig
 from .rl_agent import train_rl_agent, evaluate_rl_agent, RLConfig
 from .qlib_integration import QlibBIST, QlibConfig
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 __all__ = [
     # Core models

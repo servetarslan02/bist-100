@@ -239,7 +239,7 @@ class InMemoryRedis:
             else:
                 asyncio.run(self.publish(f"alpha:{channel}", event.to_json()))
         except RuntimeError:
-            pass
+            logger.warning("Runtime error in publish_local", exc_info=True)
 
 
 # =====================================================

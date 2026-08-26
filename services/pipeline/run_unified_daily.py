@@ -49,7 +49,7 @@ async def get_last_rebalance_date() -> Optional[date]:
         if rows:
             return rows[0]["created_at"].date()
     except Exception:
-        pass
+        logger.warning("Caught Exception in get_last_rebalance_date", exc_info=True)
     return None
 
 

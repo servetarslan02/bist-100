@@ -281,7 +281,7 @@ class RealTimeDataEngine:
                                     )
                                     await self._dispatch(event)
                             except KeyError:
-                                pass
+                                logger.warning("Data error in _listen_market_stream: KeyError", exc_info=True)
                     await asyncio.sleep(1) # rate limit protection
                     
             except Exception as e:

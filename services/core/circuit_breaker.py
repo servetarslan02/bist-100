@@ -120,7 +120,7 @@ class CircuitBreaker:
                 self.last_success_time.isoformat() if self.last_success_time else None,
             )
         except Exception:
-            pass
+            logger.warning("Caught Exception in _persist_state", exc_info=True)
 
     def restore_state(self):
         """Durumu SQLite'dan geri yükle."""

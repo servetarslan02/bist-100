@@ -73,7 +73,7 @@ class BaseGRPCClient:
                 from ..core.mtls import get_grpc_client_credentials
                 tls_credentials = get_grpc_client_credentials()
             except ImportError:
-                pass
+                logger.debug("Optional import not available in connect", exc_info=True)
             except Exception as e:
                 logger.debug("mTLS credentials not available", error=str(e))
 
@@ -114,7 +114,7 @@ class BaseGRPCClient:
             try:
                 await self._channel.close()
             except Exception:
-                pass
+                logger.warning("Caught Exception in close", exc_info=True)
             self._channel = None
             self._stub = None
 

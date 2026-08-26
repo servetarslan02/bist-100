@@ -359,7 +359,7 @@ def compute_full_risk_metrics(
             )
             component_var = {cvr.ticker: cvr.component_var_95 for cvr in cv}
         except Exception:
-            pass
+            logger.warning("Caught Exception in compute_full_risk_metrics", exc_info=True)
 
     # Risk score (0-100)
     risk_score = 50.0

@@ -327,35 +327,35 @@ def get_learning_systems() -> Dict[str, Any]:
         from .outcome_tracker import OutcomeTracker
         result["outcome_tracker"] = OutcomeTracker()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_learning_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="OutcomeTracker", error=str(e))
     try:
         from .attribution import AttributionEngine
         result["attribution"] = AttributionEngine()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_learning_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="AttributionEngine", error=str(e))
     try:
         from .learning_loop import LearningLoop
         result["learning_loop"] = LearningLoop()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_learning_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="LearningLoop", error=str(e))
     try:
         from .continuous_learning import ContinuousLearning
         result["continuous_learning"] = ContinuousLearning()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_learning_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="ContinuousLearning", error=str(e))
     try:
         from .super_intelligence import SuperIntelligence
         result["super_intelligence"] = SuperIntelligence()
     except ImportError:
-        pass
+        logger.debug("Optional import not available in get_learning_systems", exc_info=True)
     except Exception as e:
         logger.warning("Failed to load module", module="SuperIntelligence", error=str(e))
     return result

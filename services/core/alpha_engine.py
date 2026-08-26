@@ -25,7 +25,7 @@ def _detect_gpu_cuda():
             device_name = torch.cuda.get_device_name(0)
             return True, device_name
     except Exception:
-        pass
+        logger.warning("Caught Exception in _detect_gpu_cuda", exc_info=True)
     return False, "CPU"
 
 class AlphaEngine:

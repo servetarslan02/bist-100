@@ -296,5 +296,5 @@ def compute_financial_scores(financials: Dict[str, Any]) -> Dict[str, Any]:
         result["z_score"] = z_result["z_score"]
         result["z_score_detail"] = z_result
     except ImportError:
-        pass
+        logger.debug("Optional import not available in compute_financial_scores", exc_info=True)
     return result

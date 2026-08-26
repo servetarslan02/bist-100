@@ -30,13 +30,17 @@ import webbrowser
 import platform
 from pathlib import Path
 
+import structlog
+
+logger = structlog.get_logger(__name__)
+
 # Ensure UTF-8 output on Windows consoles
 if sys.platform == "win32":
     try:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        pass
+        logger.warning("Caught Exception in module_level", exc_info=True)
 
 # === Configuration ===
 SSD_WRITE_LIMIT_MBPS = 512  # MB/s — asla aşılmayacak limit
@@ -230,7 +234,7 @@ def get_container_pid(container_name: str) -> str:
             if pid and pid != "0":
                 return pid
     except Exception:
-        pass
+        logger.warning("Caught Exception in get_container_pid", exc_info=True)
     return None
 
 
@@ -253,7 +257,7 @@ def find_cgroup_v2_path(pid: str) -> str:
                     if os.path.exists(io_max):
                         return io_max
     except Exception:
-        pass
+        logger.warning("Caught Exception in find_cgroup_v2_path", exc_info=True)
 
     return None
 
@@ -279,7 +283,7 @@ def get_block_device_id() -> str:
                 minor = int(parts[1], 16)
                 return f"{major}:{minor}"
     except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError):
-        pass
+        logger.warning("Error in get_block_device_id: (FileNotFoundError, subprocess.TimeoutExpired, ValueError, IndexError)", exc_info=True)
     return "8:0"
 
 
@@ -656,7 +660,7 @@ def main():
     try:
         webbrowser.open("http://localhost:3000")
     except Exception:
-        pass
+        logger.warning("Caught Exception in main", exc_info=True)
 
     print("\n" + "=" * 72)
     print("      ✅ ALPHA BIST BAŞARIYLA ÇALIŞIYOR!")

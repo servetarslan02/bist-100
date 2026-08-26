@@ -334,7 +334,7 @@ class VaRCalculator:
                     t_samples = torch.normal(mean=mean_val, std=std_val, size=(n_simulations,), device='cuda')
                     simulated_returns = t_samples.cpu().numpy()
         except Exception:
-            pass
+            logger.warning("Caught Exception in calculate_monte_carlo_var", exc_info=True)
 
         if simulated_returns is None:
             if sigma <= 0:

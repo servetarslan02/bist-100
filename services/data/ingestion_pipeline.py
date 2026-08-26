@@ -68,7 +68,7 @@ class HistoricalIngestionPipeline:
                               hours_since=round(hours_since, 1))
                     return {"status": "skipped", "reason": "too_recent"}
             except ValueError:
-                pass
+                logger.warning("Data error in ingest_fundamentals: ValueError", exc_info=True)
 
         success_count = 0
         for ticker in tickers:
@@ -139,7 +139,7 @@ class HistoricalIngestionPipeline:
                               hours_since=round(hours_since, 1))
                     return {"status": "skipped", "reason": "too_recent"}
             except ValueError:
-                pass
+                logger.warning("Data error in ingest_kap_events: ValueError", exc_info=True)
 
         try:
             from ..ingestion.providers.kap_provider import KAPProvider
@@ -235,7 +235,7 @@ class HistoricalIngestionPipeline:
                     logger.info("News ingestion skipped (too recent)")
                     return {"status": "skipped", "reason": "too_recent"}
             except ValueError:
-                pass
+                logger.warning("Data error in ingest_news_events: ValueError", exc_info=True)
 
         try:
             from ..ingestion.providers.news_provider import NewsProvider

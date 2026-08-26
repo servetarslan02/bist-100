@@ -217,7 +217,7 @@ class FeatureEngine:
                 b = (1 + bm_ret.tail(w)).prod() - 1
                 f[f"rs_vs_bist_{label}"] = _safe_float(s - b)
             except Exception:
-                pass
+                logger.warning("Caught Exception in _relative_strength_vs_bm", exc_info=True)
 
         # RS trend (rolling 5d RS değişimi)
         if len(stock_ret) > 25:
@@ -238,7 +238,7 @@ class FeatureEngine:
                 b = (1 + sect_ret.tail(w)).prod() - 1
                 f[f"rs_vs_sector_{label}"] = _safe_float(s - b)
             except Exception:
-                pass
+                logger.warning("Caught Exception in _relative_strength_vs_sector", exc_info=True)
 
         return f
 
@@ -265,7 +265,7 @@ class FeatureEngine:
                     f[f"trend_slope_{label}"] = float(slope / close.iloc[-w])  # normalize
                     f[f"trend_r2_{label}"]    = float(r2)
                 except Exception:
-                    pass
+                    logger.warning("Caught Exception in _trend_quality", exc_info=True)
 
         # SMA alignment score (SMA20 > SMA50 > SMA200)
         if n >= 200:
@@ -467,7 +467,7 @@ def compute_universe_features(
                 if not np.isnan(ret):
                     universe_returns[ticker] = ret
             except Exception:
-                pass
+                logger.warning("Caught Exception in compute_universe_features", exc_info=True)
 
     # 2. Sektör bazlı ortalama return serisi (tz-naive)
     sector_series: Dict[str, pd.Series] = {}
@@ -491,7 +491,7 @@ def compute_universe_features(
                     combined = pd.concat(series_list, axis=1)
                     sector_series[sect] = combined.mean(axis=1)
                 except Exception:
-                    pass
+                    logger.warning("Caught Exception in compute_universe_features", exc_info=True)
 
 
     # 3. Her hisse için hesapla

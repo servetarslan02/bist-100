@@ -55,7 +55,7 @@ class CatBoostAdjustedLoss:
         try:
             pass
         except ImportError:
-            pass
+            logger.debug("Optional import not available in calc_ders_range", exc_info=True)
 
         der1 = []
         der2 = []

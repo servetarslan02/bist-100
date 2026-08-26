@@ -476,7 +476,7 @@ class WalkForwardBacktestRunner:
             t = threading.Thread(target=_save, daemon=True)
             t.start()
         except Exception:
-            pass  # Best-effort, DB yoksa devam et
+            logger.warning("Caught Exception in _save", exc_info=True)
 
         return multi_model
 

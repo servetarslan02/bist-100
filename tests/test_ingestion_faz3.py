@@ -22,6 +22,9 @@ from services.ingestion.point_in_time import PointInTimeValidator
 from services.ingestion.deduplication import EventDeduplicator
 from services.ingestion.incremental import IncrementalFetcher
 from services.ingestion.ingestion_metrics import IngestionMetrics
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 # =====================================================
@@ -357,7 +360,7 @@ class TestIngestionMetrics:
             with metrics.track_provider("yfinance", "market_price"):
                 raise ValueError("test error")
         except ValueError:
-            pass
+            logger.warning("Data error in test_track_provider_on_failure: ValueError", exc_info=True)
         assert metrics is not None
         assert hasattr(metrics, 'track_provider')
 
