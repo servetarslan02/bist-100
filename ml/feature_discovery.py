@@ -205,9 +205,9 @@ class FeatureDiscoveryPipeline:
         self, data: pl.DataFrame, feature_names: List[str], threshold: float = 0.95
     ) -> List[str]:
         """Remove highly correlated features — Polars only."""
-        # Polars correlation matrix
-        corr_matrix = data.select(feature_names).corr()
-        corr_np = corr_matrix.to_numpy()
+        # Polars correlation matrix — numpy ile hesapla
+        selected = data.select(feature_names).to_numpy()
+        corr_np = np.corrcoef(selected, rowvar=False)
         col_names = feature_names
 
         # Find pairs to drop

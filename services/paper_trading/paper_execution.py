@@ -17,6 +17,7 @@ import structlog
 
 from services.core.bist_tick_size import round_to_bist_tick
 from services.paper_trading.market_microstructure_engine import market_microstructure, MarketMicrostructureEngine
+from services.paper_trading.synthetic_liquidity import LiquidityScenario, SyntheticOrderBookBuilder
 
 logger = structlog.get_logger()
 

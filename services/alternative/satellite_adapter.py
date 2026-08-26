@@ -121,7 +121,7 @@ class SatelliteAdapter(BaseAdapter):
 
     async def _get_access_token(self) -> Optional[str]:
         """Copernicus erişim token'ı al (public access)."""
-        if self._token and datetime.now().timestamp() < self._token_expiry:
+        if self._token and datetime.now(timezone.utc).timestamp() < self._token_expiry:
             return self._token
 
         try:
@@ -139,7 +139,7 @@ class SatelliteAdapter(BaseAdapter):
                     if resp.status == 200:
                         data = await resp.json()
                         self._token = data.get("access_token")
-                        self._token_expiry = datetime.now().timestamp() + data.get("expires_in", 600) - 60
+                        self._token_expiry = datetime.now(timezone.utc).timestamp() + data.get("expires_in", 600) - 60
                         return self._token
         except Exception as e:
             logger.debug("Copernicus token fetch failed", error=str(e))

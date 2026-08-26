@@ -232,10 +232,10 @@ class AIOutputValidator:
         if "date" in parsed:
             date_str = str(parsed["date"])
             try:
-                from datetime import datetime
+                from datetime import datetime, timezone
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 # Gelecek tarih kontrolü (1 yıldan fazla ileri)
-                if dt.year > datetime.now().year + 1:
+                if dt.year > datetime.now(timezone.utc).year + 1:
                     errors.append(f"Future date too far: {date_str}")
             except (ValueError, TypeError):
                 logger.warning("Caught (ValueError, TypeError) in validate", exc_info=True)

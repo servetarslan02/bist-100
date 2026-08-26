@@ -341,20 +341,35 @@ class VirtualPortfolio:
 
     # ===================== QUERIES =====================
 
+    _price_cache: Dict[str, float] = {}
+    _price_cache_ts: float = 0.0
+    _PRICE_CACHE_TTL: float = 2.0  # saniye
+
     def _sync_live_prices(self):
-        """Açık pozisyonların güncel piyasa fiyatlarını Redis radarından anlık olarak eşitler."""
+        """Açık pozisyonların güncel piyasa fiyatlarını Redis radarından eşitler.
+        2 saniyelik cache ile Redis baskısını azaltır.
+        """
         if not self._positions:
             return
         try:
-            from services.core.redis_helper import get_cached
-            radar = get_cached("radar:data") or []
-            if radar:
-                price_map = {x["symbol"]: float(x["price"]) for x in radar if x.get("symbol") and x.get("price") and float(x.get("price")) > 0}
-                for ticker, pos in self._positions.items():
-                    if ticker in price_map:
-                        live_p = price_map[ticker]
-                        pos["current_price"] = live_p
-                        pos["market_value"] = pos["quantity"] * live_p
+            import time
+            now = time.monotonic()
+            if now - self._price_cache_ts < self._PRICE_CACHE_TTL and self._price_cache:
+                price_map = self._price_cache
+            else:
+                from services.core.redis_helper import get_cached
+                radar = get_cached("radar:data") or []
+                if radar:
+                    price_map = {x["symbol"]: float(x["price"]) for x in radar if x.get("symbol") and x.get("price") and float(x.get("price")) > 0}
+                    self._price_cache = price_map
+                    self._price_cache_ts = now
+                else:
+                    price_map = self._price_cache
+            for ticker, pos in self._positions.items():
+                if ticker in price_map:
+                    live_p = price_map[ticker]
+                    pos["current_price"] = live_p
+                    pos["market_value"] = pos["quantity"] * live_p
         except Exception:
             logger.warning("Caught Exception in _sync_live_prices", exc_info=True)
 
@@ -390,14 +405,25 @@ class VirtualPortfolio:
 
         # 2. PostgreSQL son kapanış (Redis'te olmayanlar için)
         try:
-            from services.core.database import pg_fetch
-            import asyncio
             missing = [t for t in self._positions if t not in updated]
             if missing:
+                import asyncio
+                from services.core.database import pg_fetch
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    # Async ortamda çalışıyorsa skip
-                    pass
+                    # Async ortamda — background task olarak çalıştır
+                    async def _fetch_missing():
+                        for ticker in missing:
+                            rows = await pg_fetch(
+                                "SELECT close FROM market_data WHERE ticker=$1 ORDER BY date DESC LIMIT 1",
+                                ticker
+                            )
+                            if rows:
+                                price = float(rows[0]["close"])
+                                self._positions[ticker]["current_price"] = price
+                                self._positions[ticker]["market_value"] = self._positions[ticker]["quantity"] * price
+                                updated[ticker] = price
+                    asyncio.ensure_future(_fetch_missing())
                 else:
                     for ticker in missing:
                         rows = asyncio.run(pg_fetch(

@@ -1119,7 +1119,7 @@ class MasterOrchestrator:
             "status": self.get_status(),
             "generated_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat(),
         }
-        return _json.dumps(report, indent=2, ensure_ascii=False)
+        return _json.dumps(report, option=_json.OPT_INDENT_2).decode()
 
     def get_pipeline_stats(self) -> dict[str, Any]:
         """Pipeline istatistiklerini döndür."""

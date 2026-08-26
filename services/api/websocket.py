@@ -14,6 +14,7 @@ Kullanım:
 """
 
 import asyncio
+import uuid
 import orjson
 from typing import Dict, List, Any
 from datetime import datetime, timezone

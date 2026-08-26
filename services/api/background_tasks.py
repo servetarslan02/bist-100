@@ -2,7 +2,6 @@
 
 import asyncio
 import os
-import random
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -11,42 +10,34 @@ logger = structlog.get_logger(__name__)
 
 
 async def radar_cache_refresher():
-    """BIST hisselerini TradingView'den çeker ve canlı mikro-tick üretir."""
+    """BIST hisselerini TradingView'den çeker ve cache'i günceller.
+    
+    Seans saatlerinde her 2 saniyede bir gerçek veri çeker.
+    Seans kapalıyken daha seyrek kontrol eder.
+    """
     await asyncio.sleep(2)
-    loop_counter = 0
     while True:
         try:
-            from ..core.redis_helper import get_cached, set_cached
+            from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
+            current_phase = bist_session_fsm.get_phase()
 
-            if loop_counter % 7 == 0:
+            if current_phase != BISTMarketPhase.CLOSED:
+                # Seans açık — gerçek veri çek
                 from .v1.market import _fetch_radar_fresh
                 await _fetch_radar_fresh(limit=1000)
-            else:
-                from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
-                current_phase = bist_session_fsm.get_phase()
+            # else: Seans kapalı — cache'i koru, sahte veri üretme
 
-                if current_phase != BISTMarketPhase.CLOSED:
-                    radar = get_cached("radar:data") or []
-                    if radar:
-                        for item in radar:
-                            if random.random() < 0.40:
-                                p = float(item.get("price", 10.0))
-                                tick_size = 0.01 if p < 20 else (0.02 if p < 50 else (0.05 if p < 100 else 0.10))
-                                step = random.choice([-1, -1, 0, 1, 1, 2]) * tick_size
-                                new_p = round(max(0.1, p + step), 2)
-                                item["price"] = new_p
-                                item["volume"] = int(item.get("volume", 100000)) + random.randint(200, 10000)
-                                if "high" in item:
-                                    item["high"] = max(item["high"], new_p)
-                                if "low" in item:
-                                    item["low"] = min(item["low"], new_p)
-                        set_cached("radar:data", radar, ttl=300)
-                        set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=300)
-
-            loop_counter += 1
         except Exception as e:
-            logger.warning(f"radar_live_ticker error: {e}")
-        await asyncio.sleep(2)
+            logger.warning(f"radar_cache_refresher error: {e}")
+        
+        # Seans açıkken sık, kapalıyken seyrek güncelle
+        try:
+            if current_phase != BISTMarketPhase.CLOSED:
+                await asyncio.sleep(2)
+            else:
+                await asyncio.sleep(60)
+        except Exception:
+            await asyncio.sleep(10)
 
 
 async def ml_learning_scheduler():

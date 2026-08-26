@@ -34,8 +34,8 @@ def _load_baseline_config() -> dict:
     config_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "config", "tcmb_baseline.json")
     config_path = os.path.normpath(config_path)
     try:
-        with open(config_path, "r") as f:
-            loaded = _json.load(f)
+        with open(config_path, "rb") as f:
+            loaded = _json.loads(f.read())
             merged = {**default_baseline, **loaded}
             logger.info("TCMB baseline config loaded", path=config_path)
             return merged
@@ -97,34 +97,34 @@ class TCMBProvider:
 
     async def fetch_usd_try(self, days: int = 30) -> Optional[List[Dict]]:
         """Fetch USD/TRY exchange rate."""
-        end_date = datetime.now().strftime("%d-%m-%Y")
-        start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["usd_try"], start_date, end_date)
 
     async def fetch_policy_rate(self, days: int = 365) -> Optional[List[Dict]]:
         """Fetch CBRT policy rate."""
-        end_date = datetime.now().strftime("%d-%m-%Y")
-        start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["policy_rate"], start_date, end_date)
 
     async def fetch_inflation(self, days: int = 365) -> Optional[List[Dict]]:
         """Fetch CPI data."""
-        end_date = datetime.now().strftime("%d-%m-%Y")
-        start_date = (datetime.now() - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["cpi"], start_date, end_date)
 
     async def fetch_all_macro(self) -> Dict[str, Any]:
         """Fetch all key macro indicators (with canonical baseline fallback)."""
         result = {}
-        now_str = datetime.now().strftime("%d-%m-%Y")
-        now_iso = datetime.now().isoformat()
+        now_str = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+        now_iso = datetime.now(timezone.utc).isoformat()
 
         baseline_values = self.baseline_values
 
         for name, series in self.SERIES.items():
             try:
-                end_date = datetime.now().strftime("%d-%m-%Y")
-                start_date = (datetime.now() - timedelta(days=30)).strftime("%d-%m-%Y")
+                end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+                start_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%d-%m-%Y")
                 data = await self._make_request(series, start_date, end_date)
 
                 if data and len(data) > 0:

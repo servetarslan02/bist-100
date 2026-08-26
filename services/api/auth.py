@@ -22,15 +22,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 import structlog
 
+from services.core.security import Role
+
 logger = structlog.get_logger()
-
-
-class Role(str, Enum):
-    VIEWER = "VIEWER"
-    ANALYST = "ANALYST"
-    OPERATOR = "OPERATOR"
-    ADMIN = "ADMIN"
-    SYSTEM = "SYSTEM"
 
 
 # Role → izin verilen HTTP method'ları

@@ -11,6 +11,7 @@ import os
 import sys
 import orjson
 import pickle
+from datetime import datetime, timezone
 import numpy as np
 import polars as pl
 from typing import Dict, Any, List, Tuple
@@ -35,7 +36,7 @@ try:
 except ImportError:
     cb = None
 
-from sklearn.ensemble import ExtraTreesRegressor, GradientBoostingRegressor
+from sklearn.ensemble import ExtraTreesRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 
 
@@ -167,14 +168,16 @@ class BistEnsembleTrainer:
         with open(self.save_dir / "extratrees_model.pkl", "wb") as f:
             pickle.dump(et_model, f)
 
-        # 5. Ensemble Tahmini (Ağırlıklı Ortalama)
+        # 5. Ensemble Tahmini (Ağırlıklı Ortalama — ExtraTrees dahil)
         preds = []
         if "lightgbm" in self.models:
-            preds.append(self.models["lightgbm"].predict(X_oos) * 0.40)
+            preds.append(self.models["lightgbm"].predict(X_oos) * 0.35)
         if "xgboost" in self.models:
-            preds.append(self.models["xgboost"].predict(X_oos) * 0.30)
+            preds.append(self.models["xgboost"].predict(X_oos) * 0.25)
         if "catboost" in self.models:
-            preds.append(self.models["catboost"].predict(X_oos) * 0.30)
+            preds.append(self.models["catboost"].predict(X_oos) * 0.25)
+        if "extratrees" in self.models:
+            preds.append(self.models["extratrees"].predict(X_oos) * 0.15)
 
         if preds:
             ensemble_pred = np.sum(preds, axis=0)
@@ -199,7 +202,7 @@ class BistEnsembleTrainer:
         sorted_importance = dict(sorted(combined_importance.items(), key=lambda item: item[1], reverse=True))
 
         summary = {
-            "trained_date": "2026-08-23",
+            "trained_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
             "train_samples": len(self.train_df),
             "oos_samples": len(self.oos_df),
             "features": self.feature_cols,

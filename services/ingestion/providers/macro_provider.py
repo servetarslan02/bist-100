@@ -122,8 +122,8 @@ class MacroProvider:
             return {}
 
         results = {}
-        end_date = datetime.now().strftime("%d-%m-%Y")
-        start_date = (datetime.now() - timedelta(days=30)).strftime("%d-%m-%Y")
+        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
+        start_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%d-%m-%Y")
 
         async def _fetch_series(name: str, series_code: str) -> tuple:
             try:

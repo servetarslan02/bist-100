@@ -5,13 +5,13 @@ def run_alpha_engine_sync():
     import asyncio
     import orjson
     import polars as pl
-    from datetime import datetime
+    from datetime import datetime, timezone
     
     engine = AlphaEngine()
     rm = RiskManager()
     
     # 1. Veri Cek (Son 1 yili alalim yeterli)
-    today = datetime.now()
+    today = datetime.now(timezone.utc)
     start_date = (today - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
     end_date = today.strftime("%Y-%m-%d")
     

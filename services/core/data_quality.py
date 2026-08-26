@@ -14,7 +14,7 @@ import pandas as pd
 import polars as pl
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -111,7 +111,7 @@ class DataQualityEngine:
 
         mask = TradabilityMask(
             ticker=ticker,
-            timestamp=timestamp or datetime.now(),
+            timestamp=timestamp or datetime.now(timezone.utc),
             is_tradable=is_tradable,
             reasons=reasons if reasons else ["OK"],
             price_mask=price_mask,

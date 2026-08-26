@@ -274,8 +274,8 @@ class IngestionService:
                 logger.info("Starting KAP fetch cycle")
 
                 # Fetch recent disclosures
-                from_date = (datetime.now() - timedelta(hours=1)).strftime("%Y-%m-%d")
-                to_date = datetime.now().strftime("%Y-%m-%d")
+                from_date = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%d")
+                to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
                 disclosures = await kap_provider.fetch_disclosures(
                     from_date=from_date,

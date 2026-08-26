@@ -80,15 +80,27 @@ async def get_current_user(
                 )
             return payload
 
-    # Geliştirme / Yerel Ortam: Token verilmediğinde varsayılan VIEWER rolü sağla
+    # Sadece public endpoint'lere anonim erişim izni ver
+    public_paths = {"/health", "/docs", "/openapi.json", "/redoc", "/"}
+    if path in public_paths:
+        return TokenPayload(
+            sub="anonymous",
+            username="public",
+            role=Role.VIEWER.value,
+            permissions=["GET"],
+            exp=time.time() + 300,
+            iat=time.time(),
+        )
+
     auth_strict = os.environ.get("AUTH_STRICT", "false").lower() in ("true", "1")
-    if not auth_strict or path in ["/health", "/docs", "/openapi.json", "/redoc", "/"]:
+    if not auth_strict:
+        logger.warning("AUTH_STRICT=false — anonim VIEWER rolü veriliyor", path=path)
         return TokenPayload(
             sub="anonymous",
             username="dashboard_viewer",
             role=Role.VIEWER.value,
             permissions=["GET"],
-            exp=time.time() + 86400,
+            exp=time.time() + 3600,
             iat=time.time(),
         )
 

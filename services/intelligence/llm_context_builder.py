@@ -182,15 +182,16 @@ class LLMContextBuilder:
             from services.intelligence.world_state import world_state_manager
             return world_state_manager.get_state_dict()
         except ImportError:
+            logger.warning("world_state module not available — returning empty state")
             return {
-                "global_risk_appetite": 0.55,
-                "vix_level": 18.5,
-                "turkey_macro_risk": 0.65,
-                "geopolitical_risk": 0.40,
-                "oil_pressure": 0.50,
-                "usd_strength": 0.60,
-                "inflation_pressure": 0.70,
-                "note": "mock_data",
+                "global_risk_appetite": None,
+                "vix_level": None,
+                "turkey_macro_risk": None,
+                "geopolitical_risk": None,
+                "oil_pressure": None,
+                "usd_strength": None,
+                "inflation_pressure": None,
+                "note": "unavailable",
             }
 
     def _fetch_regime(self) -> Dict[str, Any]:

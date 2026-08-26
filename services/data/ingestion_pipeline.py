@@ -148,8 +148,8 @@ class HistoricalIngestionPipeline:
             logger.error("KAP provider not available")
             return {"status": "error", "reason": "provider_unavailable"}
 
-        from_date = (datetime.now() - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        to_date = datetime.now().strftime("%Y-%m-%d")
+        from_date = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         success_count = 0
         for ticker in tickers:

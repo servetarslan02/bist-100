@@ -65,6 +65,8 @@ class RiskParityEngine:
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self.sector_map = sector_map or {}  # {ticker: sector_name}
+        if not self.sector_map:
+            logger.warning("sector_map boş — sektör yoğunlaşma kontrolü devre dışı")
         self._precompute_technicals()
 
     def _precompute_technicals(self):

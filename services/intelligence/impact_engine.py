@@ -283,11 +283,11 @@ def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, mark
     try:
         from services.event_study.kap_event import analyze_kap_event_simple
         from services.event_study.impact import calculate_event_impact
-        from datetime import datetime
+        from datetime import datetime, timezone
         result = analyze_kap_event_simple(
             ticker=ticker,
             event_description=event_type,
-            event_date=datetime.now(),
+            event_date=datetime.now(timezone.utc),
             stock_returns=np.array(stock_returns),
             market_returns=np.array(market_returns),
         )

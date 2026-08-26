@@ -1,7 +1,7 @@
 # BIST-100 ALPHA Trading System — Comprehensive Health Report
 
 **Date:** 2026-08-27  
-**Last Updated:** 2026-08-27 (Post-fix audit)  
+**Last Updated:** 2026-08-27 (Round 2 fixes)  
 **Scope:** Full codebase audit — 476 Python files across 30 service directories  
 **Auditor:** Automated deep-read analysis (every module, every key file)
 
@@ -26,7 +26,7 @@ The BIST-100 ALPHA system is an **impressively ambitious** algorithmic trading p
 - ✅ Security is production-hardened (JWT+RBAC, secret validation, no insecure defaults in prod)
 - ✅ Event bus architecture is solid (NATS primary + Redis Pub/Sub + Redis Streams for durability)
 
-**What Was Fixed (2026-08-27):**
+**What Was Fixed (2026-08-27 — Round 1):**
 - ✅ ~~Hardcoded portfolio value of 100,000~~ → Wired to actual PortfolioManager
 - ✅ ~~Learning loop never closes~~ → Default price_fetcher + run_pending_check()
 - ✅ ~~Binary regime (0.0/1.0)~~ → Multi-factor regime (trend + volatility + momentum)
@@ -42,6 +42,36 @@ The BIST-100 ALPHA system is an **impressively ambitious** algorithmic trading p
 - ✅ ~~Insider detector too simplistic~~ → Z-score + multi-window analysis
 - ✅ ~~Pickle deserialization risk~~ → SHA256 hash verification on model load
 - ✅ ~~Decision engine canonical fallback stop~~ → ATR-based stops
+
+**What Was Fixed (2026-08-27 — Round 2):**
+- ✅ ~~Mock data in radar_cache_refresher~~ → Real data only, no fake price generation
+- ✅ ~~Mock world_state fallback~~ → Returns None/unavailable instead of fake values
+- ✅ ~~Mock regime override (mock_ok status)~~ → Returns error status, no mock acceptance
+- ✅ ~~orjson.dumps(indent=2) crash in orchestrator~~ → OPT_INDENT_2
+- ✅ ~~orjson.load(f) crash in tcmb_provider~~ → read() + loads()
+- ✅ ~~Data leakage: test set used as validation in ml/training.py~~ → Skip early stopping when insufficient data
+- ✅ ~~Missing imports: uuid (websocket.py), LiquidityScenario (paper_execution.py)~~ → Added
+- ✅ ~~Wrong import: run_stress_test doesn't exist (tasks/queue.py)~~ → StressTestEngine class
+- ✅ ~~Wrong feature name: momentum_20d (model_loader.py)~~ → roc_20d
+- ✅ ~~CORS allow_origins=["*"] (apps/api/main.py)~~ → Env-based, localhost default
+- ✅ ~~WebSocket token in URL query param~~ → Authorization header
+- ✅ ~~Hardcoded DB credentials in alembic.ini~~ → ${DATABASE_URL}
+- ✅ ~~Duplicate Role enum (auth.py vs security.py)~~ → Single source in security.py
+- ✅ ~~Anonymous VIEWER role for all endpoints~~ → Public paths separated, warning logged
+- ✅ ~~PaperBroker no slippage simulation~~ → 5 bps slippage added
+- ✅ ~~np.random.seed() global state pollution~~ → np.random.default_rng() local
+- ✅ ~~scipy crash in component VaR~~ → Fallback z-scores
+- ✅ ~~Empty sector_map bypasses sector concentration check~~ → Warning logged
+- ✅ ~~asyncio.run() in sync context (virtual_portfolio.py)~~ → asyncio.ensure_future()
+- ✅ ~~Redis price fetch on every getter call~~ → 2s TTL cache
+- ✅ ~~Hardcoded trained_date "2026-08-23" (ensemble_trainer.py)~~ → Dynamic datetime.now(UTC)
+- ✅ ~~ExtraTrees trained but not in ensemble weights~~ → 15% weight assigned
+- ✅ ~~GradientBoosting imported but unused~~ → Removed
+- ✅ ~~DataFrame.corr() doesn't exist in Polars (feature_discovery.py)~~ → np.corrcoef()
+- ✅ ~~datetime.now() without timezone — 20+ files~~ → datetime.now(timezone.utc)
+- ✅ ~~Hardcoded market_regime=1.0 in main.py~~ → 0.5 neutral fallback
+- ✅ ~~json module still referenced~~ → All code uses orjson
+- ✅ ~~run_all_imports.py references non-existent modules~~ → Cleaned up
 
 **Remaining Items (P2 — Nice to Have):**
 - 🟡 Thread safety for singletons (low risk in single-process mode)

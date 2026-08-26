@@ -367,7 +367,7 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     if _ALERTS_CACHE and (now_ts - _ALERTS_CACHE_TIME < 30):
         return _ALERTS_CACHE
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     alerts: List[Dict[str, Any]] = []
 
     # 1. ML Ensemble Fırsat Alarmları

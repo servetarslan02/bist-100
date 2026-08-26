@@ -25,15 +25,12 @@ ALL_MODULES = [
     "services.ingestion.corporate_actions","services.ingestion.providers.data_validator",
     "services.ingestion.providers.bist_provider","services.ingestion.providers.bist_stream",
     "services.ingestion.providers.macro_provider","services.ingestion.providers.matriks_provider",
-    "services.ingestion.providers.news_credibility","services.ingestion.providers.provider_manager",
-    "services.ingestion.providers.realtime_provider","services.ingestion.realtime",
+    "services.ingestion.providers.provider_manager",
     "services.ingestion.bist_universe","services.ingestion.universe_enhancements","services.ingestion.main",
-    # Features (14)
-    "services.features.seven_motors","services.features.fundamental","services.features.sentiment",
-    "services.features.cross_sectional","services.features.macro","services.features.bar_engine",
-    "services.features.calculator","services.features.discovery","services.features.extended_indicators",
-    "services.features.incremental_state","services.features.store","services.features.main",
-    "services.features.technical_features","services.features.feature_selector",
+    # Features (6)
+    "services.features.bist_features","services.features.calculator",
+    "services.features.store","services.features.main",
+    "services.features.pipeline","services.features.store",
     # Intelligence (20)
     "services.intelligence.regime","services.intelligence.factor_engine",
     "services.intelligence.kap_extractor","services.intelligence.valuation.engine",

@@ -63,8 +63,8 @@ class ShortSellingMonitor:
 
     def is_quarterly_rebalance_month(self) -> bool:
         """Bu ay BIST-50 yeniden dengeleme ayı mı? (Mart, Haziran, Eylül, Aralık)"""
-        from datetime import datetime
-        return datetime.now().month in {3, 6, 9, 12}
+        from datetime import datetime, timezone
+        return datetime.now(timezone.utc).month in {3, 6, 9, 12}
 
     def auto_refresh_if_needed(self):
         """Çeyrek dönemlerde otomatik yenile."""

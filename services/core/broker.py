@@ -65,11 +65,12 @@ class BrokerInterface:
 class PaperBroker(BrokerInterface):
     """Paper broker — simülasyon, gerçek emir yok."""
 
-    def __init__(self, initial_capital: float = 1_000_000):
+    def __init__(self, initial_capital: float = 1_000_000, slippage_bps: float = 5.0):
         self._capital = initial_capital
         self._positions: Dict[str, Dict] = {}
         self._orders: Dict[str, Order] = {}
         self._idempotency_keys: Dict[str, str] = {}
+        self._slippage_bps = slippage_bps  # basis points (5 bps = %0.05)
 
     def submit_order(self, order: Order) -> Order:
         # Idempotency kontrolü
@@ -84,9 +85,12 @@ class PaperBroker(BrokerInterface):
         order.order_id = order.order_id or str(uuid.uuid4())[:12]
         order.status = OrderStatus.SUBMITTED.value
 
-        # Basit fill simülasyonu
+        # Fill simülasyonu — slippage dahil
+        slippage_mult = 1.0 + (self._slippage_bps / 10_000) if order.side == OrderSide.BUY.value else 1.0 - (self._slippage_bps / 10_000)
+        fill_price = round(order.price * slippage_mult, 4)
+
         if order.side == OrderSide.BUY.value:
-            cost = order.quantity * order.price
+            cost = order.quantity * fill_price
             if cost > self._capital:
                 order.status = OrderStatus.REJECTED.value
                 order.reject_reason = "Insufficient capital"
@@ -94,7 +98,7 @@ class PaperBroker(BrokerInterface):
                 self._capital -= cost
                 order.status = OrderStatus.FILLED.value
                 order.filled_quantity = order.quantity
-                order.avg_fill_price = order.price
+                order.avg_fill_price = fill_price
                 pos = self._positions.get(order.ticker, {"qty": 0, "avg_cost": 0})
                 total_qty = pos["qty"] + order.quantity
                 if total_qty > 0:
@@ -107,11 +111,12 @@ class PaperBroker(BrokerInterface):
                 order.status = OrderStatus.REJECTED.value
                 order.reject_reason = "Insufficient position"
             else:
-                revenue = order.quantity * order.price
+                revenue = order.quantity * fill_price
                 self._capital += revenue
                 pos["qty"] -= order.quantity
                 order.status = OrderStatus.FILLED.value
                 order.filled_quantity = order.quantity
+                order.avg_fill_price = fill_price
                 order.avg_fill_price = order.price
 
         self._orders[order.order_id] = order

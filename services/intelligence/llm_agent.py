@@ -379,7 +379,7 @@ Geçmiş piyasa koşulları ve mevcut makro bağlamı göz önünde bulundur."""
                           f"Insight: {analysis.key_insight}",
                 "confidence": analysis.importance,
             })
-            if result.get("status") in ("ok", "mock_ok"):
+            if result.get("status") == "ok":
                 analysis.regime_override = "RISK_OFF"
                 analysis.regime_override_reason = result.get("reason", "")
                 logger.warning(

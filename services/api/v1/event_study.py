@@ -1,7 +1,7 @@
 """Event Study API — KAP ve Makro Olay Çalışması (100% Canlı Veri Akışı)."""
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any, Optional
 import numpy as np
 import yfinance as yf
@@ -174,7 +174,7 @@ async def _get_live_events(ticker: Optional[str] = None) -> List[Dict[str, Any]]
                 tr_tz = timezone(timedelta(hours=3))
                 pub_time = datetime.fromtimestamp(pub_epoch, tz=timezone.utc).astimezone(tr_tz).strftime("%d.%m %H:%M")
             else:
-                pub_time = item.get("published") or datetime.now().strftime("%d.%m %H:%M")
+                pub_time = item.get("published") or datetime.now(timezone.utc).strftime("%d.%m %H:%M")
 
             # Belirlenmiş tip varsa öncelikli kullan
             event_type = item.get("type")

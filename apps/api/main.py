@@ -27,6 +27,7 @@ Endpoints:
 
 import orjson
 import asyncio
+import os
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
@@ -96,10 +97,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# CORS — ortam değişkeninden okunur, varsayılan olarak sadece localhost
+_allowed = os.environ.get("CORS_ORIGINS", "http://localhost:3000,http://localhost:8001").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Production'da kısıtla
+    allow_origins=[o.strip() for o in _allowed if o.strip()],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -273,10 +275,13 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 @app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, token: str = Query(None)):
-    """Real-time WebSocket bağlantısı — token doğrulama gerekli."""
+async def websocket_endpoint(websocket: WebSocket):
+    """Real-time WebSocket bağlantısı — Authorization header ile token doğrulama."""
+    # Token'ı header'dan al (URL'de taşınmaz — güvenlik)
+    auth_header = websocket.headers.get("authorization", "")
+    token = auth_header.replace("Bearer ", "") if auth_header else ""
     if not token:
-        await websocket.close(code=4001, reason="Authentication required: pass ?token=YOUR_JWT_TOKEN")
+        await websocket.close(code=4001, reason="Authentication required: set Authorization: Bearer <token> header")
         return
 
     # Token doğrulama

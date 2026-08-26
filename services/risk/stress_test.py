@@ -367,8 +367,8 @@ class StressTestEngine:
         Returns:
             Monte Carlo sonuçları
         """
-        if seed is not None:
-            np.random.seed(seed)
+        # Global seed yerine lokal RNG kullan (diğer thread'leri etkilemez)
+        rng = np.random.default_rng(seed)
 
         total_value = portfolio.get("total_value", 0)
         mu = np.mean(returns_history)
@@ -383,7 +383,7 @@ class StressTestEngine:
                 n_simulations, (1.0 + mu) ** holding_days - 1.0
             )
         else:
-            daily_returns = np.random.normal(mu, sigma, (n_simulations, holding_days))
+            daily_returns = rng.normal(mu, sigma, (n_simulations, holding_days))
             cumulative_returns = np.prod(1.0 + daily_returns, axis=1) - 1.0
         simulated_pnl = cumulative_returns * total_value
 

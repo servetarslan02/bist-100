@@ -218,7 +218,7 @@ async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(chec
         paper_orchestrator.portfolio.settled_cash = paper_orchestrator.portfolio.initial_capital
         paper_orchestrator.portfolio.unsettled_cash_t1 = 0.0
         paper_orchestrator.portfolio.unsettled_cash_t2 = 0.0
-        paper_orchestrator.portfolio.save_to_store(datetime.now().strftime("%Y-%m-%d"))
+        paper_orchestrator.portfolio.save_to_store(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
         return {"success": True, "cash": paper_orchestrator.portfolio.cash, "message": "Portföy tekil defterde sıfırlandı."}
     except Exception as e:
         return {"success": False, "error": str(e)}

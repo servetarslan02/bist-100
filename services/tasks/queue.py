@@ -114,12 +114,14 @@ if HAS_CELERY:
             raise self.retry(exc=e)
 
     @celery_app.task(bind=True, name="tasks.risk_stress_test")
-    def stress_test_task(self) -> Dict[str, Any]:
+    def stress_test_task(self, portfolio_value: float = 10_000_000) -> Dict[str, Any]:
         """Stres testi görevi — Monte Carlo simülasyonu."""
         try:
-            from services.risk.stress_test import run_stress_test
-            result = run_stress_test()
-            return {"status": "completed", "result": result}
+            from services.risk.stress_test import StressTestEngine
+            engine = StressTestEngine()
+            portfolio = {"total_value": portfolio_value, "positions": {}}
+            report = engine.run_all_scenarios(portfolio)
+            return {"status": "completed", "risk_score": report.risk_score}
         except Exception as e:
             logger.error("Stress test task failed", error=str(e))
             raise self.retry(exc=e)

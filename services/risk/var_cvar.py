@@ -412,13 +412,17 @@ class VaRCalculator:
         Returns:
             ComponentVaRResult listesi
         """
-        from scipy.stats import norm
+        try:
+            from scipy.stats import norm
+            z_alpha = float(norm.ppf(confidence))
+        except ImportError:
+            # scipy yoksa sabit z-skorları kullan
+            z_map = {0.90: 1.281552, 0.95: 1.644853, 0.99: 2.326348}
+            z_alpha = z_map.get(round(confidence, 2), 1.644853)
 
         portfolio_vol = np.sqrt(weights @ cov_matrix @ weights)
         if portfolio_vol <= 0:
             return []
-
-        z_alpha = norm.ppf(confidence)
         marginal_var = cov_matrix @ weights / portfolio_vol * z_alpha
         component_var = weights * marginal_var
 

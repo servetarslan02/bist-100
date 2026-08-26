@@ -1,7 +1,7 @@
 import argparse
 import sys
 import orjson
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import structlog
 
 from services.core.alpha_engine import AlphaEngine
@@ -34,8 +34,9 @@ def run_daily_pipeline(date: str):
     weights = rm.calculate_weights(top_10, method="inverse_volatility", max_weight=0.15)
     
     # Pazar rejimi kontrolu (BIST100)
-    # Gecici olarak 1.0 (Bull) varsayiyoruz veya market verisi gerektiriyor
-    market_regime = 1.0 
+    # CLI modunda tam rejim tespiti için benchmark verisi gerekir.
+    # Production'da orchestrator bunu otomatik yapar.
+    market_regime = 0.5  # nötr — CLI varsayılanı
     
     print("\n✅ TOP 10 FIRSATLAR (PHASE 17 - RISK PARITY AĞIRLIKLANDIRMASI)")
     print("-"*70)
@@ -74,7 +75,7 @@ def main():
         default="daily",
         help="Calistirma modu"
     )
-    parser.add_argument("--date", default=datetime.utcnow().strftime("%Y-%m-%d"),
+    parser.add_argument("--date", default=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
                        help="Islem tarihi (YYYY-MM-DD)")
     parser.add_argument("--start", help="Backtest baslangic tarihi")
     parser.add_argument("--end", help="Backtest bitis tarihi")

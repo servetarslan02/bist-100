@@ -67,7 +67,7 @@ class MacroCalendarEngine:
 
     def _initialize_events(self):
         """Takvim olaylarını başlat."""
-        year = datetime.now().year
+        year = datetime.now(timezone.utc).year
 
         # TCMB PPK
         for date_str in self.TCMB_PPK_DATES:

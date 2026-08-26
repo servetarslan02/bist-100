@@ -162,7 +162,7 @@ class MLModelLoader:
         Quant Probability Proxy — gerçek model yoksa kullanılır.
         Feature-based heuristic.
         """
-        mom = features.get("momentum_20d", 0) or features.get("roc_20d", 0)
+        mom = features.get("roc_20d", 0)
         vol_z = features.get("volume_zscore", 0)
         rsi = features.get("rsi_14", 50)
 

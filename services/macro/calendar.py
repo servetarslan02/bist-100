@@ -94,7 +94,7 @@ def get_upcoming_events(days: int = 7) -> List[Dict[str, Any]]:
     Returns:
         Yaklaşan olaylar listesi
     """
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     upcoming = []
 
     # TCMB PPK - ayın belirli günleri

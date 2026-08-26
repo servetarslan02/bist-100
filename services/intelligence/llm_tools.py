@@ -440,10 +440,10 @@ class LLMToolExecutor:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         except (ImportError, AttributeError):
-            logger.warning("Regime override: mock mode (regime_engine not available)")
+            logger.error("Regime override failed: regime_engine not available")
             return {
-                "status": "mock_ok",
-                "message": f"(Mock) Rejim '{new_regime}' olarak güncellendi.",
+                "status": "error",
+                "message": "Rejim motoru mevcut değil — override yapılamadı.",
                 "reason": reason,
             }
 

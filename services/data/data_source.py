@@ -198,7 +198,7 @@ class DataSourceManager:
             return None
 
         # TTL kontrolu
-        file_age = datetime.now() - datetime.fromtimestamp(cache_file.stat().st_mtime)
+        file_age = datetime.now(timezone.utc) - datetime.fromtimestamp(cache_file.stat().st_mtime)
         if file_age > timedelta(hours=self.cache_ttl_hours):
             logger.info("Cache expired", ticker=ticker)
             return None
