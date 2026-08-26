@@ -5,7 +5,6 @@ Geçmiş piyasa verilerini "canlı gibi" oynatan motor.
 """
 
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Generator, Callable
 from dataclasses import dataclass
@@ -167,13 +166,15 @@ class MarketPlayer:
                 self._ticks_processed += 1
 
                 for cb in self._on_tick_callbacks:
-                    try: cb(tick)
-                    except Exception: pass
+                    try:
+                        cb(tick)
+                    except Exception as e:
+                        logger.debug("Tick callback error", error=str(e))
 
                 yield tick
 
         except KeyboardInterrupt:
-            pass
+            logger.info("Playback interrupted by user")
         finally:
             self._is_playing = False
 

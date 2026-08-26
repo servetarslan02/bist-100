@@ -5,7 +5,7 @@ Sistem sağlık kontrolü worker'ı.
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 import structlog
 
 logger = structlog.get_logger()

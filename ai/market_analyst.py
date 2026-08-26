@@ -5,7 +5,7 @@ ML modellerinin çıktılarını insan-okunabilir analize dönüştüren agent.
 """
 
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 import structlog
 
 logger = structlog.get_logger()

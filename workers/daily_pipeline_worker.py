@@ -32,11 +32,7 @@ class DailyPipelineWorker:
         result = {"date": target_date, "steps": {}}
 
         try:
-            # 1. Piyasa durumu kontrolü
-            from services.core.market_session_fsm import bist_session_fsm
-            result["steps"]["market_check"] = "ok"
-
-            # 2. Inference (BIST-100)
+            # 1. Inference (BIST-100)
             try:
                 from services.pipeline.run_daily_inference import run_alpha_engine_sync
                 run_alpha_engine_sync()
