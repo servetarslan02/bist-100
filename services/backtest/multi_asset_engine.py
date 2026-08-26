@@ -20,7 +20,7 @@ import numpy as np
 import polars as pl
 from typing import Dict, List, Optional, Any, Tuple, Set
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 from .transaction_costs import TransactionCostEngine, bist_transaction_cost
@@ -196,7 +196,7 @@ class MultiAssetBacktestEngine:
 
         import hashlib
         run_id = hashlib.md5(
-            f"multi_{datetime.now().isoformat()}".encode()
+            f"multi_{datetime.now(timezone.utc).isoformat()}".encode()
         ).hexdigest()[:12]
 
         logger.info("Starting multi-asset backtest",

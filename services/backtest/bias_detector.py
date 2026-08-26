@@ -17,7 +17,7 @@ import numpy as np
 import polars as pl
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -203,7 +203,7 @@ class LookAheadBiasDetector:
             report.add_violation(BiasViolation(
                 violation_type="label_leakage",
                 severity="critical",
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 feature_name="purge_validation",
                 description=f"Purge days ({purge_days}) < label horizon ({label_horizon_days}). "
                            f"Minimum purge should be {min_purge} days to prevent label leakage.",
@@ -303,7 +303,7 @@ class LookAheadBiasDetector:
                     report.add_violation(BiasViolation(
                         violation_type="look_ahead",
                         severity="warning",
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                         feature_name="data_revision",
                         description=f"Multiple revisions found for report date {name}. "
                                    f"Only the first (as-reported) version should be used in backtest.",

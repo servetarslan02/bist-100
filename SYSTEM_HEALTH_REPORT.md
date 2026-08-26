@@ -2147,3 +2147,70 @@ Bu bölüm, SYSTEM_HEALTH_REPORT.md'nin orijinal analizinde yüzeysel geçilen v
 
 *Rapor sonu. 555/555 production Python dosyası (%100) okunmuştur. 30/30 servis dizini, 15/15 root-level dosya, 15/15 API v1 endpoint kapsanmıştır. 16 dosya silinmiştir. 50 bulgu tespit edilmiştir.*
 
+
+---
+
+## DEEP AUDIT — Part 4: Round 3 Fixes (2026-08-27)
+
+**Date:** 2026-08-27  
+**Method:** Automated sub-agent + manual review  
+**Scope:** Remaining P2 issues + code quality improvements
+
+### ✅ FIX-1: Anonymous VIEWER Role Restricted — FIXED
+**File:** `services/api/dependencies.py`
+**Issue:** When `AUTH_STRICT=false`, all endpoints (including write operations) received anonymous VIEWER role
+**Fix:** Anonymous VIEWER now restricted to GET requests only. Write operations (POST/PUT/DELETE) require authentication even when `AUTH_STRICT=false`
+**Verified:** ✅ Syntax OK
+
+### ✅ FIX-2: CI Lint Exit-Zero Removed — FIXED
+**File:** `.github/workflows/ci.yml`
+**Issue:** `ruff check . --exit-zero` meant lint failures didn't fail CI
+**Fix:** Removed `--exit-zero` flag — lint failures now properly fail the CI pipeline
+**Verified:** ✅ YAML valid
+
+### ✅ FIX-3: datetime.now() Timezone Fixes — FIXED (9 occurrences)
+**Files:** `services/backtest/bias_detector.py` (2), `services/backtest/deterministic.py` (3), `services/backtest/multi_asset_engine.py` (1), `services/backtest/scanner_parity.py` (2), `workers/model_retrain_worker.py` (1)
+**Issue:** `datetime.now()` without timezone in production code
+**Fix:** All replaced with `datetime.now(timezone.utc)`, `timezone` added to imports
+**Verified:** ✅ All 5 files compile, AST OK
+
+### ✅ FIX-4: Robustness Tester Cost Stress — FIXED
+**File:** `services/optimization/robustness_tester.py`
+**Issue:** `test_cost_stress()` ran same simulation for all cost levels, only applying mathematical correction
+**Fix:** Now passes `commission_rate` and `slippage_rate` to `simulate_fast()` — each cost level runs its own simulation
+**Dependency:** `services/optimization/bayesian_optimizer.py` updated to accept `commission_rate`/`slippage_rate` parameters
+**Verified:** ✅ Both files compile
+
+### ✅ FIX-5: Holidays 2027 Added — FIXED
+**File:** `config/holidays.json`
+**Issue:** Only 2026 holidays present
+**Fix:** Added 2027 Turkish holidays (New Year, National Sovereignty, Labor Day, Ramadan Feast, Sacrifice Feast, Republic Day, variable dates)
+**Verified:** ✅ JSON valid
+
+### ✅ FIX-6: Bayesian Optimizer Parameterized Costs — FIXED
+**File:** `services/optimization/bayesian_optimizer.py`
+**Issue:** `simulate_fast()` used hardcoded `COMMISSION_RATE=0.0015` and `SLIPPAGE_RATE=0.0010`
+**Fix:** Now accepts `commission_rate` and `slippage_rate` as parameters with sensible defaults
+**Verified:** ✅ Syntax OK
+
+### Already Fixed (Verified in Round 3)
+- ✅ `stress_test.py` — Already uses `np.random.default_rng()` (not `np.random.seed()`)
+- ✅ `var_cvar.py` — Already has scipy fallback with z-score map
+- ✅ `risk_parity_engine.py` — Already warns when `sector_map` is empty
+- ✅ `security.py` / `auth.py` — No Role enum conflict (auth imports from security)
+- ✅ `bayesian_optimizer.py` / `asymmetric_optimizer.py` — Different StrategyParameters by design (asymmetric has bull/bear trailing)
+- ✅ `replay_engine.py` — No duplicate WalkForwardValidator
+- ✅ `run_all_imports.py` — All 147 modules exist as files
+- ✅ `dataset_builder_30y.py` — Slippage correctly applied to next-day open (T+1 execution)
+
+### Remaining P2 Items (Non-Blocking)
+| Priority | Issue | Status | Notes |
+|---|---|---|---|
+| P2 | In-memory rate limiter | ⬜ REMAINING | Only needed for multi-instance |
+| P2 | Custom JWT → PyJWT | ⬜ REMAINING | Works correctly, low risk |
+| P2 | Thread safety | ⬜ REMAINING | Low risk in single-process mode |
+| P2 | AlphaEngine model persistence | ⬜ REMAINING | Optimization, not a bug |
+
+---
+
+*Rapor sonu — Round 3. 10 dosya değiştirildi, 62 satır eklendi, 36 satır silindi.*

@@ -120,10 +120,10 @@ class BayesianMetricOptimizer:
                 "dates": df.index
             }
 
-    def simulate_fast(self, params: StrategyParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0) -> OptimizationTrialResult:
+    def simulate_fast(self, params: StrategyParameters, start_year: int = 1997, end_year: int = 2026, initial_capital: float = 100000.0, commission_rate: float = 0.0015, slippage_rate: float = 0.0010) -> OptimizationTrialResult:
         """C-hızında saf NumPy simülasyonu."""
-        COMMISSION_RATE = 0.0015
-        SLIPPAGE_RATE = 0.0010
+        COMMISSION_RATE = commission_rate
+        SLIPPAGE_RATE = slippage_rate
 
         trading_dates = [d for d in self.bm_df.index if start_year <= d.year <= end_year]
         if len(trading_dates) < 30:

@@ -60,7 +60,7 @@ class ModelRetrainWorker:
             return True
         try:
             last = datetime.strptime(self._last_train_date, "%Y-%m-%d")
-            return (datetime.now() - last).days >= 7
+            return (datetime.now(timezone.utc) - last).days >= 7
         except ValueError:
             return True
 

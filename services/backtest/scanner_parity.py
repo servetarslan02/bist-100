@@ -17,7 +17,7 @@ import orjson
 import polars as pl
 from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -229,7 +229,7 @@ class BacktestScannerParity:
         failed = len(checks) - passed
 
         report = ParityReport(
-            timestamp=datetime.now().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
             config_hash=self._config.compute_hash(),
             total_checks=len(checks),
             passed_checks=passed,
@@ -269,7 +269,7 @@ class FeatureVersionLock:
         self._versions[version] = {
             "feature_names": feature_names,
             "config": computation_config,
-            "registered_at": datetime.now().isoformat(),
+            "registered_at": datetime.now(timezone.utc).isoformat(),
             "hash": hashlib.sha256(
                 orjson.dumps({"names": feature_names, "config": computation_config}, option=orjson.OPT_SORT_KEYS).decode()
             ).hexdigest()[:16],

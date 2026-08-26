@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check . --select E,F,W --ignore E501,E402 --exit-zero
+      - run: ruff check . --select E,F,W --ignore E501,E402
 
   test:
     runs-on: ubuntu-latest

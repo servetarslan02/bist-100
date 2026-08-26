@@ -21,7 +21,7 @@ import hashlib
 import numpy as np
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import structlog
 
@@ -103,11 +103,11 @@ class DeterministicRecovery:
         Returns:
             SystemCheckpoint
         """
-        checkpoint_id = f"cp_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
+        checkpoint_id = f"cp_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
 
         checkpoint = SystemCheckpoint(
             checkpoint_id=checkpoint_id,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             config_snapshot=config.copy(),
             portfolio_state=portfolio_state.copy(),
             model_state=model_state.copy() if model_state else None,
@@ -375,7 +375,7 @@ class IdempotencyGuard:
             "operation": operation,
             "params": params,
             "result": result,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
     def get_or_execute(

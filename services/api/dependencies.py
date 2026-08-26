@@ -94,15 +94,23 @@ async def get_current_user(
 
     auth_strict = os.environ.get("AUTH_STRICT", "false").lower() in ("true", "1")
     if not auth_strict:
-        logger.warning("AUTH_STRICT=false — anonim VIEWER rolü veriliyor", path=path)
-        return TokenPayload(
-            sub="anonymous",
-            username="dashboard_viewer",
-            role=Role.VIEWER.value,
-            permissions=["GET"],
-            exp=time.time() + 3600,
-            iat=time.time(),
-        )
+        # Sadece GET isteklerinde anonim erişime izin ver (yazma işlemleri her zaman auth gerektirir)
+        if method == "GET":
+            logger.warning("AUTH_STRICT=false — anonim VIEWER rolü veriliyor (GET only)", path=path)
+            return TokenPayload(
+                sub="anonymous",
+                username="dashboard_viewer",
+                role=Role.VIEWER.value,
+                permissions=["GET"],
+                exp=time.time() + 3600,
+                iat=time.time(),
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required for write operations",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,

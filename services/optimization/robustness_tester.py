@@ -88,6 +88,7 @@ class RobustnessTester:
     def test_cost_stress(self, base_params: StrategyParameters) -> Tuple[Dict[str, Dict[str, float]], bool]:
         """
         %0.25, %0.50, %1.00 ve %1.50 round-trip işlem maliyeti altında dayanıklılığı test eder.
+        Her maliyet seviyesi için simülasyonu gerçekten çalıştırır.
         """
         cost_levels = {
             "%0.25 (Standart)": (0.0015, 0.0010),
@@ -98,17 +99,21 @@ class RobustnessTester:
 
         stress_results = {}
         for label, (comm, slip) in cost_levels.items():
-            # Yüksek maliyetli simülasyon
-            res = self.optimizer.simulate_fast(base_params, start_year=1997, end_year=2023)
-            # Maliyet etkisini modelle
-            trade_cost_impact = (comm + slip) * res.total_trades * 100
-            adjusted_ret = max(-95.0, res.total_return_pct - (trade_cost_impact * 0.3))
-            adjusted_pf = max(0.5, round(res.profit_factor * (1.0 - (comm + slip) * 20), 2))
+            # Her maliyet seviyesi için gerçek simülasyon çalıştır
+            res = self.optimizer.simulate_fast(
+                base_params,
+                start_year=1997,
+                end_year=2023,
+                commission_rate=comm,
+                slippage_rate=slip,
+            )
 
             stress_results[label] = {
-                "total_return": round(adjusted_ret, 1),
-                "profit_factor": adjusted_pf,
-                "max_dd": res.max_drawdown
+                "total_return": round(res.total_return_pct, 1),
+                "profit_factor": round(res.profit_factor, 2),
+                "max_dd": res.max_drawdown,
+                "sharpe": round(res.sharpe_ratio, 2),
+                "trades": res.total_trades,
             }
 
         # %1.00 maliyette bile pozitif kâr kalıyorsa stres testini geçer
