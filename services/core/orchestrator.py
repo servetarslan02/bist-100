@@ -18,6 +18,9 @@ import numpy as np
 
 import structlog
 
+# Varsayılan portföy değeri — PortfolioManager yoksa kullanılır
+DEFAULT_PORTFOLIO_VALUE = 10_000_000  # ₺10M
+
 # Sync-to-async bridge: background event loop for event publishing
 _bg_loop = None
 _bg_thread = None
@@ -730,7 +733,7 @@ class MasterOrchestrator:
                 pm = self._services.get("portfolio_manager")
                 if pm and hasattr(pm, 'get_portfolio'):
                     pf = pm.get_portfolio()
-                    actual_portfolio_value = pf.get("total_value", 100000)
+                    actual_portfolio_value = pf.get("total_value", DEFAULT_PORTFOLIO_VALUE)
                     actual_positions = {}
                     for pos in pf.get("positions", []):
                         actual_positions[pos["ticker"]] = {
@@ -738,7 +741,7 @@ class MasterOrchestrator:
                             "avg_cost": pos.get("entry_price", 0),
                         }
                 else:
-                    actual_portfolio_value = 100000
+                    actual_portfolio_value = DEFAULT_PORTFOLIO_VALUE
                     actual_positions = {}
 
                 risk_result = rg.check_order(
@@ -772,7 +775,7 @@ class MasterOrchestrator:
                 pm = self._services.get("portfolio_manager")
                 if pm and hasattr(pm, 'get_portfolio'):
                     pf = pm.get_portfolio()
-                    actual_portfolio_value = pf.get("total_value", 100000)
+                    actual_portfolio_value = pf.get("total_value", DEFAULT_PORTFOLIO_VALUE)
                     pos = pf.get("positions", [])
                     current_pos_pct = 0
                     for p in pos:
@@ -780,7 +783,7 @@ class MasterOrchestrator:
                             current_pos_pct = p.get("market_value", 0) / actual_portfolio_value if actual_portfolio_value > 0 else 0
                             break
                 else:
-                    actual_portfolio_value = 100000
+                    actual_portfolio_value = DEFAULT_PORTFOLIO_VALUE
                     current_pos_pct = 0
 
                 order_value = trade_plan.get("quantity", 0) * float(prices[-1]) if isinstance(trade_plan, dict) else 0

@@ -90,7 +90,20 @@ SMA_TREND = 200
 DEFAULT_WACC = 0.20                 # %20 (Türkiye risk primi)
 DEFAULT_TAX_RATE = 0.23             # %23 kurumlar vergisi
 DEFAULT_TERMINAL_GROWTH = 0.03      # %3 (enflasyon + reel)
-DEFAULT_RISK_FREE_RATE = 0.15       # %15 (TCMB politika faizi — güncellenmeli: config/risk_free_rate.json veya TCMB API)
+def _load_risk_free_rate() -> float:
+    """TCMB politika faizini config dosyasından oku."""
+    try:
+        import orjson
+        from pathlib import Path
+        config_path = Path(__file__).parent.parent.parent / "config" / "risk_free_rate.json"
+        if config_path.exists():
+            data = orjson.loads(config_path.read_bytes())
+            return float(data.get("risk_free_rate", 0.45))
+    except Exception:
+        pass
+    return 0.45  # fallback
+
+DEFAULT_RISK_FREE_RATE = _load_risk_free_rate()  # config/risk_free_rate.json'dan okunur
 
 # =====================================================
 # VERİ KALİTESİ SABİTLERİ
