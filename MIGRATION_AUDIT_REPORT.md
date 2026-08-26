@@ -159,7 +159,7 @@ Kod DuckDB kullanıyor ama docstring'ler hâlâ "SQLite" diyordu. Bu, geliştiri
 | ✅ Polars migration | Tamamlandı | 20+ dosya |
 | ✅ QuestDB entegrasyonu | Tamamlandı | Config + Client + Docker |
 | ✅ pgvector/HNSW | Tamamlandı | Schema + Index |
-| 🔵 Kabul edilebilir | Bilgi | 5 madde |
+| 🔵 Kasıtlı (db-agnostic) | Bilgi | 3 madde |
 
 ---
 
@@ -182,11 +182,13 @@ Kod DuckDB kullanıyor ama docstring'ler hâlâ "SQLite" diyordu. Bu, geliştiri
 
 - Docstring'lerde eski "SQLite" referansları DuckDB olarak güncellendi
 
-### Kabul Edilebilir (Dokümantasyon)
+### Düzeltilen Kabul Edilebilir Sorunlar
 
-- MLflow SQLite backend (MLflow default'u, tek node için uygun)
-- `requirements.txt`'de pandas (yfinance bridge için zorunlu)
-- `db_lock.py` SQLite dialect desteği (kasıtlı, database-agnostic)
-- `scripts/` ve `memory/` altındaki eski referanslar (dokümantasyon)
+- ✅ MLflow SQLite → PostgreSQL backend (docker-compose + populate_mlflow.py)
+- ✅ `scripts/` altındaki sqlite_master → information_schema.tables
+- ✅ Kalan SQLite mesaj/referansları → DuckDB olarak güncellendi
+- 🔵 `requirements.txt`'de pandas (yfinance bridge için zorunlu — kasıtlı)
+- 🔵 `db_lock.py` + `migrations/runner.py` SQLite dialect desteği (kasıtlı, database-agnostic)
+- 🔵 `memory/` ve `docs/` altındaki eski referanslar (dokümantasyon, kod etkisi yok)
 
 **Düzeltilen toplam:** 33 dosya, 50+ sözdizimi hatası, 14 docstring güncellemesi
