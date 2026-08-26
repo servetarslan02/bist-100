@@ -52,9 +52,24 @@ class ShortSellingMonitor:
         return self._bist50_cache
 
     def refresh_bist50_cache(self):
-        """BIST-50 listesini yenile (çeyrek dönemlerde güncellenir)."""
+        """BIST-50 listesini yenile (çeyrek dönemlerde güncellenir).
+
+        BIST-50 listesi her yıl Mart, Haziran, Eylül, Aralık aylarında güncellenir.
+        Bu metod otomatik olarak çağrılmalı.
+        """
         self._bist50_cache = None
         self._get_bist50()
+        logger.info("BIST-50 cache refreshed", count=len(self._bist50_cache) if self._bist50_cache else 0)
+
+    def is_quarterly_rebalance_month(self) -> bool:
+        """Bu ay BIST-50 yeniden dengeleme ayı mı? (Mart, Haziran, Eylül, Aralık)"""
+        from datetime import datetime
+        return datetime.now().month in {3, 6, 9, 12}
+
+    def auto_refresh_if_needed(self):
+        """Çeyrek dönemlerde otomatik yenile."""
+        if self.is_quarterly_rebalance_month():
+            self.refresh_bist50_cache()
 
     def set_gross_settlement(self, tickers: List[str]):
         """Brüt takaslı hisseleri güncelle."""
@@ -92,6 +107,7 @@ class ShortSellingMonitor:
         ticker: str,
         current_price: float = 0,
         last_trade_price: float = 0,
+        best_ask_price: float = 0,  # En iyi satış fiyatı (spread kontrolü için)
     ) -> ShortSellingDecision:
         """Açığa satış yapılabilir mi kontrol et.
 
@@ -99,6 +115,7 @@ class ShortSellingMonitor:
             ticker: Hisse kodu
             current_price: Güncel fiyat
             last_trade_price: Son işlem fiyatı (uptick rule için)
+            best_ask_price: En iyi satış fiyatı (spread kontrolü için)
         """
         details = {"ticker": ticker}
 
@@ -127,14 +144,23 @@ class ShortSellingMonitor:
                 details=details,
             )
 
-        # 4. Uptick rule (Eylül 2025: BIST-100 %2 düşünce aktif)
+        # 4. Uptick rule (Ağustos 2025: BIST-100 %2 düşünce aktif)
         if self._uptick_rule_active:
+            # Aktif uptick rule: fiyat son işlem fiyatından yüksek veya eşit olmalı
             if current_price > 0 and last_trade_price > 0:
                 if current_price < last_trade_price:
                     return ShortSellingDecision(
                         allowed=False,
                         reason=f"Uptick Rule AKTİF (BIST-100 %2+ düştü): güncel ({current_price}) < son işlem ({last_trade_price})",
                         details={**details, "current_price": current_price, "last_trade_price": last_trade_price, "uptick_active": True},
+                    )
+            # Spread kontrolü: en iyi satış fiyatından da yüksek veya eşit olmalı
+            if current_price > 0 and best_ask_price > 0:
+                if current_price < best_ask_price:
+                    return ShortSellingDecision(
+                        allowed=False,
+                        reason=f"Uptick Rule AKTİF: güncel ({current_price}) < en iyi satış ({best_ask_price})",
+                        details={**details, "current_price": current_price, "best_ask_price": best_ask_price, "uptick_active": True},
                     )
         else:
             # Uptick rule pasifken de temel fiyat kontrolü

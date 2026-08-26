@@ -115,7 +115,7 @@ class PaperExecutionEngine:
             return order
 
         order_type = order_type.upper()
-        if order_type not in {"MARKET", "LIMIT", "STOP_LIMIT"}:
+        if order_type not in {"MARKET", "LIMIT", "STOP_LIMIT", "KIE", "KPY", "GIE", "TRADE_AT_CLOSE"}:
             order["status"] = "REJECTED"
             order["rejection_reason"] = f"UNSUPPORTED_ORDER_TYPE: {order_type}"
             return order

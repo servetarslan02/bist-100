@@ -48,15 +48,21 @@ TURKEY_HOLIDAYS_2026 = [
     date(2026, 7, 15),   # Demokrasi ve Millî Birlik Günü
     date(2026, 8, 30),   # Zafer Bayramı
     date(2026, 10, 29),  # Cumhuriyet Bayramı
-    date(2026, 3, 20),   # Ramazan Bayramı Arife
     date(2026, 3, 21),   # Ramazan Bayramı 1. gün
     date(2026, 3, 22),   # Ramazan Bayramı 2. gün
     date(2026, 3, 23),   # Ramazan Bayramı 3. gün
-    date(2026, 5, 27),   # Kurban Bayramı Arife
     date(2026, 5, 28),   # Kurban Bayramı 1. gün
     date(2026, 5, 29),   # Kurban Bayramı 2. gün
     date(2026, 5, 30),   # Kurban Bayramı 3. gün
     date(2026, 5, 31),   # Kurban Bayramı 4. gün
+]
+
+# 2026 Türkiye yarım gün tatilleri (resmi tatil arifeleri)
+# Bu günlerde piyasa 12:30'da kapanır
+TURKEY_HALF_DAYS_2026 = [
+    date(2026, 3, 20),   # Ramazan Bayramı Arifesi
+    date(2026, 5, 27),   # Kurban Bayramı Arifesi
+    date(2026, 10, 28),  # Cumhuriyet Bayramı Arifesi (yarım gün)
 ]
 
 
@@ -65,15 +71,26 @@ class MarketCalendar:
 
     MARKET_OPEN = time(10, 0)
     MARKET_CLOSE = time(18, 0)
+    HALF_MARKET_CLOSE = time(12, 30)  # Yarım gün kapanış
     PRE_MARKET_START = time(9, 40)
     CLOSING_END = time(18, 10)
+    HALF_CLOSING_END = time(12, 40)  # Yarım gün kapanış sonu
 
-    def __init__(self, holidays: Optional[List[date]] = None):
+    def __init__(self, holidays: Optional[List[date]] = None, half_days: Optional[List[date]] = None):
         self._holidays = set(holidays or TURKEY_HOLIDAYS_2026)
+        self._half_days = set(half_days or TURKEY_HALF_DAYS_2026)
         # FSM'ye tatil günlerini string formatında aktar
         holiday_strs = {d.strftime("%Y-%m-%d") for d in self._holidays}
+        half_day_strs = {d.strftime("%Y-%m-%d") for d in self._half_days}
         bist_session_fsm.set_holidays(holiday_strs)
+        bist_session_fsm.set_half_days(half_day_strs)
         self._halts: Dict[date, List[Tuple[time, time]]] = {}
+
+    def is_half_day(self, d: Optional[date] = None) -> bool:
+        """Bu gün yarım gün mü?"""
+        if d is None:
+            d = date.today()
+        return d in self._half_days
 
     def is_trading_day(self, d: Optional[date] = None) -> bool:
         if d is None:
@@ -142,13 +159,15 @@ class MarketCalendar:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if self.is_trading_day(dt.date()):
-            today_close = datetime.combine(dt.date(), self.MARKET_CLOSE, tzinfo=_TZ_ISTANBUL)
+            close_time = self.HALF_MARKET_CLOSE if self.is_half_day(dt.date()) else self.MARKET_CLOSE
+            today_close = datetime.combine(dt.date(), close_time, tzinfo=_TZ_ISTANBUL)
             if dt < today_close:
                 return today_close
         check_date = dt.date() + timedelta(days=1)
         for _ in range(10):
             if self.is_trading_day(check_date):
-                return datetime.combine(check_date, self.MARKET_CLOSE, tzinfo=_TZ_ISTANBUL)
+                close_time = self.HALF_MARKET_CLOSE if self.is_half_day(check_date) else self.MARKET_CLOSE
+                return datetime.combine(check_date, close_time, tzinfo=_TZ_ISTANBUL)
             check_date += timedelta(days=1)
         return dt + timedelta(days=1)
 
@@ -171,6 +190,7 @@ class MarketCalendar:
             dt = datetime.now(_TZ_ISTANBUL)
         return {
             "is_trading_day": self.is_trading_day(dt.date()),
+            "is_half_day": self.is_half_day(dt.date()),
             "is_market_open": self.is_market_open(dt),
             "session": self.get_session(dt).value,
             "status": self.get_status(dt).value,

@@ -10,7 +10,7 @@ logger = structlog.get_logger()
 
 # Persistent DLQ kullan — restart sonrası kaybolmaz
 try:
-    from .persistent_dlq import PersistentDeadLetterQueue, DLQStatus
+    from .persistent_dlq import PersistentDeadLetterQueue, DLQStatus, DLQEntry
 
     class DeadLetterQueue(PersistentDeadLetterQueue):
         """Backward-compatible wrapper — PersistentDeadLetterQueue kullanır."""

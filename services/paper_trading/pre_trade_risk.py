@@ -73,6 +73,18 @@ class PreTradeRiskEngine:
         if quantity <= 0:
             return PreTradeValidationResult(False, "INVALID_QUANTITY", f"Geçersiz miktar: {quantity}")
 
+        # 1b. LOT BÜYÜKLÜĞÜ KONTROLÜ (BIST: 1 lot = 1 pay, minimum 1 lot)
+        if quantity < 1:
+            return PreTradeValidationResult(False, "BELOW_MIN_LOT", f"Minimum lot büyüklüğü 1. Girilen: {quantity}")
+
+        # Lot altı (küsürat) işlem kontrolü — sadece belirli durumlarda izin verilir
+        # Normal işlemler tam lot olmalı
+        if quantity != int(quantity):
+            return PreTradeValidationResult(
+                False, "FRACTIONAL_LOT_NOT_ALLOWED",
+                f"Küsüratlı lot ({quantity}) normal işlemlerde kabul edilmez. Tam lot girilmeli."
+            )
+
         # 2. SEANS FAZI VE EMİR TÜRÜ UYGUNLUĞU (OrderTypeValidator)
         if market_phase == BISTMarketPhase.CLOSED:
             return PreTradeValidationResult(False, "MARKET_CLOSED", "Piyasa kapalı, emir kabul edilmez.")
@@ -81,11 +93,41 @@ class PreTradeRiskEngine:
             return PreTradeValidationResult(False, "MATCHING_PHASE", "Fiyat belirleme fazında yeni emir girilemez.")
 
         if market_phase == BISTMarketPhase.CLOSING_PRICE_TRADING:
-            if order_type != "TRADE_AT_CLOSE" and not is_closing_price:
+            if order_type not in {"TRADE_AT_CLOSE", "MARKET", "LIMIT"}:
                 return PreTradeValidationResult(
                     False, "INVALID_ORDER_FOR_SESSION",
                     "Kapanış fiyatından işlemler fazında sadece sabit kapanış fiyatlı emirler kabul edilir."
                 )
+
+        # KİE (Kalanı İptal Et): Sürekli işlem ve kapanış seansında geçerli
+        if order_type == "KIE" and market_phase not in {
+            BISTMarketPhase.CONTINUOUS_AUCTION,
+            BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+            BISTMarketPhase.CLOSING_PRICE_TRADING,
+        }:
+            return PreTradeValidationResult(
+                False, "INVALID_ORDER_FOR_SESSION",
+                "KİE emri sadece sürekli işlem ve kapanış seansında kabul edilir."
+            )
+
+        # KPY (Kalanı Pasife Yaz): Sürekli işlem seansında geçerli
+        if order_type == "KPY" and market_phase not in {
+            BISTMarketPhase.CONTINUOUS_AUCTION,
+        }:
+            return PreTradeValidationResult(
+                False, "INVALID_ORDER_FOR_SESSION",
+                "KPY emri sadece sürekli işlem seansında kabul edilir."
+            )
+
+        # GİE (Gerçekleşmezse İptal): Açılış ve kapanış seansında geçerli
+        if order_type == "GIE" and market_phase not in {
+            BISTMarketPhase.OPENING_AUCTION_COLLECTION,
+            BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+        }:
+            return PreTradeValidationResult(
+                False, "INVALID_ORDER_FOR_SESSION",
+                "GİE emri sadece açılış ve kapanış seansında kabul edilir."
+            )
 
         # 3. FİYAT ADIMI DENETİMİ (PriceTickValidator)
         if order_type == "LIMIT" and price > 0:

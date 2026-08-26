@@ -42,7 +42,16 @@ class PriceLimitResult:
 
 
 class PriceLimitMonitor:
-    """BIST fiyat limitleri kontrolü (Eylül 2025 güncel)."""
+    """BIST fiyat limitleri kontrolü (Ağustos 2025 güncel).
+
+    Pazar bazlı limitler:
+    - Yıldız Pazar: ±%10
+    - Ana Pazar: ±%10
+    - Alt Pazar: ±%10
+    - Halka arz günü: limit yok (serbest fiyat)
+    - Bedelsiz/bölünme sonrası: baz fiyat yeniden hesaplanır
+    - Devre kesici sonrası: marj daraltılır (%5)
+    """
 
     # Eylül 2025 sonrası: Tüm pazarlarda standart ±%10
     DEFAULT_LIMIT = 10.0        # %10 (tüm pazarlar standart)
@@ -50,19 +59,54 @@ class PriceLimitMonitor:
     ANA_LIMIT = 10.0            # %10 (Ana Pazar)
     ALT_LIMIT = 10.0            # %10 (Alt Pazar)
 
-    # Devre kesici sonrası marj daraltma
-    POST_CB_LIMIT = 5.0         # %5 (devre kesici sonrası daraltma)
+    # Özel durum limitleri
+    IPO_NO_LIMIT = True         # Halka arz günü limit yok
+    POST_CB_LIMIT = 5.0         # Devre kesici sonrası daraltma
+    POST_CORP_ACTION_LIMIT = 10.0  # Kurumsal işlem sonrası (bedelsiz/bölünme)
 
-    # Eski değerler (artık geçerli değil ama referans için korundu)
-    # WIDE_LIMIT = 20.0  # KALDIRILDI: Eylül 2025 sonrası tüm pazarlarda %10
+    # Pazar bazlı limit haritası
+    MARKET_LIMITS = {
+        "yildiz": 10.0,
+        "ana": 10.0,
+        "alt": 10.0,
+        "fiyat": 10.0,       # Fiyat Pazarı
+        "kesin": 10.0,       # Kesin Alım Satım Pazarı
+        "gözaltı": 10.0,     # Gözaltı Pazarı
+        "yakın": 10.0,       # Yakın İzleme Pazarı
+        "kolektif": 10.0,    # Kolektif Yatırım Ürünleri
+        "serbest": 0.0,      # Serbest İşlem (limit yok)
+    }
 
     def __init__(self):
         self._custom_limits: Dict[str, float] = {}
         self._post_cb_tickers: Dict[str, float] = {}  # Devre kesici sonrası daraltılmış marj
+        self._ipo_tickers: set = set()  # Halka arz günü (limit yok)
+        self._corp_action_tickers: set = set()  # Kurumsal işlem sonrası (bedelsiz/bölünme)
+        self._market_type: Dict[str, str] = {}  # Hisse → pazar tipi
 
     def set_custom_limit(self, ticker: str, limit_pct: float):
         """Özel limit ata (volatil hisseler)."""
         self._custom_limits[ticker] = limit_pct
+
+    def set_market_type(self, ticker: str, market_type: str):
+        """Hisse için pazar tipi ata (yildiz, ana, alt, vb.)."""
+        self._market_type[ticker] = market_type
+
+    def add_ipo_ticker(self, ticker: str):
+        """Halka arz günü limit yok."""
+        self._ipo_tickers.add(ticker)
+
+    def remove_ipo_ticker(self, ticker: str):
+        """Halka arz gününü kaldır."""
+        self._ipo_tickers.discard(ticker)
+
+    def add_corporate_action_ticker(self, ticker: str):
+        """Kurumsal işlem sonrası (bedelsiz/bölünme) baz fiyat yeniden hesaplanır."""
+        self._corp_action_tickers.add(ticker)
+
+    def remove_corporate_action_ticker(self, ticker: str):
+        """Kurumsal işlem sonrası takibi kaldır."""
+        self._corp_action_tickers.discard(ticker)
 
     def set_post_circuit_breaker_limit(self, ticker: str):
         """Devre kesici sonrası marj daraltma uygula."""
@@ -75,12 +119,23 @@ class PriceLimitMonitor:
 
     def get_effective_limit(self, ticker: str) -> float:
         """Hisseye uygulanan efektif limiti döndür."""
-        # Önce devre kesici sonrası daraltma kontrolü
+        # Halka arz günü → limit yok
+        if ticker in self._ipo_tickers:
+            return 0.0  # 0 = limit yok
+
+        # Devre kesici sonrası daraltma kontrolü
         if ticker in self._post_cb_tickers:
             return self._post_cb_tickers[ticker]
+
         # Özel limit kontrolü
         if ticker in self._custom_limits:
             return self._custom_limits[ticker]
+
+        # Pazar tipine göre limit
+        market = self._market_type.get(ticker, "")
+        if market in self.MARKET_LIMITS:
+            return self.MARKET_LIMITS[market]
+
         return self.DEFAULT_LIMIT
 
     def check_price_limit(

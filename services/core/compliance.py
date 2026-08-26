@@ -45,6 +45,9 @@ class ComplianceChecker:
     MANDATORY_BID_THRESHOLD = 0.10  # %10
     # %20 engelleme azınlığı
     BLOCKING_MINORITY = 0.20        # %20
+    # Algoritmik trading bildirim eşiği (günlük işlem adedi)
+    ALGO_TRADING_ORDER_THRESHOLD = 1000  # Günde 1000+ emir = algoritmik trading
+    ALGO_TRADING_VOLUME_THRESHOLD = 0.05  # Günlük hacmin %5'i = algoritmik trading
 
     def check_spk_compliance(
         self,
@@ -109,6 +112,39 @@ class ComplianceChecker:
                 )
 
         return ComplianceResult(action="OK", details=details)
+
+    def check_algo_trading_notification(
+        self,
+        daily_order_count: int,
+        daily_volume_pct: float,
+    ) -> ComplianceResult:
+        """Algoritmik trading bildirim kontrolü.
+
+        SPK'nın algoritmik trading bildirimi gereksinimi:
+        - Günde 1000+ emir gönderen kurumlar SPK'ya bildirimde bulunmalı
+        - Günlük hacmin %5'ini aşan algoritmik işlemler bildirim gerektirir
+
+        Args:
+            daily_order_count: Günlük emir sayısı
+            daily_volume_pct: Günlük hacim yüzdesi (0-1)
+        """
+        if daily_order_count >= self.ALGO_TRADING_ORDER_THRESHOLD:
+            return ComplianceResult(
+                notification_required=True,
+                action="NOTIFY",
+                reason=f"Algoritmik trading bildirimi: {daily_order_count} emir/gün (eşik: {self.ALGO_TRADING_ORDER_THRESHOLD})",
+                details={"daily_order_count": daily_order_count, "threshold": self.ALGO_TRADING_ORDER_THRESHOLD},
+            )
+
+        if daily_volume_pct >= self.ALGO_TRADING_VOLUME_THRESHOLD:
+            return ComplianceResult(
+                notification_required=True,
+                action="NOTIFY",
+                reason=f"Algoritmik trading bildirimi: hacim %{daily_volume_pct*100:.1f} (eşik: %{self.ALGO_TRADING_VOLUME_THRESHOLD*100:.0f})",
+                details={"daily_volume_pct": daily_volume_pct, "threshold": self.ALGO_TRADING_VOLUME_THRESHOLD},
+            )
+
+        return ComplianceResult(action="OK")
 
 
 # Singleton
