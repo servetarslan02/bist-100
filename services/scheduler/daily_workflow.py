@@ -1,20 +1,19 @@
 """
-ALPHA BIST — Daily Workflow v2.0
+ALPHA BIST — Daily Workflow v3.0
 
 Tam günlük workflow otomasyonu.
 BIST saatlerine göre otomatik job yönetimi.
+(2015 BISTECH sonrası tek seans — Eylül 2025 güncel)
 
 Günlük Akış:
-09:40 — PRE-MARKET
-09:55-12:30 — SEANS 1
-12:30-14:00 — ARA
-14:00-17:40 — SEANS 2
-17:40-18:00 — KAPANIŞ
-18:00-18:30 — POST-MARKET
+09:40-10:00 — PRE-MARKET (Açılış seansı emir toplama)
+10:00-18:00 — SÜREKLİ İŞLEM (Tek seans, ara yok)
+18:01-18:10 — KAPANIŞ (Kapanış seansı)
+18:10-18:30 — POST-MARKET
 18:30-23:00 — AFTER-HOURS
 23:00-09:40 — NIGHT
 
-Kaynaklar: BIST resmi, arXiv Agentic Trading (2026)
+Kaynaklar: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
 from typing import Dict, Any, Optional, Callable, Awaitable, List
@@ -54,46 +53,32 @@ class DailyWorkflow:
     Market session manager ile entegre çalışır.
     """
 
-    # Faz tanımları
+    # Faz tanımları (2015 BISTECH sonrası tek seans — Eylül 2025 güncel)
     PHASES = {
         "pre_market": WorkflowPhase(
             name="PRE_MARKET",
             start_time="09:40",
-            end_time="09:55",
+            end_time="10:00",
             jobs=["market_data_update", "feature_calculation", "universe_refresh", "regime_detection"],
-            description="Piyasa öncesi hazırlık",
+            description="Piyasa öncesi hazırlık (açılış seansı emir toplama)",
         ),
-        "seans_1": WorkflowPhase(
-            name="SEANS_1",
-            start_time="09:55",
-            end_time="12:30",
+        "active": WorkflowPhase(
+            name="CONTINUOUS",
+            start_time="10:00",
+            end_time="18:00",
             jobs=["batch_scan", "signal_generation", "risk_monitoring", "health_check"],
-            description="Seans 1 — Tek fiyat yöntemi",
-        ),
-        "break": WorkflowPhase(
-            name="BREAK",
-            start_time="12:30",
-            end_time="14:00",
-            jobs=["feature_recalculation", "health_check"],
-            description="Öğle arası",
-        ),
-        "seans_2": WorkflowPhase(
-            name="SEANS_2",
-            start_time="14:00",
-            end_time="17:40",
-            jobs=["batch_scan", "signal_generation", "risk_monitoring", "health_check"],
-            description="Seans 2 — Sürekli müzayede",
+            description="Sürekli müzayede — tek seans",
         ),
         "closing": WorkflowPhase(
             name="CLOSING",
-            start_time="17:40",
-            end_time="18:00",
+            start_time="18:01",
+            end_time="18:10",
             jobs=["closing_price_update", "daily_pnl"],
-            description="Kapanış",
+            description="Kapanış seansı",
         ),
         "post_market": WorkflowPhase(
             name="POST_MARKET",
-            start_time="18:00",
+            start_time="18:10",
             end_time="18:30",
             jobs=["persistence", "daily_report", "performance_attribution", "alert_check"],
             description="Piyasa sonrası",
@@ -117,14 +102,21 @@ class DailyWorkflow:
     # Phase mapping: MarketPhase → workflow phase key
     _PHASE_MAP = {
         "PRE_MARKET": "pre_market",
-        "SEANS_1": "seans_1",
-        "BREAK": "break",
-        "SEANS_2": "seans_2",
-        "CLOSING": "closing",
+        "OPENING_AUCTION_COLLECTION": "pre_market",
+        "OPENING_AUCTION_DETERMINATION": "pre_market",
+        "CONTINUOUS_AUCTION": "active",
+        "CIRCUIT_BREAKER_AUCTION": "active",
+        "CLOSING_AUCTION_COLLECTION": "closing",
+        "CLOSING_AUCTION_DETERMINATION": "closing",
+        "CLOSING_PRICE_TRADING": "closing",
         "POST_MARKET": "post_market",
         "AFTER_HOURS": "after_hours",
         "NIGHT": "night",
         "CLOSED": "night",
+        # Eski uyumluluk
+        "SEANS_1": "active",
+        "SEANS_2": "active",
+        "BREAK": "night",
     }
 
     def __init__(self):
@@ -136,32 +128,15 @@ class DailyWorkflow:
         self._current_phase: Optional[str] = None
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
-        """Job handler kaydet.
-
-        Args:
-            job_type: Job türü
-            handler: Async handler
-        """
+        """Job handler kaydet."""
         self._handlers[job_type] = handler
 
     def register_phase_handler(self, phase: str, handler: Callable):
-        """Faz başlangıcı handler'ı kaydet.
-
-        Args:
-            phase: Faz adı
-            handler: Handler fonksiyonu
-        """
+        """Faz başlangıcı handler'ı kaydet."""
         self._phase_handlers[phase] = handler
 
     async def execute_phase(self, phase_name: str) -> Dict[str, Any]:
-        """Belirli bir faz için job'ları çalıştır.
-
-        Args:
-            phase_name: Faz adı
-
-        Returns:
-            Faz sonuçları
-        """
+        """Belirli bir faz için job'ları çalıştır."""
         phase = self.PHASES.get(phase_name)
         if not phase:
             return {"error": f"Unknown phase: {phase_name}"}
@@ -169,14 +144,12 @@ class DailyWorkflow:
         results = {}
         self._current_phase = phase_name
 
-        # Phase handler
         if phase_name in self._phase_handlers:
             try:
                 await self._phase_handlers[phase_name]()
             except Exception as e:
                 logger.error("Phase handler error", phase=phase_name, error=str(e))
 
-        # Job'ları çalıştır
         for job_type in phase.jobs:
             handler = self._handlers.get(job_type)
             if handler is None:
@@ -186,14 +159,12 @@ class DailyWorkflow:
                 result = await handler()
                 results[job_type] = {"status": "SUCCESS", "result": result}
                 self._jobs_run_today += 1
-
             except Exception as e:
                 results[job_type] = {"status": "FAILED", "error": str(e)}
                 self._jobs_failed_today += 1
                 logger.error("Workflow job failed",
                            phase=phase_name, job=job_type, error=str(e))
 
-        # Daily report kontrolü
         if phase_name == "post_market":
             self._daily_report_generated = True
 
@@ -205,20 +176,13 @@ class DailyWorkflow:
         return results
 
     def get_status(self) -> WorkflowStatus:
-        """Workflow durumu.
-
-        Returns:
-            Durum bilgisi
-        """
-        # Unified scheduler'dan market session al (circular import yok)
+        """Workflow durumu."""
         from .unified_scheduler import MarketSessionManager
         market = MarketSessionManager()
         phase = market.current_phase()
 
-        # Faz adını eşleştir
         current = self._PHASE_MAP.get(phase.value, "night")
 
-        # Sonraki faz
         phase_order = list(self.PHASES.keys())
         current_idx = phase_order.index(current) if current in phase_order else 0
         next_phase = phase_order[(current_idx + 1) % len(phase_order)]
@@ -234,11 +198,7 @@ class DailyWorkflow:
         )
 
     def get_phases(self) -> Dict[str, Dict[str, Any]]:
-        """Tüm fazları al.
-
-        Returns:
-            Faz bilgileri
-        """
+        """Tüm fazları al."""
         return {
             name: {
                 "name": phase.name,
@@ -255,7 +215,6 @@ class DailyWorkflow:
         self._jobs_run_today = 0
         self._jobs_failed_today = 0
         self._daily_report_generated = False
-        # Risk gate günlük P&L sayacını sıfırla
         try:
             from services.core.risk_gate import risk_gate
             risk_gate.reset_daily()

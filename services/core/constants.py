@@ -21,9 +21,10 @@ BIST_BSMV_RATE = 0.05               # %5 BSMV
 BIST_MIN_COMMISSION = 1.0           # Minimum komisyon (TL)
 BIST_SLIPPAGE_DEFAULT = 0.05        # Varsayılan slippage (%)
 
-# Devre kesici eşikleri
-BIST_CIRCUIT_BREAKER_PCT = 9.5      # Tavan/taban yakını (%)
-BIST_HALTED_PRICE_THRESHOLD = 15.0  # Aşırı volatilite (%)
+# Devre kesici eşikleri (Eylül 2025 güncel)
+BIST_CIRCUIT_BREAKER_PCT = 5.0      # Pay bazında devre kesici eşiği (Yıldız/Ana Pazar)
+BIST_EBDKS_THRESHOLD_PCT = 6.0      # Endekse bağlı devre kesici (BIST-100 %6 düşüş)
+BIST_HALTED_PRICE_THRESHOLD = 10.0  # Aşırı volatilite (%)
 
 # Likidite
 MIN_VOLUME_FOR_TRADING = 1000       # Minimum lot (likidite)
@@ -53,7 +54,7 @@ REGIME_MACRO_WEIGHT = 0.15          # Macro ağırlığı
 # VaR/CVaR
 VAR_CONFIDENCE_LEVEL = 0.95         # %95 güven
 MAX_POSITION_PCT = 15.0             # Tek pozisyon max %
-MAX_SECTOR_PCT = 40.0               # Sektör max %
+MAX_SECTOR_PCT = 30.0               # Sektör max % (risk parity limiti)
 DEFAULT_STOP_LOSS_PCT = 6.0         # Varsayılan stop-loss %
 DEFAULT_TAKE_PROFIT_PCT = 10.0      # Varsayılan take-profit %
 

@@ -43,16 +43,18 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 # =====================================================
 
 class MarketPhase(str, Enum):
-    """BIST piyasa fazları."""
+    """BIST piyasa fazları (2015 BISTECH sonrası tek seans — Eylül 2025 güncel)."""
     CLOSED = "CLOSED"            # Piyasa kapalı (gece, hafta sonu, tatil)
-    PRE_MARKET = "PRE_MARKET"    # 09:40-09:55 (emir toplama)
-    SEANS_1 = "SEANS_1"          # 09:55-12:30 (tek fiyat)
-    BREAK = "BREAK"              # 12:30-14:00 (ara)
-    SEANS_2 = "SEANS_2"          # 14:00-17:40 (sürekli müzayede)
-    CLOSING = "CLOSING"          # 17:40-18:00 (kapanış)
-    POST_MARKET = "POST_MARKET"  # 18:00-18:30
+    PRE_MARKET = "PRE_MARKET"    # 09:40-10:00 (açılış seansı emir toplama)
+    CONTINUOUS = "CONTINUOUS"    # 10:00-18:00 (sürekli müzayede — tek seans)
+    CLOSING = "CLOSING"          # 18:01-18:10 (kapanış seansı)
+    POST_MARKET = "POST_MARKET"  # 18:10-18:30
     AFTER_HOURS = "AFTER_HOURS"  # 18:30-23:00
     NIGHT = "NIGHT"              # 23:00-09:40
+    # Geriye uyumluluk alias'ları
+    SEANS_1 = "CONTINUOUS"       # Eski kod uyumluluğu
+    SEANS_2 = "CONTINUOUS"       # Eski kod uyumluluğu
+    BREAK = "CLOSED"             # Artık ara yok
 
 
 # =====================================================
@@ -172,26 +174,22 @@ class HolidayProvider:
 # =====================================================
 
 class MarketSessionManager:
-    """BIST piyasa saatleri yöneticisi.
+    """BIST piyasa saatleri yöneticisi (2015 BISTECH sonrası tek seans — Eylül 2025 güncel).
 
     BIST işlem saatleri (Europe/Istanbul, UTC+3):
-    - Pre-market:  09:40-09:55
-    - Seans 1:     09:55-12:30 (tek fiyat)
-    - Break:       12:30-14:00
-    - Seans 2:     14:00-17:40 (sürekli müzayede)
-    - Closing:     17:40-18:00
-    - Post-market: 18:00-18:30
-    - After-hours: 18:30-23:00
-    - Night:       23:00-09:40
+    - Pre-market:     09:40-10:00 (açılış seansı emir toplama)
+    - Sürekli İşlem:  10:00-18:00 (tek seans, ara yok)
+    - Kapanış:        18:01-18:10 (kapanış seansı)
+    - Post-market:    18:10-18:30
+    - After-hours:    18:30-23:00
+    - Night:          23:00-09:40
     """
 
     PHASE_TIMES = [
         (dt_time(9, 40), MarketPhase.PRE_MARKET),
-        (dt_time(9, 55), MarketPhase.SEANS_1),
-        (dt_time(12, 30), MarketPhase.BREAK),
-        (dt_time(14, 0), MarketPhase.SEANS_2),
-        (dt_time(17, 40), MarketPhase.CLOSING),
-        (dt_time(18, 0), MarketPhase.POST_MARKET),
+        (dt_time(10, 0), MarketPhase.CONTINUOUS),
+        (dt_time(18, 1), MarketPhase.CLOSING),
+        (dt_time(18, 10), MarketPhase.POST_MARKET),
         (dt_time(18, 30), MarketPhase.AFTER_HOURS),
         (dt_time(23, 0), MarketPhase.NIGHT),
     ]
@@ -234,7 +232,7 @@ class MarketSessionManager:
 
     def is_trading_hours(self) -> bool:
         """Piyasa işlem saatlerinde mi?"""
-        return self.current_phase() in [MarketPhase.SEANS_1, MarketPhase.SEANS_2, MarketPhase.CLOSING]
+        return self.current_phase() in [MarketPhase.CONTINUOUS, MarketPhase.CLOSING]
 
     def is_market_open(self) -> bool:
         """Piyasa açık mı? (işlem + pre/post dahil)"""
@@ -855,7 +853,6 @@ class UnifiedScheduler:
         Her faz için farklı sleep süresi uygulanır:
         - ACTIVE: 30s (sık kontrol, trading job'ları için)
         - NIGHT: 300s (nadir kontrol, tasarruf)
-        - BREAK: 60s (orta sıklık)
         """
         phase = self._market.current_phase()
 
@@ -868,13 +865,9 @@ class UnifiedScheduler:
             await self._run_jobs_for_phase("pre_market")
             await asyncio.sleep(30)
 
-        elif phase in [MarketPhase.SEANS_1, MarketPhase.SEANS_2]:
+        elif phase == MarketPhase.CONTINUOUS:
             await self._run_jobs_for_phase("active")
             await asyncio.sleep(30)
-
-        elif phase == MarketPhase.BREAK:
-            await self._run_jobs_for_phase("break")
-            await asyncio.sleep(60)
 
         elif phase == MarketPhase.CLOSING:
             await self._run_jobs_for_phase("closing")

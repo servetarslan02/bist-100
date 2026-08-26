@@ -349,9 +349,25 @@ class BackfillManager:
 
             bars_filled = len(hist)
 
-            # TODO: Veriyi ClickHouse/PostgreSQL'e yaz
-            # Bu kısım mevcut ingestion pipeline'ını kullanmalı
-            # Şimdilik sadece tespit ve çekme yapıyoruz
+            # Veriyi PostgreSQL'e yaz
+            try:
+                from ..core.database import pg_execute
+                for idx, row in hist.iterrows():
+                    trade_date = idx.date() if hasattr(idx, 'date') else idx
+                    await pg_execute(
+                        """INSERT INTO daily_bars (ticker, trade_date, open, high, low, close, volume)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7)
+                        ON CONFLICT (ticker, trade_date) DO UPDATE SET
+                            open = EXCLUDED.open, high = EXCLUDED.high,
+                            low = EXCLUDED.low, close = EXCLUDED.close,
+                            volume = EXCLUDED.volume""",
+                        gap.ticker, trade_date,
+                        float(row.get('Open', 0)), float(row.get('High', 0)),
+                        float(row.get('Low', 0)), float(row.get('Close', 0)),
+                        int(row.get('Volume', 0))
+                    )
+            except Exception as write_err:
+                logger.warning("Backfill DB write failed", error=str(write_err))
 
             logger.info("Backfill data fetched",
                        ticker=gap.ticker,
