@@ -300,6 +300,7 @@ class TransactionCostEngine:
         volatility_ratio: float = 1.0,
         volume_ratio: float = 1.0,
         market_cap: Optional[float] = None,
+        **kwargs,
     ) -> Dict[str, Any]:
         """
         Toplam işlem maliyeti hesapla.
@@ -329,18 +330,30 @@ class TransactionCostEngine:
 
         notional = price * quantity
 
-        # 1. Komisyon
+        # 1. Komisyon (broker + BIST + MKK + Takasbank)
         base_commission = notional * self.fees.total_base_fee_pct / 100
         commission = max(base_commission, self.fees.min_commission_tl)
 
-        # 2. BSMV
-        bsmv = commission * self.fees.bsmv_rate
+        # Broker komisyonu ayrı hesapla (BSMV sadece broker üzerinden)
+        broker_commission = max(notional * self.fees.broker_commission_pct / 100, self.fees.min_commission_tl)
+
+        # 2. BSMV (sadece broker komisyonu üzerinden — BIST/MKK/Takasbank üzerinden alınmaz)
+        bsmv = broker_commission * self.fees.bsmv_rate
 
         # 3. Spread
         liquidity = self.classify_liquidity(avg_daily_volume, market_cap)
         spread_pct = self.spread.estimate_spread(
             liquidity, volatility_ratio, volume_ratio
         )
+
+        # Devre kesici sonrası spread genişleme
+        if kwargs.get('post_circuit_breaker', False):
+            spread_pct *= 1.5  # Devre kesici sonrası spread %50 genişler
+
+        # Brüt takaslı hisselerde spread genişleme
+        if kwargs.get('is_gross_settlement', False):
+            spread_pct *= 1.3  # Brüt takasta spread %30 genişler
+
         spread_cost = notional * spread_pct / 2  # Yarısı alış, yarısı satış
 
         # 4. Slippage
