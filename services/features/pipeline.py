@@ -57,6 +57,10 @@ class FeaturePipeline:
         target_features = self._compute_target_features(clean_features, ohlcv_df)
         clean_features.update(target_features)
 
+        # 1b. BIST-specific feature enrichment
+        bist_features = self._compute_bist_features(ticker, clean_features)
+        clean_features.update(bist_features)
+
         # 2. Drift Detection
         drift_report = None
         if self.config.enable_drift_detection:
@@ -114,6 +118,55 @@ class FeaturePipeline:
                 targets[key] = round((mom * (h / 10.0)) + ((rsi - 50.0) / 1000.0), 4)
 
         return targets
+
+    def _compute_bist_features(self, ticker: str, features: Dict[str, float]) -> Dict[str, float]:
+        """BIST-specific feature'ları hesapla.
+
+        market_session_fsm ve auto_circuit_breaker'dan gerçek zamanlı durum bilgisi alır.
+        """
+        bist: Dict[str, float] = {}
+        try:
+            from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
+            from services.core.auto_circuit_breaker import auto_circuit_breaker
+            from services.core.short_selling import short_selling_monitor
+            from services.core.gross_settlement import gross_settlement_monitor
+
+            # Seans fazı features
+            phase = bist_session_fsm.get_phase(ticker=ticker)
+            bist["is_opening_auction"] = 1.0 if phase in {
+                BISTMarketPhase.OPENING_AUCTION_COLLECTION,
+                BISTMarketPhase.OPENING_AUCTION_DETERMINATION
+            } else 0.0
+            bist["is_closing_auction"] = 1.0 if phase in {
+                BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+                BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
+                BISTMarketPhase.CLOSING_PRICE_TRADING
+            } else 0.0
+            bist["is_continuous_auction"] = 1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0
+
+            # Devre kesici features
+            cb_status = auto_circuit_breaker.get_status()
+            bist["ebdks_active"] = 1.0 if cb_status.get("ebdks_active", False) else 0.0
+            bist["ebdks_triggered_today"] = float(cb_status.get("ebdks_triggered_today", 0))
+            bist["bist100_change_pct"] = float(cb_status.get("bist100_change_pct", 0))
+
+            # EBDKS'ye mesafe
+            bist100_change = cb_status.get("bist100_change_pct", 0)
+            bist["bist100_distance_to_ebdks"] = float(bist100_change + 6.0)  # %6 eşiğine mesafe
+
+            # Uptick rule
+            bist["uptick_rule_active"] = 1.0 if short_selling_monitor._uptick_rule_active else 0.0
+
+            # Brüt takas
+            bist["is_gross_settlement"] = 1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0
+
+            # Açığa satış uygunluk
+            bist["short_sale_eligible"] = 1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0
+
+        except Exception as e:
+            logger.debug("BIST feature computation failed", ticker=ticker, error=str(e))
+
+        return bist
 
     def _check_drift(self, ticker: str, current_features: Dict[str, float]) -> Dict[str, Any]:
         """Referans istatistikler ile mevcut özellikler arasındaki drift kontrolü."""

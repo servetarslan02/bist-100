@@ -68,9 +68,27 @@ class RiskGate:
         details = {}
         reasons = []
 
-        # 1. Circuit breaker
+        # 1. Circuit breaker (hem manuel hem otomatik)
         if circuit_open:
             return RiskDecision(False, "Circuit breaker OPEN", 0, 1, {"circuit": "open"})
+
+        # 1b. Otomatik devre kesici kontrolü
+        try:
+            from services.core.auto_circuit_breaker import auto_circuit_breaker
+            if auto_circuit_breaker.get_status().get("ebdks_active", False):
+                return RiskDecision(False, "EBDKS aktif — tüm işlemler durduruldu", 0, 1, {"ebdks": "active"})
+        except Exception:
+            pass
+
+        # 1c. Fiyat limiti kontrolü
+        try:
+            from services.core.price_limits import price_limit_monitor
+            limit = price_limit_monitor.get_effective_limit(ticker)
+            if limit == 0.0:
+                # IPO günü — limit yok, ama dikkatli ol
+                details["ipo_no_limit"] = True
+        except Exception:
+            pass
 
         # 2. Market session
         if not market_open:

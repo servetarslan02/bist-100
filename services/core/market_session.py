@@ -13,6 +13,7 @@ from .market_session_fsm import (
     MarketSessionStateMachine,
     _TZ_ISTANBUL,
 )
+from .auto_circuit_breaker import auto_circuit_breaker
 from datetime import datetime, timezone, timedelta
 
 # Eski API'ye uyumluluk için enum mapping
@@ -73,6 +74,32 @@ class MarketSessionManager:
 
     def get_status(self) -> dict:
         return bist_session_fsm.get_status()
+
+    def update_price(self, ticker: str, current_price: float, reference_price: float, market_type: str = "ana") -> dict:
+        """Fiyat güncelle ve devre kesici kontrolü yap.
+
+        Args:
+            ticker: Hisse kodu ("BIST-100" için endeks)
+            current_price: Güncel fiyat
+            reference_price: Önceki kapanış
+            market_type: Pazar tipi (yildiz, ana, alt)
+        """
+        if ticker == "BIST-100":
+            event = auto_circuit_breaker.update_bist100_price(current_price)
+        else:
+            event = auto_circuit_breaker.check_pay_circuit_breaker(
+                ticker, current_price, reference_price, market_type
+            )
+        return {
+            "ticker": ticker,
+            "event": event.to_dict() if event else None,
+            "ebdks_active": bist_session_fsm.is_ebdks_active(),
+            "ebdks_late_session": bist_session_fsm.is_ebdks_late_session(),
+        }
+
+    def reset_daily_circuit_breakers(self):
+        """Günlük devre kesici sayaçlarını sıfırla (seans sonunda)."""
+        auto_circuit_breaker.reset_daily()
 
 
 # Singleton (geriye uyumluluk)
