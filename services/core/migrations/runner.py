@@ -12,7 +12,7 @@ Güvenlik:
 - Idempotent (tekrar çalıştırılabilir)
 
 Kullanım:
-    runner = MigrationRunner(db, dialect="sqlite")
+    runner = MigrationRunner(db, dialect="postgresql")
     await runner.run_pending()
     await runner.rollback_to(version)
     await runner.status()
@@ -87,7 +87,7 @@ class MigrationLockError(Exception):
 class MigrationRunner:
     """Production-grade migration runner with distributed locking."""
 
-    def __init__(self, db, dialect: str = "sqlite"):
+    def __init__(self, db, dialect: str = "postgresql"):
         self._db = db
         self._dialect = dialect
         self._lock_id: Optional[str] = None

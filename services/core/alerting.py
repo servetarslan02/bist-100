@@ -394,7 +394,7 @@ class AlertingSystem:
     """v3.0 — Lifecycle, escalation, DB persistence, notification routing."""
 
     def __init__(self, max_alerts: int = 1000, dedup_window_s: float = 300.0,
-                 db=None, dialect: str = "sqlite", policy: AlertPolicy = None):
+                 db=None, dialect: str = "postgresql", policy: AlertPolicy = None):
         self._alerts: List[Alert] = []
         self._max_alerts = max_alerts
         self._dedup_window_s = dedup_window_s

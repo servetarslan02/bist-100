@@ -104,7 +104,7 @@ class DecayConfig(BaseModel):
 
 class HistoricalStoreConfig(BaseModel):
     """Historical data store ayarları."""
-    storage_backend: str = Field(default="json", description="Depolama backend (json/sqlite)")
+    storage_backend: str = Field(default="json", description="Depolama backend (json/duckdb/postgresql)")
     max_history_days: int = Field(default=1825, description="Maksimum geçmiş (5 yıl)")
     backfill_enabled: bool = Field(default=True, description="Backfill aktif")
     pit_enabled: bool = Field(default=True, description="Point-in-time aktif")

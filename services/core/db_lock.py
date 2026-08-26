@@ -14,7 +14,7 @@ Production-grade lock infrastructure.
 - Lock ordering (deadlock prevention)
 
 Kullanım:
-    async with DatabaseLock(db, dialect="sqlite", key="portfolio_trade") as lock:
+    async with DatabaseLock(db, dialect="postgresql", key="portfolio_trade") as lock:
         # Atomik işlemler
         pass
 """
@@ -180,7 +180,7 @@ class DatabaseLock:
     def __init__(
         self,
         db,
-        dialect: str = "sqlite",
+        dialect: str = "postgresql",
         key: str = "default",
         timeout_ms: int = 5000,
         max_retries: int = 5,

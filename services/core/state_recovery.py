@@ -95,9 +95,9 @@ class StateRecovery:
             try:
                 from .state_store import state_store
                 all_state = state_store.load_learning_state()
-                sqlite_key = f"snapshot:{ticker}"
-                if sqlite_key in all_state:
-                    snapshot = all_state[sqlite_key]
+                state_key = f"snapshot:{ticker}"
+                if state_key in all_state:
+                    snapshot = all_state[state_key]
                     if isinstance(snapshot, str):
                         snapshot = orjson.loads(snapshot)
                     logger.debug("Snapshot found (SQLite)", ticker=ticker)
