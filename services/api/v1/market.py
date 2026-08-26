@@ -84,15 +84,13 @@ _INSTRUMENTS_CACHE = None
 
 @router.get("/instruments")
 async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """Tüm hisseler — BIST-30/50/100 multi-index."""
+    """Tüm hisseler."""
     global _INSTRUMENTS_CACHE
     if _INSTRUMENTS_CACHE:
         return _INSTRUMENTS_CACHE
     try:
         from ...ingestion.bist_universe import bist_universe
         _INSTRUMENTS_CACHE = {
-            "bist_30": getattr(bist_universe, 'BIST_30_TICKERS', []),
-            "bist_50": getattr(bist_universe, 'BIST_50_TICKERS', []),
             "bist_100": getattr(bist_universe, 'BIST_100_TICKERS', []),
             "all": getattr(bist_universe, 'BIST_ALL_TICKERS', []),
             "count": len(getattr(bist_universe, 'BIST_ALL_TICKERS', [])),
@@ -768,41 +766,4 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
     _HEATMAP_CACHE = res
     _HEATMAP_TIME = now
     return res
-
-
-@router.get("/multi_index_signals")
-async def multi_index_signals(universe: str = "all", user=Depends(get_current_user), _=Depends(check_rate_limit)):
-    """BIST-30/50/100 multi-index sinyalleri.
-
-    Args:
-        universe: "bist30", "bist50", "bist100", "all"
-    """
-    try:
-        from ...core.alpha_engine import AlphaEngine
-        from datetime import datetime, timezone, timedelta
-
-        date = datetime.now(timezone(timedelta(hours=3))).strftime("%Y-%m-%d")
-        engine = AlphaEngine()
-
-        if universe == "all":
-            results = engine.run_multi_index_pipeline(date)
-            return {
-                "status": "ok",
-                "date": date,
-                "universes": ["bist30", "bist50", "bist100"],
-                "per_index": {u: results.get(u, []) for u in ["bist30", "bist50", "bist100"]},
-                "combined": results.get("combined", []),
-                "summary": results.get("summary", {}),
-            }
-        else:
-            predictions = engine.run_daily_pipeline(date, universe=universe)
-            return {
-                "status": "ok",
-                "date": date,
-                "universe": universe,
-                "predictions": predictions or [],
-                "count": len(predictions) if predictions else 0,
-            }
-    except Exception as e:
-        raise HTTPException(500, str(e))
 
