@@ -65,15 +65,28 @@ class CacheWarmer:
         return False
 
     async def _warm_market_calendar(self) -> bool:
-        """BIST seans takvimini yükle."""
+        """BIST seans takvimini yükle + tatil takvimini senkronize et."""
         try:
             from ..core.market_calendar import get_market_calendar
             from ..core.redis_helper import set_cached
+            from ..core.holiday_manager import holiday_manager
+            from datetime import date
+
+            # Tatil takvimini hesapla + BIST'ten çek
+            today = date.today()
+            holidays = holiday_manager.get_holidays(today.year)
+            half_days = holiday_manager.get_half_days(today.year)
+            synced = await holiday_manager.sync_from_bist()
 
             calendar = get_market_calendar()
             if calendar:
                 set_cached("market:calendar", calendar, ttl=86400)
-                logger.debug("Warmed market calendar")
+                logger.info(
+                    "Market calendar warmed",
+                    holidays=len(holidays),
+                    half_days=len(half_days),
+                    bist_synced=synced,
+                )
                 return True
         except Exception as e:
             logger.debug("Market calendar warm failed", error=str(e))
@@ -140,10 +153,40 @@ class CacheWarmer:
 
     async def refresh_hot_keys(self):
         """Sıcak anahtarları periyodik olarak tazele (background task)."""
+        from datetime import date
+
         while True:
             try:
                 await self._warm_latest_prices()
                 await self._warm_active_signals()
+
+                # Anlık tatil tespiti — piyasa açık olması gereken saatte veri gelmiyorsa
+                today = date.today()
+                if today.weekday() < 5:  # Hafta içi
+                    from ..core.holiday_manager import holiday_manager
+                    from ..core.market_calendar import get_market_calendar
+                    from datetime import datetime, time as dtime
+
+                    now = datetime.now()
+                    market_open = dtime(10, 0)
+                    market_close = dtime(18, 0)
+
+                    # Piyasa açık olması gereken saatte mi?
+                    if market_open <= now.time() <= market_close:
+                        calendar = get_market_calendar()
+                        if calendar.is_trading_day(today):
+                            # Son radar verisini kontrol et
+                            from ..core.redis_helper import get_cached
+                            radar = get_cached("radar:data")
+                            if not radar:
+                                # Veri yok — anlık tatil olabilir
+                                detected = holiday_manager.report_no_data(today)
+                                if detected:
+                                    logger.warning(
+                                        "Sudden holiday detected by cache warmer",
+                                        date=today.isoformat(),
+                                    )
+
             except Exception as e:
                 logger.debug("Hot key refresh failed", error=str(e))
             await asyncio.sleep(30)  # 30 saniyede bir tazele

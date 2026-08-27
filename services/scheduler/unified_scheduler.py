@@ -395,6 +395,7 @@ class JobType(StrEnum):
 
     # Night
     BACKUP = "backup"
+    HOLIDAY_SYNC = "holiday_sync"
 
 
 # =====================================================
@@ -541,6 +542,13 @@ DEFAULT_JOB_CONFIGS = {
         trading_only=False,
         priority=10,
         description="Veritabanı yedekleme",
+    ),
+    JobType.HOLIDAY_SYNC: JobConfig(
+        job_type=JobType.HOLIDAY_SYNC,
+        interval_seconds=86400,  # Günde 1 kez
+        trading_only=False,
+        priority=9,
+        description="Takvim senkronizasyonu (BIST resmi + dini bayram hesaplama)",
     ),
 }
 
@@ -766,6 +774,9 @@ class UnifiedScheduler:
         self._init_state_db()
         self._load_state()
 
+        # Tatil senkronizasyon handler'ı — otomatik kaydet
+        self.register_handler(JobType.HOLIDAY_SYNC, self._holiday_sync_handler)
+
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
         """Job handler kaydet."""
         self._handlers[job_type] = handler
@@ -858,6 +869,52 @@ class UnifiedScheduler:
         self._running = False
         self._shutdown_event.set()
 
+    async def _holiday_sync_handler(self) -> dict[str, Any]:
+        """Takvim senkronizasyonu — BIST resmi + dini bayram hesaplama."""
+        from ..core.holiday_manager import holiday_manager
+        from datetime import date
+
+        today = date.today()
+        result = {"year": today.year}
+
+        # 1. Bu yılın tatillerini hesapla (dini bayramlar otomatik)
+        holidays = holiday_manager.get_holidays(today.year)
+        half_days = holiday_manager.get_half_days(today.year)
+        result["holidays"] = len(holidays)
+        result["half_days"] = len(half_days)
+
+        # 2. Gelecek yılın tatillerini de hesapla (önceden hazırla)
+        next_year = today.year + 1
+        next_holidays = holiday_manager.get_holidays(next_year)
+        result[f"holidays_{next_year}"] = len(next_holidays)
+
+        # 3. BIST resmi takviminden çek
+        synced = await holiday_manager.sync_from_bist()
+        result["bist_synced"] = synced
+
+        # 4. Anlık tatil kontrolü — eğer bugün işlem günü ama veri gelmiyorsa
+        if holiday_manager.is_trading_day(today):
+            result["is_trading_day"] = True
+            # Market data handler'ın son veri zamanını kontrol et
+            last_data = getattr(self, '_last_market_data_time', None)
+            if last_data:
+                from datetime import datetime
+                diff_minutes = (datetime.now() - last_data).total_seconds() / 60
+                if diff_minutes > 30:  # 30 dakikadır veri gelmiyor
+                    detected = holiday_manager.report_no_data(today)
+                    if detected:
+                        result["sudden_holiday_detected"] = True
+                        logger.warning(
+                            "Sudden holiday detected by scheduler",
+                            date=today.isoformat(),
+                            no_data_minutes=diff_minutes,
+                        )
+        else:
+            result["is_trading_day"] = False
+
+        logger.info("Holiday sync completed", **result)
+        return result
+
     async def _startup_sequence(self):
         """Startup kontrolleri."""
         logger.info("Running startup sequence...")
@@ -866,9 +923,28 @@ class UnifiedScheduler:
         status = self._market.get_status()
         logger.info("Market session", **status)
 
-        # Tatil takvimi
-        holiday_count = len(self._market.get_holiday_provider().get_holidays())
-        logger.info("Holiday calendar loaded", count=holiday_count)
+        # Tatil takvimi — otomatik senkronizasyon
+        try:
+            from ..core.holiday_manager import holiday_manager
+            from datetime import date
+
+            # Bu yılın tatillerini hesapla
+            today = date.today()
+            holidays = holiday_manager.get_holidays(today.year)
+            half_days = holiday_manager.get_half_days(today.year)
+            logger.info(
+                "Holiday calendar loaded",
+                year=today.year,
+                holidays=len(holidays),
+                half_days=len(half_days),
+            )
+
+            # BIST resmi takviminden çek (async)
+            synced = await holiday_manager.sync_from_bist()
+            if synced:
+                logger.info("BIST holidays synced from web")
+        except Exception as e:
+            logger.warning("Holiday sync failed at startup", error=str(e))
 
         # Registered handlers
         logger.info("Registered handlers", count=len(self._handlers), handlers=list(self._handlers.keys()))
