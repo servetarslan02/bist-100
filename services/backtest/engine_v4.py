@@ -1114,6 +1114,7 @@ class BacktestEngineV4:
         - Historical fundamental features (Motor4)
         - Historical KAP/News sentiment (Motor5)
         - Historical catalyst features (Motor6)
+        - WhyFallingMotor — düşüş nedeni sınıflandırması (Motor7)
         - Motor1 relative strength features (benchmark varsa)
         - Cross-sectional rank features (return_*, rank_*, market_breadth)
         - Seasonality features (Motor9)
@@ -1150,6 +1151,56 @@ class BacktestEngineV4:
                     enriched.update(catalyst_features)
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="engine_v4.py:1112")
+
+        # === MOTOR 7: WHY FALLING (PIT-safe) ===
+        try:
+            from services.features.seven_motors import WhyFallingMotor
+
+            stock_ret_5d = enriched.get("roc_5d", 0.0)
+            stock_ret_20d = enriched.get("roc_20d", 0.0)
+
+            # Market return: all_day_features ortalaması
+            market_ret_5d = 0.0
+            market_ret_20d = 0.0
+            if all_day_features:
+                rets_5d = [f.get("roc_5d", 0.0) for f in all_day_features if "roc_5d" in f]
+                rets_20d = [f.get("roc_20d", 0.0) for f in all_day_features if "roc_20d" in f]
+                if rets_5d:
+                    market_ret_5d = float(np.mean(rets_5d))
+                if rets_20d:
+                    market_ret_20d = float(np.mean(rets_20d))
+
+            # Sector return: aynı sektördeki hisselerin ortalaması
+            # (sector bilgisi yoksa market return kullan)
+            sector_ret_5d = market_ret_5d
+            sector_ret_20d = market_ret_20d
+
+            vol_zscore = enriched.get("volume_zscore_20d", 0.0)
+            vol_ratio = enriched.get("volume_ratio", 1.0)
+            news_sent = enriched.get("news_sentiment_weighted", 0.0)
+            kap_sent = enriched.get("kap_sentiment_avg", 0.0)
+            rsi_val = enriched.get("rsi_14", 50.0)
+            atr_val = enriched.get("atr_pct", 0.0)
+
+            why_motor = WhyFallingMotor()
+            why_feats = why_motor.compute(
+                ticker,
+                stock_return_5d=stock_ret_5d,
+                stock_return_20d=stock_ret_20d,
+                market_return_5d=market_ret_5d,
+                market_return_20d=market_ret_20d,
+                sector_return_5d=sector_ret_5d,
+                sector_return_20d=sector_ret_20d,
+                volume_change=vol_ratio,
+                volume_zscore=vol_zscore,
+                news_sentiment=news_sent,
+                kap_sentiment=kap_sent,
+                rsi=rsi_val,
+                atr_pct=atr_val,
+            )
+            enriched.update(why_feats)
+        except Exception as e:
+            logger.debug("Handled exception", error=str(e), context="engine_v4.py:WhyFallingMotor")
 
         # === MOTOR 1: RELATIVE STRENGTH (PIT-safe) ===
         if benchmark_close is not None and len(benchmark_close) > 20:

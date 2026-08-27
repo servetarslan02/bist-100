@@ -158,3 +158,122 @@ class MicrostructureMotor:
         hl_range = high[-lookback:] - low[-lookback:]
         result["spread"] = float(np.mean(hl_range / close[-lookback:])) if np.all(close[-lookback:] > 0) else 0.0
         return result
+
+
+class WhyFallingMotor:
+    """Düşen bıçağı tutma hatasını önle — çok faktörlü analiz."""
+
+    def compute(
+        self,
+        ticker: str,
+        stock_return_5d: float,
+        stock_return_20d: float,
+        market_return_5d: float,
+        market_return_20d: float,
+        sector_return_5d: float,
+        sector_return_20d: float,
+        volume_change: float,
+        volume_zscore: float,
+        news_sentiment: float,
+        kap_sentiment: float,
+        rsi: float = 50,
+        atr_pct: float = 0,
+    ) -> dict[str, float]:
+        """Düşüş nedeni sınıflandırması."""
+        features: dict[str, float] = {}
+
+        # Düşüş var mı?
+        is_falling_5d = stock_return_5d < -2
+        is_falling_20d = stock_return_20d < -5
+        features["is_falling_5d"] = 1.0 if is_falling_5d else 0.0
+        features["is_falling_20d"] = 1.0 if is_falling_20d else 0.0
+
+        # Geriye uyumluluk: why_falling anahtarı
+        features["why_falling"] = 1.0 if (is_falling_5d or is_falling_20d) else 0.0
+
+        if not is_falling_5d and not is_falling_20d:
+            features["falling_is_temporary"] = 0.5
+            features["fall_severity"] = 0.0
+            return features
+
+        # Düşüş şiddeti
+        features["fall_severity"] = round(abs(min(stock_return_5d, 0)), 4)
+
+        # Market selloff tespiti (5d ve 20d)
+        features["fall_market_selloff_5d"] = 1.0 if market_return_5d < -3 else 0.0
+        features["fall_market_selloff_20d"] = 1.0 if market_return_20d < -5 else 0.0
+
+        # Sector selloff tespiti
+        features["fall_sector_selloff_5d"] = 1.0 if sector_return_5d < -5 else 0.0
+        features["fall_sector_selloff_20d"] = 1.0 if sector_return_20d < -8 else 0.0
+
+        # Company-specific (piyasa ve sektör düşmemişse)
+        features["fall_company_specific_5d"] = 1.0 if (
+            market_return_5d > -1 and sector_return_5d > -2 and stock_return_5d < -5
+        ) else 0.0
+
+        # Liquidity event (hacim patlaması + fiyat düşüşü)
+        features["fall_liquidity_event"] = 1.0 if (
+            volume_zscore > 2 and stock_return_5d < -5
+        ) else 0.0
+
+        # Temporary panic (hızlı düşüş + negatif sentiment düşük)
+        features["fall_temporary_panic"] = 1.0 if (
+            stock_return_5d < -10 and news_sentiment > -0.3
+        ) else 0.0
+
+        # Oversold bounce potential (RSI < 30 + düşüş şiddetli)
+        features["fall_oversold_bounce"] = 1.0 if (
+            rsi < 30 and stock_return_5d < -5
+        ) else 0.0
+
+        # High volatility crash (ATR yüksek + düşüş)
+        features["fall_high_vol_crash"] = 1.0 if (
+            atr_pct > 5 and stock_return_5d < -5
+        ) else 0.0
+
+        # Düşüş nedeni geçici mi kalıcı mı? (Çok faktörlü)
+        temporary_score = 0.0
+        if features.get("fall_market_selloff_5d", 0) == 1.0:
+            temporary_score += 30
+        if features.get("fall_sector_selloff_5d", 0) == 1.0:
+            temporary_score += 20
+        if features.get("fall_temporary_panic", 0) == 1.0:
+            temporary_score += 25
+        if features.get("fall_oversold_bounce", 0) == 1.0:
+            temporary_score += 15
+        if volume_zscore < 1:  # Düşük hacim = panik değil
+            temporary_score += 10
+
+        permanent_score = 0.0
+        if features.get("fall_company_specific_5d", 0) == 1.0:
+            permanent_score += 40
+        if features.get("fall_liquidity_event", 0) == 1.0:
+            permanent_score += 20
+        if kap_sentiment < -0.5:
+            permanent_score += 25
+        if news_sentiment < -0.5:
+            permanent_score += 15
+
+        total = temporary_score + permanent_score
+        if total > 0:
+            features["falling_is_temporary"] = round(temporary_score / total, 4)
+            features["falling_is_permanent"] = round(permanent_score / total, 4)
+        else:
+            features["falling_is_temporary"] = 0.5
+            features["falling_is_permanent"] = 0.5
+
+        # Catch falling knife risk (0 = güvenli, 1 = tehlikeli)
+        risk_score = 0.0
+        if features.get("fall_company_specific_5d", 0) == 1.0:
+            risk_score += 40
+        if features.get("fall_liquidity_event", 0) == 1.0:
+            risk_score += 30
+        if features.get("fall_high_vol_crash", 0) == 1.0:
+            risk_score += 20
+        if stock_return_20d < -15:
+            risk_score += 10
+
+        features["catch_falling_knife_risk"] = round(min(100, risk_score), 0)
+
+        return features
