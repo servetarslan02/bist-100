@@ -351,8 +351,8 @@ class FeatureImportanceTracker:
         }
 
     def save_history(self, path: str) -> None:
-        """Feature importance geçmişini dosyaya kaydet."""
-        import json
+        """Feature importance geçmişini dosyaya kaydet (orjson)."""
+        import orjson
         from pathlib import Path
 
         data = []
@@ -366,18 +366,18 @@ class FeatureImportanceTracker:
             })
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
+        with open(path, "wb") as f:
+            f.write(orjson.dumps(data, option=orjson.OPT_INDENT_2, default=str))
 
         logger.info("Feature history saved", path=path, records=len(data))
 
     def load_history(self, path: str) -> None:
-        """Feature importance geçmişini dosyadan yükle."""
-        import json
+        """Feature importance geçmişini dosyadan yükle (orjson)."""
+        import orjson
 
         try:
-            with open(path) as f:
-                data = json.load(f)
+            with open(path, "rb") as f:
+                data = orjson.loads(f.read())
 
             for entry in data:
                 record = FeatureImportanceRecord(
