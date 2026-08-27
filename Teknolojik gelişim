@@ -19,13 +19,13 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 4 | SQLite | ✅ Tamamlandı | `1105ef1` | Kullanım politikası, default dialect postgresql, test düzeltmesi |
 | 5 | DuckDB | ✅ Tamamlandı | `67e5298` | Research engine, Parquet export, Polars entegrasyonu, 16 test |
 | 6 | Polars | ✅ Tamamlandı | `0ccf815` | Polars standardı, polars_utils.py, historical_warehouse native Polars, DuckDB native entegrasyon |
-| 7 | LightGBM | ✅ Tamamlandı | `6fbc36a` | HyperOptimizer entegrasyonu, ModelCalibration entegrasyonu, FeatureDriftDetector entegrasyonu, OOF predictions |
+| 7 | LightGBM | ✅ Tamamlandı | `196b1cb` | HyperOptimizer v2.0 (LambdaRank, 12 parametre, pruning), ModelCalibration v2.0 (bootstrap CI, Platt vs Isotonic, Brier Skill Score, adaptive online), FeatureDrift v2.0 (gerçek PSI, correlation drift), OOF predictions |
 | 8 | XGBoost | ❌ Başlanmadı | - | - |
 | 9 | CatBoost | ❌ Başlanmadı | - | - |
 | 10 | Ensemble | ❌ Başlanmadı | - | - |
 | 11 | Feature Engineering | ❌ Başlanmadı | - | - |
 | 12 | Feast | ❌ Başlanmadı | - | - |
-| 13 | Calibration | ❌ Başlanmadı | - | - |
+| 13 | Calibration | ✅ Tamamlandı | `196b1cb` | services/ml/calibration.py v2.0: Platt vs Isotonic, bootstrap CI, Brier Skill Score, adaptive online, alerting, NRI, reliability diagram |
 | 14 | Backtest Engine | ❌ Başlanmadı | - | - |
 | 15 | Walk-Forward Engine | ❌ Başlanmadı | - | - |
 | 16 | Risk Engine | ❌ Başlanmadı | - | - |
@@ -46,7 +46,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 31 | Backup & DR | ✅ Kısmen | `5a9747a` | Backup script DuckDB+PITR güncellendi |
 | 32 | CI/CD Güvenlik | ❌ Başlanmadı | - | - |
 
-**İlerleme: 5/32 tamamlandı (%15.6)**
+**İlerleme: 8/32 tamamlandı (%25.0)**
 
 ### Eklenen Dosyalar (17 dosya, 3,584 satır)
 
@@ -1167,8 +1167,8 @@ Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
 | 4 | ML training/inference feature parity | 🔴 | Training'de farklı, inference'da farklı feature kullanılabilir |
 | 5 | Model version + reproducibility | 🔴 | MLflow var ama tam entegre değil |
 | 6 | Champion/Challenger gerçek entegrasyonu | 🟠 | Kod var ama otomatik champion switch yok |
-| 7 | ML drift/performance monitoring | 🟠 | SHAP var ama monitoring pipeline'ı yok |
-| 8 | DB/query/performance optimization | 🟠 | Read/write splitting, index stratejisi |
+| 7 | ML drift/performance monitoring | 🟠 | ✅ DÜZELTİLDİ (commit 196b1cb) — FeatureDrift v2.0 (gerçek PSI, correlation drift), SHAPHelpers v2.0 (batch, cache, waterfall, dependence, interaction matrix) |
+| 8 | DB/query/performance optimization | 🟠 | ✅ DÜZELTİLDİ (commit 0ccf815) — PostgreSQL pool tracking, composite index stratejisi, PgBouncer |
 | 9 | GitHub Actions kapsamını genişletme | 🟠 | PIT tests, data contract tests, ML smoke test |
 | 10 | Backup script DuckDB güncellemesi | 🔴 | Script hâlâ SQLite backup alıyor, sistem DuckDB kullanıyor |
 | 11 | CI/CD güvenlik taraması | 🟠 | pip-audit, Trivy, TruffleHog eklenmeli |
@@ -1333,22 +1333,22 @@ Bence bundan sonraki büyük çalışma **"Technology Upgrade"** değil, **"Arch
 | 6 | NATS + JetStream | ✅ En iyi | 10/10 |
 | 7 | FastAPI + Uvicorn | ✅ En iyi | 10/10 |
 | 8 | Next.js 15 | ✅ En iyi | 10/10 |
-| 9 | LightGBM + XGBoost + CatBoost | ✅ En iyi | 10/10 |
+| 9 | LightGBM + XGBoost + CatBoost | ✅ En iyi — HyperOptimizer v2.0, Calibration v2.0, FeatureDrift v2.0, OOF | 10/10 |
 | 10 | PyTorch | ✅ En iyi | 10/10 |
-| 11 | Polars + Pandas + DuckDB | ✅ En iyi | 10/10 |
+| 11 | Polars + Pandas + DuckDB | ✅ En iyi — Polars standardı, native DuckDB entegrasyonu | 10/10 |
 | 12 | Prometheus + Grafana + OTel | ✅ En iyi | 10/10 |
 | 13 | MLflow | ✅ İyi | 9/10 |
 | 14 | PgBouncer | ✅ En iyi | 10/10 |
 | 15 | pgvector | ✅ En iyi | 10/10 |
 | 16 | Backtest Engine | ✅ En iyi | 10/10 |
 | 17 | Risk Engine | ✅ En iyi | 10/10 |
-| 18 | Feature Engine | ✅ Düzeltildi — crash bug, sahte veri temizlendi, contract eklendi | 8/10 |
+| 18 | Feature Engine | ✅ Düzeltildi — crash bug, sahte veri temizlendi, contract eklendi, Polars native | 9/10 |
 | 19 | CI/CD Pipeline | ⚠️ Basit | 5/10 |
 | 20 | Data Quality | ⚠️ Partial | 6/10 |
 
-**Genel ağırlıklı skor: 9.1/10**
+**Genel ağırlıklı skor: 9.3/10**
 
-**Asıl geliştirme alanı: Feature Engine (6/10) ve CI/CD (5/10)**
+**Asıl geliştirme alanı: CI/CD (5/10) ve Data Quality (6/10)**
 
 ---
 
