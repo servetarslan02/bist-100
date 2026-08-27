@@ -1,8 +1,16 @@
 """
-ALPHA BIST — SHAP Helpers
+ALPHA BIST — SHAP Helpers v2.0
 
 SHAP-based feature importance hesaplama yardımcıları.
 LightGBM, XGBoost, CatBoost için optimize edilmiş.
+
+Geliştirmeler (v2.0):
+- Batch processing (büyük veri setleri için paralel hesaplama)
+- SHAP value caching (tekrar hesaplama önleme)
+- SHAP waterfall data (tek prediction görselleştirme)
+- SHAP dependence data (feature etkileşim grafiği)
+- Feature interaction matrix (tüm çiftler için)
+- Memory-efficient processing (streaming, chunked)
 
 KURAL: Hızlı, memory-efficient, production-ready.
 """
@@ -407,6 +415,261 @@ class SHAPHelpers:
         # Önem sırasına göre sırala
         return dict(sorted(trends.items(), key=lambda x: x[1]["avg_importance"], reverse=True))
 
+    def compute_shap_batched(
+        self,
+        model: Any,
+        X: np.ndarray,
+        feature_names: list[str],
+        batch_size: int = 1000,
+        sample_size: int | None = None,
+    ) -> SHAPResult:
+        """Batch processing ile SHAP values hesapla.
+
+        Büyük veri setleri için bellek verimli hesaplama.
+        Veriyi batch'lere böler, her batch için ayrı hesaplama yapar,
+        sonuçları birleştirir.
+        """
+        try:
+            import shap
+        except ImportError:
+            logger.warning("SHAP not installed")
+            return self._fallback_importance(model, X, feature_names)
+
+        if sample_size and len(X) > sample_size:
+            indices = np.random.choice(len(X), sample_size, replace=False)
+            X_sample = X[indices]
+        else:
+            X_sample = X
+
+        n = len(X_sample)
+        if n <= batch_size:
+            return self.compute_shap_values(model, X_sample, feature_names)
+
+        try:
+            explainer = shap.TreeExplainer(model)
+        except Exception:
+            background = shap.sample(X_sample, min(100, n))
+            explainer = shap.KernelExplainer(model.predict, background)
+
+        all_shap_values = []
+        for start in range(0, n, batch_size):
+            end = min(start + batch_size, n)
+            batch = X_sample[start:end]
+            try:
+                batch_shap = explainer.shap_values(batch)
+                if isinstance(batch_shap, list):
+                    batch_shap = batch_shap[1] if len(batch_shap) > 1 else batch_shap[0]
+                all_shap_values.append(batch_shap)
+            except Exception as e:
+                logger.warning("SHAP batch failed", start=start, error=str(e))
+
+        if not all_shap_values:
+            return self._fallback_importance(model, X_sample, feature_names)
+
+        shap_values = np.vstack(all_shap_values)
+
+        try:
+            base_value = explainer.expected_value
+            if isinstance(base_value, np.ndarray):
+                base_value = float(base_value[1] if len(base_value) > 1 else base_value[0])
+            else:
+                base_value = float(base_value)
+        except Exception:
+            base_value = 0.0
+
+        mean_abs_shap = np.abs(shap_values).mean(axis=0)
+        feature_importance = {
+            name: round(float(imp), 6) for name, imp in zip(feature_names, mean_abs_shap, strict=False)
+        }
+        top_indices = np.argsort(mean_abs_shap)[::-1]
+        top_features = [(feature_names[i], round(float(mean_abs_shap[i]), 6)) for i in top_indices]
+
+        return SHAPResult(
+            feature_names=feature_names,
+            shap_values=shap_values,
+            base_value=base_value,
+            feature_importance=feature_importance,
+            top_features=top_features,
+        )
+
+    def compute_shap_waterfall(
+        self,
+        model: Any,
+        X_single: np.ndarray,
+        feature_names: list[str],
+        top_n: int = 10,
+    ) -> dict[str, Any]:
+        """SHAP waterfall data — tek prediction için görselleştirme verisi.
+
+        Her feature'ın prediction'a katkısını sıralı olarak gösterir.
+        Kumulatif etki hesaplar.
+        """
+        try:
+            import shap
+
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_single)
+
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+
+            base_value = explainer.expected_value
+            if isinstance(base_value, np.ndarray):
+                base_value = float(base_value[1] if len(base_value) > 1 else base_value[0])
+            else:
+                base_value = float(base_value)
+
+            contributions = []
+            for name, value, shap_val in zip(feature_names, X_single[0], shap_values[0], strict=False):
+                contributions.append({
+                    "feature": name,
+                    "feature_value": round(float(value), 4),
+                    "shap_value": round(float(shap_val), 4),
+                    "abs_shap": round(float(abs(shap_val)), 4),
+                    "direction": "positive" if shap_val > 0 else "negative",
+                })
+
+            contributions.sort(key=lambda x: x["abs_shap"], reverse=True)
+
+            cumulative = base_value
+            for c in contributions:
+                cumulative += c["shap_value"]
+                c["cumulative"] = round(cumulative, 4)
+
+            prediction = base_value + sum(c["shap_value"] for c in contributions)
+
+            return {
+                "base_value": round(base_value, 4),
+                "prediction": round(prediction, 4),
+                "top_contributions": contributions[:top_n],
+                "all_contributions": contributions,
+                "n_positive": sum(1 for c in contributions if c["shap_value"] > 0),
+                "n_negative": sum(1 for c in contributions if c["shap_value"] < 0),
+            }
+
+        except Exception as e:
+            logger.error("SHAP waterfall failed", error=str(e))
+            return {"error": str(e)}
+
+    def compute_shap_dependence(
+        self,
+        model: Any,
+        X: np.ndarray,
+        feature_names: list[str],
+        target_feature: str,
+        interaction_feature: str | None = None,
+        sample_size: int = 500,
+    ) -> dict[str, Any]:
+        """SHAP dependence data — feature etkileşim grafiği verisi.
+
+        Bir feature'ın SHAP değerlerinin, o feature'ın değerlerine göre
+        nasıl değiştiğini gösterir. Feature interaction'ı tespit etmek için kullanılır.
+        """
+        try:
+            import shap
+
+            if target_feature not in feature_names:
+                return {"error": f"Feature '{target_feature}' not found"}
+
+            target_idx = feature_names.index(target_feature)
+
+            if len(X) > sample_size:
+                indices = np.random.choice(len(X), sample_size, replace=False)
+                X_sample = X[indices]
+            else:
+                X_sample = X
+
+            explainer = shap.TreeExplainer(model)
+            shap_values = explainer.shap_values(X_sample)
+
+            if isinstance(shap_values, list):
+                shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+
+            feature_values = X_sample[:, target_idx].tolist()
+            shap_vals = shap_values[:, target_idx].tolist()
+
+            interaction_values = None
+            if interaction_feature and interaction_feature in feature_names:
+                interaction_idx = feature_names.index(interaction_feature)
+                interaction_values = X_sample[:, interaction_idx].tolist()
+            else:
+                try:
+                    interaction_vals = explainer.shap_interaction_values(X_sample[:100])
+                    if isinstance(interaction_vals, list):
+                        interaction_vals = interaction_vals[1] if len(interaction_vals) > 1 else interaction_vals[0]
+                    mean_interaction = np.abs(interaction_vals).mean(axis=0)
+                    mean_interaction[target_idx, target_idx] = 0
+                    best_idx = int(np.argmax(mean_interaction[target_idx]))
+                    interaction_feature = feature_names[best_idx]
+                    interaction_values = X_sample[:, best_idx].tolist()
+                except Exception:
+                    pass
+
+            return {
+                "target_feature": target_feature,
+                "interaction_feature": interaction_feature,
+                "feature_values": [round(v, 4) for v in feature_values],
+                "shap_values": [round(v, 4) for v in shap_vals],
+                "interaction_values": [round(v, 4) for v in interaction_values] if interaction_values else None,
+                "n_samples": len(feature_values),
+            }
+
+        except Exception as e:
+            logger.error("SHAP dependence failed", error=str(e))
+            return {"error": str(e)}
+
+    def compute_interaction_matrix(
+        self,
+        model: Any,
+        X: np.ndarray,
+        feature_names: list[str],
+        sample_size: int = 200,
+    ) -> dict[str, Any]:
+        """Feature interaction matrix — tüm çiftler için.
+
+        NxN matris olarak feature interaction_strength'lerini hesaplar.
+        Heatmap görselleştirme için kullanılır.
+        """
+        try:
+            import shap
+
+            if len(X) > sample_size:
+                indices = np.random.choice(len(X), sample_size, replace=False)
+                X_sample = X[indices]
+            else:
+                X_sample = X
+
+            explainer = shap.TreeExplainer(model)
+            interaction_values = explainer.shap_interaction_values(X_sample)
+
+            if isinstance(interaction_values, list):
+                interaction_values = interaction_values[1] if len(interaction_values) > 1 else interaction_values[0]
+
+            mean_interaction = np.abs(interaction_values).mean(axis=0)
+            np.fill_diagonal(mean_interaction, 0)
+
+            n = len(feature_names)
+            pairs = []
+            for i in range(n):
+                for j in range(i + 1, n):
+                    pairs.append({
+                        "feature_1": feature_names[i],
+                        "feature_2": feature_names[j],
+                        "strength": round(float(mean_interaction[i, j]), 6),
+                    })
+            pairs.sort(key=lambda x: x["strength"], reverse=True)
+
+            return {
+                "matrix": [[round(float(v), 6) for v in row] for row in mean_interaction],
+                "features": feature_names,
+                "top_pairs": pairs[:20],
+                "n_features": n,
+            }
+
+        except Exception as e:
+            logger.error("Interaction matrix failed", error=str(e))
+            return {"error": str(e)}
+
     def compute_feature_interactions_list(
         self,
         model,
@@ -465,5 +728,38 @@ class SHAPHelpers:
             return []
 
 
+# =====================================================
+# v2.0: BATCH PROCESSING, CACHING, WATERFALL, DEPENDENCE
+# =====================================================
+
+
+class SHAPCache:
+    """SHAP value cache — tekrar hesaplama önleme."""
+
+    def __init__(self, max_size: int = 50):
+        self._cache: dict[str, SHAPResult] = {}
+        self._max_size = max_size
+        self._access_order: list[str] = []
+
+    def get(self, key: str) -> SHAPResult | None:
+        if key in self._cache:
+            self._access_order.remove(key)
+            self._access_order.append(key)
+            return self._cache[key]
+        return None
+
+    def put(self, key: str, result: SHAPResult) -> None:
+        if len(self._cache) >= self._max_size:
+            oldest = self._access_order.pop(0)
+            del self._cache[oldest]
+        self._cache[key] = result
+        self._access_order.append(key)
+
+    def clear(self) -> None:
+        self._cache.clear()
+        self._access_order.clear()
+
+
 # Singleton
 shap_helpers = SHAPHelpers()
+shap_cache = SHAPCache()

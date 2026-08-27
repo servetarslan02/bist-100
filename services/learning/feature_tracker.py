@@ -216,6 +216,185 @@ class FeatureImportanceTracker:
             "last_importance": self._last_importance,
         }
 
+    def compute_stability_score(self, top_n: int = 20) -> dict[str, dict[str, Any]]:
+        """Feature ranking stability score hesapla.
+
+        Her feature'ın zaman içindeki ranking sırasının ne kadar stabil olduğunu ölçer.
+        Yüksek skor = stabil ranking (iyi). Düşük skor = dalgalı ranking (kötü).
+
+        Args:
+            top_n: En önemli N feature
+
+        Returns:
+            {feature: {stability_score, avg_rank, rank_std, rank_trend}}
+        """
+        if len(self._history) < 5:
+            return {}
+
+        # Her tarih için feature ranking hesapla
+        date_importances: dict[str, dict[str, float]] = defaultdict(dict)
+        for h in self._history:
+            date_importances[h.date][h.feature] = h.importance
+
+        # Her tarih için ranking
+        all_features = set(h.feature for h in self._history)
+        date_rankings: dict[str, dict[str, int]] = {}
+
+        for date, importances in date_importances.items():
+            sorted_features = sorted(importances.items(), key=lambda x: x[1], reverse=True)
+            date_rankings[date] = {f: rank for rank, (f, _) in enumerate(sorted_features)}
+
+        # Her feature için ranking istatistikleri
+        stability_scores = {}
+        for feature in all_features:
+            ranks = []
+            for date_ranking in date_rankings.values():
+                if feature in date_ranking:
+                    ranks.append(date_ranking[feature])
+
+            if len(ranks) < 3:
+                continue
+
+            avg_rank = float(np.mean(ranks))
+            rank_std = float(np.std(ranks))
+
+            # Stability score: 1 / (1 + rank_std) — düşük std = yüksek stabilite
+            stability = 1.0 / (1.0 + rank_std)
+
+            # Rank trend (son 3 vs ilk 3)
+            if len(ranks) >= 6:
+                recent_rank = np.mean(ranks[-3:])
+                older_rank = np.mean(ranks[:3])
+                if recent_rank < older_rank - 2:
+                    rank_trend = "improving"  # Sıralama yükseldi (daha iyi)
+                elif recent_rank > older_rank + 2:
+                    rank_trend = "declining"  # Sıralama düştü (kötü)
+                else:
+                    rank_trend = "stable"
+            else:
+                rank_trend = "insufficient_data"
+
+            stability_scores[feature] = {
+                "stability_score": round(stability, 4),
+                "avg_rank": round(avg_rank, 1),
+                "rank_std": round(rank_std, 2),
+                "rank_trend": rank_trend,
+                "n_observations": len(ranks),
+            }
+
+        # Top N (avg_rank'a göre sırala)
+        sorted_scores = dict(
+            sorted(
+                stability_scores.items(),
+                key=lambda x: x[1]["avg_rank"],
+            )[:top_n]
+        )
+
+        return sorted_scores
+
+    def suggest_feature_selection_detailed(
+        self,
+        min_importance: float | None = None,
+        min_stability: float = 0.3,
+    ) -> dict[str, Any]:
+        """Detaylı feature selection önerileri.
+
+        Feature'ları 4 kategoriye ayırır:
+        - KEEP: Yüksek importance + yüksek stabilite
+        - MONITOR: Düşük importance ama stabil (potansiyel faydalı)
+        - CONSIDER_DROPPING: Düşük importance + düşük stabilite
+        - INVESTIGATE: Yüksek importance ama düşük stabilite (overfitting riski)
+
+        Args:
+            min_importance: Minimum importance eşiği
+            min_stability: Minimum stabilite eşiği
+
+        Returns:
+            {keep: [...], monitor: [...], consider_dropping: [...], investigate: [...]}
+        """
+        cfg = learning_settings.feature_importance
+        min_importance = min_importance or cfg.min_importance_threshold
+
+        trends = self.get_trends(top_n=200)
+        stability = self.compute_stability_score(top_n=200)
+
+        keep = []
+        monitor = []
+        consider_dropping = []
+        investigate = []
+
+        for feature, trend in trends.items():
+            stab = stability.get(feature, {}).get("stability_score", 0.5)
+            avg_imp = trend.avg_importance
+
+            if avg_imp >= min_importance and stab >= min_stability:
+                keep.append(feature)
+            elif avg_imp < min_importance and stab >= min_stability:
+                monitor.append(feature)
+            elif avg_imp < min_importance and stab < min_stability:
+                consider_dropping.append(feature)
+            else:  # avg_imp >= min_importance and stab < min_stability
+                investigate.append(feature)
+
+        return {
+            "keep": keep,
+            "monitor": monitor,
+            "consider_dropping": consider_dropping,
+            "investigate": investigate,
+            "summary": {
+                "total_features": len(trends),
+                "keep_count": len(keep),
+                "monitor_count": len(monitor),
+                "consider_dropping_count": len(consider_dropping),
+                "investigate_count": len(investigate),
+            },
+        }
+
+    def save_history(self, path: str) -> None:
+        """Feature importance geçmişini dosyaya kaydet."""
+        import json
+        from pathlib import Path
+
+        data = []
+        for h in self._history:
+            data.append({
+                "date": h.date,
+                "feature": h.feature,
+                "importance": h.importance,
+                "regime": h.regime,
+                "model_version": h.model_version,
+            })
+
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+        logger.info("Feature history saved", path=path, records=len(data))
+
+    def load_history(self, path: str) -> None:
+        """Feature importance geçmişini dosyadan yükle."""
+        import json
+
+        try:
+            with open(path) as f:
+                data = json.load(f)
+
+            for entry in data:
+                record = FeatureImportanceRecord(
+                    date=entry["date"],
+                    feature=entry["feature"],
+                    importance=entry["importance"],
+                    regime=entry.get("regime", "UNKNOWN"),
+                    model_version=entry.get("model_version", "v1"),
+                )
+                self._history.append(record)
+
+            logger.info("Feature history loaded", path=path, records=len(data))
+        except FileNotFoundError:
+            logger.warning("Feature history file not found", path=path)
+        except Exception as e:
+            logger.error("Failed to load feature history", path=path, error=str(e))
+
 
 # Singleton
 feature_importance_tracker = FeatureImportanceTracker()
