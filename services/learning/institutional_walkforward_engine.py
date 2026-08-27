@@ -84,8 +84,8 @@ def extract_point_in_time_features(df: pl.DataFrame) -> pl.DataFrame:
 
     feats = df.select([])
 
-    feats = feats.with_columns((close / close.shift(5) - 1.0 * 100.0).alias('roc_5d'))
-    feats = feats.with_columns((close / close.shift(20) - 1.0 * 100.0).alias('roc_20d'))
+    feats = feats.with_columns(((close / close.shift(5) - 1.0) * 100.0).alias('roc_5d'))
+    feats = feats.with_columns(((close / close.shift(20) - 1.0) * 100.0).alias('roc_20d'))
     feats = feats.with_columns(feats['roc_20d'].alias('momentum_20d'))
 
     sma20 = close.rolling_mean(20)

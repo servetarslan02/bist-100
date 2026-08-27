@@ -296,10 +296,12 @@ class FeatureEngine:
         z = (volume[-1] - vol_mean[-1]) / (vol_std[-1] + 1)
         f['volume_zscore_20d'] = float(z)
 
-        # Percentile
+        # Percentile (rank-based)
         if n >= 60:
-            pct = (volume.rolling_rank(min(n, 252)) / min(n, 252))[-1]
-            f['volume_percentile'] = float(pct)
+            window = min(n, 252)
+            vol_tail = volume.tail(window)
+            rank_val = (vol_tail <= volume[-1]).sum() / window
+            f['volume_percentile'] = float(rank_val)
 
         # Volume trend
         if n >= 20:
@@ -457,9 +459,12 @@ def compute_universe_features(
         for sect, series_list in sector_dfs.items():
             if series_list:
                 try:
-                    # Polars'da birden fazla Series'ı yan yana koyup ortalamasını al
-                    aligned = pl.concat(series_list, how="align")
-                    sector_series[sect] = aligned.mean_horizontal()
+                    # En kısa seri uzunluğuna göre hizala ve ortalamayı al
+                    min_len = min(len(s) for s in series_list)
+                    if min_len > 0:
+                        aligned = [s.tail(min_len) for s in series_list]
+                        stacked = pl.DataFrame({f"s{i}": s for i, s in enumerate(aligned)})
+                        sector_series[sect] = stacked.mean_horizontal()
                 except Exception:
                     logger.warning("Sector series computation failed", sector=sect, exc_info=True)
 
