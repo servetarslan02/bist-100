@@ -31,9 +31,9 @@ function normalizeApiPath(path: string): string {
 }
 
 // 1 & 4. Global In-Memory Cache, In-Flight Request Deduplication Bus & Global PubSub
-const memoryCache = new Map<string, { data: any; timestamp: number }>();
-const inFlightRequests = new Map<string, Promise<any>>();
-const cacheSubscribers = new Map<string, Set<(data: any) => void>>();
+const memoryCache = new Map<string, { data: unknown; timestamp: number }>();
+const inFlightRequests = new Map<string, Promise<unknown>>();
+const cacheSubscribers = new Map<string, Set<(data: unknown) => void>>();
 
 let lastGlobalSyncTimestamp = Date.now();
 const syncStatusListeners = new Set<(ts: number) => void>();
@@ -62,7 +62,7 @@ export function useGlobalSyncStatus() {
   return { lastSync: new Date(lastSync), secondsAgo };
 }
 
-function subscribeToCache(key: string, callback: (data: any) => void) {
+function subscribeToCache(key: string, callback: (data: unknown) => void) {
   if (!cacheSubscribers.has(key)) {
     cacheSubscribers.set(key, new Set());
   }
@@ -72,7 +72,7 @@ function subscribeToCache(key: string, callback: (data: any) => void) {
   };
 }
 
-function notifyCacheSubscribers(key: string, data: any) {
+function notifyCacheSubscribers(key: string, data: unknown) {
   lastGlobalSyncTimestamp = Date.now();
   syncStatusListeners.forEach(cb => {
     try { cb(lastGlobalSyncTimestamp); } catch {}
@@ -113,7 +113,7 @@ export function getCachedData<T>(key: string): T | null {
   return getInitialCachedData<T>(key);
 }
 
-function persistCacheLocally(key: string, data: any) {
+function persistCacheLocally(key: string, data: unknown) {
   memoryCache.set(key, { data, timestamp: Date.now() });
   notifyCacheSubscribers(key, data);
 
@@ -121,7 +121,7 @@ function persistCacheLocally(key: string, data: any) {
   if (typeof window !== 'undefined') {
     const defer = typeof window.requestIdleCallback === 'function' 
       ? window.requestIdleCallback 
-      : (cb: any) => setTimeout(cb, 16);
+      : (cb: () => void) => setTimeout(cb, 16);
 
     defer(() => {
       try {
@@ -212,8 +212,8 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
       setError(null);
       setLastUpdated(new Date());
       setTick(t => t + 1);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
       setIsValidating(false);
@@ -248,10 +248,10 @@ export function usePolling<T>(path: string, intervalMs: number = 3000) {
 // =====================================================
 
 export function useWebSocket(channel: string) {
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<unknown>(null);
   const [connected, setConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -433,6 +433,16 @@ export interface WorldState {
   vix_level: number;
   inflation_pressure: number;
   timestamp: string;
+  dxy?: number;
+  dxy_change_pct?: number;
+  us10y?: number;
+  us10y_change_pct?: number;
+  brent_crude?: number;
+  brent_change_pct?: number;
+  gold?: number;
+  gold_change_pct?: number;
+  btc?: number;
+  btc_change_pct?: number;
 }
 
 export interface SystemStatus {

@@ -246,8 +246,10 @@ class AlphaModel:
             import os
 
             if os.path.exists(hash_path):
-                expected_hash = open(hash_path).read().strip()
-                actual_hash = hashlib.sha256(open(path, "rb").read()).hexdigest()
+                with open(hash_path) as hf:
+                    expected_hash = hf.read().strip()
+                with open(path, "rb") as bf:
+                    actual_hash = hashlib.sha256(bf.read()).hexdigest()
                 if actual_hash != expected_hash:
                     raise SecurityError(f"Model hash mismatch — possible tampering: {path}")
         except SecurityError:

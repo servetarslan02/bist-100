@@ -186,7 +186,7 @@ export default function ScenarioLab() {
     const mySeq = ++requestSeqRef.current;
     setRunning(true);
     try {
-      const data: any = await api(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
+      const data = await api<Record<string, unknown>>(`/risk/stress-test?horizon_days=${horizon}&vol_multiplier=${vol}&scenario=${sc}`);
       if (mySeq !== requestSeqRef.current) return;
       if (data && data.paths) {
         setSimResult(data);
@@ -228,8 +228,8 @@ export default function ScenarioLab() {
     });
 
     // Debounced background sync
-    clearTimeout((window as any)._mc_timer);
-    (window as any)._mc_timer = setTimeout(() => {
+    clearTimeout(window._mc_timer);
+    window._mc_timer = setTimeout(() => {
       fetchBackendSimulation(val, volMultiplier, selectedScenario);
     }, 150);
   };
@@ -258,8 +258,8 @@ export default function ScenarioLab() {
     });
 
     // Debounced background sync
-    clearTimeout((window as any)._mc_timer);
-    (window as any)._mc_timer = setTimeout(() => {
+    clearTimeout(window._mc_timer);
+    window._mc_timer = setTimeout(() => {
       fetchBackendSimulation(timeHorizon, val, selectedScenario);
     }, 150);
   };

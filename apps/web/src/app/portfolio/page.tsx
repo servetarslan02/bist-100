@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type PortfolioData, apiFetch } from "@/lib/api";
+import type { OrderData, PortfolioMetrics } from "@/types/api";
 import { 
   Briefcase, TrendingUp, TrendingDown, Wallet, ArrowUpRight, ArrowDownRight, 
   RefreshCw, ShieldCheck, Activity, PieChart, Layers, Clock, CheckCircle2, 
@@ -44,9 +45,9 @@ function MetricCard({ label, value, prefix = "", suffix = "", color, subtext }: 
 
 export default function PortfolioPage() {
   const router = useRouter();
-  const { data, loading, refetch } = usePolling<any>("/portfolio", 1500);
-  const { data: ordersData, refetch: refetchOrders } = usePolling<any>("/portfolio/orders", 3000);
-  const { data: metricsData } = usePolling<any>("/portfolio/metrics", 5000);
+  const { data, loading, refetch } = usePolling<PortfolioData | null>("/portfolio", 1500);
+  const { data: ordersData, refetch: refetchOrders } = usePolling<{ orders: OrderData[] } | null>("/portfolio/orders", 3000);
+  const { data: metricsData } = usePolling<PortfolioMetrics | null>("/portfolio/metrics", 5000);
   
   const [triggering, setTriggering] = useState(false);
   const [actionMsg, setActionMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -64,7 +65,7 @@ export default function PortfolioPage() {
   };
   const marketOpen = isBistOpen();
 
-  const rawP = (data as any)?.portfolio ?? data ?? {};
+  const rawP = data?.portfolio ?? (data as Record<string, unknown>) ?? {};
   const currentCapital = rawP.total_value ?? rawP.current_capital ?? 1000000;
   const investedValue = rawP.invested_value ?? 0;
   const cashBalance = rawP.cash ?? rawP.total_cash ?? rawP.settled_cash ?? 0;
@@ -74,7 +75,7 @@ export default function PortfolioPage() {
   const purchasingPower = rawP.purchasing_power ?? cashBalance;
   const totalPnl = rawP.total_pnl ?? rawP.unrealized_pnl ?? 0;
   const totalReturnPct = rawP.total_return_pct ?? 0;
-  const positions = (data as any)?.positions ?? rawP.positions ?? [];
+  const positions = data?.positions ?? (rawP.positions as PortfolioData["positions"]) ?? [];
   const sectorWeights = rawP.sector_weights ?? {};
   const orders = ordersData?.orders ?? [];
   const totalPnlPos = totalPnl >= 0;
@@ -113,8 +114,8 @@ export default function PortfolioPage() {
         refetch();
         refetchOrders();
       }, 2500);
-    } catch (e: any) {
-      setActionMsg({ type: "error", text: `İşlem tetiklenirken hata oluştu: ${e.message || e}` });
+    } catch (e: unknown) {
+      setActionMsg({ type: "error", text: `İşlem tetiklenirken hata oluştu: ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setTriggering(false);
     }
@@ -254,7 +255,7 @@ export default function PortfolioPage() {
             {Object.keys(sectorWeights).length === 0 ? (
               <p className="text-xs text-zinc-500 col-span-2 py-4 text-center">Henüz sektör verisi bulunmuyor</p>
             ) : (
-              Object.entries(sectorWeights).map(([sec, weight]: any, i) => {
+              Object.entries(sectorWeights).map(([sec, weight], i) => {
                 const wPct = (Number(weight) * 100);
                 const isNearLimit = wPct >= 25.0;
                 return (
@@ -339,7 +340,7 @@ export default function PortfolioPage() {
                   </td>
                 </tr>
               ) : (
-                positions.map((pos: any, i: number) => {
+                positions.map((pos, i: number) => {
                   const sym = pos.ticker || pos.symbol;
                   const pnlVal = Number(pos.unrealized_pnl ?? 0);
                   const pnlPct = Number(pos.unrealized_pnl_pct ?? 0);
@@ -467,7 +468,7 @@ export default function PortfolioPage() {
                   </td>
                 </tr>
               ) : (
-                orders.map((ord: any, i: number) => {
+                orders.map((ord, i: number) => {
                   const isBuy = ord.side === "BUY";
                   return (
                     <tr key={i} className="text-[12px] border-b border-zinc-800/40 hover:bg-zinc-800/20">

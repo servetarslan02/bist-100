@@ -57,10 +57,31 @@ select = [
 ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
+    "E402",   # module-level import not at top (common in scripts with sys.path)
+    "E741",   # ambiguous variable name (l used in financial formulas)
+    "N801",   # class name should use CapWords (TestFaz0_X is clearer)
+    "N802",   # function name should be lowercase (gRPC/property names)
+    "N803",   # argument name should be lowercase (X, y, S, K, T are math notation)
+    "N805",   # first argument should be self (inner class patterns)
+    "N806",   # variable in function should be lowercase (X, y, Z, L are math notation)
+    "N814",   # camelcase imported as constant (NATS client)
+    "N817",   # camelcase imported as acronym (EventType as ET)
+    "SIM102", # collapsible-if (nested ifs are clearer in complex logic)
+    "SIM103", # needless-bool (explicit is fine)
+    "SIM108", # ternary operator (if-else blocks are clearer for complex expressions)
+    "SIM112", # uncapitalized environment variable
+    "SIM115", # context manager for open (not always needed)
+    "SIM116", # if-else-block-instead-of-dict-lookup
+    "SIM117", # multiple with statements (nested is fine)
+    "B007",   # unused loop control variable (common pattern)
+    "UP035",  # deprecated import (typing.Dict still works fine)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]  # Allow re-exports in __init__.py
+"services/grpc/generated/*.py" = ["ALL"]  # Auto-generated gRPC code
+"scripts/*.py" = ["SIM"]  # Scripts have different style needs
+"tests/*.py" = ["SIM115"]  # NamedTemporaryFile in tests is standard pattern
 
 [tool.ruff.lint.isort]
 known-first-party = ["services"]

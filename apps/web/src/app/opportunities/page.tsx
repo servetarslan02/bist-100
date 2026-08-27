@@ -45,7 +45,7 @@ const CAT_FILTERS = [
 
 export default function OpportunitiesPage() {
   const router = useRouter();
-  const { data: rawSignals, loading, refetch } = usePolling<OpportunitySignal[]>(
+  const { data: rawSignals, loading, refetch } = usePolling<OpportunitySignal[] | { signals: OpportunitySignal[] }>(
     "/scanner/signals?limit=50",
     2500
   );
@@ -58,7 +58,7 @@ export default function OpportunitiesPage() {
 
   const signals = useMemo(() => {
     if (!rawSignals) return [];
-    const list = Array.isArray(rawSignals) ? rawSignals : ((rawSignals as any).signals || []);
+    const list = Array.isArray(rawSignals) ? rawSignals : (rawSignals.signals || []);
     return list;
   }, [rawSignals]);
 

@@ -74,7 +74,7 @@ const FALLBACK_ALERTS: AlertItem[] = [
 
 export default function AlertsPage() {
   const router = useRouter();
-  const { data: alertsData } = usePolling<any>("/system/alerts", 5000);
+  const { data: alertsData } = usePolling<{ alerts: AlertItem[] } | null>("/system/alerts", 5000);
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<string>("ALL");
 

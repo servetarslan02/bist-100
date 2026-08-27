@@ -13,8 +13,8 @@ export default function LearningLabPage() {
   const [training, setTraining] = useState(false);
   const [activeTab, setActiveTab] = useState<"matrix" | "report" | "pipeline">("matrix");
 
-  const { data: matrixData, refetch: refetchMatrix } = usePolling<any>("/learning/performance-matrix", 15000);
-  const { data: repData, refetch: refetchReport } = usePolling<any>("/learning/report", 15000);
+  const { data: matrixData, refetch: refetchMatrix } = usePolling<Record<string, unknown> | null>("/learning/performance-matrix", 15000);
+  const { data: repData, refetch: refetchReport } = usePolling<Record<string, unknown> | null>("/learning/report", 15000);
 
   const modelsData = matrixData?.models || [];
   const trustScores = matrixData?.trust_scores || [];

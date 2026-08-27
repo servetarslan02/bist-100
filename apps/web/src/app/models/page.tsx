@@ -29,7 +29,7 @@ interface ModelRegistryItem {
 
 
 export default function ModelCenterPage() {
-  const { data: modelsData } = usePolling<any>("/models/list", 10000);
+  const { data: modelsData } = usePolling<{ models: ModelRegistryItem[] } | null>("/models/list", 10000);
 
   const models: ModelRegistryItem[] = useMemo(() => modelsData?.models || [], [modelsData]);
   return (

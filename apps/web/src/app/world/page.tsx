@@ -9,7 +9,7 @@ import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/comp
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default function WorldIntelPage() {
-  const { data: world } = usePolling<any>("/macro/world", 5000);
+  const { data: world } = usePolling<WorldState | null>("/macro/world", 5000);
 
   const dxyVal = world?.dxy ?? 98.84;
   const dxyChg = world?.dxy_change_pct ?? 0.09;

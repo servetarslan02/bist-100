@@ -578,8 +578,9 @@ class BacktestEngine:
                 current_date,
             )
 
-        if dump_ledger:
+        if dump_ledger and trades_file:
             trades_file.close()
+        if dump_ledger and daily_file:
             daily_file.close()
 
         metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)

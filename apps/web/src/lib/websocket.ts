@@ -9,7 +9,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 class WebSocketManager {
   private static instance: WebSocketManager;
   private ws: WebSocket | null = null;
-  private subscribers: Map<string, Set<(data: any) => void>> = new Map();
+  private subscribers: Map<string, Set<(data: unknown) => void>> = new Map();
   private reconnectTimer: NodeJS.Timeout | null = null;
   private _connected = false;
   private reconnectDelay = 1000;
@@ -35,7 +35,7 @@ class WebSocketManager {
     this.ws.onopen = () => {
       this._connected = true;
       this.reconnectDelay = 1000; // Reset backoff on success
-      console.log("[WS] Connected");
+      console.debug("[WS] Connected");
     };
 
     this.ws.onmessage = (event) => {
@@ -56,7 +56,7 @@ class WebSocketManager {
 
     this.ws.onclose = () => {
       this._connected = false;
-      console.log(`[WS] Disconnected, reconnecting in ${this.reconnectDelay}ms...`);
+      console.debug(`[WS] Disconnected, reconnecting in ${this.reconnectDelay}ms...`);
       // Exponential backoff + jitter
       const jitter = Math.random() * 1000;
       const delay = Math.min(this.reconnectDelay + jitter, this.maxReconnectDelay);
@@ -80,7 +80,7 @@ class WebSocketManager {
     this._connected = false;
   }
 
-  subscribe(channel: string, callback: (data: any) => void): () => void {
+  subscribe(channel: string, callback: (data: unknown) => void): () => void {
     if (!this.subscribers.has(channel)) {
       this.subscribers.set(channel, new Set());
     }
@@ -99,7 +99,7 @@ class WebSocketManager {
     };
   }
 
-  send(data: any) {
+  send(data: unknown) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
     }

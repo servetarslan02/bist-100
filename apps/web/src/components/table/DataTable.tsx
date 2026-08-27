@@ -124,11 +124,11 @@ export const defaultColumnDefs: ColDef[] = [
 // AG Grid Component
 // =====================================================
 
-interface DataTableProps {
-  rowData: any[];
+interface DataTableProps<T extends Record<string, unknown> = Record<string, unknown>> {
+  rowData: T[];
   columnDefs?: ColDef[];
   height?: string;
-  onRowClick?: (data: any) => void;
+  onRowClick?: (data: T) => void;
   loading?: boolean;
 }
 

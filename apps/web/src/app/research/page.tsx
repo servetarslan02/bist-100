@@ -9,6 +9,17 @@ import {
 import { SkeletonList, SkeletonCard, SkeletonTable, SkeletonChart } from "@/components/ui/Skeleton";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
+interface ScannerSignal {
+  ticker: string;
+  score?: number;
+  action?: string;
+  timestamp?: string;
+  current_price?: number;
+  price?: number;
+  target_price?: number;
+  stop_loss?: number;
+}
+
 interface ResearchReport {
   id: string;
   ticker: string;
@@ -22,7 +33,7 @@ interface ResearchReport {
 }
 
 export default function AIResearchPage() {
-  const { data: signalsData, loading } = usePolling<any>("/scanner/signals", 10000);
+  const { data: signalsData, loading } = usePolling<{ signals: ScannerSignal[] } | null>("/scanner/signals", 10000);
   const [customReports, setCustomReports] = useState<ResearchReport[]>([]);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -31,7 +42,7 @@ export default function AIResearchPage() {
   // Combine live scanned top signals with reports
   const reports = useMemo(() => {
     const liveScannedReports: ResearchReport[] = [];
-    const signals: any[] = signalsData?.signals ?? [];
+    const signals: ScannerSignal[] = signalsData?.signals ?? [];
     
     signals.forEach((sig) => {
       const score = Math.round(sig.score ? (sig.score <= 1.0 ? sig.score * 1000 : sig.score) : 75);

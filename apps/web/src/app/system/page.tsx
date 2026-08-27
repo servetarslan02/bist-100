@@ -60,7 +60,7 @@ function ResourceBar({ label, value, icon: Icon }: { label: string; value: numbe
 }
 
 export default function SystemHealth() {
-  const { data: status } = usePolling<any>("/system/status", 3000);
+  const { data: status } = usePolling<SystemStatus & { resources?: Record<string, number>; system_details?: { label: string; value: string }[]; pipeline_stats?: { label: string; value: string }[] } | null>("/system/status", 3000);
   const services = status?.services || {};
   const allHealthy = Object.values(services).every(s => s === "healthy");
   const healthyCount = Object.values(services).filter(s => s === "healthy").length;
@@ -175,7 +175,7 @@ export default function SystemHealth() {
             <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Sistem Detayları</h2>
           </div>
           <div className="px-5 py-2">
-            {systemDetails.map((item: any) => <InfoRow key={item.label} label={item.label} value={item.value} />)}
+            {systemDetails.map((item: { label: string; value: string }) => <InfoRow key={item.label} label={item.label} value={item.value} />)}
             <InfoRow label="Son Veri Güncellemesi" value={status?.timestamp ? new Date(status.timestamp).toLocaleString("tr-TR") : "Canlı Akış"} />
           </div>
         </div>
@@ -192,7 +192,7 @@ export default function SystemHealth() {
             <h2 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--color-text-primary)" }}>Veri Akış Hattı (Canlı)</h2>
           </div>
           <div className="px-5 py-2">
-            {pipelineStats.map((item: any) => <InfoRow key={item.label} label={item.label} value={item.value} />)}
+            {pipelineStats.map((item: { label: string; value: string }) => <InfoRow key={item.label} label={item.label} value={item.value} />)}
           </div>
         </div>
       </div>

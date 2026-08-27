@@ -20,10 +20,10 @@ interface DatabaseInfo {
 }
 
 export default function DataCenterPage() {
-  const { data: dbData, loading, refetch } = usePolling<any>("/system/databases", 5000);
+  const { data: dbData, loading, refetch } = usePolling<{ databases: DatabaseInfo[] } | null>("/system/databases", 5000);
   const databases: DatabaseInfo[] = useMemo(() => dbData?.databases ?? [], [dbData]);
   const [optimizing, setOptimizing] = useState(false);
-  const [optResult, setOptResult] = useState<any>(null);
+  const [optResult, setOptResult] = useState<Record<string, unknown> | null>(null);
 
   const handleOptimize = async () => {
     setOptimizing(true);
@@ -36,8 +36,8 @@ export default function DataCenterPage() {
       const data = await res.json();
       setOptResult(data);
       refetch();
-    } catch (e: any) {
-      console.error(e);
+    } catch (e: unknown) {
+      console.error(e instanceof Error ? e.message : e);
     } finally {
       setOptimizing(false);
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { usePolling, type MarketState, type Signal, type SystemStatus } from "@/lib/api";
+import type { SignalItem, SignalResponse } from "@/types/api";
 import {
   TrendingUp, TrendingDown, Minus,
   Activity, BarChart2, Target as TargetIcon, Shield,
@@ -13,7 +14,14 @@ import { SkeletonStat, SkeletonTable, SkeletonList } from "@/components/ui/Skele
 // ---------------------------------------------
 // Component Helpers
 // ---------------------------------------------
-function SectionHeader({ icon: Icon, title, sub, accent }: any) {
+interface SectionHeaderProps {
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+  title: string;
+  sub?: string;
+  accent: string;
+}
+
+function SectionHeader({ icon: Icon, title, sub, accent }: SectionHeaderProps) {
   return (
     <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: "1px solid var(--color-border-subtle)" }}>
       <div className="flex items-center gap-2.5">
@@ -29,7 +37,17 @@ function SectionHeader({ icon: Icon, title, sub, accent }: any) {
   );
 }
 
-function StatCard({ label, value, suffix = "", decimals = 2, icon: Icon, accent, trend }: any) {
+interface StatCardProps {
+  label: string;
+  value: number | string;
+  suffix?: string;
+  decimals?: number;
+  icon: React.ComponentType<{ size?: number; style?: React.CSSProperties }>;
+  accent: string;
+  trend?: "up" | "down" | "neutral";
+}
+
+function StatCard({ label, value, suffix = "", decimals = 2, icon: Icon, accent, trend }: StatCardProps) {
   return (
     <div className="rounded-xl p-4 flex flex-col gap-3 relative overflow-hidden group"
       style={{
@@ -126,13 +144,13 @@ export default function ClientPageRoot() {
   
   // Real-time polling
   const { data: market, loading: marketLoading } = usePolling<MarketState>("/market/state", 2000);
-  const { data: rawSignals, loading: signalsLoading } = usePolling<any>("/signals?limit=10", 2000);
+  const { data: rawSignals, loading: signalsLoading } = usePolling<Signal[] | SignalResponse>("/signals?limit=10", 2000);
   const { data: status } = usePolling<SystemStatus>("/status", 3000);
 
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down">>({});
   const prevScoresRef = useRef<Record<string, number>>({});
 
-  const signals: Signal[] = Array.isArray(rawSignals) ? rawSignals : (rawSignals?.signals ?? []);
+  const signals: Signal[] = Array.isArray(rawSignals) ? rawSignals : ((rawSignals as SignalResponse)?.signals ?? []);
   const systemOk = !status || status.status === "healthy" || status.status === "ok" || (status.services && Object.values(status.services).every(s => s === "healthy"));
 
   useEffect(() => {

@@ -179,7 +179,7 @@ function LiveChartInner({ ticker, height = 300 }: LiveChartProps) {
   }, [ticker]);
 
   // Tick handler — updates refs only, no setState
-  const handleTick = useCallback((data: any) => {
+  const handleTick = useCallback((data: { price: number; timestamp: number; change_pct?: number; volume?: number }) => {
     if (!seriesRef.current) return;
 
     const price = data.price;
@@ -212,7 +212,7 @@ function LiveChartInner({ ticker, height = 300 }: LiveChartProps) {
 
       if (data.candles) {
         series.setData(
-          data.candles.map((c: any) => ({
+          data.candles.map((c: { time: number; open: number; high: number; low: number; close: number }) => ({
             time: c.time as Time,
             open: c.open,
             high: c.high,
@@ -223,7 +223,7 @@ function LiveChartInner({ ticker, height = 300 }: LiveChartProps) {
 
         if (data.volumes) {
           volumeSeries.setData(
-            data.volumes.map((v: any) => ({
+            data.volumes.map((v: { time: number; volume: number; open: number; close: number }) => ({
               time: v.time as Time,
               value: v.volume,
               color:

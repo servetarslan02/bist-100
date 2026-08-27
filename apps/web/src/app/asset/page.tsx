@@ -135,9 +135,9 @@ function AssetIntelContent() {
             prevPriceRef.val = p;
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (isMounted && !cached && !asset) {
-          setError(err.message || "Veri çekme hatası");
+          setError(err instanceof Error ? err.message : "Veri çekme hatası");
         }
       } finally {
         if (isMounted && isInitial) {
