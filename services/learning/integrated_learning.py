@@ -458,3 +458,4 @@ class IntegratedLearningSystem:
 
 # Singleton
 learning_system = IntegratedLearningSystem()
+integrated_learning_system = learning_system  # backward compatibility

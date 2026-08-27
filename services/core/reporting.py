@@ -21,3 +21,13 @@ def generate_daily_report(portfolio: dict, trades: list[dict], risk_metrics: dic
         "drawdown": risk_metrics.get("drawdown", 0),
         "risk_level": risk_metrics.get("risk_level", "UNKNOWN"),
     }
+
+
+def generate_report(report_type: str = "daily", **kwargs) -> dict[str, Any]:
+    """Backward-compatible wrapper — queue.py bu metodu çağırır."""
+    logger.info("Generating report", report_type=report_type)
+    return generate_daily_report(
+        portfolio=kwargs.get("portfolio", {}),
+        trades=kwargs.get("trades", []),
+        risk_metrics=kwargs.get("risk_metrics", {}),
+    )

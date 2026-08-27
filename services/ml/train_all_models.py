@@ -158,5 +158,11 @@ def train_all_models():
     logger.info("=================================================================")
 
 
+def train_all(model_type: str = "lightgbm"):
+    """Backward-compatible wrapper — queue.py bu metodu çağırır."""
+    train_all_models()
+    return {"model_type": model_type, "status": "completed"}
+
+
 if __name__ == "__main__":
     train_all_models()

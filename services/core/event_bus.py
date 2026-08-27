@@ -19,7 +19,7 @@ from typing import Any
 import structlog
 
 from .config import settings
-from .event_schema import CanonicalEvent
+from .event_schema import CanonicalEvent, EventType  # noqa: F401 — backward compatibility
 
 logger = structlog.get_logger()
 

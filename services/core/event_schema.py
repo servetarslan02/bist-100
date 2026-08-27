@@ -46,6 +46,7 @@ class EventType(IntEnum):
     HEARTBEAT = 8
     LEARNING = 9
     MACRO = 10
+    DATA_REFRESH = 11
 
 
 @dataclass

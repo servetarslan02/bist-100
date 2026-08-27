@@ -645,7 +645,7 @@ class SuperIntelligenceEngine:
             from services.core.event_bus import EventType, publish_event
 
             publish_event(
-                EventType.DATA_REFRESH_REQUESTED,
+                EventType.DATA_REFRESH,
                 source="super_intelligence",
                 payload={"reason": "self_healing", "timestamp": datetime.now(UTC).isoformat()},
             )
