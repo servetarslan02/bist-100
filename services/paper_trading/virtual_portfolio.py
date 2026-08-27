@@ -561,7 +561,7 @@ class VirtualPortfolio:
             for pos in self._positions.values():
                 orders.append(
                     {
-                        "date": pos.get("entry_date", "2026-08-24"),
+                        "date": pos.get("entry_date", datetime.now(UTC).strftime("%Y-%m-%d")),
                         "order_id": f"ORD_{pos.get('ticker')}_1",
                         "ticker": pos.get("ticker"),
                         "side": "BUY",

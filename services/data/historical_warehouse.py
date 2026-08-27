@@ -95,7 +95,9 @@ class HistoricalDataWarehouse:
         logger.info("30 yıllık BIST verisi indiriliyor ve yerel DuckDB veri tabanına kaydediliyor...")
 
         # 1. BIST-100 Endeksi
-        bm_raw = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
+        from datetime import date
+        end_date = date.today().isoformat()
+        bm_raw = yf.download(BENCHMARK_TICKER, start="1997-01-01", end=end_date, progress=False)
         bm_df = _yf_to_polars(bm_raw)
 
         with duckdb.connect(DB_FILE) as conn:
@@ -104,7 +106,7 @@ class HistoricalDataWarehouse:
 
         # 2. Hisseler
         stocks_raw = yf.download(
-            BIST_ALL_KEY_TICKERS, start="1997-01-01", end="2026-08-23", progress=False, group_by="ticker"
+            BIST_ALL_KEY_TICKERS, start="1997-01-01", end=end_date, progress=False, group_by="ticker"
         )
 
         all_dfs = []

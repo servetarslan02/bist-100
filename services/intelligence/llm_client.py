@@ -377,17 +377,17 @@ METİN:
         return "[LLM Mock] Analiz tamamlandı. Gemini API anahtarı eklendiğinde gerçek analiz üretilecek."
 
     def _mock_structured_response(self) -> dict[str, Any]:
-        """Mock yapılandırılmış yanıt."""
+        """Mock yapılandırılmış yanıt — sahte veri üretmez, nötr döner."""
         return {
-            "entities": [{"type": "COMPANY", "name": "THYAO", "confidence": 0.9}],
-            "event_type": "COMPANY",
-            "sentiment": 0.5,
-            "importance": 0.7,
-            "affected_tickers": ["THYAO", "PGSUS"],
-            "affected_sectors": ["AVIATION"],
-            "surprise_score": 0.2,
-            "uncertainty_score": 0.1,
-            "key_insight": "Mock analiz — API anahtarı gerekli",
+            "entities": [],
+            "event_type": "UNKNOWN",
+            "sentiment": 0.0,
+            "importance": 0.0,
+            "affected_tickers": [],
+            "affected_sectors": [],
+            "surprise_score": 0.0,
+            "uncertainty_score": 1.0,
+            "key_insight": "[MOCK] LLM API anahtarı tanımlı değil — analiz yapılamadı",
         }
 
 
