@@ -101,8 +101,11 @@ class HistoricalDataWarehouse:
         bm_df = _yf_to_polars(bm_raw)
 
         with duckdb.connect(DB_FILE) as conn:
-            # Polars → pandas → SQL (DuckDB pandas ile daha uyumlu)
-            bm_df.to_pandas().to_sql("benchmark_xu100", conn, if_exists="replace", index=True)
+            # Polars → DuckDB (native, pandas dönüşümü gereksiz)
+            conn.execute("DROP TABLE IF EXISTS benchmark_xu100")
+            conn.register("_bm_tmp", bm_df)
+            conn.execute("CREATE TABLE benchmark_xu100 AS SELECT * FROM _bm_tmp")
+            conn.unregister("_bm_tmp")
 
         # 2. Hisseler
         stocks_raw = yf.download(
@@ -124,7 +127,11 @@ class HistoricalDataWarehouse:
         if all_dfs:
             comb_df = pl.concat(all_dfs, how="diagonal")
             with duckdb.connect(DB_FILE) as conn:
-                comb_df.to_pandas().to_sql("stock_candles", conn, if_exists="replace", index=True)
+                # Polars → DuckDB (native, pandas dönüşümü gereksiz)
+                conn.execute("DROP TABLE IF EXISTS stock_candles")
+                conn.register("_comb_tmp", comb_df)
+                conn.execute("CREATE TABLE stock_candles AS SELECT * FROM _comb_tmp")
+                conn.unregister("_comb_tmp")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_stock_sym_date ON stock_candles(symbol, Date)")
 
         logger.info(f"Yerel depo başarıyla kaydedildi: {DB_FILE}")
@@ -136,11 +143,9 @@ class HistoricalDataWarehouse:
             self.download_and_save_warehouse()
 
         with duckdb.connect(DB_FILE) as conn:
-            bm_pandas = conn.execute("SELECT * FROM benchmark_xu100").fetchdf()
-            comb_pandas = conn.execute("SELECT * FROM stock_candles").fetchdf()
-
-        bm_df = pl.from_pandas(bm_pandas)
-        comb_df = pl.from_pandas(comb_pandas)
+            # DuckDB → Polars (native, pandas dönüşümü gereksiz)
+            bm_df = conn.execute("SELECT * FROM benchmark_xu100").pl()
+            comb_df = conn.execute("SELECT * FROM stock_candles").pl()
 
         stock_dict: dict[str, pl.DataFrame] = {}
         if "symbol" in comb_df.columns:

@@ -18,7 +18,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 3 | QuestDB | ✅ Tamamlandı | `8a908da` `c818dc3` | Consumer entegrasyonu, buffer mekanizması, retention stratejisi, 22 test |
 | 4 | SQLite | ✅ Tamamlandı | `1105ef1` | Kullanım politikası, default dialect postgresql, test düzeltmesi |
 | 5 | DuckDB | ✅ Tamamlandı | `67e5298` | Research engine, Parquet export, Polars entegrasyonu, 16 test |
-| 6 | Polars | ❌ Başlanmadı | - | - |
+| 6 | Polars | ✅ Tamamlandı | `0ccf815` | Polars standardı, polars_utils.py, historical_warehouse native Polars, DuckDB native entegrasyon |
 | 7 | LightGBM | ❌ Başlanmadı | - | - |
 | 8 | XGBoost | ❌ Başlanmadı | - | - |
 | 9 | CatBoost | ❌ Başlanmadı | - | - |
