@@ -1,6 +1,15 @@
+# =============================================================
+# ALPHA BIST — Prometheus Configuration (Optimized)
+# =============================================================
+
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 10s        # 15s → 10s (daha güncel veri)
+  evaluation_interval: 10s
+  scrape_timeout: 8s          # Timeout ekle
+
+# Alert rules
+rule_files:
+  - /etc/prometheus/alert_rules.yml
 
 scrape_configs:
   # === Application Services ===
@@ -8,6 +17,8 @@ scrape_configs:
     static_configs:
       - targets: ['api:8000']
     metrics_path: '/metrics'
+    scrape_interval: 5s       # API daha sık kontrol
+    scrape_timeout: 3s
 
   - job_name: 'alpha-services'
     static_configs:
@@ -21,33 +32,52 @@ scrape_configs:
           - 'portfolio:8000'
           - 'learning:8000'
     metrics_path: '/metrics'
+    scrape_interval: 15s
 
   # === Data Stores (via Exporters) ===
   - job_name: 'postgres'
     static_configs:
       - targets: ['postgres-exporter:9187']
+    scrape_interval: 15s
 
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
+    scrape_interval: 10s
 
   - job_name: 'clickhouse'
     static_configs:
       - targets: ['clickhouse:8123']
     metrics_path: '/metrics'
+    scrape_interval: 15s
 
   - job_name: 'clickhouse-2'
     static_configs:
       - targets: ['clickhouse-2:8123']
     metrics_path: '/metrics'
+    scrape_interval: 15s
 
   # === Infrastructure ===
   - job_name: 'nats'
     static_configs:
       - targets: ['nats:8222']
     metrics_path: '/varz'
+    scrape_interval: 10s
 
   - job_name: 'traefik'
     static_configs:
       - targets: ['traefik:8080']
     metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mlflow'
+    static_configs:
+      - targets: ['mlflow:5000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s

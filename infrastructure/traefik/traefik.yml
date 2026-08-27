@@ -1,5 +1,5 @@
 # =============================================================
-# ALPHA BIST — Traefik Static Configuration
+# ALPHA BIST — Traefik Static Configuration (Optimized)
 # =============================================================
 
 api:
@@ -9,14 +9,32 @@ api:
 entryPoints:
   web:
     address: ":80"
+    transport:
+      lifeCycle:
+        requestAcceptGraceTimeout: "5s"
+        graceTimeOut: "10s"
+      respondingTimeouts:
+        readTimeout: "30s"
+        writeTimeout: "30s"
+        idleTimeout: "120s"
   websecure:
     address: ":443"
+    transport:
+      lifeCycle:
+        requestAcceptGraceTimeout: "5s"
+        graceTimeOut: "10s"
+      respondingTimeouts:
+        readTimeout: "30s"
+        writeTimeout: "30s"
+        idleTimeout: "120s"
 
 providers:
   docker:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: bist-100-main_alpha-net
+    watch: true
+    constraints: "Label(`traefik.enable`, `true`)"
   file:
     directory: /etc/traefik/dynamic
     watch: true
@@ -24,5 +42,35 @@ providers:
 ping:
   entryPoint: web
 
+# Access log — buffering ile performans
 accessLog:
-  bufferingSize: 100
+  bufferingSize: 200
+  filters:
+    statusCodes:
+      - "400-599"
+
+# Metrics — Prometheus
+metrics:
+  prometheus:
+    entryPoint: web
+    addEntryPointsLabels: true
+    addServicesLabels: true
+    addRoutersLabels: true
+    buckets:
+      - 0.01
+      - 0.05
+      - 0.1
+      - 0.3
+      - 0.5
+      - 1.0
+      - 5.0
+
+# Health check
+ping:
+  entryPoint: web
+  interval: "10s"
+
+# Global settings
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false

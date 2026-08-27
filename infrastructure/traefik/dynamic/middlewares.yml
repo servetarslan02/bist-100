@@ -1,16 +1,26 @@
 # =============================================================
-# ALPHA BIST — Traefik Dynamic Configuration (Middlewares)
+# ALPHA BIST — Traefik Dynamic Configuration (Optimized)
 # =============================================================
 
 http:
   middlewares:
+    # Rate limiting — burst ile birlikte
     rate-limit:
       rateLimit:
-        average: 100
-        burst: 200
+        average: 200
+        burst: 400
         period: 1s
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Gzip/Brotli sıkıştırma
     compress:
-      compress: {}
+      compress:
+        excludedContentTypes:
+          - "text/event-stream"
+
+    # CORS
     cors:
       headers:
         accessControlAllowMethods:
@@ -25,3 +35,42 @@ http:
           - "http://localhost:3000"
           - "http://localhost:80"
         accessControlMaxAge: 3600
+        addVaryHeader: true
+
+    # Circuit breaker — servis çökerse otomatik fallback
+    circuit-breaker:
+      circuitBreaker:
+        expression: "NetworkErrorRatio() > 0.30 || ResponseCodeRatio(500, 600, 0, 600) > 0.25"
+        checkPeriod: "10s"
+        fallbackDuration: "15s"
+        recoveryDuration: "30s"
+
+    # Retry — geçici hatalarda otomatik tekrar
+    retry:
+      retry:
+        attempts: 3
+        initialInterval: "100ms"
+
+    # Request timeout
+    request-timeout:
+      buffering:
+        maxRequestBodyBytes: 10485760  # 10MB
+        memRequestBodyBytes: 2097152   # 2MB
+
+    # WebSocket desteği
+    websocket:
+      headers:
+        customRequestHeaders:
+          Connection: "Upgrade"
+          Upgrade: "websocket"
+
+    # Security headers
+    security-headers:
+      headers:
+        browserXssFilter: true
+        contentTypeNosniff: true
+        frameDeny: true
+        stsIncludeSubdomains: true
+        stsPreload: true
+        stsSeconds: 31536000
+        customFrameOptionsValue: "SAMEORIGIN"

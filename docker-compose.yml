@@ -58,10 +58,12 @@ services:
     volumes:
     - postgres_data:/var/lib/postgresql/data
     - ./database/init:/docker-entrypoint-initdb.d:ro
-    command: "postgres\n  -c shared_preload_libraries=timescaledb\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=50\n  -c\
-      \ shared_buffers=128MB\n  -c work_mem=4MB\n  -c effective_cache_size=256MB\n  -c wal_level=replica\n  -c max_wal_size=512MB\n\
-      \  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c min_wal_size=64MB\n  -c checkpoint_completion_target=0.9\n\
-      \  -c wal_buffers=8MB\n"
+    command: "postgres\n  -c shared_preload_libraries=timescaledb,pg_stat_statements,auto_explain\n  -c fsync=on\n  -c synchronous_commit=on\n  -c full_page_writes=on\n  -c max_connections=100\n  -c\
+      \ shared_buffers=256MB\n  -c work_mem=8MB\n  -c maintenance_work_mem=128MB\n  -c effective_cache_size=512MB\n  -c wal_level=replica\n  -c max_wal_size=1GB\n\
+      \  -c min_wal_size=256MB\n  -c max_wal_senders=3\n  -c max_replication_slots=3\n  -c hot_standby=on\n  -c checkpoint_completion_target=0.95\n\
+      \  -c wal_buffers=16MB\n  -c random_page_cost=1.1\n  -c effective_io_concurrency=200\n  -c max_worker_processes=4\n  -c max_parallel_workers_per_gather=2\n\
+      \  -c max_parallel_workers=4\n  -c max_parallel_maintenance_workers=2\n  -c autovacuum_max_workers=3\n  -c autovacuum_naptime=30\n  -c log_min_duration_statement=500\n\
+      \  -c pg_stat_statements.track=all\n  -c auto_explain.log_min_duration=500\n"
     environment:
       POSTGRES_DB: alpha_bist
       POSTGRES_USER: alpha
@@ -229,12 +231,15 @@ services:
     - 6379:6379
     volumes:
     - redis_data:/data
-    command: "redis-server\n  --appendonly yes\n  --appendfsync everysec\n  --dir /data\n  --maxmemory 96mb\n  --maxmemory-policy\
-      \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n"
-    mem_limit: 128m
-    cpus: 0.25
+    command: "redis-server\n  --appendonly yes\n  --appendfsync everysec\n  --dir /data\n  --maxmemory 192mb\n  --maxmemory-policy\
+      \ allkeys-lru\n  --requirepass ${REDIS_PASSWORD}\n  --masterauth ${REDIS_PASSWORD}\n  --hz 10\n  --dynamic-hz yes\n\
+      \  --lazyfree-lazy-eviction yes\n  --lazyfree-lazy-expire yes\n  --lazyfree-lazy-server-del yes\n  --replica-lazy-flush yes\n\
+      \  --activedefrag yes\n  --active-defrag-enabled yes\n  --active-defrag-threshold-lower 10\n  --active-defrag-threshold-upper 100\n\
+      \  --active-defrag-cycle-min 1\n  --active-defrag-cycle-max 25\n  --tcp-keepalive 300\n  --timeout 0\n"
+    mem_limit: 256m
+    cpus: 0.5
     storage_opt:
-      size: 128M
+      size: 256M
     healthcheck:
       test:
       - CMD
@@ -350,14 +355,15 @@ services:
     ports:
     - 4222:4222
     - 8222:8222
-    command: "nats-server\n  --jetstream\n  --store_dir /data\n  --max_payload 1048576\n  --max_pending 67108864\n  --sync_interval\
-      \ 30s\n"
+    command: "nats-server\n  --jetstream\n  --store_dir /data\n  --max_payload 2097152\n  --max_pending 134217728\n  --sync_interval\
+      \ 30s\n  --write_deadline 5s\n  --max_connections 1000\n  --max_control_line 4096\n  --max_payload 2MB\n\
+      \  --compress\n"
     volumes:
     - nats_data:/data
-    mem_limit: 128m
-    cpus: 0.25
+    mem_limit: 256m
+    cpus: 0.5
     storage_opt:
-      size: 128M
+      size: 256M
     healthcheck:
       test:
       - CMD
