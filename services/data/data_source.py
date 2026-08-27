@@ -380,8 +380,8 @@ class BISTSource:
             return None
 
         df = pl.DataFrame(rows)
-        df
-        df.sort_index(inplace=True)
+        if "Date" in df.columns:
+            df = df.sort("Date")
         return df
 
     def _fetch_from_web(self, ticker: str) -> pl.DataFrame | None:
@@ -457,14 +457,15 @@ class BISTSource:
         prev_close = close / (1 + change / 100) if change != 0 else close
 
         # Tek gunluk DataFrame olustur
-        today = pl.Series.now().normalize()
+        today = pl.Series("Date", [pl.Series.now().normalize()])
         df = pl.DataFrame({
+            "Date": today,
             "Open": [prev_close],
             "High": [max(close, prev_close)],
             "Low": [min(close, prev_close)],
             "Close": [close],
             "Volume": [volume],
-        }, index=[today])
+        })
 
         return df
 
@@ -477,14 +478,15 @@ class BISTSource:
             if resp.status_code == 200:
                 data = resp.json()
                 if data:
-                    today = pl.Series.now().normalize()
+                    today = pl.Series("Date", [pl.Series.now().normalize()])
                     df = pl.DataFrame({
+                        "Date": today,
                         "Open": [float(data.get("open", 0))],
                         "High": [float(data.get("high", 0))],
                         "Low": [float(data.get("low", 0))],
                         "Close": [float(data.get("lastPrice", 0))],
                         "Volume": [int(data.get("volume", 0))],
-                    }, index=[today])
+                    })
                     return df
         except Exception as e:
             logger.debug("BIST index fetch failed", error=str(e))
@@ -560,15 +562,13 @@ class WarehouseSource:
             if df.empty:
                 return None
 
-            df = df.with_columns(pl.lit(pl.Series(df["date"])).alias('Date'))
-            df
-            df.drop(columns=["date"], errors="ignore", inplace=True)
-            df.sort_index(inplace=True)
+            df = df.with_columns(pl.col("date").alias("Date")).drop("date")
+            df = df.sort("Date")
 
             if start_date:
-                df = df[df.index >= start_date]
+                df = df.filter(pl.col("Date") >= start_date)
             if end_date:
-                df = df[df.index <= end_date]
+                df = df.filter(pl.col("Date") <= end_date)
             return df
         except Exception as e:
             logger.warning("WarehouseSource fetch failed", ticker=ticker, error=str(e))

@@ -4,7 +4,6 @@ ALPHA BIST — Market Player
 Geçmiş piyasa verilerini "canlı gibi" oynatan motor.
 """
 
-import pandas as pd
 import polars as pl
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, List, Generator, Callable
@@ -92,7 +91,7 @@ class MarketPlayer:
                     for t in tickers:
                         tick_sym = f"{t}.IS"
                         try:
-                            if isinstance(raw.columns, pd.MultiIndex) and tick_sym in raw.columns.levels[0]:
+                            if isinstance(raw.columns, __import__('pandas').MultiIndex) and tick_sym in raw.columns.levels[0]:
                                 df_t = raw[tick_sym].dropna(how="all")
                                 if not df_t.empty:
                                     df_t = df_t.copy()

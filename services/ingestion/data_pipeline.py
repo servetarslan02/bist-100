@@ -122,8 +122,9 @@ class DataPipeline:
         """Tek hisseyi işle."""
         start = time.time()
 
-        # 1. Data Quality kontrolü
-        quality = self._dq.full_quality_check(df, ticker)
+        # 1. Data Quality kontrolü (Polars → Pandas dönüşümü)
+        pdf = df.to_pandas() if hasattr(df, 'to_pandas') else df
+        quality = self._dq.full_quality_check(pdf, ticker)
 
         # 2. Quality gate
         if self._require_passing and not quality.passed:

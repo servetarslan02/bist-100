@@ -52,11 +52,6 @@ class CatBoostAdjustedLoss:
 
     def calc_ders_range(self, approxes, targets, weights):
         """CatBoost custom loss interface — gradient + hessian."""
-        try:
-            pass
-        except ImportError:
-            logger.debug("Optional import not available in calc_ders_range", exc_info=True)
-
         der1 = []
         der2 = []
         for approx, target in zip(approxes, targets):

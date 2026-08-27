@@ -1,5 +1,5 @@
 """
-ALPHA BIST — Data Quality & Tradability Mask v1.0
+ALPHA BIST — Data Quality & Tradability Mask v2.0 (Polars-Native)
 
 ROADMAP v3.0: Mask-First Design
 - Devre kesici, tavan/taban, halt edilmiş fiyatlar maskelenir
@@ -10,7 +10,6 @@ KURAL: Execute edilemeyen fiyat kullanma!
 """
 
 import copy as _copy
-import pandas as pd
 import polars as pl
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
@@ -19,6 +18,7 @@ import structlog
 
 logger = structlog.get_logger()
 
+
 @dataclass
 class TradabilityMask:
     """Hisse başına tradability durumu."""
@@ -26,8 +26,6 @@ class TradabilityMask:
     timestamp: datetime
     is_tradable: bool
     reasons: List[str]
-
-    # Mask değerleri (0 = kullanma, 1 = kullan)
     price_mask: float = 1.0
     volume_mask: float = 1.0
 
@@ -40,6 +38,7 @@ class TradabilityMask:
             "price_mask": self.price_mask,
             "volume_mask": self.volume_mask,
         }
+
 
 class DataQualityEngine:
     """Veri kalitesi ve tradability kontrol motoru."""
@@ -60,54 +59,52 @@ class DataQualityEngine:
         timestamp: Optional[datetime] = None,
     ) -> TradabilityMask:
         """Hisse tradability kontrolü."""
-
         reasons = []
         is_tradable = True
         price_mask = 1.0
         volume_mask = 1.0
 
-        # 1. Devre kesici kontrolü (BIST: ±5% gün içi, ±10% açılış)
+        # 1. Devre kesici kontrolü
         if prev_close > 0:
             daily_change = abs(close / prev_close - 1) * 100
-            if daily_change >= 9.5:  # Tavan/taban yakını
+            if daily_change >= 9.5:
                 reasons.append(f"Tavan/taban: %{daily_change:.1f}")
                 price_mask = 0.0
                 is_tradable = False
 
-        # 2. Sıfır hacim — işlem gerçekleşmemiş (BIST'te hacim=0 = tradable değil)
+        # 2. Sıfır hacim
         if volume == 0:
             reasons.append("Sıfır hacim (işlem yok)")
             volume_mask = 0.0
             is_tradable = False
-            # OHLC de aynıysa tam halt
             if close == open_price and close == high and close == low:
                 reasons.append("Halt edilmiş")
                 price_mask = 0.0
 
-        # 3. Anormal fiyat (high < low, open > high, vb.)
+        # 3. Anormal fiyat
         if high < low or open_price > high or open_price < low or close > high or close < low:
             reasons.append("Anormal fiyat yapısı")
             price_mask = 0.0
             is_tradable = False
 
-        # 4. Aşırı düşük hacim (likidite yok)
-        if 0 < volume < 1000:  # 1000 lot altı
+        # 4. Düşük likidite
+        if 0 < volume < 1000:
             reasons.append("Düşük likidite")
-            volume_mask = 0.5  # Kısmen kullan
+            volume_mask = 0.5
 
-        # 5. Fiyat = 0 veya negatif
+        # 5. Geçersiz fiyat
         if close <= 0 or open_price <= 0 or high <= 0 or low <= 0:
             reasons.append("Geçersiz fiyat (≤0)")
             price_mask = 0.0
             is_tradable = False
 
-        # 6. Aşırı volatilite (tek günde %15+ hareket)
+        # 6. Aşırı volatilite
         if prev_close > 0:
             intraday_range = (high - low) / prev_close * 100
             if intraday_range > 15:
                 reasons.append(f"Aşırı volatilite: %{intraday_range:.1f}")
                 if price_mask > 0.3:
-                    price_mask = 0.3  # Kısmen kullan
+                    price_mask = 0.3
 
         mask = TradabilityMask(
             ticker=ticker,
@@ -117,49 +114,33 @@ class DataQualityEngine:
             price_mask=price_mask,
             volume_mask=volume_mask,
         )
-
         self._masks[ticker] = mask
 
         if not is_tradable:
-            logger.warning("Tradability check failed",
-                ticker=ticker, reasons=reasons)
+            logger.warning("Tradability check failed", ticker=ticker, reasons=reasons)
 
         return mask
 
     def apply_mask(self, raw_data: Dict[str, Any], mask: TradabilityMask, *, copy: bool = False) -> Dict[str, Any]:
-        """Ham veriye mask uygula.
-        KURAL: Mask=0 olan fiyat, hiçbir feature hesaplamasına girmemeli (Mask-First Design).
-
-        Args:
-            raw_data: Ham veri dict'i (varsayılan: in-place modifiye edilir)
-            mask: Tradability mask
-            copy: True ise kopya üzerinde çalışır (orijinal dict değişmez)
-        """
+        """Ham veriye mask uygula."""
         if copy:
             raw_data = _copy.deepcopy(raw_data)
         if mask.price_mask == 0.0:
-            # Mask-first: Ham fiyatı null yap ki feature motorları bunu kullanmasın
-            price_cols = ["open", "high", "low", "close"]
-            for col in price_cols:
+            for col in ["open", "high", "low", "close"]:
                 if col in raw_data:
                     raw_data[col] = None
-                    
         if mask.volume_mask == 0.0:
             if "volume" in raw_data:
-                raw_data = raw_data.with_columns(pl.lit(None).alias('volume'))
-
+                raw_data["volume"] = None
         return raw_data
 
     def get_mask(self, ticker: str) -> Optional[TradabilityMask]:
-        """Hisse mask'ını getir."""
         return self._masks.get(ticker)
 
     def get_untradable_count(self) -> int:
-        """Tradable olmayan hisse sayısı."""
         return sum(1 for m in self._masks.values() if not m.is_tradable)
 
     def get_mask_stats(self) -> Dict[str, Any]:
-        """Mask istatistikleri."""
         total = len(self._masks)
         untradable = self.get_untradable_count()
         return {
@@ -170,7 +151,6 @@ class DataQualityEngine:
         }
 
     def _get_reasons_breakdown(self) -> Dict[str, int]:
-        """Nedenlerin dağılımı."""
         reasons = {}
         for mask in self._masks.values():
             for reason in mask.reasons:
@@ -178,8 +158,9 @@ class DataQualityEngine:
                     reasons[reason] = reasons.get(reason, 0) + 1
         return reasons
 
+
 # =====================================================
-# DataFrame Kalite Kontrolleri (v2'den birleştirildi)
+# DataFrame Kalite Kontrolleri (Polars-Native)
 # =====================================================
 
 @dataclass
@@ -189,11 +170,18 @@ class QualityIssue:
     message: str
     details: Dict[str, Any] = None
     affected_rows: int = 0
+
     def __post_init__(self):
-        if self.details is None: self.details = {}
+        if self.details is None:
+            self.details = {}
+
     def to_dict(self):
-        return {"check": self.check, "severity": self.severity, "message": self.message,
-                "details": self.details, "affected_rows": self.affected_rows}
+        return {
+            "check": self.check, "severity": self.severity,
+            "message": self.message, "details": self.details,
+            "affected_rows": self.affected_rows,
+        }
+
 
 @dataclass
 class QualityReport:
@@ -202,62 +190,95 @@ class QualityReport:
     issues: List[QualityIssue]
     quality_score: float
     passed: bool
+
     def to_dict(self):
-        return {"ticker": self.ticker, "total_rows": self.total_rows,
-                "issues": [i.to_dict() for i in self.issues], "quality_score": self.quality_score,
-                "passed": self.passed}
+        return {
+            "ticker": self.ticker, "total_rows": self.total_rows,
+            "issues": [i.to_dict() for i in self.issues],
+            "quality_score": self.quality_score, "passed": self.passed,
+        }
+
 
 class DataQualityChecker:
-    """DataFrame bazlı veri kalitesi kontrolü (duplicate, stale, gap, vb.)."""
-    def full_quality_check(self, df, ticker="UNKNOWN"):
+    """Polars DataFrame bazlı veri kalitesi kontrolü."""
+
+    def full_quality_check(self, df: pl.DataFrame, ticker: str = "UNKNOWN") -> QualityReport:
         issues = []
         total_rows = len(df)
         if total_rows == 0:
             return QualityReport(ticker, 0, [], 0, False)
 
-        # F-017: Timestamp index kontrolü
-        if isinstance(df.index, pd.DatetimeIndex):
-            # Duplicate timestamp kontrolü
-            dup_count = df.index.duplicated().sum()
-            if dup_count > 0:
-                issues.append(QualityIssue("duplicate_timestamps", "CRITICAL",
-                                           f"{dup_count} duplike timestamp", affected_rows=int(dup_count)))
-            # Sıralama kontrolü
-            if not df.index.is_monotonic_increasing:
-                issues.append(QualityIssue("unsorted_timestamps", "WARNING",
-                                           "Timestamp sıralı değil"))
-            # Gap kontrolü (iş günleri arası > 5 gün)
-            if len(df.index) > 1:
-                date_diffs = df.index.to_series().diff().dt.days
-                large_gaps = (date_diffs > 5).sum()
-                if large_gaps > 0:
-                    issues.append(QualityIssue("large_gaps", "WARNING",
-                                               f"{large_gaps} büyük zaman aralığı (>5 gün)"))
-        elif 'date' in df.columns or 'Date' in df.columns:
-            date_col = 'date' if 'date' in df.columns else 'Date'
-            dup_count = df[date_col].duplicated().sum()
-            if dup_count > 0:
-                issues.append(QualityIssue("duplicate_dates", "CRITICAL",
-                                           f"{dup_count} duplike tarih", affected_rows=int(dup_count)))
+        # Date/Timestamp sütunu kontrolü
+        date_col = None
+        for col_name in ["Date", "date", "timestamp", "Timestamp"]:
+            if col_name in df.columns:
+                date_col = col_name
+                break
 
-        for col in ["close", "open", "high", "low", "volume"]:
-            if col in df.columns:
-                missing = df[col].isna().sum()
+        if date_col is not None:
+            # Duplicate kontrolü
+            dup_count = df[date_col].is_duplicated().sum()
+            if dup_count > 0:
+                issues.append(QualityIssue(
+                    "duplicate_dates", "CRITICAL",
+                    f"{dup_count} duplike tarih", affected_rows=int(dup_count),
+                ))
+            # Sıralama kontrolü
+            if not df[date_col].is_sorted():
+                issues.append(QualityIssue(
+                    "unsorted_timestamps", "WARNING",
+                    "Timestamp sıralı değil",
+                ))
+            # Gap kontrolü (> 5 gün)
+            if total_rows > 1:
+                try:
+                    date_diffs = df[date_col].diff().dt.total_days()
+                    large_gaps = (date_diffs > 5).sum()
+                    if large_gaps > 0:
+                        issues.append(QualityIssue(
+                            "large_gaps", "WARNING",
+                            f"{large_gaps} büyük zaman aralığı (>5 gün)",
+                        ))
+                except Exception:
+                    pass  # Date diff hesaplanamazsa atla
+
+        # Eksik değer kontrolü
+        for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low", "volume", "Volume"]:
+            if col_name in df.columns:
+                missing = df[col_name].null_count()
                 if missing > 0:
-                    issues.append(QualityIssue(f"missing_{col}", "CRITICAL" if col == "close" else "WARNING",
-                                               f"{col}: {missing} eksik", affected_rows=int(missing)))
-        for col in ["close", "open", "high", "low"]:
-            if col in df.columns:
-                invalid = (df[col] <= 0).sum()
+                    severity = "CRITICAL" if col_name.lower() == "close" else "WARNING"
+                    issues.append(QualityIssue(
+                        f"missing_{col_name}", severity,
+                        f"{col_name}: {missing} eksik", affected_rows=int(missing),
+                    ))
+
+        # Geçersiz fiyat kontrolü (≤0)
+        for col_name in ["close", "Close", "open", "Open", "high", "High", "low", "Low"]:
+            if col_name in df.columns:
+                invalid = (df[col_name] <= 0).sum()
                 if invalid > 0:
-                    issues.append(QualityIssue(f"invalid_{col}", "CRITICAL", f"{col}: {invalid} geçersiz", affected_rows=int(invalid)))
-        if "high" in df.columns and "low" in df.columns:
-            inv = (df["high"] < df["low"]).sum()
+                    issues.append(QualityIssue(
+                        f"invalid_{col_name}", "CRITICAL",
+                        f"{col_name}: {invalid} geçersiz", affected_rows=int(invalid),
+                    ))
+
+        # High < Low kontrolü
+        high_col = "High" if "High" in df.columns else "high"
+        low_col = "Low" if "Low" in df.columns else "low"
+        if high_col in df.columns and low_col in df.columns:
+            inv = (df[high_col] < df[low_col]).sum()
             if inv > 0:
-                issues.append(QualityIssue("high_low_inv", "CRITICAL", f"High<Low: {inv}", affected_rows=int(inv)))
+                issues.append(QualityIssue(
+                    "high_low_inv", "CRITICAL",
+                    f"High<Low: {inv}", affected_rows=int(inv),
+                ))
+
         critical = sum(1 for i in issues if i.severity == "CRITICAL")
-        score = max(0, 100 - critical * 20 - sum(1 for i in issues if i.severity == "WARNING") * 5)
+        warnings = sum(1 for i in issues if i.severity == "WARNING")
+        score = max(0, 100 - critical * 20 - warnings * 5)
         return QualityReport(ticker, total_rows, issues, score, critical == 0)
+
 
 # Singleton'lar
 data_quality = DataQualityEngine()

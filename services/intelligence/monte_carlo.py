@@ -101,7 +101,7 @@ class MonteCarloEngine:
 
         # Günlük parametreler
         dt = 1 / 252  # 1 iş günü
-        expected_return_annual * dt
+        mu_daily = expected_return_annual * dt
         sigma_daily = volatility_annual * np.sqrt(dt)
 
         # Simülasyon
