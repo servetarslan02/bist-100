@@ -52,7 +52,7 @@ class BacktestPersistence:
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_trades (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id INTEGER PRIMARY KEY,
                     run_id TEXT NOT NULL,
                     trade_id INTEGER,
                     ticker TEXT,
@@ -64,13 +64,12 @@ class BacktestPersistence:
                     slippage REAL,
                     pnl REAL,
                     pnl_pct REAL,
-                    holding_days INTEGER,
-                    FOREIGN KEY (run_id) REFERENCES backtest_runs(run_id)
+                    holding_days INTEGER
                 )
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS backtest_equity (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id INTEGER PRIMARY KEY,
                     run_id TEXT NOT NULL,
                     date TEXT NOT NULL,
                     equity REAL,
@@ -78,8 +77,7 @@ class BacktestPersistence:
                     market_value REAL,
                     positions INTEGER,
                     drawdown REAL,
-                    daily_return REAL,
-                    FOREIGN KEY (run_id) REFERENCES backtest_runs(run_id)
+                    daily_return REAL
                 )
             """)
             conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_run ON backtest_trades(run_id)")

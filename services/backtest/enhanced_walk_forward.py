@@ -72,6 +72,10 @@ class PurgeEmbargoWalkForward:
     Embargo: test sonundan bir sonraki train başına kadar gap.
 
     Bu, data leakage'ı önler.
+
+    ⚠️ PIT UYARISI: Bu modül pre-computed predictions üzerinde çalışır.
+    Modeli her fold'da YENİDEN EĞİTMEZ. Gerçek walk-forward doğrulama için
+    `walk_forward_runner.py` kullanılmalıdır.
     """
 
     def __init__(

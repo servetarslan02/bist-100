@@ -100,7 +100,7 @@ class CentralStateStore:
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS learning_predictions (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id INTEGER PRIMARY KEY,
                     ticker TEXT NOT NULL,
                     predicted_direction TEXT,
                     predicted_return REAL,
@@ -129,7 +129,7 @@ class CentralStateStore:
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS champion_history (
-                    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                    id INTEGER PRIMARY KEY,
                     data TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 )

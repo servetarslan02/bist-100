@@ -250,7 +250,7 @@ class Settings(BaseSettings):
             extra = "allow"
 
         @root_validator
-        def _validate_production_security_v1(self, values):
+        def _validate_production_security_v1(cls, values):
             config = values
             if str(config.get("app_env", "development")).lower() not in ("production", "prod", "staging"):
                 return values
@@ -282,13 +282,13 @@ class Settings(BaseSettings):
             return values
 
         @validator("app_port")
-        def _validate_port_v1(self, v: int) -> int:
+        def _validate_port_v1(cls, v: int) -> int:
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid port: {v}")
             return v
 
         @validator("postgres_port")
-        def _validate_pg_port_v1(self, v: int) -> int:
+        def _validate_pg_port_v1(cls, v: int) -> int:
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid PostgreSQL port: {v}")
             return v
