@@ -583,6 +583,7 @@ class HolidayManager:
         # Cache'ten yükle
         self._holidays: dict[int, set[date]] = {}
         self._half_days: dict[int, set[date]] = {}
+        self._blacklist: set[date] = set()  # Manuel kaldırılan tatiller
         self._load_cache()
 
     def get_holidays(self, year: int | None = None) -> set[date]:
@@ -643,13 +644,17 @@ class HolidayManager:
         logger.info("Manual holiday added", date=d.isoformat(), reason=reason)
 
     def remove_holiday(self, d: date, reason: str = "") -> None:
-        """Tatil gününü kaldır (iptal edilen tatiller için)."""
+        """Tatil gününü kaldır (iptal edilen tatiller için).
+
+        Kara listeye eklenir, böylece _compute_year() tekrar eklemez.
+        """
         year = d.year
         if year in self._holidays:
             self._holidays[year].discard(d)
-            self._save_cache()
-            self._log_audit("remove", d, reason)
-            logger.info("Holiday removed", date=d.isoformat(), reason=reason)
+        self._blacklist.add(d)
+        self._save_cache()
+        self._log_audit("remove", d, reason)
+        logger.info("Holiday removed", date=d.isoformat(), reason=reason)
 
     def report_no_data(self, d: date | None = None) -> bool:
         """Veri gelmediğini rapor et — anlık tatil tespiti."""
@@ -755,6 +760,9 @@ class HolidayManager:
         if year in self._holidays:
             holidays.update(self._holidays[year])
 
+        # Kara listedeki tatilleri çıkar (manuel kaldırılmış)
+        holidays -= self._blacklist
+
         self._holidays[year] = holidays
 
         half_days: set[date] = set()
@@ -823,6 +831,9 @@ class HolidayManager:
             for d_str in data.get("sudden", []):
                 d = date.fromisoformat(d_str)
                 self._sudden_detector._confirmed_holidays.add(d)
+            for d_str in data.get("blacklist", []):
+                d = date.fromisoformat(d_str)
+                self._blacklist.add(d)
             logger.info("Holiday cache loaded", years=len(self._holidays))
         except Exception as e:
             logger.warning("Holiday cache load failed", error=str(e))
@@ -839,6 +850,7 @@ class HolidayManager:
                 for y, dates in self._half_days.items()
             },
             "sudden": [d.isoformat() for d in sorted(self._sudden_detector.get_confirmed())],
+            "blacklist": [d.isoformat() for d in sorted(self._blacklist)],
             "updated_at": datetime.now().isoformat(),
         }
         try:
