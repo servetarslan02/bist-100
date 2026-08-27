@@ -1079,7 +1079,7 @@ Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
 |---|---|---|---|
 | 1 | Feature Engine düzeltme + standardizasyon | 🔴 | ✅ DÜZELTİLDİ (commit 2f211a7) — crash bug, sahte veri, feature contract |
 | 2 | PIT/data leakage garantisi | 🔴 | ✅ DÜZELTİLDİ (commit d930a38) — pipeline PIT kontrolü, enhanced_walk_forward uyarısı |
-| 3 | Data quality + fail-closed | 🔴 | `event_bus.py`'de fail-open var, risk engine fail-closed |
+| 3 | Data quality + fail-closed | 🔴 | ✅ DÜZELTİLDİ (commit 078100a) — event bus fail-closed modu eklendi |
 | 4 | ML training/inference feature parity | 🔴 | Training'de farklı, inference'da farklı feature kullanılabilir |
 | 5 | Model version + reproducibility | 🔴 | MLflow var ama tam entegre değil |
 | 6 | Champion/Challenger gerçek entegrasyonu | 🟠 | Kod var ama otomatik champion switch yok |
