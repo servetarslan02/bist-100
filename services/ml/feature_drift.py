@@ -91,7 +91,12 @@ class FeatureDriftDetector:
             self._feature_distributions = self._feature_distributions[-500:]
 
     def check_drift(self) -> list[DriftReport]:
-        """Tüm feature'lar için kapsamlı drift kontrolü."""
+        """Tüm feature'lar için kapsamlı drift kontrolü.
+
+        İki katmanlı drift tespiti:
+        1. SHAP importance drift (z-score tabanlı)
+        2. Distribution drift (gerçek PSI formülü)
+        """
         reports = []
 
         if len(self._shap_history) < 2:
@@ -117,23 +122,23 @@ class FeatureDriftDetector:
             # Importance trend
             trend = self._compute_trend(historical_imps, current_imp)
 
-            # PSI (simplified)
-            psi = abs(current_imp - hist_mean) / max(hist_std, 0.01)
+            # Importance z-score (standart sapma cinsinden sapma)
+            importance_zscore = abs(current_imp - hist_mean) / max(hist_std, 0.01)
 
-            # Severity
-            severity = self._compute_severity(psi, trend)
+            # Severity (z-score tabanlı)
+            severity = self._compute_severity(importance_zscore, trend)
 
             # Alert
-            alert = psi > self.psi_threshold or trend in ("increasing", "decreasing", "volatile")
+            alert = importance_zscore > self.psi_threshold or trend in ("increasing", "decreasing", "volatile")
 
             # Remediation
-            remediation = self._suggest_remediation(feature, psi, trend, severity)
+            remediation = self._suggest_remediation(feature, importance_zscore, trend, severity)
 
             reports.append(
                 DriftReport(
                     feature_name=feature,
-                    psi=round(float(psi), 4),
-                    drift_detected=psi > self.psi_threshold,
+                    psi=round(float(importance_zscore), 4),
+                    drift_detected=importance_zscore > self.psi_threshold,
                     importance_trend=trend,
                     current_importance=round(float(current_imp), 4),
                     historical_importance=round(hist_mean, 4),
@@ -143,9 +148,13 @@ class FeatureDriftDetector:
                 )
             )
 
-        # PSI-based drift (distribution shift)
+        # Distribution-based drift (gerçek PSI formülü)
         if len(self._feature_distributions) >= 2:
             self._check_distribution_drift(reports)
+
+        # Correlation drift
+        if len(self._feature_distributions) >= 2:
+            self._check_correlation_drift(reports)
 
         # Drift history
         self._drift_history.append(
@@ -262,7 +271,13 @@ class FeatureDriftDetector:
             return ""
 
     def _check_distribution_drift(self, reports: list[DriftReport]):
-        """Distribution-based drift kontrolü (PSI)."""
+        """Distribution-based drift kontrolü (gerçek PSI formülü).
+
+        PSI = Σ (P_current - P_reference) * ln(P_current / P_reference)
+        PSI < 0.1: Stabil
+        PSI 0.1-0.25: Orta değişim
+        PSI > 0.25: Significant drift
+        """
         current_dist = self._feature_distributions[-1]
         reference_dist = self._feature_distributions[0]
 
@@ -271,14 +286,75 @@ class FeatureDriftDetector:
                 continue
 
             psi = self._calculate_psi(reference_dist[feature], current_dist[feature])
-            if psi > self.psi_threshold:
+            if psi > 0.1:  # PSI eşiği (0.1 = stabil sınırı)
                 existing = next((r for r in reports if r.feature_name == feature), None)
                 if existing:
-                    existing.psi = round(float(psi), 4)
-                    existing.drift_detected = True
+                    # Distribution PSI'ı importance z-score ile birleştir
+                    combined_score = max(existing.psi, psi)
+                    existing.psi = round(float(combined_score), 4)
+                    existing.drift_detected = combined_score > self.psi_threshold
                     existing.alert = True
+                    if psi > 0.25:
+                        existing.severity = "HIGH"
                     if psi > 1.0:
                         existing.severity = "CRITICAL"
+                    existing.remediation = self._suggest_remediation(
+                        feature, combined_score, existing.importance_trend, existing.severity
+                    )
+
+    def _check_correlation_drift(self, reports: list[DriftReport]):
+        """Feature korelasyon drift kontrolü.
+
+        Feature'lar arası korelasyon yapısı değiştiyse bu bir drift işaretidir.
+        """
+        current_dist = self._feature_distributions[-1]
+        reference_dist = self._feature_distributions[0]
+
+        # Ortak feature'ları bul
+        common_features = [f for f in current_dist if f in reference_dist]
+        if len(common_features) < 3:
+            return
+
+        try:
+            # Referans korelasyon matrisi
+            ref_arrays = [reference_dist[f] for f in common_features]
+            min_len = min(len(a) for a in ref_arrays)
+            ref_matrix = np.column_stack([a[:min_len] for a in ref_arrays])
+            ref_corr = np.corrcoef(ref_matrix.T)
+
+            # Mevcut korelasyon matrisi
+            cur_arrays = [current_dist[f] for f in common_features]
+            min_len = min(len(a) for a in cur_arrays)
+            cur_matrix = np.column_stack([a[:min_len] for a in cur_arrays])
+            cur_corr = np.corrcoef(cur_matrix.T)
+
+            # Korelasyon farkı
+            corr_diff = np.abs(cur_corr - ref_corr)
+            max_diff = float(np.max(corr_diff[np.triu_indices_from(corr_diff, k=1)]))
+            mean_diff = float(np.mean(corr_diff[np.triu_indices_from(corr_diff, k=1)]))
+
+            if max_diff > 0.3:
+                # En çok değişen feature çiftini bul
+                i, j = np.unravel_index(np.argmax(corr_diff), corr_diff.shape)
+                feat_i, feat_j = common_features[i], common_features[j]
+
+                # İlgili feature'ları işaretle
+                for fname in [feat_i, feat_j]:
+                    existing = next((r for r in reports if r.feature_name == fname), None)
+                    if existing:
+                        existing.alert = True
+                        if existing.severity == "LOW":
+                            existing.severity = "MEDIUM"
+                        existing.remediation += f" [Korelasyon drift: {fname}↔{feat_j if fname == feat_i else feat_i}, max_diff={max_diff:.2f}]"
+
+                logger.info(
+                    "Correlation drift detected",
+                    max_diff=round(max_diff, 4),
+                    mean_diff=round(mean_diff, 4),
+                    pair=f"{feat_i}↔{feat_j}",
+                )
+        except Exception as e:
+            logger.debug("Correlation drift check failed", error=str(e))
 
     def _calculate_psi(self, reference: np.ndarray, current: np.ndarray) -> float:
         """PSI (Population Stability Index) hesapla.
