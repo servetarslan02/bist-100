@@ -38,7 +38,7 @@ class HaltStatus:
 
 
 class HaltMonitor:
-    """Şirket bazlı durdurma takibi — SQLite persistence ile."""
+    """Şirket bazlı durdurma takibi — DuckDB (state_store) persistence ile."""
 
     def __init__(self):
         self._halted_tickers: dict[str, HaltStatus] = {}

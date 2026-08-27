@@ -84,8 +84,8 @@
 
 ## 🔧 GELECEK İŞ
 
-- [ ] `services/core/immutable_audit.py` → DuckDB'ye migrate et (eğer production'da kullanılıyorsa)
-- [ ] `services/core/halt_monitor.py` → DuckDB'ye migrate et (eğer production'da kullanılıyorsa)
+- [x] `services/core/immutable_audit.py` → SQLite kullanmıyor (pure in-memory + hashing, DB bağımlılığı yok)
+- [x] `services/core/halt_monitor.py` → DuckDB kullanıyor (`state_store` üzerinden, docstring düzeltildi)
 - [ ] Yeni feature'lar için DuckDB/PostgreSQL kullan
 
 ---

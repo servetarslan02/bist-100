@@ -33,6 +33,11 @@ class QuestDBTickConsumer:
         self._flush_interval = 5.0  # Saniye
         self._write_count = 0
         self._error_count = 0
+        self._retry_count = 0
+        self._dropped_count = 0
+        self._max_retries = 3  # Flush retry sayısı
+        self._retry_buffer: list[dict] = []  # Başarısız flush'lardan kalan tick'ler
+        self._max_retry_buffer_size = 1000  # Retry buffer üst sınırı
         self._last_flush = datetime.now(UTC)
 
     async def start(self):
@@ -126,49 +131,104 @@ class QuestDBTickConsumer:
                 await asyncio.sleep(1)
 
     async def _flush_buffer(self):
-        """Buffer'ı QuestDB'ye yaz."""
+        """Buffer'ı QuestDB'ye yaz. Başarısız olursa retry yapar."""
         if not self._buffer:
             return
 
         ticks_to_write = self._buffer.copy()
         self._buffer.clear()
 
-        try:
-            # QuestDB bağlantısı yoksa yeniden bağlan
-            if not questdb_client._connected:
-                connected = await questdb_client.connect()
-                if not connected:
-                    logger.warning("QuestDB reconnect failed, dropping ticks", count=len(ticks_to_write))
-                    self._error_count += 1
-                    return
+        # Retry buffer'dan önceki başarısız tick'leri de ekle
+        if self._retry_buffer:
+            ticks_to_write = self._retry_buffer + ticks_to_write
+            self._retry_buffer.clear()
 
-            # Toplu yazma
-            success = questdb_client.insert_ticks_batch(ticks_to_write)
+        success = await self._write_with_retry(ticks_to_write)
 
-            if success:
-                self._write_count += len(ticks_to_write)
-                logger.debug(
-                    "QuestDB ticks written",
+        if not success:
+            # Retry'lar da başarısız olduysa retry buffer'a kaydet (üst sınır ile)
+            if len(self._retry_buffer) + len(ticks_to_write) <= self._max_retry_buffer_size:
+                self._retry_buffer.extend(ticks_to_write)
+                logger.warning(
+                    "Ticks moved to retry buffer",
                     count=len(ticks_to_write),
-                    total=self._write_count,
+                    retry_buffer_size=len(self._retry_buffer),
                 )
             else:
-                self._error_count += 1
-                logger.warning("QuestDB batch write failed", count=len(ticks_to_write))
-
-        except Exception as e:
-            self._error_count += 1
-            logger.error("QuestDB flush error", error=str(e), count=len(ticks_to_write))
+                self._dropped_count += len(ticks_to_write)
+                logger.error(
+                    "Ticks DROPPED — retry buffer full",
+                    count=len(ticks_to_write),
+                    total_dropped=self._dropped_count,
+                )
 
         self._last_flush = datetime.now(UTC)
+
+    async def _write_with_retry(self, ticks: list[dict]) -> bool:
+        """QuestDB'ye yaz, retry mekanizması ile. Başarılı ise True döner."""
+        for attempt in range(self._max_retries):
+            try:
+                # QuestDB bağlantısı yoksa yeniden bağlan
+                if not questdb_client._connected:
+                    connected = await questdb_client.connect()
+                    if not connected:
+                        logger.warning(
+                            "QuestDB reconnect failed",
+                            attempt=attempt + 1,
+                            count=len(ticks),
+                        )
+                        if attempt < self._max_retries - 1:
+                            await asyncio.sleep(1 * (attempt + 1))
+                            continue
+                        return False
+
+                # Toplu yazma
+                success = questdb_client.insert_ticks_batch(ticks)
+
+                if success:
+                    self._write_count += len(ticks)
+                    self._retry_count = 0
+                    logger.debug(
+                        "QuestDB ticks written",
+                        count=len(ticks),
+                        total=self._write_count,
+                    )
+                    return True
+                else:
+                    logger.warning(
+                        "QuestDB batch write failed",
+                        attempt=attempt + 1,
+                        count=len(ticks),
+                    )
+                    if attempt < self._max_retries - 1:
+                        await asyncio.sleep(1 * (attempt + 1))
+                        continue
+                    return False
+
+            except Exception as e:
+                logger.warning(
+                    "QuestDB write error",
+                    attempt=attempt + 1,
+                    error=str(e),
+                    count=len(ticks),
+                )
+                if attempt < self._max_retries - 1:
+                    await asyncio.sleep(1 * (attempt + 1))
+                    continue
+                return False
+
+        self._error_count += 1
+        return False
 
     def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "running": self._running,
             "buffer_size": len(self._buffer),
+            "retry_buffer_size": len(self._retry_buffer),
             "total_writes": self._write_count,
             "total_errors": self._error_count,
+            "total_dropped": self._dropped_count,
             "last_flush": self._last_flush.isoformat(),
             "connected": questdb_client._connected,
         }

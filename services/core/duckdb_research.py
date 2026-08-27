@@ -82,7 +82,9 @@ class DuckDBResearchEngine:
 
         Args:
             parquet_path: Parquet dosya yolu
-            sql: SQL sorgusu (FROM clause otomatik eklenir). None ise SELECT * kullanılır.
+            sql: SQL sorgusu. None ise SELECT * kullanılır.
+                FROM clause yoksa otomatik olarak read_parquet('{parquet_path}') eklenir.
+                FROM clause varsa parquet_path parametresi kullanılmaz.
             params: Sorgu parametreleri
 
         Returns:
@@ -93,16 +95,18 @@ class DuckDBResearchEngine:
 
         conn = self._get_conn()
 
-        # SQL yoksa basit SELECT * kullan
         if sql is None:
             query = f"SELECT * FROM read_parquet('{parquet_path}')"
         else:
-            # SQL'de FROM clause varsa Parquet yolunu kullan
-            query = sql
+            # FROM clause yoksa otomatik ekle (footgun önleme)
+            import re
+            if not re.search(r'\bFROM\b', sql, re.IGNORECASE):
+                query = f"{sql} FROM read_parquet('{parquet_path}')"
+            else:
+                query = sql
 
         try:
             result = conn.execute(query)
-            # DuckDB'den Polars'a çevir
             df = result.pl()
             return df
         except Exception as e:
@@ -179,6 +183,9 @@ class DuckDBResearchEngine:
     ) -> dict[str, Any]:
         """TimescaleDB tablosunu Parquet'e aktar.
 
+        Optimizasyon: Batch'leri ayrı geçici dosyalara yazar, sonunda tek Parquet'te birleştirir.
+        Eski yöntem her batch'te mevcut Parquet'i okuyup tekrar yazıyordu (O(n²) I/O).
+
         Args:
             table: TimescaleDB tablo adı
             parquet_path: Çıktı Parquet dosya yolu
@@ -190,6 +197,8 @@ class DuckDBResearchEngine:
         """
         if pl is None:
             raise RuntimeError("polars not installed")
+
+        import tempfile
 
         from .database import pg_fetch
 
@@ -208,43 +217,49 @@ class DuckDBResearchEngine:
             logger.warning("No data to export", table=table)
             return {"table": table, "rows_exported": 0, "parquet_path": parquet_path}
 
-        # Batch'ler halinde oku ve yaz
+        # Batch'leri geçici dosyalara yaz, sonunda birleştir
         offset = 0
         rows_exported = 0
-        first_batch = True
+        batch_files: list[str] = []
 
-        while offset < total:
-            query = f"SELECT * FROM {table}"
-            if where:
-                query += f" WHERE {where}"
-            query += f" ORDER BY 1 LIMIT {batch_size} OFFSET {offset}"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            while offset < total:
+                query = f"SELECT * FROM {table}"
+                if where:
+                    query += f" WHERE {where}"
+                query += f" ORDER BY 1 LIMIT {batch_size} OFFSET {offset}"
 
-            rows = await pg_fetch(query)
-            if not rows:
-                break
+                rows = await pg_fetch(query)
+                if not rows:
+                    break
 
-            # Polars DataFrame'e çevir
-            df = pl.from_dicts([dict(r) for r in rows])
+                df = pl.from_dicts([dict(r) for r in rows])
 
-            # Parquet'e yaz (ilk batch'te overwrite, sonrakilerde append)
-            if first_batch:
-                df.write_parquet(str(output_path))
-                first_batch = False
-            else:
-                # Mevcut Parquet'i oku ve birleştir
-                existing = pl.read_parquet(str(output_path))
-                combined = pl.concat([existing, df])
-                combined.write_parquet(str(output_path))
+                # Geçici batch dosyasına yaz
+                batch_path = f"{tmpdir}/batch_{len(batch_files):04d}.parquet"
+                df.write_parquet(batch_path)
+                batch_files.append(batch_path)
 
-            rows_exported += len(rows)
-            offset += batch_size
+                rows_exported += len(rows)
+                offset += batch_size
 
-            logger.debug(
-                "Export progress",
-                table=table,
-                exported=rows_exported,
-                total=total,
-            )
+                logger.debug(
+                    "Export progress",
+                    table=table,
+                    exported=rows_exported,
+                    total=total,
+                )
+
+            # Tüm batch'leri tek Parquet'te birleştir
+            if batch_files:
+                if len(batch_files) == 1:
+                    # Tek batch — doğrudan kopyala
+                    import shutil
+                    shutil.move(batch_files[0], str(output_path))
+                else:
+                    # Çoklu batch — Polars ile birleştir (lazy, memory-efficient)
+                    combined = pl.concat([pl.read_parquet(f) for f in batch_files])
+                    combined.write_parquet(str(output_path))
 
         logger.info(
             "TimescaleDB → Parquet export completed",

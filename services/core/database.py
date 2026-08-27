@@ -151,19 +151,29 @@ class DatabaseRouter:
     
     - write → always primary
     - read → replica (lag kontrolü ile), primary fallback
+    
+    Connection tracking: Her connection'a hangi pool'dan geldiği işaretlenir.
+    Bu sayede _release() doğru pool'a geri verir.
     """
+
+    # Connection metadata key — hangi pool'dan geldiğini işaretlemek için
+    _POOL_ATTR = "_alpha_pool_type"
 
     async def get_write_conn(self):
         """Yazma işlemleri için primary connection."""
         pool = await get_pg_pool()
-        return await pool.acquire()
+        conn = await pool.acquire()
+        conn.__dict__[self._POOL_ATTR] = "primary"
+        return conn
 
     async def get_read_conn(self):
         """Okuma işlemleri için replica connection (lag kontrolü ile)."""
         replica_host = getattr(settings, "postgres_replica_host", None)
         if not replica_host:
             pool = await get_pg_pool()
-            return await pool.acquire()
+            conn = await pool.acquire()
+            conn.__dict__[self._POOL_ATTR] = "primary"
+            return conn
 
         pool = await get_pg_replica_pool()
         conn = await pool.acquire()
@@ -177,8 +187,11 @@ class DatabaseRouter:
             )
             await pool.release(conn)
             pool = await get_pg_pool()
-            return await pool.acquire()
+            conn = await pool.acquire()
+            conn.__dict__[self._POOL_ATTR] = "primary"
+            return conn
 
+        conn.__dict__[self._POOL_ATTR] = "replica"
         return conn
 
     @asynccontextmanager
@@ -210,20 +223,24 @@ class DatabaseRouter:
             await self._release(conn)
 
     async def _release(self, conn):
-        """Release connection back to appropriate pool."""
+        """Release connection back to the correct pool.
+        
+        Connection üzerindeki _POOL_ATTR işaretine bakarak doğru pool'a geri verir.
+        İşaret yoksa primary'e geri verir (safe fallback).
+        """
         try:
-            # Determine which pool this connection belongs to
-            replica_host = getattr(settings, "postgres_replica_host", None)
-            if replica_host:
-                replica_pool = await get_pg_replica_pool()
-                primary_pool = await get_pg_pool()
-                try:
-                    await replica_pool.release(conn)
-                except Exception:
-                    await primary_pool.release(conn)
-            else:
-                pool = await get_pg_pool()
-                await pool.release(conn)
+            pool_type = conn.__dict__.get(self._POOL_ATTR, "primary")
+
+            if pool_type == "replica":
+                replica_host = getattr(settings, "postgres_replica_host", None)
+                if replica_host:
+                    pool = await get_pg_replica_pool()
+                    await pool.release(conn)
+                    return
+
+            # Primary'e geri ver (default veya replica yoksa)
+            pool = await get_pg_pool()
+            await pool.release(conn)
         except Exception as e:
             logger.warning("Error releasing connection", error=str(e))
 
@@ -292,8 +309,7 @@ async def pg_execute(query: str, *args) -> str:
             )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_execute connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
-                await close_pg_pool()
-                _pg_pool = None
+                await close_pg_pool()  # zaten _pg_pool = None yapıyor
                 await asyncio.sleep(1)
                 continue
             logger.error("pg_execute failed", query=query[:100], error=str(e))
@@ -302,7 +318,6 @@ async def pg_execute(query: str, *args) -> str:
 
 async def pg_fetch(query: str, *args):
     """Fetch from REPLICA (read-only) — pool reconnect ile."""
-    global _pg_pool, _pg_replica_pool
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
@@ -324,9 +339,7 @@ async def pg_fetch(query: str, *args):
             )
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetch connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
-                await close_pg_pool()
-                _pg_pool = None
-                _pg_replica_pool = None
+                await close_pg_pool()  # zaten _pg_pool ve _pg_replica_pool = None yapıyor
                 await asyncio.sleep(1)
                 continue
             logger.error("pg_fetch failed", query=query[:100], error=str(e))
@@ -335,7 +348,6 @@ async def pg_fetch(query: str, *args):
 
 async def pg_fetchrow(query: str, *args):
     """Fetch single row from REPLICA — pool reconnect ile."""
-    global _pg_pool, _pg_replica_pool
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
@@ -358,8 +370,6 @@ async def pg_fetchrow(query: str, *args):
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetchrow connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
-                _pg_pool = None
-                _pg_replica_pool = None
                 await asyncio.sleep(1)
                 continue
             logger.error("pg_fetchrow failed", query=query[:100], error=str(e))
@@ -368,7 +378,6 @@ async def pg_fetchrow(query: str, *args):
 
 async def pg_fetchval(query: str, *args) -> Any:
     """Fetch single value from REPLICA — pool reconnect ile."""
-    global _pg_pool, _pg_replica_pool
     max_retries = 2
     for attempt in range(max_retries + 1):
         try:
@@ -391,8 +400,6 @@ async def pg_fetchval(query: str, *args) -> Any:
             if attempt < max_retries and is_connection_error:
                 logger.warning(f"pg_fetchval connection error, refreshing pool (attempt {attempt + 1})", error=str(e))
                 await close_pg_pool()
-                _pg_pool = None
-                _pg_replica_pool = None
                 await asyncio.sleep(1)
                 continue
             logger.error("pg_fetchval failed", query=query[:100], error=str(e))
