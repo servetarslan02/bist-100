@@ -9,6 +9,13 @@ Evaluation metrics:
 - Alpha, Precision@K, IC, Hit Rate, Sharpe, Max DD, Turnover
 - Deflated Sharpe Ratio (overfitting detection)
 
+⚠️ PIT UYARISI: Bu modül pre-computed predictions üzerinde çalışır.
+Modeli her fold'da YENİDEN EĞİTMEZ. Gerçek walk-forward doğrulama için
+`walk_forward_runner.py` kullanılmalıdır — o modül her fold'da modeli
+sıfırdan eğitir.
+
+Bu modül sadece evaluation/metrik hesaplama amaçlıdır.
+
 Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 

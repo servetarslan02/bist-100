@@ -12,6 +12,7 @@ import numpy as np
 import polars as pl
 import structlog
 
+from .contract import feature_registry
 from .store import feature_store
 
 logger = structlog.get_logger()
@@ -69,6 +70,28 @@ class FeaturePipeline:
         drift_report = None
         if self.config.enable_drift_detection:
             drift_report = self._check_drift(ticker, clean_features)
+
+        # 2b. PIT-safety kontrolü — PIT-safe olmayan feature'ları işaretle
+        pit_warnings = []
+        for fname, fval in clean_features.items():
+            contract = feature_registry.get(fname)
+            if contract and not contract.pit_safe:
+                pit_warnings.append(fname)
+            # Feature value validation
+            if contract and not contract.validate_value(fval):
+                logger.warning(
+                    "Feature validation failed",
+                    ticker=ticker,
+                    feature=fname,
+                    value=fval,
+                )
+
+        if pit_warnings:
+            logger.warning(
+                "PIT-unsafe features detected",
+                ticker=ticker,
+                features=pit_warnings,
+            )
 
         # 3. Store'a kaydet
         if self.config.save_to_store and clean_features:
