@@ -85,49 +85,47 @@ class FeaturePipeline:
         )
 
     def _compute_target_features(self, features: dict[str, float], ohlcv_df: Any) -> dict[str, float]:
-        """Gelecek ve geçmiş getiri hedeflerini (return_5d, return_20d vb.) hesaplar."""
+        """Gelecek ve geçmiş getiri hedeflerini (return_5d, return_20d vb.) hesaplar.
+
+        KURAL: Gerçek fiyat verisi yoksa SAHTE/SENTETIK veri ÜRETILMEZ.
+        Eksik target'lar üretilmez — downstream bunu 'veri yok' olarak algılar.
+        """
         targets: dict[str, float] = {}
         try:
             if ohlcv_df is not None:
                 # DataFrame desteği (polars veya pandas)
-                if hasattr(ohlcv_df, "to_pandas"):
-                    pdf = ohlcv_df.to_pandas()
-                elif isinstance(ohlcv_df, pl.DataFrame):
+                if isinstance(ohlcv_df, pl.DataFrame):
                     pdf = ohlcv_df
+                elif hasattr(ohlcv_df, "to_pandas"):
+                    pdf = pl.from_pandas(ohlcv_df.to_pandas())
                 else:
                     pdf = None
 
-                if pdf is not None and len(pdf) > 5 and "close" in pdf.columns:
-                    closes = pdf["close"].to_numpy()
-                    current_close = float(closes[-1])
-                    if current_close > 0:
-                        if len(closes) >= 2 and closes[-2] > 0:
-                            targets = targets.with_columns(
-                                pl.lit(float((current_close / closes[-2]) - 1.0)).alias("return_1d")
-                            )
-                        if len(closes) >= 6 and closes[-6] > 0:
-                            targets = targets.with_columns(
-                                pl.lit(float((current_close / closes[-6]) - 1.0)).alias("return_5d")
-                            )
-                        if len(closes) >= 11 and closes[-11] > 0:
-                            targets = targets.with_columns(
-                                pl.lit(float((current_close / closes[-11]) - 1.0)).alias("return_10d")
-                            )
-                        if len(closes) >= 21 and closes[-21] > 0:
-                            targets = targets.with_columns(
-                                pl.lit(float((current_close / closes[-21]) - 1.0)).alias("return_20d")
-                            )
-        except Exception:
-            logger.warning("Caught Exception in _compute_target_features", exc_info=True)
+                if pdf is not None and len(pdf) > 5:
+                    # Kolon adı normalize et (büyük/küçük harf uyumu)
+                    close_col = None
+                    for col_name in ["close", "Close", "CLOSE"]:
+                        if col_name in pdf.columns:
+                            close_col = col_name
+                            break
 
-        # Fallback sentetik / model target kolonları
-        for h in self.config.target_horizons:
-            key = f"return_{h}d"
-            if key not in targets:
-                # Mevcut momentum/rsi üzerinden güvenli getiri tahmini
-                rsi = features.get("rsi_14", 50.0)
-                mom = features.get("momentum_10d", 0.0)
-                targets[key] = round((mom * (h / 10.0)) + ((rsi - 50.0) / 1000.0), 4)
+                    if close_col:
+                        closes = pdf[close_col].to_numpy()
+                        current_close = float(closes[-1])
+                        if current_close > 0:
+                            if len(closes) >= 2 and closes[-2] > 0:
+                                targets["return_1d"] = float((current_close / closes[-2]) - 1.0)
+                            if len(closes) >= 6 and closes[-6] > 0:
+                                targets["return_5d"] = float((current_close / closes[-6]) - 1.0)
+                            if len(closes) >= 11 and closes[-11] > 0:
+                                targets["return_10d"] = float((current_close / closes[-11]) - 1.0)
+                            if len(closes) >= 21 and closes[-21] > 0:
+                                targets["return_20d"] = float((current_close / closes[-21]) - 1.0)
+        except Exception:
+            logger.warning("Target feature computation error", exc_info=True)
+
+        # SAHTE VERI ÜRETILMEZ — eksik target'lar üretilmez
+        # Downstream (model, learning) eksik target'ı 'veri yok' olarak algılar
 
         return targets
 
@@ -135,6 +133,7 @@ class FeaturePipeline:
         """BIST-specific feature'ları hesapla.
 
         market_session_fsm ve auto_circuit_breaker'dan gerçek zamanlı durum bilgisi alır.
+        NOT: dict kullanılır — Polars DataFrame değil.
         """
         bist: dict[str, float] = {}
         try:
@@ -145,61 +144,43 @@ class FeaturePipeline:
 
             # Seans fazı features
             phase = bist_session_fsm.get_phase(ticker=ticker)
-            bist = bist.with_columns(
-                pl.lit(
-                    1.0
-                    if phase
-                    in {BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.OPENING_AUCTION_DETERMINATION}
-                    else 0.0
-                ).alias("is_opening_auction")
+            bist["is_opening_auction"] = (
+                1.0
+                if phase in {BISTMarketPhase.OPENING_AUCTION_COLLECTION, BISTMarketPhase.OPENING_AUCTION_DETERMINATION}
+                else 0.0
             )
-            bist = bist.with_columns(
-                pl.lit(
-                    1.0
-                    if phase
-                    in {
-                        BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
-                        BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
-                        BISTMarketPhase.CLOSING_PRICE_TRADING,
-                    }
-                    else 0.0
-                ).alias("is_closing_auction")
+            bist["is_closing_auction"] = (
+                1.0
+                if phase in {
+                    BISTMarketPhase.CLOSING_AUCTION_COLLECTION,
+                    BISTMarketPhase.CLOSING_AUCTION_DETERMINATION,
+                    BISTMarketPhase.CLOSING_PRICE_TRADING,
+                }
+                else 0.0
             )
-            bist = bist.with_columns(
-                pl.lit(1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0).alias("is_continuous_auction")
-            )
+            bist["is_continuous_auction"] = 1.0 if phase == BISTMarketPhase.CONTINUOUS_AUCTION else 0.0
 
             # Devre kesici features
             cb_status = auto_circuit_breaker.get_status()
-            bist = bist.with_columns(pl.lit(1.0 if cb_status.get("ebdks_active", False) else 0.0).alias("ebdks_active"))
-            bist = bist.with_columns(
-                pl.lit(float(cb_status.get("ebdks_triggered_today", 0))).alias("ebdks_triggered_today")
-            )
-            bist = bist.with_columns(pl.lit(float(cb_status.get("bist100_change_pct", 0))).alias("bist100_change_pct"))
+            bist["ebdks_active"] = 1.0 if cb_status.get("ebdks_active", False) else 0.0
+            bist["ebdks_triggered_today"] = float(cb_status.get("ebdks_triggered_today", 0))
+            bist["bist100_change_pct"] = float(cb_status.get("bist100_change_pct", 0))
 
             # EBDKS'ye mesafe
             bist100_change = cb_status.get("bist100_change_pct", 0)
-            bist = bist.with_columns(
-                pl.lit(float(bist100_change + 6.0)).alias("bist100_distance_to_ebdks")
-            )  # %6 eşiğine mesafe
+            bist["bist100_distance_to_ebdks"] = float(bist100_change + 6.0)  # %6 eşiğine mesafe
 
             # Uptick rule
-            bist = bist.with_columns(
-                pl.lit(1.0 if short_selling_monitor._uptick_rule_active else 0.0).alias("uptick_rule_active")
-            )
+            bist["uptick_rule_active"] = 1.0 if short_selling_monitor._uptick_rule_active else 0.0
 
             # Brüt takas
-            bist = bist.with_columns(
-                pl.lit(1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0).alias(
-                    "is_gross_settlement"
-                )
+            bist["is_gross_settlement"] = (
+                1.0 if gross_settlement_monitor.is_short_sell_blocked(ticker) else 0.0
             )
 
             # Açığa satış uygunluk
-            bist = bist.with_columns(
-                pl.lit(1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0).alias(
-                    "short_sale_eligible"
-                )
+            bist["short_sale_eligible"] = (
+                1.0 if ticker in (short_selling_monitor._bist50_cache or []) else 0.0
             )
 
         except Exception as e:

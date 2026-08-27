@@ -135,14 +135,20 @@ class FeatureEngineService:
             # NOT: calculator.compute_all() buyuk harfli Close/Open/High/Low/Volume
             # kolon adlari bekliyor - kucuk harfle KeyError('Close') ile sessizce {}
             # donuyor ve feature hic hesaplanmiyor (bkz. try/except).
-            df = df.rename({"price": "Close", "volume": "Volume"})
-            df = df.with_columns(
-                [
-                    pl.col("Close").alias("Open"),
-                    pl.col("Close").alias("High"),
-                    pl.col("Close").alias("Low"),
-                ]
-            )
+            # DÜZELTME: Her iki formatı da destekle (büyük/küçük harf)
+            rename_map = {}
+            if "price" in df.columns:
+                rename_map["price"] = "Close"
+            if "volume" in df.columns:
+                rename_map["volume"] = "Volume"
+            if "close" in df.columns:
+                rename_map["close"] = "Close"
+            if rename_map:
+                df = df.rename(rename_map)
+            # Eksik OHLCV kolonlarını Close'dan türet
+            for col in ["Open", "High", "Low"]:
+                if col not in df.columns:
+                    df = df.with_columns(pl.col("Close").alias(col))
 
             # Compute features
             features = feature_calculator.compute_all_features(df)

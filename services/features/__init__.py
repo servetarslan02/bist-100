@@ -1,5 +1,7 @@
 """
-ALPHA BIST — Feature Engine Package v2.0
+ALPHA BIST — Feature Engine Package v3.0
+
+Feature Contract sistemi ile standardize edilmiş feature pipeline.
 """
 
 from .bist_features import (
@@ -12,12 +14,16 @@ from .bist_features import (
     print_feature_summary,
 )
 from .calculator import FeatureCalculator, feature_calculator
+from .contract import FeatureContract, FeatureRegistry, feature_registry
 from .pipeline import FeaturePipeline, PipelineConfig, feature_pipeline
 from .store import FeatureStore, feature_store
 
 __all__ = [
     "FeatureCalculator",
     "feature_calculator",
+    "FeatureContract",
+    "FeatureRegistry",
+    "feature_registry",
     "FeatureStore",
     "feature_store",
     "FeaturePipeline",
