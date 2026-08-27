@@ -29,6 +29,7 @@ from .providers.news_provider import news_provider
 from .providers.social_provider import social_provider
 from .providers.tcmb_provider import tcmb_provider
 from .providers.yfinance_provider import yfinance_provider
+from .questdb_consumer import questdb_tick_consumer
 
 logger = structlog.get_logger()
 
@@ -61,6 +62,9 @@ class IngestionService:
         self._running = True
         logger.info("Ingestion Service started", instruments=len(self._instrument_map), universe_size=len(BIST_ALL))
 
+        # QuestDB tick consumer'ı başlat
+        await questdb_tick_consumer.start()
+
         # Start loops in the background
         self._tasks = [
             asyncio.create_task(self._market_data_loop()),
@@ -89,6 +93,7 @@ class IngestionService:
     async def stop(self):
         """Stop the ingestion service."""
         self._running = False
+        await questdb_tick_consumer.stop()
         await connectivity_monitor.stop()
         flush_producer()
         await close_databases()
