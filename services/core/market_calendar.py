@@ -41,31 +41,8 @@ class MarketStatus(StrEnum):
     EARLY_CLOSE = "EARLY_CLOSE"
 
 
-# 2026 Türkiye resmi tatilleri
-TURKEY_HOLIDAYS_2026 = [
-    date(2026, 1, 1),  # Yılbaşı
-    date(2026, 4, 23),  # Ulusal Egemenlik ve Çocuk Bayramı
-    date(2026, 5, 1),  # Emek ve Dayanışma Günü
-    date(2026, 5, 19),  # Atatürk'ü Anma, Gençlik ve Spor Bayramı
-    date(2026, 7, 15),  # Demokrasi ve Millî Birlik Günü
-    date(2026, 8, 30),  # Zafer Bayramı
-    date(2026, 10, 29),  # Cumhuriyet Bayramı
-    date(2026, 3, 21),  # Ramazan Bayramı 1. gün
-    date(2026, 3, 22),  # Ramazan Bayramı 2. gün
-    date(2026, 3, 23),  # Ramazan Bayramı 3. gün
-    date(2026, 5, 28),  # Kurban Bayramı 1. gün
-    date(2026, 5, 29),  # Kurban Bayramı 2. gün
-    date(2026, 5, 30),  # Kurban Bayramı 3. gün
-    date(2026, 5, 31),  # Kurban Bayramı 4. gün
-]
-
-# 2026 Türkiye yarım gün tatilleri (resmi tatil arifeleri)
-# Bu günlerde piyasa 12:30'da kapanır
-TURKEY_HALF_DAYS_2026 = [
-    date(2026, 3, 20),  # Ramazan Bayramı Arifesi
-    date(2026, 5, 27),  # Kurban Bayramı Arifesi
-    date(2026, 10, 28),  # Cumhuriyet Bayramı Arifesi (yarım gün)
-]
+# Tatil günleri artık HolidayManager tarafından dinamik olarak hesaplanıyor.
+# Statik liste kaldırıldı — holiday_manager.py kullanılıyor.
 
 
 class MarketCalendar:
@@ -79,8 +56,14 @@ class MarketCalendar:
     HALF_CLOSING_END = time(12, 40)  # Yarım gün kapanış sonu
 
     def __init__(self, holidays: list[date] | None = None, half_days: list[date] | None = None):
-        self._holidays = set(holidays or TURKEY_HOLIDAYS_2026)
-        self._half_days = set(half_days or TURKEY_HALF_DAYS_2026)
+        from .holiday_manager import holiday_manager
+        self._hm = holiday_manager
+
+        # Dinamik tatil yöneticisinden al (yıl otomatik hesaplanır)
+        today = date.today()
+        self._holidays = set(holidays) if holidays else self._hm.get_holidays(today.year)
+        self._half_days = set(half_days) if half_days else self._hm.get_half_days(today.year)
+
         # FSM'ye tatil günlerini string formatında aktar
         holiday_strs = {d.strftime("%Y-%m-%d") for d in self._holidays}
         half_day_strs = {d.strftime("%Y-%m-%d") for d in self._half_days}
@@ -88,10 +71,20 @@ class MarketCalendar:
         bist_session_fsm.set_half_days(half_day_strs)
         self._halts: dict[date, list[tuple[time, time]]] = {}
 
+        logger.info(
+            "MarketCalendar initialized with HolidayManager",
+            year=today.year,
+            holidays=len(self._holidays),
+            half_days=len(self._half_days),
+        )
+
     def is_half_day(self, d: date | None = None) -> bool:
         """Bu gün yarım gün mü?"""
         if d is None:
             d = date.today()
+        # Yıl değiştiyse güncelle
+        if d.year not in self._hm._half_days:
+            self._half_days = self._hm.get_half_days(d.year)
         return d in self._half_days
 
     def is_trading_day(self, d: date | None = None) -> bool:
@@ -99,7 +92,9 @@ class MarketCalendar:
             d = date.today()
         if d.weekday() >= 5:
             return False
-        return d not in self._holidays
+        # Yıl değiştiyse veya anlık tatil eklendiyse güncelle
+        holidays = self._hm.get_holidays(d.year)
+        return d not in holidays
 
     def is_market_open(self, dt: datetime | None = None) -> bool:
         if dt is None:
@@ -184,6 +179,25 @@ class MarketCalendar:
         if d not in self._halts:
             self._halts[d] = []
         self._halts[d].append((start, end))
+
+    def report_no_data(self, d: date | None = None) -> bool:
+        """Veri gelmediğini rapor et — anlık tatil tespiti."""
+        return self._hm.report_no_data(d)
+
+    def add_manual_holiday(self, d: date, reason: str = "") -> None:
+        """Manuel tatil ekle (anlık ilan edilen tatiller için)."""
+        self._hm.add_manual_holiday(d, reason)
+        # FSM'yi güncelle
+        holiday_strs = {dd.strftime("%Y-%m-%d") for dd in self._hm.get_holidays(d.year)}
+        bist_session_fsm.set_holidays(holiday_strs)
+
+    async def sync_from_bist(self) -> bool:
+        """BIST resmi web sitesinden tatilleri çek."""
+        return await self._hm.sync_from_bist()
+
+    def get_holiday_info(self, year: int | None = None) -> str:
+        """Yılın tüm tatillerini okunabilir formatta döndür."""
+        return self._hm.get_all_holidays_text(year)
 
     def get_info(self, dt: datetime | None = None) -> dict:
         if dt is None:
