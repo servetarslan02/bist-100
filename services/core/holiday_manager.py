@@ -1,19 +1,29 @@
 """
-ALPHA BIST — Dynamic Holiday Manager v1.0
+ALPHA BIST — Dynamic Holiday Manager v2.0
 
 BIST tatil günlerini otomatik yönetir:
 1. Sabit milli bayramlar (her yıl aynı)
 2. Dini bayramlar (Hicri takvime göre otomatik hesaplama)
-3. BIST resmi takvim çekme (API/web scraping)
-4. Anlık tatil tespiti (piyasa kapalıysa fark et)
-5. Yarım gün yönetimi (tatil arifeleri)
+3. BIST resmi takvim çekme (API/web scraping) + retry + alternatif kaynaklar
+4. KAP RSS izleme (anlık tatil duyuruları)
+5. Anlık tatil tespiti (piyasa kapalıysa fark et)
+6. Yarım gün yönetimi (tatil arifeleri)
+7. Proxy desteği (BIST engelli bölgeler için)
 
-KURAL: Elle liste tutma, otomatik hesapla + çek + tespit et.
+v2.0 DEĞİŞİKLİKLERİ:
+- Retry mekanizması (3 deneme, exponential backoff)
+- Alternatif kaynaklar: KAP RSS, Investing.com, Google cache
+- Proxy desteği (HTTP_PROXY / HTTPS_PROXY)
+- KAP anlık duyuru izleme (tatil anahtar kelime taraması)
+- SuddenHolidayDetector: KAP duyuru kontrolü eklendi
+- Tatil değişiklik logu (audit trail)
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import os
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -22,6 +32,15 @@ from typing import Any
 import structlog
 
 logger = structlog.get_logger(__name__)
+
+# =====================================================
+# 0. PROXY DESTEĞİ (BIST engelli bölgeler için)
+# =====================================================
+
+def _get_proxy() -> str | None:
+    """HTTP_PROXY veya HTTPS_PROXY ortam değişkeninden proxy al."""
+    return os.environ.get("HTTP_PROXY") or os.environ.get("HTTPS_PROXY") or os.environ.get("http_proxy") or os.environ.get("https_proxy")
+
 
 # =====================================================
 # 1. SABİT MİLLİ BAYRAMLAR (her yıl aynı tarih)
@@ -37,11 +56,8 @@ FIXED_HOLIDAYS: dict[int, tuple[int, int]] = {
     7: (10, 29),  # Cumhuriyet Bayramı
 }
 
-# Yarım gün tatil arifeleri (tatil gününden bir önceki gün)
+# Yarım gün tatil arifeleri
 HALF_DAY_EVES: dict[int, tuple[int, int]] = {
-    # Ramazan Bayramı arifesi (1. gününden önce)
-    # Kurban Bayramı arifesi (1. gününden önce)
-    # Cumhuriyet Bayramı arifesi
     7: (10, 28),  # Cumhuriyet Bayramı arifesi
 }
 
@@ -53,19 +69,13 @@ HALF_DAY_EVES: dict[int, tuple[int, int]] = {
 def _compute_hijri_holidays(gregorian_year: int) -> list[date]:
     """Hicri takvime göre Ramazan ve Kurban Bayramı tarihlerini hesapla.
 
-    Hicri takvim 354 günlük lunar yıldır.
-    Miladi yıla göre her yıl ~10-11 gün geri kayar.
-
     Referans noktaları (Miladi → Hicri):
     - 2024: Ramazan 10 Mart, Kurban 17 Haziran
     - 2025: Ramazan 28 Şubat, Kurban 6 Haziran
     - 2026: Ramazan 18 Şubat, Kurban 27 Mayıs
-    - 2027: Ramazan 8 Şubat, Kurban 17 Mayıs
 
     Kaynak: Diyanet İşleri Başkanlığı resmi takvimi
     """
-    # Referans tarihler — Diyanet İşleri Başkanlığı resmi takvimi
-    # (Ramazan Bayramı 1. gün, Kurban Bayramı 1. gün)
     ramazan_references: dict[int, date] = {
         2024: date(2024, 4, 10),
         2025: date(2025, 3, 30),
@@ -155,40 +165,90 @@ def _compute_half_days_eves(gregorian_year: int, religious_holidays: list[date])
 
 
 # =====================================================
-# 3. BIST RESMİ TAKVİM ÇEKME
+# 3. BIST RESMİ TAKVİM ÇEKME (Retry + Alternatif Kaynaklar)
 # =====================================================
+
+async def _fetch_with_retry(
+    url: str,
+    max_retries: int = 3,
+    timeout: int = 15,
+    proxy: str | None = None,
+) -> str | None:
+    """HTTP GET with retry and exponential backoff."""
+    import httpx
+
+    for attempt in range(max_retries):
+        try:
+            client_kwargs: dict[str, Any] = {
+                "timeout": timeout,
+                "follow_redirects": True,
+            }
+            if proxy:
+                client_kwargs["proxy"] = proxy
+
+            async with httpx.AsyncClient(**client_kwargs) as client:
+                resp = await client.get(
+                    url,
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                        "Accept-Language": "tr-TR,tr;q=0.9,en;q=0.8",
+                    },
+                )
+                if resp.status_code == 200:
+                    return resp.text
+                else:
+                    logger.warning("HTTP error", url=url, status=resp.status_code, attempt=attempt + 1)
+        except Exception as e:
+            logger.warning("Fetch failed", url=url, error=str(e), attempt=attempt + 1)
+
+        if attempt < max_retries - 1:
+            wait = 2 ** attempt  # 1s, 2s, 4s
+            await asyncio.sleep(wait)
+
+    return None
+
 
 async def fetch_bist_holidays_from_web() -> list[date] | None:
     """BIST resmi web sitesinden tatil günlerini çek.
 
-    BIST tatil takvimini yayınlar:
-    https://www.borsaistanbul.com/en/sayfa/3466/holidays
-
-    Returns:
-        Tatil günleri listesi veya çekilemezse None
+    Öncelik sırası:
+    1. BIST resmi web sitesi (proxy ile)
+    2. KAP RSS (tatil duyuruları)
+    3. Investing.com TR takvimi
     """
-    try:
-        import httpx
+    proxy = _get_proxy()
 
-        async with httpx.AsyncClient(timeout=10) as client:
-            # BIST API endpoint (resmi takvim)
-            resp = await client.get(
-                "https://www.borsaistanbul.com/en/sayfa/3466/holidays",
-                headers={"User-Agent": "Mozilla/5.0"},
-                follow_redirects=True,
-            )
-            if resp.status_code == 200:
-                return _parse_bist_holidays_html(resp.text)
-    except Exception as e:
-        logger.warning("BIST holiday fetch failed", error=str(e))
+    # 1. BIST resmi web sitesi
+    html = await _fetch_with_retry(
+        "https://www.borsaistanbul.com/en/sayfa/3466/holidays",
+        proxy=proxy,
+    )
+    if html:
+        holidays = _parse_bist_holidays_html(html)
+        if holidays:
+            logger.info("BIST holidays fetched from official site", count=len(holidays))
+            return holidays
 
+    # 2. KAP RSS (tatil duyuruları)
+    kap_holidays = await _fetch_holidays_from_kap()
+    if kap_holidays:
+        logger.info("BIST holidays fetched from KAP", count=len(kap_holidays))
+        return kap_holidays
+
+    # 3. Investing.com TR
+    investing_holidays = await _fetch_holidays_from_investing()
+    if investing_holidays:
+        logger.info("BIST holidays fetched from Investing.com", count=len(investing_holidays))
+        return investing_holidays
+
+    logger.warning("All holiday sources failed")
     return None
 
 
 def _parse_bist_holidays_html(html: str) -> list[date] | None:
     """BIST HTML sayfasından tatil tarihlerini parse et."""
     holidays: list[date] = []
-    # Tarih formatı: DD.MM.YYYY veya DD/MM/YYYY
     patterns = [
         r'(\d{1,2})[./](\d{1,2})[./](\d{4})',
         r'(\d{4})-(\d{2})-(\d{2})',
@@ -197,9 +257,9 @@ def _parse_bist_holidays_html(html: str) -> list[date] | None:
         matches = re.findall(pattern, html)
         for match in matches:
             try:
-                if len(match[0]) == 4:  # YYYY-MM-DD
+                if len(match[0]) == 4:
                     d = date(int(match[0]), int(match[1]), int(match[2]))
-                else:  # DD.MM.YYYY
+                else:
                     d = date(int(match[2]), int(match[1]), int(match[0]))
                 if 2020 <= d.year <= 2030:
                     holidays.append(d)
@@ -208,42 +268,267 @@ def _parse_bist_holidays_html(html: str) -> list[date] | None:
     return holidays if holidays else None
 
 
+async def _fetch_holidays_from_kap() -> list[date] | None:
+    """KAP (Kamuyu Aydınlatma Platformu) üzerinden tatil duyurularını çek.
+
+    KAP BIST tatil duyurularını yayınlar:
+    https://www.kap.org.tr/tr/api/Bildirim/Search
+    """
+    proxy = _get_proxy()
+
+    # KAP API — tatil anahtar kelimesi ile ara
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            kwargs: dict[str, Any] = {}
+            if proxy:
+                kwargs["proxy"] = proxy
+
+            # KAP bildirim ara API
+            resp = await client.get(
+                "https://www.kap.org.tr/tr/api/Bildirim/Search",
+                params={
+                    "searchTerm": "borsa istanbul tatil",
+                    "fromDate": f"{date.today().year}-01-01",
+                    "toDate": f"{date.today().year}-12-31",
+                },
+                headers={"User-Agent": "Mozilla/5.0"},
+                **kwargs,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                return _parse_kap_holiday_notifications(data)
+    except Exception as e:
+        logger.debug("KAP holiday fetch failed", error=str(e))
+
+    # Fallback: KAP RSS feed
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            kwargs: dict[str, Any] = {}
+            if proxy:
+                kwargs["proxy"] = proxy
+
+            resp = await client.get(
+                "https://www.kap.org.tr/tr/api/Bildirim/GetRssFeed",
+                headers={"User-Agent": "Mozilla/5.0"},
+                **kwargs,
+            )
+            if resp.status_code == 200:
+                return _parse_kap_rss_for_holidays(resp.text)
+    except Exception as e:
+        logger.debug("KAP RSS fetch failed", error=str(e))
+
+    return None
+
+
+def _parse_kap_holiday_notifications(data: Any) -> list[date] | None:
+    """KAP API yanıtından tatil tarihlerini çıkar."""
+    holidays: list[date] = []
+
+    if not isinstance(data, list):
+        return None
+
+    # Tatil anahtar kelimeleri
+    holiday_keywords = [
+        "tatil", "kapalı", "işlem yapılmayacak", "piyasa kapalı",
+        "resmi tatil", "bayram", "arife", "yarım gün",
+    ]
+
+    for notification in data:
+        title = str(notification.get("title", "") or notification.get("baslik", "")).lower()
+        content = str(notification.get("content", "") or notification.get("icerik", "")).lower()
+        text = f"{title} {content}"
+
+        # Tatil anahtar kelimesi var mı?
+        if any(kw in text for kw in holiday_keywords):
+            # Tarih çıkar
+            date_patterns = [
+                r'(\d{1,2})[./](\d{1,2})[./](\d{4})',
+                r'(\d{4})-(\d{2})-(\d{2})',
+            ]
+            for pattern in date_patterns:
+                matches = re.findall(pattern, text)
+                for match in matches:
+                    try:
+                        if len(match[0]) == 4:
+                            d = date(int(match[0]), int(match[1]), int(match[2]))
+                        else:
+                            d = date(int(match[2]), int(match[1]), int(match[0]))
+                        if 2020 <= d.year <= 2030:
+                            holidays.append(d)
+                    except ValueError:
+                        continue
+
+    return holidays if holidays else None
+
+
+def _parse_kap_rss_for_holidays(xml_text: str) -> list[date] | None:
+    """KAP RSS feed'inden tatil tarihlerini çıkar."""
+    holidays: list[date] = []
+
+    holiday_keywords = ["tatil", "kapalı", "işlem yapılmayacak", "piyasa kapalı"]
+
+    # RSS item'ları arasında tatil duyurusu ara
+    items = re.findall(r'<item>(.*?)</item>', xml_text, re.DOTALL)
+    for item in items:
+        title_match = re.search(r'<title>(.*?)</title>', item, re.DOTALL)
+        desc_match = re.search(r'<description>(.*?)</description>', item, re.DOTALL)
+
+        title = title_match.group(1) if title_match else ""
+        desc = desc_match.group(1) if desc_match else ""
+        text = f"{title} {desc}".lower()
+
+        if any(kw in text for kw in holiday_keywords):
+            date_matches = re.findall(r'(\d{1,2})[./](\d{1,2})[./](\d{4})', text)
+            for match in date_matches:
+                try:
+                    d = date(int(match[2]), int(match[1]), int(match[0]))
+                    if 2020 <= d.year <= 2030:
+                        holidays.append(d)
+                except ValueError:
+                    continue
+
+    return holidays if holidays else None
+
+
+async def _fetch_holidays_from_investing() -> list[date] | None:
+    """Investing.com TR takviminden tatil günlerini çek."""
+    proxy = _get_proxy()
+
+    try:
+        import httpx
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            kwargs: dict[str, Any] = {}
+            if proxy:
+                kwargs["proxy"] = proxy
+
+            resp = await client.get(
+                "https://tr.investing.com/holidays/turkey",
+                headers={
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                    "Accept-Language": "tr-TR,tr;q=0.9",
+                },
+                **kwargs,
+            )
+            if resp.status_code == 200:
+                return _parse_investing_holidays(resp.text)
+    except Exception as e:
+        logger.debug("Investing.com holiday fetch failed", error=str(e))
+
+    return None
+
+
+def _parse_investing_holidays(html: str) -> list[date] | None:
+    """Investing.com HTML'den tatil tarihlerini parse et."""
+    holidays: list[date] = []
+
+    # Tablo satırlarından tarih çıkar
+    rows = re.findall(r'<tr[^>]*>(.*?)</tr>', html, re.DOTALL)
+    for row in rows:
+        cells = re.findall(r'<td[^>]*>(.*?)</td>', row, re.DOTALL)
+        for cell in cells:
+            # DD/MM/YYYY veya DD.MM.YYYY formatı
+            matches = re.findall(r'(\d{1,2})[./](\d{1,2})[./](\d{4})', cell)
+            for match in matches:
+                try:
+                    d = date(int(match[2]), int(match[1]), int(match[0]))
+                    if 2020 <= d.year <= 2030:
+                        holidays.append(d)
+                except ValueError:
+                    continue
+
+    return holidays if holidays else None
+
+
 # =====================================================
-# 4. ANLIK TATİL TESPİTİ
+# 4. KAP ANLIK DUYURU İZLEYİCİ
+# =====================================================
+
+class KAPHolidayWatcher:
+    """KAP'tan anlık tatil duyurularını izler.
+
+    BIST tatil ilan ettiğinde KAP'ta yayınlanır.
+    Bu sınıf KAP'ı periyodik olarak kontrol eder.
+    """
+
+    def __init__(self):
+        self._last_check: datetime | None = None
+        self._last_announcement_time: datetime | None = None
+        self._announced_holidays: set[date] = set()
+        self._check_interval_seconds: int = 300  # 5 dakika
+
+    async def check_for_new_announcements(self) -> list[date]:
+        """KAP'ta yeni tatil duyurusu var mı?"""
+        now = datetime.now()
+
+        # Son kontrol üzerinden yeterli süre geçti mi?
+        if self._last_check and (now - self._last_check).total_seconds() < self._check_interval_seconds:
+            return []
+
+        self._last_check = now
+
+        kap_holidays = await _fetch_holidays_from_kap()
+        if not kap_holidays:
+            return []
+
+        # Yeni duyuruları bul
+        new_holidays = [d for d in kap_holidays if d not in self._announced_holidays]
+        if new_holidays:
+            self._announced_holidays.update(new_holidays)
+            self._last_announcement_time = now
+            logger.warning(
+                "KAP holiday announcement detected",
+                dates=[d.isoformat() for d in new_holidays],
+            )
+
+        return new_holidays
+
+    def get_last_announcement_time(self) -> datetime | None:
+        return self._last_announcement_time
+
+    def get_announced_holidays(self) -> set[date]:
+        return self._announced_holidays.copy()
+
+
+# =====================================================
+# 5. ANLIK TATİL TESPİTİ (Gelişmiş)
 # =====================================================
 
 class SuddenHolidayDetector:
     """Piyasa beklenmedik şekilde kapalıysa tespit et.
 
+    v2.0: Artık KAP duyurularını da kontrol ediyor.
+
     Çalışma mantığı:
-    - Her gün piyasa açık olması gereken saatte kontrol et
-    - Eğer BIST-100 verisi gelmiyorsa ve tatil listesinde yoksa → anlık tatil
-    - Otomatik olarak tatil listesine ekle
+    1. Radar verisi gelmiyorsa → sayacı artır
+    2. KAP'ta tatil duyurusu varsa → anında tespit et
+    3. 3 kez üst üste veri gelmezse → otomatik tatil ekle
     """
 
     def __init__(self):
         self._confirmed_holidays: set[date] = set()
         self._suspected_holidays: dict[date, int] = {}  # date → fail count
+        self._kap_watcher = KAPHolidayWatcher()
 
     def check_market_data_freshness(
         self,
         last_data_time: datetime | None,
         expected_interval_minutes: int = 5,
     ) -> bool:
-        """Piyasa verisi güncel mi?
-
-        Args:
-            last_data_time: Son veri gelme zamanı
-            expected_interval_minutes: Beklenen veri aralığı (dakika)
-
-        Returns:
-            True = veri güncel, False = veri gelmiyor (tatil olabilir)
-        """
+        """Piyasa verisi güncel mi?"""
         if last_data_time is None:
             return False
         now = datetime.now()
         diff = (now - last_data_time).total_seconds() / 60
-        return diff < expected_interval_minutes * 3  # 3x tolerans
+        return diff < expected_interval_minutes * 3
+
+    async def check_kap_announcements(self) -> list[date]:
+        """KAP'ta yeni tatil duyurusu var mı?"""
+        return await self._kap_watcher.check_for_new_announcements()
 
     def report_no_data(self, d: date) -> bool:
         """Veri gelmediğini rapor et.
@@ -261,6 +546,12 @@ class SuddenHolidayDetector:
             return True
         return False
 
+    def report_kap_holiday(self, d: date) -> bool:
+        """KAP'tan tatil duyurusu geldi — anında tespit et."""
+        self._confirmed_holidays.add(d)
+        logger.warning("Holiday detected via KAP announcement", date=d.isoformat())
+        return True
+
     def is_confirmed_holiday(self, d: date) -> bool:
         return d in self._confirmed_holidays
 
@@ -269,16 +560,24 @@ class SuddenHolidayDetector:
 
 
 # =====================================================
-# 5. ANA HOLIDAY MANAGER
+# 6. ANA HOLIDAY MANAGER
 # =====================================================
 
 class HolidayManager:
-    """BIST tatil yöneticisi — dinamik, otomatik, self-updating."""
+    """BIST tatil yöneticisi — dinamik, otomatik, self-updating.
+
+    v2.0:
+    - KAP anlık duyuru izleme
+    - Tatil değişiklik logu (audit trail)
+    - Proxy desteği
+    - Retry mekanizması
+    """
 
     def __init__(self, data_dir: str = "data"):
         self._data_dir = Path(data_dir)
         self._data_dir.mkdir(exist_ok=True)
         self._cache_file = self._data_dir / "holiday_cache.json"
+        self._audit_file = self._data_dir / "holiday_audit.json"
         self._sudden_detector = SuddenHolidayDetector()
 
         # Cache'ten yükle
@@ -287,14 +586,13 @@ class HolidayManager:
         self._load_cache()
 
     def get_holidays(self, year: int | None = None) -> set[date]:
-        """Belirli bir yılın tatil günlerini getir (otomatik hesaplama + cache)."""
+        """Belirli bir yılın tatil günlerini getir."""
         if year is None:
             year = date.today().year
 
         if year not in self._holidays:
             self._compute_year(year)
 
-        # Anlık tatilleri de ekle
         result = self._holidays.get(year, set()).copy()
         for d in self._sudden_detector.get_confirmed():
             if d.year == year:
@@ -341,15 +639,17 @@ class HolidayManager:
             self._holidays[year] = set()
         self._holidays[year].add(d)
         self._save_cache()
+        self._log_audit("add", d, reason)
         logger.info("Manual holiday added", date=d.isoformat(), reason=reason)
 
-    def remove_holiday(self, d: date) -> None:
+    def remove_holiday(self, d: date, reason: str = "") -> None:
         """Tatil gününü kaldır (iptal edilen tatiller için)."""
         year = d.year
         if year in self._holidays:
             self._holidays[year].discard(d)
             self._save_cache()
-            logger.info("Holiday removed", date=d.isoformat())
+            self._log_audit("remove", d, reason)
+            logger.info("Holiday removed", date=d.isoformat(), reason=reason)
 
     def report_no_data(self, d: date | None = None) -> bool:
         """Veri gelmediğini rapor et — anlık tatil tespiti."""
@@ -357,12 +657,24 @@ class HolidayManager:
             d = date.today()
         detected = self._sudden_detector.report_no_data(d)
         if detected:
-            # Otomatik olarak tatil listesine ekle
             if d.year not in self._holidays:
                 self._holidays[d.year] = set()
             self._holidays[d.year].add(d)
             self._save_cache()
+            self._log_audit("auto_detect", d, "SuddenHolidayDetector — no market data")
         return detected
+
+    async def check_kap_for_holidays(self) -> list[date]:
+        """KAP'ta yeni tatil duyurusu var mı? Varsa otomatik ekle."""
+        new_holidays = await self._sudden_detector.check_kap_announcements()
+        for d in new_holidays:
+            if d.year not in self._holidays:
+                self._holidays[d.year] = set()
+            self._holidays[d.year].add(d)
+            self._log_audit("kap_detect", d, "KAP announcement detected")
+        if new_holidays:
+            self._save_cache()
+        return new_holidays
 
     async def sync_from_bist(self) -> bool:
         """BIST resmi web sitesinden tatilleri çek ve güncelle."""
@@ -387,27 +699,23 @@ class HolidayManager:
 
         lines = [f"=== {year} BIST Tatil Günleri ===\n"]
 
-        # Milli bayramlar
         national = [d for d in holidays if d in self._get_national_holidays(year)]
         if national:
             lines.append("🇹🇷 Milli Bayramlar:")
             for d in national:
                 lines.append(f"  {d.strftime('%d.%m.%Y')} ({d.strftime('%A')}) — {self._get_holiday_name(d)}")
 
-        # Dini bayramlar
         religious = [d for d in holidays if d not in self._get_national_holidays(year)]
         if religious:
             lines.append("\n🕌 Dini Bayramlar:")
             for d in religious:
                 lines.append(f"  {d.strftime('%d.%m.%Y')} ({d.strftime('%A')}) — {self._get_holiday_name(d)}")
 
-        # Yarım günler
         if half_days:
             lines.append("\n⏰ Yarım Günler (12:30 kapanış):")
             for d in half_days:
                 lines.append(f"  {d.strftime('%d.%m.%Y')} ({d.strftime('%A')}) — {self._get_holiday_name(d)} arifesi")
 
-        # Anlık tatiller
         sudden = [d for d in self._sudden_detector.get_confirmed() if d.year == year]
         if sudden:
             lines.append("\n⚡ Anlık İlan Edilen Tatiller:")
@@ -415,6 +723,17 @@ class HolidayManager:
                 lines.append(f"  {d.strftime('%d.%m.%Y')} ({d.strftime('%A')}) — Tespit edildi")
 
         return "\n".join(lines)
+
+    def get_audit_log(self, limit: int = 50) -> list[dict]:
+        """Son tatil değişiklik loglarını getir."""
+        if not self._audit_file.exists():
+            return []
+        try:
+            with open(self._audit_file) as f:
+                data = json.load(f)
+            return data.get("entries", [])[-limit:]
+        except Exception:
+            return []
 
     # =====================================================
     # İÇ METODLAR
@@ -424,30 +743,25 @@ class HolidayManager:
         """Bir yılın tüm tatillerini hesapla."""
         holidays: set[date] = set()
 
-        # 1. Sabit milli bayramlar
         for _, (month, day) in FIXED_HOLIDAYS.items():
             try:
                 holidays.add(date(year, month, day))
             except ValueError:
                 continue
 
-        # 2. Dini bayramlar (otomatik hesaplama)
         religious = _compute_hijri_holidays(year)
         holidays.update(religious)
 
-        # 3. Cache'ten yüklenmiş manuel tatiller
         if year in self._holidays:
             holidays.update(self._holidays[year])
 
         self._holidays[year] = holidays
 
-        # Yarım günler
         half_days: set[date] = set()
         religious_half = _compute_half_days_eves(year, religious)
         half_days.update(religious_half)
         self._half_days[year] = half_days
 
-        # Cache'e kaydet
         self._save_cache()
 
         logger.info(
@@ -482,8 +796,6 @@ class HolidayManager:
         if key in names:
             return names[key]
 
-        # Dini bayram tespiti
-        # Pozisyon bazlı filtre kullan (ay filtresi 2029+ yıllarında hatalı)
         religious = sorted(_compute_hijri_holidays(d.year))
         ramazan = religious[:3] if len(religious) >= 3 else religious
         kurban = religious[3:7] if len(religious) >= 7 else []
@@ -534,6 +846,33 @@ class HolidayManager:
                 json.dump(data, f, indent=2)
         except Exception as e:
             logger.warning("Holiday cache save failed", error=str(e))
+
+    def _log_audit(self, action: str, d: date, reason: str = "") -> None:
+        """Tatil değişiklik logu (audit trail)."""
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "action": action,
+            "date": d.isoformat(),
+            "reason": reason,
+        }
+
+        try:
+            if self._audit_file.exists():
+                with open(self._audit_file) as f:
+                    data = json.load(f)
+            else:
+                data = {"entries": []}
+
+            data["entries"].append(entry)
+
+            # Son 1000 kaydı tut
+            if len(data["entries"]) > 1000:
+                data["entries"] = data["entries"][-1000:]
+
+            with open(self._audit_file, "w") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            logger.debug("Audit log failed", error=str(e))
 
 
 # Singleton

@@ -23,6 +23,7 @@ from .scanner import router as scanner_router
 from .sse import router as sse_router
 from .system import router as system_router
 from .viop import router as viop_router
+from .holidays import router as holidays_router
 from .ws import router as ws_router
 
 v1_router = APIRouter(prefix="/api/v1")
@@ -45,8 +46,10 @@ v1_router.include_router(event_study_router, prefix="/event-study", tags=["Event
 v1_router.include_router(system_router, prefix="/system", tags=["System"])
 v1_router.include_router(ws_router, prefix="/ws", tags=["WebSockets"])
 v1_router.include_router(sse_router, prefix="/sse", tags=["Server-Sent Events"])
+v1_router.include_router(holidays_router, prefix="/holidays", tags=["Holidays"])
 
 # Direct Frontend Route Aliases (Sıfır 404 Garantisi)
 v1_router.include_router(scanner_router, prefix="", tags=["Scanner (Direct)"])
 v1_router.include_router(system_router, prefix="", tags=["System (Direct)"])
 v1_router.include_router(portfolio_router, prefix="/strategy", tags=["Strategy (Direct)"])
+v1_router.include_router(holidays_router, prefix="/tatil", tags=["Tatil (Direct)"])

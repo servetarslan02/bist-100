@@ -152,7 +152,10 @@ class CacheWarmer:
         return False
 
     async def refresh_hot_keys(self):
-        """Sıcak anahtarları periyodik olarak tazele (background task)."""
+        """Sıcak anahtarları periyodik olarak tazele (background task).
+
+        v2.0: KAP anlık duyuru izleme eklendi.
+        """
         from datetime import date
 
         while True:
@@ -160,7 +163,6 @@ class CacheWarmer:
                 await self._warm_latest_prices()
                 await self._warm_active_signals()
 
-                # Anlık tatil tespiti — piyasa açık olması gereken saatte veri gelmiyorsa
                 today = date.today()
                 if today.weekday() < 5:  # Hafta içi
                     from ..core.holiday_manager import holiday_manager
@@ -171,15 +173,24 @@ class CacheWarmer:
                     market_open = dtime(10, 0)
                     market_close = dtime(18, 0)
 
-                    # Piyasa açık olması gereken saatte mi?
+                    # 1. KAP anlık duyuru izleme (her saat)
+                    try:
+                        kap_holidays = await holiday_manager.check_kap_for_holidays()
+                        if kap_holidays:
+                            logger.warning(
+                                "KAP holiday announcement detected by cache warmer",
+                                dates=[d.isoformat() for d in kap_holidays],
+                            )
+                    except Exception as e:
+                        logger.debug("KAP check failed", error=str(e))
+
+                    # 2. Radar verisi kontrolü (piyasa açık saatlerde)
                     if market_open <= now.time() <= market_close:
                         calendar = get_market_calendar()
                         if calendar.is_trading_day(today):
-                            # Son radar verisini kontrol et
                             from ..core.redis_helper import get_cached
                             radar = get_cached("radar:data")
                             if not radar:
-                                # Veri yok — anlık tatil olabilir
                                 detected = holiday_manager.report_no_data(today)
                                 if detected:
                                     logger.warning(
