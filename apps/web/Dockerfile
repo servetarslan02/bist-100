@@ -20,6 +20,10 @@ EXPOSE 3000
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
 
+# Non-root user for security
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+USER nextjs
+
 # Run from the standalone directory
 WORKDIR /app/.next/standalone
 CMD ["node", "server.js"]
