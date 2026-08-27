@@ -4,93 +4,157 @@
 from __future__ import annotations
 
 import numpy as np
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
-class SevenMotorsEngine:
-    """Seven core feature motors for comprehensive market analysis.
+class RelativeStrengthMotor:
+    """Computes relative strength features vs benchmark."""
 
-    Motors:
-    1. Momentum Motor - Trend strength and direction
-    2. Volatility Motor - Risk and regime detection
-    3. Volume Motor - Liquidity and participation
-    4. Mean Reversion Motor - Overbought/oversold detection
-    5. Seasonality Motor - Calendar and time effects
-    6. Correlation Motor - Cross-asset relationships
-    7. Microstructure Motor - Order flow and market quality
-    """
-
-    def __init__(self):
-        self._cache: dict[str, dict[str, float]] = {}
-
-    def compute_all(
+    def compute(
         self,
         ticker: str,
-        ohlcv: dict[str, np.ndarray],
-        lookback: int = 20,
+        stock_close: np.ndarray,
+        benchmark_close: np.ndarray,
     ) -> dict[str, float]:
-        """Compute all seven motor features for a ticker."""
-        result = {}
+        """Compute relative strength features.
 
-        close = ohlcv.get("close", np.array([]))
-        volume = ohlcv.get("volume", np.array([]))
-        high = ohlcv.get("high", np.array([]))
-        low = ohlcv.get("low", np.array([]))
+        Args:
+            ticker: Stock ticker
+            stock_close: Stock closing prices
+            benchmark_close: Benchmark closing prices
 
-        if len(close) < lookback:
+        Returns:
+            Dict of feature_name -> value
+        """
+        result: dict[str, float] = {}
+
+        if len(stock_close) < 20 or len(benchmark_close) < 20:
             return result
 
-        # 1. Momentum Motor
-        returns = np.diff(np.log(close[-lookback:]))
-        result["motor_momentum"] = float(np.mean(returns)) if len(returns) > 0 else 0.0
-        result["motor_momentum_strength"] = float(abs(np.mean(returns))) if len(returns) > 0 else 0.0
+        # Relative strength (stock / benchmark ratio)
+        rs = stock_close / benchmark_close
+        rs = rs[~np.isnan(rs)]
+        if len(rs) < 5:
+            return result
 
-        # 2. Volatility Motor
-        result["motor_volatility"] = float(np.std(returns)) if len(returns) > 0 else 0.0
-        if len(returns) >= 2:
-            half = len(returns) // 2
-            vol_recent = np.std(returns[half:])
-            vol_older = np.std(returns[:half])
-            result["motor_vol_regime"] = float(vol_recent / vol_older) if vol_older > 1e-10 else 1.0
-        else:
-            result["motor_vol_regime"] = 1.0
+        # RS momentum (5d, 20d)
+        result["rs_5d"] = float((rs[-1] / rs[-5] - 1.0) * 100) if len(rs) >= 5 else 0.0
+        result["rs_20d"] = float((rs[-1] / rs[-20] - 1.0) * 100) if len(rs) >= 20 else 0.0
 
-        # 3. Volume Motor
-        if len(volume) >= lookback:
-            vol_arr = volume[-lookback:]
-            avg_vol = np.mean(vol_arr)
-            result["motor_volume_ratio"] = float(vol_arr[-1] / avg_vol) if avg_vol > 0 else 1.0
-            result["motor_volume_trend"] = float(np.polyfit(range(len(vol_arr)), vol_arr, 1)[0]) if len(vol_arr) > 1 else 0.0
-        else:
-            result["motor_volume_ratio"] = 1.0
-            result["motor_volume_trend"] = 0.0
+        # RS trend (linear regression slope)
+        if len(rs) >= 20:
+            x = np.arange(20)
+            slope = np.polyfit(x, rs[-20:], 1)[0]
+            result["rs_trend"] = float(slope)
 
-        # 4. Mean Reversion Motor
-        if len(close) >= lookback:
-            sma = np.mean(close[-lookback:])
-            result["motor_mean_reversion"] = float((close[-1] - sma) / sma) if sma > 0 else 0.0
-        else:
-            result["motor_mean_reversion"] = 0.0
-
-        # 5. Seasonality Motor (simplified)
-        result["motor_seasonality"] = 0.0  # Placeholder for calendar effects
-
-        # 6. Correlation Motor (simplified)
-        result["motor_correlation"] = 0.0  # Requires market index data
-
-        # 7. Microstructure Motor
-        if len(high) >= lookback and len(low) >= lookback:
-            hl_range = high[-lookback:] - low[-lookback:]
-            result["motor_spread"] = float(np.mean(hl_range / close[-lookback:])) if np.all(close[-lookback:] > 0) else 0.0
-        else:
-            result["motor_spread"] = 0.0
-
-        self._cache[ticker] = result
         return result
 
-    def get_cached(self, ticker: str) -> dict[str, float]:
-        """Get cached motor features."""
-        return self._cache.get(ticker, {})
+
+class SeasonalityMotor:
+    """Computes seasonality features based on historical patterns."""
+
+    def compute(
+        self,
+        ticker: str,
+        close_arr: np.ndarray,
+        dates_list: list | None = None,
+    ) -> dict[str, float]:
+        """Compute seasonality features.
+
+        Args:
+            ticker: Stock ticker
+            close_arr: Closing prices (at least 252 days)
+            dates_list: Optional list of dates for calendar effects
+
+        Returns:
+            Dict of feature_name -> value
+        """
+        result: dict[str, float] = {}
+
+        if len(close_arr) < 252:
+            return result
+
+        # Monthly returns pattern
+        returns = np.diff(np.log(close_arr))
+        if len(returns) < 20:
+            return result
+
+        # Recent vs historical momentum
+        ret_5d = float((close_arr[-1] / close_arr[-5] - 1.0) * 100) if len(close_arr) >= 5 else 0.0
+        ret_20d = float((close_arr[-1] / close_arr[-20] - 1.0) * 100) if len(close_arr) >= 20 else 0.0
+        ret_60d = float((close_arr[-1] / close_arr[-60] - 1.0) * 100) if len(close_arr) >= 60 else 0.0
+
+        result["seasonality_5d"] = ret_5d
+        result["seasonality_20d"] = ret_20d
+        result["seasonality_60d"] = ret_60d
+
+        # Volatility regime
+        vol_recent = float(np.std(returns[-20:])) if len(returns) >= 20 else 0.0
+        vol_hist = float(np.std(returns[-252:])) if len(returns) >= 252 else float(np.std(returns))
+        result["seasonality_vol_ratio"] = vol_recent / vol_hist if vol_hist > 1e-10 else 1.0
+
+        return result
 
 
-# Singleton
-seven_motors = SevenMotorsEngine()
+class MomentumMotor:
+    """Computes momentum features."""
+
+    def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        result: dict[str, float] = {}
+        if len(close) < lookback:
+            return result
+        returns = np.diff(np.log(close[-lookback:]))
+        result["momentum_mean"] = float(np.mean(returns))
+        result["momentum_std"] = float(np.std(returns))
+        return result
+
+
+class VolumeMotor:
+    """Computes volume-based features."""
+
+    def compute(self, ticker: str, volume: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        result: dict[str, float] = {}
+        if len(volume) < lookback:
+            return result
+        vol_arr = volume[-lookback:]
+        avg = np.mean(vol_arr)
+        result["volume_ratio"] = float(vol_arr[-1] / avg) if avg > 0 else 1.0
+        return result
+
+
+class VolatilityMotor:
+    """Computes volatility features."""
+
+    def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        result: dict[str, float] = {}
+        if len(close) < lookback:
+            return result
+        returns = np.diff(np.log(close[-lookback:]))
+        result["volatility"] = float(np.std(returns) * np.sqrt(252))
+        return result
+
+
+class MeanReversionMotor:
+    """Computes mean reversion features."""
+
+    def compute(self, ticker: str, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        result: dict[str, float] = {}
+        if len(close) < lookback:
+            return result
+        sma = np.mean(close[-lookback:])
+        result["mean_reversion"] = float((close[-1] - sma) / sma) if sma > 0 else 0.0
+        return result
+
+
+class MicrostructureMotor:
+    """Computes microstructure features."""
+
+    def compute(self, ticker: str, high: np.ndarray, low: np.ndarray, close: np.ndarray, lookback: int = 20) -> dict[str, float]:
+        result: dict[str, float] = {}
+        if len(close) < lookback:
+            return result
+        hl_range = high[-lookback:] - low[-lookback:]
+        result["spread"] = float(np.mean(hl_range / close[-lookback:])) if np.all(close[-lookback:] > 0) else 0.0
+        return result

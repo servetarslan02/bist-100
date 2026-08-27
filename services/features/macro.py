@@ -71,4 +71,4 @@ class MacroFeatureEngine:
 
 
 # Singleton
-macro_features = MacroFeatureEngine()
+macro_feature_engine = MacroFeatureEngine()
