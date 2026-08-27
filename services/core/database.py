@@ -91,8 +91,28 @@ async def get_pg_pool():
     return _pg_pool
 
 
+# Replica lag threshold (seconds) — lag bu değerin altındaysa replica kullanılır
+_REPLICA_LAG_THRESHOLD_SECONDS = 5
+
+
+async def _check_replica_lag(replica_conn) -> float | None:
+    """Check replica lag in seconds. Returns None if unable to determine."""
+    try:
+        lag = await replica_conn.fetchval(
+            "SELECT EXTRACT(EPOCH FROM (now() - pg_last_xact_replay_timestamp()))::float"
+        )
+        return lag
+    except Exception:
+        return None
+
+
 async def get_pg_replica_pool():
-    """Get or create REPLICA PostgreSQL connection pool (reads)."""
+    """Get or create REPLICA PostgreSQL connection pool (reads).
+    
+    Replica lag kontrolü yapar:
+    - Lag < threshold → replica kullan
+    - Lag >= threshold veya kontrol başarısız → primary fallback
+    """
     global _pg_replica_pool
     if asyncpg is None:
         raise RuntimeError("asyncpg not installed")
@@ -124,6 +144,92 @@ async def get_pg_replica_pool():
             logger.warning("Replica unavailable, using primary for reads", error=str(e))
             return await get_pg_pool()
     return _pg_replica_pool
+
+
+class DatabaseRouter:
+    """Read/write ayrımı ile connection routing.
+    
+    - write → always primary
+    - read → replica (lag kontrolü ile), primary fallback
+    """
+
+    async def get_write_conn(self):
+        """Yazma işlemleri için primary connection."""
+        pool = await get_pg_pool()
+        return await pool.acquire()
+
+    async def get_read_conn(self):
+        """Okuma işlemleri için replica connection (lag kontrolü ile)."""
+        replica_host = getattr(settings, "postgres_replica_host", None)
+        if not replica_host:
+            pool = await get_pg_pool()
+            return await pool.acquire()
+
+        pool = await get_pg_replica_pool()
+        conn = await pool.acquire()
+
+        lag = await _check_replica_lag(conn)
+        if lag is not None and lag >= _REPLICA_LAG_THRESHOLD_SECONDS:
+            logger.warning(
+                "Replica lag too high, falling back to primary",
+                lag_seconds=lag,
+                threshold=_REPLICA_LAG_THRESHOLD_SECONDS,
+            )
+            await pool.release(conn)
+            pool = await get_pg_pool()
+            return await pool.acquire()
+
+        return conn
+
+    @asynccontextmanager
+    async def read(self):
+        """Context manager for read operations."""
+        conn = await self.get_read_conn()
+        try:
+            yield conn
+        finally:
+            await self._release(conn)
+
+    @asynccontextmanager
+    async def write(self):
+        """Context manager for write operations."""
+        conn = await self.get_write_conn()
+        try:
+            yield conn
+        finally:
+            await self._release(conn)
+
+    @asynccontextmanager
+    async def write_transaction(self):
+        """Context manager for write operations with transaction."""
+        conn = await self.get_write_conn()
+        try:
+            async with conn.transaction():
+                yield conn
+        finally:
+            await self._release(conn)
+
+    async def _release(self, conn):
+        """Release connection back to appropriate pool."""
+        try:
+            # Determine which pool this connection belongs to
+            replica_host = getattr(settings, "postgres_replica_host", None)
+            if replica_host:
+                replica_pool = await get_pg_replica_pool()
+                primary_pool = await get_pg_pool()
+                try:
+                    await replica_pool.release(conn)
+                except Exception:
+                    await primary_pool.release(conn)
+            else:
+                pool = await get_pg_pool()
+                await pool.release(conn)
+        except Exception as e:
+            logger.warning("Error releasing connection", error=str(e))
+
+
+# Global router instance
+db_router = DatabaseRouter()
 
 
 async def close_pg_pool():

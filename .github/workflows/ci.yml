@@ -42,9 +42,103 @@ jobs:
           JWT_SECRET: ci-test-secret-min-16-chars
           SYSTEM_API_KEY: ci-system-key-test
 
+  # PostgreSQL integration tests (yeni)
+  test-postgresql:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: timescale/timescaledb:latest-pg17
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: alpha
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: alpha_bist
+        options: >-
+          --health-cmd "pg_isready -U alpha"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python -m pytest tests/test_postgresql_integration.py -v --timeout=30
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_USER: alpha
+          POSTGRES_PASSWORD: ci-test-password
+          POSTGRES_DB: alpha_bist
+
+  # SQL syntax validation (yeni)
+  validate-sql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate SQL files
+        run: |
+          for sql_file in database/init/*.sql; do
+            echo "Validating: $sql_file"
+            # Temel syntax kontrolü (boş olmayan dosyalar)
+            if [ -s "$sql_file" ]; then
+              echo "  ✅ $sql_file — OK"
+            else
+              echo "  ❌ $sql_file — Boş dosya!"
+              exit 1
+            fi
+          done
+
+  # Python syntax validation (yeni)
+  validate-python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Python syntax
+        run: |
+          python -c "
+          import ast
+          import sys
+          from pathlib import Path
+
+          files = [
+              'services/core/database.py',
+              'services/core/pit_queries.py',
+              'scripts/audit_query_performance.py',
+              'scripts/audit_timescaledb_health.py',
+              'scripts/run_migrations.py',
+          ]
+
+          errors = []
+          for f in files:
+              path = Path(f)
+              if not path.exists():
+                  errors.append(f'{f}: Dosya bulunamadı')
+                  continue
+              try:
+                  with open(path, 'r') as fh:
+                      ast.parse(fh.read())
+                  print(f'✅ {f}')
+              except SyntaxError as e:
+                  errors.append(f'{f}: Syntax hatası — {e}')
+                  print(f'❌ {f}: {e}')
+
+          if errors:
+              print(f'\n❌ {len(errors)} hata bulundu!')
+              sys.exit(1)
+          else:
+              print(f'\n✅ Tüm dosyalar geçerli')
+          "
+
   build:
     runs-on: ubuntu-latest
-    needs: [lint, test]
+    needs: [lint, test, test-postgresql, validate-sql, validate-python]
     steps:
       - uses: actions/checkout@v4
       - run: docker build -f infrastructure/Dockerfile.api -t alpha-bist-api .

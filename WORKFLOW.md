@@ -70,6 +70,24 @@ ruff check services/ --select E,F,W
 
 # Test çalıştırma
 python -m pytest tests/ -x --timeout=30 -q --tb=short
+
+# PostgreSQL integration testleri
+python -m pytest tests/test_postgresql_integration.py -v
+
+# Migration çalıştırma (dry-run)
+python scripts/run_migrations.py --dry-run
+
+# Migration çalıştırma
+python scripts/run_migrations.py
+
+# Migration durumu
+python scripts/run_migrations.py --status
+
+# Query performance audit
+python scripts/audit_query_performance.py
+
+# TimescaleDB health audit
+python scripts/audit_timescaledb_health.py
 ```
 
 ---
