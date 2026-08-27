@@ -739,6 +739,339 @@ class LightGBMTrainer:
 
 
 # =====================================================
+# HYPERPARAMETER OPTIMIZATION INTEGRATION
+# =====================================================
+
+
+def optimize_hyperparameters(
+    features_map: dict[str, dict[str, Any]],
+    returns: dict[str, float],
+    date_groups: dict[str, str],
+    feature_names: list[str],
+    n_trials: int = 20,
+) -> dict[str, Any]:
+    """Optuna ile LightGBM hyperparameter optimizasyonu.
+
+    TimeSeriesSplit kullanarak temporal cross-validation yapar.
+    En iyi parametreleri döndürür.
+
+    Args:
+        features_map: Feature değerleri
+        returns: Gerçek getiriler
+        date_groups: Tarih grupları
+        feature_names: Feature isimleri
+        n_trials: Optuna deneme sayısı
+
+    Returns:
+        En iyi hyperparameter dict
+    """
+    try:
+        from .hyper_optimizer import HyperOptimizer
+    except ImportError:
+        logger.warning("HyperOptimizer not available")
+        return {}
+
+    trainer = LightGBMTrainer()
+    X, y, _, tickers = trainer._prepare_data(features_map, returns, date_groups, feature_names)
+
+    if len(X) < 100:
+        logger.warning("Insufficient data for hyperparameter optimization", samples=len(X))
+        return {}
+
+    # Impute
+    impute_values = trainer._compute_impute_values(X, feature_names)
+    X = trainer._impute(X, impute_values)
+
+    optimizer = HyperOptimizer(n_trials=n_trials)
+    best_params = optimizer.optimize(X, y, feature_names)
+
+    logger.info("Hyperparameter optimization completed", trials=n_trials, best_params=best_params)
+    return best_params
+
+
+# =====================================================
+# CALIBRATION INTEGRATION
+# =====================================================
+
+
+def calibrate_model(
+    model: TrainedModel,
+    X_val: np.ndarray,
+    y_val: np.ndarray,
+    regime: str = "UNKNOWN",
+) -> dict[str, Any]:
+    """Eğitilmiş modeli kalibre et.
+
+    Platt scaling ve isotonic regression ile confidence kalibrasyonu yapar.
+    Brier score ve ECE hesaplar.
+
+    Args:
+        model: Eğitilmiş TrainedModel
+        X_val: Validation features
+        y_val: Validation targets
+        regime: Piyasa rejimi
+
+    Returns:
+        Kalibrasyon sonuçları dict
+    """
+    try:
+        from .calibration import ModelCalibration
+    except ImportError:
+        logger.warning("ModelCalibration not available")
+        return {}
+
+    if model.model is None:
+        return {}
+
+    # Prediction'ları al
+    y_pred = model.model.predict(X_val)
+
+    # Binary target'a çevir (y > 0 → positive)
+    y_binary = (y_val > 0).astype(int)
+
+    calibrator = ModelCalibration()
+
+    # Platt scaling
+    platt_result = calibrator.platt_scale(y_pred, y_binary)
+
+    # Isotonic regression
+    isotonic_result = calibrator.isotonic_calibrate(y_pred, y_binary)
+
+    # Brier score
+    brier = calibrator.brier_score(y_pred, y_binary)
+
+    # ECE
+    ece = calibrator.expected_calibration_error(y_pred, y_binary)
+
+    result = {
+        "platt_coefficients": platt_result,
+        "isotonic_result": isotonic_result,
+        "brier_score": brier,
+        "ece": ece,
+        "regime": regime,
+        "n_samples": len(y_val),
+    }
+
+    logger.info(
+        "Model calibration completed",
+        brier=round(brier, 4) if brier else None,
+        ece=round(ece, 4) if ece else None,
+        regime=regime,
+    )
+    return result
+
+
+# =====================================================
+# FEATURE DRIFT CHECK INTEGRATION
+# =====================================================
+
+
+def check_feature_drift(
+    current_importance: dict[str, float],
+    historical_importance: dict[str, float],
+    current_features: dict[str, np.ndarray],
+    baseline_features: dict[str, np.ndarray],
+) -> dict[str, Any]:
+    """Feature drift kontrolü yap.
+
+    SHAP importance trendi ve PSI (Population Stability Index) hesaplar.
+
+    Args:
+        current_importance: Mevcut feature importance
+        historical_importance: Tarihsel feature importance
+        current_features: Mevcut feature değerleri
+        baseline_features: Tarihsel feature değerleri
+
+    Returns:
+        Drift raporu dict
+    """
+    try:
+        from .feature_drift import FeatureDriftDetector
+    except ImportError:
+        logger.warning("FeatureDriftDetector not available")
+        return {}
+
+    detector = FeatureDriftDetector()
+
+    # Feature importance drift
+    importance_drift = detector.detect_importance_drift(
+        current_importance, historical_importance
+    )
+
+    # PSI hesapla
+    psi_results = {}
+    for fname in current_features:
+        if fname in baseline_features:
+            psi = detector.compute_psi(
+                baseline_features[fname], current_features[fname]
+            )
+            psi_results[fname] = psi
+
+    # Drift summary
+    drifted = [f for f, p in psi_results.items() if p > 0.2]
+    alert = [f for f, p in psi_results.items() if p > 0.25]
+
+    result = {
+        "importance_drift": importance_drift,
+        "psi_results": psi_results,
+        "drifted_features": drifted,
+        "alert_features": alert,
+        "total_features": len(psi_results),
+        "drift_score": float(np.mean(list(psi_results.values()))) if psi_results else 0.0,
+    }
+
+    logger.info(
+        "Feature drift check completed",
+        drifted=len(drifted),
+        alerts=len(alert),
+        drift_score=round(result["drift_score"], 4),
+    )
+    return result
+
+
+# =====================================================
+# OUT-OF-FOLD PREDICTIONS
+# =====================================================
+
+
+def compute_oof_predictions(
+    features_map: dict[str, dict[str, Any]],
+    returns: dict[str, float],
+    date_groups: dict[str, str],
+    feature_names: list[str],
+    n_folds: int = 5,
+    config: MLModelConfig | None = None,
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Out-of-fold (OOF) predictions hesapla.
+
+    Walk-forward benzeri temporal cross-validation ile her sample için
+    OOF prediction üretir. Bu, modelin gerçek performansını ölçmek için
+    kullanılır.
+
+    Args:
+        features_map: Feature değerleri
+        returns: Gerçek getiriler
+        date_groups: Tarih grupları
+        feature_names: Feature isimleri
+        n_folds: Fold sayısı
+        config: Model konfigürasyonu
+
+    Returns:
+        (oof_predictions, oof_targets, oof_tickers) tuple
+    """
+    config = config or MLModelConfig()
+    trainer = LightGBMTrainer(config)
+
+    X, y, _, tickers = trainer._prepare_data(features_map, returns, date_groups, feature_names)
+
+    if len(X) < 100:
+        logger.warning("Insufficient data for OOF", samples=len(X))
+        return np.array([]), np.array([]), []
+
+    # Impute
+    impute_values = trainer._compute_impute_values(X, feature_names)
+    X = trainer._impute(X, impute_values)
+
+    # Unique tarihleri sırala
+    unique_dates = sorted(set(date_groups.values()))
+    n_dates = len(unique_dates)
+    fold_size = n_dates // n_folds
+
+    oof_predictions = np.full(len(X), np.nan)
+    oof_targets = y.copy()
+
+    for fold in range(n_folds):
+        # Test tarihleri
+        test_start = fold * fold_size
+        test_end = min((fold + 1) * fold_size, n_dates)
+        test_dates = set(unique_dates[test_start:test_end])
+
+        # Train tarihleri (test öncesi, purge ile)
+        purge = max(config.purge_gap_days, config.target_horizon)
+        train_end = max(0, test_start - purge)
+        train_dates = set(unique_dates[:train_end])
+
+        if len(train_dates) < 20:
+            continue
+
+        # Split
+        train_idx = [i for i, t in enumerate(tickers) if date_groups.get(t) in train_dates]
+        test_idx = [i for i, t in enumerate(tickers) if date_groups.get(t) in test_dates]
+
+        if len(train_idx) < 20 or len(test_idx) < 5:
+            continue
+
+        # Scale (train'den öğren)
+        X_train = X[train_idx]
+        X_test = X[test_idx]
+        scaler_mean = np.mean(X_train, axis=0)
+        scaler_std = np.std(X_train, axis=0)
+        scaler_std[scaler_std == 0] = 1.0
+        X_train_s = (X_train - scaler_mean) / scaler_std
+        X_test_s = (X_test - scaler_mean) / scaler_std
+
+        # Train LightGBM
+        try:
+            import lightgbm as lgb
+
+            # Rank labels
+            y_rank = np.zeros(len(y), dtype=int)
+            for d in unique_dates:
+                indices = [i for i, t in enumerate(tickers) if date_groups.get(t) == d]
+                if len(indices) > 1:
+                    group_returns = [y[i] for i in indices]
+                    sorted_idx = sorted(range(len(group_returns)), key=lambda k: -group_returns[k])
+                    for rank, idx in enumerate(sorted_idx):
+                        y_rank[indices[idx]] = rank
+
+            train_groups = trainer._compute_groups_from_indices(date_groups, tickers, train_idx)
+
+            ds_train = lgb.Dataset(
+                X_train_s, label=y_rank[train_idx], group=train_groups, feature_name=feature_names
+            )
+
+            params = {
+                "objective": config.objective,
+                "metric": config.metric,
+                "learning_rate": config.learning_rate,
+                "num_leaves": config.num_leaves,
+                "min_data_in_leaf": config.min_data_in_leaf,
+                "feature_fraction": config.feature_fraction,
+                "bagging_fraction": config.bagging_fraction,
+                "bagging_freq": config.bagging_freq,
+                "verbose": -1,
+                "seed": 42,
+                "deterministic": True,
+            }
+
+            model = lgb.train(
+                params,
+                ds_train,
+                num_boost_round=config.num_boost_round,
+                callbacks=[lgb.log_evaluation(period=0)],
+            )
+
+            # OOF predictions
+            preds = model.predict(X_test_s)
+            for i, idx in enumerate(test_idx):
+                oof_predictions[idx] = preds[i]
+
+        except Exception as e:
+            logger.warning(f"OOF fold {fold} failed", error=str(e))
+            continue
+
+    valid_mask = ~np.isnan(oof_predictions)
+    n_valid = int(valid_mask.sum())
+    logger.info(
+        "OOF predictions computed",
+        folds=n_folds,
+        valid_predictions=n_valid,
+        total=len(oof_predictions),
+    )
+    return oof_predictions, oof_targets, tickers
+
+
+# =====================================================
 # FEATURE CONTRACT VALIDATION
 # =====================================================
 
