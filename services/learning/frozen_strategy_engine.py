@@ -18,19 +18,19 @@ Fold Sonuçları (Train/Val üzerinde kanıtlanmış):
 UYARI: Bu parametre seti Final Holdout verisi kullanılarak SEÇİLMEMİŞTİR.
 """
 
+from datetime import timedelta
+from typing import Any
+
 import numpy as np
 import polars as pl
-from datetime import timedelta
-from typing import Dict, List, Any
+import structlog
 
 from services.learning.institutional_walkforward_engine import (
-    load_all_market_data,
-    extract_point_in_time_features,
     ModelTrainer,
+    extract_point_in_time_features,
+    load_all_market_data,
 )
 from services.learning.upside_capture_validator import detect_market_regime_v2
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -90,12 +90,12 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     Final Holdout veya Train/Validation fark etmeksizin aynı parametrelerle çalışır.
     """
     portfolio_cash = initial_capital
-    positions: Dict[str, Dict[str, Any]] = {}
+    positions: dict[str, dict[str, Any]] = {}
     equity_curve = []
     daily_rets = []
     holding_periods = []
     daily_exposures = []
-    monthly_perf: Dict[str, Dict[str, float]] = {}
+    monthly_perf: dict[str, dict[str, float]] = {}
 
     regime_pnl = {r: {"pnl": 0.0, "trades": 0, "wins": 0} for r in [
         "BULL_TREND", "BEAR_MARKET", "SIDEWAYS_RANGE", "HIGH_VOLATILITY",
@@ -108,8 +108,8 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     losses_count = 0
     gross_win_pnl = 0.0
     gross_loss_pnl = 0.0
-    smoothed_scores: Dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
-    pending_evals: List[Dict[str, Any]] = []
+    smoothed_scores: dict[str, float] = {tk: 0.0 for tk in features_by_ticker}
+    pending_evals: list[dict[str, Any]] = []
     completed_wins = {m: 0 for m in MODELS}
     completed_totals = {m: 0 for m in MODELS}
 
@@ -207,17 +207,9 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
             )
 
             should_exit = False
-            if pnl_pct <= FROZEN_PARAMS["hard_stop_pct"]:
-                should_exit = True
-            elif (pos["highest_price"] > pos["entry_price"] * 1.06 and
-                  cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)):
-                should_exit = True
-            elif pnl_pct >= FROZEN_PARAMS["take_profit_pct"]:
-                should_exit = True
-            elif (pos["days_held"] >= FROZEN_PARAMS["min_hold_days"] and
-                  smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]):
-                should_exit = True
-            elif pos["days_held"] >= FROZEN_PARAMS["max_hold_days"]:
+            if pnl_pct <= FROZEN_PARAMS["hard_stop_pct"] or (pos["highest_price"] > pos["entry_price"] * 1.06 and
+                  cur_p < pos["highest_price"] * (1.0 - atr_buffer / 100.0)) or pnl_pct >= FROZEN_PARAMS["take_profit_pct"] or (pos["days_held"] >= FROZEN_PARAMS["min_hold_days"] and
+                  smoothed_scores[tk] < FROZEN_PARAMS["signal_reversal_thresh"]) or pos["days_held"] >= FROZEN_PARAMS["max_hold_days"]:
                 should_exit = True
 
             if should_exit:
@@ -370,7 +362,7 @@ def run_frozen_strategy(eval_dates, features_by_ticker, xu100_close,
     }
 
 
-def print_full_report(m: Dict[str, Any]):
+def print_full_report(m: dict[str, Any]):
     logger.info(f"\n{'='*65}")
     logger.info(f"🏆 {m['label']} — SONUÇ RAPORU")
     logger.info(f"{'='*65}")

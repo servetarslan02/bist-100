@@ -10,9 +10,10 @@ Senaryo analizi ve stres testleri:
 FAZ 6.1-6.3: Scenario & Stress Test Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -41,7 +42,7 @@ class AssetImpact:
     current_price: float
     estimated_impact_pct: float
     estimated_price: float
-    impact_breakdown: Dict[str, float]
+    impact_breakdown: dict[str, float]
 
 
 @dataclass
@@ -50,9 +51,9 @@ class ScenarioResult:
     scenario: ScenarioInput
     portfolio_impact_pct: float
     portfolio_impact_value: float
-    asset_impacts: List[AssetImpact]
-    sector_impacts: Dict[str, float]
-    risk_change: Dict[str, float]
+    asset_impacts: list[AssetImpact]
+    sector_impacts: dict[str, float]
+    risk_change: dict[str, float]
 
 
 @dataclass
@@ -145,8 +146,8 @@ class ScenarioEngine:
     def run_scenario(
         self,
         scenario: ScenarioInput,
-        positions: List[Dict[str, Any]],
-        sector_sensitivity: Optional[Any] = None,
+        positions: list[dict[str, Any]],
+        sector_sensitivity: Any | None = None,
     ) -> ScenarioResult:
         """Senaryo çalıştır.
 
@@ -156,7 +157,7 @@ class ScenarioEngine:
             sector_sensitivity: MacroSensitivityEngine instance
         """
         asset_impacts = []
-        sector_impacts: Dict[str, List[float]] = {}
+        sector_impacts: dict[str, list[float]] = {}
 
         macro_shocks = {
             "usdtry_change": scenario.usdtry_change,
@@ -239,8 +240,8 @@ class ScenarioEngine:
     def _simplified_impact(
         self,
         sector: str,
-        shocks: Dict[str, float],
-        custom_sensitivity: Optional[Dict[str, Dict[str, float]]] = None,
+        shocks: dict[str, float],
+        custom_sensitivity: dict[str, dict[str, float]] | None = None,
     ) -> float:
         """Basitleştirilmiş sektör etkisi (sensitivity engine yokken).
 
@@ -257,10 +258,10 @@ class ScenarioEngine:
 
     def run_stress_test(
         self,
-        positions: List[Dict[str, Any]],
-        scenarios: Dict[str, ScenarioInput],
-        sector_sensitivity: Optional[Any] = None,
-    ) -> List[StressTestResult]:
+        positions: list[dict[str, Any]],
+        scenarios: dict[str, ScenarioInput],
+        sector_sensitivity: Any | None = None,
+    ) -> list[StressTestResult]:
         """Stres testi çalıştır."""
         results = []
 
@@ -284,11 +285,11 @@ class ScenarioEngine:
 
     def find_breaking_point(
         self,
-        positions: List[Dict[str, Any]],
+        positions: list[dict[str, Any]],
         variable: str,
         max_change: float = 1.0,
         loss_threshold_pct: float = 20.0,
-        sector_sensitivity: Optional[Any] = None,
+        sector_sensitivity: Any | None = None,
         support_negative: bool = True,  # F-019: Negatif şok desteği
     ) -> BreakingPoint:
         """Kırılma noktası bul.

@@ -4,12 +4,14 @@ ALPHA BIST — Feature Pipeline & Store Orchestrator
 ve Feature Store senkronizasyonunu yönetir.
 """
 
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-import polars as pl
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
+import polars as pl
 import structlog
+
 from .store import feature_store
 
 logger = structlog.get_logger()
@@ -21,7 +23,7 @@ class PipelineConfig:
     drift_threshold: float = 0.25
     enable_drift_detection: bool = True
     save_to_store: bool = True
-    target_horizons: List[int] = field(default_factory=lambda: [1, 5, 10, 20])
+    target_horizons: list[int] = field(default_factory=lambda: [1, 5, 10, 20])
 
 
 @dataclass
@@ -29,26 +31,26 @@ class PipelineResult:
     """Pipeline çalıştırma sonucu."""
     ticker: str
     feature_count: int
-    drift_report: Optional[Dict[str, Any]] = None
-    target_features: Dict[str, float] = field(default_factory=dict)
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    drift_report: dict[str, Any] | None = None
+    target_features: dict[str, float] = field(default_factory=dict)
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class FeaturePipeline:
     """End-to-end Feature Pipeline motoru."""
 
-    def __init__(self, config: Optional[PipelineConfig] = None):
+    def __init__(self, config: PipelineConfig | None = None):
         self.config = config or PipelineConfig()
-        self._reference_stats: Dict[str, Dict[str, float]] = {}
+        self._reference_stats: dict[str, dict[str, float]] = {}
 
     async def run(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        ohlcv_df: Optional[Any] = None,
+        features: dict[str, Any],
+        ohlcv_df: Any | None = None,
     ) -> PipelineResult:
         """Pipeline adımlarını yürüt: Zenginleştirme, Hedef Kolonlar, Store ve Drift."""
-        clean_features: Dict[str, float] = {}
+        clean_features: dict[str, float] = {}
         for k, v in features.items():
             if isinstance(v, (int, float)) and not np.isnan(v) and not np.isinf(v):
                 clean_features[k] = float(v)
@@ -80,9 +82,9 @@ class FeaturePipeline:
             target_features=target_features,
         )
 
-    def _compute_target_features(self, features: Dict[str, float], ohlcv_df: Any) -> Dict[str, float]:
+    def _compute_target_features(self, features: dict[str, float], ohlcv_df: Any) -> dict[str, float]:
         """Gelecek ve geçmiş getiri hedeflerini (return_5d, return_20d vb.) hesaplar."""
-        targets: Dict[str, float] = {}
+        targets: dict[str, float] = {}
         try:
             if ohlcv_df is not None:
                 # DataFrame desteği (polars veya pandas)
@@ -119,17 +121,17 @@ class FeaturePipeline:
 
         return targets
 
-    def _compute_bist_features(self, ticker: str, features: Dict[str, float]) -> Dict[str, float]:
+    def _compute_bist_features(self, ticker: str, features: dict[str, float]) -> dict[str, float]:
         """BIST-specific feature'ları hesapla.
 
         market_session_fsm ve auto_circuit_breaker'dan gerçek zamanlı durum bilgisi alır.
         """
-        bist: Dict[str, float] = {}
+        bist: dict[str, float] = {}
         try:
-            from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
             from services.core.auto_circuit_breaker import auto_circuit_breaker
-            from services.core.short_selling import short_selling_monitor
             from services.core.gross_settlement import gross_settlement_monitor
+            from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
+            from services.core.short_selling import short_selling_monitor
 
             # Seans fazı features
             phase = bist_session_fsm.get_phase(ticker=ticker)
@@ -168,7 +170,7 @@ class FeaturePipeline:
 
         return bist
 
-    def _check_drift(self, ticker: str, current_features: Dict[str, float]) -> Dict[str, Any]:
+    def _check_drift(self, ticker: str, current_features: dict[str, float]) -> dict[str, Any]:
         """Referans istatistikler ile mevcut özellikler arasındaki drift kontrolü."""
         if ticker not in self._reference_stats:
             self._reference_stats[ticker] = {

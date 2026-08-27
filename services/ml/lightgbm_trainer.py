@@ -12,11 +12,11 @@ FAZ 4.4 değişiklikleri:
 """
 
 import os
-import pickle
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -31,7 +31,7 @@ class MLModelConfig:
     """LightGBM model konfigürasyonu."""
     objective: str = "regression"
     metric: str = "rmse"
-    ndcg_eval_at: List[int] = field(default_factory=lambda: [5, 10, 20])
+    ndcg_eval_at: list[int] = field(default_factory=lambda: [5, 10, 20])
     learning_rate: float = 0.05
     num_leaves: int = 31
     min_data_in_leaf: int = 20
@@ -61,26 +61,26 @@ class MLModelConfig:
 class TrainedModel:
     """Eğitilmiş model wrapper'ı."""
     model: Any
-    feature_names: List[str]
-    scaler_mean: Optional[np.ndarray] = None
-    scaler_std: Optional[np.ndarray] = None
-    impute_values: Optional[Dict[str, float]] = None
-    train_date_range: Tuple[str, str] = ("", "")
+    feature_names: list[str]
+    scaler_mean: np.ndarray | None = None
+    scaler_std: np.ndarray | None = None
+    impute_values: dict[str, float] | None = None
+    train_date_range: tuple[str, str] = ("", "")
     train_samples: int = 0
     validation_score: float = 0.0
-    feature_importance: Dict[str, float] = field(default_factory=dict)
+    feature_importance: dict[str, float] = field(default_factory=dict)
     trained_at: str = ""
-    config: Optional[MLModelConfig] = None
+    config: MLModelConfig | None = None
 
     # FAZ 4.3-4.4: Kalıcı metadata (pickle ile saklanır)
-    validation_metrics: Dict[str, float] = field(default_factory=dict)
+    validation_metrics: dict[str, float] = field(default_factory=dict)
     confidence_score: float = 0.0
-    confidence_details: Dict[str, Any] = field(default_factory=dict)
-    fallback_reason: Optional[str] = None
+    confidence_details: dict[str, Any] = field(default_factory=dict)
+    fallback_reason: str | None = None
     target_horizon: int = 5
-    cs_features: List[str] = field(default_factory=list)  # CS-normalized feature names
+    cs_features: list[str] = field(default_factory=list)  # CS-normalized feature names
 
-    def predict(self, features: Dict[str, Any]) -> float:
+    def predict(self, features: dict[str, Any]) -> float:
         if self.model is None:
             raise ValueError("Model eğitilmemiş")
         vec = self._feature_vector(features)
@@ -88,14 +88,14 @@ class TrainedModel:
         result = float(pred[0])
         return result if np.isfinite(result) else 0.0
 
-    def predict_batch(self, features_list: List[Dict[str, Any]]) -> List[float]:
+    def predict_batch(self, features_list: list[dict[str, Any]]) -> list[float]:
         if self.model is None:
             raise ValueError("Model eğitilmemiş")
         vecs = [self._feature_vector(f) for f in features_list]
         preds = self.model.predict(np.array(vecs))
         return [float(p) if np.isfinite(p) else 0.0 for p in preds]
 
-    def _feature_vector(self, features: Dict[str, Any]) -> List[float]:
+    def _feature_vector(self, features: dict[str, Any]) -> list[float]:
         vec = []
         for name in self.feature_names:
             val = features.get(name)
@@ -131,15 +131,15 @@ class MultiHorizonModel:
     predict() varsayılan horizon'a (primary) delegasyon yapar.
     horizon_models dict'i ile tüm horizon'lara erişilebilir.
     """
-    horizon_models: Dict[int, TrainedModel] = field(default_factory=dict)
+    horizon_models: dict[int, TrainedModel] = field(default_factory=dict)
     primary_horizon: int = 5
-    cs_features: List[str] = field(default_factory=list)
+    cs_features: list[str] = field(default_factory=list)
 
     @property
-    def primary_model(self) -> Optional[TrainedModel]:
+    def primary_model(self) -> TrainedModel | None:
         return self.horizon_models.get(self.primary_horizon)
 
-    def predict(self, features: Dict[str, Any]) -> float:
+    def predict(self, features: dict[str, Any]) -> float:
         """Varsayılan horizon prediction."""
         m = self.primary_model
         if m is None:
@@ -149,7 +149,7 @@ class MultiHorizonModel:
         except (ValueError, Exception):
             return 0.0
 
-    def predict_horizon(self, features: Dict[str, Any], horizon: int) -> float:
+    def predict_horizon(self, features: dict[str, Any], horizon: int) -> float:
         """Belirli horizon prediction."""
         m = self.horizon_models.get(horizon)
         if m is None:
@@ -159,12 +159,12 @@ class MultiHorizonModel:
         except (ValueError, Exception):
             return 0.0
 
-    def get_all_predictions(self, features: Dict[str, Any]) -> Dict[int, float]:
+    def get_all_predictions(self, features: dict[str, Any]) -> dict[int, float]:
         """Tüm horizon'lar için prediction."""
         return {h: m.predict(features) for h, m in self.horizon_models.items()}
 
     @property
-    def available_horizons(self) -> List[int]:
+    def available_horizons(self) -> list[int]:
         return sorted(self.horizon_models.keys())
 
     @property
@@ -179,7 +179,7 @@ class MultiHorizonModel:
         return m.train_samples if m else 0
 
     @property
-    def train_date_range(self) -> Tuple[str, str]:
+    def train_date_range(self) -> tuple[str, str]:
         """Primary model'in train date range."""
         m = self.primary_model
         return m.train_date_range if m else ("", "")
@@ -190,7 +190,7 @@ class MultiHorizonModel:
         return m.validation_score if m else 0.0
 
     @property
-    def validation_metrics(self) -> Dict[str, float]:
+    def validation_metrics(self) -> dict[str, float]:
         m = self.primary_model
         return m.validation_metrics if m else {}
 
@@ -200,7 +200,7 @@ class MultiHorizonModel:
         return m.confidence_score if m else 0.0
 
     @property
-    def feature_names(self) -> List[str]:
+    def feature_names(self) -> list[str]:
         m = self.primary_model
         return m.feature_names if m else []
 
@@ -228,7 +228,7 @@ DEFAULT_TARGETS = [
 ]
 
 
-def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> Optional[float]:
+def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> float | None:
     target_idx = idx + spec.horizon
     if target_idx >= len(close):
         return None
@@ -248,7 +248,7 @@ def compute_target(close: np.ndarray, idx: int, spec: TargetSpec) -> Optional[fl
 # VALIDATION METRICS
 # =====================================================
 
-def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
+def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict[str, float]:
     defaults = {
         "mae": 0.0, "rmse": 0.0, "r_squared": 0.0,
         "directional_accuracy": 0.0, "ic": 0.0,
@@ -332,13 +332,13 @@ def compute_comprehensive_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dic
 # =====================================================
 
 def compute_model_confidence(
-    validation_metrics: Dict[str, float],
+    validation_metrics: dict[str, float],
     train_samples: int,
     feature_count: int,
     train_regime: str = "UNKNOWN",
     current_regime: str = "UNKNOWN",
-) -> Tuple[float, Dict[str, Any]]:
-    details: Dict[str, Any] = {"degradation_reasons": []}
+) -> tuple[float, dict[str, Any]]:
+    details: dict[str, Any] = {"degradation_reasons": []}
     confidence = 1.0
 
     if train_samples < 100:
@@ -399,17 +399,17 @@ def compute_model_confidence(
 class LightGBMTrainer:
     """LightGBM training pipeline v3.0 — date-space purge, multi-horizon."""
 
-    def __init__(self, config: Optional[MLModelConfig] = None):
+    def __init__(self, config: MLModelConfig | None = None):
         self._config = config or MLModelConfig()
 
     def train(
         self,
-        features_map: Dict[str, Dict[str, Any]],
-        returns: Dict[str, float],
-        date_groups: Dict[str, str],
-        feature_names: Optional[List[str]] = None,
+        features_map: dict[str, dict[str, Any]],
+        returns: dict[str, float],
+        date_groups: dict[str, str],
+        feature_names: list[str] | None = None,
         regime: str = "UNKNOWN",
-    ) -> Optional[TrainedModel]:
+    ) -> TrainedModel | None:
         """LightGBM modeli eğit — date-space purge gap ile.
 
         purge_gap_days artık gerçek tarih gününde çalışır:
@@ -578,7 +578,7 @@ class LightGBMTrainer:
 
         # Feature importance
         importance = model.feature_importance(importance_type="gain")
-        feature_importance = {name: float(imp) for name, imp in zip(feature_names, importance)}
+        feature_importance = {name: float(imp) for name, imp in zip(feature_names, importance, strict=False)}
 
         # Date range (sadece train tarihleri)
         train_date_strings = sorted(train_dates)
@@ -599,7 +599,7 @@ class LightGBMTrainer:
             train_samples=len(train_indices),
             validation_score=round(val_score, 4),
             feature_importance=feature_importance,
-            trained_at=datetime.now(timezone.utc).isoformat(),
+            trained_at=datetime.now(UTC).isoformat(),
             config=self._config,
             validation_metrics=validation_metrics,
             confidence_score=confidence,
@@ -621,11 +621,11 @@ class LightGBMTrainer:
 
     def _prepare_data(
         self,
-        features_map: Dict[str, Dict[str, Any]],
-        returns: Dict[str, float],
-        date_groups: Dict[str, str],
-        feature_names: List[str],
-    ) -> Tuple[np.ndarray, np.ndarray, List[int], List[str]]:
+        features_map: dict[str, dict[str, Any]],
+        returns: dict[str, float],
+        date_groups: dict[str, str],
+        feature_names: list[str],
+    ) -> tuple[np.ndarray, np.ndarray, list[int], list[str]]:
         X, y, tickers = [], [], []
         sorted_keys = sorted(features_map.keys(), key=lambda k: date_groups.get(k, ""))
         for key in sorted_keys:
@@ -648,7 +648,7 @@ class LightGBMTrainer:
             tickers.append(key)
         return np.array(X), np.array(y), [], tickers
 
-    def _compute_impute_values(self, X: np.ndarray, feature_names: List[str]) -> Dict[str, float]:
+    def _compute_impute_values(self, X: np.ndarray, feature_names: list[str]) -> dict[str, float]:
         impute = {}
         for i, name in enumerate(feature_names):
             col = X[:, i]
@@ -659,7 +659,7 @@ class LightGBMTrainer:
                 impute[name] = 0.0
         return impute
 
-    def _impute(self, X: np.ndarray, impute_values: Dict[str, float]) -> np.ndarray:
+    def _impute(self, X: np.ndarray, impute_values: dict[str, float]) -> np.ndarray:
         X_imputed = X.copy()
         for i in range(X.shape[1]):
             mask = np.isnan(X_imputed[:, i])
@@ -669,8 +669,8 @@ class LightGBMTrainer:
         return X_imputed
 
     def _compute_groups_from_indices(
-        self, date_groups: Dict[str, str], tickers: List[str], indices: List[int]
-    ) -> List[int]:
+        self, date_groups: dict[str, str], tickers: list[str], indices: list[int]
+    ) -> list[int]:
         """Belirli indeksler için group sizes hesapla."""
         groups = []
         current_date = None
@@ -688,7 +688,7 @@ class LightGBMTrainer:
             groups.append(current_count)
         return groups
 
-    def _compute_ndcg(self, y_true: np.ndarray, y_pred: np.ndarray, groups: List[int]) -> float:
+    def _compute_ndcg(self, y_true: np.ndarray, y_pred: np.ndarray, groups: list[int]) -> float:
         if len(groups) == 0:
             if np.std(y_true) > 0 and np.std(y_pred) > 0:
                 return float(np.corrcoef(y_true, y_pred)[0, 1])
@@ -717,9 +717,9 @@ class LightGBMTrainer:
 # =====================================================
 
 def validate_feature_contract(
-    features_map: Dict[str, Dict],
-    expected_features: List[str],
-) -> Tuple[bool, List[str]]:
+    features_map: dict[str, dict],
+    expected_features: list[str],
+) -> tuple[bool, list[str]]:
     violations = []
     if not features_map:
         return False, ["Empty features_map"]

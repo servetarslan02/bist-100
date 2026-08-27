@@ -11,13 +11,14 @@ Features:
 - cc_transaction_count: İşlem sayısı
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_cc_features(cc_data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+def compute_cc_features(cc_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Kredi kartı harcama feature'ları."""
     features = {}
 

@@ -15,11 +15,12 @@ Referanslar:
 """
 
 import hashlib
-import orjson
 import time
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -34,9 +35,9 @@ class AuditEntry:
     action: str  # CREATE, READ, UPDATE, DELETE, EXECUTE, LOGIN, LOGOUT
     resource_type: str  # portfolio, position, config, model, etc.
     resource_id: str
-    details: Dict[str, Any]
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
+    details: dict[str, Any]
+    ip_address: str | None = None
+    user_agent: str | None = None
     previous_hash: str = ""  # Bir önceki kaydın hash'i
     entry_hash: str = ""  # Bu kaydın hash'i
 
@@ -61,7 +62,7 @@ class AuditEntry:
         self.previous_hash = previous_hash
         self.entry_hash = self.compute_hash(previous_hash)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entry_id": self.entry_id,
             "timestamp": self.timestamp.isoformat(),
@@ -89,8 +90,8 @@ class ImmutableAuditLog:
         is_valid = audit.verify_integrity()
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
-        self._entries: List[AuditEntry] = []
+    def __init__(self, storage_path: str | None = None):
+        self._entries: list[AuditEntry] = []
         self._last_hash: str = "genesis"
         self._storage_path = storage_path
         self._total_entries: int = 0
@@ -102,9 +103,9 @@ class ImmutableAuditLog:
         action: str,
         resource_type: str,
         resource_id: str,
-        details: Optional[Dict[str, Any]] = None,
-        ip_address: Optional[str] = None,
-        user_agent: Optional[str] = None,
+        details: dict[str, Any] | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
     ) -> AuditEntry:
         """
         Audit log kaydı oluştur.
@@ -128,7 +129,7 @@ class ImmutableAuditLog:
 
         entry = AuditEntry(
             entry_id=entry_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             user_id=user_id,
             action=action,
             resource_type=resource_type,
@@ -159,7 +160,7 @@ class ImmutableAuditLog:
 
         return entry
 
-    def verify_integrity(self) -> Tuple[bool, Optional[str]]:
+    def verify_integrity(self) -> tuple[bool, str | None]:
         """
         Audit log bütünlüğünü doğrula.
 
@@ -195,12 +196,12 @@ class ImmutableAuditLog:
 
     def get_entries(
         self,
-        user_id: Optional[str] = None,
-        action: Optional[str] = None,
-        resource_type: Optional[str] = None,
-        since: Optional[datetime] = None,
+        user_id: str | None = None,
+        action: str | None = None,
+        resource_type: str | None = None,
+        since: datetime | None = None,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Audit log kayıtlarını filtrele."""
         entries = self._entries
 
@@ -216,7 +217,7 @@ class ImmutableAuditLog:
         entries = sorted(entries, key=lambda e: e.timestamp, reverse=True)
         return [e.to_dict() for e in entries[:limit]]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         by_action = {}
         by_user = {}
@@ -239,8 +240,8 @@ class ImmutableAuditLog:
 
     def generate_compliance_report(
         self,
-        since: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
+        since: datetime | None = None,
+    ) -> dict[str, Any]:
         """Uyumluluk raporu oluştur."""
         entries = self._entries
         if since:
@@ -263,7 +264,7 @@ class ImmutableAuditLog:
             user_activity[entry.user_id]["last_action"] = entry.timestamp.isoformat()
 
         return {
-            "report_time": datetime.now(timezone.utc).isoformat(),
+            "report_time": datetime.now(UTC).isoformat(),
             "period": {
                 "since": since.isoformat() if since else "all_time",
                 "entries_count": len(entries),

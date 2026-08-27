@@ -22,15 +22,16 @@ Endpoints:
 - POST /portfolio/rebalance/orders — Rebalance emirleri oluştur
 """
 
-import orjson
 import asyncio
-from typing import Optional, Dict, Any
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
+import orjson
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
-from ..dependencies import get_current_user, check_rate_limit
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -64,7 +65,7 @@ async def portfolio_summary(user=Depends(get_current_user), _=Depends(check_rate
         summary["positions"] = paper_orchestrator.portfolio.get_all_positions()
         return summary
     except Exception as e:
-        raise HTTPException(500, f"Portfolio summary error: {e}")
+        raise HTTPException(500, f"Portfolio summary error: {e}") from e
 
 
 @router.get("/positions")
@@ -80,7 +81,7 @@ async def positions(user=Depends(get_current_user), _=Depends(check_rate_limit))
             "total_value": total_val,
         }
     except Exception as e:
-        raise HTTPException(500, f"Positions error: {e}")
+        raise HTTPException(500, f"Positions error: {e}") from e
 
 
 @router.get("/trades")
@@ -98,7 +99,7 @@ async def trades(
             "total_trades": len(all_trades),
         }
     except Exception as e:
-        raise HTTPException(500, f"Trades error: {e}")
+        raise HTTPException(500, f"Trades error: {e}") from e
 
 
 @router.get("/pnl")
@@ -116,7 +117,7 @@ async def pnl(user=Depends(get_current_user), _=Depends(check_rate_limit)):
             "return_on_equity_pct": summary.get("total_pnl_pct", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"P&L error: {e}")
+        raise HTTPException(500, f"P&L error: {e}") from e
 
 
 @router.get("/equity-curve")
@@ -135,7 +136,7 @@ async def equity_curve(
             "high_water_mark": max([pt.get("total_value", 0.0) for pt in curve], default=paper_orchestrator.portfolio.initial_capital),
         }
     except Exception as e:
-        raise HTTPException(500, f"Equity curve error: {e}")
+        raise HTTPException(500, f"Equity curve error: {e}") from e
 
 
 # =====================================================
@@ -157,7 +158,7 @@ async def risk_metrics(user=Depends(get_current_user), _=Depends(check_rate_limi
             "unsettled_t2": summary.get("unsettled_cash_t2", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk metrics error: {e}")
+        raise HTTPException(500, f"Risk metrics error: {e}") from e
 
 
 @router.get("/drawdown")
@@ -171,7 +172,7 @@ async def drawdown(user=Depends(get_current_user), _=Depends(check_rate_limit)):
             "current_drawdown_pct": summary.get("current_drawdown_pct", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Drawdown error: {e}")
+        raise HTTPException(500, f"Drawdown error: {e}") from e
 # =====================================================
 # PERFORMANCE & ACCOUNTING METRICS
 # =====================================================
@@ -184,7 +185,7 @@ async def performance_metrics(user=Depends(get_current_user), _=Depends(check_ra
         report = paper_orchestrator.get_full_report()
         return report.get("performance_metrics", {})
     except Exception as e:
-        raise HTTPException(500, f"Performance metrics error: {e}")
+        raise HTTPException(500, f"Performance metrics error: {e}") from e
 
 
 @router.get("/accounting")
@@ -206,7 +207,7 @@ async def accounting(user=Depends(get_current_user), _=Depends(check_rate_limit)
             "realized_pnl_total": summary.get("total_pnl", 0.0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Accounting error: {e}")
+        raise HTTPException(500, f"Accounting error: {e}") from e
 
 
 @router.post("/reset")
@@ -218,7 +219,7 @@ async def reset_portfolio_to_cash(user=Depends(get_current_user), _=Depends(chec
         paper_orchestrator.portfolio.settled_cash = paper_orchestrator.portfolio.initial_capital
         paper_orchestrator.portfolio.unsettled_cash_t1 = 0.0
         paper_orchestrator.portfolio.unsettled_cash_t2 = 0.0
-        paper_orchestrator.portfolio.save_to_store(datetime.now(timezone.utc).strftime("%Y-%m-%d"))
+        paper_orchestrator.portfolio.save_to_store(datetime.now(UTC).strftime("%Y-%m-%d"))
         return {"success": True, "cash": paper_orchestrator.portfolio.cash, "message": "Portföy tekil defterde sıfırlandı."}
     except Exception as e:
         return {"success": False, "error": str(e)}
@@ -244,7 +245,7 @@ async def cash_ledger(
             "settled_cash": round(paper_orchestrator.portfolio.settled_cash, 2),
         }
     except Exception as e:
-        raise HTTPException(500, f"Cash ledger error: {e}")
+        raise HTTPException(500, f"Cash ledger error: {e}") from e
 
 
 @router.get("/orders")
@@ -291,7 +292,7 @@ async def position_history(
             "history": pm.get_position_history(ticker=ticker, limit=limit),
         }
     except Exception as e:
-        raise HTTPException(500, f"Position history error: {e}")
+        raise HTTPException(500, f"Position history error: {e}") from e
 
 
 @router.get("/equity-snapshots")
@@ -311,7 +312,7 @@ async def equity_snapshots(
             "snapshots": pm.get_equity_snapshots(limit=limit),
         }
     except Exception as e:
-        raise HTTPException(500, f"Equity snapshots error: {e}")
+        raise HTTPException(500, f"Equity snapshots error: {e}") from e
 
 
 # =====================================================
@@ -341,7 +342,7 @@ async def attribution(
 
         equities = [e["equity"] for e in equity_curve]
         eq_arr = np.array(equities)
-        returns = np.diff(eq_arr) / eq_arr[:-1]
+        np.diff(eq_arr) / eq_arr[:-1]
 
         # Gerçek factor returns — market data servisi bağlı değilse 501 döndür
         raise HTTPException(
@@ -351,7 +352,7 @@ async def attribution(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Attribution error: {e}")
+        raise HTTPException(500, f"Attribution error: {e}") from e
 
 
 @router.get("/tax")
@@ -380,7 +381,7 @@ async def tax_analysis(user=Depends(get_current_user), _=Depends(check_rate_limi
 
         return result
     except Exception as e:
-        raise HTTPException(500, f"Tax analysis error: {e}")
+        raise HTTPException(500, f"Tax analysis error: {e}") from e
 
 
 @router.get("/tca")
@@ -405,7 +406,7 @@ async def transaction_cost_analysis(
         from ...portfolio.enhancements import tca_analyzer
         return tca_analyzer.analyze(order_value, daily_volume, volatility)
     except Exception as e:
-        raise HTTPException(500, f"TCA error: {e}")
+        raise HTTPException(500, f"TCA error: {e}") from e
 
 
 # =====================================================
@@ -437,18 +438,18 @@ async def rebalance_analysis(
         try:
             weights = orjson.loads(target_weights)
         except orjson.JSONDecodeError:
-            raise HTTPException(400, "Geçersiz JSON formatı")
+            raise HTTPException(400, "Geçersiz JSON formatı") from None
 
         return pm.check_rebalance(weights, threshold_pct=threshold_pct)
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Rebalance analysis error: {e}")
+        raise HTTPException(500, f"Rebalance analysis error: {e}") from e
 
 
 @router.post("/rebalance/orders")
 async def rebalance_orders(
-    target_weights: Dict[str, float] = Body(..., description="Hedef ağırlıklar"),
+    target_weights: dict[str, float] = Body(..., description="Hedef ağırlıklar"),
     threshold_pct: float = Query(5.0, description="Sapma eşiği (%)"),
     turnover_limit: float = Query(0.3, description="Maksimum turnover (0-1)"),
     user=Depends(get_current_user),
@@ -478,7 +479,7 @@ async def rebalance_orders(
             "turnover_limit": turnover_limit,
         }
     except Exception as e:
-        raise HTTPException(500, f"Rebalance orders error: {e}")
+        raise HTTPException(500, f"Rebalance orders error: {e}") from e
 
 
 # =====================================================
@@ -507,7 +508,7 @@ async def portfolio_status(user=Depends(get_current_user), _=Depends(check_rate_
             "strict_t2": paper_orchestrator.portfolio.strict_t2,
         }
     except Exception as e:
-        raise HTTPException(500, f"Portfolio status error: {e}")
+        raise HTTPException(500, f"Portfolio status error: {e}") from e
 
 
 @router.post("/trigger_eod_signals")
@@ -518,7 +519,7 @@ async def trigger_eod_signals(user=Depends(get_current_user), _=Depends(check_ra
         res = await run_eod_signal_cycle()
         return {"status": "success", "message": "EOD sinyal uretimi ve portfoy MTM degerlemesi tamamlandi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"EOD trigger error: {e}")
+        raise HTTPException(500, f"EOD trigger error: {e}") from e
 
 
 @router.post("/trigger_morning_execution")
@@ -529,7 +530,7 @@ async def trigger_morning_execution(user=Depends(get_current_user), _=Depends(ch
         res = await run_morning_execution_cycle()
         return {"status": "success", "message": "Sabah acilisi mikro-yapi yurutme dongusu tamamlandi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Morning execution trigger error: {e}")
+        raise HTTPException(500, f"Morning execution trigger error: {e}") from e
 
 
 @router.post("/trigger_phase18")
@@ -540,12 +541,12 @@ async def trigger_phase18(user=Depends(get_current_user), _=Depends(check_rate_l
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified Daily dongusu tetiklendi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Trigger error: {e}")
+        raise HTTPException(500, f"Trigger error: {e}") from e
 
 
 @router.post("/auto_rebalance")
 async def trigger_auto_rebalance(
-    body: Optional[Any] = Body(None),
+    body: Any | None = Body(None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -555,12 +556,12 @@ async def trigger_auto_rebalance(
         res = await run_unified_daily_cycle()
         return {"status": "success", "message": "Unified daily rebalance tetiklendi.", "details": res}
     except Exception as e:
-        raise HTTPException(500, f"Auto-rebalance error: {e}")
+        raise HTTPException(500, f"Auto-rebalance error: {e}") from e
 
 
 @router.post("/deposit")
 async def deposit_funds(
-    body: Dict[str, Any] = Body(...),
+    body: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -577,7 +578,7 @@ async def deposit_funds(
             "total_value": pm.get_portfolio().get("total_value", 0),
         }
     except Exception as e:
-        raise HTTPException(500, f"Deposit error: {e}")
+        raise HTTPException(500, f"Deposit error: {e}") from e
 
 # In-memory fast cache
 _ALPHA_SIGNALS_CACHE = None
@@ -594,12 +595,12 @@ async def alpha_signals(
     global _ALPHA_SIGNALS_CACHE, _ALPHA_SIGNALS_TIME
     import time
     now = time.time()
-    
+
     if _ALPHA_SIGNALS_CACHE and (now - _ALPHA_SIGNALS_TIME < 300):
         return _ALPHA_SIGNALS_CACHE
 
     from ...core.redis_helper import get_cached, set_cached
-    
+
     # 1. Redis Cache Kontrolü
     try:
         cached = get_cached("alpha:signals")
@@ -630,7 +631,7 @@ async def alpha_signals(
                     }
         except Exception as err:
             logger.warning(f"alpha signals live computation warning: {err}")
-        
+
         # Robust verified default model allocation
         return {
             "strategy": "Dual Momentum Top 5 + PPF Cash Shield",
@@ -649,14 +650,14 @@ async def alpha_signals(
 
     loop = asyncio.get_event_loop()
     res = await loop.run_in_executor(None, _compute_alpha_live)
-    
+
     _ALPHA_SIGNALS_CACHE = res
     _ALPHA_SIGNALS_TIME = now
-    
+
     # Redis'e 15 dk cache yaz
     try:
         set_cached("alpha:signals", res, ttl=900)
     except Exception as e:
         logger.debug("alpha_signals_cache_write_failed", error=str(e))
-        
+
     return res

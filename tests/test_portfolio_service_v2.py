@@ -3,12 +3,11 @@
 Portfolio Service v2.0 — Async DB-backed Testleri
 """
 
-import sys
-import os
-
 import asyncio
-from services.portfolio.main import PortfolioService
+import sys
+
 from services.core.database_dev import dev_db
+from services.portfolio.main import PortfolioService
 
 
 async def reset_test_db():
@@ -86,7 +85,7 @@ async def test_execute_buy():
 
     acc = await svc.get_accounting()
     if not acc["invariant_check"]:
-        issues.append(f"Invariant bozuldu")
+        issues.append("Invariant bozuldu")
 
     # DB kontrolü
     positions = await dev_db.pg_fetch("SELECT * FROM positions WHERE status = 'OPEN'")
@@ -299,7 +298,7 @@ async def run_all_tests():
         print(f"\n{icon} {name}")
         if passed:
             total_pass += 1
-            print(f"   PASSED")
+            print("   PASSED")
         else:
             total_fail += 1
             for issue in issues:
@@ -309,7 +308,7 @@ async def run_all_tests():
     print(f"\n{'=' * 60}")
     print(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
     if all_issues:
-        print(f"\nTÜM HATALAR:")
+        print("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"  {i}. {issue}")
     print("=" * 60)

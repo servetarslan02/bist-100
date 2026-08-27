@@ -15,9 +15,9 @@ Attribution:
   - Technical contribution
 """
 
-from typing import Dict, List
 from dataclasses import dataclass, field
 from datetime import datetime
+
 import structlog
 
 logger = structlog.get_logger()
@@ -47,9 +47,9 @@ class TradeAttribution:
     residual: float = 0.0
 
     # Dersler
-    what_worked: List[str] = field(default_factory=list)
-    what_failed: List[str] = field(default_factory=list)
-    lessons: List[str] = field(default_factory=list)
+    what_worked: list[str] = field(default_factory=list)
+    what_failed: list[str] = field(default_factory=list)
+    lessons: list[str] = field(default_factory=list)
 
 
 class AttributionEngine:
@@ -63,11 +63,11 @@ class AttributionEngine:
         entry_price: float,
         exit_price: float,
         expected_return: float,
-        market_state_at_entry: Dict,
-        market_state_at_exit: Dict,
-        events_during_trade: List[Dict],
-        features_at_entry: Dict,
-        features_at_exit: Dict,
+        market_state_at_entry: dict,
+        market_state_at_exit: dict,
+        events_during_trade: list[dict],
+        features_at_entry: dict,
+        features_at_exit: dict,
     ) -> TradeAttribution:
         """İşlemi atfet."""
 
@@ -132,7 +132,7 @@ class AttributionEngine:
             lessons=lessons,
         )
 
-    def _calc_macro_contribution(self, entry: Dict, exit: Dict) -> float:
+    def _calc_macro_contribution(self, entry: dict, exit: dict) -> float:
         """Makro katkısı."""
         # USD değişimi
         usd_entry = entry.get("usd_strength", 0.5)
@@ -148,20 +148,20 @@ class AttributionEngine:
         contribution = -usd_change * 5 + vix_change * -3
         return contribution
 
-    def _calc_flow_contribution(self, entry: Dict, exit: Dict) -> float:
+    def _calc_flow_contribution(self, entry: dict, exit: dict) -> float:
         """Akış katkısı."""
         vol_entry = entry.get("volume_zscore", 0)
         vol_exit = exit.get("volume_zscore", 0)
         vol_change = vol_exit - vol_entry
         return vol_change * 0.5
 
-    def _calc_momentum_contribution(self, entry: Dict, exit: Dict) -> float:
+    def _calc_momentum_contribution(self, entry: dict, exit: dict) -> float:
         """Momentum katkısı."""
         mom_entry = entry.get("momentum_20d", 0)
         mom_exit = exit.get("momentum_20d", 0)
         return (mom_exit - mom_entry) * 0.3
 
-    def _calc_event_contribution(self, events: List[Dict], actual_return: float) -> float:
+    def _calc_event_contribution(self, events: list[dict], actual_return: float) -> float:
         """Olay katkısı."""
         if not events:
             return 0
@@ -172,7 +172,7 @@ class AttributionEngine:
 
         return (positive - negative) * 0.5
 
-    def _calc_regime_contribution(self, entry: Dict, exit: Dict) -> float:
+    def _calc_regime_contribution(self, entry: dict, exit: dict) -> float:
         """Rejim katkısı."""
         regime_entry = entry.get("regime", "UNKNOWN")
         regime_exit = exit.get("regime", "UNKNOWN")
@@ -185,16 +185,13 @@ class AttributionEngine:
                 return 2.0
         return 0
 
-    def _calc_technical_contribution(self, entry: Dict, exit: Dict) -> float:
+    def _calc_technical_contribution(self, entry: dict, exit: dict) -> float:
         """Teknik katkısı."""
         rsi_entry = entry.get("rsi_14", 50)
         rsi_exit = exit.get("rsi_14", 50)
 
         # Aşırı alımdan çıkış = pozitif
-        if rsi_entry > 70 and rsi_exit < 70:
-            return 1.0
-        # Aşırı satımdan çıkış = pozitif
-        elif rsi_entry < 30 and rsi_exit > 30:
+        if rsi_entry > 70 and rsi_exit < 70 or rsi_entry < 30 and rsi_exit > 30:
             return 1.0
         return 0
 
@@ -235,14 +232,14 @@ class AttributionEngine:
         lines.append(f"{'='*50}")
         lines.append(f"📊 {attribution.ticker} — İŞLEM ATFEDİLMESİ")
         lines.append(f"{'='*50}")
-        lines.append(f"")
+        lines.append("")
         lines.append(f"Giriş: ₺{attribution.entry_price:.2f} ({attribution.entry_date.strftime('%Y-%m-%d')})")
         lines.append(f"Çıkış: ₺{attribution.exit_price:.2f} ({attribution.exit_date.strftime('%Y-%m-%d')})")
         lines.append(f"Getiri: {attribution.actual_return_pct:+.2f}%")
         lines.append(f"Beklenen: {attribution.expected_return_pct:+.2f}%")
         lines.append(f"Hata: {attribution.prediction_error:+.2f}%")
-        lines.append(f"")
-        lines.append(f"ATRİBÜSYON:")
+        lines.append("")
+        lines.append("ATRİBÜSYON:")
         lines.append(f"  Macro:     {attribution.macro_contribution:+.2f}%")
         lines.append(f"  Flow:      {attribution.flow_contribution:+.2f}%")
         lines.append(f"  Momentum:  {attribution.momentum_contribution:+.2f}%")
@@ -250,20 +247,20 @@ class AttributionEngine:
         lines.append(f"  Regime:    {attribution.regime_contribution:+.2f}%")
         lines.append(f"  Technical: {attribution.technical_contribution:+.2f}%")
         lines.append(f"  Residual:  {attribution.residual:+.2f}%")
-        lines.append(f"")
+        lines.append("")
 
         if attribution.what_worked:
-            lines.append(f"✅ İŞE YARAYAN:")
+            lines.append("✅ İŞE YARAYAN:")
             for w in attribution.what_worked:
                 lines.append(f"   • {w}")
 
         if attribution.what_failed:
-            lines.append(f"❌ BAŞARISIZ OLAN:")
+            lines.append("❌ BAŞARISIZ OLAN:")
             for w in attribution.what_failed:
                 lines.append(f"   • {w}")
 
         if attribution.lessons:
-            lines.append(f"📚 DERSLER:")
+            lines.append("📚 DERSLER:")
             for l in attribution.lessons:
                 lines.append(f"   • {l}")
 

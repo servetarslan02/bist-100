@@ -8,8 +8,8 @@ v2.1: Async support + phase metrics
 
 import importlib
 import time
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 import structlog
@@ -24,7 +24,7 @@ class IntelligenceOutput:
     timestamp: str
     fused_direction: str = "NEUTRAL"
     fused_confidence: float = 0.0
-    signal_sources: List[str] = field(default_factory=list)
+    signal_sources: list[str] = field(default_factory=list)
     forecast_return_pct: float = 0.0
     forecast_probability: float = 0.0
     forecast_horizon: int = 5
@@ -47,10 +47,10 @@ class IntelligenceOutput:
     world_alignment: float = 0.0
     data_quality: float = 0.0
     model_agreement: float = 0.0
-    modules_used: List[str] = field(default_factory=list)
-    modules_failed: List[str] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
-    phase_durations_ms: Dict[str, float] = field(default_factory=dict)
+    modules_used: list[str] = field(default_factory=list)
+    modules_failed: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    phase_durations_ms: dict[str, float] = field(default_factory=dict)
     total_elapsed_ms: float = 0.0
 
 
@@ -89,8 +89,8 @@ class IntelligencePipeline:
     def run(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        market_data: Optional[Any] = None,
+        features: dict[str, Any],
+        market_data: Any | None = None,
         regime: str = "UNKNOWN",
     ) -> IntelligenceOutput:
         """Tüm intelligence modüllerini çalıştır (sync, phase metrics ile)."""
@@ -139,8 +139,8 @@ class IntelligencePipeline:
     async def run_async(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        market_data: Optional[Any] = None,
+        features: dict[str, Any],
+        market_data: Any | None = None,
         regime: str = "UNKNOWN",
     ) -> IntelligenceOutput:
         """Async pipeline — paralel phase'ler ile."""
@@ -303,7 +303,7 @@ class IntelligencePipeline:
         except Exception as e:
             output.modules_failed.append(f"spec_engine:{str(e)[:80]}")
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         return {
             "total_modules": 16,
             "loaded_modules": len(self._modules),
@@ -419,7 +419,7 @@ class IntelligencePipeline:
         try:
             mod = self._modules["research_memory"]
             rm = mod.ResearchMemory()
-            history = rm.get_ticker_history(ticker=ticker, limit=5)
+            rm.get_ticker_history(ticker=ticker, limit=5)
             output.modules_used.append("research_memory")
         except Exception as e:
             output.modules_failed.append(f"research_memory:{str(e)[:80]}")
@@ -447,8 +447,8 @@ intelligence_pipeline = IntelligencePipeline()
 # =====================================================
 # Intelligence Modül Bağlantıları
 # =====================================================
-def run_full_intelligence(ticker: str, features: Dict, market_state: Dict = None,
-                          fundamentals: Dict = None, news: list = None) -> Dict[str, Any]:
+def run_full_intelligence(ticker: str, features: dict, market_state: dict = None,
+                          fundamentals: dict = None, news: list = None) -> dict[str, Any]:
     """Tüm intelligence modüllerini çalıştır."""
     result = {"ticker": ticker}
     if market_state is None: market_state = {}

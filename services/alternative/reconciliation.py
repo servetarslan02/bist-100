@@ -10,9 +10,10 @@ Kullanım:
 - Güvenilirlik skoru: kaynak sayısı + tutarlılık
 """
 
-import numpy as np
-from typing import Dict, Any, List
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -29,10 +30,10 @@ class ReconciliationReport:
     agreeing_sources: int
     disagreeing_sources: int
     reliability_score: float  # 0-1
-    discrepancies: List[Dict] = field(default_factory=list)
-    warnings: List[str] = field(default_factory=list)
+    discrepancies: list[dict] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "ticker": self.ticker,
             "consensus_direction": self.consensus_direction,
@@ -80,7 +81,7 @@ class CrossSourceReconciler:
     def reconcile(
         self,
         ticker: str,
-        features: Dict[str, float],
+        features: dict[str, float],
     ) -> ReconciliationReport:
         """Feature'ları uzlaştır.
 
@@ -155,7 +156,7 @@ class CrossSourceReconciler:
             warnings=warnings,
         )
 
-    def _compute_consensus(self, scores: Dict[str, float], category: str) -> Dict[str, Any]:
+    def _compute_consensus(self, scores: dict[str, float], category: str) -> dict[str, Any]:
         """Consensus hesapla."""
         if not scores:
             return {"mean": 0, "confidence": 0, "agreeing": 0, "disagreeing": 0}

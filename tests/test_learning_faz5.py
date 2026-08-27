@@ -18,11 +18,7 @@ Champion-Challenger testing:
 """
 
 import sys
-import os
-import numpy as np
-from datetime import datetime, timezone, timedelta
-
-
+from datetime import UTC, datetime, timedelta
 
 # ===================== SHADOW MODE =====================
 
@@ -142,9 +138,9 @@ def test_shadow_evaluate_not_enough_predictions():
     from services.learning.shadow_manager import ShadowModeManager
 
     m = ShadowModeManager()
-    m._start_date = datetime.now(timezone.utc) - timedelta(days=25)  # Geçmişe al
+    m._start_date = datetime.now(UTC) - timedelta(days=25)  # Geçmişe al
     m.start_shadow("c1", "c2")
-    m._start_date = datetime.now(timezone.utc) - timedelta(days=25)
+    m._start_date = datetime.now(UTC) - timedelta(days=25)
 
     # 5 prediction (50 minimum)
     for i in range(5):
@@ -162,7 +158,7 @@ def test_shadow_evaluate_challenger_better():
 
     m = ShadowModeManager()
     m.start_shadow("c1", "c2")
-    m._start_date = datetime.now(timezone.utc) - timedelta(days=25)
+    m._start_date = datetime.now(UTC) - timedelta(days=25)
 
     # 60 prediction: champion SHORT, challenger LONG, hep pozitif getiri
     for i in range(60):
@@ -183,7 +179,7 @@ def test_shadow_evaluate_champion_better():
 
     m = ShadowModeManager()
     m.start_shadow("c1", "c2")
-    m._start_date = datetime.now(timezone.utc) - timedelta(days=25)
+    m._start_date = datetime.now(UTC) - timedelta(days=25)
 
     # 60 prediction: champion LONG, challenger SHORT, hep pozitif getiri
     for i in range(60):
@@ -400,14 +396,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 5 TEST SONUÇLARI (Shadow Mode + Champion-Challenger)")
+    print("📊 FAZ 5 TEST SONUÇLARI (Shadow Mode + Champion-Challenger)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

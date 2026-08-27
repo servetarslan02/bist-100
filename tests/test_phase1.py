@@ -10,9 +10,7 @@ Kullanım:
 """
 
 import sys
-import os
-
-from datetime import datetime, timezone, date, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 # Dynamic date calculation for market calendar tests
 today = date.today()
@@ -69,35 +67,35 @@ def test_market_calendar():
     # Test 5: Market açık (Pazartesi 11:00)
     dt = datetime(monday.year, monday.month, monday.day, 11, 0)
     if cal.is_market_open(dt):
-        print(f"  ✓ Pazar 11:00 market açık")
+        print("  ✓ Pazar 11:00 market açık")
         passed += 1
     else:
-        print(f"  ✗ Pazar 11:00 market açık olmalı")
+        print("  ✗ Pazar 11:00 market açık olmalı")
         failed += 1
 
     # Test 6: Market kapalı (gece)
     dt = datetime(monday.year, monday.month, monday.day, 23, 0)
     if not cal.is_market_open(dt):
-        print(f"  ✓ Gece 23:00 market kapalı")
+        print("  ✓ Gece 23:00 market kapalı")
         passed += 1
     else:
-        print(f"  ✗ Gece 23:00 market kapalı olmalı")
+        print("  ✗ Gece 23:00 market kapalı olmalı")
         failed += 1
 
     # Test 7: Öğle arası
     dt = datetime(monday.year, monday.month, monday.day, 13, 30)
     if not cal.is_market_open(dt):
-        print(f"  ✓ Öğle arası market kapalı")
+        print("  ✓ Öğle arası market kapalı")
         passed += 1
     else:
-        print(f"  ✗ Öğle arası market kapalı olmalı")
+        print("  ✗ Öğle arası market kapalı olmalı")
         failed += 1
 
     # Test 8: Pre-market
     dt = datetime(monday.year, monday.month, monday.day, 9, 50)
     session = cal.get_session(dt)
     if session == MarketSession.PRE_MARKET:
-        print(f"  ✓ 09:50 pre-market")
+        print("  ✓ 09:50 pre-market")
         passed += 1
     else:
         print(f"  ✗ 09:50 pre-market olmalı, {session}")
@@ -107,7 +105,7 @@ def test_market_calendar():
     dt = datetime(monday.year, monday.month, monday.day, 10, 30)
     session = cal.get_session(dt)
     if session == MarketSession.MORNING:
-        print(f"  ✓ 10:30 morning session")
+        print("  ✓ 10:30 morning session")
         passed += 1
     else:
         print(f"  ✗ 10:30 morning olmalı, {session}")
@@ -128,7 +126,7 @@ def test_market_calendar():
     end = saturday    # Cumartesi
     days = cal.trading_days_between(start, end)
     if days == 5:
-        print(f"  ✓ 5 işlem günü (Pzt-Cuma)")
+        print("  ✓ 5 işlem günü (Pzt-Cuma)")
         passed += 1
     else:
         print(f"  ✗ 5 işlem günü olmalı, {days}")
@@ -139,10 +137,10 @@ def test_market_calendar():
     cal.add_halt(monday, t(11, 0), t(11, 30))
     dt = datetime(monday.year, monday.month, monday.day, 11, 15)
     if cal.get_status(dt) == MarketStatus.HALT:
-        print(f"  ✓ Devre kesici 11:15")
+        print("  ✓ Devre kesici 11:15")
         passed += 1
     else:
-        print(f"  ✗ Devre kesici olmalı 11:15")
+        print("  ✗ Devre kesici olmalı 11:15")
         failed += 1
 
     assert failed == 0, f"Market Calendar: {failed} test(s) failed out of {passed + failed}"
@@ -150,9 +148,7 @@ def test_market_calendar():
 
 def test_corporate_actions():
     """Corporate Actions testleri."""
-    from services.ingestion.corporate_actions import (
-        CorporateActionsHandler, CorporateAction, ActionType
-    )
+    from services.ingestion.corporate_actions import ActionType, CorporateAction, CorporateActionsHandler
 
     handler = CorporateActionsHandler()
     passed = 0
@@ -270,7 +266,7 @@ def test_corporate_actions():
     event = {"title": "Şirketimiz 2026 yılı kar payı dağıtımı hakkında", "summary": ""}
     action_type = handler._classify_kap_event(event)
     if action_type == ActionType.DIVIDEND:
-        print(f"  ✓ KAP sınıflandırma: temettü")
+        print("  ✓ KAP sınıflandırma: temettü")
         passed += 1
     else:
         print(f"  ✗ KAP sınıflandırma: DIVIDEND bekleniyor, {action_type}")
@@ -289,10 +285,10 @@ def test_circuit_breaker():
     # Test 1: Başlangıçta CLOSED
     cb = CircuitBreaker(name="test", failure_threshold=3)
     if cb.state == CircuitState.CLOSED and cb.can_execute():
-        print(f"  ✓ Başlangıçta CLOSED")
+        print("  ✓ Başlangıçta CLOSED")
         passed += 1
     else:
-        print(f"  ✗ Başlangıçta CLOSED olmalı")
+        print("  ✗ Başlangıçta CLOSED olmalı")
         failed += 1
 
     # Test 2: 3 failure → OPEN
@@ -300,7 +296,7 @@ def test_circuit_breaker():
     cb.record_failure()
     cb.record_failure()
     if cb.state == CircuitState.OPEN:
-        print(f"  ✓ 3 failure → OPEN")
+        print("  ✓ 3 failure → OPEN")
         passed += 1
     else:
         print(f"  ✗ OPEN olmalı, {cb.state}")
@@ -308,16 +304,16 @@ def test_circuit_breaker():
 
     # Test 3: OPEN iken çağrı yapılamaz
     if not cb.can_execute():
-        print(f"  ✓ OPEN iken çağrı yok")
+        print("  ✓ OPEN iken çağrı yok")
         passed += 1
     else:
-        print(f"  ✗ OPEN iken çağrı olmamalı")
+        print("  ✗ OPEN iken çağrı olmamalı")
         failed += 1
 
     # Test 4: Recovery timeout sonrası HALF_OPEN
-    cb.last_failure_time = datetime.now(timezone.utc) - timedelta(seconds=61)
+    cb.last_failure_time = datetime.now(UTC) - timedelta(seconds=61)
     if cb.can_execute() and cb.state == CircuitState.HALF_OPEN:
-        print(f"  ✓ Timeout sonrası HALF_OPEN")
+        print("  ✓ Timeout sonrası HALF_OPEN")
         passed += 1
     else:
         print(f"  ✗ HALF_OPEN olmalı, {cb.state}")
@@ -326,7 +322,7 @@ def test_circuit_breaker():
     # Test 5: HALF_OPEN'da başarı → CLOSED
     cb.record_success()
     if cb.state == CircuitState.CLOSED:
-        print(f"  ✓ HALF_OPEN success → CLOSED")
+        print("  ✓ HALF_OPEN success → CLOSED")
         passed += 1
     else:
         print(f"  ✗ CLOSED olmalı, {cb.state}")
@@ -336,11 +332,11 @@ def test_circuit_breaker():
     cb = CircuitBreaker(name="test2", failure_threshold=2)
     cb.record_failure()
     cb.record_failure()
-    cb.last_failure_time = datetime.now(timezone.utc) - timedelta(seconds=61)
+    cb.last_failure_time = datetime.now(UTC) - timedelta(seconds=61)
     cb.can_execute()  # → HALF_OPEN
     cb.record_failure()
     if cb.state == CircuitState.OPEN:
-        print(f"  ✓ HALF_OPEN failure → OPEN")
+        print("  ✓ HALF_OPEN failure → OPEN")
         passed += 1
     else:
         print(f"  ✗ OPEN olmalı, {cb.state}")
@@ -351,15 +347,15 @@ def test_circuit_breaker():
 
 def test_rate_limiter():
     """Rate Limiter testleri."""
+
     from services.core.circuit_breaker import RateLimiter
-    import asyncio
 
     passed = 0
     failed = 0
 
     # Test 1: İlk çağrılar hemen yapılmalı
     rl = RateLimiter(name="test", max_tokens=5, refill_rate=1.0)
-    for i in range(5):
+    for _i in range(5):
         wait = rl.acquire()
         if wait == 0.0:
             passed += 1
@@ -367,7 +363,7 @@ def test_rate_limiter():
             failed += 1
 
     if passed == 5:
-        print(f"  ✓ 5 token → 5 çağrı hemen")
+        print("  ✓ 5 token → 5 çağrı hemen")
     else:
         print(f"  ✗ 5 çağrı hemen olmalı, {failed} başarısız")
 
@@ -377,7 +373,7 @@ def test_rate_limiter():
         print(f"  ✓ 6. çağrı beklemeli: {wait:.2f}s")
         passed += 1
     else:
-        print(f"  ✗ 6. çağrı beklemeli")
+        print("  ✗ 6. çağrı beklemeli")
         failed += 1
 
     assert failed == 0, f"Rate Limiter: {failed} test(s) failed out of {passed + failed}"
@@ -393,7 +389,7 @@ def test_provider_reliability():
     # Test 1: Başlangıçta skor 1.0
     pr = ProviderReliability(name="test")
     if pr.get_score() == 1.0:
-        print(f"  ✓ Başlangıç skoru: 1.0")
+        print("  ✓ Başlangıç skoru: 1.0")
         passed += 1
     else:
         print(f"  ✗ Başlangıç skoru 1.0 olmalı: {pr.get_score()}")

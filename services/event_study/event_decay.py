@@ -3,8 +3,9 @@
 Event etkisinin zamanla nasıl azaldığını analiz eder.
 Exponential decay modeli ile half-life hesaplama.
 """
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -15,7 +16,7 @@ class EventImpactDecay:
 
     def calculate_decay(
         self, ar_series: np.ndarray, event_day_idx: int = 0
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Event etkisinin zamanla nasıl azaldığını hesapla.
 
         Exponential decay: |AR(t)| = A × exp(-λ × t)
@@ -97,8 +98,8 @@ class EventImpactDecay:
         return result
 
     def calculate_decay_batch(
-        self, ar_series_list: List[np.ndarray]
-    ) -> Dict[str, Any]:
+        self, ar_series_list: list[np.ndarray]
+    ) -> dict[str, Any]:
         """Birden fazla event için toplu decay analizi.
 
         Args:
@@ -154,7 +155,7 @@ class EventImpactDecay:
         else:
             return "FAST_DECAY"  # Hızlı azalma
 
-    def _pattern_distribution(self, decays: List[Dict]) -> Dict[str, int]:
+    def _pattern_distribution(self, decays: list[dict]) -> dict[str, int]:
         """Pattern dağılımı."""
         patterns = {}
         for d in decays:

@@ -8,11 +8,12 @@ FAZ 10: Learning System (Güncellenmiş)
 """
 
 import hashlib
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
 import orjson
 import structlog
 
@@ -28,14 +29,31 @@ class Prediction:
     predicted_direction: str  # UP, DOWN
     confidence: float
     horizon: str  # 1-5D, 1-4W, 1-6M, 6-24M
-    feature_snapshot: Dict[str, Any]
+    feature_snapshot: dict[str, Any]
     model_version: str = "v1"
 
     # Outcome (daha sonra doldurulur)
-    actual_direction: Optional[str] = None
-    actual_return: Optional[float] = None
-    outcome: Optional[str] = None  # TP, SL, EXPIRED
-    outcome_timestamp: Optional[datetime] = None
+    actual_direction: str | None = None
+    actual_return: float | None = None
+    outcome: str | None = None  # TP, SL, EXPIRED
+    outcome_timestamp: datetime | None = None
+
+
+@dataclass
+class Outcome:
+    """Sonuç kaydı."""
+    prediction_id: str
+    ticker: str
+    predicted_direction: str
+    actual_direction: str
+    actual_return: float
+    outcome: str
+    correct: bool
+    regime: str
+    confidence: float
+    holding_days: int
+    timestamp: str
+
 
 class IntegratedLearningSystem:
     """Entegre öğrenme sistemi."""
@@ -43,11 +61,11 @@ class IntegratedLearningSystem:
     def __init__(self):
         self._predictions: deque = deque(maxlen=5000)
         self._outcomes: deque = deque(maxlen=5000)
-        self._regime_accuracy: Dict[str, Dict] = defaultdict(
+        self._regime_accuracy: dict[str, dict] = defaultdict(
             lambda: {"correct": 0, "total": 0}
         )
-        self._feature_importance: Dict[str, float] = {}
-        self._model_versions: List[str] = ["v1"]
+        self._feature_importance: dict[str, float] = {}
+        self._model_versions: list[str] = ["v1"]
         self._feedback_buffer: deque = deque(maxlen=1000)
 
         logger.info("IntegratedLearningSystem initialized")
@@ -61,15 +79,15 @@ class IntegratedLearningSystem:
         predicted_direction: str,
         confidence: float,
         horizon: str = "1-5D",
-        feature_snapshot: Dict = None,
+        feature_snapshot: dict = None,
     ) -> str:
         """Yeni tahmin kaydet."""
-        pred_id = f"PRED_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{ticker}"
+        pred_id = f"PRED_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{ticker}"
 
         pred = Prediction(
             prediction_id=pred_id,
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             regime=regime,
             predicted_direction=predicted_direction,
             confidence=confidence,
@@ -114,7 +132,7 @@ class IntegratedLearningSystem:
         entry_price: float,
         holding_days: int = 0,
         outcome_type: str = "auto",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tahmin sonucunu kaydet.
 
         Bu method outcome_tracker tarafından çağrılır.
@@ -133,10 +151,7 @@ class IntegratedLearningSystem:
         pred = matching_preds[-1]
 
         # Gerçek getiri
-        if entry_price and entry_price > 0:
-            actual_return = (actual_price / entry_price - 1) * 100
-        else:
-            actual_return = 0.0
+        actual_return = (actual_price / entry_price - 1) * 100 if entry_price and entry_price > 0 else 0.0
 
         # Yön belirle
         actual_direction = "UP" if actual_return > 0 else "DOWN"
@@ -153,7 +168,7 @@ class IntegratedLearningSystem:
         pred.actual_direction = actual_direction
         pred.actual_return = actual_return
         pred.outcome = outcome
-        pred.outcome_timestamp = datetime.now(timezone.utc)
+        pred.outcome_timestamp = datetime.now(UTC)
 
         # Doğruluk kontrolü
         correct = pred.predicted_direction == actual_direction
@@ -175,7 +190,7 @@ class IntegratedLearningSystem:
             "regime": pred.regime,
             "confidence": pred.confidence,
             "holding_days": holding_days,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self._outcomes.append(outcome_record)
         if len(self._outcomes) > 5000:
@@ -185,7 +200,7 @@ class IntegratedLearningSystem:
         if pred.feature_snapshot:
             weight = 1.0 if correct else -0.5
             for feat_name, feat_val in pred.feature_snapshot.items():
-                if isinstance(feat_val, (int, float)) and not (feat_val != feat_val):  # NaN check
+                if isinstance(feat_val, (int, float)) and feat_val == feat_val:  # NaN check
                     self._feature_importance[feat_name] = self._feature_importance.get(feat_name, 0) + weight
 
         logger.info("Outcome recorded",
@@ -216,7 +231,7 @@ class IntegratedLearningSystem:
             "outcome": outcome_record,
         }
 
-    def get_pending_outcomes(self, limit: int = 50) -> List[Dict]:
+    def get_pending_outcomes(self, limit: int = 50) -> list[dict]:
         """Sonuç bekleyen tahminleri getir.
 
         Bu method API handler tarafından çağrılır.
@@ -230,7 +245,7 @@ class IntegratedLearningSystem:
                 "regime": p.regime,
                 "horizon": p.horizon,
                 "timestamp": p.timestamp.isoformat(),
-                "days_elapsed": (datetime.now(timezone.utc) - p.timestamp).days,
+                "days_elapsed": (datetime.now(UTC) - p.timestamp).days,
             }
             for p in self._predictions
             if p.outcome is None
@@ -246,13 +261,13 @@ class IntegratedLearningSystem:
         action: str,
         direction: str,
         confidence: float,
-        features: Dict,
-        signals: Dict,
+        features: dict,
+        signals: dict,
         regime: str,
     ) -> str:
         """Karar kaydet."""
         decision_id = hashlib.sha256(
-            f"{ticker}:{action}:{datetime.now(timezone.utc).isoformat()}".encode()
+            f"{ticker}:{action}:{datetime.now(UTC).isoformat()}".encode()
         ).hexdigest()[:16]
 
         logger.debug("Decision recorded",
@@ -274,7 +289,7 @@ class IntegratedLearningSystem:
             "prediction_id": prediction_id,
             "feedback": feedback,
             "actual_outcome": actual_outcome,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._feedback_buffer) > 1000:
             self._feedback_buffer = self._feedback_buffer[-1000:]
@@ -283,7 +298,7 @@ class IntegratedLearningSystem:
 
     # ===================== STATS =====================
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Öğrenme istatistikleri."""
         total = len(self._outcomes)
         if total == 0:
@@ -321,7 +336,7 @@ class IntegratedLearningSystem:
             "model_version": self._model_versions[-1],
         }
 
-    def get_recent_predictions(self, limit: int = 20) -> List[Dict]:
+    def get_recent_predictions(self, limit: int = 20) -> list[dict]:
         """Son tahminleri getir."""
         recent = self._predictions[-limit:]
         return [
@@ -338,7 +353,7 @@ class IntegratedLearningSystem:
             for p in reversed(recent)
         ]
 
-    def get_regime_accuracy(self, regime: Optional[str] = None) -> Any:
+    def get_regime_accuracy(self, regime: str | None = None) -> Any:
         """Regime bazlı doğruluk."""
         if regime is not None:
             stats = self._regime_accuracy.get(str(regime), {})
@@ -347,11 +362,11 @@ class IntegratedLearningSystem:
             return 0.5
         return dict(self._regime_accuracy)
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Feature importance."""
         return dict(self._feature_importance)
 
-    def check_model_drift(self) -> Dict[str, Any]:
+    def check_model_drift(self) -> dict[str, Any]:
         """Model drift kontrolü."""
         if len(self._outcomes) < 20:
             return {"drift_detected": False, "reason": "Yetersiz veri"}

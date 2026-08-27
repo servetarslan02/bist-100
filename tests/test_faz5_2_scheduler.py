@@ -4,12 +4,9 @@ ALPHA BIST — FAZ 5.2 Test Suite (v2.0 — Unified Scheduler)
 Market Session + Worker + Unified Scheduler + Idempotency
 """
 
-import sys
-import os
 import asyncio
-import time
-
-
+import sys
+from datetime import UTC
 
 # ────────────────────────────────────────────────────────────
 # 1. Market session — timezone
@@ -17,7 +14,7 @@ import time
 
 def test_market_session_timezone():
     """Market session Istanbul timezone kullanmalı."""
-    from services.scheduler.unified_scheduler import MarketSessionManager, _TZ_ISTANBUL
+    from services.scheduler.unified_scheduler import MarketSessionManager
 
     passed = 0
     failed = 0
@@ -38,8 +35,9 @@ def test_market_session_timezone():
 
 def test_market_session_weekend():
     """Hafta sonu piyasa kapalı olmalı."""
-    from services.scheduler.unified_scheduler import MarketSessionManager, MarketPhase
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
+    from services.scheduler.unified_scheduler import MarketPhase, MarketSessionManager
 
     passed = 0
     failed = 0
@@ -74,8 +72,9 @@ def test_market_session_weekend():
 
 def test_market_session_holiday():
     """Tatil günlerinde piyasa kapalı olmalı."""
-    from services.scheduler.unified_scheduler import MarketSessionManager, MarketPhase
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
+    from services.scheduler.unified_scheduler import MarketPhase, MarketSessionManager
 
     passed = 0
     failed = 0
@@ -100,8 +99,9 @@ def test_market_session_holiday():
 
 def test_market_session_phases():
     """Market phase'leri doğru ayrılmalı."""
-    from services.scheduler.unified_scheduler import MarketSessionManager, MarketPhase
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
+    from services.scheduler.unified_scheduler import MarketPhase, MarketSessionManager
 
     passed = 0
     failed = 0
@@ -206,8 +206,9 @@ def test_scheduler_handler_registration():
 
 def test_scheduler_market_closed():
     """Market kapalıyken trading job'ları çalışmamalı."""
-    from services.scheduler.unified_scheduler import MarketSessionManager, MarketPhase
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta, timezone
+
+    from services.scheduler.unified_scheduler import MarketSessionManager
 
     passed = 0
     failed = 0
@@ -267,7 +268,7 @@ def test_priority_ordering():
 
 def test_trigger_job():
     """Manuel tetikleme çalışmalı."""
-    from services.scheduler.unified_scheduler import UnifiedScheduler, JobConfig
+    from services.scheduler.unified_scheduler import JobConfig, UnifiedScheduler
 
     passed = 0
     failed = 0
@@ -302,8 +303,9 @@ def test_trigger_job():
 
 def test_holiday_provider():
     """Tatil takvimi dinamik olmalı."""
+    from datetime import date, datetime, timedelta, timezone
+
     from services.scheduler.unified_scheduler import HolidayProvider
-    from datetime import date, datetime, timezone, timedelta
 
     passed = 0
     failed = 0
@@ -338,8 +340,9 @@ def test_holiday_provider():
 
 def test_db_job_tracker():
     """DB yoksa memory fallback çalışmalı."""
+    from datetime import datetime
+
     from services.scheduler.unified_scheduler import DBJobTracker, JobResult
-    from datetime import datetime, timezone
 
     passed = 0
     failed = 0
@@ -348,7 +351,7 @@ def test_db_job_tracker():
 
     result = JobResult(
         job_type="test", status="SUCCESS",
-        duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+        duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
     )
     success = asyncio.run(tracker.record_job(result))
     assert success is True
@@ -425,7 +428,7 @@ def test_idempotency_key_generation():
     assert k1 != k3, "Different payload should produce different key"
     assert len(k1) == 32
 
-    print(f"  ✓ Idempotency key: deterministic, order-independent")
+    print("  ✓ Idempotency key: deterministic, order-independent")
     passed += 1
 
     return passed, failed

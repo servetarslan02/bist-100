@@ -14,12 +14,11 @@ Bu modül:
 - Calendar ↔ Trading day dönüşümü yapar
 - Event window ve estimation window'ları trading day cinsinden hesaplar
 """
-from datetime import datetime, date, timedelta
-from typing import List, Tuple, Optional, Set
-import orjson
 import os
+from datetime import date, datetime, timedelta
 
 import numpy as np
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -50,10 +49,10 @@ class BISTTradingCalendar:
         cal.get_trading_days_between(start, end)  # İş günleri listesi
     """
 
-    def __init__(self, holidays_json_path: Optional[str] = None):
-        self._fixed_holidays: Set[date] = set()
-        self._variable_holidays: Set[date] = set()
-        self._all_holidays: Set[date] = set()
+    def __init__(self, holidays_json_path: str | None = None):
+        self._fixed_holidays: set[date] = set()
+        self._variable_holidays: set[date] = set()
+        self._all_holidays: set[date] = set()
         self._trading_days_cache: dict = {}
 
         # Sabit tatilleri yükle (tüm yıllar için)
@@ -88,7 +87,7 @@ class BISTTradingCalendar:
     def _load_variable_holidays(self, path: str):
         """holidays.json'dan değişken tatilleri yükle."""
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = orjson.loads(f.read())
             for d in data.get("holidays", []):
                 if isinstance(d, str):
@@ -157,7 +156,7 @@ class BISTTradingCalendar:
 
         return current
 
-    def get_trading_days_between(self, start, end) -> List[date]:
+    def get_trading_days_between(self, start, end) -> list[date]:
         """İki tarih arasındaki tüm iş günleri."""
         if isinstance(start, datetime):
             start = start.date()
@@ -205,7 +204,7 @@ class BISTTradingCalendar:
         event_date,
         start_offset: int,
         end_offset: int,
-    ) -> Tuple[date, date]:
+    ) -> tuple[date, date]:
         """Event window tarih aralığını trading day cinsinden hesapla.
 
         Args:
@@ -225,7 +224,7 @@ class BISTTradingCalendar:
         event_date,
         estimation_days: int,
         gap_trading_days: int = 6,
-    ) -> Tuple[date, date]:
+    ) -> tuple[date, date]:
         """Estimation window tarih aralığını trading day cinsinden hesapla.
 
         Look-ahead bias'ı önlemek için estimation window, event'ten
@@ -291,7 +290,7 @@ class BISTTradingCalendar:
         aligned_offsets = []
 
         dates_list = list(dates)
-        for off, target_d in zip(target_offsets, target_dates):
+        for off, target_d in zip(target_offsets, target_dates, strict=False):
             # Tarihi return serisinde bul
             for i, d in enumerate(dates_list):
                 d_date = d.date() if isinstance(d, datetime) else d

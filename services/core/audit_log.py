@@ -11,9 +11,11 @@ Immutable audit trail:
 FAZ 14: Audit Log
 """
 
-from typing import Dict, List, Any
+import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,8 +29,8 @@ class AuditEntry:
     entity_type: str      # ticker, portfolio, order, model
     entity_id: str
     actor: str            # system, decision_engine, risk_engine, user
-    details: Dict[str, Any]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    details: dict[str, Any]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     correlation_id: str = ""
     parent_audit_id: str = ""  # Lineage tracking
 
@@ -41,8 +43,8 @@ class AuditLog:
     """
 
     def __init__(self):
-        self._entries: List[AuditEntry] = []
-        self._index: Dict[str, List[int]] = {}  # entity_id → [entry indices]
+        self._entries: list[AuditEntry] = []
+        self._index: dict[str, list[int]] = {}  # entity_id → [entry indices]
 
     def log(self, entry: AuditEntry):
         """Audit kaydı ekle (append-only)."""
@@ -68,8 +70,8 @@ class AuditLog:
         action: str,
         direction: str,
         confidence: float,
-        reasons: List[str],
-        risks: List[str],
+        reasons: list[str],
+        risks: list[str],
         correlation_id: str = "",
     ):
         """Karar kaydı."""
@@ -93,7 +95,7 @@ class AuditLog:
         self,
         ticker: str,
         approved: bool,
-        checks: List[Dict],
+        checks: list[dict],
         correlation_id: str = "",
     ):
         """Risk kontrolü kaydı."""
@@ -212,7 +214,7 @@ class AuditLog:
         self,
         entity_type: str,
         entity_id: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Entity'nin tüm geçmişini getir."""
         key = f"{entity_type}:{entity_id}"
         indices = self._index.get(key, [])
@@ -228,7 +230,7 @@ class AuditLog:
             for i in indices
         ]
 
-    def get_decision_lineage(self, ticker: str) -> List[Dict]:
+    def get_decision_lineage(self, ticker: str) -> list[dict]:
         """Bir ticker için tam karar zincirini getir."""
         history = self.get_entity_history("ticker", ticker)
 
@@ -240,7 +242,7 @@ class AuditLog:
         history.sort(key=lambda x: action_order.get(x["action"], 99))
         return history
 
-    def get_recent(self, limit: int = 50) -> List[Dict]:
+    def get_recent(self, limit: int = 50) -> list[dict]:
         """Son audit kayıtları."""
         recent = self._entries[-limit:]
         return [
@@ -255,7 +257,7 @@ class AuditLog:
             for e in reversed(recent)
         ]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Audit istatistikleri."""
         action_counts = {}
         for e in self._entries:

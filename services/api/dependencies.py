@@ -6,12 +6,12 @@ Auth, rate limiting, service resolution.
 """
 
 import time
-from typing import Optional
-from fastapi import Depends, HTTPException, Request, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import structlog
 
-from .auth import jwt_handler, api_key_manager, rbac_checker, Role, TokenPayload
+import structlog
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from .auth import Role, TokenPayload, api_key_manager, jwt_handler, rbac_checker
 from .rate_limiter import rate_limiter
 
 logger = structlog.get_logger()
@@ -40,7 +40,7 @@ async def get_client_id(request: Request) -> str:
 
 async def get_current_user(
     request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
     client_id: str = Depends(get_client_id),
 ) -> TokenPayload:
     """Mevcut kullanıcıyı doğrula (JWT veya API key)."""

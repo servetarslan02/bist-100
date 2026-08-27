@@ -17,16 +17,17 @@ Optimizasyonlar:
 - DuckDB persistence
 """
 
-import time as _time
 import hashlib
+import time as _time
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
 import structlog
 
-from .portfolio_sim import PortfolioSimulatorV3
 from .persistence import backtest_persistence
+from .portfolio_sim import PortfolioSimulatorV3
 
 logger = structlog.get_logger()
 
@@ -50,7 +51,7 @@ class BacktestConfig:
     historical_repository: Any = None  # HistoricalDataRepository instance
     ml_model: Any = None  # TrainedModel instance (LightGBM)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "initial_capital": self.initial_capital,
             "lookback_days": self.lookback_days,
@@ -84,7 +85,7 @@ class BacktestMetrics:
     cvar_95: float = 0.0
     max_drawdown_duration_days: int = 0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: round(v, 4) if isinstance(v, float) else v
                 for k, v in self.__dict__.items()}
 
@@ -105,11 +106,11 @@ class BacktestResultV4:
     data_quality_issues: int
     elapsed_seconds: float
     scans_per_second: float
-    equity_curve: List[Dict[str, Any]]
-    trades: List[Dict[str, Any]]
+    equity_curve: list[dict[str, Any]]
+    trades: list[dict[str, Any]]
     persisted: bool = False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -137,19 +138,19 @@ class FeatureCache:
     """Ticker bazında feature cache."""
 
     def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._date_cache: Dict[str, str] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._date_cache: dict[str, str] = {}
         self._hits = 0
         self._misses = 0
 
-    def get(self, ticker: str, date: str) -> Optional[Dict[str, Any]]:
+    def get(self, ticker: str, date: str) -> dict[str, Any] | None:
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             self._hits += 1
             return self._cache[ticker]
         self._misses += 1
         return None
 
-    def set(self, ticker: str, date: str, features: Dict[str, Any]):
+    def set(self, ticker: str, date: str, features: dict[str, Any]):
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
@@ -169,9 +170,9 @@ class QualityCache:
     """Data quality sonucu cache."""
 
     def __init__(self):
-        self._cache: Dict[str, Tuple[bool, float]] = {}
+        self._cache: dict[str, tuple[bool, float]] = {}
 
-    def get(self, ticker: str) -> Optional[Tuple[bool, float]]:
+    def get(self, ticker: str) -> tuple[bool, float] | None:
         return self._cache.get(ticker)
 
     def set(self, ticker: str, passed: bool, score: float):
@@ -194,7 +195,7 @@ class BacktestEngineV4:
 
     def __init__(
         self,
-        config: Optional[BacktestConfig] = None,
+        config: BacktestConfig | None = None,
         use_panel_features: bool = True,
     ):
         """
@@ -255,13 +256,13 @@ class BacktestEngineV4:
 
     def run(
         self,
-        market_data: Dict[str, pl.DataFrame],
-        universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pl.DataFrame] = None,
-        run_id: Optional[str] = None,
+        market_data: dict[str, pl.DataFrame],
+        universe_at_date: list[str] | None = None,
+        benchmark_data: pl.DataFrame | None = None,
+        run_id: str | None = None,
         persist: bool = True,
-        trade_start: Optional[str] = None,
-        trade_end: Optional[str] = None,
+        trade_start: str | None = None,
+        trade_end: str | None = None,
     ) -> BacktestResultV4:
         """Backtest çalıştır.
 
@@ -288,13 +289,13 @@ class BacktestEngineV4:
 
     def _run_legacy(
         self,
-        market_data: Dict[str, pl.DataFrame],
-        universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pl.DataFrame] = None,
-        run_id: Optional[str] = None,
+        market_data: dict[str, pl.DataFrame],
+        universe_at_date: list[str] | None = None,
+        benchmark_data: pl.DataFrame | None = None,
+        run_id: str | None = None,
         persist: bool = True,
-        trade_start: Optional[str] = None,
-        trade_end: Optional[str] = None,
+        trade_start: str | None = None,
+        trade_end: str | None = None,
     ) -> BacktestResultV4:
         """Referans (ticker-by-ticker) implementasyon — v4.0 orijinal yolu.
 
@@ -377,7 +378,7 @@ class BacktestEngineV4:
             bench_price = benchmark_prices.get(date_str)
 
             # === CANONICAL: GÜNLÜK FEATURE TOPLAMA (tüm tickers) ===
-            day_features: Dict[str, Dict[str, Any]] = {}
+            day_features: dict[str, dict[str, Any]] = {}
             if cfg.use_canonical_scoring:
                 # Historical adapter (repository varsa)
                 hist_adapter = None
@@ -517,13 +518,13 @@ class BacktestEngineV4:
 
     def _run_fast(
         self,
-        market_data: Dict[str, pl.DataFrame],
-        universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pl.DataFrame] = None,
-        run_id: Optional[str] = None,
+        market_data: dict[str, pl.DataFrame],
+        universe_at_date: list[str] | None = None,
+        benchmark_data: pl.DataFrame | None = None,
+        run_id: str | None = None,
         persist: bool = True,
-        trade_start: Optional[str] = None,
-        trade_end: Optional[str] = None,
+        trade_start: str | None = None,
+        trade_end: str | None = None,
     ) -> BacktestResultV4:
         """Panel tabanlı hızlı yol — _run_legacy ile birebir aynı finansal akış.
 
@@ -596,7 +597,7 @@ class BacktestEngineV4:
             self._last_feature_seconds += store.compute_seconds
 
         # Hisse başına O(1) erişim yapıları
-        tinfo: Dict[str, Tuple[Any, np.ndarray, np.ndarray]] = {}
+        tinfo: dict[str, tuple[Any, np.ndarray, np.ndarray]] = {}
         for ticker, df in market_data.items():
             if df is None or df.empty:
                 continue
@@ -624,7 +625,7 @@ class BacktestEngineV4:
             bench_price = benchmark_prices.get(date_str)
 
             # FAZ 4.9: Tum gunun feature'larini topla (CS normalization icin)
-            day_features_fast: Dict[str, Dict[str, Any]] = {}
+            day_features_fast: dict[str, dict[str, Any]] = {}
             for _t, _df in market_data.items():
                 _info = tinfo.get(_t)
                 if _info is None:
@@ -669,7 +670,7 @@ class BacktestEngineV4:
 
             # BUY sinyalleri
             buy_candidates = []
-            day_scores: Dict[str, Tuple[float, int]] = {}
+            day_scores: dict[str, tuple[float, int]] = {}
             for ticker, df in market_data.items():
                 # Survivorship bias
                 if universe_at_date and ticker not in universe_at_date:
@@ -771,11 +772,11 @@ class BacktestEngineV4:
         ticker: str,
         date_str: str,
         pos: int,
-        panels: Dict[str, Any],
-        market_data: Dict[str, pl.DataFrame],
+        panels: dict[str, Any],
+        market_data: dict[str, pl.DataFrame],
         lookback: int,
         cfg: BacktestConfig,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Panel lookup + borderline durumlarda scalar (legacy) fallback."""
         panel = panels.get(ticker)
         use_scalar = panel is None
@@ -807,15 +808,15 @@ class BacktestEngineV4:
 
     def _find_tie_members(
         self,
-        buy_candidates: List[Tuple[str, float]],
-    ) -> List[int]:
+        buy_candidates: list[tuple[str, float]],
+    ) -> list[int]:
         """Sıralı aday listesinde near-tie kümelerine üye index'leri bul.
 
         Küme: zincirleme gap < eps ile bağlı adaylar. Clip sınırındaki
         (0/100) birebir eşitlikler deterministik olduğundan küme sayılmaz.
         """
         eps = self._BORDERLINE_SCORE_EPS
-        members: List[int] = []
+        members: list[int] = []
         cluster = [0]
         for j in range(1, len(buy_candidates)):
             a, b = buy_candidates[j - 1][1], buy_candidates[j][1]
@@ -833,17 +834,17 @@ class BacktestEngineV4:
 
     def _rescore_tie_members_scalar(
         self,
-        buy_candidates: List[Tuple[str, float]],
-        tie_members: List[int],
-        day_scores: Dict[str, Tuple[float, int]],
+        buy_candidates: list[tuple[str, float]],
+        tie_members: list[int],
+        day_scores: dict[str, tuple[float, int]],
         date_str: str,
-        market_data: Dict[str, pl.DataFrame],
+        market_data: dict[str, pl.DataFrame],
         lookback: int,
         cfg: BacktestConfig,
-        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
-    ) -> List[Tuple[str, float]]:
+        all_day_features: dict[str, dict[str, Any]] | None = None,
+    ) -> list[tuple[str, float]]:
         """Tie kümesi üyelerinin skorlarını scalar (legacy) yoldan hesapla."""
-        rescored: Dict[str, float] = {}
+        rescored: dict[str, float] = {}
         for i in tie_members:
             ticker = buy_candidates[i][0]
             pos = day_scores[ticker][1]
@@ -934,7 +935,7 @@ class BacktestEngineV4:
         df_until: pl.DataFrame,
         lookback: int,
         cfg: BacktestConfig,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Feature hesapla (cache ile)."""
         cached = self._feature_cache.get(ticker, date_str)
         if cached is not None:
@@ -963,9 +964,9 @@ class BacktestEngineV4:
             self._last_feature_seconds += _time.perf_counter() - _t0
             return None
 
-    def _compute_score(self, features: Dict[str, Any],
+    def _compute_score(self, features: dict[str, Any],
                        ticker: str = "",
-                       all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+                       all_day_features: dict[str, dict[str, Any]] | None = None,
                        date_str: str = "") -> float:
         """Feature'lardan skor hesapla.
 
@@ -976,7 +977,7 @@ class BacktestEngineV4:
             return self._compute_score_canonical(features, ticker, all_day_features, date_str)
         return self._compute_score_legacy(features)
 
-    def _compute_score_legacy(self, features: Dict[str, Any]) -> float:
+    def _compute_score_legacy(self, features: dict[str, Any]) -> float:
         """Legacy skor — normalize edilmiş ağırlıklar.
 
         Her bileşen ±5-10 puan aralığına normalize edilir:
@@ -987,7 +988,8 @@ class BacktestEngineV4:
 
         Skor aralığı: ~25-75 (normal), 0-100 (aşırı durumlar)
         """
-        _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
+        def _s(v):
+            return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
         score = 50.0
 
         # RSI: 40-60 arası nötr, dışı ±10 puan
@@ -1011,9 +1013,9 @@ class BacktestEngineV4:
 
         return max(0, min(100, score))
 
-    def _compute_score_canonical(self, features: Dict[str, Any],
+    def _compute_score_canonical(self, features: dict[str, Any],
                                 ticker: str = "",
-                                all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+                                all_day_features: dict[str, dict[str, Any]] | None = None,
                                 date_str: str = "") -> float:
         """Canonical scoring pipeline ile skor.
 
@@ -1037,14 +1039,14 @@ class BacktestEngineV4:
     def _enrich_features_for_canonical(
         self,
         ticker: str,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         date_str: str,
-        all_day_features: Dict[str, Dict[str, Any]],
-        market_data: Dict[str, pl.DataFrame],
+        all_day_features: dict[str, dict[str, Any]],
+        market_data: dict[str, pl.DataFrame],
         current_date,
-        benchmark_close: Optional[np.ndarray] = None,
+        benchmark_close: np.ndarray | None = None,
         historical_adapter=None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculator feature'larını canonical scoring için zenginleştir.
 
         PIT-safe: Sadece current_date'e kadar bilinen veriler kullanılır.
@@ -1149,7 +1151,7 @@ class BacktestEngineV4:
 
         return enriched
 
-    def _generate_run_id(self, market_data: Dict[str, pl.DataFrame]) -> str:
+    def _generate_run_id(self, market_data: dict[str, pl.DataFrame]) -> str:
         """Deterministic run ID üret."""
         tickers = sorted(market_data.keys())
         hash_input = f"{','.join(tickers)}_{self._config.to_dict()}"

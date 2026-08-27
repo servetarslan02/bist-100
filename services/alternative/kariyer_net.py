@@ -15,8 +15,9 @@ Features:
 - remote_ratio: Uzaktan çalışma oranı
 """
 
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from .base import BaseAdapter
@@ -31,7 +32,7 @@ class KariyerNetAdapter(BaseAdapter):
     rate_limit = 5  # Düşük limit — scraping koruması
 
     # BIST ticker → şirket adı mapping
-    TICKER_COMPANY: Dict[str, str] = {
+    TICKER_COMPANY: dict[str, str] = {
         "THYAO": "Türk Hava Yolları",
         "GARAN": "Garanti BBVA",
         "AKBNK": "Akbank",
@@ -64,7 +65,7 @@ class KariyerNetAdapter(BaseAdapter):
         "KRDMD": "Kardemir",
     }
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Kariyer.net verisi çek."""
         company = self.TICKER_COMPANY.get(ticker.upper())
         if not company:
@@ -78,7 +79,7 @@ class KariyerNetAdapter(BaseAdapter):
             logger.warning("Kariyer.net scrape failed", ticker=ticker, error=str(e))
             return None
 
-    async def _scrape_postings(self, company: str, ticker: str) -> Dict[str, Any]:
+    async def _scrape_postings(self, company: str, ticker: str) -> dict[str, Any]:
         """İlanları scrape et.
 
         Production'da: aiohttp + BeautifulSoup ile Kariyer.net'ten çekilecek.
@@ -112,7 +113,7 @@ class KariyerNetAdapter(BaseAdapter):
                         "total_count": len(postings),
                         "company": company,
                         "ticker": ticker,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
 
         except ImportError:
@@ -122,7 +123,7 @@ class KariyerNetAdapter(BaseAdapter):
             logger.warning("Scraping error", error=str(e))
             return {}
 
-    def _parse_postings(self, soup) -> List[Dict]:
+    def _parse_postings(self, soup) -> list[dict]:
         """HTML'den ilan bilgilerini çıkar."""
         postings = []
         # Kariyer.net HTML yapısına göre parse
@@ -170,7 +171,7 @@ class KariyerNetAdapter(BaseAdapter):
         title_lower = title.lower()
         return any(kw.lower() in title_lower for kw in mgmt_keywords)
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """İş ilanı feature'ları hesapla."""
         if not data or not data.get("postings"):
             return {}

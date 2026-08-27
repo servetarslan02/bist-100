@@ -11,12 +11,13 @@ Memory consolidation periyodik yapılır.
 FAZ 3: Agent Memory
 """
 
-import orjson
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -32,9 +33,9 @@ class MemoryEntry:
     confidence: float
     reasoning: str
     timestamp: str
-    outcome: Optional[Dict] = None
+    outcome: dict | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "task_id": self.task_id,
             "agent_role": self.agent_role,
@@ -55,7 +56,7 @@ class WorkingMemory:
     """
 
     def __init__(self, max_items: int = 100):
-        self.items: List[MemoryEntry] = []
+        self.items: list[MemoryEntry] = []
         self.max_items = max_items
 
     def add(self, entry: MemoryEntry):
@@ -66,10 +67,10 @@ class WorkingMemory:
 
     def get_recent(
         self,
-        ticker: Optional[str] = None,
-        agent_role: Optional[str] = None,
+        ticker: str | None = None,
+        agent_role: str | None = None,
         limit: int = 10,
-    ) -> List[MemoryEntry]:
+    ) -> list[MemoryEntry]:
         """Son görevleri getir."""
         filtered = self.items
         if ticker:
@@ -78,7 +79,7 @@ class WorkingMemory:
             filtered = [e for e in filtered if e.agent_role == agent_role]
         return filtered[-limit:]
 
-    def get_last_direction(self, ticker: str) -> Optional[str]:
+    def get_last_direction(self, ticker: str) -> str | None:
         """Son yön kararını getir."""
         for entry in reversed(self.items):
             if entry.ticker == ticker:
@@ -89,7 +90,7 @@ class WorkingMemory:
         """Working memory'yi temizle."""
         self.items.clear()
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "count": len(self.items),
             "items": [e.to_dict() for e in self.items[-10:]],  # Son 10
@@ -104,10 +105,10 @@ class EpisodicMemory:
     """
 
     def __init__(self, max_items: int = 1000):
-        self.episodes: List[MemoryEntry] = []
-        self.outcomes: Dict[str, Dict] = {}  # task_id → outcome
-        self.accuracy_by_regime: Dict[str, List[float]] = {}
-        self.accuracy_by_ticker: Dict[str, List[float]] = {}
+        self.episodes: list[MemoryEntry] = []
+        self.outcomes: dict[str, dict] = {}  # task_id → outcome
+        self.accuracy_by_regime: dict[str, list[float]] = {}
+        self.accuracy_by_ticker: dict[str, list[float]] = {}
         self.max_items = max_items
 
     def add(self, entry: MemoryEntry):
@@ -144,7 +145,7 @@ class EpisodicMemory:
             "correct": correct,
             "regime": regime,
             "holding_days": holding_days,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Rejim bazlı doğruluk
@@ -160,9 +161,9 @@ class EpisodicMemory:
 
     def get_accuracy(
         self,
-        regime: Optional[str] = None,
-        ticker: Optional[str] = None,
-        last_n: Optional[int] = None,
+        regime: str | None = None,
+        ticker: str | None = None,
+        last_n: int | None = None,
     ) -> float:
         """Doğruluk oranı."""
         if regime:
@@ -177,7 +178,7 @@ class EpisodicMemory:
 
         return round(sum(scores) / len(scores) if scores else 0, 4)
 
-    def get_accuracy_by_regime(self) -> Dict[str, float]:
+    def get_accuracy_by_regime(self) -> dict[str, float]:
         """Rejim bazlı doğruluk."""
         return {
             regime: round(sum(scores) / len(scores) if scores else 0, 4)
@@ -185,7 +186,7 @@ class EpisodicMemory:
             if scores
         }
 
-    def get_accuracy_by_ticker(self) -> Dict[str, float]:
+    def get_accuracy_by_ticker(self) -> dict[str, float]:
         """Ticker bazlı doğruluk."""
         return {
             ticker: round(sum(scores) / len(scores) if scores else 0, 4)
@@ -196,14 +197,14 @@ class EpisodicMemory:
     def get_similar(
         self,
         ticker: str,
-        regime: Optional[str] = None,
+        regime: str | None = None,
         limit: int = 5,
-    ) -> List[MemoryEntry]:
+    ) -> list[MemoryEntry]:
         """Benzer olayları bul."""
         filtered = [e for e in self.episodes if e.ticker == ticker]
         return filtered[-limit:]
 
-    def get_confidence_calibration(self) -> Dict:
+    def get_confidence_calibration(self) -> dict:
         """Confidence kalibrasyonu — beklenen vs gerçek doğruluk."""
         if len(self.outcomes) < 10:
             return {"calibrated": False, "reason": "insufficient_data"}
@@ -233,7 +234,7 @@ class EpisodicMemory:
 
         return {"calibrated": True, "calibration": calibration}
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "episode_count": len(self.episodes),
             "outcome_count": len(self.outcomes),
@@ -250,23 +251,23 @@ class SemanticMemory:
     """
 
     def __init__(self):
-        self.patterns: Dict[str, List[Dict]] = {}  # ticker → patterns
-        self.regime_patterns: Dict[str, List[Dict]] = {}  # regime → patterns
-        self.sector_patterns: Dict[str, List[Dict]] = {}  # sector → patterns
+        self.patterns: dict[str, list[dict]] = {}  # ticker → patterns
+        self.regime_patterns: dict[str, list[dict]] = {}  # regime → patterns
+        self.sector_patterns: dict[str, list[dict]] = {}  # sector → patterns
 
     def add_pattern(
         self,
         ticker: str,
         regime: str,
-        pattern: Dict[str, Any],
-        sector: Optional[str] = None,
+        pattern: dict[str, Any],
+        sector: str | None = None,
     ):
         """Kalıp ekle."""
         entry = {
             **pattern,
             "ticker": ticker,
             "regime": regime,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         if ticker not in self.patterns:
@@ -284,11 +285,11 @@ class SemanticMemory:
 
     def get_patterns(
         self,
-        ticker: Optional[str] = None,
-        regime: Optional[str] = None,
-        sector: Optional[str] = None,
+        ticker: str | None = None,
+        regime: str | None = None,
+        sector: str | None = None,
         limit: int = 10,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Kalıpları getir."""
         results = []
 
@@ -313,7 +314,7 @@ class SemanticMemory:
                 if p.get("accuracy", 0.5) >= threshold
             ]
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "ticker_patterns": sum(len(v) for v in self.patterns.values()),
             "regime_patterns": sum(len(v) for v in self.regime_patterns.values()),
@@ -335,7 +336,7 @@ class AgentMemory:
         agent_role: str,
         max_working: int = 100,
         max_episodic: int = 1000,
-        persistence_path: Optional[str] = None,
+        persistence_path: str | None = None,
     ):
         self.agent_role = agent_role
         self.working = WorkingMemory(max_items=max_working)
@@ -359,7 +360,7 @@ class AgentMemory:
             direction=direction,
             confidence=confidence,
             reasoning=reasoning,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         # Working memory — her zaman
@@ -380,8 +381,8 @@ class AgentMemory:
     def get_context_for_task(
         self,
         ticker: str,
-        regime: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        regime: str | None = None,
+    ) -> dict[str, Any]:
         """Yeni görev için bağlam oluştur."""
         return {
             "recent_tasks": [
@@ -396,7 +397,7 @@ class AgentMemory:
             "ticker_accuracy": self.episodic.get_accuracy(ticker=ticker),
         }
 
-    def get_performance_summary(self) -> Dict:
+    def get_performance_summary(self) -> dict:
         """Performans özeti."""
         return {
             "agent_role": self.agent_role,
@@ -409,7 +410,7 @@ class AgentMemory:
             "semantic_patterns": self.semantic.to_dict(),
         }
 
-    def save(self, path: Optional[str] = None):
+    def save(self, path: str | None = None):
         """Memory'yi dosyaya kaydet."""
         save_path = path or self._persistence_path
         if not save_path:
@@ -417,7 +418,7 @@ class AgentMemory:
 
         data = {
             "agent_role": self.agent_role,
-            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "saved_at": datetime.now(UTC).isoformat(),
             "working": self.working.to_dict(),
             "episodic": self.episodic.to_dict(),
             "semantic": self.semantic.to_dict(),
@@ -430,7 +431,7 @@ class AgentMemory:
 
         logger.info("Memory saved", path=save_path)
 
-    def load(self, path: Optional[str] = None):
+    def load(self, path: str | None = None):
         """Memory'yi dosyadan yükle."""
         load_path = path or self._persistence_path
         if not load_path or not Path(load_path).exists():
@@ -465,9 +466,9 @@ class MemoryConsolidator:
 
     def __init__(self, consolidation_interval_hours: int = 24):
         self.interval_hours = consolidation_interval_hours
-        self._last_consolidation: Dict[str, float] = {}
+        self._last_consolidation: dict[str, float] = {}
 
-    async def consolidate(self, memory: AgentMemory) -> Dict[str, Any]:
+    async def consolidate(self, memory: AgentMemory) -> dict[str, Any]:
         """Memory'yi temizle ve özetle."""
         now = time.time()
         last = self._last_consolidation.get(memory.agent_role, 0)

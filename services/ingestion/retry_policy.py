@@ -15,8 +15,10 @@ Kullanım:
 import asyncio
 import random
 import time
-from typing import Callable, Any, Optional, Set, Type
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -42,14 +44,14 @@ class RetryStats:
     total_failures: int = 0
     total_wait_seconds: float = 0.0
     max_attempts_used: int = 0
-    last_retry_time: Optional[float] = None
+    last_retry_time: float | None = None
 
 
 # Retryable HTTP status codes
-RETRYABLE_STATUS_CODES: Set[int] = {429, 500, 502, 503, 504}
+RETRYABLE_STATUS_CODES: set[int] = {429, 500, 502, 503, 504}
 
 # Non-retryable HTTP status codes
-NON_RETRYABLE_STATUS_CODES: Set[int] = {400, 401, 403, 404, 405}
+NON_RETRYABLE_STATUS_CODES: set[int] = {400, 401, 403, 404, 405}
 
 
 class HTTPStatusError(Exception):
@@ -94,8 +96,8 @@ class RetryPolicy:
         backoff_factor: float = 2.0,
         jitter: bool = True,
         jitter_range: float = 0.2,
-        retryable_exceptions: Optional[Set[Type[Exception]]] = None,
-        non_retryable_exceptions: Optional[Set[Type[Exception]]] = None,
+        retryable_exceptions: set[type[Exception]] | None = None,
+        non_retryable_exceptions: set[type[Exception]] | None = None,
     ):
         self.config = RetryConfig(
             max_attempts=max_attempts,
@@ -133,11 +135,7 @@ class RetryPolicy:
                 return True
 
         # Retryable exception kontrolü
-        for exc_type in self.retryable_exceptions:
-            if isinstance(error, exc_type):
-                return True
-
-        return False
+        return any(isinstance(error, exc_type) for exc_type in self.retryable_exceptions)
 
     def _calculate_delay(self, attempt: int) -> float:
         """Gecikme süresini hesapla (exponential backoff + jitter)."""

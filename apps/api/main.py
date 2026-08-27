@@ -25,18 +25,16 @@ Endpoints:
     WS   /ws                  → Real-time updates (token gerekli)
 """
 
-import orjson
 import asyncio
 import os
-from typing import Dict, List, Optional
-from datetime import datetime, timezone
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Depends, Query
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+import orjson
 import structlog
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 logger = structlog.get_logger()
 
@@ -51,25 +49,25 @@ class OpportunityResponse(BaseModel):
     direction: str
     confidence: float
     regime: str
-    signals: Dict
+    signals: dict
 
 class PortfolioResponse(BaseModel):
     date: str
     total_positions: int
     total_weight: float
-    positions: List[Dict]
-    risk_metrics: Dict
+    positions: list[dict]
+    risk_metrics: dict
 
 class HealthResponse(BaseModel):
     status: str
     timestamp: str
     uptime_hours: float
     version: str
-    modules: Dict[str, str]
+    modules: dict[str, str]
 
 class PredictRequest(BaseModel):
     ticker: str
-    features: Optional[Dict] = None
+    features: dict | None = None
 
 class PredictResponse(BaseModel):
     ticker: str
@@ -77,7 +75,7 @@ class PredictResponse(BaseModel):
     rank: int
     direction: str
     confidence: float
-    feature_importance: Dict[str, float]
+    feature_importance: dict[str, float]
 
 # =====================================================
 # FASTAPI UYGULAMASI
@@ -130,7 +128,7 @@ async def health_check():
         health = super_intelligence.get_health_status()
         return {
             "status": health.overall_status,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "version": "3.0.0",
             "server": "standalone (apps/api/main.py)",
             "services": health.module_status,
@@ -138,7 +136,7 @@ async def health_check():
     except Exception as e:
         return {
             "status": "unhealthy",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "version": "3.0.0",
             "server": "standalone (apps/api/main.py)",
             "error": str(e),
@@ -155,7 +153,7 @@ async def get_regime():
 @app.get("/opportunities", tags=["Trading"])
 async def get_opportunities(
     limit: int = 20,
-    regime: Optional[str] = None,
+    regime: str | None = None,
     min_confidence: float = 0.0,
 ):
     """En iyi fırsatları getir."""
@@ -254,7 +252,7 @@ class ConnectionManager:
     """WebSocket bağlantı yöneticisi."""
 
     def __init__(self):
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: list[WebSocket] = []
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -265,7 +263,7 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
         logger.info("WebSocket disconnected", connections=len(self.active_connections))
 
-    async def broadcast(self, message: Dict):
+    async def broadcast(self, message: dict):
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
@@ -301,7 +299,7 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.send_json({
             "type": "init",
             "message": f"Connected as {payload.username}",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
         while True:
@@ -326,7 +324,7 @@ async def websocket_endpoint(websocket: WebSocket):
                     })
 
             elif action == "ping":
-                await websocket.send_json({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+                await websocket.send_json({"type": "pong", "timestamp": datetime.now(UTC).isoformat()})
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
@@ -349,7 +347,7 @@ async def broadcast_updates():
         if report:
             await manager.broadcast({
                 "type": "update",
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "regime": report.regime,
                 "top_opportunity": report.top_opportunities[0] if report.top_opportunities else None,
             })

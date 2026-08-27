@@ -10,18 +10,18 @@ Piyasa rejimlerini feature-based olarak tespit eder:
 FAZ 3.2: Regime Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
-from enum import Enum
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import StrEnum
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-class Regime(str, Enum):
+class Regime(StrEnum):
     BULL = "BULL"
     BEAR = "BEAR"
     SIDEWAYS = "SIDEWAYS"
@@ -40,8 +40,8 @@ class RegimeState:
     """Rejim durumu."""
     regime: Regime
     confidence: float
-    features_used: Dict[str, float]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    features_used: dict[str, float]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     duration_hours: float = 0.0
 
 
@@ -64,9 +64,9 @@ class RegimeEngine:
     }
 
     def __init__(self, use_hmm: bool = True):
-        self._current_regime: Optional[RegimeState] = None
+        self._current_regime: RegimeState | None = None
         self._regime_history: deque = deque(maxlen=1000)
-        self._transition_counts: Dict[str, Dict[str, int]] = {}
+        self._transition_counts: dict[str, dict[str, int]] = {}
         self._use_hmm = use_hmm
         self._hmm_detector = None
         self._return_history: deque = deque(maxlen=252)  # Gerçek rolling return serisi
@@ -78,7 +78,7 @@ class RegimeEngine:
             except Exception:
                 self._hmm_detector = None
 
-    def detect_regime(self, features: Dict[str, float]) -> RegimeState:
+    def detect_regime(self, features: dict[str, float]) -> RegimeState:
         """Feature'lardan rejim tespit et.
 
         Args:
@@ -191,7 +191,7 @@ class RegimeEngine:
         # Regime değiştiyse duration sıfırla
         duration = 0.0
         if self._current_regime and self._current_regime.regime == best_regime:
-            elapsed = (datetime.now(timezone.utc) - self._current_regime.timestamp).total_seconds() / 3600
+            elapsed = (datetime.now(UTC) - self._current_regime.timestamp).total_seconds() / 3600
             duration = self._current_regime.duration_hours + elapsed
 
         new_state = RegimeState(
@@ -217,7 +217,7 @@ class RegimeEngine:
         logger.info("Regime detected", regime=best_regime.value, confidence=confidence, duration=duration)
         return new_state
 
-    def _score_bull(self, f: Dict) -> float:
+    def _score_bull(self, f: dict) -> float:
         """Bull market skoru — sürekli değerlerle."""
         score = 0.0
         breadth = f.get("breadth_pct", 50)
@@ -235,7 +235,7 @@ class RegimeEngine:
             score += min((ra - 0.5) * 2, 0.2)
         return min(1.0, score)
 
-    def _score_bear(self, f: Dict) -> float:
+    def _score_bear(self, f: dict) -> float:
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth < 50:
@@ -251,7 +251,7 @@ class RegimeEngine:
             score += min((0.5 - ra) * 2, 0.2)
         return min(1.0, score)
 
-    def _score_sideways(self, f: Dict) -> float:
+    def _score_sideways(self, f: dict) -> float:
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         # 45-55 arası en yüksek
@@ -264,7 +264,7 @@ class RegimeEngine:
             score += 0.3 * (1 - abs(vol - 20) / 10)
         return min(1.0, score)
 
-    def _score_high_vol(self, f: Dict) -> float:
+    def _score_high_vol(self, f: dict) -> float:
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol > 20:
@@ -277,7 +277,7 @@ class RegimeEngine:
             score += min(fx / 15, 0.2)
         return min(1.0, score)
 
-    def _score_low_vol(self, f: Dict) -> float:
+    def _score_low_vol(self, f: dict) -> float:
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol < 20:
@@ -289,7 +289,7 @@ class RegimeEngine:
         score += max(0, 1 - mom / 3) * 0.2
         return min(1.0, score)
 
-    def _score_risk_on(self, f: Dict) -> float:
+    def _score_risk_on(self, f: dict) -> float:
         score = 0.0
         ra = f.get("risk_appetite", 0.5)
         if ra > 0.5:
@@ -302,7 +302,7 @@ class RegimeEngine:
             score += min(gm / 5, 0.3)
         return min(1.0, score)
 
-    def _score_risk_off(self, f: Dict) -> float:
+    def _score_risk_off(self, f: dict) -> float:
         score = 0.0
         ra = f.get("risk_appetite", 0.5)
         if ra < 0.5:
@@ -315,7 +315,7 @@ class RegimeEngine:
             score += min(fx / 15, 0.3)
         return min(1.0, score)
 
-    def _score_crisis(self, f: Dict) -> float:
+    def _score_crisis(self, f: dict) -> float:
         score = 0.0
         vol = f.get("volatility_avg", 20)
         if vol > 30:
@@ -331,7 +331,7 @@ class RegimeEngine:
             score += min((fx - 5) / 15, 0.2)
         return min(1.0, score)
 
-    def _score_recovery(self, f: Dict) -> float:
+    def _score_recovery(self, f: dict) -> float:
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if 35 < breadth < 60:
@@ -347,7 +347,7 @@ class RegimeEngine:
             score += min((30 - vol) / 20, 0.2)
         return min(1.0, score)
 
-    def _score_momentum_expansion(self, f: Dict) -> float:
+    def _score_momentum_expansion(self, f: dict) -> float:
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth > 60:
@@ -363,7 +363,7 @@ class RegimeEngine:
             score += min((vol - 15) / 20, 0.2)
         return min(1.0, score)
 
-    def _score_momentum_contraction(self, f: Dict) -> float:
+    def _score_momentum_contraction(self, f: dict) -> float:
         score = 0.0
         breadth = f.get("breadth_pct", 50)
         if breadth < 45:
@@ -380,11 +380,11 @@ class RegimeEngine:
         return min(1.0, score)
 
     @property
-    def current_regime(self) -> Optional[RegimeState]:
+    def current_regime(self) -> RegimeState | None:
         """Mevcut rejim durumunu dondur."""
         return self._current_regime
 
-    def get_regime_weights(self, regime: Regime) -> Dict[str, float]:
+    def get_regime_weights(self, regime: Regime) -> dict[str, float]:
         """Rejime göre model ağırlıkları döndür.
 
         Farklı rejimlerde farklı stratejilerin ağırlıkları değişir.
@@ -404,7 +404,7 @@ class RegimeEngine:
         }
         return weights.get(regime, weights[Regime.SIDEWAYS])
 
-    def get_transition_matrix(self) -> Dict[str, Dict[str, float]]:
+    def get_transition_matrix(self) -> dict[str, dict[str, float]]:
         """Regime geçiş olasılıkları matrisi."""
         matrix = {}
         for from_regime, to_counts in self._transition_counts.items():
@@ -413,7 +413,7 @@ class RegimeEngine:
                 matrix[from_regime] = {to: count / total for to, count in to_counts.items()}
         return matrix
 
-    def get_history(self, limit: int = 10) -> List[Dict]:
+    def get_history(self, limit: int = 10) -> list[dict]:
         """Son regime değişimleri."""
         history = self._regime_history[-limit:]
         return [
@@ -426,7 +426,7 @@ class RegimeEngine:
             for s in history
         ]
 
-    def get_regime(self) -> Optional[RegimeState]:
+    def get_regime(self) -> RegimeState | None:
         """Mevcut rejim durumunu döndür."""
         return self._current_regime
 
@@ -491,7 +491,7 @@ class RegimeEngine:
             regime=target,
             confidence=confidence,
             features_used={"llm_override": 1.0, "reason": reason},
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             duration_hours=0.0,
         )
 
@@ -505,7 +505,7 @@ class RegimeEngine:
             new_regime=target.value,
             confidence=confidence,
             reason=reason,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         return True
 

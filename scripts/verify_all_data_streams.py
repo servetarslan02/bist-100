@@ -3,11 +3,9 @@ ALPHA BIST — TÜM VERİ KAYNAKLARI (KAP, HABERLER, SOSYAL MEDYA, TEMEL ANALİZ
 Sisteme akan alternatif, temel, haber, sosyal medya ve makroekonomik verilerin canlı akışını kanıtlar.
 """
 
-import sys
-import os
 import asyncio
-import orjson
-from datetime import datetime, timezone
+import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -25,7 +23,7 @@ async def test_all_streams():
     print("\n[1. KAYNAK] Canlı KAP Bildirimleri ve Finans Haber Akışı (RSS & NLP)...")
     from services.ingestion.providers.news_provider import NewsProvider
     news_prov = NewsProvider()
-    
+
     # 5 popüler hisse için haber taraması
     sample_news = await news_prov.fetch_financial_news_rss(max_items=20)
     print(f"  ✓ Toplam Çekilen Canlı Haber/KAP Sayısı: {len(sample_news)} adet")
@@ -43,7 +41,7 @@ async def test_all_streams():
     print("\n[2. KAYNAK] Canlı Sosyal Medya & Topluluk İlgisi (StockTwits & Ekşi & X)...")
     from services.ingestion.providers.social_provider import SocialProvider
     social_prov = SocialProvider()
-    
+
     # StockTwits THYAO & ASELS
     for tk in ["THYAO", "ASELS", "GARAN"]:
         msgs = await social_prov.fetch_stocktwits(tk)
@@ -61,7 +59,7 @@ async def test_all_streams():
     # -------------------------------------------------------------
     print("\n[3. KAYNAK] Canlı Temel Analiz, Bilanço & Değerleme Rasyoları...")
     import yfinance as yf
-    
+
     fund_sample = ["THYAO.IS", "ASELS.IS", "GARAN.IS", "BIMAS.IS", "FROTO.IS"]
     for sym in fund_sample:
         tk_obj = yf.Ticker(sym)
@@ -78,14 +76,14 @@ async def test_all_streams():
     from services.ingestion.providers.macro_provider import MacroProvider
     macro_prov = MacroProvider()
     macro_data = await macro_prov.fetch_yahoo_macro()
-    
+
     dxy_val = macro_data.get("DXY", {}).get("price") or 98.84
     brent_val = macro_data.get("BRENT", {}).get("price") or 94.39
     gold_val = macro_data.get("GOLD", {}).get("price") or 4680.60
     usdtry_val = macro_data.get("USDTRY", {}).get("price") or 48.04
     us10y_val = macro_data.get("US10Y", {}).get("price") or 4.35
     vix_val = macro_data.get("VIX", {}).get("price") or 15.14
-    
+
     print(f"  ✓ Dolar Endeksi (DXY)   : {dxy_val:.2f}")
     print(f"  ✓ Brent Ham Petrol      : ${brent_val:.2f} / varil")
     print(f"  ✓ Ons Altın (XAU/USD)   : ${gold_val:.2f} / ons")
@@ -98,8 +96,8 @@ async def test_all_streams():
     # -------------------------------------------------------------
     print("\n[5. KATMAN] Tüm Bu Verilerin Feature Engine Motorlarında Birleştiğinin Kanıtı...")
     from services.ml.feature_engine import FeatureEngine
-    
-    feat_engine = FeatureEngine()
+
+    FeatureEngine()
     print("  ✓ Motor 1: Relative Strength Motor   -> XU100 ve Sektör Göreli Gücü")
     print("  ✓ Motor 2: Trend & Momentum Motor    -> Trend Eğimi, SuperTrend, ROC, İvme")
     print("  ✓ Motor 3: Volume & Microstructure   -> VWAP Sapması, Hacim Z-Skoru, Up/Down Hacim")

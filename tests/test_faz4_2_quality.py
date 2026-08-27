@@ -5,11 +5,10 @@ ML Training Dataset kalite kontrolü testleri.
 """
 
 import sys
-import os
+from datetime import date, timedelta
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timedelta, date
-
 
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):
@@ -72,7 +71,7 @@ def test_sample_metadata():
     bad_returns = {"::2022-01-01": 1.0}
     bad_dates = {"::2022-01-01": "2022-01-01"}
     report2 = v.validate_dataset(bad_map, bad_returns, bad_dates, ["feat_0"])
-    assert report2.dropped_samples == 1, f"Expected 1 drop for empty ticker"
+    assert report2.dropped_samples == 1, "Expected 1 drop for empty ticker"
     print(f"  ✓ Empty ticker detected: dropped={report2.dropped_samples}")
     passed += 1
 
@@ -99,7 +98,7 @@ def test_target_t5_forward_return():
     report = v.validate_dataset(features_map, returns, date_groups, ["feat_0"])
 
     assert abs(report.target_mean - 10.0) < 1e-6, f"Target mean mismatch: {report.target_mean}"
-    assert abs(report.target_std - 0.0) < 1e-6, f"Single sample std should be 0"
+    assert abs(report.target_std - 0.0) < 1e-6, "Single sample std should be 0"
     print(f"  ✓ Target = T+5 return: mean={report.target_mean}, std={report.target_std}")
     passed += 1
 
@@ -124,7 +123,7 @@ def test_train_test_leakage_detection():
     test_dates_no_overlap = {"2025-01-01", "2025-01-02"}
     report = v.validate_dataset(features_map, returns, date_groups, fnames, test_dates=test_dates_no_overlap)
     assert not report.train_test_overlap, "False positive leakage detection"
-    print(f"  ✓ No overlap: train dates don't intersect test dates")
+    print("  ✓ No overlap: train dates don't intersect test dates")
     passed += 1
 
     # Test: overlap var
@@ -156,8 +155,8 @@ def test_cross_ticker_samples():
     returns = {}
     date_groups = {}
     for ticker in ["THYAO", "GARAN", "ASELS"]:
-        for date in ["2022-01-03", "2022-01-04"]:
-            key = f"{ticker}::{date}"
+        for dt in ["2022-01-03", "2022-01-04"]:
+            key = f"{ticker}::{dt}"
             features_map[key] = {"feat_0": 1.0}
             returns[key] = 5.0
             date_groups[key] = date
@@ -166,7 +165,7 @@ def test_cross_ticker_samples():
 
     assert report.unique_tickers == 3, f"Expected 3 tickers, got {report.unique_tickers}"
     assert report.unique_dates == 2, f"Expected 2 dates, got {report.unique_dates}"
-    assert report.samples_per_date["2022-01-03"] == 3, f"Expected 3 samples per date"
+    assert report.samples_per_date["2022-01-03"] == 3, "Expected 3 samples per date"
     print(f"  ✓ Cross-ticker: {report.unique_tickers} tickers × {report.unique_dates} dates = 6 samples")
     passed += 1
 
@@ -304,7 +303,7 @@ def test_validation_metrics():
     assert m.mae < 1e-10, f"Perfect MAE should be ~0: {m.mae}"
     assert m.rmse < 1e-10, f"Perfect RMSE should be ~0: {m.rmse}"
     assert abs(m.r_squared - 1.0) < 1e-10, f"Perfect R² should be 1: {m.r_squared}"
-    assert abs(m.directional_accuracy - 1.0) < 1e-10, f"Perfect dir_acc should be 1"
+    assert abs(m.directional_accuracy - 1.0) < 1e-10, "Perfect dir_acc should be 1"
     print(f"  ✓ Perfect: MAE={m.mae:.6f}, RMSE={m.rmse:.6f}, R²={m.r_squared:.4f}, DirAcc={m.directional_accuracy:.4f}")
     passed += 1
 
@@ -432,7 +431,7 @@ def test_rule_based_fallback():
     dates = sorted(pit_data[tickers[0]].index)
     model = runner._train_fold_model(pit_data, str(dates[0].date()), str(dates[149].date()))
 
-    assert model is None, f"Expected None (fallback), got model"
+    assert model is None, "Expected None (fallback), got model"
     print("  ✓ Rule-based fallback: model=None when insufficient samples")
     passed += 1
 
@@ -453,8 +452,8 @@ def test_rule_based_fallback():
 
 def test_full_pipeline_integration():
     """Train → validate → clean → train pipeline entegrasyonu."""
-    from services.ml.training_validator import TrainingDatasetValidator
     from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig
+    from services.ml.training_validator import TrainingDatasetValidator
 
     passed = 0
     failed = 0

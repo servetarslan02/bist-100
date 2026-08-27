@@ -19,16 +19,17 @@ Kullanım:
 
 import asyncio
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Optional, List, Callable, Awaitable
-from dataclasses import dataclass, field
-from enum import Enum
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import StrEnum
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class ConnectivityState(str, Enum):
+class ConnectivityState(StrEnum):
     ONLINE = "ONLINE"
     DEGRADED = "DEGRADED"      # Bazı endpoint'ler erişilebilir
     OFFLINE = "OFFLINE"
@@ -79,19 +80,19 @@ class ConnectivityMonitor:
         self._consecutive_successes = 0
         self._last_check_time: float = 0
         self._last_online_time: float = time.time()
-        self._offline_since: Optional[float] = None
+        self._offline_since: float | None = None
         self._total_offline_seconds: float = 0
 
-        self._event_log: List[ConnectivityEvent] = []
+        self._event_log: list[ConnectivityEvent] = []
         self._max_event_log = 500
 
         # Callbacks
-        self._on_offline: List[Callable[[], Awaitable[None]]] = []
-        self._on_online: List[Callable[[float], Awaitable[None]]] = []  # arg: offline_duration
-        self._on_degraded: List[Callable[[], Awaitable[None]]] = []
+        self._on_offline: list[Callable[[], Awaitable[None]]] = []
+        self._on_online: list[Callable[[float], Awaitable[None]]] = []  # arg: offline_duration
+        self._on_degraded: list[Callable[[], Awaitable[None]]] = []
 
         # Background task
-        self._monitor_task: Optional[asyncio.Task] = None
+        self._monitor_task: asyncio.Task | None = None
         self._running = False
 
     @property
@@ -107,7 +108,7 @@ class ConnectivityMonitor:
         return self._state
 
     @property
-    def offline_since(self) -> Optional[float]:
+    def offline_since(self) -> float | None:
         return self._offline_since
 
     @property
@@ -216,10 +217,7 @@ class ConnectivityMonitor:
 
         if successful >= self._recovery_threshold:
             # Online veya degraded
-            if successful == total:
-                new_state = ConnectivityState.ONLINE
-            else:
-                new_state = ConnectivityState.DEGRADED
+            new_state = ConnectivityState.ONLINE if successful == total else ConnectivityState.DEGRADED
 
             self._consecutive_successes += 1
             self._consecutive_failures = 0
@@ -293,19 +291,19 @@ class ConnectivityMonitor:
             "state": self._state.value,
             "is_online": self.is_online,
             "offline_since": datetime.fromtimestamp(
-                self._offline_since, tz=timezone.utc
+                self._offline_since, tz=UTC
             ).isoformat() if self._offline_since else None,
             "offline_duration_seconds": round(self.offline_duration_seconds, 1),
             "total_offline_seconds": round(self.total_offline_seconds, 1),
             "consecutive_failures": self._consecutive_failures,
             "consecutive_successes": self._consecutive_successes,
             "last_check": datetime.fromtimestamp(
-                self._last_check_time, tz=timezone.utc
+                self._last_check_time, tz=UTC
             ).isoformat() if self._last_check_time else None,
             "recent_events": [
                 {
                     "type": e.event_type,
-                    "time": datetime.fromtimestamp(e.timestamp, tz=timezone.utc).isoformat(),
+                    "time": datetime.fromtimestamp(e.timestamp, tz=UTC).isoformat(),
                     "duration": round(e.duration_seconds, 1),
                 }
                 for e in self._event_log[-10:]

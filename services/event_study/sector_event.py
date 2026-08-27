@@ -3,8 +3,9 @@
 Sektör bazlı event study — peer comparison, sector-relative CAR,
 sector rotation detection.
 """
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Any, Optional
 import structlog
 
 logger = structlog.get_logger()
@@ -32,10 +33,10 @@ class SectorEventAnalyzer:
         event_type: str,
         stock_returns: np.ndarray,
         market_returns: np.ndarray,
-        sector_returns: Optional[np.ndarray] = None,
+        sector_returns: np.ndarray | None = None,
         alpha: float = 0.0,
         beta: float = 1.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Sektör bazlı event study.
 
         Args:
@@ -86,10 +87,10 @@ class SectorEventAnalyzer:
         self,
         sector: str,
         event_type: str,
-        peer_returns: Dict[str, np.ndarray],
+        peer_returns: dict[str, np.ndarray],
         market_returns: np.ndarray,
         target_ticker: str = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Peer comparison — aynı sektördeki hisseleri karşılaştır.
 
         Args:
@@ -148,9 +149,9 @@ class SectorEventAnalyzer:
 
     def detect_sector_rotation(
         self,
-        sector_cars: Dict[str, float],
+        sector_cars: dict[str, float],
         threshold: float = 0.02,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Sektör rotasyonu tespiti.
 
         Args:
@@ -192,11 +193,11 @@ class SectorEventAnalyzer:
             "sector_dispersion": round(float(np.std(list(sector_cars.values()))), 4),
         }
 
-    def get_sector_stocks(self, sector: str) -> List[str]:
+    def get_sector_stocks(self, sector: str) -> list[str]:
         """Sektördeki hisseleri döndür."""
         return SECTOR_STOCKS.get(sector.upper(), [])
 
-    def get_stock_sector(self, ticker: str) -> Optional[str]:
+    def get_stock_sector(self, ticker: str) -> str | None:
         """Hissenin sektörünü döndür."""
         for sector, stocks in SECTOR_STOCKS.items():
             if ticker in stocks:

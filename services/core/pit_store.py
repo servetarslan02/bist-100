@@ -11,9 +11,10 @@ Her veri kaydı:
 Kaynak: Quant research — pandas index alignment ile gelecek veri sızıntısı
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +27,7 @@ class PITRecord:
     field_name: str       # price, revenue, pe_ratio, vb.
     value: Any
     valid_from: datetime  # Bu tarihten itibaren biliniyor
-    valid_until: Optional[datetime] = None  # Bu tarihte düzeltildi
+    valid_until: datetime | None = None  # Bu tarihte düzeltildi
     source: str = ""
     revision: int = 0     # Kaçıncı revizyon
 
@@ -40,7 +41,7 @@ class PointInTimeStore:
 
     def __init__(self):
         # ticker → field_name → [PITRecord] (zaman sıralı)
-        self._store: Dict[str, Dict[str, List[PITRecord]]] = {}
+        self._store: dict[str, dict[str, list[PITRecord]]] = {}
 
     def insert(
         self,
@@ -80,7 +81,7 @@ class PointInTimeStore:
         ticker: str,
         field_name: str,
         as_of_date: datetime,
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """Belirli bir tarihte bilinen değeri döndür.
 
         Kritik: Sadece as_of_date'ten ÖNCE bilinen veriyi döndürür.
@@ -97,7 +98,7 @@ class PointInTimeStore:
 
         return result
 
-    def get_latest(self, ticker: str, field_name: str) -> Optional[Any]:
+    def get_latest(self, ticker: str, field_name: str) -> Any | None:
         """En son kaydedilen değeri döndür."""
         records = self._store.get(ticker, {}).get(field_name, [])
         return records[-1].value if records else None
@@ -106,9 +107,9 @@ class PointInTimeStore:
         self,
         ticker: str,
         field_name: str,
-        from_date: Optional[datetime] = None,
-        to_date: Optional[datetime] = None,
-    ) -> List[Dict]:
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+    ) -> list[dict]:
         """Değer geçmişini döndür."""
         records = self._store.get(ticker, {}).get(field_name, [])
         result = []
@@ -135,7 +136,7 @@ class PointInTimeStore:
     def bulk_insert(
         self,
         ticker: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         valid_from: datetime,
         source: str = "",
     ):
@@ -143,7 +144,7 @@ class PointInTimeStore:
         for field_name, value in data.items():
             self.insert(ticker, field_name, value, valid_from, source)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         total_records = sum(
             len(records)

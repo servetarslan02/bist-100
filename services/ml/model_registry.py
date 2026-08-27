@@ -4,11 +4,11 @@ Model version tracking, metrics storage, status management, lineage,
 artifact management, model comparison, snapshot/restore.
 """
 import os
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
-import pickle
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -23,26 +23,26 @@ class ModelEntry:
     version: str
     model_type: str
     status: str = "CANDIDATE"
-    metrics: Dict[str, Any] = field(default_factory=dict)
-    hyperparams: Dict[str, Any] = field(default_factory=dict)
-    features: List[str] = field(default_factory=list)
+    metrics: dict[str, Any] = field(default_factory=dict)
+    hyperparams: dict[str, Any] = field(default_factory=dict)
+    features: list[str] = field(default_factory=list)
     training_data_hash: str = ""
-    training_data_info: Dict[str, Any] = field(default_factory=dict)
+    training_data_info: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
-    promoted_at: Optional[str] = None
-    retired_at: Optional[str] = None
+    promoted_at: str | None = None
+    retired_at: str | None = None
     description: str = ""
-    tags: List[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
     # Lineage
-    parent_model: Optional[str] = None
-    training_config: Dict[str, Any] = field(default_factory=dict)
+    parent_model: str | None = None
+    training_config: dict[str, Any] = field(default_factory=dict)
     feature_set_version: str = ""
     # Performance tracking
-    production_metrics: Dict[str, Any] = field(default_factory=dict)
-    last_evaluated: Optional[str] = None
+    production_metrics: dict[str, Any] = field(default_factory=dict)
+    last_evaluated: str | None = None
     # Metadata
     author: str = "system"
-    notes: List[str] = field(default_factory=list)
+    notes: list[str] = field(default_factory=list)
 
 
 class ModelRegistry:
@@ -63,9 +63,9 @@ class ModelRegistry:
 
     def __init__(self, registry_path: str = "data/model_registry"):
         self._registry_path = registry_path
-        self._entries: Dict[str, ModelEntry] = {}
-        self._models: Dict[str, Any] = {}
-        self._snapshots: Dict[str, Dict[str, Any]] = {}
+        self._entries: dict[str, ModelEntry] = {}
+        self._models: dict[str, Any] = {}
+        self._snapshots: dict[str, dict[str, Any]] = {}
         os.makedirs(registry_path, exist_ok=True)
         self._load_registry()
 
@@ -74,15 +74,15 @@ class ModelRegistry:
         model_id: str,
         model: Any,
         model_type: str,
-        metrics: Dict[str, Any],
-        hyperparams: Optional[Dict[str, Any]] = None,
-        features: Optional[List[str]] = None,
+        metrics: dict[str, Any],
+        hyperparams: dict[str, Any] | None = None,
+        features: list[str] | None = None,
         training_data_hash: str = "",
-        training_data_info: Optional[Dict[str, Any]] = None,
+        training_data_info: dict[str, Any] | None = None,
         description: str = "",
-        tags: Optional[List[str]] = None,
-        parent_model: Optional[str] = None,
-        training_config: Optional[Dict[str, Any]] = None,
+        tags: list[str] | None = None,
+        parent_model: str | None = None,
+        training_config: dict[str, Any] | None = None,
         author: str = "system",
     ) -> str:
         """Model kaydet — otomatik version numarası.
@@ -103,7 +103,7 @@ class ModelRegistry:
             features=features or [],
             training_data_hash=training_data_hash,
             training_data_info=training_data_info or {},
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             description=description,
             tags=tags or [],
             parent_model=parent_model,
@@ -131,13 +131,13 @@ class ModelRegistry:
         for k, v in self._entries.items():
             if v.model_id == model_id and v.status == "CHAMPION":
                 v.status = "RETIRED"
-                v.retired_at = datetime.now(timezone.utc).isoformat()
+                v.retired_at = datetime.now(UTC).isoformat()
                 if reason:
                     v.notes.append(f"Retired: {reason}")
                 logger.info("model_retired", key=k)
 
         self._entries[key].status = "CHAMPION"
-        self._entries[key].promoted_at = datetime.now(timezone.utc).isoformat()
+        self._entries[key].promoted_at = datetime.now(UTC).isoformat()
         if reason:
             self._entries[key].notes.append(f"Promoted: {reason}")
 
@@ -168,14 +168,14 @@ class ModelRegistry:
         self._save_registry()
         return True
 
-    def get_champion(self, model_id: str) -> Optional[Dict[str, Any]]:
+    def get_champion(self, model_id: str) -> dict[str, Any] | None:
         """Champion model'i getir."""
         for key, entry in self._entries.items():
             if entry.model_id == model_id and entry.status == "CHAMPION":
                 return {"key": key, "entry": entry, "model": self._models.get(key)}
         return None
 
-    def get_latest(self, model_id: str, status: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def get_latest(self, model_id: str, status: str | None = None) -> dict[str, Any] | None:
         """En son version'u getir."""
         candidates = [
             (key, entry) for key, entry in self._entries.items()
@@ -188,7 +188,7 @@ class ModelRegistry:
         key, entry = candidates[0]
         return {"key": key, "entry": entry, "model": self._models.get(key)}
 
-    def get_model(self, model_id: str, version: str) -> Optional[Any]:
+    def get_model(self, model_id: str, version: str) -> Any | None:
         """Model objesini getir."""
         key = f"{model_id}:{version}"
         if key in self._models:
@@ -197,12 +197,12 @@ class ModelRegistry:
 
     def list_models(
         self,
-        model_id: Optional[str] = None,
-        status: Optional[str] = None,
-        model_type: Optional[str] = None,
-        tag: Optional[str] = None,
+        model_id: str | None = None,
+        status: str | None = None,
+        model_type: str | None = None,
+        tag: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Modelleri listele — filtre destekli."""
         results = []
         for key, entry in self._entries.items():
@@ -236,7 +236,7 @@ class ModelRegistry:
         model_id: str,
         version_a: str,
         version_b: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """İki versiyonu kapsamlı karşılaştır."""
         key_a = f"{model_id}:{version_a}"
         key_b = f"{model_id}:{version_b}"
@@ -290,7 +290,7 @@ class ModelRegistry:
         self,
         model_id: str,
         version: str,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
     ) -> bool:
         """Production metriklerini güncelle."""
         key = f"{model_id}:{version}"
@@ -298,7 +298,7 @@ class ModelRegistry:
             return False
 
         self._entries[key].production_metrics = metrics
-        self._entries[key].last_evaluated = datetime.now(timezone.utc).isoformat()
+        self._entries[key].last_evaluated = datetime.now(UTC).isoformat()
         self._save_registry()
         return True
 
@@ -308,19 +308,19 @@ class ModelRegistry:
         if key not in self._entries:
             return False
 
-        self._entries[key].notes.append(f"[{datetime.now(timezone.utc).isoformat()}] {note}")
+        self._entries[key].notes.append(f"[{datetime.now(UTC).isoformat()}] {note}")
         self._save_registry()
         return True
 
     def snapshot(self, name: str) -> bool:
         """Tüm registry'nin snapshot'ını al."""
         self._snapshots[name] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "entries": {k: asdict(v) for k, v in self._entries.items()},
         }
         return True
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Registry istatistikleri."""
         status_counts = {}
         type_counts = {}
@@ -366,7 +366,7 @@ class ModelRegistry:
         except Exception as e:
             logger.error("model_save_failed", key=key, error=str(e))
 
-    def _load_model(self, key: str) -> Optional[Any]:
+    def _load_model(self, key: str) -> Any | None:
         """Model'i diskten yükle (SHA256 doğrulamalı)."""
         try:
             from services.core.safe_pickle import safe_pickle_load
@@ -392,7 +392,7 @@ class ModelRegistry:
         try:
             path = os.path.join(self._registry_path, "registry.json")
             if os.path.exists(path):
-                with open(path, "r") as f:
+                with open(path) as f:
                     data = orjson.loads(f.read())
                 for key, entry_dict in data.items():
                     # Backward compatibility

@@ -3,9 +3,9 @@ ALPHA BIST — Yapısal ve Matematiksel Düzeltmeleri Kanıtlama Testi
 Tespit edilen 5 temel yöntemsel yanlışın sistem üzerinde düzeltildiğini doğrular.
 """
 
-import sys
 import os
-from datetime import datetime, timezone, timedelta
+import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -73,7 +73,7 @@ print("  [BAŞARILI] Rejime Duyarlı Dinamik Eşikleme ve Güven Füzyonu Kanıt
 
 # 3. TEST: Market Calendar UTC+3 Istanbul Timezone
 print("\n[TEST 3] Piyasa Takvimi: Europe/Istanbul (UTC+3) Zaman Dilimi Kanıtı...")
-from services.core.market_calendar import market_calendar, _TZ_ISTANBUL
+from services.core.market_calendar import _TZ_ISTANBUL, market_calendar
 
 info = market_calendar.get_info()
 print(f"  -> Sistem Saat Bilgisi: {info['date']} {info['time']} (Seans: {info['session']} | Açık: {info['is_market_open']})")

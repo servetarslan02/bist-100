@@ -11,8 +11,10 @@ BIST açığa satış kuralları:
 Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from datetime import UTC
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -22,7 +24,7 @@ logger = structlog.get_logger()
 class ShortSellingDecision:
     allowed: bool
     reason: str = ""
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
@@ -36,12 +38,12 @@ class ShortSellingMonitor:
     UPTICK_RULE_THRESHOLD_PCT = 2.0  # BIST-100 %2 düşünce uptick rule aktif
 
     def __init__(self):
-        self._bist50_cache: Optional[List[str]] = None
+        self._bist50_cache: list[str] | None = None
         self._gross_settlement_tickers: set = set()
         self._spk_banned_tickers: set = set()
         self._uptick_rule_active: bool = False  # BIST-100 düşünce aktif olur
 
-    def _get_bist50(self) -> List[str]:
+    def _get_bist50(self) -> list[str]:
         """BIST-50 hisselerini getir."""
         if self._bist50_cache is None:
             try:
@@ -63,19 +65,19 @@ class ShortSellingMonitor:
 
     def is_quarterly_rebalance_month(self) -> bool:
         """Bu ay BIST-50 yeniden dengeleme ayı mı? (Mart, Haziran, Eylül, Aralık)"""
-        from datetime import datetime, timezone
-        return datetime.now(timezone.utc).month in {3, 6, 9, 12}
+        from datetime import datetime
+        return datetime.now(UTC).month in {3, 6, 9, 12}
 
     def auto_refresh_if_needed(self):
         """Çeyrek dönemlerde otomatik yenile."""
         if self.is_quarterly_rebalance_month():
             self.refresh_bist50_cache()
 
-    def set_gross_settlement(self, tickers: List[str]):
+    def set_gross_settlement(self, tickers: list[str]):
         """Brüt takaslı hisseleri güncelle."""
         self._gross_settlement_tickers = set(tickers)
 
-    def set_spk_banned(self, tickers: List[str]):
+    def set_spk_banned(self, tickers: list[str]):
         """SPK geçici yasaklı hisseleri güncelle."""
         self._spk_banned_tickers = set(tickers)
 
@@ -164,13 +166,12 @@ class ShortSellingMonitor:
                     )
         else:
             # Uptick rule pasifken de temel fiyat kontrolü
-            if current_price > 0 and last_trade_price > 0:
-                if current_price < last_trade_price:
-                    return ShortSellingDecision(
-                        allowed=False,
-                        reason=f"Yukarı adım kuralı: güncel ({current_price}) < son işlem ({last_trade_price})",
-                        details={**details, "current_price": current_price, "last_trade_price": last_trade_price},
-                    )
+            if current_price > 0 and last_trade_price > 0 and current_price < last_trade_price:
+                return ShortSellingDecision(
+                    allowed=False,
+                    reason=f"Yukarı adım kuralı: güncel ({current_price}) < son işlem ({last_trade_price})",
+                    details={**details, "current_price": current_price, "last_trade_price": last_trade_price},
+                )
 
         return ShortSellingDecision(
             allowed=True,

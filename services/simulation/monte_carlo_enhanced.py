@@ -11,9 +11,10 @@ Gelişmiş Monte Carlo modelleri:
 Kaynaklar: Springer Data-Driven Monte Carlo (2026), LinkedIn Jump-Diffusion (2025)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -46,7 +47,7 @@ class MonteCarloResult:
     prob_down_10pct: float
 
     # Percentiles
-    percentiles: Dict[int, float]
+    percentiles: dict[int, float]
 
     # Path istatistikleri
     max_return_pct: float
@@ -77,7 +78,7 @@ class JumpDiffusionMonteCarlo:
         jump_intensity: float = 0.02,
         jump_mean: float = 0.0,
         jump_std: float = 0.05,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> MonteCarloResult:
         """Jump-diffusion Monte Carlo simülasyonu.
 
@@ -95,10 +96,7 @@ class JumpDiffusionMonteCarlo:
         Returns:
             MonteCarloResult
         """
-        if seed is not None:
-            rng = np.random.default_rng(seed)
-        else:
-            rng = np.random.default_rng()
+        rng = np.random.default_rng(seed) if seed is not None else np.random.default_rng()
 
         paths = np.zeros((num_sims, horizon + 1))
         paths[:, 0] = current_price
@@ -202,14 +200,14 @@ class CorrelatedMonteCarlo:
 
     def simulate_portfolio(
         self,
-        tickers: List[str],
+        tickers: list[str],
         prices: np.ndarray,
         returns_matrix: np.ndarray,
         weights: np.ndarray,
         num_sims: int = 10000,
         horizon: int = 20,
-        seed: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        seed: int | None = None,
+    ) -> dict[str, Any]:
         """Portföy bazlı Monte Carlo.
 
         Args:
@@ -224,10 +222,7 @@ class CorrelatedMonteCarlo:
         Returns:
             Portföy Monte Carlo sonuçları
         """
-        if seed is not None:
-            rng = np.random.default_rng(seed)
-        else:
-            rng = np.random.default_rng()
+        rng = np.random.default_rng(seed) if seed is not None else np.random.default_rng()
 
         n_assets = len(tickers)
         returns_matrix.shape[0]
@@ -332,7 +327,7 @@ class RegimeConditionedMonteCarlo:
         regime: str,
         num_sims: int = 10000,
         horizon: int = 20,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> MonteCarloResult:
         """Rejim-conditioned Monte Carlo.
 

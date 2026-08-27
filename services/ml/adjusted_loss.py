@@ -8,8 +8,8 @@ ROADMAP v3.0: Yanlış yön tahminleri 11x ceza
 KURAL: Yanlış yön tahminler çok pahalı!
 """
 
+
 import numpy as np
-from typing import Dict
 import structlog
 
 logger = structlog.get_logger()
@@ -29,7 +29,7 @@ class AdjustedMSELoss:
         self,
         predictions: np.ndarray,
         actuals: np.ndarray,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Asimetrik MSE hesapla.
 
@@ -71,7 +71,7 @@ class AdjustedMSELoss:
         self,
         prediction: float,
         actual: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Tek örnek için loss hesapla."""
         error = (prediction - actual) ** 2
 

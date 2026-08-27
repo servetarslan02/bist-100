@@ -12,22 +12,27 @@ Kapsam:
 - Role-based authorization (admin/operator/viewer)
 """
 
-import sys
-import os
 import asyncio
-import orjson
+import sys
 import time
 
 from services.core.alerting import (
-    AlertingSystem, Alert, AlertType, AlertSeverity, AlertStatus,
-    WebhookProvider, SlackProvider, DiscordProvider, PagerDutyProvider,
-    LogProvider, EmailProvider, NotificationRouter,
+    Alert,
+    AlertingSystem,
+    AlertStatus,
+    AlertType,
+    LogProvider,
+    NotificationRouter,
+    SlackProvider,
+    WebhookProvider,
 )
 from services.core.monitoring_security import (
-    AuthManager, AuthResult, JWTProvider, OAuthProvider,
-    StaticTokenProvider, ROLE_PERMISSIONS,
+    ROLE_PERMISSIONS,
+    AuthManager,
+    JWTProvider,
+    OAuthProvider,
+    StaticTokenProvider,
 )
-
 
 # =====================================================
 # ALERT LIFECYCLE TESTS
@@ -122,7 +127,7 @@ async def test_escalation_timeout():
     active = alerting.get_active_alerts()
     if not active:
         issues.append("Alert yok")
-        assert False, f"Escalation Timeout: {issues}"
+        raise AssertionError(f"Escalation Timeout: {issues}")
 
     # Manuel olarak timestamp'i eski yap
     for a in alerting._alerts:
@@ -156,7 +161,7 @@ async def test_acknowledge_stops_escalation():
     active = alerting.get_active_alerts()
     if not active:
         issues.append("Alert yok")
-        assert False, f"Acknowledge Stops Escalation: {issues}"
+        raise AssertionError(f"Acknowledge Stops Escalation: {issues}")
 
     fp = active[0]["fingerprint"]
 
@@ -170,9 +175,8 @@ async def test_acknowledge_stops_escalation():
     alerting._check_escalations()
 
     active = alerting.get_active_alerts()
-    if active:
-        if active[0]["status"] == "ESCALATED":
-            issues.append("Acknowledged alert escalate edildi")
+    if active and active[0]["status"] == "ESCALATED":
+        issues.append("Acknowledged alert escalate edildi")
 
     assert len(issues) == 0, f"Acknowledge Stops Escalation: {issues}"
 
@@ -348,7 +352,7 @@ async def test_jwt_validation():
         try:
             from jose import jwt as pyjwt
         except ImportError:
-            assert False, "JWT Validation: PyJWT not installed"
+            raise AssertionError("JWT Validation: PyJWT not installed") from None
 
     secret = "test_secret_key_12345"
     provider = JWTProvider(secret=secret, algorithm="HS256")
@@ -400,7 +404,7 @@ async def test_jwt_role_extraction():
         try:
             from jose import jwt as pyjwt
         except ImportError:
-            assert False, "JWT Role Extraction: PyJWT not installed"
+            raise AssertionError("JWT Role Extraction: PyJWT not installed") from None
 
     secret = "test_secret"
 

@@ -8,6 +8,7 @@ Kullanım:
 """
 
 import structlog
+
 from .database import get_pg_pool, get_pg_replica_pool
 
 logger = structlog.get_logger()
@@ -112,6 +113,7 @@ async def get_replication_metrics() -> dict:
 
 if __name__ == "__main__":
     import asyncio
+
     import orjson
 
     async def main():

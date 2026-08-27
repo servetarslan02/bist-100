@@ -15,9 +15,10 @@ BIST'in tamamından en güçlü fırsatları bulur:
 FAZ 8: Opportunity Discovery Engine
 """
 
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -56,9 +57,9 @@ class OpportunityScore:
     confidence: float = 0.0
 
     # Decomposition
-    decomposition: Dict[str, float] = field(default_factory=dict)
-    evidence: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
+    decomposition: dict[str, float] = field(default_factory=dict)
+    evidence: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
 
 
 class OpportunityDiscoveryEngine:
@@ -95,7 +96,7 @@ class OpportunityDiscoveryEngine:
     def compute_opportunity_score(
         self,
         ticker: str,
-        features: Dict[str, float],
+        features: dict[str, float],
         market_regime: str = "RANGE",
         ml_score: float = 50.0,
         event_score: float = 50.0,
@@ -107,7 +108,7 @@ class OpportunityDiscoveryEngine:
         """Tek hisse için fırsat skoru hesapla."""
         score = OpportunityScore(
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             price=features.get("price", 0) or features.get("close", 0),
             change_1d_pct=features.get("return_1d", 0),
         )
@@ -173,7 +174,7 @@ class OpportunityDiscoveryEngine:
 
         return score
 
-    def _compute_technical_score(self, f: Dict) -> float:
+    def _compute_technical_score(self, f: dict) -> float:
         """Teknik skor (0-100)."""
         score = 50.0
 
@@ -207,7 +208,7 @@ class OpportunityDiscoveryEngine:
 
         return max(0, min(100, score))
 
-    def _compute_momentum_score(self, f: Dict) -> float:
+    def _compute_momentum_score(self, f: dict) -> float:
         """Momentum skoru (0-100)."""
         score = 50.0
 
@@ -233,7 +234,7 @@ class OpportunityDiscoveryEngine:
 
         return max(0, min(100, score))
 
-    def _compute_volume_score(self, f: Dict) -> float:
+    def _compute_volume_score(self, f: dict) -> float:
         """Hacim skoru (0-100)."""
         score = 50.0
 
@@ -256,7 +257,7 @@ class OpportunityDiscoveryEngine:
 
         return max(0, min(100, score))
 
-    def _compute_volatility_score(self, f: Dict) -> float:
+    def _compute_volatility_score(self, f: dict) -> float:
         """Volatilite skoru (0-100). Düşük volatilite = yüksek skor."""
         score = 70.0
 
@@ -278,7 +279,7 @@ class OpportunityDiscoveryEngine:
 
         return max(0, min(100, score))
 
-    def _compute_regime_fit(self, f: Dict, regime: str) -> float:
+    def _compute_regime_fit(self, f: dict, regime: str) -> float:
         """Rejim uyumu (0-100)."""
         mom = f.get("momentum_20d", 0) or f.get("roc_20d", 0)
 
@@ -300,7 +301,7 @@ class OpportunityDiscoveryEngine:
         fit = regime_fit.get(regime, {"LONG": 50, "SHORT": 50})
         return fit.get(direction, 50)
 
-    def _compute_risk_score(self, f: Dict) -> float:
+    def _compute_risk_score(self, f: dict) -> float:
         """Risk skoru (0-100). Yüksek = güvenli."""
         score = 70.0
 
@@ -324,7 +325,7 @@ class OpportunityDiscoveryEngine:
 
         return max(0, min(100, score))
 
-    def _determine_signal(self, score: OpportunityScore, f: Dict) -> Tuple[str, str]:
+    def _determine_signal(self, score: OpportunityScore, f: dict) -> tuple[str, str]:
         """Sinyal türü ve yönünü belirle."""
         if score.opportunity_score < 50:
             return "", "NEUTRAL"
@@ -347,7 +348,7 @@ class OpportunityDiscoveryEngine:
 
         return signal_type, direction
 
-    def _generate_evidence(self, score: OpportunityScore, f: Dict) -> List[str]:
+    def _generate_evidence(self, score: OpportunityScore, f: dict) -> list[str]:
         """Gerekçe üret."""
         evidence = []
 
@@ -367,7 +368,7 @@ class OpportunityDiscoveryEngine:
 
         return evidence
 
-    def _generate_risks(self, score: OpportunityScore, f: Dict) -> List[str]:
+    def _generate_risks(self, score: OpportunityScore, f: dict) -> list[str]:
         """Risk üret."""
         risks = []
 
@@ -386,16 +387,16 @@ class OpportunityDiscoveryEngine:
 
     def scan_universe(
         self,
-        universe: List[str],
-        features_map: Dict[str, Dict[str, float]],
+        universe: list[str],
+        features_map: dict[str, dict[str, float]],
         market_regime: str = "RANGE",
-        ml_scores: Optional[Dict[str, float]] = None,
-        event_scores: Optional[Dict[str, float]] = None,
-        sentiment_scores: Optional[Dict[str, float]] = None,
-        fundamental_scores: Optional[Dict[str, float]] = None,
-        valuation_scores: Optional[Dict[str, float]] = None,
-        macro_scores: Optional[Dict[str, float]] = None,
-    ) -> List[OpportunityScore]:
+        ml_scores: dict[str, float] | None = None,
+        event_scores: dict[str, float] | None = None,
+        sentiment_scores: dict[str, float] | None = None,
+        fundamental_scores: dict[str, float] | None = None,
+        valuation_scores: dict[str, float] | None = None,
+        macro_scores: dict[str, float] | None = None,
+    ) -> list[OpportunityScore]:
         """Tüm BIST'i tara ve fırsatları sırala."""
         results = []
 
@@ -430,10 +431,10 @@ class OpportunityDiscoveryEngine:
 
     def get_top_opportunities(
         self,
-        results: List[OpportunityScore],
+        results: list[OpportunityScore],
         limit: int = 20,
         min_score: float = 50.0,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """En iyi fırsatları getir."""
         filtered = [r for r in results if r.risk_adjusted_score >= min_score]
 
@@ -462,7 +463,7 @@ opportunity_engine = OpportunityDiscoveryEngine()
 # =====================================================
 # Scanner Modül Bağlantıları
 # =====================================================
-def run_full_scan(universe: List[str], market_data: Dict = None) -> List[Dict]:
+def run_full_scan(universe: list[str], market_data: dict = None) -> list[dict]:
     """Tüm scanner modüllerini çalıştır."""
     results = []
     try:

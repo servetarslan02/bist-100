@@ -10,10 +10,10 @@ Veri ingestion anında anomali tespiti:
 Kaynak: Confluent streaming quality, Monte Carlo anomaly detection
 """
 
-import numpy as np
-from typing import Dict, List
-from dataclasses import dataclass
 from collections import deque
+from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -38,9 +38,9 @@ class StreamingAnomalyDetector:
 
     def __init__(self, window_size: int = 100):
         self._window_size = window_size
-        self._price_history: Dict[str, deque] = {}   # ticker → deque of prices
-        self._volume_history: Dict[str, deque] = {}
-        self._spread_history: Dict[str, deque] = {}
+        self._price_history: dict[str, deque] = {}   # ticker → deque of prices
+        self._volume_history: dict[str, deque] = {}
+        self._spread_history: dict[str, deque] = {}
 
     def check_price(
         self,
@@ -174,7 +174,7 @@ class StreamingAnomalyDetector:
         bid: float = 0,
         ask: float = 0,
         volatility: float = 0.25,
-    ) -> List[AnomalyResult]:
+    ) -> list[AnomalyResult]:
         """Tüm anomalileri kontrol et."""
         results = []
 
@@ -190,7 +190,7 @@ class StreamingAnomalyDetector:
 
         return results
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "tracked_tickers": len(self._price_history),

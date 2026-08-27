@@ -1,7 +1,7 @@
 """
 ALPHA BIST — Cross-Sectional + Temporal Model v1.0
 
-ROADMAP v3.0: 
+ROADMAP v3.0:
 - Cross-Sectional: Aynı gün diğer hisselerin durumu (sektör, BIST rank)
 - Temporal: Zaman serisi (momentum, trend)
 - Birleşik: Her iki boyut birlikte
@@ -9,9 +9,10 @@ ROADMAP v3.0:
 KURAL: Hisse yalnız değil, bağlamında değerlendir!
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from collections import defaultdict
+from typing import Any, Dict, List, Optional
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -20,17 +21,17 @@ class CrossSectionalFeatures:
     """Cross-sectional feature hesaplama."""
 
     def __init__(self):
-        self._sector_data: Dict[str, List[Dict]] = defaultdict(list)
-        self._market_data: Dict[str, Any] = {}
+        self._sector_data: dict[str, list[dict]] = defaultdict(list)
+        self._market_data: dict[str, Any] = {}
         logger.info("CrossSectionalFeatures initialized")
 
     def calculate_sector_relative(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        sector_tickers: List[str],
-        all_features: Dict[str, Dict],
-    ) -> Dict[str, Any]:
+        features: dict[str, Any],
+        sector_tickers: list[str],
+        all_features: dict[str, dict],
+    ) -> dict[str, Any]:
         """Sektör bazlı göreceli feature'lar."""
 
         cs_features = {}
@@ -73,9 +74,9 @@ class CrossSectionalFeatures:
     def calculate_market_relative(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        all_features: Dict[str, Dict],
-    ) -> Dict[str, Any]:
+        features: dict[str, Any],
+        all_features: dict[str, dict],
+    ) -> dict[str, Any]:
         """Piyasa (BIST-100) bazlı göreceli feature'lar."""
 
         market_features = {}
@@ -115,9 +116,9 @@ class CrossSectionalFeatures:
     def calculate_peer_correlation(
         self,
         ticker: str,
-        price_history: Dict[str, List[float]],
-        sector_tickers: List[str],
-    ) -> Dict[str, Any]:
+        price_history: dict[str, list[float]],
+        sector_tickers: list[str],
+    ) -> dict[str, Any]:
         """Sektör arkadaşları ile korelasyon."""
 
         if ticker not in price_history:
@@ -154,9 +155,9 @@ class TemporalFeatures:
 
     def calculate_trend_features(
         self,
-        prices: List[float],
-        volumes: Optional[List[float]] = None,
-    ) -> Dict[str, Any]:
+        prices: list[float],
+        volumes: list[float] | None = None,
+    ) -> dict[str, Any]:
         """Trend feature'ları."""
 
         if len(prices) < 20:
@@ -192,9 +193,9 @@ class TemporalFeatures:
 
     def calculate_regime_features(
         self,
-        prices: List[float],
+        prices: list[float],
         window: int = 60,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Regime feature'ları."""
 
         if len(prices) < window:

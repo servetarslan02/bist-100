@@ -7,12 +7,13 @@ Confidence-weighted conflict resolution.
 FAZ 4: Conflict Resolution + Communication
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
-from .agent_system import AgentRole, AgentResult
+from .agent_system import AgentResult, AgentRole
 
 logger = structlog.get_logger()
 
@@ -24,8 +25,8 @@ class AgentMessage:
     receiver: AgentRole
     task_id: str
     message_type: str  # REQUEST, RESPONSE, DEBATE, ALERT, CONTEXT
-    payload: Dict[str, Any] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    payload: dict[str, Any] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     priority: str = "NORMAL"  # LOW, NORMAL, HIGH, CRITICAL
 
 
@@ -35,11 +36,11 @@ class Resolution:
     direction: str
     confidence: float
     method: str  # majority_vote, confidence_tiebreak, debate_consensus, risk_veto
-    vote_distribution: Dict[str, int] = field(default_factory=dict)
+    vote_distribution: dict[str, int] = field(default_factory=dict)
     conflict: bool = False
-    agents: Dict[str, List[str]] = field(default_factory=dict)
+    agents: dict[str, list[str]] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "direction": self.direction,
             "confidence": self.confidence,
@@ -62,10 +63,10 @@ class AgentCommunicationBus:
     """
 
     def __init__(self):
-        self._message_queue: Dict[AgentRole, List[AgentMessage]] = {
+        self._message_queue: dict[AgentRole, list[AgentMessage]] = {
             role: [] for role in AgentRole
         }
-        self._message_log: List[AgentMessage] = []
+        self._message_log: list[AgentMessage] = []
 
     def send(self, message: AgentMessage):
         """Mesaj gönder."""
@@ -74,13 +75,13 @@ class AgentCommunicationBus:
         if len(self._message_log) > 1000:
             self._message_log = self._message_log[-1000:]
 
-    def receive(self, role: AgentRole) -> List[AgentMessage]:
+    def receive(self, role: AgentRole) -> list[AgentMessage]:
         """Mesaj al (ve kuyruktan sil)."""
         messages = self._message_queue.get(role, [])
         self._message_queue[role] = []
         return messages
 
-    def peek(self, role: AgentRole) -> List[AgentMessage]:
+    def peek(self, role: AgentRole) -> list[AgentMessage]:
         """Mesajları görüntüle (kuyruktan silmeden)."""
         return self._message_queue.get(role, [])
 
@@ -88,7 +89,7 @@ class AgentCommunicationBus:
         self,
         sender: AgentRole,
         message_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         priority: str = "NORMAL",
     ):
         """Tüm agent'lara gönder."""
@@ -103,7 +104,7 @@ class AgentCommunicationBus:
                     priority=priority,
                 ))
 
-    def get_context_enrichment(self, role: AgentRole) -> Dict[str, Any]:
+    def get_context_enrichment(self, role: AgentRole) -> dict[str, Any]:
         """Bu agent için diğer agent'lardan gelen bağlamı topla."""
         messages = self.receive(role)
         return {
@@ -134,8 +135,8 @@ class AgentCommunicationBus:
     def get_message_log(
         self,
         limit: int = 50,
-        message_type: Optional[str] = None,
-    ) -> List[Dict]:
+        message_type: str | None = None,
+    ) -> list[dict]:
         """Mesaj geçmişini getir."""
         messages = self._message_log
         if message_type:
@@ -169,10 +170,10 @@ class ConflictResolver:
 
     def resolve(
         self,
-        results: Dict[AgentRole, AgentResult],
-        debate_consensus: Optional[str] = None,
+        results: dict[AgentRole, AgentResult],
+        debate_consensus: str | None = None,
         risk_approved: bool = True,
-        risk_veto_reason: Optional[str] = None,
+        risk_veto_reason: str | None = None,
     ) -> Resolution:
         """Çelişki varsa çöz.
 
@@ -218,7 +219,7 @@ class ConflictResolver:
             )
 
         # Yön bazlı gruplama
-        direction_groups: Dict[str, List[tuple]] = {}
+        direction_groups: dict[str, list[tuple]] = {}
         for role, result in valid.items():
             direction = result.output.get("direction", "NEUTRAL")
             if direction not in direction_groups:

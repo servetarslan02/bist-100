@@ -3,9 +3,10 @@
 Reinforcement Learning agent — PPO, A2C, DQN desteği,
 custom reward function, multi-action space, proper training.
 """
-import numpy as np
-from typing import Dict, Any, Optional
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -47,7 +48,7 @@ class BISTTradingEnv:
         self,
         features: np.ndarray,
         prices: np.ndarray,
-        returns: Optional[np.ndarray] = None,
+        returns: np.ndarray | None = None,
         initial_capital: float = 100_000,
         commission_rate: float = 0.001,
         max_position: float = 1.0,
@@ -170,7 +171,7 @@ class BISTTradingEnv:
         else:  # risk_adjusted
             return (self._portfolio_values[-1] / self.initial_capital) - 1.0
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Performans metrikleri."""
         values = np.array(self._portfolio_values)
         total_return = (values[-1] / self.initial_capital) - 1.0
@@ -192,7 +193,7 @@ class BISTTradingEnv:
 
 def train_rl_agent(
     env: Any,
-    config: Optional[RLConfig] = None,
+    config: RLConfig | None = None,
 ) -> Any:
     """RL agent eğit.
 
@@ -206,7 +207,7 @@ def train_rl_agent(
     config = config or RLConfig()
 
     try:
-        from stable_baselines3 import PPO, A2C, DQN
+        from stable_baselines3 import A2C, DQN, PPO
         from stable_baselines3.common.vec_env import DummyVecEnv
     except ImportError:
         logger.warning("stable-baselines3 not installed — pip install stable-baselines3")
@@ -266,7 +267,7 @@ def train_rl_agent(
     return model
 
 
-def evaluate_rl_agent(model: Any, env: Any, n_episodes: int = 10) -> Dict[str, Any]:
+def evaluate_rl_agent(model: Any, env: Any, n_episodes: int = 10) -> dict[str, Any]:
     """RL agent'ı değerlendir.
 
     Args:
@@ -280,7 +281,7 @@ def evaluate_rl_agent(model: Any, env: Any, n_episodes: int = 10) -> Dict[str, A
     episode_rewards = []
     episode_metrics = []
 
-    for episode in range(n_episodes):
+    for _episode in range(n_episodes):
         obs, _ = env.reset()
         total_reward = 0
         done = False

@@ -11,10 +11,10 @@ ROADMAP v3.0 FAZ 6:
 KURAL: KAP'tan haberden anlam çıkarmak = altın değerinde.
 """
 
-import numpy as np
-from typing import Dict, List, Optional
-from dataclasses import dataclass, field
 from collections import defaultdict
+from dataclasses import dataclass, field
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -31,8 +31,8 @@ class KAPDocument:
     content: str
     sentiment: float = 0.0
     importance: float = 0.5
-    entities: List[str] = field(default_factory=list)
-    key_metrics: Dict[str, float] = field(default_factory=dict)
+    entities: list[str] = field(default_factory=list)
+    key_metrics: dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
@@ -41,10 +41,10 @@ class LLMInsight:
     ticker: str
     overall_sentiment: float
     confidence: float
-    key_topics: List[str]
-    risk_factors: List[str]
-    opportunity_factors: List[str]
-    sector_impact: Dict[str, float]
+    key_topics: list[str]
+    risk_factors: list[str]
+    opportunity_factors: list[str]
+    sector_impact: dict[str, float]
     summary: str
 
 
@@ -68,8 +68,8 @@ class KAPLLMExtractor:
     }
 
     def __init__(self):
-        self._knowledge_graph: Dict[str, Dict] = defaultdict(lambda: {"relations": [], "events": []})
-        self._sector_impact_cache: Dict[str, Dict] = {}
+        self._knowledge_graph: dict[str, dict] = defaultdict(lambda: {"relations": [], "events": []})
+        self._sector_impact_cache: dict[str, dict] = {}
         logger.info("KAPLLMExtractor v3.0 initialized")
 
     def extract_structured_kap(
@@ -120,8 +120,8 @@ class KAPLLMExtractor:
 
     def analyze_with_llm(
         self,
-        documents: List[KAPDocument],
-        news_articles: Optional[List[Dict]] = None,
+        documents: list[KAPDocument],
+        news_articles: list[dict] | None = None,
     ) -> LLMInsight:
         """LLM ile derinlemesine analiz.
 
@@ -189,9 +189,9 @@ class KAPLLMExtractor:
 
     def discover_factors_agentic(
         self,
-        market_data: Dict[str, any],
+        market_data: dict[str, any],
         lookback_days: int = 252,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """Agentic Factor Discovery — piyasadan yeni faktörler keşfet.
 
         Bu fonksiyon:
@@ -254,7 +254,7 @@ class KAPLLMExtractor:
 
         return default
 
-    def _extract_metrics(self, text: str, fields: List[str]) -> Dict[str, float]:
+    def _extract_metrics(self, text: str, fields: list[str]) -> dict[str, float]:
         """Metinden sayısal metrikler çıkar."""
         import re
         metrics = {}
@@ -273,7 +273,7 @@ class KAPLLMExtractor:
 
         return metrics
 
-    def _extract_entities(self, text: str) -> List[str]:
+    def _extract_entities(self, text: str) -> list[str]:
         """Metinden entity'ler çıkar."""
         # Basit entity extraction
         entities = []
@@ -315,7 +315,7 @@ class KAPLLMExtractor:
         lines = text.strip().split('\n')
         return lines[0][:200] if lines else ""
 
-    def _estimate_sector_impact(self, documents: List[KAPDocument]) -> Dict[str, float]:
+    def _estimate_sector_impact(self, documents: list[KAPDocument]) -> dict[str, float]:
         """Sektör zincirleme etkisini tahmin et."""
         impact = {}
 
@@ -330,7 +330,7 @@ class KAPLLMExtractor:
 
         return impact
 
-    def _generate_summary(self, documents: List[KAPDocument], sentiment: float) -> str:
+    def _generate_summary(self, documents: list[KAPDocument], sentiment: float) -> str:
         """Özet oluştur — Canlı Gemini AI veya kural tabanlı fallback."""
         if not documents:
             return "Analiz edilecek KAP dokümanı bulunamadı."
@@ -357,7 +357,7 @@ class KAPLLMExtractor:
         return f"{len(documents)} KAP dokümanı analiz edildi. Genel ton: {tone}. " \
                f"Kategoriler: {categories}. Sentiment: {sentiment:.2f}"
 
-    def get_knowledge_graph(self, ticker: str) -> Dict:
+    def get_knowledge_graph(self, ticker: str) -> dict:
         """Knowledge graph'ı getir."""
         return dict(self._knowledge_graph.get(ticker, {}))
 

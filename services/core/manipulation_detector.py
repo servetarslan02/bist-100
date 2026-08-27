@@ -7,10 +7,12 @@ Geliştirmeler:
 - Price clustering: Benford analizi
 - Layering: birden fazla seviyede emir manipülasyonu
 """
-import numpy as np
-from typing import Dict, Any, List
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
+
 logger = structlog.get_logger()
 
 @dataclass
@@ -18,14 +20,14 @@ class ManipulationAlert:
     alert_type: str   # WASH_TRADING, SPOOFING, LAYERING, VOLUME_MANIP, PRICE_CLUSTER
     severity: str     # LOW, MEDIUM, HIGH, CRITICAL
     description: str
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
     def __post_init__(self):
         if self.details is None: self.details = {}
 
 class ManipulationDetector:
     """Manipülasyon tespit motoru — istatistiksel testler ile."""
 
-    def detect_wash_trading(self, trades: List[Dict], window: int = 20) -> List[ManipulationAlert]:
+    def detect_wash_trading(self, trades: list[dict], window: int = 20) -> list[ManipulationAlert]:
         """Wash trading tespiti — adjacent + pencere bazlı anomali.
 
         Sadece bitişik trade'ler değil, penceredeki tekrarlayan fiyat/hacim
@@ -58,7 +60,7 @@ class ManipulationDetector:
 
         return alerts
 
-    def detect_spoofing(self, orders: List[Dict], window: int = 50) -> List[ManipulationAlert]:
+    def detect_spoofing(self, orders: list[dict], window: int = 50) -> list[ManipulationAlert]:
         """Spoofing tespiti — iptal oranı + emir boyutu anomalisi.
 
         Gelişmiş: büyük emirlerin iptal oranı normalden yüksekse spoofing.
@@ -100,7 +102,7 @@ class ManipulationDetector:
 
         return alerts
 
-    def detect_volume_manipulation(self, volumes: List[float], window: int = 20) -> List[ManipulationAlert]:
+    def detect_volume_manipulation(self, volumes: list[float], window: int = 20) -> list[ManipulationAlert]:
         """Hacim manipülasyonu tespiti — Z-score + percentil bazlı."""
         alerts = []
         if not volumes or len(volumes) < window:
@@ -132,7 +134,7 @@ class ManipulationDetector:
 
         return alerts
 
-    def detect_price_clustering(self, prices: List[float], window: int = 50) -> List[ManipulationAlert]:
+    def detect_price_clustering(self, prices: list[float], window: int = 50) -> list[ManipulationAlert]:
         """Fiyat kümeleme tespiti — yuvarlama anomalisi.
 
         Manipülatörler genellikle yuvarlak fiyatlar kullanır.
@@ -160,8 +162,8 @@ class ManipulationDetector:
 
         return alerts
 
-    def detect_all(self, trades: List[Dict] = None, orders: List[Dict] = None,
-                   volumes: List[float] = None, prices: List[float] = None) -> List[ManipulationAlert]:
+    def detect_all(self, trades: list[dict] = None, orders: list[dict] = None,
+                   volumes: list[float] = None, prices: list[float] = None) -> list[ManipulationAlert]:
         """Tüm tespitleri çalıştır."""
         all_alerts = []
         if trades:

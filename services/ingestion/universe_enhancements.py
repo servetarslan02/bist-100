@@ -9,10 +9,11 @@ ALPHA BIST — BIST Universe Enhancements v1.0
 - Outlier detection
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -67,7 +68,7 @@ class UniverseEnhancements:
 
         return max(0, min(100, score))
 
-    def classify_listing_status(self, ticker: str, last_trade_date: Optional[str] = None, has_suspension: bool = False) -> str:
+    def classify_listing_status(self, ticker: str, last_trade_date: str | None = None, has_suspension: bool = False) -> str:
         """Listing status sınıflandır."""
         if has_suspension:
             return "SUSPENDED"
@@ -75,7 +76,7 @@ class UniverseEnhancements:
         if last_trade_date:
             try:
                 last = datetime.fromisoformat(last_trade_date)
-                days_since = (datetime.now(timezone.utc) - last.replace(tzinfo=timezone.utc)).days
+                days_since = (datetime.now(UTC) - last.replace(tzinfo=UTC)).days
                 if days_since > 30:
                     return "DELISTED"
                 elif days_since > 5:
@@ -89,7 +90,7 @@ class UniverseEnhancements:
 class CrossSourceReconciliation:
     """Çapraz kaynak doğrulama."""
 
-    def reconcile_price(self, sources: Dict[str, float], tolerance_pct: float = 2.0) -> Dict[str, Any]:
+    def reconcile_price(self, sources: dict[str, float], tolerance_pct: float = 2.0) -> dict[str, Any]:
         """Fiyat kaynaklarını doğrula.
 
         Args:
@@ -133,7 +134,7 @@ class CrossSourceReconciliation:
 class OutlierDetector:
     """Anomali/aykırı değer tespiti."""
 
-    def detect_zscore_outliers(self, values: List[float], threshold: float = 4.0) -> List[int]:
+    def detect_zscore_outliers(self, values: list[float], threshold: float = 4.0) -> list[int]:
         """Z-score ile outlier tespit et."""
         if len(values) < 5:
             return []
@@ -148,7 +149,7 @@ class OutlierDetector:
         zscores = np.abs((arr - mean) / std)
         return [i for i, z in enumerate(zscores) if z > threshold]
 
-    def detect_iqr_outliers(self, values: List[float]) -> List[int]:
+    def detect_iqr_outliers(self, values: list[float]) -> list[int]:
         """IQR ile outlier tespit et."""
         if len(values) < 5:
             return []
@@ -167,18 +168,18 @@ class SurvivorshipBiasProtection:
     """Survivorship bias koruması."""
 
     def __init__(self):
-        self._delisted: Dict[str, Dict] = {}
+        self._delisted: dict[str, dict] = {}
 
     def mark_delisted(self, ticker: str, delist_date: str, reason: str = ""):
         """Şirketi delisted olarak işaretle."""
         self._delisted[ticker] = {
             "delist_date": delist_date,
             "reason": reason,
-            "marked_at": datetime.now(timezone.utc).isoformat(),
+            "marked_at": datetime.now(UTC).isoformat(),
         }
         logger.info("Company marked delisted", ticker=ticker, date=delist_date)
 
-    def is_delisted(self, ticker: str, as_of_date: Optional[str] = None) -> bool:
+    def is_delisted(self, ticker: str, as_of_date: str | None = None) -> bool:
         """Belirli bir tarihte delisted mi?"""
         info = self._delisted.get(ticker)
         if not info:
@@ -188,11 +189,11 @@ class SurvivorshipBiasProtection:
             return info["delist_date"] <= as_of_date
         return True
 
-    def get_active_universe(self, all_tickers: List[str], as_of_date: str) -> List[str]:
+    def get_active_universe(self, all_tickers: list[str], as_of_date: str) -> list[str]:
         """Belirli bir tarihte aktif olan hisseleri döndür (survivorship bias koruması)."""
         return [t for t in all_tickers if not self.is_delisted(t, as_of_date)]
 
-    def get_delisted(self) -> Dict[str, Dict]:
+    def get_delisted(self) -> dict[str, dict]:
         """Delisted şirketleri döndür."""
         return dict(self._delisted)
 

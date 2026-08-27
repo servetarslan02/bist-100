@@ -1,6 +1,7 @@
-import urllib.request
-import orjson
 import sys
+import urllib.request
+
+import orjson
 
 # Ensure UTF-8 stdout
 sys.stdout.reconfigure(encoding='utf-8')

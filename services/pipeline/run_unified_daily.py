@@ -19,14 +19,15 @@ iki aşamalı günlük işlem akışını yönetir:
 """
 
 import asyncio
-import orjson
-import structlog
-from datetime import datetime, date
-import polars as pl
-from typing import Dict, Any, Optional
+from datetime import date, datetime, timedelta, timezone
+from typing import Any
 
-from services.core.database import pg_fetch, pg_execute, init_databases
+import orjson
+import polars as pl
+import structlog
+
 from services.core.alpha_engine import AlphaEngine
+from services.core.database import init_databases, pg_execute, pg_fetch
 from services.paper_trading.paper_orchestrator import paper_orchestrator
 
 logger = structlog.get_logger("unified_daily")
@@ -35,13 +36,13 @@ logger = structlog.get_logger("unified_daily")
 HOLDING_PERIOD_DAYS = 63
 
 
-async def get_last_rebalance_date() -> Optional[date]:
+async def get_last_rebalance_date() -> date | None:
     """Veritabanından son gerçek rebalance tarihini döner."""
     query = """
-        SELECT created_at 
-        FROM paper_trade_portfolio 
+        SELECT created_at
+        FROM paper_trade_portfolio
         WHERE is_rebalance = TRUE
-        ORDER BY created_at DESC 
+        ORDER BY created_at DESC
         LIMIT 1
     """
     try:
@@ -53,7 +54,7 @@ async def get_last_rebalance_date() -> Optional[date]:
     return None
 
 
-async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalance: bool = False) -> Dict[str, Any]:
+async def run_eod_signal_cycle(target_date: str | None = None, force_rebalance: bool = False) -> dict[str, Any]:
     """18:15 EOD: Sinyalleri üretir, kuyruğa alır ve portföy MTM değerlemesini yapar."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
@@ -62,15 +63,14 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
 
     current_positions = [p["ticker"] for p in paper_orchestrator.portfolio.get_all_positions()]
     last_rebalance = await get_last_rebalance_date()
-    
+
     # Eger portfoyde hic pozisyon yoksa (0 pozisyon) veya force_rebalance istenmisse MUTLAKA rebalance yap
     needs_rebalance = True
-    if len(current_positions) > 0 and not force_rebalance:
-        if last_rebalance is not None:
-            days_passed = (today_dt - last_rebalance).days
-            if days_passed < HOLDING_PERIOD_DAYS:
-                needs_rebalance = False
-                logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
+    if len(current_positions) > 0 and not force_rebalance and last_rebalance is not None:
+        days_passed = (today_dt - last_rebalance).days
+        if days_passed < HOLDING_PERIOD_DAYS:
+            needs_rebalance = False
+            logger.info("Rebalance period not reached. Only MTM will be performed", days_passed=days_passed)
 
     engine = AlphaEngine()
     start_date = (today_dt - datetime.timedelta(days=400)).strftime("%Y-%m-%d")
@@ -178,7 +178,7 @@ async def run_eod_signal_cycle(target_date: Optional[str] = None, force_rebalanc
     }
 
 
-async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict[str, Any]:
+async def run_morning_execution_cycle(target_date: str | None = None) -> dict[str, Any]:
     """09:55-10:05 Sabah Açılışı: Bekleyen emirleri gerçek açılış ve mikro-yapı defteriyle yürütür."""
     await init_databases()
     today_str = target_date or date.today().strftime("%Y-%m-%d")
@@ -212,7 +212,7 @@ async def run_morning_execution_cycle(target_date: Optional[str] = None) -> Dict
     return report
 
 
-async def run_unified_daily_cycle() -> Dict[str, Any]:
+async def run_unified_daily_cycle() -> dict[str, Any]:
     """API ve zamanlayıcı için ortak orkestrasyon fonksiyonu."""
     now_hour = datetime.now(timezone(timedelta(hours=3))).hour
     pending = paper_orchestrator.store.load_pending_signals()

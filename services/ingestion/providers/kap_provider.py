@@ -8,7 +8,8 @@ v2.0: Async refactor + detaylı KAP çekme + corporate actions parsing
 """
 
 import re
-from typing import Optional, List, Dict, Any
+from typing import Any
+
 import structlog
 
 from ...core.async_http import get_client
@@ -43,12 +44,12 @@ class KAPProvider:
 
     async def fetch_disclosures(
         self,
-        from_date: Optional[str] = None,
-        to_date: Optional[str] = None,
-        ticker: Optional[str] = None,
-        category: Optional[str] = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+        ticker: str | None = None,
+        category: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """KAP açıklamalarını çek (async).
 
         Args:
@@ -94,7 +95,7 @@ class KAPProvider:
             logger.debug("KAP fetch fallback activated", error=str(e))
             return []
 
-    async def fetch_company_info(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_company_info(self, ticker: str) -> dict[str, Any] | None:
         """Şirket bilgisi çek (async)."""
         try:
             data = await self._client.get_json(f"{KAP_API_URL}/company/{ticker}")
@@ -114,7 +115,7 @@ class KAPProvider:
             logger.warning("KAP company info failed", ticker=ticker, error=str(e))
             return None
 
-    async def fetch_financial_data(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_financial_data(self, ticker: str) -> dict[str, Any] | None:
         """Finansal veri çek (async)."""
         try:
             data = await self._client.get_json(f"{KAP_API_URL}/financial/{ticker}")
@@ -138,10 +139,10 @@ class KAPProvider:
 
     async def fetch_corporate_actions(
         self,
-        ticker: Optional[str] = None,
-        from_date: Optional[str] = None,
-        to_date: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        ticker: str | None = None,
+        from_date: str | None = None,
+        to_date: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Şirket olaylarını çek (async) — temettü, bölünme, bedelsiz."""
         try:
             params = {"limit": "100"}
@@ -185,15 +186,15 @@ class KAPProvider:
     async def fetch_price_sensitive_disclosures(
         self,
         ticker: str,
-        from_date: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        from_date: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Fiyat olayı niteliğindeki KAP açıklamaları (async)."""
         all_disclosures = await self.fetch_disclosures(
             ticker=ticker, from_date=from_date, limit=100
         )
         return [d for d in all_disclosures if d.get("is_price_sensitive")]
 
-    def _is_price_sensitive(self, item: Dict) -> bool:
+    def _is_price_sensitive(self, item: dict) -> bool:
         """Fiyat olayı niteliğinde mi?"""
         category = item.get("category", "").upper()
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
@@ -216,7 +217,7 @@ class KAPProvider:
 
         return any(kw in title for kw in sensitive_keywords)
 
-    def _classify_sentiment(self, item: Dict) -> float:
+    def _classify_sentiment(self, item: dict) -> float:
         """KAP açıklaması sentiment skoru."""
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
@@ -245,7 +246,7 @@ class KAPProvider:
             return 0.0
         return round((pos - neg) / total, 3)
 
-    def _classify_importance(self, item: Dict) -> int:
+    def _classify_importance(self, item: dict) -> int:
         """Önem derecesi (1-5)."""
         category = item.get("category", "").upper()
 
@@ -257,7 +258,7 @@ class KAPProvider:
             return 3
         return 2
 
-    def _classify_action_type(self, item: Dict) -> Optional[str]:
+    def _classify_action_type(self, item: dict) -> str | None:
         """Şirket olayı türünü sınıflandır."""
         title = (item.get("title", "") + " " + item.get("summary", "")).lower()
 
@@ -277,7 +278,7 @@ class KAPProvider:
             return "DELISTING"
         return None
 
-    def _extract_amount(self, item: Dict) -> Optional[float]:
+    def _extract_amount(self, item: dict) -> float | None:
         """Temettü miktarını çıkar."""
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
@@ -294,7 +295,7 @@ class KAPProvider:
                     continue
         return None
 
-    def _extract_ratio(self, item: Dict) -> Optional[float]:
+    def _extract_ratio(self, item: dict) -> float | None:
         """Bölünme/bedelsiz oranını çıkar."""
         text = item.get("title", "") + " " + item.get("summary", "")
         patterns = [
@@ -310,19 +311,19 @@ class KAPProvider:
                     continue
         return None
 
-    def sync_disclosures_to_registry(self, disclosures: List[Dict[str, Any]], current_date: str) -> int:
+    def sync_disclosures_to_registry(self, disclosures: list[dict[str, Any]], current_date: str) -> int:
         """KAP bildirimlerinden VBTS / Tedbir / İşlem durdurma kararlarını ayıklar ve KAPMarketRestrictionRegistry'ye kaydeder."""
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
-        
+
         registered_count = 0
         for item in disclosures:
             ticker = item.get("ticker", "").strip()
             if not ticker:
                 continue
-            
+
             title = (item.get("title", "") + " " + item.get("summary", "")).lower()
             pub_date = item.get("publish_date", current_date)
-            
+
             # 1. VBTS Brüt Takas Tespiti
             if any(w in title for w in ["brüt takas", "brut takas", "gross settlement"]):
                 kap_restriction_registry.register_restriction(
@@ -333,7 +334,7 @@ class KAPProvider:
                     details=item.get("title", "KAP VBTS Brüt Takas Bildirimi")
                 )
                 registered_count += 1
-            
+
             # 2. VBTS Açığa Satış ve Kredili İşlem Yasağı
             elif any(w in title for w in ["açığa satış", "kredili işlem", "short sale ban"]):
                 kap_restriction_registry.register_restriction(
@@ -344,7 +345,7 @@ class KAPProvider:
                     details=item.get("title", "KAP Açığa Satış Yasağı")
                 )
                 registered_count += 1
-            
+
             # 3. İşlem Sırası Durdurma / Devre Kesici (Halt)
             elif any(w in title for w in ["işlem sırası durdurul", "işleme kapatıl", "devre kesici"]):
                 kap_restriction_registry.register_restriction(
@@ -355,7 +356,7 @@ class KAPProvider:
                     details=item.get("title", "KAP İşlem Sırası Durdurma")
                 )
                 registered_count += 1
-                
+
         if registered_count > 0:
             logger.info("Automated KAP market restrictions synced", count=registered_count, date=current_date)
         return registered_count

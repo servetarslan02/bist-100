@@ -1,8 +1,7 @@
 """Bölüm 25-32 — ML, Alternative, Macro, Factors, Event Study, VIOP Testleri."""
-import pytest
+
 import numpy as np
-import sys
-from pathlib import Path
+import pytest
 
 
 class TestMLModels:

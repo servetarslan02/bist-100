@@ -3,9 +3,10 @@
 Optuna Bayesian optimization — IC-based objective, regime-specific tuning,
 cross-validation within trials, multi-model support, trial history analysis.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -14,12 +15,12 @@ logger = structlog.get_logger()
 @dataclass
 class TuningResult:
     """Tuning sonucu."""
-    best_params: Dict[str, Any]
+    best_params: dict[str, Any]
     best_value: float
     n_trials: int
-    trial_history: List[Dict[str, Any]]
+    trial_history: list[dict[str, Any]]
     tuning_time_seconds: float
-    convergence_info: Dict[str, Any] = field(default_factory=dict)
+    convergence_info: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -55,7 +56,7 @@ class HyperparameterTuner:
         self.timeout_seconds = timeout_seconds
         self.cv_folds = cv_folds
         self.pruning = pruning
-        self._trial_history: List[Dict[str, Any]] = []
+        self._trial_history: list[dict[str, Any]] = []
 
     def tune_lightgbm(
         self,
@@ -64,12 +65,12 @@ class HyperparameterTuner:
         X_val: np.ndarray,
         y_val: np.ndarray,
         objective_type: str = "ic",
-        sample_weight_train: Optional[np.ndarray] = None,
+        sample_weight_train: np.ndarray | None = None,
     ) -> TuningResult:
         """LightGBM hyperparameter tuning — CV within trials."""
         try:
-            import optuna
             import lightgbm as lgb
+            import optuna
         except ImportError:
             logger.warning("optuna or lightgbm not installed")
             return TuningResult(best_params={}, best_value=0, n_trials=0, trial_history=[], tuning_time_seconds=0)
@@ -259,7 +260,7 @@ class HyperparameterTuner:
         X_val: np.ndarray,
         y_val: np.ndarray,
         regimes_val: np.ndarray,
-    ) -> Dict[str, TuningResult]:
+    ) -> dict[str, TuningResult]:
         """Her rejim için ayrı tuning.
 
         Returns:
@@ -294,11 +295,11 @@ class HyperparameterTuner:
     def _cv_objective(
         self,
         model_class: Any,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         X: np.ndarray,
         y: np.ndarray,
         objective_type: str,
-        sample_weight: Optional[np.ndarray] = None,
+        sample_weight: np.ndarray | None = None,
     ) -> float:
         """Cross-validation within trial."""
         from sklearn.model_selection import TimeSeriesSplit
@@ -345,7 +346,7 @@ class HyperparameterTuner:
         else:  # mse
             return -float(np.mean((preds - y_true) ** 2))
 
-    def _analyze_convergence(self, trial_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _analyze_convergence(self, trial_history: list[dict[str, Any]]) -> dict[str, Any]:
         """Convergence analizi — tuning ne kadar iyi sonuçlandı."""
         if len(trial_history) < 5:
             return {"converged": False, "reason": "too_few_trials"}
@@ -372,11 +373,11 @@ class HyperparameterTuner:
             "n_trials_analyzed": len(values),
         }
 
-    def get_trial_history(self) -> List[Dict[str, Any]]:
+    def get_trial_history(self) -> list[dict[str, Any]]:
         """Tüm trial history."""
         return self._trial_history
 
-    def get_best_trials(self, n: int = 5) -> List[Dict[str, Any]]:
+    def get_best_trials(self, n: int = 5) -> list[dict[str, Any]]:
         """En iyi N trial."""
         sorted_trials = sorted(self._trial_history, key=lambda t: t.get("value", 0), reverse=True)
         return sorted_trials[:n]

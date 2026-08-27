@@ -13,10 +13,11 @@ Beklenti vs gerçek sürpriz hesaplama:
 KURAL: Beklenti verisi yoksa surprise = 0 kabul et (belirsizlik = etki yok).
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -44,8 +45,8 @@ class SurpriseImpact:
     """Surprise etki sonucu."""
     indicator: str
     surprise_pct: float
-    sector_impacts: Dict[str, float]  # sector → impact
-    company_impacts: Dict[str, float]  # ticker → impact
+    sector_impacts: dict[str, float]  # sector → impact
+    company_impacts: dict[str, float]  # ticker → impact
     decay_days: int
     remaining_impact: float  # Decay sonrası kalan etki
 
@@ -92,9 +93,9 @@ class MacroSurpriseModel:
     }
 
     def __init__(self):
-        self._expectations: Dict[str, Dict] = {}  # indicator → {value, source, timestamp}
-        self._surprise_history: List[SurpriseResult] = []
-        self._active_surprises: Dict[str, SurpriseResult] = {}
+        self._expectations: dict[str, dict] = {}  # indicator → {value, source, timestamp}
+        self._surprise_history: list[SurpriseResult] = []
+        self._active_surprises: dict[str, SurpriseResult] = {}
 
     def set_expectation(
         self,
@@ -108,7 +109,7 @@ class MacroSurpriseModel:
             "value": expected,
             "source": source,
             "confidence": confidence,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         logger.info("Expectation set", indicator=indicator,
                    expected=expected, source=source)
@@ -150,7 +151,7 @@ class MacroSurpriseModel:
                     direction="IN_LINE",
                     confidence=0.0,
                     source="no_expectation",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 )
         else:
             source = "manual"
@@ -187,7 +188,7 @@ class MacroSurpriseModel:
             direction=direction,
             confidence=round(confidence, 4),
             source=source,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         self._surprise_history.append(result)
@@ -204,8 +205,8 @@ class MacroSurpriseModel:
 
     def compute_surprise_features(
         self,
-        actuals: Dict[str, float],
-    ) -> Dict[str, float]:
+        actuals: dict[str, float],
+    ) -> dict[str, float]:
         """Surprise feature'ları üret.
 
         Args:
@@ -245,8 +246,8 @@ class MacroSurpriseModel:
     def compute_sector_surprise_impact(
         self,
         sector: str,
-        surprises: Dict[str, SurpriseResult],
-    ) -> Dict[str, float]:
+        surprises: dict[str, SurpriseResult],
+    ) -> dict[str, float]:
         """Sektör bazlı surprise etkisi."""
         sensitivity = self.SECTOR_SURPRISE_SENSITIVITY.get(
             sector, self.SECTOR_SURPRISE_SENSITIVITY["OTHER"]
@@ -276,7 +277,7 @@ class MacroSurpriseModel:
         )
         return round(0.5 ** (days_elapsed / half_life), 4)
 
-    def get_surprise_report(self) -> Dict[str, Any]:
+    def get_surprise_report(self) -> dict[str, Any]:
         """Surprise raporu."""
         return {
             "active_surprises": {
@@ -295,13 +296,13 @@ class MacroSurpriseModel:
             },
         }
 
-    def _compute_cumulative_surprise(self) -> Dict[str, float]:
+    def _compute_cumulative_surprise(self) -> dict[str, float]:
         """Son 3 ayın birikimli surprise'ını hesapla."""
         features = {}
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=90)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(days=90)).isoformat()
 
         # Indicator bazlı grupla
-        indicator_surprises: Dict[str, List[float]] = {}
+        indicator_surprises: dict[str, list[float]] = {}
         for s in self._surprise_history:
             if s.timestamp > cutoff and s.magnitude != "NONE":
                 if s.indicator not in indicator_surprises:

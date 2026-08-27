@@ -3,7 +3,8 @@
 Finansal manipülasyon tespiti — 8 değişken, orijinal Beneish (1999) katsayıları.
 Gerçek veriden hesaplama + raw index input desteği.
 """
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -29,9 +30,9 @@ THRESHOLDS = {
 
 
 def calculate_m_score(
-    current: Dict[str, Any],
-    previous: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    current: dict[str, Any],
+    previous: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Beneish M-Score — detaylı.
 
     Args:
@@ -93,7 +94,7 @@ def calculate_m_score(
     return result
 
 
-def _calculate_components(current: Dict, previous: Dict) -> Dict[str, float]:
+def _calculate_components(current: dict, previous: dict) -> dict[str, float]:
     """Ham finansal veriden index hesapla."""
 
     # 1. DSRI (Days Sales in Receivables Index)
@@ -162,7 +163,7 @@ def _calculate_components(current: Dict, previous: Dict) -> Dict[str, float]:
     }
 
 
-def _read_raw_indices(financials: Dict) -> Dict[str, float]:
+def _read_raw_indices(financials: dict) -> dict[str, float]:
     """Raw index'leri doğrudan oku (backward compatibility)."""
     return {
         "dsri": financials.get("dsri", 1.0),
@@ -176,7 +177,7 @@ def _read_raw_indices(financials: Dict) -> Dict[str, float]:
     }
 
 
-def calculate_m_score_simple(financials: Dict[str, Any]) -> float:
+def calculate_m_score_simple(financials: dict[str, Any]) -> float:
     """Basitleştirilmiş M-Score (backward compatibility)."""
     result = calculate_m_score(financials)
     return result["m_score"]

@@ -1,10 +1,11 @@
 """ALPHA BIST - yfinance Data Provider for BIST"""
 
-import yfinance as yf
+from datetime import UTC, datetime
+from typing import Any
+
 import polars as pl
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
 import structlog
+import yfinance as yf
 
 from ..bist_universe import bist_universe
 
@@ -28,7 +29,7 @@ class YFinanceProvider:
     _FETCH_TIMEOUT = 15  # saniye
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
     @staticmethod
     def _expand_period(period: str) -> str:
@@ -60,12 +61,12 @@ class YFinanceProvider:
                 logger.warning("yfinance call timed out", timeout=timeout)
                 return None
 
-    def fetch_current_price(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def fetch_current_price(self, ticker: str) -> dict[str, Any] | None:
         """Fetch current price data for a single ticker."""
         yf_ticker = get_yfinance_ticker(ticker)
         try:
             t = yf.Ticker(yf_ticker)
-            info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+            info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
             if info is None:
                 return None
 
@@ -87,7 +88,7 @@ class YFinanceProvider:
                 "fifty_two_week_high": info.get("fiftyTwoWeekHigh"),
                 "fifty_two_week_low": info.get("fiftyTwoWeekLow"),
                 "avg_volume_20d": info.get("averageVolume"),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             logger.warning("Failed to fetch price", ticker=ticker, error=str(e))
@@ -98,7 +99,7 @@ class YFinanceProvider:
         ticker: str,
         period: str = "1y",
         interval: str = "1d",
-    ) -> Optional[pl.DataFrame]:
+    ) -> pl.DataFrame | None:
         """Fetch OHLCV data for a single ticker."""
         yf_ticker = get_yfinance_ticker(ticker)
         try:
@@ -138,10 +139,10 @@ class YFinanceProvider:
 
     def fetch_batch_ohlcv(
         self,
-        tickers: Optional[List[str]] = None,
+        tickers: list[str] | None = None,
         period: str = "1y",
         interval: str = "1d",
-    ) -> Dict[str, pl.DataFrame]:
+    ) -> dict[str, pl.DataFrame]:
         """Fetch OHLCV data for multiple tickers."""
         if tickers is None:
             tickers = bist_universe.get_tickers()
@@ -206,12 +207,12 @@ class YFinanceProvider:
         logger.info("Batch OHLCV fetched", count=len(results))
         return results
 
-    def fetch_index(self, index_symbol: str = "XU100") -> Optional[Dict[str, Any]]:
+    def fetch_index(self, index_symbol: str = "XU100") -> dict[str, Any] | None:
         """Fetch BIST index data."""
         yf_symbol = f"{index_symbol}.IS"
         try:
             t = yf.Ticker(yf_symbol)
-            info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+            info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
             if info is None:
                 return None
 
@@ -221,13 +222,13 @@ class YFinanceProvider:
                 "previous_close": info.get("regularMarketPreviousClose", 0),
                 "change_pct": info.get("regularMarketChangePercent", 0),
                 "volume": info.get("regularMarketVolume", 0),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             logger.warning("Failed to fetch index", symbol=index_symbol, error=str(e))
             return None
 
-    def fetch_macro(self) -> Dict[str, Any]:
+    def fetch_macro(self) -> dict[str, Any]:
         """Fetch macro indicators (USD/TRY, Gold, Oil, VIX).
 
         Düzeltme: USD/TRY ve EUR/TRY için doğru yfinance symbol'leri kullanılır.
@@ -246,7 +247,7 @@ class YFinanceProvider:
         for yf_symbol, name in macro_tickers.items():
             try:
                 t = yf.Ticker(yf_symbol)
-                info = self._run_with_timeout(lambda: t.info, timeout=self._FETCH_TIMEOUT)
+                info = self._run_with_timeout(lambda t=t: t.info, timeout=self._FETCH_TIMEOUT)
                 if info is None:
                     results[name] = {"price": None, "change_pct": None, "error": "no data"}
                     continue

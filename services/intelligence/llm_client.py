@@ -12,10 +12,11 @@ Yenilikler v2.0:
 - Mock fallback korunuyor
 """
 
-import orjson
 import os
+from typing import Any
+
+import orjson
 import structlog
-from typing import Dict, Any, List, Optional
 
 logger = structlog.get_logger()
 
@@ -50,7 +51,7 @@ class LLMClient:
         if self.api_key:
             self._initialize_gemini()
 
-    def _load_api_key(self) -> Optional[str]:
+    def _load_api_key(self) -> str | None:
         """API anahtarını env, .env dosyası veya config'den yükle."""
         # 1. Environment variable
         key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -67,7 +68,7 @@ class LLMClient:
         for env_path in env_paths:
             if os.path.exists(env_path):
                 try:
-                    with open(env_path, "r", encoding="utf-8") as f:
+                    with open(env_path, encoding="utf-8") as f:
                         for line in f:
                             line = line.strip()
                             if line.startswith("GEMINI_API_KEY="):
@@ -125,10 +126,10 @@ class LLMClient:
     def call_with_tools(
         self,
         prompt: str,
-        tool_schemas: List[Dict],
-        context: Optional[Dict] = None,
+        tool_schemas: list[dict],
+        context: dict | None = None,
         max_retries: int = 2,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         LLM'i araç şemalarıyla çağır (Function Calling).
 
@@ -157,7 +158,7 @@ class LLMClient:
                         "description": s["description"],
                         "parameters": s.get("parameters", {}),
                     })
-                
+
                 models_to_try = [self.model_name, "gemini-3.1-pro-preview"]
                 for mod in dict.fromkeys(models_to_try):
                     try:
@@ -204,7 +205,7 @@ class LLMClient:
     def generate_text(
         self,
         prompt: str,
-        context: Optional[Dict] = None,
+        context: dict | None = None,
         max_tokens: int = 1024,
     ) -> str:
         """
@@ -250,8 +251,8 @@ class LLMClient:
         self,
         text: str,
         context_type: str = "news",
-        context: Optional[Dict] = None,
-    ) -> Dict[str, Any]:
+        context: dict | None = None,
+    ) -> dict[str, Any]:
         """
         Finansal metin analizi — JSON yapılandırılmış çıktı.
         Geriye dönük uyumluluk için korunuyor.
@@ -319,7 +320,7 @@ METİN:
 
     # ── Yardımcı Metodlar ────────────────────────────────────────────────────
 
-    def _build_prompt(self, prompt: str, context: Optional[Dict]) -> str:
+    def _build_prompt(self, prompt: str, context: dict | None) -> str:
         """Prompt'a bağlam ekle."""
         if not context:
             return prompt
@@ -329,7 +330,7 @@ METİN:
         except Exception:
             return prompt
 
-    def _parse_response(self, response: Any) -> Dict[str, Any]:
+    def _parse_response(self, response: Any) -> dict[str, Any]:
         """Gemini response'unu ayrıştır."""
         result = {"text": None, "tool_calls": []}
 
@@ -350,7 +351,7 @@ METİN:
 
         return result
 
-    def _mock_tool_response(self, prompt: str, context: Optional[Dict]) -> Dict[str, Any]:
+    def _mock_tool_response(self, prompt: str, context: dict | None) -> dict[str, Any]:
         """Mock araç yanıtı."""
         logger.debug("LLM mock tool response", prompt_length=len(prompt))
         return {
@@ -361,14 +362,14 @@ METİN:
             ],
         }
 
-    def _mock_text_response(self, prompt: str, context: Optional[Dict]) -> str:
+    def _mock_text_response(self, prompt: str, context: dict | None) -> str:
         """Mock metin yanıtı."""
         return (
             "[LLM Mock] Analiz tamamlandı. "
             "Gemini API anahtarı eklendiğinde gerçek analiz üretilecek."
         )
 
-    def _mock_structured_response(self) -> Dict[str, Any]:
+    def _mock_structured_response(self) -> dict[str, Any]:
         """Mock yapılandırılmış yanıt."""
         return {
             "entities": [{"type": "COMPANY", "name": "THYAO", "confidence": 0.9}],

@@ -3,8 +3,8 @@
 CAR[t1, t2] = Σ AR_it (t1'den t2'ye)
 MacKinlay (1997) metodolojisi.
 """
+
 import numpy as np
-from typing import Dict
 import structlog
 
 logger = structlog.get_logger()
@@ -39,7 +39,7 @@ def calculate_car_window(
 def calculate_car_sub_windows(
     abnormal_returns: np.ndarray,
     day_offsets: np.ndarray,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Alt pencereler için CAR hesapla (pre-event, event-day, post-event).
 
     Returns:
@@ -74,7 +74,7 @@ def calculate_car_series(abnormal_returns: np.ndarray) -> np.ndarray:
     return np.cumsum(abnormal_returns)
 
 
-def calculate_aar(car_dict: Dict[str, float]) -> float:
+def calculate_aar(car_dict: dict[str, float]) -> float:
     """Average Abnormal Return (AAR) — birden fazla event'in ortalaması."""
     if not car_dict:
         return 0.0
@@ -82,7 +82,7 @@ def calculate_aar(car_dict: Dict[str, float]) -> float:
 
 
 def calculate_caar(
-    car_dict: Dict[str, np.ndarray],
+    car_dict: dict[str, np.ndarray],
 ) -> np.ndarray:
     """Cumulative Average Abnormal Return (CAAR).
 

@@ -5,11 +5,11 @@ advanced kategorik feature handling, walk-forward desteği,
 regime-aware training, SHAP feature importance.
 """
 import os
-import pickle
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -27,12 +27,12 @@ class CatBoostConfig:
     verbose: int = 0
     early_stopping_rounds: int = 50
     random_seed: int = 42
-    cat_features: List[int] = field(default_factory=list)
+    cat_features: list[int] = field(default_factory=list)
     # Multi-horizon
-    target_horizons: List[int] = field(default_factory=lambda: [1, 5, 20, 60])
+    target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20, 60])
     # Regime-aware
     regime_aware: bool = False
-    regime_weights: Dict[str, float] = field(default_factory=lambda: {
+    regime_weights: dict[str, float] = field(default_factory=lambda: {
         "BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0
     })
     # Custom loss
@@ -54,7 +54,7 @@ class CatBoostAdjustedLoss:
         """CatBoost custom loss interface — gradient + hessian."""
         der1 = []
         der2 = []
-        for approx, target in zip(approxes, targets):
+        for approx, target in zip(approxes, targets, strict=False):
             diff = approx - target
             # Yanlış yön kontrolü: tahmin pozitif ama gerçek negatif (veya tersi)
             wrong_direction = (approx > 0 and target < 0) or (approx < 0 and target > 0)
@@ -85,27 +85,27 @@ class CatBoostModel:
     - Overfitting detection (train-val gap monitoring)
     """
 
-    def __init__(self, config: Optional[CatBoostConfig] = None):
+    def __init__(self, config: CatBoostConfig | None = None):
         self._config = config or CatBoostConfig()
-        self._models: Dict[int, Any] = {}  # horizon → model
+        self._models: dict[int, Any] = {}  # horizon → model
         self._is_classifier = self._config.loss_function in ["Logloss", "CrossEntropy"]
         self._feature_names = None
-        self._training_metrics: Dict[str, Any] = {}
+        self._training_metrics: dict[str, Any] = {}
         self._shap_values = None
         self._feature_interactions = None
-        self._cat_features_detected: List[int] = []
+        self._cat_features_detected: list[int] = []
 
     def train(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-        feature_names: Optional[List[str]] = None,
-        cat_features: Optional[List[int]] = None,
-        sample_weights: Optional[np.ndarray] = None,
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+        feature_names: list[str] | None = None,
+        cat_features: list[int] | None = None,
+        sample_weights: np.ndarray | None = None,
         horizon: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """CatBoost model eğit.
 
         Args:
@@ -197,11 +197,11 @@ class CatBoostModel:
     def train_multi_horizon(
         self,
         X_train: np.ndarray,
-        y_train_dict: Dict[int, np.ndarray],
-        X_val: Optional[np.ndarray] = None,
-        y_val_dict: Optional[Dict[int, np.ndarray]] = None,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[int, Dict[str, Any]]:
+        y_train_dict: dict[int, np.ndarray],
+        X_val: np.ndarray | None = None,
+        y_val_dict: dict[int, np.ndarray] | None = None,
+        feature_names: list[str] | None = None,
+    ) -> dict[int, dict[str, Any]]:
         """Multi-horizon eğitim — birden fazla tahmin ufkunda eğit.
 
         Args:
@@ -260,15 +260,15 @@ class CatBoostModel:
         else:
             return model.predict(X)
 
-    def predict_all_horizons(self, X: np.ndarray) -> Dict[int, np.ndarray]:
+    def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
         """Tüm horizon'lar için tahmin."""
-        return {h: self.predict(X, h) for h in self._models.keys()}
+        return {h: self.predict(X, h) for h in self._models}
 
     def feature_importance(
         self,
         importance_type: str = "FeatureImportance",
         horizon: int = 5,
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """Feature importance döndür.
 
         Args:
@@ -290,12 +290,12 @@ class CatBoostModel:
             else:
                 importance = model.feature_importances_
                 if self._feature_names:
-                    return dict(zip(self._feature_names, importance.tolist()))
+                    return dict(zip(self._feature_names, importance.tolist(), strict=False))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
         except Exception:
             return None
 
-    def get_feature_interactions(self, horizon: int = 5) -> Optional[Dict[str, float]]:
+    def get_feature_interactions(self, horizon: int = 5) -> dict[str, float] | None:
         """Feature interaction skorları — hangi feature'lar birlikte güçlü."""
         model = self._models.get(horizon)
         if model is None:
@@ -314,7 +314,7 @@ class CatBoostModel:
             logger.debug("Handled exception", error=str(e), context="catboost_model.py:317")
         return None
 
-    def get_cat_feature_stats(self, horizon: int = 5) -> Optional[Dict[str, Any]]:
+    def get_cat_feature_stats(self, horizon: int = 5) -> dict[str, Any] | None:
         """Kategorik feature istatistikleri — CatBoost'un öğrendiği kategorik bilgiler."""
         model = self._models.get(horizon)
         if model is None or not self._cat_features_detected:
@@ -338,7 +338,7 @@ class CatBoostModel:
         try:
             from catboost import CatBoostClassifier, CatBoostRegressor
         except ImportError:
-            raise ImportError("catboost not installed")
+            raise ImportError("catboost not installed") from None
 
         params = {
             "iterations": self._config.iterations,
@@ -358,7 +358,7 @@ class CatBoostModel:
             params["eval_metric"] = "RMSE"
             return CatBoostRegressor(**params)
 
-    def _detect_categorical(self, X: np.ndarray, feature_names: Optional[List[str]]) -> List[int]:
+    def _detect_categorical(self, X: np.ndarray, feature_names: list[str] | None) -> list[int]:
         """Kategorik feature'ları otomatik tespit et.
 
         Kurallar:
@@ -390,10 +390,10 @@ class CatBoostModel:
         model: Any,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray],
-        y_val: Optional[np.ndarray],
+        X_val: np.ndarray | None,
+        y_val: np.ndarray | None,
         horizon: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Training metrics hesapla."""
         metrics = {
             "horizon": horizon,
@@ -409,7 +409,7 @@ class CatBoostModel:
             val_pred = self.predict(X_val, horizon)
 
             if self._is_classifier:
-                from sklearn.metrics import roc_auc_score, accuracy_score, log_loss
+                from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
                 try:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
@@ -417,7 +417,7 @@ class CatBoostModel:
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="catboost_model.py:421")
             else:
-                from sklearn.metrics import mean_squared_error, mean_absolute_error
+                from sklearn.metrics import mean_absolute_error, mean_squared_error
                 try:
                     metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val, val_pred))), 6)
                     metrics["val_mae"] = round(float(mean_absolute_error(y_val, val_pred)), 6)
@@ -433,7 +433,7 @@ class CatBoostModel:
 
         return metrics
 
-    def _compute_shap(self, model: Any, X: np.ndarray, feature_names: Optional[List[str]]):
+    def _compute_shap(self, model: Any, X: np.ndarray, feature_names: list[str] | None):
         """SHAP values hesapla."""
         try:
             import shap
@@ -441,7 +441,7 @@ class CatBoostModel:
             shap_values = explainer.shap_values(X[:100])  # İlk 100 sample
             mean_shap = np.mean(np.abs(shap_values), axis=0)
             if feature_names and len(feature_names) == len(mean_shap):
-                self._shap_values = dict(zip(feature_names, mean_shap.tolist()))
+                self._shap_values = dict(zip(feature_names, mean_shap.tolist(), strict=False))
             else:
                 self._shap_values = {f"f{i}": float(v) for i, v in enumerate(mean_shap)}
         except ImportError:
@@ -449,7 +449,7 @@ class CatBoostModel:
         except Exception as e:
             logger.debug("shap_computation_failed", error=str(e))
 
-    def _compute_feature_interactions(self, model: Any, feature_names: Optional[List[str]]):
+    def _compute_feature_interactions(self, model: Any, feature_names: list[str] | None):
         """Feature interactions hesapla."""
         try:
             interactions = model.get_feature_importance(type="Interaction")
@@ -463,7 +463,7 @@ class CatBoostModel:
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="catboost_model.py:467")
 
-    def _check_overfitting(self, metrics: Dict[str, Any], horizon: int):
+    def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
         """Overfitting kontrolü — train-val gap."""
         if "val_auc" in metrics and "train_auc" in metrics:
             gap = metrics["train_auc"] - metrics["val_auc"]
@@ -488,7 +488,7 @@ class CatBoostModel:
                 "shap_values": self._shap_values,
                 "feature_interactions": self._feature_interactions,
                 "cat_features_detected": self._cat_features_detected,
-                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "saved_at": datetime.now(UTC).isoformat(),
             }, path)
             return True
         except Exception as e:
@@ -517,9 +517,9 @@ class CatBoostModel:
         return len(self._models) > 0
 
     @property
-    def trained_horizons(self) -> List[int]:
+    def trained_horizons(self) -> list[int]:
         return sorted(self._models.keys())
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return self._training_metrics

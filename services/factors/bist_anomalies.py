@@ -3,7 +3,8 @@
 8+ anomaly/faktör: temettü, likidite, kur, enflasyon, faiz, sektör momentum,
 KAP sentiment, yabancı yatırımcı.
 """
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -54,9 +55,9 @@ ANOMALY_DEFINITIONS = {
 
 
 def calculate_bist_anomalies(
-    stock: Dict[str, Any],
-    market_data: Optional[Dict[str, Any]] = None,
-) -> Dict[str, float]:
+    stock: dict[str, Any],
+    market_data: dict[str, Any] | None = None,
+) -> dict[str, float]:
     """BIST'e özgü anomaly/faktör skorları.
 
     Args:
@@ -107,8 +108,8 @@ def calculate_bist_anomalies(
 
 
 def calculate_anomaly_score(
-    anomalies: Dict[str, float],
-    weights: Optional[Dict[str, float]] = None,
+    anomalies: dict[str, float],
+    weights: dict[str, float] | None = None,
 ) -> float:
     """Ağırlıklı anomaly skoru (0-100).
 
@@ -135,8 +136,8 @@ def calculate_anomaly_score(
 
 
 def calculate_bist_anomalies_batch(
-    universe: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    universe: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Tüm evren için toplu anomaly hesaplama.
 
     Args:

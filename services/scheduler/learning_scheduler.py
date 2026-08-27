@@ -12,9 +12,11 @@ Kaynaklar: arXiv Agentic Trading (2026), Endüstri standardı
 """
 
 import inspect
-from typing import Dict, Any, Optional, Callable, Awaitable
-from datetime import datetime, timezone
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,8 +28,8 @@ class LearningJobConfig:
     job_type: str
     interval_hours: int
     enabled: bool = True
-    last_run: Optional[str] = None
-    handler: Optional[Callable] = None
+    last_run: str | None = None
+    handler: Callable | None = None
     description: str = ""
 
 
@@ -43,7 +45,7 @@ class LearningScheduler:
     """
 
     def __init__(self):
-        self._jobs: Dict[str, LearningJobConfig] = {}
+        self._jobs: dict[str, LearningJobConfig] = {}
         self._running = False
         self._setup_default_jobs()
 
@@ -125,7 +127,7 @@ class LearningScheduler:
         if job_type in self._jobs:
             self._jobs[job_type].interval_hours = max(1, interval_hours)
 
-    async def run_pending_jobs(self) -> Dict[str, Any]:
+    async def run_pending_jobs(self) -> dict[str, Any]:
         """Zamanı gelen job'ları çalıştır.
 
         Returns:
@@ -141,9 +143,9 @@ class LearningScheduler:
                 logger.info("Running learning job", job_type=job_type)
 
                 try:
-                    start = datetime.now(timezone.utc)
+                    start = datetime.now(UTC)
                     result = await config.handler()
-                    end = datetime.now(timezone.utc)
+                    end = datetime.now(UTC)
 
                     config.last_run = start.isoformat()
                     duration = (end - start).total_seconds()
@@ -182,12 +184,12 @@ class LearningScheduler:
 
         try:
             last = datetime.fromisoformat(config.last_run)
-            elapsed_hours = (datetime.now(timezone.utc) - last).total_seconds() / 3600
+            elapsed_hours = (datetime.now(UTC) - last).total_seconds() / 3600
             return elapsed_hours >= config.interval_hours
         except Exception:
             return True
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Scheduler durumu.
 
         Returns:

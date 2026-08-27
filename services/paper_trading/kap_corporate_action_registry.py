@@ -6,9 +6,9 @@ brüt takas, kredili işlem yasağı ve işlem sırası durdurma bildirimlerini 
 Eğer hissenin kurumsal/seans durumu doğrulanamıyorsa fail-safe olarak NO_TRADE kuralını işletir.
 """
 
-from typing import Dict, List, Optional, Set
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 logger = structlog.get_logger()
@@ -20,26 +20,26 @@ class CorporateActionRecord:
     ticker: str
     action_type: str            # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "DIVIDEND" | "SPLIT"
     effective_date: str         # YYYY-MM-DD
-    end_date: Optional[str] = None
+    end_date: str | None = None
     details: str = ""
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class KAPCorporateActionRegistry:
     """Zaman damgalı KAP tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
-        self._actions: Dict[str, List[CorporateActionRecord]] = {}
-        self._halted_tickers: Set[str] = set()
-        self._gross_settlement_tickers: Set[str] = set()
-        self._short_ban_tickers: Set[str] = set()
+        self._actions: dict[str, list[CorporateActionRecord]] = {}
+        self._halted_tickers: set[str] = set()
+        self._gross_settlement_tickers: set[str] = set()
+        self._short_ban_tickers: set[str] = set()
 
     def register_action(
         self,
         ticker: str,
         action_type: str,
         effective_date: str,
-        end_date: Optional[str] = None,
+        end_date: str | None = None,
         details: str = "",
     ):
         """Yeni bir kurumsal tedbir / olay kaydeder."""
@@ -94,7 +94,7 @@ class KAPCorporateActionRegistry:
                     return True
         return False
 
-    def validate_trading_eligibility(self, ticker: str, date: str, side: str) -> Tuple[bool, Optional[str]]:
+    def validate_trading_eligibility(self, ticker: str, date: str, side: str) -> tuple[bool, str | None]:
         """
         İşlem öncesi kurumsal uygunluk denetimi:
         Durdurulmuş sıra veya belirsiz durumda NO_TRADE döner.

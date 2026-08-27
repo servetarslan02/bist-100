@@ -3,8 +3,9 @@ ALPHA BIST — Site ve Uç Nokta Canlı Veri Doğrulama Scripti
 """
 
 import sys
-import orjson
 import urllib.request
+
+import orjson
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -42,7 +43,7 @@ def main():
                 sample = f"ClickHouse: {data['databases'][0]['size']} | PostgreSQL: {data['databases'][1]['size']} | Redis: {data['databases'][2]['size']}"
             elif "regime" in data:
                 sample = f"Rejim: {data['regime']} | Yükselen: {data.get('advancing', 0)} | Düşen: {data.get('declining', 0)}"
-            
+
             print(f"[DOĞRULANDI] {name:<38} -> {sample}")
         except Exception as e:
             print(f"[HATA] {name} -> {e}")

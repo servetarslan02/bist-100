@@ -12,45 +12,54 @@ Tüm yeni modüller için kapsamlı testler:
 8. Scanner Parity
 """
 
+from datetime import date, datetime, timedelta
+
 import numpy as np
 import polars as pl
 import pytest
-from datetime import datetime, timedelta, date
-from typing import Dict, List, Any
+
+from services.backtest.benchmark import (
+    BenchmarkComparator,
+    BenchmarkComparison,
+)
 
 # Import modules
 from services.backtest.bias_detector import (
-    LookAheadBiasDetector, BiasDetectorMiddleware, BiasViolation, BiasReport,
-)
-from services.backtest.survivorship import (
-    SurvivorshipBiasHandler, DelistingEvent, UniverseSnapshot,
-)
-from services.backtest.pit_validator import (
-    PointInTimeValidator, PITRecord, PITViolation, PITValidationReport,
-)
-from services.backtest.transaction_costs import (
-    TransactionCostEngine, BISTFeeStructure, SpreadModel, SlippageModel,
-    MarketImpactModel, LiquidityTier,
-)
-from services.backtest.multi_asset_engine import (
-    MultiAssetBacktestEngine, MultiAssetConfig,
-)
-from services.backtest.event_replay import (
-    EnhancedReplayEngine, SystemState, ReplayDecision,
-)
-from services.backtest.deterministic import (
-    DeterministicRecovery, IdempotencyGuard,
+    BiasDetectorMiddleware,
+    LookAheadBiasDetector,
 )
 from services.backtest.deflated_sharpe import (
-    DeflatedSharpeCalculator, ProbabilisticSharpeRatio,
+    DeflatedSharpeCalculator,
+    ProbabilisticSharpeRatio,
 )
-from services.backtest.benchmark import (
-    BenchmarkComparator, BenchmarkComparison,
+from services.backtest.deterministic import (
+    DeterministicRecovery,
+    IdempotencyGuard,
+)
+from services.backtest.event_replay import (
+    EnhancedReplayEngine,
+    ReplayDecision,
+)
+from services.backtest.multi_asset_engine import (
+    MultiAssetBacktestEngine,
+    MultiAssetConfig,
+)
+from services.backtest.pit_validator import (
+    PointInTimeValidator,
 )
 from services.backtest.scanner_parity import (
-    BacktestScannerParity, FeatureVersionLock,
+    BacktestScannerParity,
+    FeatureVersionLock,
 )
-
+from services.backtest.survivorship import (
+    DelistingEvent,
+    SurvivorshipBiasHandler,
+)
+from services.backtest.transaction_costs import (
+    LiquidityTier,
+    SpreadModel,
+    TransactionCostEngine,
+)
 
 # =====================================================
 # Phase 1 Tests: Bias Detection
@@ -340,10 +349,10 @@ class TestMultiAssetBacktestEngine:
         signal_data = []
         for ticker in tickers:
             base_price = np.random.uniform(50, 200)
-            for date in dates:
+            for dt in dates:
                 price = base_price * (1 + np.random.randn() * 0.02)
                 market_data.append({
-                    "date": date,
+                    "date": dt,
                     "ticker": ticker,
                     "open": price * 0.99,
                     "high": price * 1.02,
@@ -352,7 +361,7 @@ class TestMultiAssetBacktestEngine:
                     "volume": np.random.randint(1_000_000, 10_000_000),
                 })
                 signal_data.append({
-                    "date": date,
+                    "date": dt,
                     "ticker": ticker,
                     "score": np.random.uniform(30, 90),
                     "confidence": np.random.uniform(0.3, 0.9),

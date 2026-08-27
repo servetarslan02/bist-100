@@ -10,8 +10,9 @@ Her şirket için makro değişkenlereduyarlılık hesaplar:
 FAZ 3.3: Macro Sensitivity
 """
 
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -108,21 +109,21 @@ class MacroSensitivityEngine:
     """Şirket bazlı makro hassasiyet hesaplama — dinamik güncelleme destekli."""
 
     def __init__(self):
-        self._company_sensitivity: Dict[str, Dict[str, float]] = {}
-        self._dynamic_sensitivity: Dict[str, Dict[str, float]] = {}  # sector → dynamic values
-        self._sector_returns: Dict[str, List[float]] = {}  # sector → returns history
-        self._macro_values: Dict[str, List[float]] = {}  # macro_var → values history
+        self._company_sensitivity: dict[str, dict[str, float]] = {}
+        self._dynamic_sensitivity: dict[str, dict[str, float]] = {}  # sector → dynamic values
+        self._sector_returns: dict[str, list[float]] = {}  # sector → returns history
+        self._macro_values: dict[str, list[float]] = {}  # macro_var → values history
         self._window = 60  # Rolling window
 
-    def get_sector_sensitivity(self, sector: str) -> Dict[str, float]:
+    def get_sector_sensitivity(self, sector: str) -> dict[str, float]:
         """Sektör bazlı makro hassasiyet."""
         return SECTOR_MACRO_SENSITIVITY.get(sector, SECTOR_MACRO_SENSITIVITY["OTHER"])
 
-    def set_company_sensitivity(self, ticker: str, sensitivity: Dict[str, float]):
+    def set_company_sensitivity(self, ticker: str, sensitivity: dict[str, float]):
         """Şirket bazlı hassasiyet kaydet (override)."""
         self._company_sensitivity[ticker] = sensitivity
 
-    def get_company_sensitivity(self, ticker: str, sector: str) -> Dict[str, float]:
+    def get_company_sensitivity(self, ticker: str, sector: str) -> dict[str, float]:
         """Şirket hassasiyetini döndür.
 
         Önce şirket-specific, yoksa sektör bazlı.
@@ -135,8 +136,8 @@ class MacroSensitivityEngine:
         self,
         ticker: str,
         sector: str,
-        macro_shocks: Dict[str, float],
-    ) -> Dict[str, float]:
+        macro_shocks: dict[str, float],
+    ) -> dict[str, float]:
         """Makro şokların şirket üzerindeki etkisini hesapla.
 
         Args:
@@ -191,7 +192,7 @@ class MacroSensitivityEngine:
         ticker: str,
         sector: str,
         scenario: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Önceden tanımlı senaryo etkisi hesapla."""
         scenarios = {
             "TCMB_RATE_HIKE_500BP": {"interest_rate_change": 0.05},
@@ -210,8 +211,8 @@ class MacroSensitivityEngine:
 
     def update_dynamic(
         self,
-        sector_returns: Dict[str, float],
-        macro_values: Dict[str, float],
+        sector_returns: dict[str, float],
+        macro_values: dict[str, float],
     ):
         """Dinamik hassasiyet güncelleme — günlük çağrılır.
 
@@ -263,11 +264,11 @@ class MacroSensitivityEngine:
             if dynamic:
                 self._dynamic_sensitivity[sector] = dynamic
 
-    def get_dynamic_sensitivity(self, sector: str) -> Dict[str, float]:
+    def get_dynamic_sensitivity(self, sector: str) -> dict[str, float]:
         """Dinamik hassasiyet getir."""
         return self._dynamic_sensitivity.get(sector, {})
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Hassasiyet raporu."""
         return {
             "static_sectors": len(SECTOR_MACRO_SENSITIVITY),

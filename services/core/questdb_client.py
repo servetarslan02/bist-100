@@ -20,11 +20,10 @@ Kullanım:
     rows = await questdb_client.query("SELECT * FROM market_ticks WHERE ticker = 'THYAO'")
 """
 
-import asyncio
 import socket
-import time
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 try:
@@ -37,6 +36,8 @@ try:
     HAS_HTTPX = True
 except ImportError:
     HAS_HTTPX = False
+
+import contextlib
 
 from .config import settings
 
@@ -52,7 +53,7 @@ class QuestDBClient:
         self._pg_port = settings.questdb_pg_port
         self._ilp_port = settings.questdb_ilp_port
         self._connected = False
-        self._ilp_socket: Optional[socket.socket] = None
+        self._ilp_socket: socket.socket | None = None
 
     async def connect(self) -> bool:
         """QuestDB'ye bağlan."""
@@ -72,10 +73,8 @@ class QuestDBClient:
     def close(self):
         """Bağlantıyı kapat."""
         if self._ilp_socket:
-            try:
+            with contextlib.suppress(Exception):
                 self._ilp_socket.close()
-            except Exception:
-                pass
             self._ilp_socket = None
         self._connected = False
 
@@ -86,14 +85,13 @@ class QuestDBClient:
         volume: int,
         bid: float = 0.0,
         ask: float = 0.0,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> bool:
         """Tick verisi yaz (ILP protocol)."""
-        if not self._connected:
-            if not self._sync_connect():
-                return False
+        if not self._connected and not self._sync_connect():
+            return False
 
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
 
         # ILP format: measurement,tag=value field=value timestamp
@@ -111,15 +109,14 @@ class QuestDBClient:
             self._connected = False
             return False
 
-    def insert_ticks_batch(self, ticks: List[Dict[str, Any]]) -> bool:
+    def insert_ticks_batch(self, ticks: list[dict[str, Any]]) -> bool:
         """Toplu tick verisi yaz."""
-        if not self._connected:
-            if not self._sync_connect():
-                return False
+        if not self._connected and not self._sync_connect():
+            return False
 
         lines = []
         for tick in ticks:
-            ts = tick.get("timestamp", datetime.now(timezone.utc))
+            ts = tick.get("timestamp", datetime.now(UTC))
             ts_ns = int(ts.timestamp() * 1_000_000_000)
             line = (
                 f"market_ticks,ticker={tick['ticker']} "
@@ -146,14 +143,13 @@ class QuestDBClient:
         low: float,
         close: float,
         volume: int,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> bool:
         """OHLCV verisi yaz."""
-        if not self._connected:
-            if not self._sync_connect():
-                return False
+        if not self._connected and not self._sync_connect():
+            return False
 
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
 
         line = (
@@ -178,14 +174,13 @@ class QuestDBClient:
         sentiment: float = 0.0,
         importance: float = 0.0,
         body: str = "",
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> bool:
         """Olay verisi yaz (KAP, haber, makro)."""
-        if not self._connected:
-            if not self._sync_connect():
-                return False
+        if not self._connected and not self._sync_connect():
+            return False
 
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
         ts_ns = int(ts.timestamp() * 1_000_000_000)
 
         # Escape special characters for ILP
@@ -207,7 +202,7 @@ class QuestDBClient:
             self._connected = False
             return False
 
-    async def query(self, sql: str) -> List[Dict[str, Any]]:
+    async def query(self, sql: str) -> list[dict[str, Any]]:
         """SQL sorgusu çalıştır (HTTP API)."""
         if not HAS_HTTPX:
             logger.warning("httpx not installed, cannot query QuestDB")
@@ -224,7 +219,7 @@ class QuestDBClient:
                     data = resp.json()
                     columns = [col["name"] for col in data.get("columns", [])]
                     rows = data.get("dataset", [])
-                    return [dict(zip(columns, row)) for row in rows]
+                    return [dict(zip(columns, row, strict=False)) for row in rows]
                 else:
                     logger.warning("QuestDB query failed", status=resp.status_code, body=resp.text[:200])
                     return []

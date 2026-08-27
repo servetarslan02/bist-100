@@ -13,12 +13,11 @@ Roller:
 
 import os
 import time
-import orjson
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from enum import Enum
-import structlog
+from typing import Any
+
 import jwt
+import structlog
 
 from services.core.security import Role
 
@@ -26,7 +25,7 @@ logger = structlog.get_logger()
 
 
 # Role → izin verilen HTTP method'ları
-ROLE_PERMISSIONS: Dict[Role, List[str]] = {
+ROLE_PERMISSIONS: dict[Role, list[str]] = {
     Role.VIEWER: ["GET"],
     Role.ANALYST: ["GET", "POST"],
     Role.OPERATOR: ["GET", "POST", "PUT"],
@@ -41,7 +40,7 @@ class User:
     user_id: str
     username: str
     role: Role
-    permissions: List[str] = field(default_factory=list)
+    permissions: list[str] = field(default_factory=list)
     is_active: bool = True
 
 
@@ -51,7 +50,7 @@ class TokenPayload:
     sub: str  # user_id
     username: str
     role: str
-    permissions: List[str]
+    permissions: list[str]
     exp: float  # expiration timestamp
     iat: float  # issued at
 
@@ -84,7 +83,7 @@ class JWTHandler:
         }
         return jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
 
-    def verify_token(self, token: str) -> Optional[TokenPayload]:
+    def verify_token(self, token: str) -> TokenPayload | None:
         """JWT token doğrula."""
         try:
             payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
@@ -101,9 +100,9 @@ class APIKeyManager:
     """API key yönetimi (servisler arası)."""
 
     def __init__(self):
-        self._keys: Dict[str, Dict[str, Any]] = {}
+        self._keys: dict[str, dict[str, Any]] = {}
 
-    def register_key(self, api_key: str, service: str, permissions: List[str]):
+    def register_key(self, api_key: str, service: str, permissions: list[str]):
         """API key kaydet."""
         self._keys[api_key] = {
             "service": service,
@@ -111,7 +110,7 @@ class APIKeyManager:
             "created_at": time.time(),
         }
 
-    def verify_key(self, api_key: str) -> Optional[Dict[str, Any]]:
+    def verify_key(self, api_key: str) -> dict[str, Any] | None:
         """API key doğrula."""
         return self._keys.get(api_key)
 

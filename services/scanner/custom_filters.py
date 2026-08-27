@@ -7,8 +7,10 @@ Tarama sonuçlarını son kez filtreler.
 Kaynaklar: Mometic (2026), BIST kuralları
 """
 
-from typing import Dict, List, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +32,7 @@ class CustomFilter:
     """Özel filtre tanımı."""
     name: str
     description: str
-    condition: Callable[[Dict[str, Any]], bool]  # result → passed?
+    condition: Callable[[dict[str, Any]], bool]  # result → passed?
     action: str = "exclude"  # exclude, include, adjust_score
     score_adjustment: float = 0.0  # adjust_score için
     enabled: bool = True
@@ -50,7 +52,7 @@ class CustomFilterEngine:
     """
 
     def __init__(self):
-        self._filters: List[CustomFilter] = []
+        self._filters: list[CustomFilter] = []
         self._setup_bist_filters()
 
     def _setup_bist_filters(self):
@@ -133,7 +135,7 @@ class CustomFilterEngine:
 
     def apply_filters(
         self,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
     ) -> tuple:
         """Filtreleri uygula.
 
@@ -214,7 +216,7 @@ class CustomFilterEngine:
 
         return filtered, filter_log
 
-    def get_filters(self) -> List[Dict[str, Any]]:
+    def get_filters(self) -> list[dict[str, Any]]:
         """Tüm filtreleri al.
 
         Returns:
@@ -230,8 +232,8 @@ class CustomFilterEngine:
 
     def get_filter_stats(
         self,
-        results: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        results: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """Filtre istatistikleri — hangi filtre kaç hisseyi eliyor.
 
         Args:

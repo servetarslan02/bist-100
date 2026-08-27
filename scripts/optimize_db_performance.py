@@ -13,15 +13,16 @@ Kullanım:
     python scripts/optimize_db_performance.py [--analyze] [--vacuum] [--refresh-views] [--slow-queries]
 """
 
-import asyncio
 import argparse
+import asyncio
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from services.core.database import get_pg_pool, check_db_health
 import structlog
+
+from services.core.database import check_db_health, get_pg_pool
 
 logger = structlog.get_logger()
 

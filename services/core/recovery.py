@@ -9,8 +9,10 @@ ALPHA BIST — Recovery & Resilience v1.0
 """
 
 import asyncio
-from typing import Dict, List, Any, Callable
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -20,14 +22,14 @@ class EventReplay:
     """Event replay motoru — belirli timestamp'ten itibaren eventleri yeniden oynat."""
 
     def __init__(self):
-        self._event_log: List[Dict] = []
+        self._event_log: list[dict] = []
 
-    def log_event(self, event_type: str, data: Dict, timestamp: str = None):
+    def log_event(self, event_type: str, data: dict, timestamp: str = None):
         """Event kaydet (replay için)."""
         self._event_log.append({
             "event_type": event_type,
             "data": data,
-            "timestamp": timestamp or datetime.now(timezone.utc).isoformat(),
+            "timestamp": timestamp or datetime.now(UTC).isoformat(),
         })
         if len(self._event_log) > 1000:
             self._event_log = self._event_log[-1000:]
@@ -64,7 +66,7 @@ class GracefulShutdown:
     """Graceful shutdown yönetimi."""
 
     def __init__(self):
-        self._shutdown_handlers: List[Callable] = []
+        self._shutdown_handlers: list[Callable] = []
         self._is_shutting_down = False
 
     def register_handler(self, handler: Callable):
@@ -128,9 +130,9 @@ class StartupRecovery:
     """Startup recovery — restart sonrası state'i geri yükle."""
 
     def __init__(self):
-        self._recovery_steps: List[Dict] = []
+        self._recovery_steps: list[dict] = []
 
-    async def recover(self, config: Dict = None, snapshot: Dict = None, event_log: List = None) -> Dict[str, Any]:
+    async def recover(self, config: dict = None, snapshot: dict = None, event_log: list = None) -> dict[str, Any]:
         """Recovery pipeline."""
         results = {
             "steps": [],
@@ -202,7 +204,7 @@ class FailureInjector:
     """Test amaçlı hata enjeksiyonu."""
 
     def __init__(self):
-        self._active_failures: Dict[str, bool] = {}
+        self._active_failures: dict[str, bool] = {}
 
     def inject(self, component: str, failure_type: str = "down"):
         """Hata enjekte et."""
@@ -224,7 +226,7 @@ class FailureInjector:
         """Tüm hataları kaldır."""
         self._active_failures.clear()
 
-    def get_active(self) -> Dict[str, bool]:
+    def get_active(self) -> dict[str, bool]:
         """Aktif hataları döndür."""
         return dict(self._active_failures)
 

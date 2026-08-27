@@ -3,11 +3,10 @@ ALPHA BIST — Çoklu Veri Akışının (KAP, Haber, Sosyal, Bilanço, Makro)
 Sisteme Kâr ve Koruma Katkısının Matematiksel Kanıtı
 """
 
-import sys
 import os
+import sys
+
 import orjson
-import numpy as np
-import polars as pl
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -72,10 +71,10 @@ for s in scenarios:
     print(f"\n>>> {s['case']}")
     print(f"  • Hisse: {s['ticker']}")
     print(f"  • Fiyat Durumu: {s['price_action']}")
-    print(f"  ❌ Sadece Grafiğe Bakan Klasik Robot:")
+    print("  ❌ Sadece Grafiğe Bakan Klasik Robot:")
     print(f"     - Kararı: {s['pure_technical_decision']}")
     print(f"     - Getirisi: {s['pure_technical_pnl']}")
-    print(f"  ✅ KAP + Haber + Sosyal + Bilanço + Makro Beslemeli ALPHA Robot:")
+    print("  ✅ KAP + Haber + Sosyal + Bilanço + Makro Beslemeli ALPHA Robot:")
     print(f"     - Alınan Ek Veriler: {orjson.dumps(s['multi_data_features']).decode()}")
     print(f"     - Motorun Yorumu: {s['alpha_engine_interpretation']}")
     print(f"     - Üretilen Karar: {s['alpha_engine_decision']}")

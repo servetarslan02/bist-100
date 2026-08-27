@@ -4,10 +4,12 @@ Model predictions → backtest engine entegrasyonu.
 Ensemble vs single model karşılaştırması, regime-based performans analizi,
 transaction cost dahil backtest.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List, Callable, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -42,18 +44,18 @@ class BacktestResult:
     avg_trade_pnl: float
     avg_holding_days: float
     calmar_ratio: float
-    equity_curve: List[Tuple[str, float]]
-    trades: List[BacktestTrade]
-    regime_performance: Dict[str, Dict[str, float]]
+    equity_curve: list[tuple[str, float]]
+    trades: list[BacktestTrade]
+    regime_performance: dict[str, dict[str, float]]
 
 
 @dataclass
 class ComparisonResult:
     """Model karşılaştırma sonucu."""
-    models: List[BacktestResult]
+    models: list[BacktestResult]
     best_model: str
     ranking_metric: str
-    ranking: List[Tuple[str, float]]
+    ranking: list[tuple[str, float]]
 
 
 class MLBacktestEngine:
@@ -87,11 +89,11 @@ class MLBacktestEngine:
         self,
         model_name: str,
         predict_fn: Callable,
-        price_data: Dict[str, np.ndarray],     # {ticker: prices}
-        feature_data: Dict[str, np.ndarray],    # {ticker: features}
-        dates: List[str],                       # Tarih listesi
-        regimes: Optional[List[str]] = None,    # Rejim etiketleri
-        tickers: Optional[List[str]] = None,
+        price_data: dict[str, np.ndarray],     # {ticker: prices}
+        feature_data: dict[str, np.ndarray],    # {ticker: features}
+        dates: list[str],                       # Tarih listesi
+        regimes: list[str] | None = None,    # Rejim etiketleri
+        tickers: list[str] | None = None,
     ) -> BacktestResult:
         """Tek model için backtest çalıştır.
 
@@ -111,10 +113,10 @@ class MLBacktestEngine:
             tickers = list(price_data.keys())
 
         capital = self.initial_capital
-        positions: Dict[str, Dict[str, Any]] = {}  # {ticker: {qty, entry_price, entry_date}}
-        trades: List[BacktestTrade] = []
-        equity_curve: List[Tuple[str, float]] = []
-        regime_perf: Dict[str, List[float]] = {}
+        positions: dict[str, dict[str, Any]] = {}  # {ticker: {qty, entry_price, entry_date}}
+        trades: list[BacktestTrade] = []
+        equity_curve: list[tuple[str, float]] = []
+        regime_perf: dict[str, list[float]] = {}
 
         n_days = len(dates)
 
@@ -126,7 +128,7 @@ class MLBacktestEngine:
                 regime_perf[regime] = []
 
             # Her hisse için tahmin al
-            scores: Dict[str, float] = {}
+            scores: dict[str, float] = {}
             for ticker in tickers:
                 if ticker not in feature_data or ticker not in price_data:
                     continue
@@ -271,11 +273,11 @@ class MLBacktestEngine:
 
     def compare_models(
         self,
-        models: Dict[str, Callable],
-        price_data: Dict[str, np.ndarray],
-        feature_data: Dict[str, np.ndarray],
-        dates: List[str],
-        regimes: Optional[List[str]] = None,
+        models: dict[str, Callable],
+        price_data: dict[str, np.ndarray],
+        feature_data: dict[str, np.ndarray],
+        dates: list[str],
+        regimes: list[str] | None = None,
         ranking_metric: str = "sharpe_ratio",
     ) -> ComparisonResult:
         """Birden fazla modeli karşılaştır.
@@ -323,13 +325,13 @@ class MLBacktestEngine:
 
     def _calculate_metrics(
         self,
-        equity_curve: List[Tuple[str, float]],
-        trades: List[BacktestTrade],
+        equity_curve: list[tuple[str, float]],
+        trades: list[BacktestTrade],
         final_capital: float,
-        positions: Dict[str, Any],
-        price_data: Dict[str, np.ndarray],
-        dates: List[str],
-    ) -> Dict[str, float]:
+        positions: dict[str, Any],
+        price_data: dict[str, np.ndarray],
+        dates: list[str],
+    ) -> dict[str, float]:
         """Performans metriklerini hesapla."""
         if not equity_curve:
             return self._empty_metrics()
@@ -375,7 +377,7 @@ class MLBacktestEngine:
 
         # Ortalama holding süresi
         holding_days = []
-        buy_dates: Dict[str, str] = {}
+        buy_dates: dict[str, str] = {}
         for t in trades:
             if t.side == "BUY":
                 buy_dates[t.ticker] = t.timestamp
@@ -404,7 +406,7 @@ class MLBacktestEngine:
             "calmar_ratio": round(calmar, 4),
         }
 
-    def _empty_metrics(self) -> Dict[str, float]:
+    def _empty_metrics(self) -> dict[str, float]:
         """Boş metrik seti."""
         return {
             "total_return": 0.0,

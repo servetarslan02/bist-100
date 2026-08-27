@@ -12,13 +12,14 @@ Features:
 - job_remote_ratio: Uzaktan çalışma oranı
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_job_features(job_data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+def compute_job_features(job_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """İş ilanı feature'ları."""
     features = {}
 

@@ -15,9 +15,10 @@ Kontroller:
 8. Validation metrikleri (MAE, RMSE, R², directional accuracy)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -39,12 +40,12 @@ class DataQualityReport:
     total_samples: int = 0
     valid_samples: int = 0
     dropped_samples: int = 0
-    drop_reasons: Dict[str, int] = field(default_factory=dict)
+    drop_reasons: dict[str, int] = field(default_factory=dict)
 
     # NaN/inf analizi
-    nan_features: Dict[str, int] = field(default_factory=dict)    # feature_name → NaN count
-    inf_features: Dict[str, int] = field(default_factory=dict)    # feature_name → inf count
-    outlier_features: Dict[str, int] = field(default_factory=dict) # feature_name → outlier count
+    nan_features: dict[str, int] = field(default_factory=dict)    # feature_name → NaN count
+    inf_features: dict[str, int] = field(default_factory=dict)    # feature_name → inf count
+    outlier_features: dict[str, int] = field(default_factory=dict) # feature_name → outlier count
 
     # Target analizi
     target_mean: float = 0.0
@@ -57,21 +58,21 @@ class DataQualityReport:
     target_positive_pct: float = 0.0
 
     # Feature dağılım analizi
-    feature_stats: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    feature_stats: dict[str, dict[str, float]] = field(default_factory=dict)
 
     # Cross-ticker analizi
     unique_tickers: int = 0
     unique_dates: int = 0
-    samples_per_date: Dict[str, int] = field(default_factory=dict)
+    samples_per_date: dict[str, int] = field(default_factory=dict)
 
     # Leakage kontrolü
     train_test_overlap: bool = False
-    overlap_details: List[str] = field(default_factory=list)
+    overlap_details: list[str] = field(default_factory=list)
 
     # Genel kalite
     quality_score: float = 0.0  # 0-1 arası
-    warnings: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -106,11 +107,11 @@ class TrainingDatasetValidator:
 
     def validate_dataset(
         self,
-        features_map: Dict[str, Dict[str, Any]],
-        returns: Dict[str, float],
-        date_groups: Dict[str, str],
-        feature_names: List[str],
-        test_dates: Optional[set] = None,
+        features_map: dict[str, dict[str, Any]],
+        returns: dict[str, float],
+        date_groups: dict[str, str],
+        feature_names: list[str],
+        test_dates: set | None = None,
     ) -> DataQualityReport:
         """Training dataset'in tamamını_validate et.
 
@@ -155,15 +156,15 @@ class TrainingDatasetValidator:
 
     def _validate_sample_metadata(
         self,
-        features_map: Dict[str, Dict],
-        returns: Dict[str, float],
-        date_groups: Dict[str, str],
+        features_map: dict[str, dict],
+        returns: dict[str, float],
+        date_groups: dict[str, str],
         report: DataQualityReport,
     ):
         """Sample metadata doğruluğunu kontrol et."""
         valid = 0
         dropped = 0
-        drop_reasons: Dict[str, int] = {}
+        drop_reasons: dict[str, int] = {}
 
         for key in features_map:
             # Key formatı: "TICKER::YYYY-MM-DD"
@@ -215,19 +216,19 @@ class TrainingDatasetValidator:
 
     def _validate_features(
         self,
-        features_map: Dict[str, Dict],
-        feature_names: List[str],
+        features_map: dict[str, dict],
+        feature_names: list[str],
         report: DataQualityReport,
     ):
         """Feature'larda NaN/inf/outlier kontrolü."""
-        nan_counts: Dict[str, int] = {f: 0 for f in feature_names}
-        inf_counts: Dict[str, int] = {f: 0 for f in feature_names}
-        outlier_counts: Dict[str, int] = {f: 0 for f in feature_names}
+        nan_counts: dict[str, int] = {f: 0 for f in feature_names}
+        inf_counts: dict[str, int] = {f: 0 for f in feature_names}
+        outlier_counts: dict[str, int] = {f: 0 for f in feature_names}
 
         # Feature değerlerini topla (istatistik için)
-        feature_values: Dict[str, List[float]] = {f: [] for f in feature_names}
+        feature_values: dict[str, list[float]] = {f: [] for f in feature_names}
 
-        for key, feats in features_map.items():
+        for _key, feats in features_map.items():
             for fname in feature_names:
                 val = feats.get(fname)
                 if val is None:
@@ -260,7 +261,7 @@ class TrainingDatasetValidator:
                 outlier_counts[fname] = int(np.sum(z_scores > self.OUTLIER_Z_THRESHOLD))
 
         # Feature istatistikleri
-        feature_stats: Dict[str, Dict[str, float]] = {}
+        feature_stats: dict[str, dict[str, float]] = {}
         for fname in feature_names:
             vals = feature_values[fname]
             if not vals:
@@ -294,7 +295,7 @@ class TrainingDatasetValidator:
 
     def _validate_target_distribution(
         self,
-        returns: Dict[str, float],
+        returns: dict[str, float],
         report: DataQualityReport,
     ):
         """Target dağılım analizi."""
@@ -342,14 +343,14 @@ class TrainingDatasetValidator:
 
     def _validate_cross_ticker(
         self,
-        date_groups: Dict[str, str],
+        date_groups: dict[str, str],
         report: DataQualityReport,
     ):
         """Cross-ticker sample oluşturma doğruluğu."""
         # Ticker'ları key'den çıkar
         tickers = set()
         dates = set()
-        samples_per_date: Dict[str, int] = {}
+        samples_per_date: dict[str, int] = {}
 
         for key, date_str in date_groups.items():
             parts = key.split("::")
@@ -371,7 +372,7 @@ class TrainingDatasetValidator:
 
     def _validate_leakage(
         self,
-        date_groups: Dict[str, str],
+        date_groups: dict[str, str],
         test_dates: set,
         report: DataQualityReport,
     ):
@@ -507,9 +508,9 @@ class TrainingDatasetValidator:
 
     def clean_features(
         self,
-        features_map: Dict[str, Dict],
-        feature_names: List[str],
-    ) -> Tuple[Dict[str, Dict], Dict[str, Any]]:
+        features_map: dict[str, dict],
+        feature_names: list[str],
+    ) -> tuple[dict[str, dict], dict[str, Any]]:
         """Feature'ları temizle: inf → NaN, outlier clamp.
 
         Args:
@@ -523,7 +524,7 @@ class TrainingDatasetValidator:
         stats = {"inf_replaced": 0, "outliers_clamped": 0}
 
         # Önce outlier sınırlarını hesapla
-        bounds: Dict[str, Tuple[float, float]] = {}
+        bounds: dict[str, tuple[float, float]] = {}
         for fname in feature_names:
             vals = []
             for feats in features_map.values():
@@ -601,10 +602,10 @@ class CrossSectionalNormalizer:
 
     def normalize_zscore_by_date(
         self,
-        features_map: Dict[str, Dict[str, Any]],
-        date_groups: Dict[str, str],
-        feature_names: List[str],
-    ) -> Dict[str, Dict[str, Any]]:
+        features_map: dict[str, dict[str, Any]],
+        date_groups: dict[str, str],
+        feature_names: list[str],
+    ) -> dict[str, dict[str, Any]]:
         """Her tarihte feature'ları cross-sectional z-score'a çevir.
 
         Args:
@@ -616,7 +617,7 @@ class CrossSectionalNormalizer:
             Normalized features_map (yeni dict, orijinali bozmaz)
         """
         # Tarih bazlı grupla
-        date_to_keys: Dict[str, List[str]] = {}
+        date_to_keys: dict[str, list[str]] = {}
         for key, date_str in date_groups.items():
             if date_str not in date_to_keys:
                 date_to_keys[date_str] = []
@@ -676,16 +677,16 @@ class CrossSectionalNormalizer:
 
     def normalize_rank_by_date(
         self,
-        features_map: Dict[str, Dict[str, Any]],
-        date_groups: Dict[str, str],
-        feature_names: List[str],
-    ) -> Dict[str, Dict[str, Any]]:
+        features_map: dict[str, dict[str, Any]],
+        date_groups: dict[str, str],
+        feature_names: list[str],
+    ) -> dict[str, dict[str, Any]]:
         """Her tarihte feature'ları rank percentile'a çevir.
 
         Returns:
             Normalized features_map (yeni dict)
         """
-        date_to_keys: Dict[str, List[str]] = {}
+        date_to_keys: dict[str, list[str]] = {}
         for key, date_str in date_groups.items():
             if date_str not in date_to_keys:
                 date_to_keys[date_str] = []
@@ -739,13 +740,13 @@ cross_sectional_normalizer = CrossSectionalNormalizer()
 
 def prepare_features_for_inference(
     ticker: str,
-    raw_features: Dict[str, Any],
-    all_date_features: Dict[str, Dict[str, Any]],
-    feature_names: List[str],
-    cs_features: List[str],
-    impute_values: Optional[Dict[str, float]] = None,
+    raw_features: dict[str, Any],
+    all_date_features: dict[str, dict[str, Any]],
+    feature_names: list[str],
+    cs_features: list[str],
+    impute_values: dict[str, float] | None = None,
     date_str: str = "",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Live inference icin feature'lari hazırla — training ile PARITY.
 
     Training pipeline ile aynı matematigi kullanir:

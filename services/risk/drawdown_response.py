@@ -9,16 +9,16 @@ Kaynaklar:
 - ScienceDirect — Dynamic Market-Aware Portfolio Optimization (2026)
 """
 
-from typing import List, Optional
 from dataclasses import dataclass
-from enum import Enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from enum import StrEnum
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class DrawdownAction(str, Enum):
+class DrawdownAction(StrEnum):
     NONE = "NONE"
     REDUCE_SIZE = "REDUCE_SIZE"           # Pozisyon boyutunu azalt
     STOP_NEW = "STOP_NEW"                 # Yeni pozisyon durdur
@@ -26,7 +26,7 @@ class DrawdownAction(str, Enum):
     HALT_SYSTEM = "HALT_SYSTEM"           # Sistem durdur
 
 
-class DrawdownSeverity(str, Enum):
+class DrawdownSeverity(StrEnum):
     NORMAL = "NORMAL"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
@@ -56,7 +56,7 @@ class DrawdownEvent:
     action_taken: DrawdownAction
     previous_action: DrawdownAction
     equity_before: float
-    equity_after: Optional[float] = None
+    equity_after: float | None = None
 
 
 class DrawdownResponseSystem:
@@ -111,8 +111,8 @@ class DrawdownResponseSystem:
         self._peak_equity: float = 0.0
         self._current_equity: float = 0.0
         self._current_action: DrawdownAction = DrawdownAction.NONE
-        self._drawdown_start: Optional[datetime] = None
-        self._events: List[DrawdownEvent] = []
+        self._drawdown_start: datetime | None = None
+        self._events: list[DrawdownEvent] = []
         self._max_drawdown_pct: float = 0.0
 
     def update_equity(self, current_equity: float) -> DrawdownState:
@@ -124,7 +124,7 @@ class DrawdownResponseSystem:
         Returns:
             DrawdownState
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # Peak equity güncelle
         if current_equity > self._peak_equity:
@@ -134,10 +134,7 @@ class DrawdownResponseSystem:
         self._current_equity = current_equity
 
         # Drawdown hesapla
-        if self._peak_equity <= 0:
-            drawdown_pct = 0.0
-        else:
-            drawdown_pct = ((self._peak_equity - current_equity) / self._peak_equity) * 100
+        drawdown_pct = 0.0 if self._peak_equity <= 0 else (self._peak_equity - current_equity) / self._peak_equity * 100
 
         # Max drawdown güncelle
         self._max_drawdown_pct = max(self._max_drawdown_pct, drawdown_pct)
@@ -272,7 +269,7 @@ class DrawdownResponseSystem:
                 severity=DrawdownSeverity.NORMAL,
                 position_scale=1.0,
                 description="Henüz equity verisi yok",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             )
 
         drawdown_pct = ((self._peak_equity - self._current_equity) / self._peak_equity) * 100
@@ -280,7 +277,7 @@ class DrawdownResponseSystem:
 
         duration_days = 0
         if self._drawdown_start:
-            duration_days = (datetime.now(timezone.utc) - self._drawdown_start).days
+            duration_days = (datetime.now(UTC) - self._drawdown_start).days
 
         return DrawdownState(
             current_drawdown_pct=round(drawdown_pct, 2),
@@ -292,16 +289,16 @@ class DrawdownResponseSystem:
             severity=severity,
             position_scale=position_scale,
             description=description,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
-    def get_events(self, limit: int = 50) -> List[DrawdownEvent]:
+    def get_events(self, limit: int = 50) -> list[DrawdownEvent]:
         """Son drawdown olaylarını al."""
         return self._events[-limit:]
 
     def reset(self, *, force: bool = False, reason: str = ""):
         """Drawdown sistemini sıfırla.
-        
+
         Args:
             force: True ise kill switch aktif olsa bile sıfırlar
             reason: Sıfırlama nedeni (audit trail için)
@@ -318,7 +315,7 @@ class DrawdownResponseSystem:
         self._events = []
         self._max_drawdown_pct = 0.0
 
-    def get_alert_message(self, state: DrawdownState) -> Optional[str]:
+    def get_alert_message(self, state: DrawdownState) -> str | None:
         """Drawdown alert mesajı oluştur."""
         if state.severity == DrawdownSeverity.NORMAL:
             return None

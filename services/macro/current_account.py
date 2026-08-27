@@ -8,13 +8,14 @@ Cari açık feature'ları:
 - ca_improving: İyileşiyor mu?
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_ca_features(ca_data: Dict[str, Any]) -> Dict[str, float]:
+def compute_ca_features(ca_data: dict[str, Any]) -> dict[str, float]:
     """Cari açık feature'ları.
 
     Args:

@@ -2,19 +2,20 @@
 
 Faktör getiri serisi hesaplama, trend analizi, mevsimsellik.
 """
-from typing import Dict, Any, List
+from typing import Any
+
 import numpy as np
-from scipy import stats as scipy_stats
 import structlog
+from scipy import stats as scipy_stats
 
 logger = structlog.get_logger()
 
 
 def calculate_factor_returns(
-    factor_long: List[float],
-    factor_short: List[float],
+    factor_long: list[float],
+    factor_short: list[float],
     method: str = "long_short",
-) -> List[float]:
+) -> list[float]:
     """Faktör getiri serisi hesapla.
 
     Long-short: factor_return = long_return - short_return
@@ -39,9 +40,9 @@ def calculate_factor_returns(
 
 
 def analyze_factor_trend(
-    factor_returns: List[float],
+    factor_returns: list[float],
     window: int = 60,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Faktör trend analizi.
 
     Args:
@@ -87,9 +88,9 @@ def analyze_factor_trend(
 
 
 def calculate_factor_momentum(
-    factor_returns: List[float],
-    periods: List[int] = None,
-) -> Dict[str, float]:
+    factor_returns: list[float],
+    periods: list[int] = None,
+) -> dict[str, float]:
     """Faktör momentum hesaplama (çeşitli periyotlar).
 
     Args:
@@ -117,9 +118,9 @@ def calculate_factor_momentum(
 
 
 def detect_seasonality(
-    factor_returns: List[float],
+    factor_returns: list[float],
     period: int = 252,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Faktör mevsimsellik analizi.
 
     Args:

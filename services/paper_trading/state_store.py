@@ -10,14 +10,15 @@ Persistent state yonetimi: SQLite.
 Mevcut services.core.audit_log.AuditLog'i extend eder.
 """
 
-import orjson
 import os
-import duckdb
 import shutil
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any
 from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import duckdb
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -165,7 +166,7 @@ class PaperStateStore:
 
     # ===================== PORTFOLIO STATE =====================
 
-    def save_portfolio_state(self, state: Dict[str, Any]):
+    def save_portfolio_state(self, state: dict[str, Any]):
         """Portfoy durumunu kaydet (F-016: Atomic write — temp + rename pattern)."""
         state_json = orjson.dumps(state, default=str).decode()
         # Atomic write: önce temp dosyaya yaz, sonra rename ile değiştir
@@ -180,7 +181,7 @@ class PaperStateStore:
                     state["date"],
                     state["cash"],
                     state["initial_capital"],
-                    state.get("last_updated", datetime.now(timezone.utc).isoformat()),
+                    state.get("last_updated", datetime.now(UTC).isoformat()),
                     state_json,
                 ))
                 conn.commit()
@@ -191,7 +192,7 @@ class PaperStateStore:
                 shutil.move(tmp_path, str(self.db_path))
             raise
 
-    def load_portfolio_state(self) -> Optional[Dict[str, Any]]:
+    def load_portfolio_state(self) -> dict[str, Any] | None:
         """Portfoy durumunu yukle."""
         with self._connect() as conn:
             row = conn.execute("SELECT json_data FROM portfolio_state WHERE id = 1").fetchone()
@@ -201,7 +202,7 @@ class PaperStateStore:
 
     # ===================== POSITIONS =====================
 
-    def save_positions(self, positions: List[Dict[str, Any]]):
+    def save_positions(self, positions: list[dict[str, Any]]):
         """Pozisyonlari kaydet."""
         with self._connect() as conn:
             conn.execute("DELETE FROM positions")
@@ -216,7 +217,7 @@ class PaperStateStore:
                 ))
             conn.commit()
 
-    def load_positions(self) -> List[Dict[str, Any]]:
+    def load_positions(self) -> list[dict[str, Any]]:
         """Pozisyonlari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM positions").fetchall()
@@ -224,7 +225,7 @@ class PaperStateStore:
 
     # ===================== TRADES =====================
 
-    def save_trade(self, trade: Dict[str, Any]):
+    def save_trade(self, trade: dict[str, Any]):
         """Trade kaydet."""
         with self._connect() as conn:
             conn.execute("""
@@ -238,7 +239,7 @@ class PaperStateStore:
             ))
             conn.commit()
 
-    def load_trades(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def load_trades(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Trade'leri yukle."""
         with self._connect() as conn:
             sql = "SELECT json_data FROM trades ORDER BY date DESC"
@@ -249,7 +250,7 @@ class PaperStateStore:
 
     # ===================== ORDERS =====================
 
-    def save_order(self, order: Dict[str, Any]):
+    def save_order(self, order: dict[str, Any]):
         """Order kaydet."""
         with self._connect() as conn:
             conn.execute("""
@@ -263,7 +264,7 @@ class PaperStateStore:
             ))
             conn.commit()
 
-    def load_orders(self, date: Optional[str] = None) -> List[Dict[str, Any]]:
+    def load_orders(self, date: str | None = None) -> list[dict[str, Any]]:
         """Order'lari yukle."""
         with self._connect() as conn:
             if date:
@@ -274,7 +275,7 @@ class PaperStateStore:
 
     # ===================== AUDIT LOG =====================
 
-    def append_audit(self, entry: Dict[str, Any]):
+    def append_audit(self, entry: dict[str, Any]):
         """Audit entry ekle (immutable, append-only)."""
         entry_hash = self._compute_hash(entry)
         with self._connect() as conn:
@@ -287,7 +288,7 @@ class PaperStateStore:
             ))
             conn.commit()
 
-    def load_audit_log(self, date: Optional[str] = None, entry_type: Optional[str] = None, limit: int = 1000) -> List[Dict[str, Any]]:
+    def load_audit_log(self, date: str | None = None, entry_type: str | None = None, limit: int = 1000) -> list[dict[str, Any]]:
         """Audit log'u yukle."""
         with self._connect() as conn:
             sql = "SELECT json_data FROM audit_log WHERE 1=1"
@@ -305,7 +306,7 @@ class PaperStateStore:
 
     # ===================== DAILY PERFORMANCE =====================
 
-    def save_daily_performance(self, perf: Dict[str, Any]):
+    def save_daily_performance(self, perf: dict[str, Any]):
         """Gunluk performans kaydet."""
         with self._connect() as conn:
             conn.execute("""
@@ -321,7 +322,7 @@ class PaperStateStore:
             ))
             conn.commit()
 
-    def load_daily_performance(self) -> List[Dict[str, Any]]:
+    def load_daily_performance(self) -> list[dict[str, Any]]:
         """Gunluk performanslari yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT json_data FROM daily_performance ORDER BY date ASC").fetchall()
@@ -329,7 +330,7 @@ class PaperStateStore:
 
     # ===================== EQUITY CURVE =====================
 
-    def save_equity_point(self, date: str, equity: float, cash: float, invested: float, benchmark_equity: Optional[float] = None):
+    def save_equity_point(self, date: str, equity: float, cash: float, invested: float, benchmark_equity: float | None = None):
         """Equity curve noktasi kaydet."""
         with self._connect() as conn:
             conn.execute("""
@@ -338,7 +339,7 @@ class PaperStateStore:
             """, (date, equity, cash, invested, benchmark_equity))
             conn.commit()
 
-    def load_equity_curve(self) -> List[Dict[str, Any]]:
+    def load_equity_curve(self) -> list[dict[str, Any]]:
         """Equity curve'u yukle."""
         with self._connect() as conn:
             rows = conn.execute("SELECT date, equity, cash, invested, benchmark_equity FROM equity_curve ORDER BY date ASC").fetchall()
@@ -350,13 +351,13 @@ class PaperStateStore:
 
     # ===================== PENDING SIGNALS =====================
 
-    def save_pending_signals(self, signals: List[Dict[str, Any]], date: str):
+    def save_pending_signals(self, signals: list[dict[str, Any]], date: str):
         """EOD (18:15) anında üretilen sinyalleri sabah seans açılışında yürütülmek üzere kaydeder."""
         with self._connect() as conn:
             conn.execute("DELETE FROM pending_signals")
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             # Sinyaller ertesi gün geçerli, 1 gün sonra expire
-            expires_dt = datetime.now(timezone.utc) + timedelta(days=1)
+            expires_dt = datetime.now(UTC) + timedelta(days=1)
             expires_iso = expires_dt.isoformat()
             for idx, sig in enumerate(signals):
                 sig_id = f"SIG_{date}_{sig.get('ticker', 'UNKNOWN')}_{idx}"
@@ -382,10 +383,10 @@ class PaperStateStore:
             conn.commit()
         logger.info("Saved pending signals for next session execution", count=len(signals), date=date, expires=expires_iso)
 
-    def load_pending_signals(self) -> List[Dict[str, Any]]:
+    def load_pending_signals(self) -> list[dict[str, Any]]:
         """Bekleyen sinyalleri yukle (süresi dolmuş olanlar hariç)."""
         with self._connect() as conn:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             rows = conn.execute(
                 "SELECT json_data FROM pending_signals WHERE expires_at > ? ORDER BY rank ASC",
                 (now_iso,)
@@ -395,7 +396,7 @@ class PaperStateStore:
     def clear_stale_pending_signals(self, max_age_days: int = 1) -> int:
         """Süresi dolmuş bekleyen sinyalleri temizler. Temizlenen sayıyı döner."""
         with self._connect() as conn:
-            now_iso = datetime.now(timezone.utc).isoformat()
+            now_iso = datetime.now(UTC).isoformat()
             cursor = conn.execute(
                 "DELETE FROM pending_signals WHERE expires_at <= ?",
                 (now_iso,)
@@ -419,20 +420,20 @@ class PaperStateStore:
             conn.execute("""
                 INSERT OR REPLACE INTO config (key, value, updated_at)
                 VALUES (?, ?, ?)
-            """, (key, value, datetime.now(timezone.utc).isoformat()))
+            """, (key, value, datetime.now(UTC).isoformat()))
             conn.commit()
 
-    def get_config(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get_config(self, key: str, default: str | None = None) -> str | None:
         with self._connect() as conn:
             row = conn.execute("SELECT value FROM config WHERE key = ?", (key,)).fetchone()
             return row["value"] if row else default
 
     # ===================== BACKUP / RESET =====================
 
-    def backup(self, backup_path: Optional[str] = None) -> str:
+    def backup(self, backup_path: str | None = None) -> str:
         """DB'yi yedekle."""
         if backup_path is None:
-            ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+            ts = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
             backup_path = str(self.db_path).replace(".db", f"_backup_{ts}.db")
         shutil.copy2(str(self.db_path), backup_path)
         logger.info("PaperStateStore backup created", path=backup_path)
@@ -453,7 +454,7 @@ class PaperStateStore:
         logger.warning("PaperStateStore RESET — all data cleared")
 
     @staticmethod
-    def _compute_hash(entry: Dict[str, Any]) -> str:
+    def _compute_hash(entry: dict[str, Any]) -> str:
         import hashlib
         data = orjson.dumps(entry, option=orjson.OPT_SORT_KEYS, default=str).decode()
         return hashlib.sha256(data.encode()).hexdigest()[:16]

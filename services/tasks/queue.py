@@ -14,7 +14,8 @@ Kullanım:
 """
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any
+
 import structlog
 
 try:
@@ -69,7 +70,7 @@ if HAS_CELERY:
     # =====================================================
 
     @celery_app.task(bind=True, name="tasks.backtest")
-    def run_backtest_task(self, ticker: str, days: int = 30) -> Dict[str, Any]:
+    def run_backtest_task(self, ticker: str, days: int = 30) -> dict[str, Any]:
         """Backtest görevi — arka planda çalışır."""
         try:
             from services.backtest.engine import BacktestEngine
@@ -78,10 +79,10 @@ if HAS_CELERY:
             return {"status": "completed", "ticker": ticker, "result": result}
         except Exception as e:
             logger.error("Backtest task failed", ticker=ticker, error=str(e))
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
     @celery_app.task(bind=True, name="tasks.model_train")
-    def train_model_task(self, model_type: str = "lightgbm") -> Dict[str, Any]:
+    def train_model_task(self, model_type: str = "lightgbm") -> dict[str, Any]:
         """Model eğitim görevi — GPU gerektirir."""
         try:
             from services.ml.train_all_models import train_all
@@ -89,10 +90,10 @@ if HAS_CELERY:
             return {"status": "completed", "model_type": model_type, "result": result}
         except Exception as e:
             logger.error("Model train task failed", error=str(e))
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
     @celery_app.task(bind=True, name="tasks.data_backfill")
-    def data_backfill_task(self, days: int = 30) -> Dict[str, Any]:
+    def data_backfill_task(self, days: int = 30) -> dict[str, Any]:
         """Veri backfill görevi — eksik günleri tamamla."""
         try:
             from scripts.backfill_data import backfill
@@ -100,21 +101,21 @@ if HAS_CELERY:
             return {"status": "completed", "days": days, "result": result}
         except Exception as e:
             logger.error("Data backfill task failed", error=str(e))
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
     @celery_app.task(bind=True, name="tasks.report_generate")
-    def generate_report_task(self, report_type: str = "daily") -> Dict[str, Any]:
+    def generate_report_task(self, report_type: str = "daily") -> dict[str, Any]:
         """Rapor oluşturma görevi."""
         try:
             from services.core.reporting import generate_report
-            result = generate_report(report_type=report_type)
+            generate_report(report_type=report_type)
             return {"status": "completed", "report_type": report_type}
         except Exception as e:
             logger.error("Report task failed", error=str(e))
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
     @celery_app.task(bind=True, name="tasks.risk_stress_test")
-    def stress_test_task(self, portfolio_value: float = 10_000_000) -> Dict[str, Any]:
+    def stress_test_task(self, portfolio_value: float = 10_000_000) -> dict[str, Any]:
         """Stres testi görevi — Monte Carlo simülasyonu."""
         try:
             from services.risk.stress_test import StressTestEngine
@@ -124,7 +125,7 @@ if HAS_CELERY:
             return {"status": "completed", "risk_score": report.risk_score}
         except Exception as e:
             logger.error("Stress test task failed", error=str(e))
-            raise self.retry(exc=e)
+            raise self.retry(exc=e) from e
 
     logger.info("Celery task queue initialized", broker=_get_broker_url())
 
@@ -136,7 +137,7 @@ else:
 # Convenience Functions (sync wrapper)
 # =====================================================
 
-def submit_task(task_name: str, *args, **kwargs) -> Optional[str]:
+def submit_task(task_name: str, *args, **kwargs) -> str | None:
     """Görevi kuyruğa al. Task ID döndürür."""
     if not celery_app:
         logger.warning("Celery not available, running inline")
@@ -160,7 +161,7 @@ def submit_task(task_name: str, *args, **kwargs) -> Optional[str]:
     return result.id
 
 
-def get_task_status(task_id: str) -> Dict[str, Any]:
+def get_task_status(task_id: str) -> dict[str, Any]:
     """Görev durumunu sorgula."""
     if not celery_app:
         return {"status": "unavailable", "error": "Celery not installed"}

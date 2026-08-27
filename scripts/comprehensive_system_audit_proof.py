@@ -1,12 +1,13 @@
-import sys
 import os
-import orjson
-import duckdb
 import pickle
-import numpy as np
-import urllib.request
 import subprocess
+import urllib.request
 from datetime import datetime
+
+import duckdb
+import numpy as np
+import orjson
+
 
 def print_banner(text):
     print("\n" + "=" * 78)
@@ -67,7 +68,7 @@ def audit_ml_models():
                 pred = m.predict(dummy_features)
                 pred_val = float(pred[0]) if hasattr(pred, "__iter__") else float(pred)
                 print(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Cikarim Testi: {pred_val:+.4f} (Calisiyor)")
-            except Exception as e:
+            except Exception:
                 print(f"  [OK] {name:<12} | Boyut: {size_kb:>7.1f} KB | Egitim: {mtime} | Yuklendi")
         else:
             print(f"  [--] {name:<12} | Dosya eksik: {path}")

@@ -2,15 +2,15 @@
 ALPHA BIST — Sürekli Öğrenme ve Otonom Büyüme Motoru Canlı Doğrulama Testi
 Kod tabanındaki otonom öğrenme, güvenilirlik ağırlıklandırması ve telafi sistemini doğrudan test eder.
 """
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 from services.learning.learning_pipeline import LearningPipeline
-from services.learning.continuous_learning import ContinuousLearningPipeline
+
 
 def test_learning_pipeline_in_code():
     print("=" * 80)
@@ -30,7 +30,7 @@ def test_learning_pipeline_in_code():
     cycle_res = pipeline.run_learning_cycle(current_regime="BULL_MOMENTUM")
     print(f"   Öğrenme Başarısı: {cycle_res.get('success')}")
     print(f"   Değerlendirilen Modeller: {cycle_res.get('models_evaluated')} adet")
-    print(f"   Adaptif Füzyon Ağırlıkları (Hangi modelin sözü ne kadar geçecek):")
+    print("   Adaptif Füzyon Ağırlıkları (Hangi modelin sözü ne kadar geçecek):")
     for model_id, weight in cycle_res.get("fusion_weights", {}).items():
         print(f"     - {model_id:<25}: %{weight*100:.1f}")
 

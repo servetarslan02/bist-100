@@ -6,12 +6,13 @@ ALPHA BIST — Sağlamlık, Stres ve Parametre Platosu Test Motoru (Robustness T
 3. Parametre Platosu Analizi: Sivri zirveleri eleyip geniş ve kararlı kâr platolarını seçer.
 """
 
-from typing import Dict, List, Any, Tuple
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import structlog
-from dataclasses import dataclass
 
-from .bayesian_optimizer import StrategyParameters, BayesianMetricOptimizer
+from .bayesian_optimizer import BayesianMetricOptimizer, StrategyParameters
 
 logger = structlog.get_logger()
 
@@ -26,12 +27,12 @@ class RobustnessReport:
     base_pf: float
 
     # Perturbasyon Testi (±%10, ±%20)
-    perturbation_results: List[Dict[str, Any]]
+    perturbation_results: list[dict[str, Any]]
     is_plateau_stable: bool
     plateau_stability_score: float
 
     # Maliyet Stres Testi (%0.25, %0.50, %1.00, %1.50)
-    cost_stress_results: Dict[str, Dict[str, float]]
+    cost_stress_results: dict[str, dict[str, float]]
     cost_resilience_passed: bool
 
 
@@ -41,7 +42,7 @@ class RobustnessTester:
     def __init__(self, optimizer: BayesianMetricOptimizer):
         self.optimizer = optimizer
 
-    def test_parameter_perturbations(self, base_params: StrategyParameters) -> Tuple[List[Dict[str, Any]], bool, float]:
+    def test_parameter_perturbations(self, base_params: StrategyParameters) -> tuple[list[dict[str, Any]], bool, float]:
         """Parametreleri ±%10 ve ±%20 oranında kaydırarak plato stabilitesini ölçer."""
         perturbation_deltas = [-0.20, -0.10, 0.0, 0.10, 0.20]
         results = []
@@ -85,7 +86,7 @@ class RobustnessTester:
 
         return results, is_stable, stability_score
 
-    def test_cost_stress(self, base_params: StrategyParameters) -> Tuple[Dict[str, Dict[str, float]], bool]:
+    def test_cost_stress(self, base_params: StrategyParameters) -> tuple[dict[str, dict[str, float]], bool]:
         """
         %0.25, %0.50, %1.00 ve %1.50 round-trip işlem maliyeti altında dayanıklılığı test eder.
         Her maliyet seviyesi için simülasyonu gerçekten çalıştırır.

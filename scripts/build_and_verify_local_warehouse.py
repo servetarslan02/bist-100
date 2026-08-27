@@ -5,8 +5,8 @@ ALPHA BIST — 30-Yıllık Yerel Veri Deposu Oluşturucu ve Hız Testi
 sonraki testlerde kaç milisaniyede yüklendiğini ölçer.
 """
 
-import sys
 import os
+import sys
 import time
 
 sys.path.insert(0, os.path.abspath("."))
@@ -14,6 +14,7 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 from services.data.historical_warehouse import historical_warehouse
+
 
 def main():
     print("=" * 80)

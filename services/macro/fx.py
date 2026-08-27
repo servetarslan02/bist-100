@@ -10,14 +10,15 @@ Döviz kuru feature'ları:
 - usdtry_regime: Kur rejimi (değer kazanma/kayıp/stabil)
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_fx_features(fx_data: Dict[str, Any]) -> Dict[str, float]:
+def compute_fx_features(fx_data: dict[str, Any]) -> dict[str, float]:
     """Döviz kuru feature'ları.
 
     Args:

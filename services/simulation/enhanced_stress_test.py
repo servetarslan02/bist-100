@@ -16,9 +16,10 @@ ALPHA BIST — Enhanced Stress Test v2.0
 Kaynaklar: arXiv Agentic Trading (2026), MDPI Regime-Dependent CVaR (2026)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -33,7 +34,7 @@ class StressScenario:
     vol_spike: float           # Volatilite çarpanı
     usd_shock: float           # USD/TRY şoku (%)
     rate_shock: float          # Faiz şoku (bp)
-    sector_impacts: Dict[str, float]  # Sektör bazlı etki
+    sector_impacts: dict[str, float]  # Sektör bazlı etki
     probability: float         # Olasılık (yıllık)
 
 
@@ -45,8 +46,8 @@ class StressResult:
     portfolio_impact_amount: float
     worst_position: str
     best_position: str
-    position_impacts: List[Dict[str, Any]]
-    recovery_estimate_days: Optional[int] = None
+    position_impacts: list[dict[str, Any]]
+    recovery_estimate_days: int | None = None
 
 
 class EnhancedStressTestEngine:
@@ -176,8 +177,8 @@ class EnhancedStressTestEngine:
     def run_stress_test(
         self,
         portfolio_value: float,
-        positions: List[Dict[str, Any]],
-    ) -> List[StressResult]:
+        positions: list[dict[str, Any]],
+    ) -> list[StressResult]:
         """Tüm stres senaryolarını çalıştır.
 
         Args:
@@ -198,7 +199,7 @@ class EnhancedStressTestEngine:
     def _run_scenario(
         self,
         portfolio_value: float,
-        positions: List[Dict[str, Any]],
+        positions: list[dict[str, Any]],
         scenario: StressScenario,
     ) -> StressResult:
         """Tek senaryo çalıştır."""
@@ -257,9 +258,9 @@ class EnhancedStressTestEngine:
     def find_breaking_point(
         self,
         portfolio_value: float,
-        positions: List[Dict[str, Any]],
+        positions: list[dict[str, Any]],
         max_loss_pct: float = 20.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Breaking point analizi.
 
         Args:
@@ -293,8 +294,8 @@ class EnhancedStressTestEngine:
 
     def get_scenario_summary(
         self,
-        results: List[StressResult],
-    ) -> Dict[str, Any]:
+        results: list[StressResult],
+    ) -> dict[str, Any]:
         """Stres testi özeti.
 
         Args:
@@ -326,7 +327,7 @@ class EnhancedStressTestEngine:
         self,
         name: str,
         market_shock: float,
-        sector_impacts: Dict[str, float],
+        sector_impacts: dict[str, float],
         usd_shock: float = 0,
         rate_shock: float = 0,
         vol_spike: float = 2.0,

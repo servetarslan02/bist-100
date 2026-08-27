@@ -15,9 +15,10 @@ Kullanım:
 
 import asyncio
 import uuid
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
-from typing import Dict, List, Any
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -30,10 +31,10 @@ class WebSocketConnection:
         self.ws = ws
         self.channel = channel
         self.client_id = client_id
-        self.connected_at = datetime.now(timezone.utc)
+        self.connected_at = datetime.now(UTC)
         self.messages_sent = 0
 
-    async def send(self, data: Dict[str, Any]):
+    async def send(self, data: dict[str, Any]):
         """Veri gönder."""
         try:
             message = orjson.dumps(data, default=str).decode()
@@ -56,7 +57,7 @@ class WebSocketServer:
     CHANNELS = ["market", "opportunities", "portfolio", "risk", "system"]
 
     def __init__(self):
-        self._connections: Dict[str, List[WebSocketConnection]] = {
+        self._connections: dict[str, list[WebSocketConnection]] = {
             ch: [] for ch in self.CHANNELS
         }
         self._running = False
@@ -104,7 +105,7 @@ class WebSocketServer:
                 "type": "connected",
                 "channel": channel,
                 "client_id": client_id,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
 
             # Bağlantıyı açık tut
@@ -120,12 +121,12 @@ class WebSocketServer:
             if conn in self._connections[channel]:
                 self._connections[channel].remove(conn)
 
-    async def _handle_client_message(self, conn: WebSocketConnection, data: Dict):
+    async def _handle_client_message(self, conn: WebSocketConnection, data: dict):
         """İstemciden gelen mesajı işle."""
         msg_type = data.get("type", "")
 
         if msg_type == "ping":
-            await conn.send({"type": "pong", "timestamp": datetime.now(timezone.utc).isoformat()})
+            await conn.send({"type": "pong", "timestamp": datetime.now(UTC).isoformat()})
 
         elif msg_type == "subscribe":
             new_channel = data.get("channel", "")
@@ -138,7 +139,7 @@ class WebSocketServer:
                 self._connections[new_channel].append(conn)
                 await conn.send({"type": "subscribed", "channel": new_channel})
 
-    async def broadcast(self, channel: str, data: Dict[str, Any]):
+    async def broadcast(self, channel: str, data: dict[str, Any]):
         """Belirli kanala veri gönder."""
         await self._message_queue.put((channel, data))
 
@@ -164,7 +165,7 @@ class WebSocketServer:
                     if conn in self._connections[channel]:
                         self._connections[channel].remove(conn)
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 logger.error("Broadcast loop error", error=str(e))
@@ -177,7 +178,7 @@ class WebSocketServer:
             "price": price,
             "change_pct": change_pct,
             "volume": volume,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
     async def broadcast_opportunity(self, ticker: str, score: float, signal: str, direction: str):
@@ -188,7 +189,7 @@ class WebSocketServer:
             "score": score,
             "signal": signal,
             "direction": direction,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
     async def broadcast_portfolio(self, equity: float, pnl: float, pnl_pct: float):
@@ -198,7 +199,7 @@ class WebSocketServer:
             "equity": equity,
             "pnl": pnl,
             "pnl_pct": pnl_pct,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
     async def broadcast_risk(self, alert_type: str, message: str, severity: str):
@@ -208,7 +209,7 @@ class WebSocketServer:
             "alert_type": alert_type,
             "message": message,
             "severity": severity,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
     async def broadcast_system(self, component: str, status: str, details: str = ""):
@@ -218,10 +219,10 @@ class WebSocketServer:
             "component": component,
             "status": status,
             "details": details,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Bağlantı istatistikleri."""
         return {
             "total_connections": sum(len(conns) for conns in self._connections.values()),
@@ -232,7 +233,7 @@ class WebSocketServer:
     async def stop(self):
         """Sunucuyu durdur."""
         self._running = False
-        for channel, conns in self._connections.items():
+        for _channel, conns in self._connections.items():
             for conn in conns:
                 await conn.close()
             conns.clear()

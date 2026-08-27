@@ -9,8 +9,8 @@ Periyodik kontrol:
 FAZ 11: Portfolio Reconciliation
 """
 
-from typing import List
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -23,8 +23,8 @@ class ReconciliationResult:
     cash_diff: float
     position_diff: float
     equity_diff: float
-    errors: List[str]
-    warnings: List[str]
+    errors: list[str]
+    warnings: list[str]
 
 
 class ReconciliationEngine:

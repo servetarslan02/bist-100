@@ -1,20 +1,21 @@
 """Macro API — Gerçek canlı küresel makro veri motoru (DXY, VIX, Altın, Brent, USD/TRY, ABD 10Y)."""
 
-import time
 import asyncio
-from fastapi import APIRouter, Depends
-from typing import Dict, Any
+import time
+from typing import Any
+
 import structlog
 import yfinance as yf
+from fastapi import APIRouter, Depends
 
-from ..dependencies import get_current_user, check_rate_limit
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 _CACHE_TTL = 120
 _last_macro_fetch = time.time()
-_cached_macro_data: Dict[str, Any] = {
+_cached_macro_data: dict[str, Any] = {
     "dxy": 98.84,
     "dxy_change_pct": 0.09,
     "us10y": 4.74,
@@ -43,7 +44,7 @@ _cached_macro_data: Dict[str, Any] = {
     "bist_macro_bias": "POZİTİF"
 }
 
-def _fetch_live_macro_data() -> Dict[str, Any]:
+def _fetch_live_macro_data() -> dict[str, Any]:
     global _last_macro_fetch, _cached_macro_data
     now = time.time()
     if _cached_macro_data and (now - _last_macro_fetch < _CACHE_TTL):

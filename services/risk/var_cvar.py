@@ -12,17 +12,18 @@ Kaynaklar:
 - arXiv 2605.19337 — Agentic Trading Meta-Analiz (2026)
 """
 
-import numpy as np
 import math
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-class VaRMethod(str, Enum):
+class VaRMethod(StrEnum):
     PARAMETRIC = "parametric"
     HISTORICAL = "historical"
     MONTE_CARLO = "monte_carlo"
@@ -67,7 +68,7 @@ class MonteCarloResult:
     best_case: float
     n_simulations: int
     n_days: int
-    percentiles: Dict[int, float]  # percentile → return
+    percentiles: dict[int, float]  # percentile → return
 
 
 class VaRCalculator:
@@ -291,7 +292,7 @@ class VaRCalculator:
         portfolio_value: float = 100000.0,
         n_simulations: int = 10000,
         holding_period_days: int = 1,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> MonteCarloResult:
         """Monte Carlo VaR simülasyonu.
 
@@ -309,10 +310,7 @@ class VaRCalculator:
         Returns:
             MonteCarloResult
         """
-        if seed is not None:
-            rng = np.random.default_rng(seed)
-        else:
-            rng = np.random.default_rng()
+        rng = np.random.default_rng(seed) if seed is not None else np.random.default_rng()
 
         if len(returns) < 2 or holding_period_days < 1:
             return MonteCarloResult(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -396,8 +394,8 @@ class VaRCalculator:
         cov_matrix: np.ndarray,
         confidence: float = 0.95,
         portfolio_value: float = 100000.0,
-        tickers: Optional[List[str]] = None,
-    ) -> List[ComponentVaRResult]:
+        tickers: list[str] | None = None,
+    ) -> list[ComponentVaRResult]:
         """Component VaR — her pozisyonun portföy VaR'ına katkısı.
 
         Component VaR_i = w_i × (Σw)_i / σ_p × z_α × portfolio_value
@@ -482,11 +480,11 @@ class VaRCalculator:
         returns: np.ndarray,
         portfolio_value: float = 100000.0,
         holding_period_days: int = 1,
-        weights: Optional[np.ndarray] = None,
-        cov_matrix: Optional[np.ndarray] = None,
-        tickers: Optional[List[str]] = None,
+        weights: np.ndarray | None = None,
+        cov_matrix: np.ndarray | None = None,
+        tickers: list[str] | None = None,
         n_monte_carlo: int = 10000,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Kapsamlı VaR/CVaR raporu — tüm yöntemler.
 
         Args:

@@ -7,11 +7,12 @@ Geçmiş tarama analizi ve performans takibi için.
 Kaynaklar: TradingAgents (TauricResearch 2025), Endüstri standardı
 """
 
-import orjson
 import time
-from typing import Dict, List, Any
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -31,10 +32,10 @@ class ScanResultRecord:
     regime: str
     price: float
     volume: int
-    features: Dict[str, float]  # Key feature'lar
+    features: dict[str, float]  # Key feature'lar
     timestamp: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
@@ -161,7 +162,7 @@ class ScanPersistence:
     def save_batch_results(
         self,
         scan_type: str,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
         regime: str = "RANGE",
     ):
         """Toplu tarama sonuçları kaydet.
@@ -172,7 +173,7 @@ class ScanPersistence:
             regime: Piyasa rejimi
         """
         scan_id = f"{scan_type}_{int(time.time())}"
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         for result in results:
             record = ScanResultRecord(
@@ -202,7 +203,7 @@ class ScanPersistence:
         ticker: str,
         days: int = 30,
         limit: int = 100,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Hisse tarama geçmişini al.
 
         Args:
@@ -220,7 +221,7 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             cursor.execute("""
                 SELECT * FROM scan_results
@@ -243,7 +244,7 @@ class ScanPersistence:
         self,
         scan_type: str = None,
         days: int = 30,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tarama istatistikleri.
 
         Args:
@@ -260,7 +261,7 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             if scan_type:
                 cursor.execute("""
@@ -305,7 +306,7 @@ class ScanPersistence:
         scan_type: str = None,
         days: int = 30,
         min_score: float = 70.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """İsabet oranı — skoru yüksek sinyallerin takibi.
 
         Args:
@@ -323,7 +324,7 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             # Yüksek skorlu sinyaller
             if scan_type:
@@ -373,7 +374,7 @@ class ScanPersistence:
         self,
         days: int = 7,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """En çok taranan hisseler.
 
         Args:
@@ -390,7 +391,7 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             cursor.execute("""
                 SELECT ticker,
@@ -433,7 +434,7 @@ class ScanPersistence:
             conn = duckdb.connect(self._db_path)
             cursor = conn.cursor()
 
-            cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+            cutoff = (datetime.now(UTC) - timedelta(days=days)).isoformat()
 
             cursor.execute("DELETE FROM scan_results WHERE timestamp < ?", (cutoff,))
             deleted = cursor.rowcount

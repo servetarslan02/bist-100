@@ -1,10 +1,11 @@
 """
 ALPHA BIST — WebSocket Canlı Akış & SWR Veri Mimarisi Doğrulama Testi
 """
-import sys
-import os
 import asyncio
+import os
+import sys
 import time
+
 import requests
 
 sys.path.insert(0, os.path.abspath("."))

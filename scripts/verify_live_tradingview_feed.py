@@ -2,8 +2,8 @@
 Verify live zero-delay BIST radar and stock feed
 """
 import sys
+
 import requests
-import orjson
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')

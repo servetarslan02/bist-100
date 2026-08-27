@@ -3,10 +3,11 @@
 Performans tracking, prediction drift, model decay detection,
 auto-retrain trigger, dashboard data, alerting system.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -69,18 +70,18 @@ class ModelMonitor:
         self.min_history = min_history
         self.window_size = window_size
         self.alert_cooldown_minutes = alert_cooldown_minutes
-        self._metric_history: Dict[str, List[Tuple[str, float]]] = {}  # metric → [(timestamp, value)]
-        self._prediction_history: List[Dict[str, Any]] = []
-        self._alerts: List[Alert] = []
-        self._last_alert: Dict[str, datetime] = {}
-        self._retrain_callbacks: List[Any] = []
+        self._metric_history: dict[str, list[tuple[str, float]]] = {}  # metric → [(timestamp, value)]
+        self._prediction_history: list[dict[str, Any]] = []
+        self._alerts: list[Alert] = []
+        self._last_alert: dict[str, datetime] = {}
+        self._retrain_callbacks: list[Any] = []
 
     def record_metric(self, metric_name: str, value: float, model_id: str = ""):
         """Performans metriği kaydet."""
         if metric_name not in self._metric_history:
             self._metric_history[metric_name] = []
         self._metric_history[metric_name].append((
-            datetime.now(timezone.utc).isoformat(),
+            datetime.now(UTC).isoformat(),
             value,
         ))
 
@@ -93,13 +94,13 @@ class ModelMonitor:
         if report.alert_level in ("WARNING", "CRITICAL"):
             self._emit_alert(report, model_id)
 
-    def record_prediction(self, prediction: float, actual: Optional[float] = None, ticker: str = ""):
+    def record_prediction(self, prediction: float, actual: float | None = None, ticker: str = ""):
         """Tahmin kaydet."""
         self._prediction_history.append({
             "prediction": prediction,
             "actual": actual,
             "ticker": ticker,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "correct": (prediction > 0.5 and actual > 0) or (prediction <= 0.5 and actual <= 0) if actual is not None else None,
         })
         if len(self._prediction_history) > 5000:
@@ -164,7 +165,7 @@ class ModelMonitor:
             trend=trend,
         )
 
-    def check_prediction_drift(self) -> Dict[str, Any]:
+    def check_prediction_drift(self) -> dict[str, Any]:
         """Tahmin drift'i kontrolü."""
         if len(self._prediction_history) < self.min_history * 2:
             return {"drift_detected": False, "reason": "insufficient_data"}
@@ -186,7 +187,7 @@ class ModelMonitor:
             "historical_std": round(float(np.std(historical)), 4),
         }
 
-    def get_win_rate(self, window: Optional[int] = None) -> float:
+    def get_win_rate(self, window: int | None = None) -> float:
         """Son periyot win rate."""
         predictions = self._prediction_history
         if window:
@@ -198,7 +199,7 @@ class ModelMonitor:
 
         return round(sum(1 for p in correct if p["correct"]) / len(correct), 4)
 
-    def get_health_score(self, model_id: str = "") -> Dict[str, Any]:
+    def get_health_score(self, model_id: str = "") -> dict[str, Any]:
         """Model sağlık skoru (0-100)."""
         scores = []
         details = {}
@@ -250,7 +251,7 @@ class ModelMonitor:
             "n_predictions": len(self._prediction_history),
         }
 
-    def get_dashboard_data(self, model_id: str = "") -> Dict[str, Any]:
+    def get_dashboard_data(self, model_id: str = "") -> dict[str, Any]:
         """Dashboard için veri hazırla."""
         # Metric time series
         metric_series = {}
@@ -288,7 +289,7 @@ class ModelMonitor:
             "summary": self.get_summary(),
         }
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Monitoring özeti."""
         summaries = {}
         for metric_name in self._metric_history:
@@ -310,7 +311,7 @@ class ModelMonitor:
             "health_score": self.get_health_score().get("overall_score", 0),
         }
 
-    def get_alerts(self, severity: Optional[str] = None) -> List[Dict[str, Any]]:
+    def get_alerts(self, severity: str | None = None) -> list[dict[str, Any]]:
         """Alert listesi."""
         alerts = self._alerts
         if severity:
@@ -332,7 +333,7 @@ class ModelMonitor:
         if len(self._retrain_callbacks) > 100:
             self._retrain_callbacks = self._retrain_callbacks[-100:]
 
-    def _compute_trend(self, values: List[float]) -> str:
+    def _compute_trend(self, values: list[float]) -> str:
         """Performans trendi."""
         if len(values) < 5:
             return "stable"
@@ -353,7 +354,7 @@ class ModelMonitor:
         """Alert oluştur."""
         # Cooldown check
         alert_key = f"{model_id}_{report.metric_name}"
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         last = self._last_alert.get(alert_key)
         if last and (now - last).total_seconds() < self.alert_cooldown_minutes * 60:
             return

@@ -3,7 +3,8 @@
 Value, Momentum, Quality, Size, Low Vol, Dividend, Leverage, BIST-specific.
 Cross-sectional z-score normalization.
 """
-from typing import Dict, Any, List
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -55,9 +56,9 @@ FACTOR_DEFINITIONS = {
 
 
 def calculate_factor_scores(
-    stock: Dict[str, Any],
-    universe_stats: Dict[str, Any],
-) -> Dict[str, float]:
+    stock: dict[str, Any],
+    universe_stats: dict[str, Any],
+) -> dict[str, float]:
     """Fama-French faktör skorları — cross-sectional percentile.
 
     Args:
@@ -108,8 +109,8 @@ def calculate_factor_scores(
 
 
 def calculate_factor_scores_batch(
-    universe: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
+    universe: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
     """Tüm evren için toplu faktör skoru hesaplama.
 
     Args:
@@ -144,7 +145,7 @@ def calculate_factor_scores_batch(
     return universe
 
 
-def get_factor_weights(regime: str = "NORMAL") -> Dict[str, float]:
+def get_factor_weights(regime: str = "NORMAL") -> dict[str, float]:
     """Rejime göre faktör ağırlıkları döndür."""
     base = {k: v["weight"] for k, v in FACTOR_DEFINITIONS.items()}
 

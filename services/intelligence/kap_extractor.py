@@ -11,8 +11,9 @@ KAP bildirimlerinden yapılandırılmış veri çıkarma:
 LLM varsa kullanır, yoksa kural tabanlı çalışır.
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +31,7 @@ class KAPExtractedEvent:
     surprise_score: float     # 0-1 (beklenmediklik)
     uncertainty: float        # 0-1 (bilgi eksikliği)
     time_horizon: str         # IMMEDIATE, SHORT, MEDIUM, LONG
-    affected_sectors: List[str]
+    affected_sectors: list[str]
     description: str
     raw_title: str
     raw_summary: str
@@ -97,6 +98,7 @@ KEYWORD_MAP = {
 
 from services.intelligence.llm_agent import llm_agent
 
+
 class KAPExtractor:
     """KAP bildirimlerinden yapılandırılmış veri çıkarma (LLM Agent & RAG Tabanlı)."""
 
@@ -106,7 +108,7 @@ class KAPExtractor:
         kap_id: str,
         title: str,
         summary: str = "",
-        kap_history: Optional[List[Dict]] = None,
+        kap_history: list[dict] | None = None,
     ) -> KAPExtractedEvent:
         """KAP bildiriminden LLM Agent ile yapılandırılmış veri çıkar."""
         text = f"{title} {summary}".strip()
@@ -194,7 +196,7 @@ class SectorChainImpact:
         },
     }
 
-    def compute_chain_impact(self, source_sector: str, impact_direction: float) -> List[Dict[str, Any]]:
+    def compute_chain_impact(self, source_sector: str, impact_direction: float) -> list[dict[str, Any]]:
         """Sektör zincirleme etkisi hesapla.
 
         Args:

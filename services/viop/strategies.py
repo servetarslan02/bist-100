@@ -5,7 +5,7 @@ Opsiyon stratejileri: Covered Call, Protective Put, vb.
 Enhanced_options modülünden delegate eder.
 """
 
-from .enhanced_options import options_strategies, OptionsStrategies, StrategyResult
+from .enhanced_options import OptionsStrategies, StrategyResult, options_strategies
 
 
 def create_covered_call(spot: float, call_strike: float, call_premium: float,

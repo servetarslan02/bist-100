@@ -3,10 +3,10 @@
 t-distribution, Bonferroni düzeltmesi ve cross-sectional testler.
 MacKinlay (1997) metodolojisi.
 """
+
 import numpy as np
-from typing import Dict, List
-from scipy import stats
 import structlog
+from scipy import stats
 
 logger = structlog.get_logger()
 
@@ -15,7 +15,7 @@ def test_significance(
     car: float,
     abnormal_returns: np.ndarray,
     n_params: int = 2,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """CAR'ın istatistiksel anlamlılığı — t-distribution.
 
     H0: CAR = 0 (event etkisi yok)
@@ -78,8 +78,8 @@ def test_significance(
 
 
 def test_significance_cross_sectional(
-    cars: List[float],
-) -> Dict[str, float]:
+    cars: list[float],
+) -> dict[str, float]:
     """Cross-sectional t-test — birden fazla event için.
 
     H0: Mean CAR = 0
@@ -126,8 +126,8 @@ def test_significance_cross_sectional(
 
 
 def bonferroni_correction(
-    p_values: List[float], alpha: float = 0.05
-) -> Dict[str, any]:
+    p_values: list[float], alpha: float = 0.05
+) -> dict[str, any]:
     """Bonferroni multiple testing düzeltmesi.
 
     Birden fazla hipotez testi yapıldığında Type I error'ı kontrol eder.
@@ -158,8 +158,8 @@ def bonferroni_correction(
 
 
 def benjamini_hochberg_correction(
-    p_values: List[float], alpha: float = 0.05
-) -> Dict[str, any]:
+    p_values: list[float], alpha: float = 0.05
+) -> dict[str, any]:
     """Benjamini-Hochberg FDR düzeltmesi (Bonferroni'den daha az muhafazakâr).
 
     Args:
@@ -204,7 +204,7 @@ def benjamini_hochberg_correction(
     }
 
 
-def wilcoxon_test(cars: List[float]) -> Dict[str, float]:
+def wilcoxon_test(cars: list[float]) -> dict[str, float]:
     """Wilcoxon signed-rank test — non-parametrik alternatif.
 
     Normal dağılmayan CAR'lar için kullanılır.

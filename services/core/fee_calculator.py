@@ -9,8 +9,9 @@ BIST işlem maliyetleri:
 - Minimum komisyon ₺1
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ class FeeBreakdown:
     total: float            # Toplam maliyet
     effective_rate: float   # Efektif oran (%)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "amount": round(self.amount, 2),
             "broker_fee": round(self.broker_fee, 2),

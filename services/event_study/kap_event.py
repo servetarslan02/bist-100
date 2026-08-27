@@ -4,9 +4,10 @@ KAP açıklamaları için detaylı event study.
 Event type mapping, event-specific window sizes, clustering detection.
 MacKinlay (1997) — estimation window ayrı, event window ayrı.
 """
-import numpy as np
-from typing import Dict, List, Any, Optional
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -88,7 +89,7 @@ KAP_EVENT_TYPES = {
 }
 
 
-def classify_kap_event(description: str) -> Dict[str, Any]:
+def classify_kap_event(description: str) -> dict[str, Any]:
     """KAP açıklamasından event tipini sınıflandır.
 
     Args:
@@ -131,9 +132,9 @@ def analyze_kap_event(
     estimation_market_returns: np.ndarray,
     event_stock_returns: np.ndarray,
     event_market_returns: np.ndarray,
-    dates: Optional[np.ndarray] = None,
-    volume_data: Optional[np.ndarray] = None,
-) -> Dict[str, Any]:
+    dates: np.ndarray | None = None,
+    volume_data: np.ndarray | None = None,
+) -> dict[str, Any]:
     """KAP açıklaması için detaylı event study (MacKinlay 1997 uyumlu).
 
     Estimation window ve event window AYRI veri ile çalışır.
@@ -153,11 +154,11 @@ def analyze_kap_event(
     Returns:
         Dict with event_type, car, impact, significance, classification
     """
-    from .expected_return import calculate_expected_return
     from .abnormal_return import calculate_abnormal_return
     from .car import calculate_car, calculate_car_sub_windows
-    from .statistical_test import test_significance
+    from .expected_return import calculate_expected_return
     from .impact import calculate_event_impact
+    from .statistical_test import test_significance
 
     # Event sınıflandırma
     classification = classify_kap_event(event_description)
@@ -245,9 +246,9 @@ def analyze_kap_event_simple(
     stock_returns: np.ndarray,
     market_returns: np.ndarray,
     estimation_ratio: float = 0.7,
-    dates: Optional[np.ndarray] = None,
-    volume_data: Optional[np.ndarray] = None,
-) -> Dict[str, Any]:
+    dates: np.ndarray | None = None,
+    volume_data: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Basitleştirilmiş KAP event study — tek veri setini estimation/event olarak böler.
 
     Veriyi estimation_ratio oranında estimation ve event window olarak ayırır.
@@ -300,11 +301,11 @@ def analyze_kap_event_simple(
 
 
 def analyze_kap_events_batch(
-    events: List[Dict[str, Any]],
+    events: list[dict[str, Any]],
     estimation_market_returns: np.ndarray,
     event_market_returns: np.ndarray,
-    dates: Optional[np.ndarray] = None,
-) -> Dict[str, Any]:
+    dates: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Birden fazla KAP event'i için toplu analiz.
 
     Args:
@@ -348,7 +349,7 @@ def analyze_kap_events_batch(
     }
 
 
-def _calculate_volume_change(volume_data: Optional[np.ndarray], n: int) -> float:
+def _calculate_volume_change(volume_data: np.ndarray | None, n: int) -> float:
     """Hacim değişimi hesapla."""
     if volume_data is None or len(volume_data) < 2:
         return 0.0
@@ -362,7 +363,7 @@ def _calculate_volume_change(volume_data: Optional[np.ndarray], n: int) -> float
 
 def _error_result(
     ticker: str, event_type: str, event_date: Any, error_msg: str
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Hata sonuç şablonu."""
     return {
         "ticker": ticker,

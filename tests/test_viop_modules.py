@@ -5,10 +5,10 @@ Tüm VIOP modülleri için kapsamlı testler.
 Her test gerçek matematiksel doğrulama yapar.
 """
 
-import pytest
-import numpy as np
 from datetime import date, timedelta
 
+import numpy as np
+import pytest
 
 # =====================================================
 # BLACK-SCHOLES TESTS
@@ -232,7 +232,7 @@ class TestPortfolioGreeks:
             {"option_type": "call", "S": 100, "K": 100, "T": 0.25, "r": 0.15, "sigma": 0.25, "quantity": 100, "side": "long"},
             {"option_type": "call", "S": 100, "K": 100, "T": 0.25, "r": 0.15, "sigma": 0.25, "quantity": 100, "side": "short"},
         ])
-        assert result.delta_neutral == True
+        assert result.delta_neutral
 
     def test_put_call_portfolio(self):
         """Long call + long put → gamma pozitif, delta küçük."""
@@ -254,7 +254,7 @@ class TestOptionsChain:
 
     def test_add_and_get_quote(self):
         """Kotasyon ekle ve getir."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10000)
         q = OptionQuote(strike=10000, expiry=date(2026, 9, 26), option_type="call", bid=100, ask=105)
         chain.add_quote(q)
@@ -277,7 +277,7 @@ class TestOptionsChain:
 
     def test_get_strikes(self):
         """Strike listesi sıralı olmalı."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10000)
         exp = date(2026, 9, 26)
         chain.add_quote(OptionQuote(strike=10500, expiry=exp, option_type="call"))
@@ -288,7 +288,7 @@ class TestOptionsChain:
 
     def test_get_expiries(self):
         """Vade listesi sıralı olmalı."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10000)
         chain.add_quote(OptionQuote(strike=10000, expiry=date(2026, 12, 26), option_type="call"))
         chain.add_quote(OptionQuote(strike=10000, expiry=date(2026, 9, 26), option_type="call"))
@@ -297,7 +297,7 @@ class TestOptionsChain:
 
     def test_find_atm(self):
         """ATM bulma çalışmalı."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10050)
         exp = date(2026, 9, 26)
         chain.add_quote(OptionQuote(strike=9500, expiry=exp, option_type="call"))
@@ -309,7 +309,7 @@ class TestOptionsChain:
 
     def test_get_chain(self):
         """Chain calls/puts ayrımı."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10000)
         exp = date(2026, 9, 26)
         chain.add_quote(OptionQuote(strike=10000, expiry=exp, option_type="call"))
@@ -320,7 +320,7 @@ class TestOptionsChain:
 
     def test_calculate_all_greeks(self):
         """Tüm chain için Greeks hesaplama."""
-        from services.viop.enhanced_options import OptionsChain, OptionQuote
+        from services.viop.enhanced_options import OptionQuote, OptionsChain
         chain = OptionsChain("XU030", 10000)
         exp = date.today() + timedelta(days=90)
         chain.add_quote(OptionQuote(strike=10000, expiry=exp, option_type="call"))
@@ -625,7 +625,7 @@ class TestParity:
         call = black_scholes(S, K, T, r, sigma, "call")
         put = black_scholes(S, K, T, r, sigma, "put")
         result = check_put_call_parity(call, put, S, K, r, T)
-        assert result["parity_holds"] == True
+        assert result["parity_holds"]
         assert abs(result["deviation"]) < 0.01
 
     def test_arbitrage_detected(self):
@@ -633,7 +633,7 @@ class TestParity:
         from services.viop.enhanced_options import check_put_call_parity
         # Call 10, Put 5, ama teorik diff farklı
         result = check_put_call_parity(call_price=10, put_price=5, spot_price=100, strike=100, r=0.15, T=0.25)
-        assert result["arbitrage_opportunity"] == True
+        assert result["arbitrage_opportunity"]
 
 
 # =====================================================
@@ -703,8 +703,9 @@ class TestBacktest:
 
     def test_covered_call_backtest(self):
         """Covered call backtest çalışmalı."""
-        from services.viop.enhanced_options import OptionsBacktestEngine
         from datetime import date
+
+        from services.viop.enhanced_options import OptionsBacktestEngine
         engine = OptionsBacktestEngine()
         # Basit fiyat serisi: yatay
         prices = [{"date": date(2026, 1, 1) + timedelta(days=i), "close": 100 + i * 0.1} for i in range(60)]
@@ -715,8 +716,9 @@ class TestBacktest:
 
     def test_iron_condor_backtest(self):
         """Iron condor backtest çalışmalı."""
-        from services.viop.enhanced_options import OptionsBacktestEngine
         from datetime import date
+
+        from services.viop.enhanced_options import OptionsBacktestEngine
         engine = OptionsBacktestEngine()
         # Yatay fiyat serisi → iron condor kazançlı olmalı
         prices = [{"date": date(2026, 1, 1) + timedelta(days=i), "close": 100 + np.random.uniform(-1, 1)} for i in range(60)]
@@ -733,8 +735,9 @@ class TestBacktest:
 
     def test_result_to_dict(self):
         """BacktestResult to_dict çalışmalı."""
-        from services.viop.enhanced_options import OptionsBacktestEngine
         from datetime import date
+
+        from services.viop.enhanced_options import OptionsBacktestEngine
         engine = OptionsBacktestEngine()
         prices = [{"date": date(2026, 1, 1) + timedelta(days=i), "close": 100} for i in range(60)]
         result = engine.backtest_covered_call(prices)
@@ -849,7 +852,7 @@ class TestIntegration:
         """Catalog → Margin entegrasyonu."""
         from services.viop.contract_catalog import viop_catalog
         from services.viop.enhanced_options import SPANMarginCalculator
-        margin = viop_catalog.calculate_margin("XU030", 10, 10000)
+        viop_catalog.calculate_margin("XU030", 10, 10000)
         span = SPANMarginCalculator()
         result = span.calculate([{
             "ticker": "XU030", "value": 10 * 10000 * 10,
@@ -859,15 +862,13 @@ class TestIntegration:
 
     def test_chain_then_greeks_then_hedge(self):
         """Chain → Greeks → Hedge tam pipeline."""
-        from services.viop.enhanced_options import (
-            OptionsChain, OptionQuote, PortfolioGreeks, DeltaHedger
-        )
+        from services.viop.enhanced_options import DeltaHedger, OptionQuote, OptionsChain, PortfolioGreeks
         chain = OptionsChain("XU030", 10000)
         exp = date.today() + timedelta(days=90)
         chain.add_quote(OptionQuote(strike=10000, expiry=exp, option_type="call"))
         chain.calculate_all_greeks(sigma=0.25)
 
-        call = chain.get_quote(10000, exp, "call")
+        chain.get_quote(10000, exp, "call")
         pg = PortfolioGreeks()
         greeks = pg.aggregate([{
             "option_type": "call", "S": 10000, "K": 10000,
@@ -883,7 +884,7 @@ class TestIntegration:
         """Strateji → Risk entegrasyonu."""
         from services.viop.enhanced_options import OptionsStrategies, VIOPRiskCalculator
         strat = OptionsStrategies()
-        result = strat.covered_call(100, 105, 3, 100)
+        strat.covered_call(100, 105, 3, 100)
 
         risk = VIOPRiskCalculator()
         positions = [{
@@ -896,8 +897,9 @@ class TestIntegration:
 
     def test_backtest_then_summary(self):
         """Backtest → Özet."""
-        from services.viop.enhanced_options import OptionsBacktestEngine
         from datetime import date
+
+        from services.viop.enhanced_options import OptionsBacktestEngine
         engine = OptionsBacktestEngine()
         # Yükselen trend → covered call sınırlı kar
         prices = [{"date": date(2026, 1, 1) + timedelta(days=i), "close": 100 + i * 0.5} for i in range(90)]

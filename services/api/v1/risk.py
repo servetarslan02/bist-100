@@ -19,13 +19,12 @@ Endpoints:
 - POST /risk/tail-hedge/analyze — Tail hedge analizi
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from typing import Optional, List
+
 import numpy as np
-
-from ..dependencies import get_current_user, check_rate_limit
-
 import structlog
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger(__name__)
 
@@ -140,7 +139,7 @@ async def risk_overview(
             "system_halted": dd.is_system_halted(),
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk overview error: {e}")
+        raise HTTPException(500, f"Risk overview error: {e}") from e
 
 
 @router.get("/dashboard")
@@ -201,7 +200,7 @@ async def risk_dashboard(
             "calibration": cal_quality,
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk dashboard error: {e}")
+        raise HTTPException(500, f"Risk dashboard error: {e}") from e
 
 
 # =====================================================
@@ -221,11 +220,11 @@ async def var_report(
         calc = _get_var_calculator()
         np.random.seed(42)
         returns = np.random.normal(0.0008, 0.015, 252)
-        
+
         param_var = calc.calculate_parametric_var(returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days)
         hist_var = calc.calculate_historical_var(returns, confidence=confidence, portfolio_value=portfolio_value, holding_period_days=holding_days) if hasattr(calc, 'calculate_historical_var') else param_var * 0.98
         cvar = calc.calculate_cvar(returns, confidence=confidence, portfolio_value=portfolio_value) if hasattr(calc, 'calculate_cvar') else param_var * 1.35
-        
+
         return {
             "portfolio_value": portfolio_value,
             "confidence": confidence,
@@ -237,7 +236,7 @@ async def var_report(
             "var_pct": round((param_var / max(1, portfolio_value)) * 100, 2),
         }
     except Exception as e:
-        raise HTTPException(500, f"VaR report error: {e}")
+        raise HTTPException(500, f"VaR report error: {e}") from e
 
 
 @router.get("/portfolio")
@@ -255,10 +254,10 @@ async def portfolio_risk(
     try:
         pass
 
-        portfolio = {"total_value": portfolio_value, "weights": {}}
         try:
-            from ...risk.var_cvar import VaRCalculator
             import numpy as np
+
+            from ...risk.var_cvar import VaRCalculator
             calc = VaRCalculator()
             # Demo return history — gerçek veri kaynağı bağlandığında değiştirilmeli
             demo_returns = np.random.normal(0.0005, 0.015, 252)
@@ -270,7 +269,7 @@ async def portfolio_risk(
         except Exception as calc_err:
             return {"portfolio_risk": {}, "error": str(calc_err), "note": "Risk calculation failed."}
     except Exception as e:
-        raise HTTPException(500, f"Portfolio risk error: {e}")
+        raise HTTPException(500, f"Portfolio risk error: {e}") from e
 
 
 # =====================================================
@@ -282,7 +281,7 @@ async def risk_limits(
     volatility: float = Query(0.20, ge=0.01, le=2.0, description="Yıllık volatilite"),
     regime: str = Query("SIDEWAYS"),
     drawdown: float = Query(0.0, ge=0, le=100, description="Mevcut drawdown %"),
-    vix: Optional[float] = Query(None, description="VIX seviyesi"),
+    vix: float | None = Query(None, description="VIX seviyesi"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -331,7 +330,7 @@ async def risk_limits(
             },
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk limits error: {e}")
+        raise HTTPException(500, f"Risk limits error: {e}") from e
 
 
 @router.get("/drawdown")
@@ -370,7 +369,7 @@ async def drawdown_status(user=Depends(get_current_user), _=Depends(check_rate_l
             "alert_message": dd.get_alert_message(state),
         }
     except Exception as e:
-        raise HTTPException(500, f"Drawdown status error: {e}")
+        raise HTTPException(500, f"Drawdown status error: {e}") from e
 
 
 # =====================================================
@@ -408,7 +407,7 @@ async def stress_test_scenarios(user=Depends(get_current_user), _=Depends(check_
             "portfolio_heat": 0.038,
         }
     except Exception as e:
-        raise HTTPException(500, f"Stress test scenarios error: {e}")
+        raise HTTPException(500, f"Stress test scenarios error: {e}") from e
 
 
 @router.post("/stress-test/run")
@@ -465,12 +464,12 @@ async def run_stress_test(
             }
         else:
             result = engine.run_scenario(portfolio, scenario)
-            
+
             # Cast position impacts explicitly to avoid numpy.float64 errors
             position_impacts_clean = {}
             for k, v in result.position_impacts.items():
                 position_impacts_clean[k] = float(v)
-                
+
             return {
                 "scenario": result.scenario_name,
                 "type": result.scenario_type,
@@ -482,7 +481,7 @@ async def run_stress_test(
                 "position_impacts": position_impacts_clean,
             }
     except Exception as e:
-        raise HTTPException(500, f"Stress test run error: {e}")
+        raise HTTPException(500, f"Stress test run error: {e}") from e
 
 
 # =====================================================
@@ -507,7 +506,7 @@ async def tail_hedge_status(user=Depends(get_current_user), _=Depends(check_rate
             "vix_levels": hedger.VIX_LEVELS,
         }
     except Exception as e:
-        raise HTTPException(500, f"Tail hedge status error: {e}")
+        raise HTTPException(500, f"Tail hedge status error: {e}") from e
 
 
 @router.post("/tail-hedge/analyze")
@@ -548,7 +547,7 @@ async def analyze_tail_hedge(
             "instruments": result.instruments,
         }
     except Exception as e:
-        raise HTTPException(500, f"Tail hedge analysis error: {e}")
+        raise HTTPException(500, f"Tail hedge analysis error: {e}") from e
 
 
 # =====================================================
@@ -572,13 +571,13 @@ async def risk_parity_info(user=Depends(get_current_user), _=Depends(check_rate_
             "usage": "POST /api/v1/risk/risk-parity/optimize ile ağırlıkları hesaplayın",
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk parity info error: {e}")
+        raise HTTPException(500, f"Risk parity info error: {e}") from e
 
 
 @router.post("/risk-parity/optimize")
 async def optimize_risk_parity(
-    tickers: List[str] = Body(..., description="Hisse kodları"),
-    returns_data: List[List[float]] = Body(..., description="Getiri matrisi (n_days x n_assets)"),
+    tickers: list[str] = Body(..., description="Hisse kodları"),
+    returns_data: list[list[float]] = Body(..., description="Getiri matrisi (n_days x n_assets)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -616,7 +615,7 @@ async def optimize_risk_parity(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Risk parity optimization error: {e}")
+        raise HTTPException(500, f"Risk parity optimization error: {e}") from e
 
 
 # =====================================================
@@ -654,13 +653,13 @@ async def risk_monitoring(user=Depends(get_current_user), _=Depends(check_rate_l
             "alert_summary": monitor.get_alert_summary(),
         }
     except Exception as e:
-        raise HTTPException(500, f"Risk monitoring error: {e}")
+        raise HTTPException(500, f"Risk monitoring error: {e}") from e
 
 
 @router.get("/alerts")
 async def risk_alerts(
     limit: int = Query(50, ge=1, le=200),
-    severity: Optional[str] = Query(None, description="Severity filtresi: INFO, WARNING, BLOCK, CRITICAL"),
+    severity: str | None = Query(None, description="Severity filtresi: INFO, WARNING, BLOCK, CRITICAL"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -682,7 +681,7 @@ async def risk_alerts(
             try:
                 sev_filter = AlertSeverity(severity)
             except ValueError:
-                raise HTTPException(400, f"Invalid severity: {severity}. Use: INFO, WARNING, BLOCK, CRITICAL")
+                raise HTTPException(400, f"Invalid severity: {severity}. Use: INFO, WARNING, BLOCK, CRITICAL") from None
 
         alerts = monitor.get_alerts(severity=sev_filter, limit=limit)
 
@@ -708,7 +707,7 @@ async def risk_alerts(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, f"Risk alerts error: {e}")
+        raise HTTPException(500, f"Risk alerts error: {e}") from e
 
 
 # =====================================================
@@ -736,7 +735,7 @@ async def calibration_quality(user=Depends(get_current_user), _=Depends(check_ra
             "brier_history": cal.get_brier_history()[-10:],
         }
     except Exception as e:
-        raise HTTPException(500, f"Calibration quality error: {e}")
+        raise HTTPException(500, f"Calibration quality error: {e}") from e
 
 
 # =====================================================
@@ -825,7 +824,7 @@ async def pre_trade_check(
             },
         }
     except Exception as e:
-        raise HTTPException(500, f"Pre-trade check error: {e}")
+        raise HTTPException(500, f"Pre-trade check error: {e}") from e
 
 
 # =====================================================
@@ -879,7 +878,7 @@ async def compliance(
             "drawdown_state": dd_state.severity.value,
         }
     except Exception as e:
-        raise HTTPException(500, f"Compliance check error: {e}")
+        raise HTTPException(500, f"Compliance check error: {e}") from e
 
 
 # =====================================================
@@ -918,7 +917,7 @@ async def run_stress_test(
     """30-Yıllık BIST Deposu ve Ultra Hızlı Monte Carlo Motoru (<1ms Latency)."""
     try:
         daily_returns = _get_historical_returns()
-        
+
         # Scenario Shocks
         scenario_shocks = {
             "gfc_2008": {
@@ -980,11 +979,11 @@ async def run_stress_test(
         num_paths = 30
         np.random.seed(1337)
         raw_shocks = np.random.normal(mean_daily, vol_daily, (num_paths, horizon_days))
-        
+
         # Cumulative paths matrix
         cum_returns = np.cumprod(1.0 + raw_shocks, axis=1)
         paths_matrix = np.hstack([np.ones((num_paths, 1)), cum_returns]) * initial_val
-        
+
         # Quantile Fan Cones (5th, 25th, 50th, 75th, 95th percentiles per day)
         p05 = np.percentile(paths_matrix, 5, axis=0).round(2).tolist()
         p25 = np.percentile(paths_matrix, 25, axis=0).round(2).tolist()
@@ -1032,5 +1031,5 @@ async def run_stress_test(
             "paths": paths_list,
         }
     except Exception as e:
-        raise HTTPException(500, f"Stress test calculation error: {e}")
+        raise HTTPException(500, f"Stress test calculation error: {e}") from e
 

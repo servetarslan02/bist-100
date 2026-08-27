@@ -12,9 +12,9 @@ Evaluation metrics:
 Kaynak: Du (2026), Huang (2026), Oxford (2023)
 """
 
-import numpy as np
-from typing import List, Tuple
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -53,7 +53,7 @@ class WalkForwardResult:
     avg_turnover: float
     stability_score: float
     deflated_sharpe: float
-    folds: List[WalkForwardFold]
+    folds: list[WalkForwardFold]
 
 
 class PurgeEmbargoWalkForward:
@@ -82,7 +82,7 @@ class PurgeEmbargoWalkForward:
     def split(
         self,
         n_days: int,
-    ) -> List[Tuple[int, int, int, int]]:
+    ) -> list[tuple[int, int, int, int]]:
         """Walk-forward split üret.
 
         Returns:
@@ -293,7 +293,7 @@ class PurgeEmbargoWalkForward:
 
         return total_return
 
-    def _compute_daily_returns(self, predictions: np.ndarray, actuals: np.ndarray, k: int = 10) -> List[float]:
+    def _compute_daily_returns(self, predictions: np.ndarray, actuals: np.ndarray, k: int = 10) -> list[float]:
         """Günlük getiri serisi."""
         returns = []
         for day in range(len(predictions)):
@@ -304,7 +304,7 @@ class PurgeEmbargoWalkForward:
             returns.append(day_return)
         return returns
 
-    def _compute_sharpe(self, daily_returns: List[float], risk_free: float = 0) -> float:
+    def _compute_sharpe(self, daily_returns: list[float], risk_free: float = 0) -> float:
         """Sharpe ratio."""
         if not daily_returns or len(daily_returns) < 2:
             return 0.0
@@ -314,7 +314,7 @@ class PurgeEmbargoWalkForward:
             return 0.0
         return float(np.mean(excess) / np.std(excess) * np.sqrt(252))
 
-    def _compute_max_drawdown(self, daily_returns: List[float]) -> float:
+    def _compute_max_drawdown(self, daily_returns: list[float]) -> float:
         """Max drawdown."""
         if not daily_returns:
             return 0.0
@@ -341,7 +341,7 @@ class PurgeEmbargoWalkForward:
 
         return float(np.mean(turnovers)) if turnovers else 0.0
 
-    def _deflated_sharpe(self, sharpes: List[float], n_trials: int) -> float:
+    def _deflated_sharpe(self, sharpes: list[float], n_trials: int) -> float:
         """Deflated Sharpe Ratio — overfitting tespiti.
 
         Backtest sayısı arttıkça Sharpe'ın güvenilirliği düşer.

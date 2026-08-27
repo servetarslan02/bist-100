@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """ALPHA BIST — 162 modül import testi."""
-import sys, importlib, time
+import importlib
+import sys
+import time
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent))
 
 ALL_MODULES = [

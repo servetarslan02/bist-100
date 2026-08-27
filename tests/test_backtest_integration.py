@@ -12,17 +12,13 @@ NIHAI-SPEC doğrultusunda entegrasyon testleri:
 8. Deterministic recovery
 """
 
-import sys
-import os
+from datetime import date, datetime, timedelta
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timedelta, date
-from pathlib import Path
 
 # Add project root to path
-
 import pytest
-
 
 # =====================================================
 # FIXTURES
@@ -31,7 +27,7 @@ import pytest
 def _make_ohlcv(n_days: int = 300, base_price: float = 100.0, seed: int = 42) -> pl.DataFrame:
     """Sentetik OHLCV veri üret."""
     rng = np.random.RandomState(seed)
-    dates = pl.date_range(date(2023, 1, 1), date(2023, 1, 1) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
+    pl.date_range(date(2023, 1, 1), date(2023, 1, 1) + timedelta(days=n_days*2), timedelta(days=1), eager=True).head(n_days)
     returns = rng.normal(0.0003, 0.02, n_days)
     close = base_price * np.cumprod(1 + returns)
     high = close * (1 + rng.uniform(0, 0.02, n_days))
@@ -280,7 +276,7 @@ class TestWalkForwardLeakage:
         folds = engine.split(500)
         assert len(folds) > 0
 
-        for train_start, train_end, test_start, test_end in folds:
+        for _train_start, train_end, test_start, _test_end in folds:
             # Test train'den sonra başlamalı
             assert test_start > train_end
             # Purge gap
@@ -411,7 +407,7 @@ class TestTransactionCosts:
 
     def test_spread_tiers(self):
         """Likidite katmanlarına göre spread farklı olmalı."""
-        from services.backtest.transaction_costs import SpreadModel, LiquidityTier
+        from services.backtest.transaction_costs import LiquidityTier, SpreadModel
 
         spread = SpreadModel()
         s1 = spread.estimate_spread(LiquidityTier.TIER_1)
@@ -453,9 +449,7 @@ class TestSurvivorship:
 
     def test_universe_at_date_excludes_delisted(self):
         """Delist edilen hisseler evrenden çıkarılmalı."""
-        from services.backtest.survivorship import (
-            SurvivorshipBiasHandler, DelistingEvent
-        )
+        from services.backtest.survivorship import DelistingEvent, SurvivorshipBiasHandler
 
         handler = SurvivorshipBiasHandler()
         handler.register_delisting(DelistingEvent(
@@ -493,7 +487,7 @@ class TestDeterministicRecovery:
         config = {"mode": "test", "threshold": 60}
         portfolio = {"cash": 50000, "positions": {"THYAO": 100}}
 
-        cp = recovery.create_checkpoint(config, portfolio)
+        recovery.create_checkpoint(config, portfolio)
         restored_config, restored_portfolio, seed = recovery.restore_checkpoint()
 
         assert restored_config == config

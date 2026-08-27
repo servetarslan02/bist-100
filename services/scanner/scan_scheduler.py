@@ -12,16 +12,19 @@ Kaynaklar: Mometic (2026), TradeAlgo (2026)
 
 import asyncio
 import time
-from typing import Dict, Optional, Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime, time as dt_time, timezone, timedelta
-from enum import Enum
+from datetime import UTC, datetime, timedelta, timezone
+from datetime import time as dt_time
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class ScanMode(str, Enum):
+class ScanMode(StrEnum):
     """Tarama modu."""
     CONTINUOUS = "CONTINUOUS"      # Sürekli tarama (piyasa açık)
     SCHEDULED = "SCHEDULED"        # Zamanlanmış tarama
@@ -93,7 +96,7 @@ class AdaptiveScanScheduler:
         self._event_cooldown_until: float = 0
 
         # Callbacks
-        self._scan_callback: Optional[Callable[[], Awaitable[None]]] = None
+        self._scan_callback: Callable[[], Awaitable[None]] | None = None
 
         # İstatistikler
         self._total_scans = 0
@@ -203,7 +206,7 @@ class AdaptiveScanScheduler:
 
                 # Interval geçmişine kaydet
                 self._interval_history.append({
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "interval": interval,
                     "mode": self._current_mode.value,
                     "volatility": self._current_volatility,
@@ -287,7 +290,7 @@ class AdaptiveScanScheduler:
         Returns:
             Çarpan (0.25 = 4x hızlı, 2.0 = 2x yavaş)
         """
-        for level, config in self.VOLATILITY_INTERVALS.items():
+        for _level, config in self.VOLATILITY_INTERVALS.items():
             if volatility <= config["max_vol"]:
                 return config["scale"]
         return 1.0
@@ -308,7 +311,7 @@ class AdaptiveScanScheduler:
         # Piyasa saatleri (pre-market + market + post-market)
         return self.PRE_MARKET <= current_time <= self.POST_MARKET
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler.
 
         Returns:
@@ -326,7 +329,7 @@ class AdaptiveScanScheduler:
             "total_scans": self._total_scans,
             "total_events_triggered": self._total_events_triggered,
             "last_scan_time": datetime.fromtimestamp(
-                self._last_scan_time, tz=timezone.utc
+                self._last_scan_time, tz=UTC
             ).isoformat() if self._last_scan_time else None,
         }
 

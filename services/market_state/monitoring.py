@@ -15,9 +15,10 @@ Metrikler:
 - market_state_breadth_trin (gauge) — TRIN
 """
 
-from typing import Dict, Any, List
-from datetime import datetime, timezone
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -78,53 +79,53 @@ class MarketStateMetrics:
         lines = []
 
         # Regime
-        lines.append(f"# HELP market_state_regime Current market regime (encoded)")
-        lines.append(f"# TYPE market_state_regime gauge")
+        lines.append("# HELP market_state_regime Current market regime (encoded)")
+        lines.append("# TYPE market_state_regime gauge")
         lines.append(f"market_state_regime {self.regime_value}")
 
-        lines.append(f"# HELP market_state_confidence Regime confidence [0-1]")
-        lines.append(f"# TYPE market_state_confidence gauge")
+        lines.append("# HELP market_state_confidence Regime confidence [0-1]")
+        lines.append("# TYPE market_state_confidence gauge")
         lines.append(f"market_state_confidence {self.regime_confidence}")
 
         # Stability
-        lines.append(f"# HELP market_state_stability Regime stability score [0-1]")
-        lines.append(f"# TYPE market_state_stability gauge")
+        lines.append("# HELP market_state_stability Regime stability score [0-1]")
+        lines.append("# TYPE market_state_stability gauge")
         lines.append(f"market_state_stability {self.stability_score}")
 
-        lines.append(f"# HELP market_state_transitions Total regime transitions")
-        lines.append(f"# TYPE market_state_transitions counter")
+        lines.append("# HELP market_state_transitions Total regime transitions")
+        lines.append("# TYPE market_state_transitions counter")
         lines.append(f"market_state_transitions {self.transition_count}")
 
         # Breadth
-        lines.append(f"# HELP market_state_breadth_pct Percentage of advancing stocks")
-        lines.append(f"# TYPE market_state_breadth_pct gauge")
+        lines.append("# HELP market_state_breadth_pct Percentage of advancing stocks")
+        lines.append("# TYPE market_state_breadth_pct gauge")
         lines.append(f"market_state_breadth_pct {self.breadth_pct}")
 
-        lines.append(f"# HELP market_state_breadth_mcclellan McClellan Oscillator")
-        lines.append(f"# TYPE market_state_breadth_mcclellan gauge")
+        lines.append("# HELP market_state_breadth_mcclellan McClellan Oscillator")
+        lines.append("# TYPE market_state_breadth_mcclellan gauge")
         lines.append(f"market_state_breadth_mcclellan {self.breadth_mcclellan}")
 
-        lines.append(f"# HELP market_state_breadth_trin TRIN / Arms Index")
-        lines.append(f"# TYPE market_state_breadth_trin gauge")
+        lines.append("# HELP market_state_breadth_trin TRIN / Arms Index")
+        lines.append("# TYPE market_state_breadth_trin gauge")
         lines.append(f"market_state_breadth_trin {self.breadth_trin}")
 
-        lines.append(f"# HELP market_state_breadth_thrust Breadth Thrust")
-        lines.append(f"# TYPE market_state_breadth_thrust gauge")
+        lines.append("# HELP market_state_breadth_thrust Breadth Thrust")
+        lines.append("# TYPE market_state_breadth_thrust gauge")
         lines.append(f"market_state_breadth_thrust {self.breadth_thrust}")
 
         # Risk appetite
-        lines.append(f"# HELP market_state_risk_appetite Risk appetite [0-1]")
-        lines.append(f"# TYPE market_state_risk_appetite gauge")
+        lines.append("# HELP market_state_risk_appetite Risk appetite [0-1]")
+        lines.append("# TYPE market_state_risk_appetite gauge")
         lines.append(f"market_state_risk_appetite {self.risk_appetite}")
 
         # Alerts
-        lines.append(f"# HELP market_state_alerts Total alerts")
-        lines.append(f"# TYPE market_state_alerts counter")
+        lines.append("# HELP market_state_alerts Total alerts")
+        lines.append("# TYPE market_state_alerts counter")
         lines.append(f"market_state_alerts {self.alert_count}")
 
         # Performance
-        lines.append(f"# HELP market_state_compute_ms Compute duration in ms")
-        lines.append(f"# TYPE market_state_compute_ms histogram")
+        lines.append("# HELP market_state_compute_ms Compute duration in ms")
+        lines.append("# TYPE market_state_compute_ms histogram")
         lines.append(f"market_state_compute_ms {self.compute_duration_ms}")
 
         return "\\n".join(lines)
@@ -135,7 +136,7 @@ class MarketStateMonitor:
 
     def __init__(self):
         self._metrics = MarketStateMetrics()
-        self._history: List[MarketStateMetrics] = []
+        self._history: list[MarketStateMetrics] = []
         self._max_history = 1000
 
     def update(
@@ -169,7 +170,7 @@ class MarketStateMonitor:
             alert_count=alert_count,
             critical_alerts=critical_alerts,
             compute_duration_ms=compute_duration_ms,
-            last_update=datetime.now(timezone.utc).isoformat(),
+            last_update=datetime.now(UTC).isoformat(),
         )
 
         # History
@@ -181,7 +182,7 @@ class MarketStateMonitor:
         """Prometheus text format."""
         return self._metrics.to_prometheus()
 
-    def get_grafana_dashboard(self) -> Dict[str, Any]:
+    def get_grafana_dashboard(self) -> dict[str, Any]:
         """Grafana dashboard JSON."""
         return {
             "dashboard": {
@@ -301,7 +302,7 @@ class MarketStateMonitor:
             }
         }
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Monitoring özeti."""
         return {
             "current_regime": {v: k for k, v in REGIME_ENCODING.items()}.get(self._metrics.regime_value, "UNKNOWN"),

@@ -10,11 +10,12 @@ Yeni model eski modelle paralel çalışır:
 KURAL: Yeni model doğrudan production'a alınamaz.
 """
 
-import numpy as np
-from typing import Dict, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -27,8 +28,8 @@ logger = structlog.get_logger()
 class ShadowPrediction:
     """Shadow prediction kaydı."""
     ticker: str
-    champion_prediction: Dict
-    challenger_prediction: Dict
+    champion_prediction: dict
+    challenger_prediction: dict
     timestamp: str
 
 
@@ -52,9 +53,9 @@ class ShadowModeManager:
 
     def __init__(self):
         self._shadow_active: bool = False
-        self._champion_id: Optional[str] = None
-        self._challenger_id: Optional[str] = None
-        self._start_date: Optional[datetime] = None
+        self._champion_id: str | None = None
+        self._challenger_id: str | None = None
+        self._start_date: datetime | None = None
         self._predictions: deque = deque(maxlen=5000)
         self._champion_returns: deque = deque(maxlen=5000)
         self._challenger_returns: deque = deque(maxlen=5000)
@@ -64,7 +65,7 @@ class ShadowModeManager:
         self._shadow_active = True
         self._champion_id = champion_id
         self._challenger_id = challenger_id
-        self._start_date = datetime.now(timezone.utc)
+        self._start_date = datetime.now(UTC)
         self._predictions = deque(maxlen=5000)
         self._champion_returns = deque(maxlen=5000)
         self._challenger_returns = deque(maxlen=5000)
@@ -75,8 +76,8 @@ class ShadowModeManager:
     def record_prediction(
         self,
         ticker: str,
-        champion_pred: Dict,
-        challenger_pred: Dict,
+        champion_pred: dict,
+        challenger_pred: dict,
     ):
         """Her iki modelden prediction kaydet."""
         if not self._shadow_active:
@@ -86,7 +87,7 @@ class ShadowModeManager:
             ticker=ticker,
             champion_prediction=champion_pred,
             challenger_prediction=challenger_pred,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         ))
 
     def record_outcome(self, ticker: str, actual_return: float):
@@ -120,7 +121,7 @@ class ShadowModeManager:
                         self._challenger_returns = self._challenger_returns[-1000:]
                 break
 
-    def evaluate(self) -> Optional[ShadowResult]:
+    def evaluate(self) -> ShadowResult | None:
         """Shadow mode sonuçlarını değerlendir."""
         cfg = learning_settings.shadow
 
@@ -128,7 +129,7 @@ class ShadowModeManager:
             return None
 
         # Minimum bekleme süresi
-        days_elapsed = (datetime.now(timezone.utc) - self._start_date).days
+        days_elapsed = (datetime.now(UTC) - self._start_date).days
         if days_elapsed < cfg.duration_days:
             logger.info("Shadow mode: not enough time",
                        elapsed=days_elapsed, required=cfg.duration_days)
@@ -155,10 +156,7 @@ class ShadowModeManager:
         )
 
         # Improvement
-        if champion_sharpe != 0:
-            improvement = ((challenger_sharpe - champion_sharpe) / abs(champion_sharpe)) * 100
-        else:
-            improvement = 0
+        improvement = (challenger_sharpe - champion_sharpe) / abs(champion_sharpe) * 100 if champion_sharpe != 0 else 0
 
         # Karar
         if improvement > cfg.promote_threshold_pct and t_result.significant:
@@ -196,13 +194,13 @@ class ShadowModeManager:
                    challenger=self._challenger_id,
                    predictions=len(self._predictions))
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Shadow mode durumu."""
         return {
             "active": self._shadow_active,
             "champion_id": self._champion_id,
             "challenger_id": self._challenger_id,
-            "days_elapsed": (datetime.now(timezone.utc) - self._start_date).days if self._start_date else 0,
+            "days_elapsed": (datetime.now(UTC) - self._start_date).days if self._start_date else 0,
             "prediction_count": len(self._predictions),
             "outcome_count": len(self._champion_returns),
         }

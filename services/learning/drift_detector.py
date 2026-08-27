@@ -21,16 +21,20 @@ Drift Type Sınıflandırması:
 KURAL: En az 2 yöntem hemfikir olmalı → drift kararı.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
 from services.learning.utils.statistical_tests import (
-    StatisticalTests, PSIResult, KSTestResult,
-    PageHinkleyResult, ADWINResult,
+    ADWINResult,
+    KSTestResult,
+    PageHinkleyResult,
+    PSIResult,
+    StatisticalTests,
 )
 
 logger = structlog.get_logger()
@@ -44,7 +48,7 @@ class DriftResult:
     drift_type: str  # MINOR, MAJOR, SIGNIFICANT, GRADUAL, SUDDEN, EXTREME, CONCEPT
     severity: str  # LOW, MEDIUM, HIGH, CRITICAL
     methods_agreed: int  # Kaç yöntem drift tespit etti
-    details: Dict[str, Any]
+    details: dict[str, Any]
 
 
 @dataclass
@@ -54,9 +58,9 @@ class ComprehensiveDriftReport:
     overall_drift: bool
     drift_type: str
     severity: str
-    affected_features: List[str]
-    feature_results: Dict[str, DriftResult]
-    concept_drift: Dict[str, Any]
+    affected_features: list[str]
+    feature_results: dict[str, DriftResult]
+    concept_drift: dict[str, Any]
     recommendation: str  # MONITOR, RETRAIN, INVESTIGATE
     agreement_count: int  # Kaç yöntem hemfikir
 
@@ -65,15 +69,15 @@ class AdvancedDriftDetector:
     """Gelişmiş drift detection motoru — çoklu yöntem."""
 
     def __init__(self):
-        self._baseline_distributions: Dict[str, Dict] = {}  # feature → {mean, std, data}
-        self._drift_history: List[ComprehensiveDriftReport] = []
-        self._performance_history: List[Dict] = []  # concept drift için
-        self._last_report: Optional[ComprehensiveDriftReport] = None
+        self._baseline_distributions: dict[str, dict] = {}  # feature → {mean, std, data}
+        self._drift_history: list[ComprehensiveDriftReport] = []
+        self._performance_history: list[dict] = []  # concept drift için
+        self._last_report: ComprehensiveDriftReport | None = None
 
     def set_baseline(
         self,
-        feature_data: Dict[str, np.ndarray],
-        performance_data: Optional[List[Dict]] = None,
+        feature_data: dict[str, np.ndarray],
+        performance_data: list[dict] | None = None,
     ):
         """Baseline dağılımları ayarla.
 
@@ -100,8 +104,8 @@ class AdvancedDriftDetector:
 
     def detect_all_drift(
         self,
-        current_data: Dict[str, np.ndarray],
-        current_performance: Optional[Dict[str, float]] = None,
+        current_data: dict[str, np.ndarray],
+        current_performance: dict[str, float] | None = None,
         min_agreement: int = 2,
     ) -> ComprehensiveDriftReport:
         """Tüm drift türlerini tespit et.
@@ -166,7 +170,7 @@ class AdvancedDriftDetector:
         recommendation = self._recommend(drift_type, severity, len(drifted_features), concept)
 
         report = ComprehensiveDriftReport(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             overall_drift=overall_drift or concept.get("concept_drift", False),
             drift_type=drift_type,
             severity=severity,
@@ -192,7 +196,7 @@ class AdvancedDriftDetector:
 
         return report
 
-    def get_drift_report(self) -> Dict[str, Any]:
+    def get_drift_report(self) -> dict[str, Any]:
         """Son drift raporunu döndür."""
         if not self._last_report:
             return {"status": "No drift data"}
@@ -217,7 +221,7 @@ class AdvancedDriftDetector:
     def _detect_feature_drift(
         self,
         name: str,
-        baseline: Dict,
+        baseline: dict,
         current: np.ndarray,
         cfg: Any,
     ) -> DriftResult:
@@ -322,7 +326,7 @@ class AdvancedDriftDetector:
         ks: KSTestResult,
         ph: PageHinkleyResult,
         adwin: ADWINResult,
-        zscore: Dict,
+        zscore: dict,
     ) -> str:
         """Drift type sınıflandır."""
         if psi.severity == "CRITICAL":
@@ -342,7 +346,7 @@ class AdvancedDriftDetector:
     def _calculate_severity(
         self,
         psi: PSIResult,
-        zscore: Dict,
+        zscore: dict,
         methods_agreed: int,
     ) -> str:
         """Drift severity hesapla."""
@@ -360,9 +364,9 @@ class AdvancedDriftDetector:
 
     def _detect_concept_drift(
         self,
-        current_performance: Optional[Dict[str, float]],
+        current_performance: dict[str, float] | None,
         cfg: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Concept drift tespit — performans bazlı."""
         if not current_performance or len(self._performance_history) < 20:
             return {"concept_drift": False, "reason": "Insufficient performance data"}
@@ -409,12 +413,10 @@ class AdvancedDriftDetector:
         drift_type: str,
         severity: str,
         affected_count: int,
-        concept: Dict,
+        concept: dict,
     ) -> str:
         """Drift durumuna göre öner."""
-        if concept.get("concept_drift"):
-            return "RETRAIN_IMMEDIATE"
-        elif severity == "CRITICAL":
+        if concept.get("concept_drift") or severity == "CRITICAL":
             return "RETRAIN_IMMEDIATE"
         elif severity == "HIGH":
             return "RETRAIN_SCHEDULED"

@@ -12,15 +12,15 @@ Test edilen alanlar:
 import os
 import shutil
 import tempfile
-import pytest
-import numpy as np
 
-from services.learning.model_performance_engine import ModelPerformanceEngine, PerformanceMetrics, ROUNDTRIP_COST_PCT
-from services.learning.model_trust_engine import ModelTrustEngine, ModelTrustScore
-from services.learning.model_memory_store import ModelMemoryStore
-from services.learning.learning_pipeline import LearningPipeline
-from services.learning.performance_reporter import ModelPerformanceReporter
+import numpy as np
+import pytest
+
 from services.intelligence.signal_fusion import SignalFusionEngine
+from services.learning.learning_pipeline import LearningPipeline
+from services.learning.model_memory_store import ModelMemoryStore
+from services.learning.model_performance_engine import ModelPerformanceEngine, PerformanceMetrics
+from services.learning.model_trust_engine import ModelTrustEngine, ModelTrustScore
 
 
 @pytest.fixture
@@ -34,7 +34,7 @@ def temp_db():
 def test_prediction_to_outcome_matching(temp_db):
     """Prediction -> Outcome eşleşmesi ve net PnL hesaplaması."""
     store = ModelMemoryStore(db_path=temp_db)
-    
+
     # 1. Tahmin kaydet
     pred_id = "PRED_TEST_THYAO_001"
     store.save_prediction(
@@ -54,7 +54,7 @@ def test_prediction_to_outcome_matching(temp_db):
     assert outcome_res is not None
     assert outcome_res["is_correct"] == 1
     assert outcome_res["actual_return"] == pytest.approx(5.0, abs=0.01)
-    
+
     # Net PnL = 10000 * (%5 - %0.074 maliyet) = 500 - 7.4 = 492.6 TL
     assert outcome_res["net_pnl"] == pytest.approx(492.6, abs=0.5)
 
@@ -127,10 +127,10 @@ def test_signal_fusion_adaptive_weights_and_bounds():
     ]
 
     weights = trust_engine.calculate_ensemble_weights(scores)
-    
+
     # Toplam 1.0 olmalı
     assert sum(weights.values()) == pytest.approx(1.0, abs=0.01)
-    
+
     # En iyi model bile %35 tavanını aşmamalı
     assert weights["model_A"] <= 0.35 + 1e-4
     # En kötü model bile %5 tabanının altına inmemeli
@@ -150,7 +150,7 @@ def test_full_learning_pipeline_end_to_end(temp_db):
     # 1. 6 model için 30'ar adet simüle edilmiş tahmin ve sonuç oluştur
     np.random.seed(42)
     models = ["LightGBM_LambdaRank", "CatBoost_Classifier", "SPEC_Anomaly_Detector", "LSTM_Sequential", "Cross_Sectional_Momentum", "KAP_NLP_Sentiment"]
-    
+
     for i in range(25):
         for m_id in models:
             # Her modelin kendine has doğruluk olasılığı (LightGBM %75, LSTM %55)
@@ -158,7 +158,7 @@ def test_full_learning_pipeline_end_to_end(temp_db):
             pred_dir = "UP" if np.random.rand() > 0.4 else "DOWN"
             is_win = (np.random.rand() < true_acc)
             act_dir = pred_dir if is_win else ("DOWN" if pred_dir == "UP" else "UP")
-            
+
             entry_p = 100.0 + np.random.randn() * 10.0
             act_ret = (np.random.uniform(1.0, 5.0)) if act_dir == "UP" else (-np.random.uniform(1.0, 5.0))
             act_price = entry_p * (1.0 + act_ret / 100.0)
@@ -178,7 +178,7 @@ def test_full_learning_pipeline_end_to_end(temp_db):
     assert cycle_res["success"] is True
     assert cycle_res["models_evaluated"] == 6
     assert len(cycle_res["fusion_weights"]) == 6
-    
+
     # 3. Rapor üretimini kontrol et
     report_md = cycle_res["markdown_report"]
     assert "# 📊 ALPHA BIST — Otonom Model Öğrenme ve Performans Raporu" in report_md

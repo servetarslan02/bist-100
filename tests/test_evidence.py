@@ -3,13 +3,15 @@ ALPHA BIST — Evidence Verification Test Suite
 """
 
 import sys
-import os
 
 
 def test_evidence_engine():
     """Evidence Engine testleri."""
     from services.intelligence.evidence_engine import (
-        evidence_engine, ClaimType, VerificationResult, SourceReliability,
+        ClaimType,
+        SourceReliability,
+        VerificationResult,
+        evidence_engine,
     )
 
     passed = 0
@@ -28,7 +30,7 @@ def test_evidence_engine():
     assert evidence_engine._classify_claim("Tahminime göre yükselecek") == ClaimType.PREDICTION
     assert evidence_engine._classify_claim("Bence bu iyi bir yatırım") == ClaimType.OPINION
     passed += 1
-    print(f"  ✓ Claim type classification")
+    print("  ✓ Claim type classification")
 
     # 3. Source reliability
     assert evidence_engine._get_source_type("kap.org.tr") == SourceReliability.PRIMARY
@@ -37,7 +39,7 @@ def test_evidence_engine():
     assert evidence_engine._get_source_type("twitter.com") == SourceReliability.SOCIAL
     assert evidence_engine._get_source_type("unknown.com") == SourceReliability.UNKNOWN
     passed += 1
-    print(f"  ✓ Source reliability")
+    print("  ✓ Source reliability")
 
     # 4. Fact verification (primary source)
     from services.intelligence.evidence_engine import Claim
@@ -112,7 +114,7 @@ def main():
     total_passed = 0
     total_failed = 0
 
-    print(f"\n--- Evidence Engine ---")
+    print("\n--- Evidence Engine ---")
     try:
         p, f = test_evidence_engine()
         total_passed += p

@@ -12,9 +12,10 @@ ALPHA BIST — Observability & Monitoring v1.0
 """
 
 import uuid
-from typing import Dict, List, Any
-from datetime import datetime, timezone
 from collections import defaultdict
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -28,22 +29,22 @@ class PrometheusMetrics:
     """Prometheus uyumlu metric sistemi — histogram bucket desteği ile."""
 
     def __init__(self):
-        self._counters: Dict[str, int] = defaultdict(int)
-        self._gauges: Dict[str, float] = {}
-        self._histograms: Dict[str, List[float]] = defaultdict(list)
-        self._histogram_buckets: Dict[str, tuple] = {}
+        self._counters: dict[str, int] = defaultdict(int)
+        self._gauges: dict[str, float] = {}
+        self._histograms: dict[str, list[float]] = defaultdict(list)
+        self._histogram_buckets: dict[str, tuple] = {}
 
-    def inc(self, name: str, value: int = 1, labels: Dict[str, str] = None):
+    def inc(self, name: str, value: int = 1, labels: dict[str, str] = None):
         """Counter artır."""
         key = self._make_key(name, labels)
         self._counters[key] += value
 
-    def set_gauge(self, name: str, value: float, labels: Dict[str, str] = None):
+    def set_gauge(self, name: str, value: float, labels: dict[str, str] = None):
         """Gauge ayarla."""
         key = self._make_key(name, labels)
         self._gauges[key] = value
 
-    def observe(self, name: str, value: float, labels: Dict[str, str] = None,
+    def observe(self, name: str, value: float, labels: dict[str, str] = None,
                 buckets: tuple = None):
         """Histogram gözlem (bucket desteği ile)."""
         key = self._make_key(name, labels)
@@ -52,7 +53,7 @@ class PrometheusMetrics:
         if buckets:
             self._histogram_buckets[name] = buckets
 
-    def timed(self, name: str, labels: Dict[str, str] = None, buckets: tuple = None):
+    def timed(self, name: str, labels: dict[str, str] = None, buckets: tuple = None):
         """Context manager — işlem süresini ölçer."""
         import time as _time
         class _Timer:
@@ -70,7 +71,7 @@ class PrometheusMetrics:
                 self._metrics.observe(self._name, elapsed, self._labels, self._buckets)
         return _Timer(self, name, labels, buckets)
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Tüm metrikleri döndür."""
         result = {
             "counters": dict(self._counters),
@@ -118,7 +119,7 @@ class PrometheusMetrics:
             lines.append(f"{name}_sum {stats['sum']:.6f}")
         return "\n".join(lines) + "\n"
 
-    def _make_key(self, name: str, labels: Dict[str, str] = None) -> str:
+    def _make_key(self, name: str, labels: dict[str, str] = None) -> str:
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
             return f"{name}{{{label_str}}}"
@@ -129,7 +130,7 @@ class DistributedTracing:
     """Dağıtık izleme — correlation_id zinciri."""
 
     def __init__(self):
-        self._traces: Dict[str, List[Dict]] = {}
+        self._traces: dict[str, list[dict]] = {}
 
     def start_trace(self, operation: str) -> str:
         """Yeni trace başlat."""
@@ -137,7 +138,7 @@ class DistributedTracing:
         self._traces[trace_id] = [{
             "trace_id": trace_id,
             "operation": operation,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "started",
         }]
         return trace_id
@@ -152,14 +153,14 @@ class DistributedTracing:
             "operation": operation,
             "duration_ms": round(duration_ms, 2),
             "status": status,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
 
-    def get_trace(self, trace_id: str) -> List[Dict]:
+    def get_trace(self, trace_id: str) -> list[dict]:
         """Trace getir."""
         return self._traces.get(trace_id, [])
 
-    def get_recent_traces(self, limit: int = 20) -> List[Dict]:
+    def get_recent_traces(self, limit: int = 20) -> list[dict]:
         """Son trace'ler."""
         all_traces = []
         for trace_id, spans in self._traces.items():
@@ -178,14 +179,14 @@ class PerformanceMonitor:
     """Performans izleme."""
 
     def __init__(self):
-        self._latencies: Dict[str, List[float]] = defaultdict(list)
+        self._latencies: dict[str, list[float]] = defaultdict(list)
 
     def record_latency(self, operation: str, latency_ms: float):
         """Gecikme kaydet."""
         self._latencies[operation].append(latency_ms)
         self._latencies[operation] = self._latencies[operation][-1000:]
 
-    def get_stats(self, operation: str) -> Dict[str, float]:
+    def get_stats(self, operation: str) -> dict[str, float]:
         """İşlem istatistikleri."""
         values = self._latencies.get(operation, [])
         if not values:
@@ -200,7 +201,7 @@ class PerformanceMonitor:
             "p95_ms": round(sorted(values)[int(len(values) * 0.95)], 2),
         }
 
-    def get_all_stats(self) -> Dict[str, Dict]:
+    def get_all_stats(self) -> dict[str, dict]:
         """Tüm işlem istatistikleri."""
         return {op: self.get_stats(op) for op in self._latencies}
 
@@ -209,7 +210,7 @@ class CostMonitor:
     """Maliyet izleme."""
 
     def __init__(self):
-        self._costs: List[Dict] = []
+        self._costs: list[dict] = []
         self._total_cost: float = 0.0
 
     def record(self, provider: str, model: str, tokens: int, cost_usd: float):
@@ -219,7 +220,7 @@ class CostMonitor:
             "model": model,
             "tokens": tokens,
             "cost_usd": round(cost_usd, 6),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
         self._costs.append(entry)
         if len(self._costs) > 1000:
@@ -227,7 +228,7 @@ class CostMonitor:
         self._total_cost += cost_usd
         self._costs = self._costs[-10000:]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Maliyet özeti."""
         by_provider = {}
         by_model = {}
@@ -249,7 +250,7 @@ class ResourceMonitor:
     """Kaynak kullanımı izleme."""
 
     def __init__(self):
-        self._snapshots: List[Dict] = []
+        self._snapshots: list[dict] = []
 
     def snapshot(self, cpu_pct: float = 0, memory_mb: float = 0, gpu_pct: float = 0, disk_mb: float = 0):
         """Kaynak kullanımı snapshot."""
@@ -258,13 +259,13 @@ class ResourceMonitor:
             "memory_mb": memory_mb,
             "gpu_pct": gpu_pct,
             "disk_mb": disk_mb,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._snapshots) > 1000:
             self._snapshots = self._snapshots[-1000:]
         self._snapshots = self._snapshots[-1000]
 
-    def get_current(self) -> Dict[str, Any]:
+    def get_current(self) -> dict[str, Any]:
         """Mevcut kaynak kullanımı."""
         if self._snapshots:
             return self._snapshots[-1]
@@ -275,9 +276,9 @@ class ConfigManager:
     """Config yönetimi — versioned, auditable."""
 
     def __init__(self):
-        self._config: Dict[str, Any] = {}
-        self._versions: List[Dict] = []
-        self._defaults: Dict[str, Any] = {
+        self._config: dict[str, Any] = {}
+        self._versions: list[dict] = []
+        self._defaults: dict[str, Any] = {
             "risk.max_position_pct": 10.0,
             "risk.max_sector_pct": 30.0,
             "risk.max_drawdown_pct": 15.0,
@@ -303,18 +304,18 @@ class ConfigManager:
             "new": str(value),
             "actor": actor,
             "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._versions) > 500:
             self._versions = self._versions[-500:]
 
         logger.info("Config changed", key=key, old=old_value, new=value, actor=actor)
 
-    def get_history(self, key: str) -> List[Dict]:
+    def get_history(self, key: str) -> list[dict]:
         """Config değişiklik geçmişi."""
         return [v for v in self._versions if v["key"] == key]
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Tüm config."""
         result = dict(self._defaults)
         result.update(self._config)
@@ -325,7 +326,7 @@ class HealthChecker:
     """Sistem sağlık kontrolü."""
 
     def __init__(self):
-        self._components: Dict[str, Dict] = {}
+        self._components: dict[str, dict] = {}
 
     def register(self, component: str, check_fn: Any = None):
         """Bileşen kaydet."""
@@ -340,9 +341,9 @@ class HealthChecker:
         if component in self._components:
             self._components[component]["status"] = status
             self._components[component]["details"] = details
-            self._components[component]["last_check"] = datetime.now(timezone.utc).isoformat()
+            self._components[component]["last_check"] = datetime.now(UTC).isoformat()
 
-    def check_all(self) -> Dict[str, Any]:
+    def check_all(self) -> dict[str, Any]:
         """Tüm bileşenlerin sağlık durumu."""
         results = {}
         overall = "HEALTHY"
@@ -353,15 +354,13 @@ class HealthChecker:
                 "details": comp.get("details", ""),
                 "last_check": comp.get("last_check"),
             }
-            if comp["status"] == "FAILED":
-                overall = "DEGRADED"
-            elif comp["status"] == "DEGRADED" and overall == "HEALTHY":
+            if comp["status"] == "FAILED" or comp["status"] == "DEGRADED" and overall == "HEALTHY":
                 overall = "DEGRADED"
 
         return {
             "overall": overall,
             "components": results,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 

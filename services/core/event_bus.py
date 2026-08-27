@@ -11,8 +11,11 @@ Mesajlaşma Strateji:
 """
 
 import asyncio
+import time
 from collections import defaultdict
-from typing import Optional, Callable, Dict, Any, List
+from collections.abc import Callable
+from typing import Any
+
 import structlog
 
 from .config import settings
@@ -47,7 +50,7 @@ DEFAULT_SUBJECTS = [
 ]
 
 
-def ensure_topics(subjects: Optional[List[str]] = None):
+def ensure_topics(subjects: list[str] | None = None):
     """Ensure NATS subjects are registered.
 
     NATS otomatik subject oluşturma destekler, bu fonksiyon
@@ -85,7 +88,7 @@ class InternalEventBus:
     def __init__(self):
         self._redis = None
         self._redis_loop = None
-        self._subscribers: Dict[str, List[Callable]] = {}
+        self._subscribers: dict[str, list[Callable]] = {}
         self._running = False
 
     async def _get_redis(self):
@@ -130,7 +133,7 @@ class InternalEventBus:
 
         # Tüm kanalları tek bir pubsub'da dinle
         pubsub = r.pubsub()
-        channels = [f"alpha:{ch}" for ch in self._subscribers.keys()]
+        channels = [f"alpha:{ch}" for ch in self._subscribers]
         if channels:
             await pubsub.subscribe(*channels)
             logger.info("Listening on channels", channels=list(self._subscribers.keys()))
@@ -184,17 +187,17 @@ class InMemoryRedis:
         self._pubsub_handlers = {}
         self._streams = defaultdict(list)
 
-    async def set(self, key: str, value: Any, ex: Optional[int] = None, nx: bool = False) -> bool:
+    async def set(self, key: str, value: Any, ex: int | None = None, nx: bool = False) -> bool:
         if nx and key in self._data:
             return False
         self._data[key] = value
         return True
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         return self._data.get(key)
 
-    async def xadd(self, stream_key: str, fields: Dict[str, Any]) -> str:
-        msg_id = f"{int(_time.time() * 1000)}-0"
+    async def xadd(self, stream_key: str, fields: dict[str, Any]) -> str:
+        msg_id = f"{int(time.time() * 1000)}-0"
         self._streams[stream_key].append({"id": msg_id, "fields": fields})
         return msg_id
 
@@ -380,15 +383,13 @@ async def _check_and_mark_published(event_id: str) -> bool:
         r = await _get_redis()
         key = f"event_published:{event_id}"
         result = await r.set(key, "1", ex=3600, nx=True)
-        if result is not None:
-            return True
-        return False
+        return result is not None
     except Exception as e:
         logger.debug("Redis idempotency check skipped", error=str(e))
 
     # 2. PostgreSQL dene
     try:
-        from services.core.database import pg_fetchrow, pg_execute
+        from services.core.database import pg_execute, pg_fetchrow
         existing = await pg_fetchrow(
             "SELECT event_id FROM event_ledger WHERE event_id = $1", event_id
         )
@@ -443,10 +444,10 @@ async def _publish_to_stream(event: CanonicalEvent):
 class EventConsumer:
     """Push-based consumer — Redis Pub/Sub ile çalışır."""
 
-    def __init__(self, group_id: str, topics: List[str], auto_offset_reset: str = "latest"):
+    def __init__(self, group_id: str, topics: list[str], auto_offset_reset: str = "latest"):
         self.group_id = group_id
         self.topics = topics
-        self._handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable] = {}
         self._running = False
         self._processed_ids: set = set()
 

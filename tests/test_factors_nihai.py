@@ -1,7 +1,5 @@
 """Factors Nihai Sistem Testleri — 10 Modül, 60+ Test."""
-import pytest
 import numpy as np
-
 
 # ─── Piotroski F-Score Tests ───
 
@@ -240,7 +238,7 @@ class TestRanking:
         assert len(ranked) == 3
 
     def test_top_bottom(self):
-        from services.factors.ranking import rank_stocks, get_top_n, get_bottom_n
+        from services.factors.ranking import get_bottom_n, get_top_n, rank_stocks
         stocks = [{"name": f"S{i}", "factors": {"value": i / 10}, "risk_score": 50} for i in range(10)]
         ranked = rank_stocks(stocks)
         assert len(get_top_n(ranked, 3)) == 3
@@ -376,9 +374,8 @@ class TestTimeSeries:
 class TestIntegration:
     def test_full_pipeline(self):
         """Finansal veri → Piotroski + Beneish + Altman → Ranking."""
-        from services.factors.piotroski import calculate_f_score
-        from services.factors.beneish import calculate_m_score
         from services.factors.altman import calculate_z_score
+        from services.factors.piotroski import calculate_f_score
         from services.factors.ranking import rank_stocks
 
         # Hisse verileri
@@ -395,7 +392,7 @@ class TestIntegration:
                 "revenue": 1000 + i * 200,
             }
             f_score = calculate_f_score(fin)["f_score"]
-            z_score = calculate_z_score(fin)["z_score"]
+            calculate_z_score(fin)["z_score"]
 
             stocks.append({
                 "ticker": f"STOCK{i}",

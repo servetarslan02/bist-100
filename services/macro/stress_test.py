@@ -10,9 +10,10 @@ Makro stres testi — portfolio bazlı:
 KURAL: "USDTRY +10% olursa portföy ne olur?" sorusunu cevapla.
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -36,11 +37,11 @@ class StressTestResult:
     """Stres testi sonucu."""
     scenario: str
     description: str
-    shocks: Dict[str, float]
+    shocks: dict[str, float]
     total_impact_pct: float
     total_impact_value: float
     portfolio_value: float
-    position_impacts: List[PositionImpact]
+    position_impacts: list[PositionImpact]
     worst_position: str
     best_position: str
     timestamp: str
@@ -96,7 +97,7 @@ class MacroStressTest:
 
     def run_stress_test(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         scenario: str,
     ) -> StressTestResult:
         """Stres testi çalıştır.
@@ -123,8 +124,8 @@ class MacroStressTest:
 
     def run_custom_scenario(
         self,
-        portfolio: Dict[str, Any],
-        shocks: Dict[str, float],
+        portfolio: dict[str, Any],
+        shocks: dict[str, float],
         description: str = "Custom scenario",
     ) -> StressTestResult:
         """Özel senaryo stres testi."""
@@ -132,7 +133,7 @@ class MacroStressTest:
 
     def find_breaking_point(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         shock_type: str,
         threshold_pct: float = -0.10,
     ) -> BreakingPointResult:
@@ -164,8 +165,8 @@ class MacroStressTest:
 
     def run_all_scenarios(
         self,
-        portfolio: Dict[str, Any],
-    ) -> List[StressTestResult]:
+        portfolio: dict[str, Any],
+    ) -> list[StressTestResult]:
         """Tüm önceden tanımlı senaryoları çalıştır."""
         cfg = macro_config.stress_test
         results = []
@@ -178,8 +179,8 @@ class MacroStressTest:
 
     def get_report(
         self,
-        portfolio: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        portfolio: dict[str, Any],
+    ) -> dict[str, Any]:
         """Stres testi raporu."""
         results = self.run_all_scenarios(portfolio)
 
@@ -209,9 +210,9 @@ class MacroStressTest:
 
     def _run_scenario(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         scenario: str,
-        shocks: Dict[str, float],
+        shocks: dict[str, float],
         description: str = None,
     ) -> StressTestResult:
         """Senaryo çalıştır."""
@@ -272,7 +273,7 @@ class MacroStressTest:
             position_impacts=position_impacts,
             worst_position=worst.ticker,
             best_position=best.ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
     def _empty_result(self, scenario: str, total_value: float) -> StressTestResult:
@@ -287,7 +288,7 @@ class MacroStressTest:
             position_impacts=[],
             worst_position="",
             best_position="",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
 

@@ -12,15 +12,15 @@ Retry, timeout, token counting dahil.
 """
 
 import asyncio
-import orjson
 import os
 import re
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
+from dataclasses import dataclass
+from typing import Any
 
 import aiohttp
-from dataclasses import dataclass
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -36,8 +36,8 @@ class LLMResponse:
     tokens_out: int = 0
     duration_ms: float = 0
     success: bool = True
-    error: Optional[str] = None
-    raw_response: Optional[Dict] = None
+    error: str | None = None
+    raw_response: dict | None = None
 
 
 @dataclass
@@ -46,7 +46,7 @@ class LLMConfig:
     provider: str = "ollama"
     model: str = "gemma4:12b-q4_0"
     base_url: str = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-    api_key: Optional[str] = None
+    api_key: str | None = None
     temperature: float = 0.3
     max_tokens: int = 2048
     context_size: int = 8192
@@ -64,9 +64,9 @@ class BaseLLMClient(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Chat completion."""
 
@@ -74,8 +74,8 @@ class BaseLLMClient(ABC):
         self,
         system_prompt: str,
         user_prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Tek seferlik generate (system + user)."""
         messages = [
@@ -88,8 +88,8 @@ class BaseLLMClient(ABC):
         self,
         system_prompt: str,
         user_prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
         """Retry mekanizmalı generate."""
         last_error = None
@@ -129,9 +129,9 @@ class OllamaLLMClient(BaseLLMClient):
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
 
         start = time.monotonic()
@@ -179,7 +179,7 @@ class OllamaLLMClient(BaseLLMClient):
                         raw_response=data,
                     )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return LLMResponse(
                 content="",
                 model=self.config.model,
@@ -204,9 +204,9 @@ class OpenAILLMClient(BaseLLMClient):
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
 
         start = time.monotonic()
@@ -262,7 +262,7 @@ class OpenAILLMClient(BaseLLMClient):
                         raw_response=data,
                     )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return LLMResponse(
                 content="",
                 model=self.config.model,
@@ -287,9 +287,9 @@ class AnthropicLLMClient(BaseLLMClient):
 
     async def chat(
         self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        messages: list[dict[str, str]],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> LLMResponse:
 
         start = time.monotonic()
@@ -355,7 +355,7 @@ class AnthropicLLMClient(BaseLLMClient):
                         raw_response=data,
                     )
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return LLMResponse(
                 content="",
                 model=self.config.model,
@@ -422,7 +422,7 @@ class LLMClientFactory:
         cls._providers[name.lower()] = client_class
 
 
-def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
+def parse_llm_json(content: str) -> dict[str, Any] | None:
     """LLM yanıtından JSON çıkar.
 
     Birden fazla strateji dener:
@@ -462,7 +462,7 @@ def parse_llm_json(content: str) -> Optional[Dict[str, Any]]:
     return _extract_from_text(content)
 
 
-def _extract_from_text(content: str) -> Dict[str, Any]:
+def _extract_from_text(content: str) -> dict[str, Any]:
     """Metinden structured veri çıkar (son çare)."""
     result = {
         "direction": "NEUTRAL",

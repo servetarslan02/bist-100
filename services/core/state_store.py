@@ -31,20 +31,21 @@ Kullanım:
     weights = state_store.load_fusion_weights()
 """
 
-import duckdb
-import time
-import signal
 import atexit
+import signal
+import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any
+
+import duckdb
 import structlog
 
 try:
     import orjson
 except ImportError:
-    raise ImportError("orjson is required")
+    raise ImportError("orjson is required") from None
 
 logger = structlog.get_logger()
 
@@ -56,7 +57,7 @@ class CentralStateStore:
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
-        self._write_buffer: List[tuple] = []
+        self._write_buffer: list[tuple] = []
         self._buffer_size = 10  # Küçük buffer — crash safety için
         self._last_flush = time.time()
         self._flush_interval = 30.0  # saniye
@@ -172,17 +173,17 @@ class CentralStateStore:
     # ===================== CIRCUIT BREAKER =====================
 
     def save_circuit_state(self, name: str, state: str, failure_count: int,
-                           last_failure: Optional[str] = None,
-                           last_success: Optional[str] = None):
+                           last_failure: str | None = None,
+                           last_success: str | None = None):
         """Circuit breaker durumunu kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self._buffered_write("""
             INSERT OR REPLACE INTO circuit_breakers
             (name, state, failure_count, last_failure_at, last_success_at, updated_at)
             VALUES (?, ?, ?, ?, ?, ?)
         """, (name, state, failure_count, last_failure, last_success, now))
 
-    def load_circuit_state(self, name: str) -> Optional[Dict[str, Any]]:
+    def load_circuit_state(self, name: str) -> dict[str, Any] | None:
         """Circuit breaker durumunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -193,7 +194,7 @@ class CentralStateStore:
                 return dict(row)
         return None
 
-    def load_all_circuit_states(self) -> Dict[str, Dict]:
+    def load_all_circuit_states(self) -> dict[str, dict]:
         """Tüm circuit breaker durumlarını yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -203,9 +204,9 @@ class CentralStateStore:
     # ===================== PROVIDER RELIABILITY =====================
 
     def save_provider_reliability(self, name: str, total_calls: int,
-                                   total_failures: int, recent_results: List):
+                                   total_failures: int, recent_results: list):
         """Provider reliability skorunu kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         results_json = orjson.dumps(recent_results[-100:]).decode()
         self._buffered_write("""
             INSERT OR REPLACE INTO provider_reliability
@@ -213,7 +214,7 @@ class CentralStateStore:
             VALUES (?, ?, ?, ?, ?)
         """, (name, total_calls, total_failures, results_json, now))
 
-    def load_provider_reliability(self, name: str) -> Optional[Dict[str, Any]]:
+    def load_provider_reliability(self, name: str) -> dict[str, Any] | None:
         """Provider reliability skorunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -230,13 +231,13 @@ class CentralStateStore:
 
     def save_rate_limiter(self, name: str, tokens: float):
         """Rate limiter token durumunu kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         self._buffered_write("""
             INSERT OR REPLACE INTO rate_limiters (name, tokens, updated_at)
             VALUES (?, ?, ?)
         """, (name, tokens, now))
 
-    def load_rate_limiter(self, name: str) -> Optional[float]:
+    def load_rate_limiter(self, name: str) -> float | None:
         """Rate limiter token durumunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -247,22 +248,19 @@ class CentralStateStore:
 
     # ===================== LEARNING LOOP =====================
 
-    def save_learning_state(self, state: Dict[str, Any]):
+    def save_learning_state(self, state: dict[str, Any]):
         """Learning loop durumunu kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._connect() as conn:
             for key, value in state.items():
-                if isinstance(value, (dict, list)):
-                    value = orjson.dumps(value, default=str).decode()
-                else:
-                    value = str(value)
+                value = orjson.dumps(value, default=str).decode() if isinstance(value, (dict, list)) else str(value)
                 conn.execute("""
                     INSERT OR REPLACE INTO learning_state (key, value, updated_at)
                     VALUES (?, ?, ?)
                 """, (key, value, now))
             conn.commit()
 
-    def load_learning_state(self) -> Dict[str, Any]:
+    def load_learning_state(self) -> dict[str, Any]:
         """Learning loop durumunu yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -277,9 +275,9 @@ class CentralStateStore:
 
     def save_prediction(self, ticker: str, predicted_direction: str,
                         predicted_return: float, confidence: float,
-                        regime: str, features: Dict):
+                        regime: str, features: dict):
         """Tahmin kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         features_json = orjson.dumps(features, default=str).decode()
         with self._connect() as conn:
             conn.execute("""
@@ -291,7 +289,7 @@ class CentralStateStore:
                   regime, features_json, now))
             conn.commit()
 
-    def update_prediction_outcome(self, ticker: str, outcome: Dict):
+    def update_prediction_outcome(self, ticker: str, outcome: dict):
         """Tahmin sonucunu güncelle."""
         outcome_json = orjson.dumps(outcome, default=str).decode()
         with self._connect() as conn:
@@ -304,7 +302,7 @@ class CentralStateStore:
             """, (outcome_json, ticker, ticker))
             conn.commit()
 
-    def load_recent_predictions(self, limit: int = 100) -> List[Dict]:
+    def load_recent_predictions(self, limit: int = 100) -> list[dict]:
         """Son tahminleri yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -333,9 +331,9 @@ class CentralStateStore:
 
     # ===================== SIGNAL FUSION =====================
 
-    def save_fusion_weights(self, weights: Dict[str, float]):
+    def save_fusion_weights(self, weights: dict[str, float]):
         """Signal fusion ağırlıklarını kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         weights_json = orjson.dumps(weights).decode()
         with self._connect() as conn:
             conn.execute("""
@@ -344,7 +342,7 @@ class CentralStateStore:
             """, (weights_json, now))
             conn.commit()
 
-    def load_fusion_weights(self) -> Optional[Dict[str, float]]:
+    def load_fusion_weights(self) -> dict[str, float] | None:
         """Signal fusion ağırlıklarını yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -357,18 +355,18 @@ class CentralStateStore:
 
     # ===================== CORRELATION TRACKER =====================
 
-    def save_correlation_history(self, var1: str, var2: str, values: List[float]):
+    def save_correlation_history(self, var1: str, var2: str, values: list[float]):
         """Korelasyon geçmişini kaydet."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(values).decode()
-        key = f"{min(var1,var2)}:{max(var1,var2)}"
+        f"{min(var1,var2)}:{max(var1,var2)}"
         self._buffered_write("""
             INSERT OR REPLACE INTO correlation_history
             (var1, var2, corr_values, updated_at)
             VALUES (?, ?, ?, ?)
         """, (var1, var2, values_json, now))
 
-    def load_correlation_history(self, var1: str, var2: str) -> Optional[List[float]]:
+    def load_correlation_history(self, var1: str, var2: str) -> list[float] | None:
         """Korelasyon geçmişini yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -382,9 +380,9 @@ class CentralStateStore:
 
     # ===================== CHAMPION CHALLENGER =====================
 
-    def save_champion_entry(self, data: Dict):
+    def save_champion_entry(self, data: dict):
         """Champion challenger kaydı ekle."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         data_json = orjson.dumps(data, default=str).decode()
         with self._connect() as conn:
             conn.execute("""
@@ -393,7 +391,7 @@ class CentralStateStore:
             """, (data_json, now))
             conn.commit()
 
-    def load_champion_history(self, limit: int = 100) -> List[Dict]:
+    def load_champion_history(self, limit: int = 100) -> list[dict]:
         """Champion challenger geçmişini yükle."""
         self._flush_buffer()
         with self._connect() as conn:
@@ -405,7 +403,7 @@ class CentralStateStore:
 
     # ===================== GENEL =====================
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         with self._connect() as conn:
             tables = [

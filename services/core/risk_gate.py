@@ -4,8 +4,9 @@ Merkezi risk kontrolü — order gönderilmeden önce.
 Fail-safe, fail-closed.
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -17,7 +18,7 @@ class RiskDecision:
     reason: str = ""
     checks_passed: int = 0
     checks_failed: int = 0
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
@@ -54,7 +55,7 @@ class RiskGate:
         quantity: int,
         price: float,
         portfolio_value: float,
-        current_positions: Dict[str, Any],
+        current_positions: dict[str, Any],
         model_confidence: float = 0.5,
         market_open: bool = True,
         data_valid: bool = True,
@@ -197,12 +198,11 @@ class RiskGate:
         passed = failed = 0
         details = {}
         reasons = []
-        failed_before = 0  # local counter not needed, track via return
 
         try:
-            from services.core.short_selling import short_selling_monitor
-            from services.core.halt_monitor import halt_monitor
             from services.core.compliance import compliance_checker
+            from services.core.halt_monitor import halt_monitor
+            from services.core.short_selling import short_selling_monitor
 
             if side == "SELL" and ticker not in current_positions:
                 ss = short_selling_monitor.can_short_sell(ticker, price, last_trade_price=price)
@@ -251,14 +251,14 @@ class RiskGate:
 
         return passed, failed, reasons
 
-    def set_macro_stress_result(self, stress_result: Dict[str, Any]):
+    def set_macro_stress_result(self, stress_result: dict[str, Any]):
         """Macro stres testi sonucunu risk gate'e besle."""
         self._macro_stress_result = stress_result
 
     def check_macro_stress(
         self,
-        portfolio: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        portfolio: dict[str, Any],
+    ) -> dict[str, Any]:
         """Macro stres testi çalıştır ve sonucu kaydet."""
         try:
             from services.macro.stress_test import macro_stress_test

@@ -16,11 +16,12 @@ Kullanım:
     validated = validate_ohlcv(raw_data)
 """
 
-import numpy as np
-from typing import Dict, Optional, Any
-from pydantic import BaseModel, Field, validator
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
+from pydantic import BaseModel, Field, validator
 
 logger = structlog.get_logger()
 
@@ -35,16 +36,15 @@ class OHLCVSchema(BaseModel):
     volume: float = Field(ge=0)
 
     @validator("high")
-    def high_gte_low(cls, v, values):
+    def high_gte_low(self, v, values):
         if "low" in values and v < values["low"]:
             raise ValueError("high must be >= low")
         return v
 
     @validator("open")
-    def open_in_range(cls, v, values):
-        if "high" in values and "low" in values:
-            if v > values["high"] or v < values["low"]:
-                raise ValueError("open must be between low and high")
+    def open_in_range(self, v, values):
+        if "high" in values and "low" in values and (v > values["high"] or v < values["low"]):
+            raise ValueError("open must be between low and high")
         return v
 
 
@@ -52,10 +52,10 @@ class FeatureVectorSchema(BaseModel):
     """Feature vektörü doğrulama şeması."""
     ticker: str
     date: datetime
-    features: Dict[str, float]
+    features: dict[str, float]
 
     @validator("features")
-    def no_nan_inf(cls, v):
+    def no_nan_inf(self, v):
         for key, val in v.items():
             if val is not None and (np.isnan(val) or np.isinf(val)):
                 raise ValueError(f"Feature '{key}' contains NaN/Inf")
@@ -78,8 +78,8 @@ class SignalSchema(BaseModel):
     action: str = Field(pattern="^(BUY|SELL|HOLD)$")
     price: float = Field(gt=0)
     confidence: float = Field(ge=0.0, le=1.0)
-    stop_loss: Optional[float] = Field(default=None, gt=0)
-    target: Optional[float] = Field(default=None, gt=0)
+    stop_loss: float | None = Field(default=None, gt=0)
+    target: float | None = Field(default=None, gt=0)
 
 
 class PositionSchema(BaseModel):
@@ -91,7 +91,7 @@ class PositionSchema(BaseModel):
     current_price: float = Field(ge=0)
 
 
-def validate_ohlcv(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_ohlcv(data: dict[str, Any]) -> dict[str, Any]:
     """OHLCV verisini doğrula."""
     try:
         validated = OHLCVSchema(**data)
@@ -101,7 +101,7 @@ def validate_ohlcv(data: Dict[str, Any]) -> Dict[str, Any]:
         return None
 
 
-def validate_features(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_features(data: dict[str, Any]) -> dict[str, Any]:
     """Feature vektörünü doğrula."""
     try:
         validated = FeatureVectorSchema(**data)
@@ -111,7 +111,7 @@ def validate_features(data: Dict[str, Any]) -> Dict[str, Any]:
         return None
 
 
-def validate_prediction(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_prediction(data: dict[str, Any]) -> dict[str, Any]:
     """Model tahminini doğrula."""
     try:
         validated = PredictionSchema(**data)
@@ -121,7 +121,7 @@ def validate_prediction(data: Dict[str, Any]) -> Dict[str, Any]:
         return None
 
 
-def validate_signal(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_signal(data: dict[str, Any]) -> dict[str, Any]:
     """Sinyali doğrula."""
     try:
         validated = SignalSchema(**data)
@@ -131,7 +131,7 @@ def validate_signal(data: Dict[str, Any]) -> Dict[str, Any]:
         return None
 
 
-def validate_position(data: Dict[str, Any]) -> Dict[str, Any]:
+def validate_position(data: dict[str, Any]) -> dict[str, Any]:
     """Pozisyonu doğrula."""
     try:
         validated = PositionSchema(**data)

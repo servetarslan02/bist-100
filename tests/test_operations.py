@@ -10,24 +10,23 @@ Kapsam:
 - Rate limiting
 """
 
-import sys
-import os
-import orjson
 import asyncio
+import os
+import sys
 import time
 
-from services.core.monitoring_security import (
-    MonitoringAuth, AuthConfig, extract_bearer_token, extract_api_key,
-)
-from services.core.alerting import (
-    AlertingSystem, Alert, AlertType, AlertSeverity,
-)
-from services.core.observability import PrometheusMetrics, DEFAULT_BUCKETS
-from services.core.monitoring import PortfolioMonitor
-from services.core.db_lock import get_lock_metrics
-from services.portfolio.main import PortfolioService
-from services.core.database_dev import dev_db
+import orjson
 
+from services.core.alerting import (
+    AlertingSystem,
+)
+from services.core.monitoring_security import (
+    AuthConfig,
+    MonitoringAuth,
+    extract_api_key,
+    extract_bearer_token,
+)
+from services.core.observability import DEFAULT_BUCKETS, PrometheusMetrics
 
 # =====================================================
 # AUTHENTICATION TESTS

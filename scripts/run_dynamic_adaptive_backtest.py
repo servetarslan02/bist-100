@@ -12,14 +12,13 @@ ALPHA BIST — 100% Dinamik, Sıfır Statik Veri ve 3 Aşamalı OOS Doğrulama S
    - Out-of-Sample 2 (2024 - 2026): 2.5 Yıl (Tam Bağımsız Kör Seanslar)
 """
 
-import sys
 import os
-from typing import Dict, List, Any, Tuple, Optional
-import yfinance as yf
-import polars as pl
-import numpy as np
-from datetime import datetime, timedelta
+import sys
 import warnings
+
+import numpy as np
+import polars as pl
+
 warnings.filterwarnings('ignore')
 
 sys.path.insert(0, os.path.abspath("."))
@@ -43,6 +42,7 @@ BENCHMARK_TICKER = "XU100.IS"
 
 from services.data.historical_warehouse import historical_warehouse
 
+
 def load_bist_historical_data():
     """30 yıllık gerçek BIST verilerini yerel disk deposundan 0.3 saniyede yükler."""
     print("=" * 90)
@@ -53,7 +53,7 @@ def load_bist_historical_data():
 
     print(f"✓ BIST-100: {len(bm_df)} seans günü ({bm_df.index[0].strftime('%Y-%m-%d')} -> {bm_df.index[-1].strftime('%Y-%m-%d')})")
     print(f"✓ {len(stock_dict)} hissenin 30 yıllık eksiksiz verisi hazırlandı.")
-    
+
     print("  • Mum formasyonları hafızaya önbellekleniyor (Mikrosaniye hızlı simülasyon)...")
     for ticker, df_t in stock_dict.items():
         dynamic_candle_matrix.precompute_stock_patterns(ticker, df_t)
@@ -62,7 +62,7 @@ def load_bist_historical_data():
     return bm_df, stock_dict
 
 
-def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame], initial_capital: float = 100000.0):
+def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame], initial_capital: float = 100000.0):
     """Belirli bir zaman dilimi için Next-Bar Open icralı dinamik simülasyon koşturur."""
     print(f"\n>> {stage_name} ({start_year} - {end_year}) SİMÜLASYONU BAŞLATILIYOR...")
 
@@ -112,7 +112,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
         # =============================================================
         # 1. NEXT-BAR OPEN İCRASI (Dün Kapanışta Verilen Emirlerin İcrası)
         # =============================================================
-        
+
         # A) Bekleyen Satış Emirlerinin İcrası ($t+1$ Open)
         for sell_ord in pending_sell_orders:
             t = sell_ord["ticker"]
@@ -122,7 +122,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                     open_p = float(s_df.loc[current_date]["Open"])
                     exit_p = open_p * (1 - SLIPPAGE_RATE)
                     pos = positions[t]
-                    
+
                     pnl_raw = (exit_p - pos["entry_price"]) * pos["shares"]
                     fee = (pos["entry_price"] + exit_p) * pos["shares"] * COMMISSION_RATE
                     net_pnl = pnl_raw - fee
@@ -148,7 +148,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                     open_p = float(s_df.loc[current_date]["Open"])
                     entry_p = open_p * (1 + SLIPPAGE_RATE)
                     cost_with_fee = entry_p * (1 + COMMISSION_RATE)
-                    
+
                     invest_amount = buy_ord["amount"]
                     shares = int(invest_amount / cost_with_fee)
 
@@ -167,7 +167,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
         # =============================================================
         # 2. GÜN İÇİ DEĞERLENDİRME & SİNYAL ÜRETİMİ (Günün Kapanışında)
         # =============================================================
-        
+
         # Rejim Kontrolü (XU100 50-SMA ve 200-SMA)
         bm_closes_sub = bm_df["Close"].iloc[max(0, global_day_idx-200):global_day_idx+1].values
         bm_now = float(bm_closes_sub[-1])
@@ -199,7 +199,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
         # 2. Dinamik Kayan Mum Matrisi ile Yeni Alım Sinyalleri Taraması
         max_positions = 10 if is_bull_regime else 3
         active_and_pending_count = len(positions) + len(pending_buy_orders) - len(pending_sell_orders)
-        
+
         if active_and_pending_count < max_positions:
             candidates = []
             for ticker in BIST_CORE_STOCKS:
@@ -217,7 +217,7 @@ def run_stage_simulation(stage_name: str, start_year: int, end_year: int, bm_df:
                 rolling_edges = dynamic_candle_matrix.evaluate_rolling_edge(ticker, loc_idx, forward_days=5)
 
                 c_res = candle_engine.analyze_dataframe(s_hist.iloc[-30:], ticker)
-                p_now = float(s_hist["Close"].iloc[-1])
+                float(s_hist["Close"].iloc[-1])
                 vol_now = float(s_hist["Volume"].iloc[-1])
                 if vol_now < 5_000:
                     continue

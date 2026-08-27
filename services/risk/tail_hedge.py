@@ -12,9 +12,10 @@ Kaynaklar:
 - CFA Institute — Measuring and Managing Market Risk (2026)
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -29,7 +30,7 @@ class HedgeRecommendation:
     estimated_cost_amount: float # Maliyet (TL)
     protection_level: str        # LOW, MEDIUM, HIGH
     description: str
-    instruments: List[str]       # Önerilen enstrümanlar
+    instruments: list[str]       # Önerilen enstrümanlar
 
 
 @dataclass
@@ -217,7 +218,7 @@ class TailRiskHedger:
         hedge_cost_pct: float,
         max_loss_without_hedge_pct: float,
         max_loss_with_hedge_pct: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Hedge maliyet-fayda analizi.
 
         Args:
@@ -328,7 +329,7 @@ class TailRiskHedger:
             return "TAIL_SPREAD"
         return "CRISIS_ALPHA"  # Normal durumda düşük maliyetli
 
-    def _get_instruments(self, strategy: str, vix_level: float) -> List[str]:
+    def _get_instruments(self, strategy: str, vix_level: float) -> list[str]:
         """Strateji için önerilen enstrümanlar."""
         instruments = {
             "PROTECTIVE_PUT": ["XU030 Put Opsiyon", "VIOP Endeks Put"],

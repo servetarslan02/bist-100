@@ -1,20 +1,27 @@
 """ALPHA BIST - Simulation Engine (Monte Carlo, Scenarios, Backtest)"""
 
 import asyncio
-import orjson
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
+import orjson
 import structlog
 
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, pg_execute, ch_execute,
+    ch_execute,
+    close_databases,
+    init_databases,
+    pg_execute,
+    pg_fetch,
+)
+from ..core.event_bus import (
+    EventConsumer,
+    EventType,
+    ensure_topics,
+    publish_event,
 )
 from ..core.event_schema import CanonicalEvent
-from ..core.event_bus import (
-    ensure_topics, EventType,
-    EventConsumer, publish_event,
-)
 from ..core.logging import setup_logging
 
 logger = structlog.get_logger()
@@ -95,10 +102,10 @@ class SimulationEngine:
         except Exception as e:
             logger.error("Simulation error", error=str(e))
 
-    async def _run_monte_carlo(self, params: Dict) -> Dict[str, Any]:
+    async def _run_monte_carlo(self, params: dict) -> dict[str, Any]:
         """
         Monte Carlo simülasyonu — v1.1
-        
+
         Daha gerçekçi:
         - Regime-conditioned returns
         - Fat tails (Student-t dağılımı)
@@ -188,13 +195,13 @@ class SimulationEngine:
                 "75": float(np.percentile(returns, 75)),
                 "95": float(np.percentile(returns, 95)),
             },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         logger.info("Monte Carlo simulation completed", ticker=ticker, simulations=num_simulations)
         return result
 
-    async def _run_scenario_analysis(self, params: Dict) -> Dict[str, Any]:
+    async def _run_scenario_analysis(self, params: dict) -> dict[str, Any]:
         """Run scenario analysis — beta ve sektör bazlı.
 
         Her pozisyon için:
@@ -304,10 +311,10 @@ class SimulationEngine:
             ),
             "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
             "best_case": max(r["portfolio_impact"] for r in results) if results else 0,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    async def _run_stress_test(self, params: Dict) -> Dict[str, Any]:
+    async def _run_stress_test(self, params: dict) -> dict[str, Any]:
         """Run stress test — gerçek hesaplama."""
         params.get("portfolio_id")
         positions = params.get("positions", [])
@@ -359,10 +366,10 @@ class SimulationEngine:
         return {
             "stress_tests": results,
             "worst_case": min(r["portfolio_impact"] for r in results) if results else 0,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    async def _get_historical_volatility(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def _get_historical_volatility(self, ticker: str) -> dict[str, Any] | None:
         """Get historical volatility from ClickHouse."""
         try:
             result = ch_execute("""

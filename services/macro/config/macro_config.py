@@ -5,9 +5,9 @@ Tüm eşikler, parametreler ve konfigürasyonlar tek merkezden yönetilir.
 Hardcoded değerler YASAKTIR — hepsi buradan okunur.
 """
 
-from pydantic import BaseModel, Field
-from typing import Dict
 import os
+
+from pydantic import BaseModel, Field
 
 
 class SurpriseConfig(BaseModel):
@@ -51,7 +51,7 @@ class StressTestConfig(BaseModel):
     custom_scenario_max_shocks: int = Field(default=10, description="Maksimum özel senaryo şoku sayısı")
 
     # Önceden tanımlı senaryolar
-    predefined_scenarios: Dict[str, Dict[str, float]] = Field(default={
+    predefined_scenarios: dict[str, dict[str, float]] = Field(default={
         "USDTRY_10_PCT": {"usdtry_change": 0.10},
         "TCMB_RATE_HIKE_500BP": {"interest_rate_change": 0.05},
         "VIX_SPIKE_50_PCT": {"vix_change": 0.50},
@@ -92,7 +92,7 @@ class DecayConfig(BaseModel):
     default_half_life_days: int = Field(default=5, description="Varsayılan half-life (gün)")
 
     # Şok türüne göre half-life
-    half_life_by_shock_type: Dict[str, int] = Field(default={
+    half_life_by_shock_type: dict[str, int] = Field(default={
         "monetary_policy": 10,      # Para politikası sürprizi
         "inflation_surprise": 7,    # Enflasyon sürprizi
         "fx_shock": 5,             # Kur şoku

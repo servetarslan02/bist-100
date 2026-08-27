@@ -3,8 +3,9 @@
 TCMB faiz kararı, enflasyon, GSYH, cari açık, USDTRY reaksiyonu.
 MacKinlay (1997) metodolojisi ile detaylı makro event study.
 """
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Any, Optional
 import structlog
 
 logger = structlog.get_logger()
@@ -67,12 +68,12 @@ def analyze_tcmb_event(
     rate_expected: float,
     rate_previous: float,
     market_returns: np.ndarray,
-    dates: Optional[np.ndarray] = None,
-    event_date: Optional[Any] = None,
-    inflation: Optional[float] = None,
-    usdtry_returns: Optional[np.ndarray] = None,
-    sector_returns: Optional[Dict[str, np.ndarray]] = None,
-) -> Dict[str, Any]:
+    dates: np.ndarray | None = None,
+    event_date: Any | None = None,
+    inflation: float | None = None,
+    usdtry_returns: np.ndarray | None = None,
+    sector_returns: dict[str, np.ndarray] | None = None,
+) -> dict[str, Any]:
     """TCMB faiz kararı için detaylı event study.
 
     Args:
@@ -197,8 +198,8 @@ def analyze_macro_event(
     expected: float,
     previous: float,
     market_returns: np.ndarray,
-    usdtry_returns: Optional[np.ndarray] = None,
-) -> Dict[str, Any]:
+    usdtry_returns: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Genel makro event analizi.
 
     Args:
@@ -276,10 +277,10 @@ def analyze_macro_event(
 
 
 def analyze_macro_events_batch(
-    events: List[Dict[str, Any]],
+    events: list[dict[str, Any]],
     market_returns: np.ndarray,
-    usdtry_returns: Optional[np.ndarray] = None,
-) -> Dict[str, Any]:
+    usdtry_returns: np.ndarray | None = None,
+) -> dict[str, Any]:
     """Birden fazla makro event için toplu analiz.
 
     Args:
@@ -319,7 +320,7 @@ def analyze_macro_events_batch(
 
 
 def _check_rate_inflation_consistency(
-    rate: float, inflation: Optional[float]
+    rate: float, inflation: float | None
 ) -> str:
     """Faiz-enflasyon tutarlılığı kontrolü."""
     if inflation is None:

@@ -14,8 +14,9 @@ import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-import numpy as np
 
+import numpy as np
+import polars as pl
 import structlog
 
 # Varsayılan portföy değeri — PortfolioManager yoksa kullanılır

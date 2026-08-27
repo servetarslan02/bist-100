@@ -7,11 +7,12 @@ Desteklenen formatlar:
 - Protobuf (binary frame, 10x daha küçük)
 """
 
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
-from typing import Dict, Set, Any
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import structlog
-from datetime import datetime, timezone
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 logger = structlog.get_logger()
 
@@ -34,13 +35,13 @@ except ImportError:
 class ConnectionManager:
     def __init__(self):
         # Kanal bazlı aktif WebSocket bağlantıları: "live", "radar", "events"
-        self.active_connections: Dict[str, Set[WebSocket]] = {
+        self.active_connections: dict[str, set[WebSocket]] = {
             "live": set(),
             "radar": set(),
             "events": set(),
         }
         # Bağlantı format tercihi: websocket -> "json" | "protobuf"
-        self._client_format: Dict[WebSocket, str] = {}
+        self._client_format: dict[WebSocket, str] = {}
 
     async def connect(self, websocket: WebSocket, channel: str, fmt: str = "json"):
         await websocket.accept()
@@ -56,12 +57,12 @@ class ConnectionManager:
             self._client_format.pop(websocket, None)
             logger.debug(f"WS client disconnected from {channel}")
 
-    async def broadcast(self, channel: str, message: Dict[str, Any]):
+    async def broadcast(self, channel: str, message: dict[str, Any]):
         if channel not in self.active_connections or not self.active_connections[channel]:
             return
-        
+
         dead_connections = set()
-        
+
         for connection in self.active_connections[channel]:
             try:
                 fmt = self._client_format.get(connection, "json")
@@ -75,21 +76,21 @@ class ConnectionManager:
                     await connection.send_text(payload)
             except Exception:
                 dead_connections.add(connection)
-                
+
         for dead in dead_connections:
             self.disconnect(dead, channel)
 
-    def _to_protobuf_bytes(self, message: Dict[str, Any]) -> bytes:
+    def _to_protobuf_bytes(self, message: dict[str, Any]) -> bytes:
         """Dict'i Protobuf binary'ye çevir.
-        
+
         StreamMessage wrapper kullanarak gerçek Protobuf serialization.
         Protobuf yoksa orjson fallback.
         """
         if not HAS_PROTOBUF or not HAS_BINARY_WS:
             return orjson.dumps(message, default=str)
-        
+
         msg_type = message.get("type", "")
-        
+
         try:
             if msg_type == "tick":
                 return ProtobufMessage.encode_tick(
@@ -161,7 +162,7 @@ async def websocket_live(websocket: WebSocket):
         welcome = {
             "type": "CONNECTION_ESTABLISHED",
             "channel": "live",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "connected",
             "format": fmt,
         }
@@ -186,7 +187,7 @@ async def websocket_radar(websocket: WebSocket):
         welcome = {
             "type": "CONNECTION_ESTABLISHED",
             "channel": "radar",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "format": fmt,
         }
         if fmt == "protobuf":
@@ -210,7 +211,7 @@ async def websocket_events(websocket: WebSocket):
         welcome = {
             "type": "CONNECTION_ESTABLISHED",
             "channel": "events",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "format": fmt,
         }
         if fmt == "protobuf":
@@ -257,9 +258,7 @@ async def websocket_binary(websocket: WebSocket):
                 decoded = ProtobufMessage.decode(data)
                 msg_type = decoded.get("type", "unknown")
 
-                if msg_type == "heartbeat":
-                    await websocket.send_bytes(ProtobufMessage.encode_heartbeat())
-                elif msg_type == "ping":
+                if msg_type == "heartbeat" or msg_type == "ping":
                     await websocket.send_bytes(ProtobufMessage.encode_heartbeat())
                 else:
                     logger.debug("Binary WS message", type=msg_type)

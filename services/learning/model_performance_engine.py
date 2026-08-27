@@ -10,10 +10,11 @@ Kapsamlı model performans takip ve metrik hesaplama motoru:
 """
 
 import math
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -50,9 +51,9 @@ class PerformanceMetrics:
     information_coefficient: float
     rank_ic: float
     win_loss_ratio: float
-    regime_breakdown: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    horizon_breakdown: Dict[str, Dict[str, float]] = field(default_factory=dict)
-    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    regime_breakdown: dict[str, dict[str, float]] = field(default_factory=dict)
+    horizon_breakdown: dict[str, dict[str, float]] = field(default_factory=dict)
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class ModelPerformanceEngine:
@@ -62,7 +63,7 @@ class ModelPerformanceEngine:
     def calculate_metrics(
         model_id: str,
         model_version: str,
-        predictions_with_outcomes: List[Dict[str, Any]],
+        predictions_with_outcomes: list[dict[str, Any]],
         risk_free_rate_annual: float = 0.40,  # TCMB referans faiz oranı
     ) -> PerformanceMetrics:
         """Gerçekleşmiş sonuçlar üzerinden tüm performans metriklerini hesaplar."""
@@ -99,10 +100,10 @@ class ModelPerformanceEngine:
         brier_errors = []
         pred_scores = []
         actual_returns = []
-        
+
         tp = fp = tn = fn = 0
-        regime_data: Dict[str, List[Dict]] = {}
-        horizon_data: Dict[str, List[Dict]] = {}
+        regime_data: dict[str, list[dict]] = {}
+        horizon_data: dict[str, list[dict]] = {}
 
         for p in predictions_with_outcomes:
             pred_dir = (p.get("predicted_direction") or "UP").upper()
@@ -184,7 +185,7 @@ class ModelPerformanceEngine:
             ic = float(np.corrcoef(pred_scores, actual_returns)[0, 1])
             if math.isnan(ic):
                 ic = 0.0
-            
+
             # Spearman Rank Correlation
             rank_preds = np.argsort(np.argsort(pred_scores))
             rank_actuals = np.argsort(np.argsort(actual_returns))

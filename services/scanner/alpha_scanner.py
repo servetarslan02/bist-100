@@ -9,9 +9,9 @@ Bu, ALPHA'nın kalbidir.
 """
 
 import time
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 from .scanner_interface import ScannerInterface, ScanResult
@@ -78,8 +78,8 @@ class ScannerResult:
     signal_confidence: float = 0.0
 
     # Evidence
-    evidence: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
 
 
 # =====================================================
@@ -95,20 +95,20 @@ class AlphaScanner(ScannerInterface):
     """
 
     def __init__(self):
-        self._last_scan: Optional[datetime] = None
+        self._last_scan: datetime | None = None
         self._scan_count: int = 0
         self._regime: str = "RANGE"
         self._regime_confidence: float = 0.5
 
     def scan(
         self,
-        universe: List[str],
-        features_map: Dict[str, Dict[str, float]],
+        universe: list[str],
+        features_map: dict[str, dict[str, float]],
         market_regime: str = "RANGE",
         regime_confidence: float = 0.5,
-        ml_scores: Optional[Dict[str, float]] = None,
-        event_scores: Optional[Dict[str, float]] = None,
-    ) -> List[ScannerResult]:
+        ml_scores: dict[str, float] | None = None,
+        event_scores: dict[str, float] | None = None,
+    ) -> list[ScannerResult]:
         """
         Tüm BIST'i tara → sonuçları döndür.
 
@@ -145,7 +145,7 @@ class AlphaScanner(ScannerInterface):
             self._generate_signal(r)
 
         elapsed = time.time() - start
-        self._last_scan = datetime.now(timezone.utc)
+        self._last_scan = datetime.now(UTC)
         self._scan_count += 1
 
         logger.info("Alpha scan completed",
@@ -156,9 +156,9 @@ class AlphaScanner(ScannerInterface):
 
         return results
 
-    def _scan_single(self, ticker: str, f: Dict[str, float], ml_score: float = 50.0, event_score: float = 50.0) -> ScannerResult:
+    def _scan_single(self, ticker: str, f: dict[str, float], ml_score: float = 50.0, event_score: float = 50.0) -> ScannerResult:
         """Tek hisse için quant scan."""
-        r = ScannerResult(ticker=ticker, timestamp=datetime.now(timezone.utc))
+        r = ScannerResult(ticker=ticker, timestamp=datetime.now(UTC))
 
         # State
         r.price = f.get("price", 0) or f.get("close", 0) or f.get("current_price", 0)
@@ -189,7 +189,7 @@ class AlphaScanner(ScannerInterface):
 
         return r
 
-    def _calc_breakout(self, f: Dict) -> float:
+    def _calc_breakout(self, f: dict) -> float:
         """Kırılım skoru."""
         bb_pos = f.get("bb_position", 0.5)
         near_high = f.get("near_20d_high", 0)
@@ -209,13 +209,13 @@ class AlphaScanner(ScannerInterface):
 
         return min(100, score)
 
-    def _calc_volume_acceleration(self, f: Dict) -> float:
+    def _calc_volume_acceleration(self, f: dict) -> float:
         """Hacim ivmesi."""
         vol_z = f.get("volume_zscore", 0)
         vol_ratio = f.get("volume_ratio_20d", 1)
         return (vol_z * 30 + (vol_ratio - 1) * 20)
 
-    def _calc_regime_fit(self, f: Dict) -> float:
+    def _calc_regime_fit(self, f: dict) -> float:
         """Rejim uyumu."""
         regime = self._regime
         mom = f.get("momentum_20d", 0) or f.get("roc_20d", 0)
@@ -383,10 +383,10 @@ class AlphaScanner(ScannerInterface):
 
     def get_opportunities(
         self,
-        results: List[ScannerResult],
+        results: list[ScannerResult],
         top_n: int = 50,
         min_score: float = 50.0,
-    ) -> List[ScannerResult]:
+    ) -> list[ScannerResult]:
         """En iyi fırsatları seç."""
         filtered = [r for r in results if r.opportunity_score >= min_score]
         filtered.sort(key=lambda r: r.opportunity_score, reverse=True)
@@ -394,14 +394,14 @@ class AlphaScanner(ScannerInterface):
 
     def generate_signals(
         self,
-        results: List[ScannerResult],
-    ) -> List[ScannerResult]:
+        results: list[ScannerResult],
+    ) -> list[ScannerResult]:
         """Sinyal üret — ScannerInterface implementasyonu."""
         for r in results:
             self._generate_signal(r)
         return [r for r in results if r.signal_type]
 
-    def to_scan_results(self, results: List[ScannerResult]) -> List[ScanResult]:
+    def to_scan_results(self, results: list[ScannerResult]) -> list[ScanResult]:
         """ScannerResult'ları standart ScanResult formatına çevir."""
         scan_results = []
         for r in results:
@@ -433,7 +433,7 @@ class AlphaScanner(ScannerInterface):
             scan_results.append(sr)
         return scan_results
 
-    def get_summary(self, results: List[ScannerResult]) -> Dict:
+    def get_summary(self, results: list[ScannerResult]) -> dict:
         """Tarama özeti."""
         signals = [r for r in results if r.signal_score > 0]
         anomalies = [r for r in results if r.volume_zscore > 2.5]
@@ -441,7 +441,7 @@ class AlphaScanner(ScannerInterface):
         overbought = [r for r in results if r.rsi > 70]
 
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "regime": self._regime,
             "total_scanned": len(results),
             "signals_generated": len(signals),

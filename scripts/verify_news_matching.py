@@ -3,16 +3,16 @@ ALPHA BIST — TÜM 629+ BIST HİSSESİ HABER & KAP EŞLEŞTİRME KANITI
 Belli başlı hisseler değil, borsadaki 629+ hissenin tamamı için haber/KAP yakalama doğrulaması.
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
-from services.ingestion.providers.news_provider import news_provider
 from services.ingestion.bist_universe import bist_universe
+from services.ingestion.providers.news_provider import news_provider
 
 print("=" * 85)
 print("BIST TÜM HİSSELER İÇİN DİNAMİK HABER & KAP EŞLEŞTİRME TESTİ")

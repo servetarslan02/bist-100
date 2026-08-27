@@ -7,8 +7,8 @@ Genişletilmiş çoklu pencere ve 5-rejimli MLOps analiz raporlayıcısı:
 - Dinamik Adaptif Sinyal Ağırlıkları
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 from .model_performance_engine import PerformanceMetrics
@@ -22,15 +22,15 @@ class ModelPerformanceReporter:
 
     @staticmethod
     def generate_markdown_report(
-        metrics_list: List[PerformanceMetrics],
-        trust_scores: List[ModelTrustScore],
+        metrics_list: list[PerformanceMetrics],
+        trust_scores: list[ModelTrustScore],
         current_regime: str = "BULL_TREND",
-        window_comparison: Optional[Dict[str, List[PerformanceMetrics]]] = None,
+        window_comparison: dict[str, list[PerformanceMetrics]] | None = None,
     ) -> str:
         """Kapsamlı markdown formatında performans raporu üretir."""
         lines = [
             "# 📊 ALPHA BIST — Kurumsal Model Öğrenme ve İstatistiki Performans Raporu",
-            f"*Rapor Tarihi: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC | Aktif Piyasa Rejimi: **{current_regime}***\n",
+            f"*Rapor Tarihi: {datetime.now(UTC).strftime('%Y-%m-%d %H:%M:%S')} UTC | Aktif Piyasa Rejimi: **{current_regime}***\n",
             "## 1. Genel Model Karşılaştırma ve Güvenilirlik Matrisi (Tüm Örneklem)",
             "",
             "| Model | Versiyon | Örneklem ($N$) | Yön Doğruluğu | Ort. Net Getiri | Net PnL (TL) | Sharpe | Max DD | Brier Skoru | Güven Skoru ($S_{rel}$) | Sinyal Ağırlığı |",
@@ -41,7 +41,7 @@ class ModelPerformanceReporter:
 
         sorted_metrics = sorted(
             metrics_list,
-            key=lambda m: trust_map.get(m.model_id, None).reliability_score if m.model_id in trust_map else m.direction_accuracy,
+            key=lambda m: trust_map.get(m.model_id).reliability_score if m.model_id in trust_map else m.direction_accuracy,
             reverse=True
         )
 

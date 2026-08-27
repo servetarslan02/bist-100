@@ -1,15 +1,17 @@
 """Alternative Data API — Gerçek servislere bağlı ultra-hızlı önbellekli."""
 
 import time
+from typing import Any
+
 from fastapi import APIRouter, Depends, Query
-from typing import Dict, Any, List
-from ..dependencies import get_current_user, check_rate_limit
+
+from ..dependencies import check_rate_limit, get_current_user
 
 router = APIRouter()
 
-_SENTIMENT_CACHE: Dict[str, tuple[float, Dict[str, Any]]] = {}
-_NEWS_CACHE: tuple[float, List[Any]] = (0.0, [])
-_MACRO_CACHE: tuple[float, Dict[str, Any]] = (0.0, {})
+_SENTIMENT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_NEWS_CACHE: tuple[float, list[Any]] = (0.0, [])
+_MACRO_CACHE: tuple[float, dict[str, Any]] = (0.0, {})
 
 
 @router.get("/sources")
@@ -35,13 +37,13 @@ async def sentiment(ticker: str, user=Depends(get_current_user), _=Depends(check
     try:
         from ...ingestion.providers.news_provider import news_provider
         news = await news_provider.fetch_news_for_ticker(sym, max_items=10)
-        
+
         pos_words = ["artış", "büyüme", "kâr", "rekor", "ihale", "anlaşma", "yüksek", "temettü", "başarı", "onay"]
         neg_words = ["düşüş", "zarar", "ceza", "iptal", "dava", "risk", "kayıp", "soruşturma", "faiz", "borç"]
-        
+
         pos_count = 0
         neg_count = 0
-        
+
         for item in news:
             title = (item.get("title", "") + " " + item.get("summary", "")).lower()
             pos_count += sum(1 for w in pos_words if w in title)

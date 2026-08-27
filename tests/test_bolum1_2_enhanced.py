@@ -5,22 +5,22 @@ PIT Store, Cross-Source Reconciliation, Streaming Anomaly Detection testleri.
 """
 
 import sys
-import os
+from datetime import UTC
 
 
 def test_pit_store():
     """Point-in-Time Store testleri."""
+    from datetime import datetime, timedelta
+
     from services.core.pit_store import PointInTimeStore
-    from datetime import datetime, timezone, timedelta
 
     store = PointInTimeStore()
     passed = 0
     failed = 0
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     day1 = now - timedelta(days=10)
     day2 = now - timedelta(days=5)
-    day3 = now
 
     # 1. Insert ve get_as_of
     store.insert("THYAO", "pe_ratio", 8.5, day1, "yfinance")
@@ -72,7 +72,7 @@ def test_pit_store():
 
 def test_cross_source_reconciliation():
     """Cross-Source Reconciliation testleri."""
-    from services.core.reconciliation import cross_source_reconciliation, CrossSourceReconciliation
+    from services.core.reconciliation import CrossSourceReconciliation
 
     rec = CrossSourceReconciliation()
     passed = 0

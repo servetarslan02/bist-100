@@ -8,12 +8,13 @@ test imports don't break.
 """
 
 import warnings
+
 from .database import (
+    init_databases,
     pg_execute,
     pg_fetch,
     pg_fetchrow,
     pg_fetchval,
-    init_databases,
 )
 
 warnings.warn(

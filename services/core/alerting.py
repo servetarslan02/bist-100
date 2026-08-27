@@ -14,13 +14,14 @@ Otonom sistem yönetimi için production-grade alerting.
 
 import asyncio
 import hashlib
-import orjson
 import os
 import time
-from typing import Dict, Any, List, Optional, Protocol
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any, Protocol
+
+import orjson
 import structlog
 
 from .alert_policy import AlertPolicy, VersionConflictError
@@ -32,20 +33,20 @@ logger = structlog.get_logger()
 # ENUMS
 # =====================================================
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
     CRITICAL = "CRITICAL"
 
 
-class AlertStatus(str, Enum):
+class AlertStatus(StrEnum):
     CREATED = "CREATED"
     ACKNOWLEDGED = "ACKNOWLEDGED"
     ESCALATED = "ESCALATED"
     RESOLVED = "RESOLVED"
 
 
-class AlertType(str, Enum):
+class AlertType(StrEnum):
     HEALTH_CHANGE = "health_change"
     INVARIANT_FAILURE = "invariant_failure"
     LOCK_DEADLOCK = "lock_deadlock"
@@ -75,14 +76,14 @@ class Alert:
     alert_type: str
     severity: str
     message: str
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
     fingerprint: str = ""
     status: str = AlertStatus.CREATED
     notification_status: str = "pending"
-    acknowledged_at: Optional[float] = None
-    escalated_at: Optional[float] = None
-    resolved_at: Optional[float] = None
+    acknowledged_at: float | None = None
+    escalated_at: float | None = None
+    resolved_at: float | None = None
     escalation_count: int = 0
 
     def __post_init__(self):
@@ -111,7 +112,7 @@ class Alert:
     def is_active(self) -> bool:
         return self.status in (AlertStatus.CREATED, AlertStatus.ACKNOWLEDGED, AlertStatus.ESCALATED)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "alert_type": self.alert_type,
             "severity": self.severity,
@@ -119,7 +120,7 @@ class Alert:
             "message": self.message,
             "details": self.details,
             "timestamp": self.timestamp,
-            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat(),
+            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
             "fingerprint": self.fingerprint,
             "notification_status": self.notification_status,
             "acknowledged_at": self.acknowledged_at,
@@ -128,7 +129,7 @@ class Alert:
             "escalation_count": self.escalation_count,
         }
 
-    def to_webhook_payload(self) -> Dict[str, Any]:
+    def to_webhook_payload(self) -> dict[str, Any]:
         return {
             "event": "alert",
             "alert_type": self.alert_type,
@@ -141,7 +142,7 @@ class Alert:
             "escalation_count": self.escalation_count,
         }
 
-    def to_slack_payload(self) -> Dict[str, Any]:
+    def to_slack_payload(self) -> dict[str, Any]:
         color = {"INFO": "#36a64f", "WARNING": "#ff9900", "CRITICAL": "#ff0000"}.get(self.severity, "#999")
         return {
             "attachments": [{
@@ -156,7 +157,7 @@ class Alert:
             }]
         }
 
-    def to_discord_payload(self) -> Dict[str, Any]:
+    def to_discord_payload(self) -> dict[str, Any]:
         color = {"INFO": 0x36A64F, "WARNING": 0xFF9900, "CRITICAL": 0xFF0000}.get(self.severity, 0x999999)
         return {
             "embeds": [{
@@ -167,11 +168,11 @@ class Alert:
                     {"name": "Status", "value": self.status, "inline": True},
                     {"name": "Escalations", "value": str(self.escalation_count), "inline": True},
                 ],
-                "timestamp": datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat(),
+                "timestamp": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
             }]
         }
 
-    def to_pagerduty_payload(self, routing_key: str = "") -> Dict[str, Any]:
+    def to_pagerduty_payload(self, routing_key: str = "") -> dict[str, Any]:
         severity_map = {"INFO": "info", "WARNING": "warning", "CRITICAL": "critical"}
         return {
             "routing_key": routing_key,
@@ -186,7 +187,7 @@ class Alert:
         }
 
     def timestamp_iso_str(self) -> str:
-        return datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat()
+        return datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat()
 
 
 # =====================================================
@@ -213,20 +214,19 @@ class LogProvider:
 @dataclass
 class WebhookProvider:
     url: str
-    headers: Dict[str, str] = field(default_factory=dict)
+    headers: dict[str, str] = field(default_factory=dict)
     timeout: float = 10.0
     def name(self) -> str: return f"webhook:{self.url[:50]}"
     def min_severity(self) -> str: return "WARNING"
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.url, json=alert.to_webhook_payload(),
-                    headers={"Content-Type": "application/json", **self.headers},
-                    timeout=aiohttp.ClientTimeout(total=self.timeout),
-                ) as resp:
-                    return resp.status < 400
+            async with aiohttp.ClientSession() as session, session.post(
+                self.url, json=alert.to_webhook_payload(),
+                headers={"Content-Type": "application/json", **self.headers},
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                return resp.status < 400
         except Exception as e:
             logger.error("Webhook error", url=self.url, error=str(e))
             return False
@@ -241,12 +241,11 @@ class SlackProvider:
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.webhook_url, json=alert.to_slack_payload(),
-                    timeout=aiohttp.ClientTimeout(total=self.timeout),
-                ) as resp:
-                    return resp.status < 400
+            async with aiohttp.ClientSession() as session, session.post(
+                self.webhook_url, json=alert.to_slack_payload(),
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                return resp.status < 400
         except Exception as e:
             logger.error("Slack error", error=str(e))
             return False
@@ -261,12 +260,11 @@ class DiscordProvider:
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.webhook_url, json=alert.to_discord_payload(),
-                    timeout=aiohttp.ClientTimeout(total=self.timeout),
-                ) as resp:
-                    return resp.status < 400
+            async with aiohttp.ClientSession() as session, session.post(
+                self.webhook_url, json=alert.to_discord_payload(),
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                return resp.status < 400
         except Exception as e:
             logger.error("Discord error", error=str(e))
             return False
@@ -281,13 +279,12 @@ class PagerDutyProvider:
     async def send(self, alert: Alert) -> bool:
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://events.pagerduty.com/v2/enqueue",
-                    json=alert.to_pagerduty_payload(self.routing_key),
-                    timeout=aiohttp.ClientTimeout(total=self.timeout),
-                ) as resp:
-                    return resp.status < 400
+            async with aiohttp.ClientSession() as session, session.post(
+                "https://events.pagerduty.com/v2/enqueue",
+                json=alert.to_pagerduty_payload(self.routing_key),
+                timeout=aiohttp.ClientTimeout(total=self.timeout),
+            ) as resp:
+                return resp.status < 400
         except Exception as e:
             logger.error("PagerDuty error", error=str(e))
             return False
@@ -295,7 +292,7 @@ class PagerDutyProvider:
 
 @dataclass
 class EmailProvider:
-    to_addresses: List[str] = field(default_factory=list)
+    to_addresses: list[str] = field(default_factory=list)
     from_address: str = "alerts@alpha-bist.local"
     smtp_host: str = field(default_factory=lambda: os.environ.get("SMTP_HOST", "localhost"))
     smtp_port: int = field(default_factory=lambda: int(os.environ.get("SMTP_PORT", "587")))
@@ -341,14 +338,14 @@ class NotificationRouter:
     """
 
     def __init__(self):
-        self._providers: List[Any] = []
+        self._providers: list[Any] = []
 
     def add_provider(self, provider):
         self._providers.append(provider)
         if len(self._providers) > 100:
             self._providers = self._providers[-100:]
 
-    def get_providers_for_severity(self, severity: str) -> List[Any]:
+    def get_providers_for_severity(self, severity: str) -> list[Any]:
         """Severity'ye göre uygun provider'ları döndür."""
         severity_order = {"INFO": 0, "WARNING": 1, "CRITICAL": 2}
         target_level = severity_order.get(severity, 0)
@@ -357,7 +354,7 @@ class NotificationRouter:
             if severity_order.get(p.min_severity(), 999) <= target_level
         ]
 
-    def get_all_providers(self) -> List[str]:
+    def get_all_providers(self) -> list[str]:
         return [p.name() for p in self._providers]
 
 
@@ -379,9 +376,9 @@ class NotificationResult:
         self.alert_fingerprint = alert_fingerprint
         self.attempts: int = 0
         self.success: bool = False
-        self.last_error: Optional[str] = None
+        self.last_error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"provider": self.provider_name, "fingerprint": self.alert_fingerprint,
                 "attempts": self.attempts, "success": self.success, "last_error": self.last_error}
 
@@ -395,26 +392,26 @@ class AlertingSystem:
 
     def __init__(self, max_alerts: int = 1000, dedup_window_s: float = 300.0,
                  db=None, dialect: str = "postgresql", policy: AlertPolicy = None):
-        self._alerts: List[Alert] = []
+        self._alerts: list[Alert] = []
         self._max_alerts = max_alerts
         self._dedup_window_s = dedup_window_s
-        self._dedup_cache: Dict[str, float] = {}
+        self._dedup_cache: dict[str, float] = {}
         self._router = NotificationRouter()
         self._retry_config = RetryConfig()
-        self._notification_log: List[NotificationResult] = []
-        self._failed_notifications: List[NotificationResult] = []
+        self._notification_log: list[NotificationResult] = []
+        self._failed_notifications: list[NotificationResult] = []
         self._db = db
         self._dialect = dialect
         self._policy = policy or AlertPolicy()
 
         # State for change detection
-        self._last_health_status: Optional[str] = None
+        self._last_health_status: str | None = None
         self._last_lock_deadlock_count: int = 0
         self._last_lock_timeout_count: int = 0
         self._invariant_failure_count: int = 0
 
         # Escalation task
-        self._escalation_task: Optional[asyncio.Task] = None
+        self._escalation_task: asyncio.Task | None = None
 
     # =====================================================
     # LIFECYCLE
@@ -481,14 +478,14 @@ class AlertingSystem:
         logger.info("Provider added", name=provider.name(),
                    min_severity=provider.min_severity())
 
-    def get_providers(self) -> List[str]:
+    def get_providers(self) -> list[str]:
         return self._router.get_all_providers()
 
     # =====================================================
     # ALERT CHECKS
     # =====================================================
 
-    def check_health(self, health_report: Dict[str, Any]):
+    def check_health(self, health_report: dict[str, Any]):
         current_status = health_report.get("status", "UNKNOWN")
         if self._last_health_status and self._last_health_status != current_status:
             if current_status in ("DEGRADED", "UNHEALTHY"):
@@ -507,7 +504,7 @@ class AlertingSystem:
                 ))
         self._last_health_status = current_status
 
-    def check_invariant(self, invariant_ok: bool, details: Dict[str, Any] = None):
+    def check_invariant(self, invariant_ok: bool, details: dict[str, Any] = None):
         if not invariant_ok:
             self._invariant_failure_count += 1
             self._add_alert(Alert(
@@ -531,7 +528,7 @@ class AlertingSystem:
                 details={"drawdown_pct": drawdown_pct, "threshold": threshold_pct},
             ))
 
-    def check_lock_metrics(self, lock_metrics: Dict[str, Any]):
+    def check_lock_metrics(self, lock_metrics: dict[str, Any]):
         for key, metrics in lock_metrics.items():
             dc = metrics.get("total_deadlocks_detected", 0)
             tc = metrics.get("total_timeouts", 0)
@@ -580,10 +577,10 @@ class AlertingSystem:
     # QUERIES
     # =====================================================
 
-    def get_active_alerts(self) -> List[Dict[str, Any]]:
+    def get_active_alerts(self) -> list[dict[str, Any]]:
         return [a.to_dict() for a in self._alerts if a.is_active]
 
-    def get_all_alerts(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def get_all_alerts(self, limit: int = 100) -> list[dict[str, Any]]:
         return [a.to_dict() for a in self._alerts[-limit:]]
 
     # =====================================================
@@ -592,7 +589,7 @@ class AlertingSystem:
 
     def add_silence(self, alert_type: str = None, fingerprint: str = None,
                     duration_s: float = 3600, reason: str = "",
-                    created_by: str = "system") -> Dict[str, Any]:
+                    created_by: str = "system") -> dict[str, Any]:
         """Alert susturma ekle (DB persist ile)."""
         rule = self._policy.add_silence(
             alert_type=alert_type, fingerprint=fingerprint,
@@ -609,7 +606,7 @@ class AlertingSystem:
             actor=actor, db=self._db,
         )
 
-    def get_active_silences(self) -> List[Dict[str, Any]]:
+    def get_active_silences(self) -> list[dict[str, Any]]:
         """Aktif susturmalar."""
         return self._policy.get_active_silences()
 
@@ -624,7 +621,7 @@ class AlertingSystem:
         else:
             self._policy.load_silences()
 
-    def get_policy_info(self) -> Dict[str, Any]:
+    def get_policy_info(self) -> dict[str, Any]:
         """Policy bilgisi."""
         return self._policy.to_dict()
 
@@ -632,8 +629,8 @@ class AlertingSystem:
         """Policy'yi yeniden yükle."""
         return self._policy.reload_if_changed()
 
-    def update_policy(self, new_config: Dict[str, Any], actor: str = "api",
-                      expected_version: int = 0) -> Dict[str, Any]:
+    def update_policy(self, new_config: dict[str, Any], actor: str = "api",
+                      expected_version: int = 0) -> dict[str, Any]:
         """Policy güncelle (optimistic locking ile)."""
         try:
             return self._policy.update(new_config, actor, expected_version)
@@ -641,37 +638,37 @@ class AlertingSystem:
             return {"success": False, "error": str(e), "conflict": True,
                     "current_version": self._policy._version}
 
-    def rollback_policy(self, target_version: int = 0, actor: str = "api") -> Dict[str, Any]:
+    def rollback_policy(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
         """Policy rollback."""
         return self._policy.rollback(target_version, actor)
 
-    def get_policy_history(self) -> List[Dict[str, Any]]:
+    def get_policy_history(self) -> list[dict[str, Any]]:
         """Policy versiyon geçmişi."""
         return self._policy.get_history()
 
-    def get_policy_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_policy_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
         """Policy audit log."""
         return self._policy.get_audit_log(limit)
 
-    def batch_add_silences(self, rules: List[Dict[str, Any]],
-                           created_by: str = "system") -> List[Dict[str, Any]]:
+    def batch_add_silences(self, rules: list[dict[str, Any]],
+                           created_by: str = "system") -> list[dict[str, Any]]:
         """Toplu susturma ekle (transaction)."""
         return self._policy.batch_add_silences(rules, created_by, self._db)
 
-    def batch_remove_silences(self, filters: List[Dict[str, str]],
-                               actor: str = "api") -> Dict[str, int]:
+    def batch_remove_silences(self, filters: list[dict[str, str]],
+                               actor: str = "api") -> dict[str, int]:
         """Toplu susturma kaldır (transaction)."""
         return self._policy.batch_remove_silences(filters, actor, self._db)
 
-    def compute_policy_diff(self, new_config: Dict[str, Any]):
+    def compute_policy_diff(self, new_config: dict[str, Any]):
         """Policy diff hesapla (uygulamadan)."""
         return self._policy.compute_diff(new_config)
 
-    def set_policy_webhook(self, urls: List[str]):
+    def set_policy_webhook(self, urls: list[str]):
         """Policy değişiklik webhook URL'leri."""
         self._policy.set_webhook_urls(urls)
 
-    def get_alert_summary(self) -> Dict[str, Any]:
+    def get_alert_summary(self) -> dict[str, Any]:
         active = [a for a in self._alerts if a.is_active]
         by_severity = {}
         for a in active:
@@ -688,10 +685,10 @@ class AlertingSystem:
             "failed_notifications": len(self._failed_notifications),
         }
 
-    def get_notification_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_notification_log(self, limit: int = 50) -> list[dict[str, Any]]:
         return [r.to_dict() for r in self._notification_log[-limit:]]
 
-    def get_failed_notifications(self) -> List[Dict[str, Any]]:
+    def get_failed_notifications(self) -> list[dict[str, Any]]:
         return [r.to_dict() for r in self._failed_notifications]
 
     # =====================================================
@@ -821,10 +818,7 @@ class AlertingSystem:
 
     def _is_duplicate(self, alert: Alert) -> bool:
         fp = alert.fingerprint
-        if fp in self._dedup_cache:
-            if time.time() - self._dedup_cache[fp] < self._dedup_window_s:
-                return True
-        return False
+        return bool(fp in self._dedup_cache and time.time() - self._dedup_cache[fp] < self._dedup_window_s)
 
     def _trim_alerts(self):
         if len(self._alerts) > self._max_alerts:

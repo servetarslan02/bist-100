@@ -1,14 +1,12 @@
 """ALPHA BIST - ML Models (LightGBM/XGBoost Ensemble)"""
 
-import numpy as np
-import polars as pl
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime
-import structlog
 import pickle
-import orjson
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import structlog
 
 logger = structlog.get_logger()
 
@@ -24,8 +22,8 @@ class ModelConfig:
     name: str
     model_type: str  # "lightgbm", "xgboost", "pytorch"
     target: str  # "return_5d", "return_20d", "direction", "volatility"
-    features: List[str] = field(default_factory=list)
-    hyperparams: Dict[str, Any] = field(default_factory=dict)
+    features: list[str] = field(default_factory=list)
+    hyperparams: dict[str, Any] = field(default_factory=dict)
     version: str = "v1"
     description: str = ""
 
@@ -150,10 +148,10 @@ class AlphaModel:
         self.config = config
         self.model = None
         self.is_trained = False
-        self.feature_importance: Dict[str, float] = {}
-        self.metrics: Dict[str, float] = {}
+        self.feature_importance: dict[str, float] = {}
+        self.metrics: dict[str, float] = {}
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: Optional[np.ndarray] = None, y_val: Optional[np.ndarray] = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
         """Train the model."""
         raise NotImplementedError
 
@@ -173,14 +171,14 @@ class AlphaModel:
             return self.model.predict_proba(X)
         return self.model.predict(X)
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Get feature importance."""
         if not self.is_trained or self.model is None:
             return {}
 
         if hasattr(self.model, "feature_importances_"):
             importance = self.model.feature_importances_
-            return dict(zip(self.config.features, importance))
+            return dict(zip(self.config.features, importance, strict=False))
 
         return {}
 
@@ -246,7 +244,7 @@ class LightGBMModel(AlphaModel):
     def __init__(self, config: ModelConfig):
         super().__init__(config)
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: Optional[np.ndarray] = None, y_val: Optional[np.ndarray] = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
         """Train LightGBM model."""
         import lightgbm as lgb
 
@@ -282,7 +280,7 @@ class XGBoostModel(AlphaModel):
     def __init__(self, config: ModelConfig):
         super().__init__(config)
 
-    def train(self, X: np.ndarray, y: np.ndarray, X_val: Optional[np.ndarray] = None, y_val: Optional[np.ndarray] = None):
+    def train(self, X: np.ndarray, y: np.ndarray, X_val: np.ndarray | None = None, y_val: np.ndarray | None = None):
         """Train XGBoost model."""
         import xgboost as xgb
 
@@ -313,14 +311,14 @@ class ModelEnsemble:
     """Ensemble of multiple models for consensus predictions."""
 
     def __init__(self):
-        self.models: Dict[str, AlphaModel] = {}
+        self.models: dict[str, AlphaModel] = {}
 
     def add_model(self, model: AlphaModel):
         """Add a model to the ensemble."""
         self.models[model.config.name] = model
         logger.info("Model added to ensemble", name=model.config.name)
 
-    def predict_consensus(self, X: np.ndarray) -> Dict[str, Any]:
+    def predict_consensus(self, X: np.ndarray) -> dict[str, Any]:
         """Get consensus prediction from all models."""
         predictions = {}
         confidences = {}
@@ -354,7 +352,7 @@ class ModelEnsemble:
             "consensus": float(consensus),
             "confidence": float(np.mean(list(confidences.values()))),
             "models": predictions,
-            "weights": dict(zip(predictions.keys(), weights.tolist())),
+            "weights": dict(zip(predictions.keys(), weights.tolist(), strict=False)),
         }
 
 

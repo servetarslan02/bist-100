@@ -23,8 +23,8 @@ Features:
 """
 
 import math
-from typing import Dict, Any, Optional, List, Tuple
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import numpy as np
 import structlog
@@ -35,7 +35,7 @@ logger = structlog.get_logger()
 
 
 # BIST şirket → koordinat mapping (fabrika/tesis/mağaza lokasyonları)
-COMPANY_LOCATIONS: Dict[str, List[Dict[str, Any]]] = {
+COMPANY_LOCATIONS: dict[str, list[dict[str, Any]]] = {
     "THYAO": [
         {"name": "IST Airport", "lat": 41.2753, "lon": 28.7519, "radius_m": 2000, "type": "airport"},
     ],
@@ -78,7 +78,7 @@ COMPANY_LOCATIONS: Dict[str, List[Dict[str, Any]]] = {
 }
 
 
-def _bbox_from_center(lat: float, lon: float, radius_m: int) -> Tuple[float, float, float, float]:
+def _bbox_from_center(lat: float, lon: float, radius_m: int) -> tuple[float, float, float, float]:
     """Merkez nokta ve yarıçaptan bounding box hesapla."""
     # 1 derece ≈ 111 km
     delta_lat = radius_m / 111_000
@@ -91,7 +91,7 @@ def _bbox_from_center(lat: float, lon: float, radius_m: int) -> Tuple[float, flo
     )
 
 
-def _bbox_to_wkt(bbox: Tuple[float, float, float, float]) -> str:
+def _bbox_to_wkt(bbox: tuple[float, float, float, float]) -> str:
     """Bounding box'ı WKT POLYGON formatına çevir."""
     west, south, east, north = bbox
     return (
@@ -116,37 +116,36 @@ class SatelliteAdapter(BaseAdapter):
 
     def __init__(self):
         super().__init__()
-        self._token: Optional[str] = None
+        self._token: str | None = None
         self._token_expiry: float = 0
 
-    async def _get_access_token(self) -> Optional[str]:
+    async def _get_access_token(self) -> str | None:
         """Copernicus erişim token'ı al (public access)."""
-        if self._token and datetime.now(timezone.utc).timestamp() < self._token_expiry:
+        if self._token and datetime.now(UTC).timestamp() < self._token_expiry:
             return self._token
 
         try:
             import aiohttp
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
-                    data={
-                        "grant_type": "client_credentials",
-                        "client_id": "cdse-public",
-                    },
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        self._token = data.get("access_token")
-                        self._token_expiry = datetime.now(timezone.utc).timestamp() + data.get("expires_in", 600) - 60
-                        return self._token
+            async with aiohttp.ClientSession() as session, session.post(
+                "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token",
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": "cdse-public",
+                },
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    self._token = data.get("access_token")
+                    self._token_expiry = datetime.now(UTC).timestamp() + data.get("expires_in", 600) - 60
+                    return self._token
         except Exception as e:
             logger.debug("Copernicus token fetch failed", error=str(e))
 
         return None
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Sentinel-2 verisi çek."""
         locations = COMPANY_LOCATIONS.get(ticker.upper())
         if not locations:
@@ -171,7 +170,7 @@ class SatelliteAdapter(BaseAdapter):
             return {
                 "locations": results,
                 "ticker": ticker,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "source": "sentinel2",
             }
 
@@ -182,8 +181,8 @@ class SatelliteAdapter(BaseAdapter):
     async def _fetch_ndvi(
         self,
         token: str,
-        location: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        location: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """Belirli lokasyon için NDVI hesapla."""
         try:
             import aiohttp
@@ -194,7 +193,7 @@ class SatelliteAdapter(BaseAdapter):
             _bbox_to_wkt(bbox)
 
             # Son 30 günün en bulutsuz görüntüsünü ara
-            end_date = datetime.now(timezone.utc)
+            end_date = datetime.now(UTC)
             start_date = end_date - timedelta(days=30)
 
             # Sentinel-2 L2A için evalscript (NDVI + NDBI)
@@ -242,21 +241,20 @@ class SatelliteAdapter(BaseAdapter):
 
             headers = {"Authorization": f"Bearer {token}"}
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    self.PROCESS_URL,
-                    json=payload,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
-                    if resp.status != 200:
-                        logger.debug("Sentinel-2 request failed", status=resp.status, location=location["name"])
-                        return None
+            async with aiohttp.ClientSession() as session, session.post(
+                self.PROCESS_URL,
+                json=payload,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status != 200:
+                    logger.debug("Sentinel-2 request failed", status=resp.status, location=location["name"])
+                    return None
 
-                    image_data = await resp.read()
+                image_data = await resp.read()
 
-                    # TIFF parse
-                    return self._parse_ndvi_image(image_data, location)
+                # TIFF parse
+                return self._parse_ndvi_image(image_data, location)
 
         except Exception as e:
             logger.debug("NDVI fetch error", location=location["name"], error=str(e))
@@ -265,11 +263,12 @@ class SatelliteAdapter(BaseAdapter):
     def _parse_ndvi_image(
         self,
         image_data: bytes,
-        location: Dict[str, Any],
-    ) -> Optional[Dict[str, Any]]:
+        location: dict[str, Any],
+    ) -> dict[str, Any] | None:
         """TIFF görüntüsünden NDVI/NDBI istatistikleri çıkar."""
         try:
             import io
+
             import numpy as np
 
             try:
@@ -304,7 +303,7 @@ class SatelliteAdapter(BaseAdapter):
             logger.debug("NDVI parse error", error=str(e))
             return None
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """Uydu verisi feature'ları hesapla."""
         if not data or not data.get("locations"):
             return {}
@@ -316,7 +315,7 @@ class SatelliteAdapter(BaseAdapter):
         features = {}
 
         # Her lokasyon için feature hesapla
-        for loc_name, loc_data in locations.items():
+        for _loc_name, loc_data in locations.items():
             ndvi = loc_data.get("ndvi_mean", 0)
             ndbi = loc_data.get("ndbi_mean", 0)
             loc_type = loc_data.get("location_type", "unknown")

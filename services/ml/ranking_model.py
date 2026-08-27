@@ -11,10 +11,11 @@ ROADMAP v3.0 FAZ 3:
 KURAL: "En iyi %10'da mı?" sor, "yükselir mi?" sorma!
 """
 
-import numpy as np
-from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -28,18 +29,18 @@ class OpportunityScore:
     direction: str
     confidence: float
     regime: str
-    signals: Dict
-    features: Dict
-    model_contribution: Dict  # Hangi model ne kadar katkı sağladı
+    signals: dict
+    features: dict
+    model_contribution: dict  # Hangi model ne kadar katkı sağladı
 
 
 @dataclass
 class RankingResult:
-    scores: List[OpportunityScore]
-    top_k: Dict[int, List[OpportunityScore]]
-    feature_importance: Dict[str, float]
-    regime_weights: Dict[str, Dict[str, float]]
-    ensemble_weights: Dict[str, float]
+    scores: list[OpportunityScore]
+    top_k: dict[int, list[OpportunityScore]]
+    feature_importance: dict[str, float]
+    regime_weights: dict[str, dict[str, float]]
+    ensemble_weights: dict[str, float]
 
 
 class RankingModel:
@@ -115,11 +116,11 @@ class RankingModel:
 
     def train(
         self,
-        features_map: Dict[str, Dict],  # {ticker: {feature: value}}
-        returns: Dict[str, float],      # {ticker: future_return}
-        date_groups: Dict[str, str],    # {ticker: date}
+        features_map: dict[str, dict],  # {ticker: {feature: value}}
+        returns: dict[str, float],      # {ticker: future_return}
+        date_groups: dict[str, str],    # {ticker: date}
         regime: str = "UNKNOWN",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Model eğit — LambdaRank + Adjusted-MSE."""
 
         try:
@@ -171,10 +172,10 @@ class RankingModel:
         importance = self._lgbm_model.feature_importance(importance_type="gain")
         self._feature_importance = {
             name: float(imp)
-            for name, imp in zip(self._feature_names, importance)
+            for name, imp in zip(self._feature_names, importance, strict=False)
         }
         self._feature_importance_history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "regime": regime,
             "importance": dict(self._feature_importance),
         })
@@ -200,7 +201,7 @@ class RankingModel:
 
     def rank(
         self,
-        features_map: Dict[str, Dict],
+        features_map: dict[str, dict],
         regime: str = "UNKNOWN",
     ) -> RankingResult:
         """Hisseleri sırala — Ensemble (LightGBM + Rule-based)."""
@@ -220,7 +221,7 @@ class RankingModel:
                 # Rejim ağırlıkları uygula
                 X_weighted = self._apply_regime_weights(X_arr, regime)
                 predictions = self._lgbm_model.predict(X_weighted)
-                for ticker, pred in zip(tickers, predictions):
+                for ticker, pred in zip(tickers, predictions, strict=False):
                     lgbm_scores[ticker] = float(pred)
 
         # Rule-based skoru
@@ -233,7 +234,7 @@ class RankingModel:
         has_lgbm = self._is_trained and self._lgbm_model is not None and lgbm_scores
         ensemble_scores = {}
         normalized_scores = {}
-        for ticker in features_map.keys():
+        for ticker in features_map:
             rule = rule_scores.get(ticker, 0)
             rule_norm = self._normalize_score(rule)
             if has_lgbm:
@@ -306,10 +307,10 @@ class RankingModel:
 
     def _prepare_training_data(
         self,
-        features_map: Dict[str, Dict],
-        returns: Dict[str, float],
-        date_groups: Dict[str, str],
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        features_map: dict[str, dict],
+        returns: dict[str, float],
+        date_groups: dict[str, str],
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Eğitim verisi hazırla — tarih sırasına göre."""
         X = []
         y = []
@@ -342,7 +343,7 @@ class RankingModel:
 
         return np.array(X), np.array(y), np.array(groups)
 
-    def _feature_vector(self, features: Dict) -> List[float]:
+    def _feature_vector(self, features: dict) -> list[float]:
         """Feature dict'ten vektör oluştur.
 
         R-001 düzeltmesi: Feature isim uyuşmazlıklarını tolere et.
@@ -395,7 +396,7 @@ class RankingModel:
             return float(val.flat[0]) if val.size > 0 else 0.0
         return float(val)
 
-    def _rule_based_score(self, features: Dict, regime: str) -> float:
+    def _rule_based_score(self, features: dict, regime: str) -> float:
         """Rejim-aware rule-based skor.
 
         Rejime göre strateji ağırlıkları:
@@ -473,7 +474,7 @@ class RankingModel:
         """Skoru 0-100 arası normalize et."""
         return max(0, min(100, score))
 
-    def _compute_shap_importance(self, X: np.ndarray) -> Dict[str, float]:
+    def _compute_shap_importance(self, X: np.ndarray) -> dict[str, float]:
         """SHAP importance hesapla."""
         try:
             import shap
@@ -482,23 +483,23 @@ class RankingModel:
             importance = np.mean(np.abs(shap_values), axis=0)
             return {
                 name: float(imp)
-                for name, imp in zip(self._feature_names, importance)
+                for name, imp in zip(self._feature_names, importance, strict=False)
             }
         except Exception as e:
             logger.warning("SHAP computation failed", error=str(e))
             return {}
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         return dict(sorted(
             self._feature_importance.items(), key=lambda x: x[1], reverse=True
         )) if self._feature_importance else {}
 
     def get_top_opportunities(
         self,
-        features_map: Dict,
+        features_map: dict,
         regime: str = "UNKNOWN",
         limit: int = 20,
-    ) -> List[Dict]:
+    ) -> list[dict]:
         result = self.rank(features_map, regime)
         return [
             {
@@ -520,7 +521,7 @@ ranking_model = RankingModel()
 # =====================================================
 # ML Modül Bağlantıları
 # =====================================================
-def get_ml_ensemble() -> Dict[str, Any]:
+def get_ml_ensemble() -> dict[str, Any]:
     """Tüm ML modüllerini ensemble olarak getir."""
     models = {}
     try:

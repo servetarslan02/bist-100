@@ -10,7 +10,8 @@ REST API endpoint'leri:
 - GET /api/market/health     — Sağlık durumu
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 logger = structlog.get_logger()
@@ -118,7 +119,7 @@ def register_market_state_routes(app, market_state_service):
             return {
                 "alerts": alerts,
                 "count": len(alerts),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             logger.error("api_alerts_failed", error=str(e))

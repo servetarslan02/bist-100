@@ -11,17 +11,17 @@ Eylül 2025 güncel kurallar:
 - EBDKS: BIST-100 %6 düşüşte tetiklenir
 """
 
-from datetime import datetime, date, time, timedelta, timezone
-from typing import Optional, List, Dict, Tuple
-from enum import Enum
+from datetime import date, datetime, time, timedelta
+from enum import StrEnum
+
 import structlog
 
-from .market_session_fsm import bist_session_fsm, BISTMarketPhase, _TZ_ISTANBUL
+from .market_session_fsm import _TZ_ISTANBUL, BISTMarketPhase, bist_session_fsm
 
 logger = structlog.get_logger()
 
 
-class MarketSession(str, Enum):
+class MarketSession(StrEnum):
     """BIST işlem seansları."""
     PRE_MARKET = "PRE_MARKET"      # 09:40 - 10:00
     OPENING = "OPENING"             # 09:55 - 10:00
@@ -30,7 +30,7 @@ class MarketSession(str, Enum):
     CLOSED = "CLOSED"
 
 
-class MarketStatus(str, Enum):
+class MarketStatus(StrEnum):
     """Piyasa durumu."""
     OPEN = "OPEN"
     CLOSED = "CLOSED"
@@ -76,7 +76,7 @@ class MarketCalendar:
     CLOSING_END = time(18, 10)
     HALF_CLOSING_END = time(12, 40)  # Yarım gün kapanış sonu
 
-    def __init__(self, holidays: Optional[List[date]] = None, half_days: Optional[List[date]] = None):
+    def __init__(self, holidays: list[date] | None = None, half_days: list[date] | None = None):
         self._holidays = set(holidays or TURKEY_HOLIDAYS_2026)
         self._half_days = set(half_days or TURKEY_HALF_DAYS_2026)
         # FSM'ye tatil günlerini string formatında aktar
@@ -84,24 +84,22 @@ class MarketCalendar:
         half_day_strs = {d.strftime("%Y-%m-%d") for d in self._half_days}
         bist_session_fsm.set_holidays(holiday_strs)
         bist_session_fsm.set_half_days(half_day_strs)
-        self._halts: Dict[date, List[Tuple[time, time]]] = {}
+        self._halts: dict[date, list[tuple[time, time]]] = {}
 
-    def is_half_day(self, d: Optional[date] = None) -> bool:
+    def is_half_day(self, d: date | None = None) -> bool:
         """Bu gün yarım gün mü?"""
         if d is None:
             d = date.today()
         return d in self._half_days
 
-    def is_trading_day(self, d: Optional[date] = None) -> bool:
+    def is_trading_day(self, d: date | None = None) -> bool:
         if d is None:
             d = date.today()
         if d.weekday() >= 5:
             return False
-        if d in self._holidays:
-            return False
-        return True
+        return d not in self._holidays
 
-    def is_market_open(self, dt: Optional[datetime] = None) -> bool:
+    def is_market_open(self, dt: datetime | None = None) -> bool:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if not self.is_trading_day(dt.date()):
@@ -109,7 +107,7 @@ class MarketCalendar:
         phase = bist_session_fsm.get_phase(current_time=dt)
         return bist_session_fsm.is_order_entry_allowed(phase)
 
-    def get_session(self, dt: Optional[datetime] = None) -> MarketSession:
+    def get_session(self, dt: datetime | None = None) -> MarketSession:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if not self.is_trading_day(dt.date()):
@@ -128,7 +126,7 @@ class MarketCalendar:
         }
         return mapping.get(phase, MarketSession.CLOSED)
 
-    def get_status(self, dt: Optional[datetime] = None) -> MarketStatus:
+    def get_status(self, dt: datetime | None = None) -> MarketStatus:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         session = self.get_session(dt)
@@ -141,7 +139,7 @@ class MarketCalendar:
         else:
             return MarketStatus.OPEN
 
-    def next_open(self, dt: Optional[datetime] = None) -> datetime:
+    def next_open(self, dt: datetime | None = None) -> datetime:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if self.is_trading_day(dt.date()):
@@ -155,7 +153,7 @@ class MarketCalendar:
             check_date += timedelta(days=1)
         return dt + timedelta(days=1)
 
-    def next_close(self, dt: Optional[datetime] = None) -> datetime:
+    def next_close(self, dt: datetime | None = None) -> datetime:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         if self.is_trading_day(dt.date()):
@@ -185,7 +183,7 @@ class MarketCalendar:
             self._halts[d] = []
         self._halts[d].append((start, end))
 
-    def get_info(self, dt: Optional[datetime] = None) -> Dict:
+    def get_info(self, dt: datetime | None = None) -> dict:
         if dt is None:
             dt = datetime.now(_TZ_ISTANBUL)
         return {

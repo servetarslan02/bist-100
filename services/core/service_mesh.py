@@ -26,13 +26,14 @@ Kullanım:
     all_health = service_mesh.get_all_health()
 """
 
+import asyncio
 import os
 import ssl
 import time
-import asyncio
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -54,7 +55,7 @@ class ServiceInfo:
     status: ServiceStatus = ServiceStatus.UNKNOWN
     last_heartbeat: float = 0.0
     failure_count: int = 0
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def address(self) -> str:
@@ -71,19 +72,19 @@ class ServiceDiscovery:
     """Service Discovery & Health Monitor — Docker Compose ile çalışır."""
 
     def __init__(self):
-        self._services: Dict[str, ServiceInfo] = {}
+        self._services: dict[str, ServiceInfo] = {}
         self._health_check_interval = 15  # saniye
         self._failure_threshold = 3
         self._running = False
-        self._ca_cert: Optional[str] = None
-        self._ca_key: Optional[str] = None
-        self._health_history: Dict[str, List[bool]] = {}  # Son N sağlık durumu
+        self._ca_cert: str | None = None
+        self._ca_key: str | None = None
+        self._health_history: dict[str, list[bool]] = {}  # Son N sağlık durumu
 
     # =====================================================
     # Service Registry
     # =====================================================
 
-    def register(self, name: str, host: str, port: int, metadata: Dict = None):
+    def register(self, name: str, host: str, port: int, metadata: dict = None):
         """Servisi kaydet."""
         self._services[name] = ServiceInfo(
             name=name,
@@ -100,19 +101,19 @@ class ServiceDiscovery:
         self._health_history.pop(name, None)
         logger.info("Service unregistered", name=name)
 
-    def get_service(self, name: str) -> Optional[ServiceInfo]:
+    def get_service(self, name: str) -> ServiceInfo | None:
         """Servis bilgisini al."""
         return self._services.get(name)
 
-    def get_healthy_services(self) -> List[ServiceInfo]:
+    def get_healthy_services(self) -> list[ServiceInfo]:
         """Sağlıklı servisleri listele."""
         return [s for s in self._services.values() if s.is_alive]
 
-    def get_all_services(self) -> Dict[str, ServiceInfo]:
+    def get_all_services(self) -> dict[str, ServiceInfo]:
         """Tüm servisleri al."""
         return dict(self._services)
 
-    def get_all_health(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_health(self) -> dict[str, dict[str, Any]]:
         """Tüm servislerin sağlık raporu."""
         return {name: self.get_health(name) for name in self._services}
 
@@ -165,14 +166,14 @@ class ServiceDiscovery:
             return 0.0
         return sum(history) / len(history) * 100
 
-    async def check_all_health(self) -> Dict[str, ServiceStatus]:
+    async def check_all_health(self) -> dict[str, ServiceStatus]:
         """Tüm servislerin sağlık durumunu kontrol et."""
         results = {}
         for name in self._services:
             results[name] = await self.check_health(name)
         return results
 
-    def get_health(self, name: str) -> Dict[str, Any]:
+    def get_health(self, name: str) -> dict[str, Any]:
         """Servis sağlık raporu."""
         service = self._services.get(name)
         if not service:
@@ -238,11 +239,12 @@ class ServiceDiscovery:
             return
 
         try:
+            import datetime
+
             from cryptography import x509
-            from cryptography.x509.oid import NameOID
             from cryptography.hazmat.primitives import hashes, serialization
             from cryptography.hazmat.primitives.asymmetric import rsa
-            import datetime
+            from cryptography.x509.oid import NameOID
 
             key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
@@ -280,7 +282,7 @@ class ServiceDiscovery:
         except ImportError:
             logger.warning("cryptography not installed, SSL disabled")
 
-    def get_ssl_context(self, service_name: str) -> Optional[ssl.SSLContext]:
+    def get_ssl_context(self, service_name: str) -> ssl.SSLContext | None:
         """Servis için SSL context oluştur."""
         if not self._ca_cert:
             return None
@@ -298,7 +300,7 @@ class ServiceDiscovery:
     # Traffic Management Config
     # =====================================================
 
-    def get_circuit_breaker_config(self, service_name: str) -> Dict[str, Any]:
+    def get_circuit_breaker_config(self, service_name: str) -> dict[str, Any]:
         """Servis için circuit breaker config döndür."""
         return {
             "failure_threshold": 5,
@@ -306,7 +308,7 @@ class ServiceDiscovery:
             "half_open_max_calls": 3,
         }
 
-    def get_retry_config(self, service_name: str) -> Dict[str, Any]:
+    def get_retry_config(self, service_name: str) -> dict[str, Any]:
         """Servis için retry config döndür."""
         return {
             "max_retries": 3,

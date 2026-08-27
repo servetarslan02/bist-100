@@ -10,8 +10,9 @@ Kaynaklar:
 - Nature — ML-Based Dynamic Risk Allocation (2025)
 """
 
-from typing import Dict, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -86,7 +87,7 @@ class DynamicRiskLimits:
         annualized_volatility: float = 0.20,
         regime: str = "SIDEWAYS",
         current_drawdown_pct: float = 0.0,
-        vix_level: Optional[float] = None,
+        vix_level: float | None = None,
     ) -> RiskLimits:
         """Dinamik limitler hesapla.
 
@@ -169,7 +170,7 @@ class DynamicRiskLimits:
 
         return limits
 
-    def get_drawdown_action(self, current_drawdown_pct: float) -> Optional[Dict[str, Any]]:
+    def get_drawdown_action(self, current_drawdown_pct: float) -> dict[str, Any] | None:
         """Drawdown eşiğine göre aksiyon belirle.
 
         Args:
@@ -232,7 +233,7 @@ class DynamicRiskLimits:
         self,
         static_limits: RiskLimits,
         dynamic_limits: RiskLimits,
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> dict[str, dict[str, float]]:
         """Statik vs dinamik limit karşılaştırması."""
         return {
             "max_position_pct": {"static": static_limits.max_position_pct, "dynamic": dynamic_limits.max_position_pct},

@@ -41,13 +41,13 @@ BIST'e Özel Düzeltmeler:
 - Sektör kontrolü: BIST'te bankacılık/holding ağırlığı yüksek
 """
 import concurrent.futures
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
-
-import yfinance as yf
-from datetime import date
 from dataclasses import dataclass
+from datetime import date
+from typing import Any
+
+import numpy as np
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -118,9 +118,9 @@ class FamaFrenchFactorBuilder:
 
     def calculate_daily_factors(
         self,
-        stocks: List[StockData],
-        trade_date: Optional[date] = None,
-    ) -> Optional[FactorReturns]:
+        stocks: list[StockData],
+        trade_date: date | None = None,
+    ) -> FactorReturns | None:
         """Tek bir gün için Fama-French factor return'leri hesapla.
 
         2x3 Sort Metodolojisi:
@@ -203,8 +203,8 @@ class FamaFrenchFactorBuilder:
 
     def calculate_factor_series(
         self,
-        daily_stocks: Dict[date, List[StockData]],
-    ) -> List[FactorReturns]:
+        daily_stocks: dict[date, list[StockData]],
+    ) -> list[FactorReturns]:
         """Zaman serisi factor return'leri hesapla.
 
         Args:
@@ -230,7 +230,7 @@ class FamaFrenchFactorBuilder:
 
         return results
 
-    def _filter_stocks(self, stocks: List[StockData]) -> List[StockData]:
+    def _filter_stocks(self, stocks: list[StockData]) -> list[StockData]:
         """Likidite ve boyut filtresi uygula.
 
         Fama-French (1993) NYSE breakpoint kullanır → BIST için
@@ -419,8 +419,8 @@ class FamaFrenchFactorBuilder:
 
     def get_factor_arrays(
         self,
-        factor_series: List[FactorReturns],
-    ) -> Dict[str, np.ndarray]:
+        factor_series: list[FactorReturns],
+    ) -> dict[str, np.ndarray]:
         """Factor return listesini numpy array'lere çevir.
 
         expected_return.py ile uyumlu format.
@@ -464,14 +464,14 @@ class FamaFrenchDataFetcher:
     """
 
     def __init__(self):
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
 
     async def fetch_and_build_factors(
         self,
-        tickers: List[str],
+        tickers: list[str],
         start_date: date,
         end_date: date,
-    ) -> List[FactorReturns]:
+    ) -> list[FactorReturns]:
         """Hisse verilerini çek ve factor return'leri hesapla.
 
         Args:
@@ -594,14 +594,14 @@ class FamaFrenchDataFetcher:
         return factor_series
 
     async def _fetch_fundamentals(
-        self, tickers: List[str]
-    ) -> Dict[str, Dict[str, float]]:
+        self, tickers: list[str]
+    ) -> dict[str, dict[str, float]]:
         """Hisse fundamental verilerini çek."""
 
         fundamentals = {}
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
-        def _fetch_one(ticker: str) -> Tuple[str, Dict]:
+        def _fetch_one(ticker: str) -> tuple[str, dict]:
             try:
                 stock = yf.Ticker(f"{ticker}.IS")
                 info = stock.info or {}
@@ -672,8 +672,8 @@ class FamaFrenchDataFetcher:
 
 # Kolaylık fonksiyonu
 def build_factor_arrays_from_series(
-    factor_series: List[FactorReturns],
-) -> Dict[str, np.ndarray]:
+    factor_series: list[FactorReturns],
+) -> dict[str, np.ndarray]:
     """Factor series'den numpy array'ler oluştur (expected_return.py uyumlu)."""
     builder = FamaFrenchFactorBuilder()
     return builder.get_factor_arrays(factor_series)

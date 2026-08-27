@@ -9,9 +9,8 @@ Tüm yeni simulation modülleri için test'ler:
 - Enhanced Stress Test
 """
 
-import pytest
 import numpy as np
-
+import pytest
 
 # =====================================================
 # ENHANCED EXECUTION TESTS
@@ -427,7 +426,7 @@ class TestSimulationIntegration:
             {"ticker": "THYAO", "value": 500000, "sector": "INDUSTRY", "beta": 1.2, "usd_sensitivity": 0.3},
         ]
         stress_results = stress.run_stress_test(1000000, positions)
-        worst = min(stress_results, key=lambda r: r.portfolio_impact_pct)
+        min(stress_results, key=lambda r: r.portfolio_impact_pct)
 
         # Worst case'de execution
         order = Order(
@@ -447,11 +446,11 @@ class TestSimulationIntegration:
 
     def test_monte_carlo_with_stress(self):
         """Monte Carlo + stress test entegrasyonu."""
-        from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
         from services.simulation.enhanced_stress_test import EnhancedStressTestEngine
+        from services.simulation.monte_carlo_enhanced import RegimeConditionedMonteCarlo
 
         mc = RegimeConditionedMonteCarlo()
-        stress = EnhancedStressTestEngine()
+        EnhancedStressTestEngine()
 
         # Normal rejim
         normal = mc.simulate(100.0, 0.0004, 0.02, "BULL", 1000, 20, seed=42)
@@ -542,7 +541,7 @@ class TestOrderBook:
 # INTEGRATION TESTS (updated)
 # =====================================================
 
-class TestSimulationIntegration:
+class TestSimulationIntegrationUpdated:
     """Entegrasyon testleri."""
 
     def test_execution_with_stress(self):
@@ -558,7 +557,7 @@ class TestSimulationIntegration:
             {"ticker": "THYAO", "value": 500000, "sector": "INDUSTRY", "beta": 1.2, "usd_sensitivity": 0.3},
         ]
         stress_results = stress.run_stress_test(1000000, positions)
-        worst = min(stress_results, key=lambda r: r.portfolio_impact_pct)
+        min(stress_results, key=lambda r: r.portfolio_impact_pct)
 
         order = Order(
             order_id="stress_test", portfolio_id=1, instrument_id=1,
@@ -578,9 +577,9 @@ class TestSimulationIntegration:
 
     def test_order_book_with_execution(self):
         """Order book + execution entegrasyonu."""
-        from services.simulation.order_book import OrderBookSimulator
         from services.simulation.enhanced_execution import EnhancedExecutionSimulator, LiquidityProfile
         from services.simulation.execution_simulator import Order, OrderSide, OrderType
+        from services.simulation.order_book import OrderBookSimulator
 
         book_sim = OrderBookSimulator()
         exec_sim = EnhancedExecutionSimulator()

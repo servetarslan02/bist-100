@@ -6,13 +6,18 @@ ALPHA BIST — Kurumsal Risk Parity & 3 Günlük Kriz Teyidi + Boğa Breakout Mo
 3. Fixed Fractional ATR Risk Sizing (%1.0 Risk / Trade, Max %10 Hisse Tavanı, Max %5 Portföy Isısı)
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import polars as pl
 import structlog
 
 logger = structlog.get_logger()
+
+# İşlem maliyetleri
+COMMISSION_RATE = 0.0015  # %0.15 komisyon
+SLIPPAGE_RATE = 0.0010    # %0.10 slippage
 
 
 @dataclass
@@ -22,19 +27,19 @@ class RiskParityParameters:
     max_position_size_pct: float = 0.10     # Tek bir hisseye asla portföyün %10'undan fazlası bağlanmaz
     max_portfolio_heat_pct: float = 0.05    # Portföy açık risk tavanı: %5.0
     max_sector_concentration_pct: float = 0.30  # Tek sektörde max %30 yoğunlaşma
-    
+
     # Teknik Eşikler
     min_buyer_pressure: float = 50.0
     min_candle_score: float = 65.0
     rsi_oversold: float = 30.0
     volume_surge_mult: float = 1.20
-    
+
     # ATR Stop & Trailing
     atr_initial_stop_mult: float = 2.20     # İlk stop mesafesi
     atr_breakeven_mult: float = 2.20        # Kâra geçince stopu maliyete çekme eşiği
     atr_trailing_bull_mult: float = 6.00    # Boğada trendi sağma mesafesi
     atr_trailing_bear_mult: float = 2.00    # Ayıda sıkı koruma mesafesi
-    
+
     # Rejim & Kriz Teyidi
     regime_sma_fast: int = 50
     regime_sma_slow: int = 200
@@ -54,14 +59,14 @@ class RiskAuditResult:
     win_rate: float = 0.0
     max_drawdown: float = 0.0
     total_trades: int = 0
-    equity_curve: List[float] = None
-    trade_logs: List[Dict[str, Any]] = None
+    equity_curve: list[float] = None
+    trade_logs: list[dict[str, Any]] = None
 
 
 class RiskParityEngine:
     """Kurumsal Risk Parity ve Teyitli Kriz Kontrol Motoru."""
 
-    def __init__(self, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame], sector_map: Dict[str, str] = None):
+    def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame], sector_map: dict[str, str] = None):
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self.sector_map = sector_map or {}  # {ticker: sector_name}
@@ -125,9 +130,9 @@ class RiskParityEngine:
                 "dates": df.index
             }
 
-    def _get_sector_exposure(self, positions: Dict, total_equity: float) -> Dict[str, float]:
+    def _get_sector_exposure(self, positions: dict, total_equity: float) -> dict[str, float]:
         """Mevcut pozisyonların sektör bazlı yoğunlaşmasını hesapla."""
-        sector_values: Dict[str, float] = {}
+        sector_values: dict[str, float] = {}
         for ticker, pos in positions.items():
             sector = self.sector_map.get(ticker.split(".")[0], "unknown")
             pos_value = pos["shares"] * pos["entry_price"]
@@ -208,11 +213,11 @@ class RiskParityEngine:
                         # Risk Parity: Stop mesafesi kadar risk al (%1.0)
                         stop_dist = atr_val * params.atr_initial_stop_mult
                         dollar_risk = total_equity * params.risk_per_trade_pct
-                        
+
                         shares_by_risk = int(dollar_risk / stop_dist)
                         max_pos_val = total_equity * params.max_position_size_pct
                         shares_by_cap = int(max_pos_val / cost_with_fee)
-                        
+
                         shares = min(shares_by_risk, shares_by_cap)
                         total_cost = shares * cost_with_fee
 

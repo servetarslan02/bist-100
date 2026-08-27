@@ -10,11 +10,12 @@ Borsa İstanbul Kurumsal Emir Öncesi Risk ve Uygunluk Denetimleri:
 6. OrderTypeValidator (Seans Fazına Göre İzin Verilen Emir Türleri)
 """
 
-from typing import Dict, Any, Optional, Set, List
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
-from services.core.bist_tick_size import is_valid_bist_tick, get_bist_tick_size, round_to_bist_tick
+from services.core.bist_tick_size import get_bist_tick_size, is_valid_bist_tick, round_to_bist_tick
 from services.core.market_session_fsm import BISTMarketPhase
 
 logger = structlog.get_logger()
@@ -23,9 +24,9 @@ logger = structlog.get_logger()
 @dataclass
 class PreTradeValidationResult:
     is_valid: bool
-    rejection_code: Optional[str] = None
-    rejection_reason: Optional[str] = None
-    details: Dict[str, Any] = None
+    rejection_code: str | None = None
+    rejection_reason: str | None = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
@@ -37,18 +38,18 @@ class PreTradeRiskEngine:
 
     def __init__(self):
         # Dinamik konfigürasyon ve tarihsel eligibility listeleri
-        self._short_sale_eligible_tickers: Set[str] = set()
-        self._gross_settlement_tickers: Set[str] = set()
-        self._spk_banned_tickers: Set[str] = set()
-        self._custom_price_margins: Dict[str, float] = {}  # Örn: %10, %5, %20
+        self._short_sale_eligible_tickers: set[str] = set()
+        self._gross_settlement_tickers: set[str] = set()
+        self._spk_banned_tickers: set[str] = set()
+        self._custom_price_margins: dict[str, float] = {}  # Örn: %10, %5, %20
 
-    def set_short_sale_universe(self, tickers: List[str]):
+    def set_short_sale_universe(self, tickers: list[str]):
         self._short_sale_eligible_tickers = set(tickers)
 
-    def set_gross_settlement_universe(self, tickers: List[str]):
+    def set_gross_settlement_universe(self, tickers: list[str]):
         self._gross_settlement_tickers = set(tickers)
 
-    def set_spk_banned_universe(self, tickers: List[str]):
+    def set_spk_banned_universe(self, tickers: list[str]):
         self._spk_banned_tickers = set(tickers)
 
     def set_custom_price_margin(self, ticker: str, margin_pct: float):
@@ -64,7 +65,7 @@ class PreTradeRiskEngine:
         reference_price: float,    # Önceki kapanış / baz fiyat
         market_phase: BISTMarketPhase,
         portfolio_cash: float,
-        last_trade_price: Optional[float] = None,
+        last_trade_price: float | None = None,
         is_closing_price: bool = False,
     ) -> PreTradeValidationResult:
         """Tüm BIST emir öncesi kurallarını denetler."""
@@ -130,13 +131,12 @@ class PreTradeRiskEngine:
             )
 
         # 3. FİYAT ADIMI DENETİMİ (PriceTickValidator)
-        if order_type == "LIMIT" and price > 0:
-            if not is_valid_bist_tick(price):
-                expected_tick = get_bist_tick_size(price)
-                return PreTradeValidationResult(
-                    False, "INVALID_TICK_SIZE",
-                    f"Fiyat {price:.4f} TL, BIST fiyat adımına ({expected_tick:.2f} TL) uymuyor."
-                )
+        if order_type == "LIMIT" and price > 0 and not is_valid_bist_tick(price):
+            expected_tick = get_bist_tick_size(price)
+            return PreTradeValidationResult(
+                False, "INVALID_TICK_SIZE",
+                f"Fiyat {price:.4f} TL, BIST fiyat adımına ({expected_tick:.2f} TL) uymuyor."
+            )
 
         # 4. FİYAT MARJI VE TAVAN/TABAN KİLİT DENETİMİ (PriceLimitValidator)
         margin = self._custom_price_margins.get(ticker, 10.0)  # Standart ±%10

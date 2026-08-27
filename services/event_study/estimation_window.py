@@ -15,7 +15,7 @@ Calendar day kullanımının sorunları:
 Çözüm: Tüm uzunluklar trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
 from datetime import datetime
-from typing import Tuple, Optional
+
 import numpy as np
 import structlog
 
@@ -63,12 +63,12 @@ class EstimationWindowManager:
     BIST takvimi (hafta sonları + resmi tatiller) otomatik uygulanır.
     """
 
-    def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS, gap_days: Optional[int] = None):
+    def __init__(self, gap_trading_days: int = GAP_TRADING_DAYS, gap_days: int | None = None):
         self.gap_trading_days = gap_days if gap_days is not None else gap_trading_days
 
     def get_window(
         self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> Tuple[datetime, datetime]:
+    ) -> tuple[datetime, datetime]:
         """Event type'a göre estimation window döndür (TRADING DAY bazlı).
 
         Args:
@@ -137,7 +137,7 @@ class EstimationWindowManager:
         dates: np.ndarray,
         event_date: datetime,
         event_type: str = "DEFAULT",
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Estimation window verisini çıkar (TRADING DAY bazlı).
 
         Trading calendar kullanarak sadece iş günlerini seçer.

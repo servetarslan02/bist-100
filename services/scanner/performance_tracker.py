@@ -11,10 +11,11 @@ Kaynaklar: Endüstri standardı, awesome-quant
 """
 
 import time
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -61,8 +62,8 @@ class ScanPerformanceTracker:
 
     def __init__(self, max_history: int = 10000):
         self._max_history = max_history
-        self._scan_metrics: List[ScanMetric] = []
-        self._signal_outcomes: List[SignalOutcome] = []
+        self._scan_metrics: list[ScanMetric] = []
+        self._signal_outcomes: list[SignalOutcome] = []
 
     def record_scan(
         self,
@@ -114,7 +115,7 @@ class ScanPerformanceTracker:
         if len(self._signal_outcomes) > self._max_history:
             self._signal_outcomes = self._signal_outcomes[-self._max_history:]
 
-    def get_stats(self, scan_type: str = None) -> Dict[str, Any]:
+    def get_stats(self, scan_type: str = None) -> dict[str, Any]:
         """Tarama istatistikleri.
 
         Args:
@@ -123,10 +124,7 @@ class ScanPerformanceTracker:
         Returns:
             İstatistikler
         """
-        if scan_type:
-            metrics = [m for m in self._scan_metrics if m.scan_type == scan_type]
-        else:
-            metrics = self._scan_metrics
+        metrics = [m for m in self._scan_metrics if m.scan_type == scan_type] if scan_type else self._scan_metrics
 
         if not metrics:
             return {
@@ -156,7 +154,7 @@ class ScanPerformanceTracker:
             "total_signals": sum(signals),
         }
 
-    def get_regime_performance(self) -> Dict[str, Dict[str, Any]]:
+    def get_regime_performance(self) -> dict[str, dict[str, Any]]:
         """Rejim bazlı performans.
 
         Returns:
@@ -197,7 +195,7 @@ class ScanPerformanceTracker:
 
         return result
 
-    def get_signal_accuracy(self, signal_type: str = None) -> Dict[str, Any]:
+    def get_signal_accuracy(self, signal_type: str = None) -> dict[str, Any]:
         """Sinyal doğruluğu.
 
         Args:
@@ -233,7 +231,7 @@ class ScanPerformanceTracker:
             "signal_type": signal_type or "all",
         }
 
-    def get_top_performing_filters(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_top_performing_filters(self, limit: int = 10) -> list[dict[str, Any]]:
         """En iyi performans gösteren filtreler.
 
         Args:
@@ -288,7 +286,7 @@ class ScanPerformanceTracker:
 
         return ranked[:limit]
 
-    def get_scan_type_comparison(self) -> Dict[str, Dict[str, Any]]:
+    def get_scan_type_comparison(self) -> dict[str, dict[str, Any]]:
         """Tarama türü karşılaştırması.
 
         Returns:
@@ -303,7 +301,7 @@ class ScanPerformanceTracker:
 
         return comparison
 
-    def get_hourly_distribution(self) -> Dict[int, int]:
+    def get_hourly_distribution(self) -> dict[int, int]:
         """Saatlik tarama dağılımı.
 
         Returns:
@@ -312,12 +310,12 @@ class ScanPerformanceTracker:
         distribution = {h: 0 for h in range(24)}
 
         for metric in self._scan_metrics:
-            dt = datetime.fromtimestamp(metric.timestamp, tz=timezone.utc)
+            dt = datetime.fromtimestamp(metric.timestamp, tz=UTC)
             distribution[dt.hour] += 1
 
         return distribution
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Genel özet.
 
         Returns:

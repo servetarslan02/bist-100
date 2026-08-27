@@ -11,21 +11,28 @@ Apache Arrow tabanlı veri pipeline'ı.
 
 Kullanım:
     from services.core.arrow_pipeline import ArrowPipeline
-    
+
     pipeline = ArrowPipeline()
-    
+
     # DataFrame'den Arrow'a
     arrow_table = pipeline.from_polars(df)
-    
+
     # Parquet'e yaz
     pipeline.to_parquet(arrow_table, "data/output.parquet")
-    
+
     # Parquet'ten oku
     table = pipeline.read_parquet("data/output.parquet")
 """
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    import polars as pl
+    import pyarrow as pa
+
 import structlog
 
 logger = structlog.get_logger()
@@ -38,7 +45,7 @@ class ArrowPipeline:
         self.base_path = Path(base_path)
         self.base_path.mkdir(parents=True, exist_ok=True)
 
-    def from_polars(self, df) -> "pa.Table":
+    def from_polars(self, df) -> pa.Table:
         """Polars DataFrame'den Arrow Table'a çevir."""
         try:
             return df.to_arrow()
@@ -46,7 +53,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
-    def to_polars(self, table) -> "pl.DataFrame":
+    def to_polars(self, table) -> pl.DataFrame:
         """Arrow Table'dan Polars DataFrame'e çevir."""
         try:
             import polars as pl
@@ -77,7 +84,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
-    def read_parquet(self, path: str, columns: Optional[List[str]] = None):
+    def read_parquet(self, path: str, columns: list[str] | None = None):
         """Parquet dosyasından Arrow Table oku."""
         try:
             import pyarrow.parquet as pq
@@ -108,7 +115,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
-    def merge_parquet(self, input_paths: List[str], output_path: str) -> str:
+    def merge_parquet(self, input_paths: list[str], output_path: str) -> str:
         """Birden fazla Parquet dosyasını birleştir."""
         try:
             import pyarrow as pa
@@ -136,7 +143,7 @@ class ArrowPipeline:
             logger.error("PyArrow not installed")
             raise
 
-    def get_metadata(self, path: str) -> Dict[str, Any]:
+    def get_metadata(self, path: str) -> dict[str, Any]:
         """Parquet dosyası metadata'sını al."""
         try:
             import pyarrow.parquet as pq

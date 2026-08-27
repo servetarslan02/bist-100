@@ -10,9 +10,10 @@ Makro şok etki analizi + decay modeli:
 KURAL: Etki zamanla azalır — half-life modeli.
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -61,7 +62,7 @@ class MacroImpactAnalyzer:
     }
 
     def __init__(self):
-        self._shock_history: List[ShockEvent] = []
+        self._shock_history: list[ShockEvent] = []
 
     def record_shock(
         self,
@@ -76,7 +77,7 @@ class MacroImpactAnalyzer:
         event = ShockEvent(
             shock_type=shock_type,
             magnitude=magnitude,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             indicator=indicator,
             half_life_days=half_life,
         )
@@ -126,9 +127,9 @@ class MacroImpactAnalyzer:
         self,
         ticker: str,
         sector: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Tüm aktif şokların birikimli etkisini hesapla."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         total_impact = 0.0
         shock_impacts = {}
 
@@ -169,7 +170,7 @@ class MacroImpactAnalyzer:
         shock_type: str,
         magnitude: float,
         max_days: int = 30,
-    ) -> List[Dict[str, float]]:
+    ) -> list[dict[str, float]]:
         """Decay eğrisi hesapla (görselleştirme için)."""
         cfg = macro_config.decay
         half_life = cfg.half_life_by_shock_type.get(shock_type, cfg.default_half_life_days)
@@ -186,7 +187,7 @@ class MacroImpactAnalyzer:
 
         return curve
 
-    def get_shock_report(self) -> Dict[str, Any]:
+    def get_shock_report(self) -> dict[str, Any]:
         """Şok raporu."""
         return {
             "total_shocks": len(self._shock_history),

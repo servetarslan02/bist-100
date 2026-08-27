@@ -7,20 +7,20 @@ her saniyedeki muhasebe eşitliğini, Takasbank mahsubunu,
 VBTS kısıtlarını ve mikro-yapı defterini matematiksel olarak kanıtlar.
 """
 
-import sys
 import os
+import sys
+from datetime import date, timedelta
+
 import polars as pl
-import numpy as np
-from datetime import datetime, timedelta, date
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
-from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
-from services.paper_trading.synthetic_liquidity import LiquidityScenario
+from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 from services.paper_trading.state_store import PaperStateStore
+from services.paper_trading.synthetic_liquidity import LiquidityScenario
 
 
 def run_forensic_proof():
@@ -82,7 +82,7 @@ def run_forensic_proof():
         for i, t in enumerate(tickers)
     ]
     orch.queue_pending_signals(cuma_signals, date_strs[0])
-    
+
     # Doğrulama: Cuma akşamı 0 işlem olmalı, nakit 1.000.000 TL kalmalı
     summary = orch.portfolio.get_summary()
     assert summary["total_value"] == 1_000_000.0, "Cuma akşamı değer bozulmamalı!"
@@ -95,15 +95,15 @@ def run_forensic_proof():
     # -------------------------------------------------------------
     print(f"\n[2] 📅 PAZARTESİ SABAHI ({date_strs[1]} 09:55) — Açılış Fiyatı & 10 Kademeli Walk-the-Book")
     rep_pazartesi = orch.execute_pending_signals(date_strs[1], market_data, sector_map)
-    
+
     assert rep_pazartesi["status"] == "COMPLETED"
     assert rep_pazartesi["num_orders"] == 10
-    
+
     p_summary = orch.portfolio.get_summary()
     print(f"  ✓ 10 emir Walk-the-Book ile eşleşti. Açık Pozisyon: {p_summary['num_positions']}")
     print(f"  ✓ Pazartesi Açılış Sonrası Portföy Değeri: {p_summary['total_value']:,.2f} ₺")
     print(f"  ✓ Kalan Serbest Nakit: {p_summary['total_cash']:,.2f} ₺, Yatırılan Tutar: {p_summary['invested_value']:,.2f} ₺")
-    
+
     # Muhasebe Invariant Kontrolü: total_value == total_cash + invested_value
     assert abs(p_summary["total_value"] - (p_summary["total_cash"] + p_summary["invested_value"])) < 1e-4
     print("  ✓ [İNVARİANT DOĞRULANDI]: Total Value == Total Cash + Invested Value")
@@ -120,12 +120,12 @@ def run_forensic_proof():
         effective_date=date_strs[2],
         details="VBTS Kapsamında Brüt Takas Tedbiri"
     )
-    
+
     # THYAO için bugün nakit ekleyip 100 lot alalım
     orch.portfolio.settled_cash += 50_000.0
     open_res = orch.portfolio.open_position("THYAO", quantity=100, price=101.5, date=date_strs[2], is_gross_settlement=True)
     assert open_res["success"] is True
-    
+
     # Şimdi bugün alınan bu 100 lotu da içerecek şekilde TÜM THYAO pozisyonunu satmayı deneyelim -> Kesinlikle BLOKLANMALI!
     res_sell = orch.portfolio.close_position("THYAO", price=101.5, quantity=orch.portfolio._positions["THYAO"]["quantity"], date=date_strs[2])
     assert res_sell.get("error") == "GROSS_SETTLEMENT_BLOCKED", "Brüt takastaki hissenin aynı gün satışı engellenmeliydi!"
@@ -146,13 +146,13 @@ def run_forensic_proof():
     # Çarşamba sabahı yürüt
     rep_reb = orch.execute_pending_signals(date_strs[3], market_data, sector_map)
     assert rep_reb["status"] == "COMPLETED"
-    
+
     reb_summary = orch.portfolio.get_summary()
-    print(f"  ✓ Rebalance başarıyla tamamlandı. THYAO ve AKBNK satıldı, satış geliri ile yeni emirler alındı.")
+    print("  ✓ Rebalance başarıyla tamamlandı. THYAO ve AKBNK satıldı, satış geliri ile yeni emirler alındı.")
     print(f"  ✓ Alım Gücü (Purchasing Power): {reb_summary['purchasing_power']:,.2f} ₺")
     print(f"  ✓ Valörlü Takas Bekleyen Nakit (T+2): {reb_summary['unsettled_cash_t2']:,.2f} ₺")
     print(f"  ✓ Bankaya Çekilebilir Bakiye (Settled): {reb_summary['withdrawable_cash']:,.2f} ₺")
-    
+
     # -------------------------------------------------------------
     # ADIM 5: PERŞEMBE (2024-01-11) - Piyasa Çöküşü & Risk Kapısı Kill-Switch
     # -------------------------------------------------------------
@@ -161,12 +161,12 @@ def run_forensic_proof():
     orch.portfolio._max_equity = 1_500_000.0 # Zirve
     # Risk kapısı kill-switch kontrolü
     assert orch.portfolio.get_current_drawdown() > 25.0
-    
+
     # Yeni alım sinyali geldiğinde risk kapısı BLOCK vermeli
     crash_signal = [{"ticker": "BIMAS", "direction": "LONG", "rank": 1, "score": 9.9, "confidence": 0.95, "model_version": "LambdaRank_v3_LOCKED", "target_weight": 0.10}]
     orch.queue_pending_signals(crash_signal, date_strs[3])
     rep_crash = orch.execute_pending_signals(date_strs[4], market_data, sector_map)
-    
+
     # Drawdown kill switch nedeniyle emir doldurulmamalı
     print(f"  ✓ Risk Kapısı Kill-Switch Tetiklendi. Gerçekleşen Emir: {rep_crash['num_orders']} (Sermaye Korundu!)")
 

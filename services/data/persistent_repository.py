@@ -7,16 +7,19 @@ Mevcut proje altyapısındaki persistence yapısını kullanır.
 Incremental ingestion, deduplication, PIT-safe sorgulama destekler.
 """
 
+import hashlib
+from datetime import UTC, datetime
+from typing import Any
+
 import duckdb
 import orjson
-import hashlib
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 import structlog
 
 from .historical_contracts import (
-    HistoricalDataRepository, FundamentalSnapshot,
-    EventSnapshot, CatalystSnapshot,
+    CatalystSnapshot,
+    EventSnapshot,
+    FundamentalSnapshot,
+    HistoricalDataRepository,
 )
 
 logger = structlog.get_logger()
@@ -100,7 +103,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
     def get_fundamental_snapshots(
         self, ticker: str, as_of_date: str,
-    ) -> List[FundamentalSnapshot]:
+    ) -> list[FundamentalSnapshot]:
         conn = self._get_conn()
         rows = conn.execute(
             """SELECT * FROM fundamental_snapshots
@@ -120,8 +123,8 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
     def get_event_snapshots(
         self, ticker: str, as_of_date: str,
-        event_types: Optional[List[str]] = None,
-    ) -> List[EventSnapshot]:
+        event_types: list[str] | None = None,
+    ) -> list[EventSnapshot]:
         conn = self._get_conn()
         if event_types:
             placeholders = ','.join('?' * len(event_types))
@@ -154,7 +157,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
     def get_catalyst_snapshots(
         self, ticker: str, as_of_date: str,
-    ) -> List[CatalystSnapshot]:
+    ) -> list[CatalystSnapshot]:
         conn = self._get_conn()
         rows = conn.execute(
             """SELECT * FROM catalyst_snapshots
@@ -178,7 +181,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def add_fundamental_snapshot(self, snapshot: FundamentalSnapshot) -> bool:
         """Fundamental snapshot ekle (duplicate kontrolü ile)."""
         conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         values_json = orjson.dumps(snapshot.values, option=orjson.OPT_SORT_KEYS).decode()
         checksum = hashlib.md5(values_json.encode()).hexdigest()
 
@@ -200,7 +203,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def add_event_snapshot(self, snapshot: EventSnapshot) -> bool:
         """Event snapshot ekle (duplicate kontrolü ile)."""
         conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         checksum = hashlib.md5(
             f"{snapshot.event_id}:{snapshot.title}".encode()
         ).hexdigest()
@@ -226,7 +229,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def add_catalyst_snapshot(self, snapshot: CatalystSnapshot) -> bool:
         """Catalyst snapshot ekle (duplicate kontrolü ile)."""
         conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         checksum = hashlib.md5(
             f"{snapshot.event_id}:{snapshot.catalyst_type}".encode()
         ).hexdigest()
@@ -250,7 +253,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
     # === INGESTION STATE ===
 
-    def get_last_ingestion_time(self, key: str) -> Optional[str]:
+    def get_last_ingestion_time(self, key: str) -> str | None:
         """Son ingestion timestamp'ini getir."""
         conn = self._get_conn()
         row = conn.execute(
@@ -262,7 +265,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
     def set_last_ingestion_time(self, key: str, timestamp: str):
         """Son ingestion timestamp'ini kaydet."""
         conn = self._get_conn()
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         conn.execute(
             """INSERT OR REPLACE INTO ingestion_state (key, value, updated_at)
                VALUES (?, ?, ?)""",
@@ -272,7 +275,7 @@ class PersistentHistoricalRepository(HistoricalDataRepository):
 
     # === STATISTICS ===
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Repository istatistikleri."""
         conn = self._get_conn()
         fund_count = conn.execute("SELECT COUNT(*) FROM fundamental_snapshots").fetchone()[0]

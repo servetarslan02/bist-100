@@ -4,10 +4,11 @@ Confidence calibration — Brier score, calibration curve,
 Platt scaling, isotonic regression, regime-specific calibration,
 overconfidence detection, calibration monitoring.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -18,7 +19,7 @@ class CalibrationResult:
     """Kalibrasyon sonucu."""
     is_calibrated: bool
     brier_score: float
-    calibration_curve: List[Dict[str, float]]
+    calibration_curve: list[dict[str, float]]
     miscalibration: float
     overconfident: bool
     recommendation: str
@@ -61,8 +62,8 @@ class ModelCalibration:
         self.n_bins = n_bins
         self.overconfidence_threshold = overconfidence_threshold
         self.ece_threshold = ece_threshold
-        self._calibration_history: List[Dict[str, Any]] = []
-        self._regime_calibrators: Dict[str, Any] = {}
+        self._calibration_history: list[dict[str, Any]] = []
+        self._regime_calibrators: dict[str, Any] = {}
 
     def check_calibration(
         self,
@@ -91,7 +92,7 @@ class ModelCalibration:
                 y_true, y_prob, n_bins=self.n_bins, strategy="uniform"
             )
             curve = []
-            for frac, mean_pred in zip(fraction_pos, mean_predicted):
+            for frac, mean_pred in zip(fraction_pos, mean_predicted, strict=False):
                 curve.append({
                     "mean_predicted": round(float(mean_pred), 4),
                     "fraction_positive": round(float(frac), 4),
@@ -136,7 +137,7 @@ class ModelCalibration:
 
         # History
         self._calibration_history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "brier_score": brier,
             "ece": ece,
             "miscalibration": miscalibration,
@@ -151,11 +152,11 @@ class ModelCalibration:
         self,
         y_true: np.ndarray,
         y_prob: np.ndarray,
-        y_prob_val: Optional[np.ndarray] = None,
-        y_true_train: Optional[np.ndarray] = None,
-    ) -> Tuple[Any, np.ndarray]:
+        y_prob_val: np.ndarray | None = None,
+        y_true_train: np.ndarray | None = None,
+    ) -> tuple[Any, np.ndarray]:
         """Platt scaling (sigmoid calibration).
-        
+
         Args:
             y_true: Tüm gerçek etiketler (veya train etiketleri)
             y_prob: Tüm olasılıklar (veya train olasılıkları)
@@ -182,18 +183,15 @@ class ModelCalibration:
         self,
         y_true: np.ndarray,
         y_prob: np.ndarray,
-        y_prob_val: Optional[np.ndarray] = None,
-    ) -> Tuple[Any, np.ndarray]:
+        y_prob_val: np.ndarray | None = None,
+    ) -> tuple[Any, np.ndarray]:
         """Isotonic regression calibration."""
         from sklearn.isotonic import IsotonicRegression
 
         calibrator = IsotonicRegression(out_of_bounds="clip")
         calibrator.fit(y_prob, y_true)
 
-        if y_prob_val is not None:
-            calibrated = calibrator.predict(y_prob_val)
-        else:
-            calibrated = calibrator.predict(y_prob)
+        calibrated = calibrator.predict(y_prob_val) if y_prob_val is not None else calibrator.predict(y_prob)
 
         return calibrator, calibrated
 
@@ -203,7 +201,7 @@ class ModelCalibration:
         y_prob: np.ndarray,
         regimes: np.ndarray,
         method: str = "isotonic",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Her rejim için ayrı kalibrasyon.
 
         Returns:
@@ -232,7 +230,7 @@ class ModelCalibration:
     def apply_calibration(
         self,
         y_prob: np.ndarray,
-        regime: Optional[str] = None,
+        regime: str | None = None,
     ) -> np.ndarray:
         """Kalibrasyon uygula.
 
@@ -257,7 +255,7 @@ class ModelCalibration:
         y_true: np.ndarray,
         y_prob: np.ndarray,
         confidence_threshold: float = 0.8,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Overconfidence analizi — yüksek confidence'lı tahminlerin doğruluğu.
 
         Args:
@@ -307,11 +305,11 @@ class ModelCalibration:
             "n_total": len(y_true),
         }
 
-    def get_calibration_history(self) -> List[Dict[str, Any]]:
+    def get_calibration_history(self) -> list[dict[str, Any]]:
         """Kalibrasyon geçmişi."""
         return self._calibration_history
 
-    def get_calibration_drift(self) -> Dict[str, Any]:
+    def get_calibration_drift(self) -> dict[str, Any]:
         """Kalibrasyon drift analizi — zaman içinde kalibrasyon değişti mi?"""
         if len(self._calibration_history) < 3:
             return {"drift_detected": False, "reason": "insufficient_history"}

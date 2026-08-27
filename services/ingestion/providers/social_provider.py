@@ -9,8 +9,9 @@ v2.0: Async refactor + Ekşi Sözlük scraper + Reddit + gelişmiş sentiment
 
 import asyncio
 import re
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from ...core.async_http import get_client
@@ -43,7 +44,7 @@ class SocialProvider:
 
     def __init__(self):
         self._client = get_client("social", timeout=15.0, max_retries=2)
-        self._x_api_key: Optional[str] = None
+        self._x_api_key: str | None = None
 
     def set_x_api_key(self, key: str):
         """X API key ayarla."""
@@ -57,14 +58,13 @@ class SocialProvider:
         self,
         query: str = "$BIST OR $BIST100 OR borsa istanbul",
         max_results: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """X (Twitter) mentions çek (async)."""
         if not self._x_api_key:
             logger.debug("X API key not configured")
             return []
 
         url = "https://api.twitter.com/2/tweets/search/recent"
-        headers = {"Authorization": f"Bearer {self._x_api_key}"}
         params = {
             "query": query,
             "max_results": min(max_results, 100),
@@ -110,7 +110,7 @@ class SocialProvider:
     # StockTwits
     # =====================================================
 
-    async def fetch_stocktwits(self, ticker: str) -> List[Dict[str, Any]]:
+    async def fetch_stocktwits(self, ticker: str) -> list[dict[str, Any]]:
         """StockTwits mesajları çek (async)."""
         url = f"https://api.stocktwits.com/api/2/streams/symbol/{ticker}.json"
 
@@ -158,7 +158,7 @@ class SocialProvider:
         self,
         query: str,
         max_entries: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Ekşi Sözlük başlığı çek (async).
 
         Args:
@@ -167,12 +167,6 @@ class SocialProvider:
         """
         try:
             # Ekşi Sözlük arama API'si
-            search_url = "https://eksisozluk.com/"
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                "Accept": "text/html,application/xhtml+xml",
-                "Accept-Language": "tr-TR,tr;q=0.9",
-            }
 
             # Doğrudan başlık URL'si
             topic_url = f"https://eksisozluk.com/{query}--1"
@@ -202,7 +196,7 @@ class SocialProvider:
             logger.warning("Ekşi Sözlük fetch failed", query=query, error=str(e))
             return []
 
-    def _parse_eksi_html(self, html: str, max_entries: int) -> List[Dict[str, Any]]:
+    def _parse_eksi_html(self, html: str, max_entries: int) -> list[dict[str, Any]]:
         """Ekşi Sözlük HTML'den entry'leri çıkar."""
         entries = []
 
@@ -253,8 +247,8 @@ class SocialProvider:
     async def fetch_eksi_stock_mentions(
         self,
         ticker: str,
-        company_name: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        company_name: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Hisse ile ilgili Ekşi Sözlük entry'leri (async)."""
         all_entries = []
 
@@ -281,9 +275,9 @@ class SocialProvider:
     async def fetch_reddit_mentions(
         self,
         subreddit: str = "yatirim",
-        query: Optional[str] = None,
+        query: str | None = None,
         limit: int = 25,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Reddit Türkiye subreddit'inden gönderileri çek (async).
 
         Args:
@@ -330,7 +324,7 @@ class SocialProvider:
                     "score": post_data.get("score", 0),
                     "num_comments": post_data.get("num_comments", 0),
                     "created_at": datetime.fromtimestamp(
-                        post_data.get("created_utc", 0), tz=timezone.utc
+                        post_data.get("created_utc", 0), tz=UTC
                     ).isoformat(),
                     "sentiment": self._analyze_sentiment(content),
                     "engagement_score": (
@@ -350,8 +344,8 @@ class SocialProvider:
     async def fetch_reddit_stock_mentions(
         self,
         ticker: str,
-        subreddits: Optional[List[str]] = None,
-    ) -> List[Dict[str, Any]]:
+        subreddits: list[str] | None = None,
+    ) -> list[dict[str, Any]]:
         """Hisse ile ilgili Reddit gönderileri (async)."""
         if subreddits is None:
             subreddits = ["yatirim", "borsa", "turkey", "KucukYatirimci"]
@@ -416,7 +410,7 @@ class SocialProvider:
 
         return round(max(-1.0, min(1.0, sentiment)), 3)
 
-    def _analyze_sentiment_batch(self, texts: List[str]) -> Dict[str, Any]:
+    def _analyze_sentiment_batch(self, texts: list[str]) -> dict[str, Any]:
         """Toplu sentiment analizi."""
         if not texts:
             return {"avg_sentiment": 0.0, "positive_ratio": 0.0, "count": 0}
@@ -444,8 +438,8 @@ class SocialProvider:
     async def fetch_all_social(
         self,
         ticker: str,
-        company_name: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        company_name: str | None = None,
+    ) -> dict[str, Any]:
         """Tüm sosyal medya kaynaklarından veri çek (async, paralel)."""
         tasks = [
             self.fetch_stocktwits(ticker),
@@ -477,7 +471,7 @@ class SocialProvider:
                 "reddit": len([i for i in all_items if i.get("platform") == "Reddit"]),
                 "x": len([i for i in all_items if i.get("platform") == "X"]),
             },
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 

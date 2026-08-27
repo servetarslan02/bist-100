@@ -12,18 +12,21 @@ Gerçek zamanlı kaynaklar:
 
 import asyncio
 import hashlib
-import orjson
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
-from typing import Optional, Dict, Any, Callable, List, Set
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import orjson
+
 try:
     import aiohttp
 except ImportError:
     aiohttp = None
 
-import yfinance as yf
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -33,8 +36,8 @@ class DataEvent:
     """Yakalanan veri olayı."""
     source: str
     event_type: str
-    data: Dict[str, Any]
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    data: dict[str, Any]
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     content_hash: str = ""
 
     def __post_init__(self):
@@ -58,9 +61,9 @@ class RealTimeDataEngine:
 
     def __init__(self):
         self._running = False
-        self._handlers: Dict[str, List[Callable]] = {}
-        self._seen_hashes: Set[str] = set()  # Duplicate detection
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._handlers: dict[str, list[Callable]] = {}
+        self._seen_hashes: set[str] = set()  # Duplicate detection
+        self._session: aiohttp.ClientSession | None = None
 
     def on(self, source: str, handler: Callable):
         """Veri kaynağına handler ata."""
@@ -128,7 +131,7 @@ class RealTimeDataEngine:
         KAP WebSocket/SSE yok ama RSS/API çok sık poll edilebilir.
         Her 30 saniyede bir yeni bildirim kontrolü.
         """
-        last_check = datetime.now(timezone.utc)
+        last_check = datetime.now(UTC)
 
         while self._running:
             try:
@@ -136,7 +139,7 @@ class RealTimeDataEngine:
                 url = "https://www.kap.org.tr/tr/api/disclosures"
                 params = {
                     "fromDate": last_check.strftime("%Y-%m-%d"),
-                    "toDate": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                    "toDate": datetime.now(UTC).strftime("%Y-%m-%d"),
                 }
 
                 async with self._session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=15)) as resp:
@@ -159,7 +162,7 @@ class RealTimeDataEngine:
                             )
                             await self._dispatch(event)
 
-                        last_check = datetime.now(timezone.utc)
+                        last_check = datetime.now(UTC)
                         logger.debug("KAP check completed", new=len(data.get("data", [])))
 
             except Exception as e:
@@ -185,7 +188,7 @@ class RealTimeDataEngine:
             ("https://www.borsagundem.com/rss", "Borsa Gündem"),
         ]
 
-        seen_urls: Set[str] = set()
+        seen_urls: set[str] = set()
 
         while self._running:
             for feed_url, source_name in feeds:
@@ -256,18 +259,15 @@ class RealTimeDataEngine:
                         threads=True,
                         progress=False,
                     )
-                    
+
                     if not data.empty:
                         for ticker in chunk:
                             try:
-                                if len(chunk) == 1:
-                                    td = data.dropna()
-                                else:
-                                    td = data[f"{ticker}.IS"].dropna()
-                                    
+                                td = data.dropna() if len(chunk) == 1 else data[f"{ticker}.IS"].dropna()
+
                                 if not td.empty:
                                     latest = td.iloc[-1]
-                                    
+
                                     event = DataEvent(
                                         source="yfinance",
                                         event_type="market.trade",
@@ -275,15 +275,15 @@ class RealTimeDataEngine:
                                             "ticker": ticker,
                                             "price": float(latest["Close"]),
                                             "volume": int(latest.get("Volume", 0)),
-                                            "vwap": float(latest["Close"]), 
-                                            "timestamp": datetime.now(timezone.utc).isoformat(), # yf is 15-min delayed
+                                            "vwap": float(latest["Close"]),
+                                            "timestamp": datetime.now(UTC).isoformat(), # yf is 15-min delayed
                                         },
                                     )
                                     await self._dispatch(event)
                             except KeyError:
                                 logger.warning("Data error in _listen_market_stream: KeyError", exc_info=True)
                     await asyncio.sleep(1) # rate limit protection
-                    
+
             except Exception as e:
                 logger.warning("yfinance realtime error", error=str(e))
 

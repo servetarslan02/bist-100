@@ -27,9 +27,9 @@ YARIM İŞ GÜNLERİ (Resmi Tatil Arifeleri — Ramazan/Kurban Bayramı Arife, 2
 Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
-from datetime import datetime, time, timezone, timedelta
+from datetime import datetime, time, timedelta, timezone
 from enum import Enum
-from typing import Optional, Dict, List
+
 import structlog
 
 logger = structlog.get_logger()
@@ -98,12 +98,12 @@ class MarketSessionStateMachine:
         "alt": [5.0, 10.0],
     }
 
-    def __init__(self, holidays: Optional[set] = None, half_days: Optional[set] = None):
+    def __init__(self, holidays: set | None = None, half_days: set | None = None):
         self._holidays = holidays or set()
         self._half_days = half_days or set()  # Yarım gün tarihleri (YYYY-MM-DD)
-        self._circuit_breaker_active: Dict[str, datetime] = {}  # Ticker bazlı devre kesici bitiş zamanı
-        self._ebdks_active: Optional[datetime] = None  # Endekse bağlı devre kesici bitiş zamanı
-        self._ebdks_triggered_at: Optional[datetime] = None  # EBDKS tetiklenme anı
+        self._circuit_breaker_active: dict[str, datetime] = {}  # Ticker bazlı devre kesici bitiş zamanı
+        self._ebdks_active: datetime | None = None  # Endekse bağlı devre kesici bitiş zamanı
+        self._ebdks_triggered_at: datetime | None = None  # EBDKS tetiklenme anı
         self._ebdks_triggered_count: int = 0  # Bugün kaç kez tetiklendi
 
     def now_istanbul(self) -> datetime:
@@ -131,7 +131,7 @@ class MarketSessionStateMachine:
                        ticker=ticker, expiry=expiry.isoformat(),
                        duration_min=duration_minutes)
 
-    def trigger_ebdks(self, feature_code: Optional[str] = None):
+    def trigger_ebdks(self, feature_code: str | None = None):
         """Endekse bağlı devre kesici (EBDKS) başlatır.
 
         BIST-100 %6 veya daha fazla düşüşte tetiklenir (Ağustos 2025: tek aşamalı).
@@ -192,7 +192,7 @@ class MarketSessionStateMachine:
             return False
         return self._ebdks_triggered_at.time() >= self.EBDKS_LATE_SESSION_CUTOFF
 
-    def get_phase(self, ticker: Optional[str] = None, current_time: Optional[datetime] = None) -> BISTMarketPhase:
+    def get_phase(self, ticker: str | None = None, current_time: datetime | None = None) -> BISTMarketPhase:
         """Belirtilen an ve hisse için güncel seans fazını belirler.
 
         Yarım günlerde (resmi tatil arifeleri) seans 12:30'da sona erer.

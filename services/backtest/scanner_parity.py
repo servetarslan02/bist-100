@@ -13,11 +13,13 @@ Prensipler:
 """
 
 import hashlib
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
 import polars as pl
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -46,10 +48,10 @@ class ParityCheckResult:
     is_parity: bool
     backtest_value: Any
     live_value: Any
-    difference: Optional[float] = None
+    difference: float | None = None
     tolerance: float = 1e-6
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "check_type": self.check_type,
             "is_parity": self.is_parity,
@@ -68,9 +70,9 @@ class ParityReport:
     passed_checks: int
     failed_checks: int
     is_full_parity: bool
-    checks: List[ParityCheckResult]
+    checks: list[ParityCheckResult]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
             "config_hash": self.config_hash,
@@ -90,18 +92,18 @@ class BacktestScannerParity:
     """
 
     def __init__(self):
-        self._feature_engine: Optional[Callable] = None
-        self._signal_engine: Optional[Callable] = None
-        self._risk_engine: Optional[Callable] = None
-        self._cost_engine: Optional[Callable] = None
+        self._feature_engine: Callable | None = None
+        self._signal_engine: Callable | None = None
+        self._risk_engine: Callable | None = None
+        self._cost_engine: Callable | None = None
         self._config = ParityConfig()
 
     def register_engines(
         self,
         feature_engine: Callable,
         signal_engine: Callable,
-        risk_engine: Optional[Callable] = None,
-        cost_engine: Optional[Callable] = None,
+        risk_engine: Callable | None = None,
+        cost_engine: Callable | None = None,
     ):
         """Motorları kaydet."""
         self._feature_engine = feature_engine
@@ -115,7 +117,7 @@ class BacktestScannerParity:
         data: pl.DataFrame,
         ticker: str,
         timestamp: datetime,
-        expected_features: Optional[Dict[str, float]] = None,
+        expected_features: dict[str, float] | None = None,
         tolerance: float = 1e-6,
     ) -> ParityCheckResult:
         """
@@ -161,9 +163,9 @@ class BacktestScannerParity:
 
     def verify_signal_parity(
         self,
-        features: Dict[str, float],
+        features: dict[str, float],
         ticker: str,
-        expected_score: Optional[float] = None,
+        expected_score: float | None = None,
         tolerance: float = 0.01,
     ) -> ParityCheckResult:
         """
@@ -201,7 +203,7 @@ class BacktestScannerParity:
     def run_full_parity_check(
         self,
         test_data: pl.DataFrame,
-        test_tickers: List[str],
+        test_tickers: list[str],
         test_timestamp: datetime,
     ) -> ParityReport:
         """
@@ -229,7 +231,7 @@ class BacktestScannerParity:
         failed = len(checks) - passed
 
         report = ParityReport(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             config_hash=self._config.compute_hash(),
             total_checks=len(checks),
             passed_checks=passed,
@@ -256,20 +258,20 @@ class FeatureVersionLock:
     """
 
     def __init__(self):
-        self._versions: Dict[str, Dict[str, Any]] = {}
+        self._versions: dict[str, dict[str, Any]] = {}
         self._active_version: str = "v1.0"
 
     def register_version(
         self,
         version: str,
-        feature_names: List[str],
-        computation_config: Dict[str, Any],
+        feature_names: list[str],
+        computation_config: dict[str, Any],
     ):
         """Feature versiyonu kaydet."""
         self._versions[version] = {
             "feature_names": feature_names,
             "config": computation_config,
-            "registered_at": datetime.now(timezone.utc).isoformat(),
+            "registered_at": datetime.now(UTC).isoformat(),
             "hash": hashlib.sha256(
                 orjson.dumps({"names": feature_names, "config": computation_config}, option=orjson.OPT_SORT_KEYS).decode()
             ).hexdigest()[:16],
@@ -284,7 +286,7 @@ class FeatureVersionLock:
             raise ValueError(f"Unknown feature version: {version}")
         self._active_version = version
 
-    def get_active_config(self) -> Dict[str, Any]:
+    def get_active_config(self) -> dict[str, Any]:
         """Aktif versiyonun konfigürasyonunu döndür."""
         return self._versions.get(self._active_version, {})
 

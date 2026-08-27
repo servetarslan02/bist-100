@@ -7,9 +7,8 @@ ALPHA BIST — Model Eğitimi & Kilitli Validasyon Çalıştırıcısı
 4. Metriklerin 'data/model_metrics.json' ve Dashboard için Hazırlanması
 """
 
-import sys
 import os
-import orjson
+import sys
 import time
 
 # Windows UTF-8 Terminal desteği
@@ -18,13 +17,14 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        logger.warning("Caught Exception in module_level", exc_info=True)
+        pass  # logger not yet initialized
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import structlog
+
 from ml.dataset_builder_30y import DatasetBuilder30Y
 from ml.ensemble_trainer import BistEnsembleTrainer
-import structlog
 
 logger = structlog.get_logger(__name__)
 

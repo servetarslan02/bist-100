@@ -10,10 +10,11 @@ Model versiyon kayıt defteri:
 KURAL: Her model versiyonu izlenebilir olmalı.
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -28,14 +29,14 @@ class ModelRecord:
     version: str
     created_at: str
     status: str  # CANDIDATE, SHADOW, CHAMPION, RETIRED
-    metrics: Dict
-    features: List[str]
-    hyperparameters: Dict
-    training_data_info: Dict
+    metrics: dict
+    features: list[str]
+    hyperparameters: dict
+    training_data_info: dict
     regime: str
-    performance_history: List[Dict] = field(default_factory=list)
-    retired_at: Optional[str] = None
-    retired_reason: Optional[str] = None
+    performance_history: list[dict] = field(default_factory=list)
+    retired_at: str | None = None
+    retired_reason: str | None = None
 
 
 class ModelRegistry:
@@ -43,16 +44,16 @@ class ModelRegistry:
 
     def __init__(self):
         self._records: deque = deque(maxlen=500)
-        self._active_versions: Dict[str, str] = {}  # regime → version
+        self._active_versions: dict[str, str] = {}  # regime → version
 
     def register(
         self,
         model_id: str,
         version: str,
-        metrics: Dict,
-        features: List[str],
-        hyperparameters: Dict,
-        training_data_info: Dict,
+        metrics: dict,
+        features: list[str],
+        hyperparameters: dict,
+        training_data_info: dict,
         regime: str = "UNKNOWN",
         status: str = "CANDIDATE",
     ) -> ModelRecord:
@@ -60,7 +61,7 @@ class ModelRegistry:
         record = ModelRecord(
             model_id=model_id,
             version=version,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             status=status,
             metrics=metrics,
             features=features,
@@ -82,7 +83,7 @@ class ModelRegistry:
         for r in self._records:
             if r.status == "CHAMPION" and r.regime == regime:
                 r.status = "RETIRED"
-                r.retired_at = datetime.now(timezone.utc).isoformat()
+                r.retired_at = datetime.now(UTC).isoformat()
                 r.retired_reason = "Superseded by new champion"
 
         record = self._get_version(version)
@@ -109,7 +110,7 @@ class ModelRegistry:
             return True
         return False
 
-    def get_champion(self, regime: str = "UNKNOWN") -> Optional[ModelRecord]:
+    def get_champion(self, regime: str = "UNKNOWN") -> ModelRecord | None:
         """Mevcut champion model."""
         version = self._active_versions.get(regime)
         if version:
@@ -120,11 +121,11 @@ class ModelRegistry:
                 return r
         return None
 
-    def get_version(self, version: str) -> Optional[ModelRecord]:
+    def get_version(self, version: str) -> ModelRecord | None:
         """Versiyon detayı."""
         return self._get_version(version)
 
-    def get_all_versions(self) -> List[Dict]:
+    def get_all_versions(self) -> list[dict]:
         """Tüm versiyonlar."""
         return [
             {
@@ -138,16 +139,16 @@ class ModelRegistry:
             for r in self._records
         ]
 
-    def add_performance_record(self, version: str, metrics: Dict):
+    def add_performance_record(self, version: str, metrics: dict):
         """Performans kaydı ekle."""
         record = self._get_version(version)
         if record:
             record.performance_history.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **metrics,
             })
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Rapor."""
         champions = [r for r in self._records if r.status == "CHAMPION"]
         shadows = [r for r in self._records if r.status == "SHADOW"]
@@ -161,7 +162,7 @@ class ModelRegistry:
             "active_versions": self._active_versions,
         }
 
-    def _get_version(self, version: str) -> Optional[ModelRecord]:
+    def _get_version(self, version: str) -> ModelRecord | None:
         """Versiyon bul."""
         for r in self._records:
             if r.version == version:

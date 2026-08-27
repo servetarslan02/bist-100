@@ -8,11 +8,11 @@ FAZ 6: Risk Assessment
 """
 
 import time
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
 import structlog
 
-from .agent_system import AgentRole, AgentResult
+from .agent_system import AgentResult, AgentRole
 from .llm_client import BaseLLMClient
 from .prompts import PromptFactory
 
@@ -27,11 +27,11 @@ class RiskAssessment:
     risk_score: float  # 0-100
     max_position_pct: float  # Maksimum pozisyon yüzdesi
     stop_loss_pct: float  # Stop-loss yüzdesi
-    risk_factors: List[str]
-    veto_reason: Optional[str] = None
+    risk_factors: list[str]
+    veto_reason: str | None = None
     reasoning: str = ""
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "approved": self.approved,
             "risk_level": self.risk_level,
@@ -74,10 +74,10 @@ class RiskAssessor:
     async def assess(
         self,
         ticker: str,
-        agent_results: Dict[AgentRole, AgentResult],
-        features: Dict[str, float],
-        portfolio_info: Optional[Dict] = None,
-        llm_client: Optional[BaseLLMClient] = None,
+        agent_results: dict[AgentRole, AgentResult],
+        features: dict[str, float],
+        portfolio_info: dict | None = None,
+        llm_client: BaseLLMClient | None = None,
     ) -> RiskAssessment:
         """Risk değerlendirmesi yap.
 
@@ -231,11 +231,11 @@ class RiskAssessor:
     async def _llm_risk_assessment(
         self,
         ticker: str,
-        agent_results: Dict[AgentRole, AgentResult],
-        features: Dict[str, float],
-        portfolio_info: Optional[Dict],
+        agent_results: dict[AgentRole, AgentResult],
+        features: dict[str, float],
+        portfolio_info: dict | None,
         llm_client: BaseLLMClient,
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """LLM ile risk değerlendirmesi."""
         try:
             # Agent sonuçlarını formatla

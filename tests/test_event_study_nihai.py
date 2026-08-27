@@ -1,8 +1,8 @@
 """Event Study Nihai Sistem Testleri — 14 Modül, 50+ Test."""
-import pytest
-import numpy as np
 from datetime import datetime, timedelta
 
+import numpy as np
+import pytest
 
 # ─── Estimation Window Tests ───
 
@@ -656,13 +656,11 @@ class TestSectorEvent:
 class TestIntegration:
     def test_full_pipeline(self):
         """Tam pipeline: estimation → expected return → AR → CAR → test → impact."""
-        from services.event_study.estimation_window import EstimationWindowManager
-        from services.event_study.event_window import EventWindowManager
-        from services.event_study.expected_return import calculate_expected_return
         from services.event_study.abnormal_return import calculate_abnormal_return
-        from services.event_study.car import calculate_car, calculate_car_sub_windows
-        from services.event_study.statistical_test import test_significance
+        from services.event_study.car import calculate_car
+        from services.event_study.expected_return import calculate_expected_return
         from services.event_study.impact import calculate_event_impact
+        from services.event_study.statistical_test import test_significance
 
         # Simüle veri
         est_returns = np.random.randn(100) * 0.02
@@ -691,8 +689,8 @@ class TestIntegration:
 
     def test_kap_to_cross_sectional(self):
         """KAP event → cross-sectional pipeline."""
-        from services.event_study.kap_event import analyze_kap_event
         from services.event_study.cross_sectional import CrossSectionalEventStudy
+        from services.event_study.kap_event import analyze_kap_event
 
         events = []
         for i in range(5):

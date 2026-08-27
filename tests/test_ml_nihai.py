@@ -1,14 +1,13 @@
 """ML Nihai Sistem Testleri — 6 Faz, 65+ Test."""
-import pytest
 import numpy as np
-
+import pytest
 
 # ─── Faz 1: CatBoost + XGBoost ───
 
 class TestCatBoost:
     def test_train_predict(self):
         pytest.importorskip("catboost")
-        from services.ml.catboost_model import CatBoostModel, CatBoostConfig
+        from services.ml.catboost_model import CatBoostConfig, CatBoostModel
         config = CatBoostConfig(iterations=10, verbose=0)
         model = CatBoostModel(config)
         X = np.random.randn(100, 5)
@@ -54,7 +53,7 @@ class TestCatBoost:
 class TestXGBoost:
     def test_train_predict(self):
         pytest.importorskip("xgboost")
-        from services.ml.xgboost_model import XGBoostModel, XGBoostConfig
+        from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
         config = XGBoostConfig(n_estimators=10, verbose=0)
         model = XGBoostModel(config)
         X = np.random.randn(100, 5)
@@ -91,9 +90,10 @@ class TestXGBoost:
 
 class TestStackingEnsemble:
     def test_stacking(self):
-        from services.ml.stacking_ensemble import StackingEnsemble
-        from sklearn.linear_model import Ridge
         from sklearn.ensemble import RandomForestRegressor
+        from sklearn.linear_model import Ridge
+
+        from services.ml.stacking_ensemble import StackingEnsemble
         ensemble = StackingEnsemble()
         ensemble.add_model("ridge", Ridge(alpha=1.0))
         ensemble.add_model("rf", RandomForestRegressor(n_estimators=10, random_state=42))
@@ -106,8 +106,9 @@ class TestStackingEnsemble:
         assert len(preds) == 50
 
     def test_stacking_weights(self):
-        from services.ml.stacking_ensemble import StackingEnsemble
         from sklearn.linear_model import Ridge
+
+        from services.ml.stacking_ensemble import StackingEnsemble
         ensemble = StackingEnsemble()
         ensemble.add_model("a", Ridge())
         ensemble.add_model("b", Ridge())
@@ -271,7 +272,7 @@ class TestModelMonitor:
     def test_metric_recording(self):
         from services.ml.model_monitor import ModelMonitor
         mon = ModelMonitor(min_history=3)
-        for i in range(10):
+        for _i in range(10):
             mon.record_metric("ic", 0.05 + np.random.normal(0, 0.01))
         report = mon.check_decay("ic")
         assert report.historical_mean > 0
@@ -342,8 +343,8 @@ class TestMLIntegration:
     def test_xgboost_shap_to_drift(self):
         pytest.importorskip("xgboost")
         """XGBoost → SHAP → Drift Detection pipeline."""
-        from services.ml.xgboost_model import XGBoostModel
         from services.ml.feature_drift import FeatureDriftDetector
+        from services.ml.xgboost_model import XGBoostModel
 
         model = XGBoostModel()
         X = np.random.randn(100, 5)
@@ -362,9 +363,10 @@ class TestMLIntegration:
 
     def test_stacking_to_monitor(self):
         """Stacking Ensemble → Model Monitor pipeline."""
-        from services.ml.stacking_ensemble import StackingEnsemble
-        from services.ml.model_monitor import ModelMonitor
         from sklearn.linear_model import Ridge
+
+        from services.ml.model_monitor import ModelMonitor
+        from services.ml.stacking_ensemble import StackingEnsemble
 
         ensemble = StackingEnsemble()
         ensemble.add_model("a", Ridge())

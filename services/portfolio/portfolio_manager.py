@@ -13,11 +13,12 @@ Kurumsal seviye portföy muhasebesi:
 v1.0 API'leri 100% geriye uyumlu.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import defaultdict
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -41,7 +42,7 @@ class Position:
     direction: str  # LONG, SHORT
     quantity: int
     entry_price: float          # Komisyonsuz birim fiyat
-    entry_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    entry_time: datetime = field(default_factory=lambda: datetime.now(UTC))
     current_price: float = 0.0
     stop_price: float = 0.0
     target_price: float = 0.0
@@ -69,7 +70,7 @@ class Position:
             return 0.0
         return (self.unrealized_pnl / self.cost_basis) * 100
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "direction": self.direction,
@@ -120,7 +121,7 @@ class Trade:
     def holding_days(self) -> int:
         return max(0, (self.exit_time - self.entry_time).days)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "trade_id": self.trade_id,
             "ticker": self.ticker,
@@ -149,7 +150,7 @@ class CashLedgerEntry:
     ticker: str = ""
     reference_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "amount": round(self.amount, 2),
@@ -176,7 +177,7 @@ class EquitySnapshot:
     high_water_mark: float
     drawdown_from_hwm: float           # HWM'den düşüş (%)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date,
             "timestamp": self.timestamp.isoformat(),
@@ -209,7 +210,7 @@ class PositionHistoryEntry:
     realized_pnl: float
     reference_id: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -261,7 +262,7 @@ class CommissionModel:
         total = base + bsmv
         return max(total, self.min_commission)
 
-    def breakdown(self, amount: float) -> Dict[str, float]:
+    def breakdown(self, amount: float) -> dict[str, float]:
         """Komisyon detayları."""
         base = amount * (self.broker_rate + self.exchange_rate)
         bsmv = base * self.bsmv_rate
@@ -292,24 +293,24 @@ class PortfolioManager:
         # v1.0 mevcut alanlar
         self._initial_capital = initial_capital
         self._cash = initial_capital
-        self._positions: Dict[str, Position] = {}
-        self._trades: List[Trade] = []
-        self._equity_curve: List[Dict] = []
-        self._daily_pnl: List[Dict] = []
+        self._positions: dict[str, Position] = {}
+        self._trades: list[Trade] = []
+        self._equity_curve: list[dict] = []
+        self._daily_pnl: list[dict] = []
         self._max_equity = initial_capital
 
         # v2.0 yeni alanlar
         self._commission_model = CommissionModel()
-        self._cash_ledger: List[CashLedgerEntry] = []
-        self._equity_snapshots: List[EquitySnapshot] = []
-        self._position_history: List[PositionHistoryEntry] = []
+        self._cash_ledger: list[CashLedgerEntry] = []
+        self._equity_snapshots: list[EquitySnapshot] = []
+        self._position_history: list[PositionHistoryEntry] = []
         self._realized_pnl_total: float = 0.0
         self._commission_total: float = 0.0
         self._high_water_mark: float = initial_capital
         self._daily_realized_pnl: float = 0.0
         self._daily_commission: float = 0.0
         self._last_snapshot_date: str = ""
-        self._cached_max_drawdown: Optional[float] = None
+        self._cached_max_drawdown: float | None = None
 
         # İlk nakit kaydı
         self._record_cash(0.0, initial_capital, "DEPOSIT", "Başlangıç sermayesi")
@@ -322,7 +323,7 @@ class PortfolioManager:
         """Komisyon hesapla (dışarıdan çağrılabilir)."""
         return self._commission_model.calculate(amount)
 
-    def get_commission_breakdown(self, amount: float) -> Dict[str, float]:
+    def get_commission_breakdown(self, amount: float) -> dict[str, float]:
         """Komisyon detayları."""
         return self._commission_model.breakdown(amount)
 
@@ -339,7 +340,7 @@ class PortfolioManager:
     ):
         """Nakit hareketi kaydet."""
         entry = CashLedgerEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             amount=amount,
             balance_after=balance_after,
             entry_type=entry_type,
@@ -361,7 +362,7 @@ class PortfolioManager:
             logger.info("cash_deposited", amount=amount, new_cash=self._cash)
         return self._cash
 
-    def get_cash_ledger(self, limit: int = 100) -> List[Dict]:
+    def get_cash_ledger(self, limit: int = 100) -> list[dict]:
         """Nakit hareket geçmişi."""
         return [e.to_dict() for e in self._cash_ledger[-limit:]]
 
@@ -384,7 +385,7 @@ class PortfolioManager:
     ):
         """Pozisyon değişiklik audit trail."""
         entry = PositionHistoryEntry(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             ticker=ticker,
             action=action,
             direction=direction,
@@ -403,12 +404,9 @@ class PortfolioManager:
             self._position_history = self._position_history[-1000:]
         self._trim_list(self._position_history, MAX_POSITION_HISTORY)
 
-    def get_position_history(self, ticker: str = "", limit: int = 100) -> List[Dict]:
+    def get_position_history(self, ticker: str = "", limit: int = 100) -> list[dict]:
         """Pozisyon değişiklik geçmişi."""
-        if ticker:
-            filtered = [e for e in self._position_history if e.ticker == ticker]
-        else:
-            filtered = self._position_history
+        filtered = [e for e in self._position_history if e.ticker == ticker] if ticker else self._position_history
         return [e.to_dict() for e in filtered[-limit:]]
 
     # ===================== EQUITY CURVE v2.0 =====================
@@ -422,7 +420,7 @@ class PortfolioManager:
         # v1.0 uyumlu equity curve
         self._trim_list(self._equity_curve, MAX_EQUITY_CURVE)
         self._equity_curve.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "equity": total_equity,
             "cash": self._cash,
             "invested": total_equity - self._cash,
@@ -441,14 +439,14 @@ class PortfolioManager:
         self._cached_max_drawdown = None
 
         # v2.0: Günlük snapshot (günde bir kez)
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        today = datetime.now(UTC).strftime("%Y-%m-%d")
         if today != self._last_snapshot_date:
             unrealized = sum(p.unrealized_pnl for p in self._positions.values())
             dd_pct = (self._high_water_mark - total_equity) / self._high_water_mark if self._high_water_mark > 0 else 0.0
 
             snapshot = EquitySnapshot(
                 date=today,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 total_equity=total_equity,
                 cash=self._cash,
                 invested=total_equity - self._cash,
@@ -469,7 +467,7 @@ class PortfolioManager:
             self._daily_realized_pnl = 0.0
             self._daily_commission = 0.0
 
-    def get_equity_snapshots(self, limit: int = 252) -> List[Dict]:
+    def get_equity_snapshots(self, limit: int = 252) -> list[dict]:
         """Günlük equity snapshot'ları."""
         return [s.to_dict() for s in self._equity_snapshots[-limit:]]
 
@@ -496,7 +494,7 @@ class PortfolioManager:
         target_price: float = 0.0,
         sector: str = "",
         commission: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Yeni pozisyon aç (v1.0 uyumlu + v2.0 muhasebe)."""
         # Validasyon
         if quantity <= 0:
@@ -596,7 +594,7 @@ class PortfolioManager:
         ticker: str,
         price: float,
         commission: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Pozisyon kapat (v1.0 uyumlu + v2.0 muhasebe)."""
         if ticker not in self._positions:
             return {"success": False, "error": f"{ticker} pozisyonu bulunamadı"}
@@ -616,14 +614,14 @@ class PortfolioManager:
 
         # Trade kaydı
         trade = Trade(
-            trade_id=f"TRD_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{ticker}",
+            trade_id=f"TRD_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{ticker}",
             ticker=ticker,
             direction=pos.direction,
             entry_price=pos.entry_price,
             exit_price=price,
             quantity=pos.quantity,
             entry_time=pos.entry_time,
-            exit_time=datetime.now(timezone.utc),
+            exit_time=datetime.now(UTC),
             commission=commission,
             realized_pnl=realized_pnl,
         )
@@ -696,7 +694,7 @@ class PortfolioManager:
         quantity: int,
         price: float,
         commission: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Pozisyonu azalt (v1.0 uyumlu + v2.0 muhasebe)."""
         pos = self._positions[ticker]
 
@@ -719,14 +717,14 @@ class PortfolioManager:
 
         # Trade kaydı
         trade = Trade(
-            trade_id=f"TRD_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{ticker}_partial",
+            trade_id=f"TRD_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{ticker}_partial",
             ticker=ticker,
             direction=pos.direction,
             entry_price=pos.entry_price,
             exit_price=price,
             quantity=close_qty,
             entry_time=pos.entry_time,
-            exit_time=datetime.now(timezone.utc),
+            exit_time=datetime.now(UTC),
             commission=commission,
             realized_pnl=realized_pnl,
         )
@@ -785,7 +783,7 @@ class PortfolioManager:
             "commission": round(commission, 2),
         }
 
-    def update_prices(self, prices: Dict[str, float]):
+    def update_prices(self, prices: dict[str, float]):
         """Pozisyon fiyatlarını güncelle (v1.0 uyumlu)."""
         for ticker, price in prices.items():
             if ticker in self._positions:
@@ -795,7 +793,7 @@ class PortfolioManager:
 
     # ===================== QUERIES v1.0 (uyumlu) =====================
 
-    def get_portfolio(self) -> Dict[str, Any]:
+    def get_portfolio(self) -> dict[str, Any]:
         """Portföy durumu (v1.0 uyumlu + v2.0扩展)."""
         total_value = self._cash
         total_unrealized = 0.0
@@ -818,7 +816,7 @@ class PortfolioManager:
             "positions": positions_list,
         }
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Portföy metrikleri (v1.0 uyumlu + v2.0扩展)."""
         if not self._equity_curve:
             return {"error": "Henüz veri yok"}
@@ -901,7 +899,7 @@ class PortfolioManager:
             "total_realized_pnl": round(self._realized_pnl_total, 2),
         }
 
-    def get_risk_metrics(self) -> Dict[str, Any]:
+    def get_risk_metrics(self) -> dict[str, Any]:
         """Risk metrikleri — VaR/CVaR + rolling correlation + concentration.
 
         Risk modülünden VaR/CVaR hesaplar.
@@ -1010,18 +1008,18 @@ class PortfolioManager:
             "concentration_risk": "HIGH" if hhi > 0.25 else "MEDIUM" if hhi > 0.15 else "LOW",
         }
 
-    def get_position(self, ticker: str) -> Optional[Dict]:
+    def get_position(self, ticker: str) -> dict | None:
         """Tek pozisyon getir (v1.0 uyumlu)."""
         if ticker in self._positions:
             return self._positions[ticker].to_dict()
         return None
 
-    def get_trade_history(self, limit: int = 100) -> List[Dict]:
+    def get_trade_history(self, limit: int = 100) -> list[dict]:
         """Trade geçmişi (v1.0 uyumlu + v2.0扩展)."""
         trades = self._trades[-limit:]
         return [t.to_dict() for t in reversed(trades)]
 
-    def get_equity_curve(self) -> List[Dict]:
+    def get_equity_curve(self) -> list[dict]:
         """Equity curve (v1.0 uyumlu)."""
         return self._equity_curve
 
@@ -1034,9 +1032,7 @@ class PortfolioManager:
             return False
         if pos.direction == "LONG" and current_price <= pos.stop_price:
             return True
-        if pos.direction == "SHORT" and current_price >= pos.stop_price:
-            return True
-        return False
+        return bool(pos.direction == "SHORT" and current_price >= pos.stop_price)
 
     def check_target(self, ticker: str, current_price: float) -> bool:
         """Target kontrolü (v1.0 uyumlu)."""
@@ -1047,9 +1043,7 @@ class PortfolioManager:
             return False
         if pos.direction == "LONG" and current_price >= pos.target_price:
             return True
-        if pos.direction == "SHORT" and current_price <= pos.target_price:
-            return True
-        return False
+        return bool(pos.direction == "SHORT" and current_price <= pos.target_price)
 
     # ===================== v2.0 YENİ QUERIES =====================
 
@@ -1061,7 +1055,7 @@ class PortfolioManager:
         """Toplam komisyon."""
         return self._commission_total
 
-    def get_accounting_summary(self) -> Dict[str, Any]:
+    def get_accounting_summary(self) -> dict[str, Any]:
         """Muhasebe özeti — EQUITY = CASH + MARKET_VALUE doğrulaması dahil."""
         market_value = sum(p.market_value for p in self._positions.values())
         total_equity = self._cash + market_value
@@ -1106,9 +1100,9 @@ class PortfolioManager:
 
     def check_rebalance(
         self,
-        target_weights: Dict[str, float],
+        target_weights: dict[str, float],
         threshold_pct: float = 5.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Rebalance gerekli mi? Drift analizi.
 
         Args:
@@ -1159,10 +1153,10 @@ class PortfolioManager:
 
     def compute_rebalance_orders(
         self,
-        target_weights: Dict[str, float],
+        target_weights: dict[str, float],
         threshold_pct: float = 5.0,
         turnover_limit: float = 0.3,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Rebalance emirleri oluştur.
 
         Args:
@@ -1222,7 +1216,7 @@ class PortfolioManager:
 
         return orders
 
-    def execute_auto_rebalance(self, signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    def execute_auto_rebalance(self, signals: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Otonom portfoy yeniden dengeleme (Kelly Kriteri + Yüksek Skorlu BİST Liderleri)."""
         if not signals:
             logger.info("No signals provided for auto-rebalance, skipping")
@@ -1237,7 +1231,7 @@ class PortfolioManager:
 
         executed = []
         total_equity = self._cash + sum(p.market_value for p in self._positions.values())
-        
+
         # Sort signals by score descending
         qualified_signals = [s for s in signals if s.get("score", 0) >= 75]
         qualified_signals.sort(key=lambda s: s.get("score", 0), reverse=True)
@@ -1249,11 +1243,11 @@ class PortfolioManager:
 
             price = float(sig.get("price", 100.0))
             score = float(sig.get("score", 80))
-            
+
             # Dynamic Score-Weighted Sizing (Score 90+ gets up to 7-8%, Score 75-80 gets 4-5%)
             weight = 0.04 + ((score - 75) / 20.0) * 0.04
             allocation = total_equity * weight
-            
+
             if self._cash < allocation * 0.3:
                 break
 

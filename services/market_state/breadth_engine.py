@@ -20,10 +20,11 @@ BIST-specific:
 - Döviz etkisini breadth'den izole etmek için normalize
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -56,12 +57,12 @@ class BreadthResult:
     alert_level: str = "NORMAL"             # NORMAL / WARNING / ALERT / CRITICAL
 
     # Sektörel breadth (opsiyonel)
-    sector_breadth: Dict[str, float] = field(default_factory=dict)
+    sector_breadth: dict[str, float] = field(default_factory=dict)
 
     # Döviz izolasyonu
     fx_adjustment: float = 0.0  # Breadth'e uygulanan döviz düzeltmesi
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "advancing": self.advancing,
@@ -110,15 +111,15 @@ class MarketBreadthEngine:
         # Cumulative state
         self._ad_line_cumulative = 0
         self._mcclellan_summation = 0.0
-        self._net_advances_history: List[int] = []
+        self._net_advances_history: list[int] = []
 
     def compute(
         self,
-        instrument_states: List[Dict],
-        ad_history: Optional[List[int]] = None,
+        instrument_states: list[dict],
+        ad_history: list[int] | None = None,
         new_highs: int = 0,
         new_lows: int = 0,
-        sector_map: Optional[Dict[str, str]] = None,
+        sector_map: dict[str, str] | None = None,
         fx_momentum: float = 0.0,
     ) -> BreadthResult:
         """Tüm breadth göstergelerini hesapla.
@@ -143,7 +144,7 @@ class MarketBreadthEngine:
 
         if not valid_states:
             logger.warning("No valid instruments for breadth calculation")
-            return BreadthResult(timestamp=datetime.now(timezone.utc))
+            return BreadthResult(timestamp=datetime.now(UTC))
 
         # 1. Temel breadth
         advancing = sum(1 for s in valid_states if s.get("change_pct", 0) > 0)
@@ -207,7 +208,7 @@ class MarketBreadthEngine:
             sector_breadth = self._compute_sector_breadth(valid_states, sector_map)
 
         result = BreadthResult(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             advancing=advancing,
             declining=declining,
             unchanged=unchanged,
@@ -257,7 +258,7 @@ class MarketBreadthEngine:
 
         return short_ema - long_ema
 
-    def _ema(self, data: List[int], period: int) -> float:
+    def _ema(self, data: list[int], period: int) -> float:
         """Exponential Moving Average."""
         if len(data) < period:
             return float(np.mean(data))
@@ -272,7 +273,7 @@ class MarketBreadthEngine:
 
     def _compute_trin(
         self,
-        states: List[Dict],
+        states: list[dict],
         advancing: int,
         declining: int,
     ) -> float:
@@ -384,11 +385,11 @@ class MarketBreadthEngine:
 
     def _compute_sector_breadth(
         self,
-        states: List[Dict],
-        sector_map: Dict[str, str],
-    ) -> Dict[str, float]:
+        states: list[dict],
+        sector_map: dict[str, str],
+    ) -> dict[str, float]:
         """Sektörel breadth hesapla — her sektör için % advancing."""
-        sector_data: Dict[str, Dict] = {}
+        sector_data: dict[str, dict] = {}
 
         for s in states:
             ticker = s.get("ticker", "")

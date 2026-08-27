@@ -12,14 +12,9 @@ CORE-NIHAI-SPEC doğrultusunda entegrasyon testleri:
 8. Distributed Tracing
 """
 
-import sys
 import asyncio
-import time
-from pathlib import Path
-
 
 import pytest
-
 
 # =====================================================
 # TEST 1: Event Bus → DLQ Integration
@@ -76,7 +71,7 @@ class TestEventBusDLQ:
 
     def test_dlq_max_retries_exhaustion(self):
         """Max retry aşıldığında EXHAUSTED olmalı."""
-        from services.core.dead_letter_queue import DeadLetterQueue, DLQStatus
+        from services.core.dead_letter_queue import DeadLetterQueue
 
         dlq = DeadLetterQueue()
         entry = asyncio.get_event_loop().run_until_complete(
@@ -118,7 +113,7 @@ class TestSecurityJWT:
         from services.core.security import AuthenticationService, Role
 
         auth = AuthenticationService()
-        user = auth.create_user("testuser2", "securepass123", Role.OPERATOR)
+        auth.create_user("testuser2", "securepass123", Role.OPERATOR)
 
         token = auth.authenticate("testuser2", "securepass123")
         validated_user = auth.validate_token(token)
@@ -137,7 +132,7 @@ class TestSecurityJWT:
 
     def test_jwt_generate_and_validate(self):
         """JWT Manager token üretme ve doğrulama."""
-        from services.core.jwt_manager import JWTManager, TokenType
+        from services.core.jwt_manager import JWTManager
 
         mgr = JWTManager(secret_key="test-secret-key-12345678")
         token = mgr.generate_token("user1", "ADMIN", ["READ", "WRITE"])
@@ -162,7 +157,7 @@ class TestSecurityJWT:
 
     def test_jwt_revocation(self):
         """Revoked token reddedilmeli."""
-        from services.core.jwt_manager import JWTManager, JWTError
+        from services.core.jwt_manager import JWTError, JWTManager
 
         mgr = JWTManager(secret_key="test-secret-key-12345678")
         token = mgr.generate_token("user1", "ADMIN", ["READ"])
@@ -254,8 +249,10 @@ class TestConfigHotReload:
 
     def test_load_and_change_detection(self):
         """Config yükleme ve değişiklik algılama."""
-        import orjson
         import tempfile
+
+        import orjson
+
         from services.core.config_hot_reload import ConfigHotReload
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -276,8 +273,10 @@ class TestConfigHotReload:
 
     def test_force_reload(self):
         """Force reload çalışmalı."""
-        import orjson
         import tempfile
+
+        import orjson
+
         from services.core.config_hot_reload import ConfigHotReload
 
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -336,7 +335,7 @@ class TestSystemGovernor:
 
     def test_state_transitions(self):
         """Durum geçişleri çalışmalı."""
-        from services.core.system_governor import SystemStateGovernor, SystemState
+        from services.core.system_governor import SystemState, SystemStateGovernor
 
         governor = SystemStateGovernor()
 
@@ -349,18 +348,18 @@ class TestSystemGovernor:
 
     def test_feature_flags(self):
         """Feature flag'ler çalışmalı."""
-        from services.core.system_governor import SystemStateGovernor, FeatureFlag, SystemState
+        from services.core.system_governor import FeatureFlag, SystemState, SystemStateGovernor
 
         governor = SystemStateGovernor()
         # FULL modda tüm feature'lar aktif
-        assert governor.is_allowed(FeatureFlag.LIVE_TRADING) == True
-        assert governor.is_allowed(FeatureFlag.ALTERNATIVE_DATA) == True
+        assert governor.is_allowed(FeatureFlag.LIVE_TRADING)
+        assert governor.is_allowed(FeatureFlag.ALTERNATIVE_DATA)
 
         # DEGRADED modda kritik olmayan feature'lar devre dışı
         governor.transition(SystemState.DEGRADED, "test")
-        assert governor.is_allowed(FeatureFlag.LIVE_TRADING) == True  # Kritik
-        assert governor.is_allowed(FeatureFlag.ALTERNATIVE_DATA) == False  # Kritik değil
-        assert governor.is_allowed(FeatureFlag.LEARNING) == False  # Kritik değil
+        assert governor.is_allowed(FeatureFlag.LIVE_TRADING)  # Kritik
+        assert not governor.is_allowed(FeatureFlag.ALTERNATIVE_DATA)  # Kritik değil
+        assert not governor.is_allowed(FeatureFlag.LEARNING)  # Kritik değil
 
 
 # =====================================================
@@ -405,9 +404,7 @@ class TestRBAC:
 
     def test_role_permissions(self):
         """Rol izinleri doğru atanmalı."""
-        from services.core.security import (
-            Role, Permission, ROLE_PERMISSIONS
-        )
+        from services.core.security import ROLE_PERMISSIONS, Permission, Role
 
         # VIEWER sadece okuyabilir
         viewer_perms = ROLE_PERMISSIONS[Role.VIEWER]
@@ -421,10 +418,7 @@ class TestRBAC:
 
     def test_authorization_check(self):
         """İzin kontrolü çalışmalı."""
-        from services.core.security import (
-            AuthenticationService, AuthorizationService,
-            Role, Permission, User
-        )
+        from services.core.security import AuthorizationService, Permission, Role, User
 
         authz = AuthorizationService()
         viewer = User(user_id="v1", username="viewer", role=Role.VIEWER)

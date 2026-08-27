@@ -12,14 +12,15 @@ Bu adapter:
 - Mevcut backtest API'sini bozmaz
 """
 
-from typing import Dict, Any, Optional
+from typing import Any
+
 import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-def _scalar_features(feats: Dict[str, Any]) -> Dict[str, Any]:
+def _scalar_features(feats: dict[str, Any]) -> dict[str, Any]:
     """Dict/nested feature'ları filtrele, sadece scalar olanları tut."""
     return {k: v for k, v in feats.items()
             if isinstance(v, (int, float, np.floating, np.integer)) and np.isfinite(float(v))}
@@ -46,11 +47,11 @@ class BacktestCanonicalAdapter:
 
     def compute_score(
         self,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         regime: str = "UNKNOWN",
         ml_model=None,
         ticker: str = "BACKTEST",
-        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+        all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
     ) -> float:
         """Feature'lardan canonical opportunity score üret.
@@ -105,12 +106,12 @@ class BacktestCanonicalAdapter:
 
     def compute_score_and_decision(
         self,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         regime: str = "UNKNOWN",
         price: float = 0,
         ml_model=None,
         ticker: str = "BACKTEST",
-        all_day_features: Optional[Dict[str, Dict[str, Any]]] = None,
+        all_day_features: dict[str, dict[str, Any]] | None = None,
         date_str: str = "",
     ):
         """Feature'lardan canonical score + decision üret."""
@@ -152,10 +153,10 @@ class BacktestCanonicalAdapter:
 
     def enrich_features_for_canonical(
         self,
-        calc_features: Dict[str, Any],
+        calc_features: dict[str, Any],
         ticker: str = "",
         date_str: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Calculator feature'larını canonical scoring için hazırla."""
         enriched = dict(calc_features)
         return enriched

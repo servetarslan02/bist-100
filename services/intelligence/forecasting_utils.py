@@ -8,8 +8,9 @@ Contains helper logic previously in forecasting.py to adhere to Single Responsib
 """
 
 import hashlib
-from typing import Dict, List, Any
 from collections import deque
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -17,7 +18,7 @@ logger = structlog.get_logger()
 class NewsImpactEngine:
     """Haber etki motoru."""
 
-    def compute_impact(self, news_event: Dict) -> Dict[str, Any]:
+    def compute_impact(self, news_event: dict) -> dict[str, Any]:
         """Her haber için etki hesapla."""
         sentiment = news_event.get("sentiment", 0)
         importance = news_event.get("importance", 0.5)
@@ -59,7 +60,7 @@ class NewsDuplicationEngine:
     """Haber tekrarı tespiti."""
 
     def __init__(self):
-        self._seen_hashes: Dict[str, deque] = {}  # hash → deque of sources
+        self._seen_hashes: dict[str, deque] = {}  # hash → deque of sources
 
     def is_duplicate(self, title: str, source: str) -> bool:
         """Aynı haber farklı kaynaktan mı geldi?"""
@@ -84,9 +85,9 @@ class EventTimelineEngine:
     """Olay zaman çizelgesi."""
 
     def __init__(self):
-        self._timelines: Dict[str, deque] = {}  # ticker → deque of events
+        self._timelines: dict[str, deque] = {}  # ticker → deque of events
 
-    def add_event(self, ticker: str, event_type: str, data: Dict, timestamp: str):
+    def add_event(self, ticker: str, event_type: str, data: dict, timestamp: str):
         """Olay ekle."""
         if ticker not in self._timelines:
             self._timelines[ticker] = deque(maxlen=100)
@@ -97,11 +98,11 @@ class EventTimelineEngine:
             "timestamp": timestamp,
         })
 
-    def get_timeline(self, ticker: str, limit: int = 20) -> List[Dict]:
+    def get_timeline(self, ticker: str, limit: int = 20) -> list[dict]:
         """Ticker olay zaman çizelgesi."""
         return self._timelines.get(ticker, [])[-limit:]
 
-    def get_correlation(self, ticker: str) -> Dict[str, Any]:
+    def get_correlation(self, ticker: str) -> dict[str, Any]:
         """Olaylar arası korelasyon."""
         timeline = self._timelines.get(ticker, [])
         if len(timeline) < 2:

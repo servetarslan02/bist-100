@@ -12,13 +12,13 @@ ROADMAP v3.0:
 KURAL: Veri = petrol. Kirli veri = kirli petrol.
 """
 
-import orjson
 import os
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import orjson
 import polars as pl
 import requests
 import structlog
@@ -59,7 +59,7 @@ class DataSourceManager:
         end_date: str | None = None,
         period: str = "2y",
         interval: str = "1d",
-        source_priority: list[str] = ["warehouse", "local", "yahoo", "bist"],
+        source_priority: list[str] = None,
     ) -> pl.DataFrame:
         """Hisse verisini getir (cache-aware, multi-source).
 
@@ -75,18 +75,20 @@ class DataSourceManager:
             OHLCV DataFrame
         """
         # Önce cache kontrol et
+        if source_priority is None:
+            source_priority = ["warehouse", "local", "yahoo", "bist"]
         if self.use_cache:
             cached = self._load_from_cache(ticker, interval)
             if cached is not None and not cached.empty:
                 cache_min_date = cached.index.min().strftime('%Y-%m-%d')
                 cache_max_date = cached.index.max().strftime('%Y-%m-%d')
-                
+
                 cache_is_valid = True
                 if start_date and start_date < cache_min_date:
                     cache_is_valid = False
                 if end_date and end_date > cache_max_date:
                     cache_is_valid = False
-                    
+
                 if cache_is_valid:
                     if start_date:
                         cached = cached[cached.index >= start_date]
@@ -198,7 +200,7 @@ class DataSourceManager:
             return None
 
         # TTL kontrolu
-        file_age = datetime.now(timezone.utc) - datetime.fromtimestamp(cache_file.stat().st_mtime)
+        file_age = datetime.now(UTC) - datetime.fromtimestamp(cache_file.stat().st_mtime)
         if file_age > timedelta(hours=self.cache_ttl_hours):
             logger.info("Cache expired", ticker=ticker)
             return None
@@ -550,7 +552,7 @@ class WarehouseSource:
         try:
             conn = duckdb.connect(str(self.db_path))
             tbl = "benchmark_data" if sym in ["XU100", "^XU100", "BIST100"] else "stock_data"
-            
+
             if tbl == "benchmark_data":
                 query = "SELECT date, open as Open, high as High, low as Low, close as Close, volume as Volume FROM benchmark_data"
                 df = pl.read_database(query, conn)

@@ -19,8 +19,9 @@ Endpoint'ler:
 """
 
 import time
-from typing import Dict, Any
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -76,10 +77,10 @@ class SchedulerAPI:
     """
 
     def __init__(self):
-        from .unified_scheduler import unified_scheduler
-        from .job_monitor import job_monitor
         from .daily_workflow import daily_workflow
+        from .job_monitor import job_monitor
         from .learning_scheduler import learning_scheduler
+        from .unified_scheduler import unified_scheduler
 
         self._scheduler = unified_scheduler
         self._monitor = job_monitor
@@ -89,7 +90,7 @@ class SchedulerAPI:
         # Rate limiter — trigger endpoint'i için
         self._trigger_limiter = _RateLimiter(max_tokens=10, refill_rate=10/60)
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Scheduler durumu.
 
         Returns:
@@ -97,7 +98,7 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "scheduler": self._scheduler.get_status(),
                 "workflow": self._workflow.get_status().__dict__,
                 "learning": self._learning.get_status(),
@@ -106,7 +107,7 @@ class SchedulerAPI:
             logger.error("get_status failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def get_jobs(self) -> Dict[str, Any]:
+    def get_jobs(self) -> dict[str, Any]:
         """Job listesi ve konfigürasyonları.
 
         Returns:
@@ -114,7 +115,7 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "total_jobs": len(self._scheduler._configs),
                 "jobs": self._scheduler.get_job_configs(),
             }
@@ -122,7 +123,7 @@ class SchedulerAPI:
             logger.error("get_jobs failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def get_monitor(self, job_type: str = None) -> Dict[str, Any]:
+    def get_monitor(self, job_type: str = None) -> dict[str, Any]:
         """Job monitoring.
 
         Args:
@@ -133,7 +134,7 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "stats": self._monitor.get_stats(job_type),
                 "slow_jobs": self._monitor.get_slow_jobs(),
                 "alerts": self._monitor.get_alerts(limit=20),
@@ -143,7 +144,7 @@ class SchedulerAPI:
             logger.error("get_monitor failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def get_workflow(self) -> Dict[str, Any]:
+    def get_workflow(self) -> dict[str, Any]:
         """Workflow durumu.
 
         Returns:
@@ -151,7 +152,7 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": self._workflow.get_status().__dict__,
                 "phases": self._workflow.get_phases(),
             }
@@ -159,7 +160,7 @@ class SchedulerAPI:
             logger.error("get_workflow failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def get_learning(self) -> Dict[str, Any]:
+    def get_learning(self) -> dict[str, Any]:
         """Learning scheduler durumu.
 
         Returns:
@@ -167,7 +168,7 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": self._learning.get_status(),
                 "pending_jobs": self._learning.get_pending_jobs(),
             }
@@ -175,7 +176,7 @@ class SchedulerAPI:
             logger.error("get_learning failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def get_market_session(self) -> Dict[str, Any]:
+    def get_market_session(self) -> dict[str, Any]:
         """Market session durumu.
 
         Returns:
@@ -183,14 +184,14 @@ class SchedulerAPI:
         """
         try:
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "market": self._scheduler.get_market_session().get_status(),
             }
         except Exception as e:
             logger.error("get_market_session failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    async def get_job_history(self, job_type: str = None, limit: int = 50) -> Dict[str, Any]:
+    async def get_job_history(self, job_type: str = None, limit: int = 50) -> dict[str, Any]:
         """Job geçmişi (DB-backed).
 
         Args:
@@ -205,7 +206,7 @@ class SchedulerAPI:
             memory_history = self._scheduler.get_job_history(limit)
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "db_history": db_history,
                 "memory_history": memory_history,
                 "total": len(db_history) + len(memory_history),
@@ -214,7 +215,7 @@ class SchedulerAPI:
             logger.error("get_job_history failed", error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    async def trigger_job(self, job_type: str) -> Dict[str, Any]:
+    async def trigger_job(self, job_type: str) -> dict[str, Any]:
         """Job'ı manuel olarak tetikle.
 
         Rate limited: dakikada max 10 tetikleme.
@@ -243,14 +244,14 @@ class SchedulerAPI:
                        status=result.get("status"))
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 **result,
             }
         except Exception as e:
             logger.error("trigger_job failed", job_type=job_type, error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def update_interval(self, job_type: str, interval_seconds: int) -> Dict[str, Any]:
+    def update_interval(self, job_type: str, interval_seconds: int) -> dict[str, Any]:
         """Job interval'ını runtime'da güncelle.
 
         Args:
@@ -278,7 +279,7 @@ class SchedulerAPI:
             self._scheduler.update_interval(job_type, interval_seconds)
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": "OK",
                 "job_type": job_type,
                 "old_interval": old_interval,
@@ -288,7 +289,7 @@ class SchedulerAPI:
             logger.error("update_interval failed", job_type=job_type, error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def enable_job(self, job_type: str, enabled: bool = True) -> Dict[str, Any]:
+    def enable_job(self, job_type: str, enabled: bool = True) -> dict[str, Any]:
         """Job'ı aktif/pasif yap.
 
         Args:
@@ -308,7 +309,7 @@ class SchedulerAPI:
             self._scheduler.enable_job(job_type, enabled)
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": "OK",
                 "job_type": job_type,
                 "enabled": enabled,
@@ -317,7 +318,7 @@ class SchedulerAPI:
             logger.error("enable_job failed", job_type=job_type, error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    def update_priority(self, job_type: str, priority: int) -> Dict[str, Any]:
+    def update_priority(self, job_type: str, priority: int) -> dict[str, Any]:
         """Job önceliğini güncelle.
 
         Args:
@@ -344,7 +345,7 @@ class SchedulerAPI:
             self._scheduler.update_priority(job_type, priority)
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": "OK",
                 "job_type": job_type,
                 "old_priority": old_priority,
@@ -354,7 +355,7 @@ class SchedulerAPI:
             logger.error("update_priority failed", job_type=job_type, error=str(e))
             return {"status": "ERROR", "message": str(e)}
 
-    async def get_full_dashboard(self) -> Dict[str, Any]:
+    async def get_full_dashboard(self) -> dict[str, Any]:
         """Tam dashboard verisi.
 
         Returns:
@@ -364,7 +365,7 @@ class SchedulerAPI:
             db_stats = await self._scheduler.get_db_tracker().get_failure_stats(24)
 
             return {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "status": self.get_status(),
                 "jobs": self.get_jobs(),
                 "monitor": self.get_monitor(),

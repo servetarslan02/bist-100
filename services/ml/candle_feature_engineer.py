@@ -6,7 +6,7 @@ ALPHA BIST — Mum Formasyonları Ampirik Başarı Karnesi & ML Özellik Mühend
 modeline beslenecek yüksek değerli özellik matrislerini (Feature Vectors) üretir.
 """
 
-from typing import Dict
+
 import numpy as np
 import polars as pl
 import structlog
@@ -20,9 +20,9 @@ class CandleFeatureEngineer:
     """BIST hisselerinde mum formasyonlarının ampirik başarı analizini ve ML özelliklerini üretir."""
 
     def __init__(self):
-        self.pattern_stats: Dict[str, Dict[str, float]] = {}
+        self.pattern_stats: dict[str, dict[str, float]] = {}
 
-    def compute_empirical_edge_table(self, stock_dict: Dict[str, pl.DataFrame], forward_days: int = 10) -> pl.DataFrame:
+    def compute_empirical_edge_table(self, stock_dict: dict[str, pl.DataFrame], forward_days: int = 10) -> pl.DataFrame:
         """
         Tüm BIST hisselerinin tarihsel verilerini tarayarak her bir formasyonun
         gerçek hayattaki kazanma oranını, ortalama getirisini ve kâr çarpanını hesaplar.
@@ -63,16 +63,16 @@ class CandleFeatureEngineer:
             count = len(grp)
             win_rate = (grp["is_win"].sum() / count) * 100
             avg_ret = grp["fwd_ret"].mean()
-            
+
             wins = grp.filter(pl.col('fwd_ret') > 0)["fwd_ret"]
             losses = abs(grp.filter(pl.col('fwd_ret') < 0)["fwd_ret"])
-            
+
             avg_win = wins.mean() if len(wins) > 0 else 0.0
             avg_loss = losses.mean() if len(losses) > 0 else 1e-9
-            
+
             payoff_ratio = round(avg_win / avg_loss, 2)
             profit_factor = round(wins.sum() / max(losses.sum(), 1e-9), 2)
-            
+
             # Beklenen Değer (Expectancy = (Win% * AvgWin) - (Loss% * AvgLoss))
             expectancy = ((win_rate / 100) * avg_win) - (((100 - win_rate) / 100) * avg_loss)
 
@@ -96,7 +96,7 @@ class CandleFeatureEngineer:
         """
         df_feat = df.copy()
         n = len(df)
-        
+
         # Özellik sütunları
         col_buyer_pressure = np.zeros(n)
         col_candle_score = np.zeros(n)
@@ -111,10 +111,10 @@ class CandleFeatureEngineer:
         for i in range(3, n):
             sub_df = df[max(0, i-30):i+1]
             c_res = candle_engine.analyze_dataframe(sub_df, ticker)
-            
+
             col_buyer_pressure[i] = c_res.buyer_pressure_pct
             col_candle_score[i] = c_res.candle_score
-            
+
             pats = set(c_res.patterns_detected)
             if "BULLISH_ENGULFING" in pats: col_has_engulfing[i] = 1.0
             if "HAMMER_PINBAR" in pats: col_has_hammer[i] = 1.0

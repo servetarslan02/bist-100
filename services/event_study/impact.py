@@ -2,7 +2,8 @@
 
 Event type'a göre özelleştirilmiş ağırlıklarla etki skoru hesaplama.
 """
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -30,8 +31,8 @@ def calculate_event_impact(
     p_value: float,
     volume_change: float = 0.0,
     event_type: str = "DEFAULT",
-    ar_series: Optional[list] = None,
-) -> Dict[str, Any]:
+    ar_series: list | None = None,
+) -> dict[str, Any]:
     """Event type'a göre özelleştirilmiş etki skoru (0-100).
 
     Args:
@@ -109,7 +110,7 @@ def calculate_event_impact(
 
 def calculate_impact_batch(
     events: list,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Birden fazla event için toplu etki analizi.
 
     Args:

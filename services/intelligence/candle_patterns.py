@@ -5,8 +5,8 @@ ALPHA BIST — 10/10 Perfect Candlestick & Price Action Intelligence Engine
 Fair Value Gap (FVG) ve Smart Money Likidite Emilimini tespit eder.
 """
 
-from typing import List, Optional, Tuple
 from dataclasses import dataclass, field
+
 import numpy as np
 import polars as pl
 import structlog
@@ -56,20 +56,20 @@ class CandleMetrics:
 class CandlePatternResult:
     """Mum analizi sonucu."""
     ticker: str
-    patterns_detected: List[str] = field(default_factory=list)
-    primary_pattern: Optional[str] = None
+    patterns_detected: list[str] = field(default_factory=list)
+    primary_pattern: str | None = None
     direction: str = "NEUTRAL"  # BULLISH, BEARISH, NEUTRAL
     candle_score: float = 50.0  # 0 - 100
     buyer_pressure_pct: float = 50.0  # Alıcı gücü %
     seller_pressure_pct: float = 50.0 # Satıcı gücü %
     has_fvg: bool = False
-    fvg_type: Optional[str] = None   # BULLISH_FVG, BEARISH_FVG
-    fvg_gap_range: Tuple[float, float] = (0.0, 0.0)
+    fvg_type: str | None = None   # BULLISH_FVG, BEARISH_FVG
+    fvg_gap_range: tuple[float, float] = (0.0, 0.0)
     support_level: float = 0.0
     resistance_level: float = 0.0
     recommended_stop: float = 0.0
     recommended_target: float = 0.0
-    evidence: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
 
 
 class CandlePatternEngine:
@@ -114,7 +114,7 @@ class CandlePatternEngine:
         c0 = CandleMetrics(opens[-1], highs[-1], lows[-1], closes[-1], vols[-1])
         c1 = CandleMetrics(opens[-2], highs[-2], lows[-2], closes[-2], vols[-2])
         c2 = CandleMetrics(opens[-3], highs[-3], lows[-3], closes[-3], vols[-3]) if n >= 3 else None
-        c3 = CandleMetrics(opens[-4], highs[-4], lows[-4], closes[-4], vols[-4]) if n >= 4 else None
+        CandleMetrics(opens[-4], highs[-4], lows[-4], closes[-4], vols[-4]) if n >= 4 else None
 
         detected = []
         score = 50.0
@@ -142,13 +142,13 @@ class CandlePatternEngine:
         if not c1.is_green and c0.is_green and c0.open <= (c1.close * 1.005) and c0.close >= (c1.open * 0.995):
             detected.append("BULLISH_ENGULFING")
             score += 25
-            evidence.append(f"Yutan Boğa Mumu: Güçlü alıcılar önceki kırmızı mumu tamamen yuttu.")
+            evidence.append("Yutan Boğa Mumu: Güçlü alıcılar önceki kırmızı mumu tamamen yuttu.")
 
         # B) Bearish Engulfing (Yutan Ayı)
         elif c1.is_green and not c0.is_green and c0.open >= (c1.close * 0.995) and c0.close <= (c1.open * 1.005):
             detected.append("BEARISH_ENGULFING")
             score -= 25
-            evidence.append(f"Yutan Ayı Mumu: Satıcılar önceki yeşil mumu tamamen yuttu (Tepe Dönüşü).")
+            evidence.append("Yutan Ayı Mumu: Satıcılar önceki yeşil mumu tamamen yuttu (Tepe Dönüşü).")
 
         # C) Hammer (Çekiç / Dip Pinbar)
         if c0.lower_wick_ratio >= 0.50 and c0.upper_wick_ratio <= 0.20 and c0.body_ratio >= 0.10:
@@ -238,7 +238,7 @@ class CandlePatternEngine:
         resistance = float(np.max(highs[-20:])) if n >= 20 else float(c0.high * 1.05)
 
         # ATR bazlı stop ve hedef
-        tr_list = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1])]
+        tr_list = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1], strict=False)]
         atr = float(np.mean(tr_list[-14:])) if len(tr_list) >= 14 else (p_now * 0.03)
 
         # Skora göre yön belirleme

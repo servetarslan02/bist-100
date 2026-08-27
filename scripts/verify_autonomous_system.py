@@ -3,9 +3,9 @@ ALPHA BIST — TAM OTONOM ÇALIŞMA VE OTOMATİK EĞİTİM DÖNGÜSÜ KANITI
 Kullanıcı müdahalesine gerek kalmadan sistemin tüm seans ve gece döngülerini otonom yönettiğini kanıtlar.
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -21,19 +21,19 @@ async def verify_autonomous():
     # 1. BİRLEŞİK OTONOM ZAMANLAYICI (UNIFIED SCHEDULER)
     # -------------------------------------------------------------
     print("\n[1. KATMAN] Birleşik Otonom Zamanlayıcı (UnifiedScheduler)...")
-    from services.scheduler.unified_scheduler import unified_scheduler, MarketPhase
-    
+    from services.scheduler.unified_scheduler import unified_scheduler
+
     status = unified_scheduler.get_status()
     print(f"  ✓ Otonom Scheduler Durumu: {'AKTİF (ÇALIŞIYOR)' if status.get('running') else 'HAZIR'}")
     print(f"  ✓ Mevcut BIST Seans Fazı : {status.get('current_phase', 'SEANS_KAPALI')}")
     print(f"  ✓ Kayıtlı Otonom Görevler: {len(status.get('jobs', []))} adet otomatik job")
-    
+
     # -------------------------------------------------------------
     # 2. OTONOM ÖĞRENME VE GECE MODEL EĞİTİMİ (LEARNING SCHEDULER)
     # -------------------------------------------------------------
     print("\n[2. KATMAN] Otonom Öğrenme & Gece Modeli Güncelleme (LearningScheduler)...")
     from services.scheduler.learning_scheduler import learning_scheduler
-    
+
     l_status = learning_scheduler.get_status()
     print(f"  ✓ Öğrenme Zamanlayıcısı  : AKTİF (Toplam {l_status.get('total_jobs', 0)} Görev)")
     for job_name, job_cfg in l_status.get("jobs", {}).items():

@@ -10,10 +10,10 @@ Aynı veri birden fazla kaynaktan geldiğinde:
 Kaynak: Monte Carlo Data Quality Testing, Confluent streaming quality
 """
 
-import numpy as np
-from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +26,7 @@ class ReconciledData:
     source: str
     confidence: float          # 0-1
     quality_score: float       # 0-100
-    all_sources: Dict[str, float]
+    all_sources: dict[str, float]
     discrepancy_pct: float     # Kaynaklar arası fark %
     is_consistent: bool
     anomaly_detected: bool
@@ -59,8 +59,8 @@ class CrossSourceReconciliation:
 
     def reconcile_price(
         self,
-        sources: Dict[str, float],
-        timestamp: Optional[datetime] = None,
+        sources: dict[str, float],
+        timestamp: datetime | None = None,
     ) -> ReconciledData:
         """Fiyat kaynaklarını uzlaştır.
 
@@ -125,8 +125,8 @@ class CrossSourceReconciliation:
     def reconcile_multi_field(
         self,
         ticker: str,
-        data_per_source: Dict[str, Dict[str, float]],
-    ) -> Dict[str, ReconciledData]:
+        data_per_source: dict[str, dict[str, float]],
+    ) -> dict[str, ReconciledData]:
         """Çoklu alan uzlaştırması (price, volume, bid, ask)."""
         results = {}
 
@@ -149,9 +149,9 @@ class CrossSourceReconciliation:
 
     def _select_best_source(
         self,
-        sources: Dict[str, float],
+        sources: dict[str, float],
         mean_val: float,
-    ) -> Tuple[str, float]:
+    ) -> tuple[str, float]:
         """En güvenilir kaynağı seç.
 
         Öncelik:
@@ -165,10 +165,7 @@ class CrossSourceReconciliation:
             reliability = self.SOURCE_RELIABILITY.get(source_name, 0.5)
 
             # Ortalamaya yakınlık bonusu
-            if mean_val > 0:
-                closeness = 1 - abs(value - mean_val) / mean_val
-            else:
-                closeness = 1.0
+            closeness = 1 - abs(value - mean_val) / mean_val if mean_val > 0 else 1.0
 
             score = reliability * 0.7 + closeness * 0.3
 
@@ -244,7 +241,7 @@ class CrossSourceReconciliation:
         previous_price: float,
         volatility: float,
         threshold_sigma: float = 4.0,
-    ) -> Tuple[bool, float]:
+    ) -> tuple[bool, float]:
         """Ani fiyat sıçraması tespiti.
 
         Volatiliteye göre normalize edilmiş eşik kullanır.

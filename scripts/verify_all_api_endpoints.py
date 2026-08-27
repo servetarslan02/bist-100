@@ -13,13 +13,12 @@ Kullanım:
     python scripts/verify_all_api_endpoints.py
 """
 
-import sys
-import os
 import importlib
+import os
+import sys
 import traceback
 from pathlib import Path
-from typing import Dict, List, Any, Tuple
-from datetime import datetime
+from typing import Any
 
 # Proje kökünü ekle
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -31,7 +30,7 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-for-verification")
 os.environ.setdefault("SYSTEM_API_KEY", "test-system-api-key")
 
 # Sonuçlar
-results: Dict[str, Dict[str, Any]] = {}
+results: dict[str, dict[str, Any]] = {}
 total_checks = 0
 passed_checks = 0
 failed_checks = 0
@@ -96,9 +95,9 @@ for module_path, name in MODULES:
     try:
         mod = importlib.import_module(module_path)
         if hasattr(mod, "router"):
-            check(f"Import: {name}", "PASS", f"Router mevcut")
+            check(f"Import: {name}", "PASS", "Router mevcut")
         elif module_path.endswith("schemas"):
-            check(f"Import: {name}", "PASS", f"Schema modülü")
+            check(f"Import: {name}", "PASS", "Schema modülü")
         else:
             check(f"Import: {name}", "WARN", "Router bulunamadı")
     except ImportError as e:
@@ -309,8 +308,9 @@ section("4. VERİ KAYNAĞI BAĞLANTI TESTLERİ")
 
 # 4.1 PostgreSQL
 try:
-    from services.core.database import check_db_health
     import asyncio
+
+    from services.core.database import check_db_health
     health = asyncio.run(check_db_health())
     for db_name, status in health.items():
         if status == "healthy":
@@ -324,8 +324,9 @@ except Exception as e:
 
 # 4.2 Redis
 try:
-    from services.core.database import get_redis
     import asyncio
+
+    from services.core.database import get_redis
     redis = asyncio.run(get_redis())
     if redis:
         check("Database: Redis", "PASS", "Bağlantı başarılı")
@@ -338,8 +339,9 @@ except Exception as e:
 
 # 4.3 ClickHouse
 try:
-    from services.core.database import get_clickhouse
     import asyncio
+
+    from services.core.database import get_clickhouse
     ch = asyncio.run(get_clickhouse())
     if ch:
         check("Database: ClickHouse", "PASS", "Bağlantı başarılı")
@@ -542,7 +544,7 @@ for filename, name in cert_files.items():
 
 # mTLS modülü testi
 try:
-    from services.core.mtls import MTLSContext, MTLSConfig
+    from services.core.mtls import MTLSConfig, MTLSContext
     config = MTLSConfig()
     ctx = MTLSContext(config)
     status = ctx.get_status()

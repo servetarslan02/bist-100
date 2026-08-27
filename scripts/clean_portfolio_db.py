@@ -1,5 +1,6 @@
-import duckdb
 import os
+
+import duckdb
 
 db_path = "data/alpha_dev.db"
 if os.path.exists(db_path):

@@ -3,7 +3,6 @@ ALPHA BIST — FAZ 6 Test Suite (KAP Extractor & Sector Chain)
 """
 
 import sys
-import os
 
 
 def test_kap_extractor():

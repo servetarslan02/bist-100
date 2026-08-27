@@ -11,9 +11,10 @@ Makro takvim entegrasyonu — otomatik tetikleme:
 KURAL: Olay öncesi beklenti topla, olay sonrası surprise hesapla.
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -29,9 +30,9 @@ class MacroEvent:
     date: str
     indicator: str
     description: str
-    expected_value: Optional[float] = None
-    actual_value: Optional[float] = None
-    surprise: Optional[float] = None
+    expected_value: float | None = None
+    actual_value: float | None = None
+    surprise: float | None = None
     status: str = "UPCOMING"  # UPCOMING, COMPLETED, ANALYZED
 
 
@@ -61,13 +62,13 @@ class MacroCalendarEngine:
     ]
 
     def __init__(self):
-        self._events: List[MacroEvent] = []
-        self._expectations: Dict[str, float] = {}  # event_id → expected
+        self._events: list[MacroEvent] = []
+        self._expectations: dict[str, float] = {}  # event_id → expected
         self._initialize_events()
 
     def _initialize_events(self):
         """Takvim olaylarını başlat."""
-        year = datetime.now(timezone.utc).year
+        year = datetime.now(UTC).year
 
         # TCMB PPK
         for date_str in self.TCMB_PPK_DATES:
@@ -77,7 +78,7 @@ class MacroCalendarEngine:
                     event_type="TCMB_PPK",
                     date=date_str,
                     indicator="POLICY_RATE",
-                    description=f"TCMB Para Politikası Kurulu Toplantısı",
+                    description="TCMB Para Politikası Kurulu Toplantısı",
                 ))
 
         # FOMC
@@ -88,12 +89,12 @@ class MacroCalendarEngine:
                     event_type="FOMC",
                     date=date_str,
                     indicator="FED_RATE",
-                    description=f"ABD Federal Açık Piyasa Komitesi Toplantısı",
+                    description="ABD Federal Açık Piyasa Komitesi Toplantısı",
                 ))
 
-    def get_upcoming_events(self, days: int = 7) -> List[MacroEvent]:
+    def get_upcoming_events(self, days: int = 7) -> list[MacroEvent]:
         """Yaklaşan makro olayları getir."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now + timedelta(days=days)
 
         upcoming = []
@@ -116,7 +117,7 @@ class MacroCalendarEngine:
 
         logger.info("Expectation registered", event_id=event_id, expected=expected)
 
-    def complete_event(self, event_id: str, actual: float) -> Optional[MacroEvent]:
+    def complete_event(self, event_id: str, actual: float) -> MacroEvent | None:
         """Olay tamamlandı — actual değeri kaydet."""
         for event in self._events:
             if event.event_id == event_id:
@@ -141,13 +142,13 @@ class MacroCalendarEngine:
 
         return None
 
-    def get_pre_event_alert(self, event_id: str) -> Dict[str, Any]:
+    def get_pre_event_alert(self, event_id: str) -> dict[str, Any]:
         """Olay öncesi hazırlık uyarısı."""
         event = next((e for e in self._events if e.event_id == event_id), None)
         if not event:
             return {"error": "Event not found"}
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         event_date = datetime.strptime(event.date, "%Y-%m-%d")
         days_until = (event_date.date() - now.date()).days
 
@@ -163,7 +164,7 @@ class MacroCalendarEngine:
             "preparation_needed": days_until <= macro_config.calendar.pre_event_alert_days,
         }
 
-    def get_post_event_analysis(self, event_id: str) -> Dict[str, Any]:
+    def get_post_event_analysis(self, event_id: str) -> dict[str, Any]:
         """Olay sonrası analiz."""
         event = next((e for e in self._events if e.event_id == event_id), None)
         if not event or event.status != "ANALYZED":
@@ -180,9 +181,9 @@ class MacroCalendarEngine:
             "direction": "HIGHER" if event.surprise > 0 else ("LOWER" if event.surprise < 0 else "IN_LINE"),
         }
 
-    def get_calendar_report(self) -> Dict[str, Any]:
+    def get_calendar_report(self) -> dict[str, Any]:
         """Takvim raporu."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         upcoming = self.get_upcoming_events(days=30)
         completed = [e for e in self._events if e.status == "COMPLETED"]

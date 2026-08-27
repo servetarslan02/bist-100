@@ -11,10 +11,9 @@ SHAP-based feature importance testing:
 """
 
 import sys
-import os
-import numpy as np
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
+import numpy as np
 
 
 def _make_tracker_with_data(n_records=30, n_features=5):
@@ -25,7 +24,7 @@ def _make_tracker_with_data(n_records=30, n_features=5):
     np.random.seed(42)
 
     for i in range(n_records):
-        date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d")
         for j in range(n_features):
             tracker._history.append(
                 type('Record', (), {
@@ -77,7 +76,7 @@ def test_trends_with_data():
     trends = tracker.get_trends(top_n=3)
 
     assert len(trends) > 0
-    for name, trend in trends.items():
+    for _name, trend in trends.items():
         assert hasattr(trend, 'avg_importance')
         assert hasattr(trend, 'trend')
         assert trend.trend in ["increasing", "decreasing", "stable"]
@@ -104,7 +103,7 @@ def test_trends_ordering():
 
     importances = [t.avg_importance for t in trends.values()]
     assert importances == sorted(importances, reverse=True)
-    print(f"✅ Trends ordering: correct")
+    print("✅ Trends ordering: correct")
 
 
 def test_trends_increasing():
@@ -114,7 +113,7 @@ def test_trends_increasing():
     tracker = FeatureImportanceTracker()
     # Artan importance verisi ekle
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         tracker._history.append(
             type('Record', (), {
                 'date': date, 'feature': 'rising_feat',
@@ -135,7 +134,7 @@ def test_trends_decreasing():
 
     tracker = FeatureImportanceTracker()
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         tracker._history.append(
             type('Record', (), {
                 'date': date, 'feature': 'falling_feat',
@@ -173,7 +172,7 @@ def test_regime_importance():
 
     assert len(bull_imp) > 0
     assert len(bear_imp) > 0
-    for name, val in bull_imp.items():
+    for _name, val in bull_imp.items():
         assert isinstance(val, float)
         assert val >= 0
     print(f"✅ Regime importance: BULL={len(bull_imp)}, BEAR={len(bear_imp)}")
@@ -198,7 +197,7 @@ def test_regime_importance_different():
 
     # BULL: feat_0 önemli
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d")
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'feat_0', 'importance': 0.8,
             'regime': 'BULL', 'model_version': 'v1',
@@ -210,7 +209,7 @@ def test_regime_importance_different():
 
     # BEAR: feat_1 önemli
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d")
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'feat_0', 'importance': 0.2,
             'regime': 'BEAR', 'model_version': 'v1',
@@ -247,7 +246,7 @@ def test_feature_selection_low_importance():
 
     tracker = FeatureImportanceTracker()
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         # Düşük importance + azalan trend
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'low_feat',
@@ -273,7 +272,7 @@ def test_feature_selection_custom_threshold():
 
     tracker = FeatureImportanceTracker()
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'med_feat',
             'importance': 0.01 - i * 0.0005,
@@ -324,7 +323,7 @@ def test_report_top_features():
 
     top = report["top_features"]
     assert len(top) > 0
-    for name, info in top.items():
+    for _name, info in top.items():
         assert "importance" in info
         assert "trend" in info
     print(f"✅ Report top features: {len(top)} features")
@@ -341,7 +340,7 @@ def test_trend_volatility():
 
     # Stabil feature
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'stable_feat',
             'importance': 0.5 + np.random.randn() * 0.001,  # Çok düşük volatility
@@ -350,7 +349,7 @@ def test_trend_volatility():
 
     # Volatil feature
     for i in range(20):
-        date = (datetime.now(timezone.utc) - timedelta(days=19-i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=19-i)).strftime("%Y-%m-%d")
         tracker._history.append(type('Record', (), {
             'date': date, 'feature': 'volatile_feat',
             'importance': 0.5 + np.random.randn() * 0.2,  # Yüksek volatility
@@ -401,14 +400,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 4 TEST SONUÇLARI (Feature Importance Tracker)")
+    print("📊 FAZ 4 TEST SONUÇLARI (Feature Importance Tracker)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

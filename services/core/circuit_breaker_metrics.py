@@ -8,9 +8,10 @@ Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.5
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -25,14 +26,14 @@ class CircuitBreakerSnapshot:
     success_count: int
     failure_threshold: int
     recovery_timeout_seconds: int
-    last_failure_time: Optional[str]
-    last_success_time: Optional[str]
+    last_failure_time: str | None
+    last_success_time: str | None
     total_requests: int
     total_failures: int
     total_successes: int
     uptime_percentage: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "state": self.state,
@@ -57,8 +58,8 @@ class CircuitBreakerMetricsCollector:
     """
 
     def __init__(self):
-        self._tracked_breakers: Dict[str, Any] = {}  # name → CircuitBreaker
-        self._history: List[Dict[str, Any]] = []
+        self._tracked_breakers: dict[str, Any] = {}  # name → CircuitBreaker
+        self._history: list[dict[str, Any]] = []
         self._max_history = 1000
 
     def track(self, breaker: Any):
@@ -70,7 +71,7 @@ class CircuitBreakerMetricsCollector:
         """İzlemeyi kaldır."""
         self._tracked_breakers.pop(name, None)
 
-    def get_snapshot(self, name: str) -> Optional[CircuitBreakerSnapshot]:
+    def get_snapshot(self, name: str) -> CircuitBreakerSnapshot | None:
         """Tek circuit breaker snapshot'ı."""
         breaker = self._tracked_breakers.get(name)
         if not breaker:
@@ -99,7 +100,7 @@ class CircuitBreakerMetricsCollector:
             uptime_percentage=uptime,
         )
 
-    def get_all_snapshots(self) -> List[CircuitBreakerSnapshot]:
+    def get_all_snapshots(self) -> list[CircuitBreakerSnapshot]:
         """Tüm circuit breaker snapshot'ları."""
         return [
             self.get_snapshot(name)
@@ -147,10 +148,10 @@ class CircuitBreakerMetricsCollector:
 
         return "\n".join(lines) + "\n"
 
-    def export_json(self) -> Dict[str, Any]:
+    def export_json(self) -> dict[str, Any]:
         """JSON formatında export."""
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "circuit_breakers": {
                 name: self.get_snapshot(name).to_dict()
                 for name in self._tracked_breakers
@@ -175,7 +176,7 @@ class CircuitBreakerMetricsCollector:
     def record_state_change(self, name: str, old_state: str, new_state: str):
         """State change kaydet."""
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "name": name,
             "old_state": old_state,
             "new_state": new_state,
@@ -190,7 +191,7 @@ class CircuitBreakerMetricsCollector:
         logger.info("Circuit breaker state changed",
                     name=name, old=old_state, new=new_state)
 
-    def get_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """State change geçmişi."""
         return self._history[-limit:]
 

@@ -23,16 +23,16 @@ Kullanım:
 
 import asyncio
 import hashlib
-import os
-import duckdb
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
-import structlog
+from typing import Any
 
+import duckdb
 import orjson
+import structlog
 
 logger = structlog.get_logger()
 
@@ -54,7 +54,7 @@ class OfflineQueue:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
         self._default_ttl_hours = default_ttl_hours
-        self._publish_handlers: Dict[str, Callable] = {}
+        self._publish_handlers: dict[str, Callable] = {}
         self._flushing = False
         self._init_db()
 
@@ -102,10 +102,10 @@ class OfflineQueue:
     async def enqueue(
         self,
         event_type: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         subject: str = "alpha.offline",
         priority: int = 5,
-        ttl_hours: Optional[int] = None,
+        ttl_hours: int | None = None,
     ) -> str:
         """Event'i kuyruğa ekle."""
         entry_id = hashlib.md5(
@@ -113,7 +113,7 @@ class OfflineQueue:
         ).hexdigest()[:16]
 
         ttl = ttl_hours or self._default_ttl_hours
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl)
+        expires_at = datetime.now(UTC) + timedelta(hours=ttl)
 
         payload_json = orjson.dumps(payload, default=str).decode()
 
@@ -124,7 +124,7 @@ class OfflineQueue:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             """, (
                 entry_id, event_type, subject, payload_json, priority,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 expires_at.isoformat(),
             ))
             conn.commit()
@@ -216,7 +216,7 @@ class OfflineQueue:
 
     def _cleanup_expired(self):
         """Süresi dolmuş kayıtları temizle."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._connect() as conn:
             cursor = conn.execute(
                 "DELETE FROM offline_queue WHERE expires_at <= ?", (now,)
@@ -227,7 +227,7 @@ class OfflineQueue:
                 self._total_expired += expired
                 logger.debug("Expired offline entries cleaned", count=expired)
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """Kuyruk istatistikleri."""
         with self._connect() as conn:
             total = conn.execute(
@@ -253,7 +253,7 @@ class OfflineQueue:
             "flushing": self._flushing,
         }
 
-    async def get_entries(self, limit: int = 50) -> List[Dict[str, Any]]:
+    async def get_entries(self, limit: int = 50) -> list[dict[str, Any]]:
         """Kuyruktaki kayıtları listele."""
         with self._connect() as conn:
             rows = conn.execute("""

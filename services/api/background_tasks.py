@@ -1,7 +1,6 @@
 """Arka plan görevleri — lifespan'dan ayrılmış."""
 
 import asyncio
-import os
 from datetime import datetime, timedelta, timezone
 
 import structlog
@@ -11,14 +10,14 @@ logger = structlog.get_logger(__name__)
 
 async def radar_cache_refresher():
     """BIST hisselerini TradingView'den çeker ve cache'i günceller.
-    
+
     Seans saatlerinde her 2 saniyede bir gerçek veri çeker.
     Seans kapalıyken daha seyrek kontrol eder.
     """
     await asyncio.sleep(2)
     while True:
         try:
-            from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
+            from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
             current_phase = bist_session_fsm.get_phase()
 
             if current_phase != BISTMarketPhase.CLOSED:
@@ -29,7 +28,7 @@ async def radar_cache_refresher():
 
         except Exception as e:
             logger.warning(f"radar_cache_refresher error: {e}")
-        
+
         # Seans açıkken sık, kapalıyken seyrek güncelle
         try:
             if current_phase != BISTMarketPhase.CLOSED:

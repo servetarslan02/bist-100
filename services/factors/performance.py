@@ -2,7 +2,8 @@
 
 Detaylı performans metrikleri, factor exposure, benchmark karşılaştırma.
 """
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -10,11 +11,11 @@ logger = structlog.get_logger()
 
 
 def track_factor_performance(
-    factor_returns: List[float],
-    benchmark_returns: Optional[List[float]] = None,
+    factor_returns: list[float],
+    benchmark_returns: list[float] | None = None,
     factor_name: str = "unknown",
     risk_free_rate: float = 0.15,  # Türkiye risk-free (yıllık)
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Detaylı faktör performans analizi.
 
     Args:
@@ -66,7 +67,7 @@ def track_factor_performance(
 
     # Skewness ve kurtosis
     try:
-        from scipy.stats import skew, kurtosis
+        from scipy.stats import kurtosis, skew
         if volatility > 1e-10:
             skewness = float(skew(f))
             kurt = float(kurtosis(f))
@@ -106,10 +107,7 @@ def track_factor_performance(
         if n >= 3:
             cov_matrix = np.cov(f, b)
             var_b = cov_matrix[1, 1]
-            if var_b > 1e-10:
-                beta = float(cov_matrix[0, 1] / var_b)
-            else:
-                beta = 0.0
+            beta = float(cov_matrix[0, 1] / var_b) if var_b > 1e-10 else 0.0
         else:
             beta = 0.0
 
@@ -134,9 +132,9 @@ def track_factor_performance(
 
 
 def track_factor_performance_batch(
-    factors_data: Dict[str, List[float]],
-    benchmark_returns: Optional[List[float]] = None,
-) -> Dict[str, Dict[str, Any]]:
+    factors_data: dict[str, list[float]],
+    benchmark_returns: list[float] | None = None,
+) -> dict[str, dict[str, Any]]:
     """Birden fazla faktör için toplu performans analizi.
 
     Args:

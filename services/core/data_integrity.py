@@ -19,10 +19,10 @@ Kullanım:
         await data_integrity_validator.auto_repair(results)
 """
 
-import asyncio
 import time
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Any, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -35,15 +35,15 @@ class DataIntegrityValidator:
     """
 
     def __init__(self):
-        self._last_validation: Optional[float] = None
-        self._validation_history: List[Dict] = []
+        self._last_validation: float | None = None
+        self._validation_history: list[dict] = []
 
     async def validate_on_startup(
         self,
         clickhouse_client=None,
         pg_pool=None,
         redis_client=None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Startup'ta tam doğrulama yap.
 
         Returns:
@@ -51,7 +51,7 @@ class DataIntegrityValidator:
         """
         start_time = time.time()
         results = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "checks": {},
             "has_issues": False,
             "issues": [],
@@ -113,7 +113,7 @@ class DataIntegrityValidator:
 
         return results
 
-    async def _check_clickhouse_gaps(self, client=None) -> Dict[str, Any]:
+    async def _check_clickhouse_gaps(self, client=None) -> dict[str, Any]:
         """ClickHouse'da eksik bar'ları kontrol et."""
         result = {
             "has_gaps": False,
@@ -181,7 +181,7 @@ class DataIntegrityValidator:
 
         return result
 
-    async def _check_postgres_consistency(self, pg_pool=None) -> Dict[str, Any]:
+    async def _check_postgres_consistency(self, pg_pool=None) -> dict[str, Any]:
         """PostgreSQL tutarlılığını kontrol et."""
         result = {
             "has_issues": False,
@@ -229,7 +229,7 @@ class DataIntegrityValidator:
 
         return result
 
-    async def _check_feature_completeness(self, pg_pool=None) -> Dict[str, Any]:
+    async def _check_feature_completeness(self, pg_pool=None) -> dict[str, Any]:
         """Feature hesaplama bütünlüğünü kontrol et."""
         result = {
             "incomplete_tickers": [],
@@ -251,7 +251,7 @@ class DataIntegrityValidator:
                 """)
 
                 result["total_tickers"] = len(rows)
-                cutoff = datetime.now(timezone.utc) - timedelta(hours=6)
+                cutoff = datetime.now(UTC) - timedelta(hours=6)
 
                 for row in rows:
                     if row["last_computed"] and row["last_computed"] < cutoff:
@@ -268,7 +268,7 @@ class DataIntegrityValidator:
 
         return result
 
-    async def _check_redis_health(self, redis_client=None) -> Dict[str, Any]:
+    async def _check_redis_health(self, redis_client=None) -> dict[str, Any]:
         """Redis sağlık durumunu kontrol et."""
         result = {
             "connected": False,
@@ -299,7 +299,7 @@ class DataIntegrityValidator:
 
     async def _check_data_freshness(
         self, clickhouse_client=None, pg_pool=None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Veri tazelik kontrolü — son veri ne kadar eski?"""
         result = {
             "stale_tickers": [],
@@ -308,7 +308,7 @@ class DataIntegrityValidator:
         }
 
         # 2 saatten eski veriler "stale" sayılır
-        stale_threshold = datetime.now(timezone.utc) - timedelta(hours=2)
+        stale_threshold = datetime.now(UTC) - timedelta(hours=2)
 
         if pg_pool:
             try:
@@ -326,7 +326,7 @@ class DataIntegrityValidator:
                                 "ticker": row["ticker"],
                                 "last_update": row["last_ts"].isoformat(),
                                 "age_hours": round(
-                                    (datetime.now(timezone.utc) - row["last_ts"]).total_seconds() / 3600, 1
+                                    (datetime.now(UTC) - row["last_ts"]).total_seconds() / 3600, 1
                                 ),
                             })
                         else:
@@ -338,7 +338,7 @@ class DataIntegrityValidator:
 
         return result
 
-    async def auto_repair(self, validation_results: Dict[str, Any]):
+    async def auto_repair(self, validation_results: dict[str, Any]):
         """Tespit edilen sorunları otomatik onar."""
         logger.info("Starting auto-repair based on validation results")
 
@@ -360,11 +360,11 @@ class DataIntegrityValidator:
             logger.info("Triggering data refresh for stale tickers",
                        count=len(freshness["stale_tickers"]))
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
             "last_validation": datetime.fromtimestamp(
-                self._last_validation, tz=timezone.utc
+                self._last_validation, tz=UTC
             ).isoformat() if self._last_validation else None,
             "validation_count": len(self._validation_history),
         }

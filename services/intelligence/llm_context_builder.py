@@ -15,8 +15,9 @@ paketi hazırlar:
 Bu bağlam paketi llm_agent.py tarafından prompt'a eklenir.
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
 import structlog
 
@@ -31,15 +32,15 @@ class LLMContextBuilder:
 
     def build_news_context(
         self,
-        ticker: Optional[str] = None,
-        sector: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        ticker: str | None = None,
+        sector: str | None = None,
+    ) -> dict[str, Any]:
         """
         Haber analizi için bağlam paketi.
         Eğer ticker biliniyorsa: geçmiş hafıza + features da eklenir.
         """
         context = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context_type": "news",
         }
 
@@ -63,14 +64,14 @@ class LLMContextBuilder:
     def build_kap_context(
         self,
         ticker: str,
-        kap_history: Optional[List[Dict]] = None,
-    ) -> Dict[str, Any]:
+        kap_history: list[dict] | None = None,
+    ) -> dict[str, Any]:
         """
         KAP bildirimi analizi için bağlam paketi.
         Şirketin geçmiş KAP bildirimleri ve LLM analizleri dahil edilir.
         """
         context = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context_type": "kap",
             "ticker": ticker,
         }
@@ -96,17 +97,17 @@ class LLMContextBuilder:
     def build_signal_fusion_context(
         self,
         ticker: str,
-        signals: Dict[str, Any],
-        conflict_details: List[str],
-        features: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        signals: dict[str, Any],
+        conflict_details: list[str],
+        features: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Signal Fusion aşaması için LLM meta-skor bağlamı.
         LLM tüm çelişen sinyalleri + piyasa bağlamını görerek
         kendi 'hakem skoru'nu üretir.
         """
         context = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context_type": "signal_fusion",
             "ticker": ticker,
         }
@@ -152,16 +153,16 @@ class LLMContextBuilder:
     def build_decision_narrative_context(
         self,
         ticker: str,
-        decision: Dict[str, Any],
-        features: Dict[str, Any],
+        decision: dict[str, Any],
+        features: dict[str, Any],
         price: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Nihai karar için Türkçe açıklama bağlamı.
         Tüm kararı + gerekçeyi Türkçe metne çevirmek için kullanılır.
         """
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "context_type": "decision_narrative",
             "ticker": ticker,
             "price": price,
@@ -177,7 +178,7 @@ class LLMContextBuilder:
 
     # ── İç Yardımcı Metodlar ─────────────────────────────────────────────────
 
-    def _fetch_world_state(self) -> Dict[str, Any]:
+    def _fetch_world_state(self) -> dict[str, Any]:
         try:
             from services.intelligence.world_state import world_state_manager
             return world_state_manager.get_state_dict()
@@ -194,7 +195,7 @@ class LLMContextBuilder:
                 "note": "unavailable",
             }
 
-    def _fetch_regime(self) -> Dict[str, Any]:
+    def _fetch_regime(self) -> dict[str, Any]:
         try:
             from services.intelligence.regime import regime_engine
             r = regime_engine.get_regime()
@@ -206,18 +207,18 @@ class LLMContextBuilder:
         except (ImportError, AttributeError):
             return {"regime": "BULL", "confidence": 0.70, "duration_days": 12}
 
-    def _fetch_research_memory(self, ticker: str, limit: int = 5) -> List[Dict]:
+    def _fetch_research_memory(self, ticker: str, limit: int = 5) -> list[dict]:
         try:
             from services.intelligence.research_memory import research_memory
             return research_memory.get_ticker_history(ticker, limit=limit)
         except ImportError:
             return []
 
-    def _fetch_features_summary(self, ticker: str) -> Dict[str, Any]:
+    def _fetch_features_summary(self, ticker: str) -> dict[str, Any]:
         # Feature store'a direkt erişim yok; orchestrator bağlamda sağlar.
         return {"note": "Feature verisi orchestrator tarafından bağlama eklenir."}
 
-    def _fetch_sector_relations(self, sector: str) -> List[Dict]:
+    def _fetch_sector_relations(self, sector: str) -> list[dict]:
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
             entity_id = f"sector_{sector}"
@@ -233,7 +234,7 @@ class LLMContextBuilder:
         except ImportError:
             return []
 
-    def _fetch_spec_score(self, ticker: str) -> Dict[str, Any]:
+    def _fetch_spec_score(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.spec_engine import spec_engine
             result = spec_engine.get_latest(ticker)
@@ -246,7 +247,7 @@ class LLMContextBuilder:
             logger.warning("Error in _fetch_spec_score: (ImportError, AttributeError)", exc_info=True)
         return {"spec_score": None, "category": None}
 
-    def to_prompt_text(self, context: Dict[str, Any]) -> str:
+    def to_prompt_text(self, context: dict[str, Any]) -> str:
         """
         Bağlam nesnesini LLM prompt'una eklenebilecek metin bloğuna dönüştürür.
         JSON olarak eklenir — LLM'in yapılandırılmış veriyi daha iyi okuması için.

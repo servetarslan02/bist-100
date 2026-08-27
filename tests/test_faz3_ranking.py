@@ -15,6 +15,7 @@ Bu dosya, birisi bilinçli olarak ya eski sınıfları geri getirmeye ya da test
 yeni API'ye göre yeniden yazmaya karar verene kadar skip ediliyor.
 """
 import pytest
+
 pytestmark = pytest.mark.skip(
     reason="Eski RankingModel API'sini test ediyor (RuleBasedRanker/LightGBMRanker/"
            "FeatureImportanceTracker/AdjustedMSELoss artık mevcut değil). Güncel "
@@ -22,7 +23,7 @@ pytestmark = pytest.mark.skip(
 )
 
 import sys
-import os
+
 import numpy as np
 
 
@@ -98,7 +99,7 @@ def test_rule_based_ranker():
     for p in predictions:
         assert p.model_source == "rule_based"
     passed += 1
-    print(f"  ✓ Model source: rule_based")
+    print("  ✓ Model source: rule_based")
 
     # 5. Regime etkisi
     bull_preds = ranker.predict(features_list, "BULL")
@@ -117,7 +118,7 @@ def test_rule_based_ranker():
 
 def test_lightgbm_ranker():
     """LightGBM Ranker testleri."""
-    from services.ml.ranking_model import LightGBMRanker, HAS_LGBM
+    from services.ml.ranking_model import HAS_LGBM, LightGBMRanker
 
     passed = 0
     failed = 0
@@ -138,7 +139,7 @@ def test_lightgbm_ranker():
     feature_names = [f"feat_{i}" for i in range(n_features)]
 
     # 1. Eğitim
-    metrics = ranker.train(X, y, groups, feature_names)
+    ranker.train(X, y, groups, feature_names)
     assert ranker._is_trained
     passed += 1
     print(f"  ✓ Training completed: {ranker._model.num_trees()} trees")
@@ -174,7 +175,7 @@ def test_feature_importance_tracker():
     tracker.record({"feat_a": 0.4, "feat_b": 0.4, "feat_c": 0.2}, "BULL")
     tracker.record({"feat_a": 0.2, "feat_b": 0.6, "feat_c": 0.2}, "BEAR")
     passed += 1
-    print(f"  ✓ Recorded 3 importance snapshots")
+    print("  ✓ Recorded 3 importance snapshots")
 
     # 2. Top features
     top = tracker.get_top_features(3)
@@ -201,7 +202,7 @@ def test_feature_importance_tracker():
 
 def test_ranking_model_integration():
     """Ranking Model entegrasyon testi."""
-    from services.ml.ranking_model import ranking_model, HAS_LGBM
+    from services.ml.ranking_model import HAS_LGBM, ranking_model
 
     passed = 0
     failed = 0
@@ -241,17 +242,17 @@ def test_ranking_model_integration():
         y = np.random.rand(n)
         groups = [40] * 5
 
-        metrics = ranking_model.train(X, y, groups, feature_names, "BULL")
+        ranking_model.train(X, y, groups, feature_names, "BULL")
         assert ranking_model._lgbm._is_trained
 
         # LightGBM ile tahmin
         predictions_lgbm = ranking_model.predict(features_list, "BULL")
         assert any(p.model_source == "lightgbm" for p in predictions_lgbm)
         passed += 1
-        print(f"  ✓ LightGBM trained and predicting")
+        print("  ✓ LightGBM trained and predicting")
     else:
         passed += 1
-        print(f"  ✓ LightGBM not available, rule-based works")
+        print("  ✓ LightGBM not available, rule-based works")
 
     return passed, failed
 

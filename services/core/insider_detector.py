@@ -6,10 +6,11 @@ Geliştirmeler:
 - Çoklu pencere analizi (1, 3, 5 gün)
 - Bayes yaklaşımı: prior (sektör ortalaması) + posterior
 """
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
+
 logger = structlog.get_logger()
 
 @dataclass
@@ -31,10 +32,10 @@ class InsiderDetector:
 
     def detect_pre_kap_trade(
         self,
-        trades: List[Dict],
-        kap_events: List[Dict],
-        volume_history: Optional[List[float]] = None,
-    ) -> List[InsiderAlert]:
+        trades: list[dict],
+        kap_events: list[dict],
+        volume_history: list[float] | None = None,
+    ) -> list[InsiderAlert]:
         """KAP açıklaması öncesi olağandışı işlem — Z-score ile.
 
         Args:
@@ -112,10 +113,10 @@ class InsiderDetector:
 
     def detect_price_move_before_kap(
         self,
-        prices: List[float],
+        prices: list[float],
         kap_date_idx: int,
         window: int = 5,
-    ) -> List[InsiderAlert]:
+    ) -> list[InsiderAlert]:
         """KAP öncesi fiyat hareketi anomalisi.
 
         KAP açıklamasından önceki günlerde anormal fiyat hareketi var mı?

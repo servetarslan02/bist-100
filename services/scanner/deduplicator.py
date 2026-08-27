@@ -9,9 +9,10 @@ Deduplication ile sadece değişen veya önemli hisseler taranır.
 """
 
 import time
-from typing import Dict, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -53,7 +54,7 @@ class ScanDeduplicator:
         self._cooldown = cooldown_seconds
         self._event_cooldown = event_cooldown_seconds
         self._max_tracked = max_tracked_tickers
-        self._records: Dict[str, ScanRecord] = {}
+        self._records: dict[str, ScanRecord] = {}
         self._forced_tickers: set = set()  # Force scan bekleyenler
 
         # İstatistikler
@@ -180,7 +181,7 @@ class ScanDeduplicator:
         remaining = self._cooldown - elapsed
         return max(0.0, remaining)
 
-    def get_last_scan_info(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def get_last_scan_info(self, ticker: str) -> dict[str, Any] | None:
         """Son tarama bilgisini al.
 
         Args:
@@ -196,7 +197,7 @@ class ScanDeduplicator:
         return {
             "ticker": record.ticker,
             "last_scan_time": datetime.fromtimestamp(
-                record.last_scan_time, tz=timezone.utc
+                record.last_scan_time, tz=UTC
             ).isoformat(),
             "scan_count": record.scan_count,
             "last_score": record.last_score,
@@ -215,7 +216,7 @@ class ScanDeduplicator:
         self._cooldown = seconds
         logger.info("Cooldown changed", old=f"{old}s", new=f"{seconds}s")
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler.
 
         Returns:
@@ -238,7 +239,7 @@ class ScanDeduplicator:
             "block_rate_pct": round(block_rate, 1),
         }
 
-    def get_all_tracked(self) -> Dict[str, Dict]:
+    def get_all_tracked(self) -> dict[str, dict]:
         """Tüm takip edilen hisseleri al.
 
         Returns:

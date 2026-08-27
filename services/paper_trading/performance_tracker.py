@@ -18,8 +18,9 @@ Mevcut services.backtest.engine.BacktestMetrics'i extend eder.
 Gunluk incremental hesaplama yapar (tum veriyi her gun bastan hesaplamaz).
 """
 
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Optional, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +31,7 @@ class PerformanceTracker:
 
     def __init__(self, state_store=None):
         self._state_store = state_store
-        self._daily_perf_cache: List[Dict[str, Any]] = []
+        self._daily_perf_cache: list[dict[str, Any]] = []
 
     def compute_daily_performance(
         self,
@@ -38,12 +39,12 @@ class PerformanceTracker:
         portfolio_value: float,
         cash: float,
         initial_capital: float,
-        trades_today: List[Dict[str, Any]],
-        orders_today: List[Dict[str, Any]],
+        trades_today: list[dict[str, Any]],
+        orders_today: list[dict[str, Any]],
         num_positions: int,
         benchmark_return_pct: float = 0.0,
-        prev_portfolio_value: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        prev_portfolio_value: float | None = None,
+    ) -> dict[str, Any]:
         """Gunluk performans hesapla."""
 
         # Daily return
@@ -95,7 +96,7 @@ class PerformanceTracker:
             self._daily_perf_cache = self._daily_perf_cache[-1000:]
         return perf
 
-    def compute_full_metrics(self, equity_curve: List[Dict[str, Any]], trades: List[Dict[str, Any]], benchmark_returns: Optional[List[float]] = None) -> Dict[str, Any]:
+    def compute_full_metrics(self, equity_curve: list[dict[str, Any]], trades: list[dict[str, Any]], benchmark_returns: list[float] | None = None) -> dict[str, Any]:
         """Tum metrikleri hesapla."""
         if not equity_curve:
             return {"error": "No equity curve data"}
@@ -183,7 +184,7 @@ class PerformanceTracker:
             "num_days": n_days,
         }
 
-    def compute_ic(self, predictions: List[float], actuals: List[float]) -> float:
+    def compute_ic(self, predictions: list[float], actuals: list[float]) -> float:
         """Information Coefficient (Spearman rank correlation)."""
         if len(predictions) < 2 or len(predictions) != len(actuals):
             return 0.0
@@ -194,7 +195,7 @@ class PerformanceTracker:
         except Exception:
             return 0.0
 
-    def compute_icir(self, ic_series: List[float]) -> float:
+    def compute_icir(self, ic_series: list[float]) -> float:
         """IC Information Ratio = mean(IC) / std(IC)."""
         if len(ic_series) < 2:
             return 0.0
@@ -203,7 +204,7 @@ class PerformanceTracker:
         std_ic = np.std(arr, ddof=1)
         return float(mean_ic / std_ic) if std_ic > 0 else 0.0
 
-    def compute_top_k_spread(self, returns: Dict[str, float], k: int = 5) -> float:
+    def compute_top_k_spread(self, returns: dict[str, float], k: int = 5) -> float:
         """Top K - Bottom K getiri farki."""
         if len(returns) < k * 2:
             return 0.0
@@ -225,7 +226,7 @@ class PerformanceTracker:
             return 0.0
         return float(np.mean(returns) / np.std(downside) * np.sqrt(252))
 
-    def _max_drawdown(self, equities: List[float]) -> float:
+    def _max_drawdown(self, equities: list[float]) -> float:
         peak = equities[0]
         max_dd = 0.0
         for e in equities:
@@ -253,7 +254,7 @@ class PerformanceTracker:
                 max_dd = dd
         return max_dd
 
-    def _compute_daily_turnover(self, orders: List[Dict[str, Any]], portfolio_value: float) -> float:
+    def _compute_daily_turnover(self, orders: list[dict[str, Any]], portfolio_value: float) -> float:
         if portfolio_value <= 0:
             return 0.0
         total_value = sum(o.get("quantity", 0) * o.get("execution_price", 0) for o in orders if o.get("execution_price", 0) > 0)
@@ -269,7 +270,7 @@ class PerformanceTracker:
         corr = np.corrcoef(returns, benchmark)[0, 1] if len(returns) > 1 else 0
         return alpha, beta, corr if not np.isnan(corr) else 0
 
-    def load_history(self) -> List[Dict[str, Any]]:
+    def load_history(self) -> list[dict[str, Any]]:
         if self._state_store:
             return self._state_store.load_daily_performance()
         return []

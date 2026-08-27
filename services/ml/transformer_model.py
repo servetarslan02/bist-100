@@ -4,9 +4,10 @@ PyTorch Transformer — multi-head attention, positional encoding,
 multi-horizon prediction, proper training loop.
 """
 import os
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -67,19 +68,19 @@ class StockTransformer:
     - Proper temporal train/val split
     """
 
-    def __init__(self, config: Optional[TransformerConfig] = None):
+    def __init__(self, config: TransformerConfig | None = None):
         self._config = config or TransformerConfig()
         self._model = None
-        self._training_history: List[Dict[str, Any]] = []
+        self._training_history: list[dict[str, Any]] = []
         self._is_trained = False
 
     def train(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-    ) -> Dict[str, Any]:
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+    ) -> dict[str, Any]:
         """Transformer eğit."""
         try:
             import torch
@@ -198,7 +199,7 @@ class StockTransformer:
         except Exception:
             return np.zeros(len(X))
 
-    def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Sequence formatına dönüştür."""
         if len(X) < self._config.sequence_length:
             return np.array([]), np.array([])

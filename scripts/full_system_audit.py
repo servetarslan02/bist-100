@@ -5,20 +5,21 @@ ALPHA BIST — FULL SYSTEM FORENSIC AUDIT
 Canlı verilerle uçtan uca test.
 """
 
-import sys
 import os
-import orjson
+import sys
 import traceback
-import numpy as np
-import polars as pl
-from datetime import datetime, timezone, timedelta, date
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
+
+import numpy as np
+import orjson
+import polars as pl
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import structlog
+
 structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
@@ -46,12 +47,12 @@ class AuditIssue:
 class ModuleResult:
     name: str
     status: str  # PASS, FAIL, CONDITIONAL PASS
-    issues: List[AuditIssue] = field(default_factory=list)
+    issues: list[AuditIssue] = field(default_factory=list)
     details: str = ""
 
 class AuditReport:
     def __init__(self):
-        self.modules: Dict[str, ModuleResult] = {}
+        self.modules: dict[str, ModuleResult] = {}
         self.system_status = "PASS"
         self.critical_bugs = []
         self.logic_bugs = []
@@ -62,7 +63,7 @@ class AuditReport:
         self.performance_issues = []
         self.missing_features = []
 
-    def add_module(self, name: str, status: str, issues: List[AuditIssue] = None, details: str = ""):
+    def add_module(self, name: str, status: str, issues: list[AuditIssue] = None, details: str = ""):
         self.modules[name] = ModuleResult(name=name, status=status, issues=issues or [], details=details)
         if status == "FAIL":
             self.system_status = "FAIL"
@@ -212,7 +213,7 @@ def audit_live_data(report: AuditReport):
                         root_cause=f"{ticker}: {col}'da {null_counts[col]} null değer",
                         evidence=f"df['{col}'].isnull().sum() = {null_counts[col]}",
                         affected_module="Data",
-                        recommended_fix=f"Null değerleri forward-fill veya interpolasyon ile doldur"
+                        recommended_fix="Null değerleri forward-fill veya interpolasyon ile doldur"
                     ))
 
             # OHLC mantık kontrolü
@@ -379,7 +380,7 @@ def audit_data_quality(report: AuditReport):
                 recommended_fix="Aşırı anomali eşiğini düşür"
             ))
         else:
-            details_lines.append(f"  ✅ Extreme anomaly: correctly rejected")
+            details_lines.append("  ✅ Extreme anomaly: correctly rejected")
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Data Quality", status, issues, "\n".join(details_lines))
@@ -528,13 +529,13 @@ def audit_features(report: AuditReport):
     details_lines = []
 
     try:
-        from services.features.calculator import feature_calculator
         from services.core.tradability_mask import TradabilityMask
+        from services.features.calculator import feature_calculator
 
         # Sentetik veri oluştur (bilinen sonuçlarla)
         np.random.seed(42)
         n = 120
-        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
+        pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         close = 100 + np.cumsum(np.random.randn(n) * 0.5)
         high = close + np.abs(np.random.randn(n) * 0.5)
         low = close - np.abs(np.random.randn(n) * 0.5)
@@ -619,7 +620,7 @@ def audit_features(report: AuditReport):
                             recommended_fix="RSI hesaplama formülünü düzelt"
                         ))
                     else:
-                        details_lines.append(f"  ✅ RSI range: [0, 100] ✓")
+                        details_lines.append("  ✅ RSI range: [0, 100] ✓")
 
         # MACD doğrulama
         if 'macd' in features and 'macd_signal' in features:
@@ -706,16 +707,15 @@ def audit_cross_sectional(report: AuditReport):
 
                 # Rank değerleri 0-1 aralığında olmalı
                 for name, val in rank_feats.items():
-                    if isinstance(val, (int, float)):
-                        if val < 0 or val > 1:
-                            if "percentile" in name.lower() or "rank" in name.lower():
-                                issues.append(AuditIssue(
-                                    module="Cross Sectional", severity="P1", category="LOGIC BUG",
-                                    root_cause=f"{name} 0-1 aralığında değil",
-                                    evidence=f"{name}={val}",
-                                    affected_module="Cross Sectional",
-                                    recommended_fix=f"{name} hesaplama mantığını düzelt"
-                                ))
+                    if isinstance(val, (int, float)) and (val < 0 or val > 1):
+                        if "percentile" in name.lower() or "rank" in name.lower():
+                            issues.append(AuditIssue(
+                                module="Cross Sectional", severity="P1", category="LOGIC BUG",
+                                root_cause=f"{name} 0-1 aralığında değil",
+                                evidence=f"{name}={val}",
+                                affected_module="Cross Sectional",
+                                recommended_fix=f"{name} hesaplama mantığını düzelt"
+                            ))
             else:
                 details_lines.append("  ⚠️ Rank features hesaplanamadı")
         else:
@@ -780,7 +780,7 @@ def audit_regime(report: AuditReport):
         # BULL market sentetik veri
         np.random.seed(42)
         n = 120
-        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
+        pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         bull_close = 100 + np.arange(n) * 0.5 + np.random.randn(n) * 0.5
         bull_df = pl.DataFrame({
             'Open': bull_close - 0.5, 'High': bull_close + 1,
@@ -895,7 +895,7 @@ def audit_ranking(report: AuditReport):
 
             # Sıralama doğruluğu: A > B > C olmalı
             rank_map = {s.ticker: s.rank for s in result.scores}
-            score_map = {s.ticker: s.score for s in result.scores}
+            {s.ticker: s.score for s in result.scores}
 
             # Score yönünü tespit et (düşük mü yüksek mi iyi?)
             if len(result.scores) >= 3:
@@ -906,7 +906,7 @@ def audit_ranking(report: AuditReport):
 
                 # Eğer A en düşük score'a sahipse (düşük = iyi)
                 if rank_map.get("A", 999) < rank_map.get("C", 999):
-                    details_lines.append(f"  ✅ Sıralama doğru: A > B > C (rank)")
+                    details_lines.append("  ✅ Sıralama doğru: A > B > C (rank)")
                 else:
                     issues.append(AuditIssue(
                         module="Ranking", severity="P0", category="CRITICAL BUG",
@@ -967,20 +967,20 @@ def audit_calibration(report: AuditReport):
                         recommended_fix="Calibration output'unu [0,1] aralığına clip et"
                     ))
             else:
-                details_lines.append(f"  ⚠️ calibrate fonksiyonu yok veya None döndürdü")
+                details_lines.append("  ⚠️ calibrate fonksiyonu yok veya None döndürdü")
 
         # Cold start testi
         # Henüz trade gerçekleşmeden calibration kullanıyor mu?
         if hasattr(calibrator, '_fitted'):
             if calibrator._fitted:
-                details_lines.append(f"  Calibrator fitted: True")
+                details_lines.append("  Calibrator fitted: True")
             else:
-                details_lines.append(f"  Calibrator fitted: False (cold start)")
+                details_lines.append("  Calibrator fitted: False (cold start)")
 
         # add_trade testi
         if hasattr(calibrator, 'add_trade'):
             calibrator.add_trade(score=2.0, return_pct=5.0, ticker="TEST", date="2024-01-01")
-            details_lines.append(f"  ✅ add_trade çalıştı")
+            details_lines.append("  ✅ add_trade çalıştı")
 
             # Trade gerçekleşmeden kullanma kontrolü
             if hasattr(calibrator, '_trade_history'):
@@ -1076,7 +1076,7 @@ def audit_position_sizing(report: AuditReport):
                     recommended_fix="Max position clamp'ini uygula"
                 ))
         else:
-            details_lines.append(f"  ⚠️ Position sizing boş sonuç döndürdü")
+            details_lines.append("  ⚠️ Position sizing boş sonuç döndürdü")
 
         # Negative expectation testi (kelly <= 0 → NO TRADE)
         bad_opportunities = [{
@@ -1105,7 +1105,7 @@ def audit_position_sizing(report: AuditReport):
                         recommended_fix="Kelly <= 0 ise NO TRADE uygula"
                     ))
         else:
-            details_lines.append(f"  ✅ Negative expectation: correctly rejected (NO TRADE)")
+            details_lines.append("  ✅ Negative expectation: correctly rejected (NO TRADE)")
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
         report.add_module("Position Sizing", status, issues, "\n".join(details_lines))
@@ -1365,7 +1365,7 @@ def audit_performance(report: AuditReport):
                 recommended_fix="CAGR formülünü düzelt: (1+total_return)^(1/years)-1"
             ))
         else:
-            details_lines.append(f"  ✅ CAGR ≠ Total Return ✓")
+            details_lines.append("  ✅ CAGR ≠ Total Return ✓")
 
         # Metrik doğruluğu
         if sharpe < -5 or sharpe > 5:
@@ -1420,7 +1420,7 @@ def audit_benchmark(report: AuditReport):
             if xu100_data.index.tz is not None:
                 details_lines.append(f"  Timezone: {xu100_data.index.tz}")
             else:
-                details_lines.append(f"  Timezone: Naive (timezone yok)")
+                details_lines.append("  Timezone: Naive (timezone yok)")
 
             # Duplicate kontrolü
             if xu100_data.index.duplicated().any():
@@ -1535,7 +1535,7 @@ def audit_quality_gate(report: AuditReport):
 
             # Champion lifecycle
             if hasattr(reg, 'champion_version') and reg.champion_version:
-                details_lines.append(f"  ✅ Champion model kayıtlı")
+                details_lines.append("  ✅ Champion model kayıtlı")
             else:
                 issues.append(AuditIssue(
                     module="Quality Gate", severity="P2", category="MISSING FEATURE",
@@ -1637,17 +1637,17 @@ def audit_fail_safe(report: AuditReport):
 
         # Recovery kontrolü
         from services.core.recovery import StartupRecovery
-        sr = StartupRecovery()
+        StartupRecovery()
         details_lines.append("  ✅ StartupRecovery modülü mevcut")
 
         # State recovery
         from services.core.state_recovery import StateRecovery
-        sr = StateRecovery()
+        StateRecovery()
         details_lines.append("  ✅ State recovery modülü mevcut")
 
         # Streaming anomaly
         from services.core.streaming_anomaly import StreamingAnomalyDetector
-        sa = StreamingAnomalyDetector()
+        StreamingAnomalyDetector()
         details_lines.append("  ✅ Streaming anomaly detector mevcut")
 
         # Boş veri testi
@@ -1731,7 +1731,7 @@ def audit_survivorship(report: AuditReport):
 
         # Corporate actions
         from services.ingestion.corporate_actions import CorporateActionsHandler
-        ca = CorporateActionsHandler()
+        CorporateActionsHandler()
         details_lines.append("  ✅ Corporate actions modülü mevcut")
 
         status = "FAIL" if any(i.severity == "P0" for i in issues) else "CONDITIONAL PASS" if issues else "PASS"
@@ -1763,19 +1763,19 @@ def audit_lookahead(report: AuditReport):
         from services.features.incremental_state import IncrementalStateManager
 
         # Incremental state kontrolü
-        inc = IncrementalStateManager()
+        IncrementalStateManager()
         details_lines.append("  ✅ IncrementalStateManager modülü mevcut")
 
         # PIT store kontrolü
         from services.core.pit_store import PointInTimeStore
-        pit = PointInTimeStore()
+        PointInTimeStore()
         details_lines.append("  ✅ PointInTimeStore modülü mevcut")
 
         # Future data injection testi
         # Sentetik veri oluştur
         np.random.seed(42)
         n = 60
-        dates = pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
+        pl.date_range(datetime.now() - timedelta(days=n*2), datetime.now(), timedelta(days=1), eager=True).tail(n)
         close = 100 + np.cumsum(np.random.randn(n) * 0.5)
         df = pl.DataFrame({
             'Open': close - 0.5, 'High': close + 1,
@@ -1846,14 +1846,14 @@ def audit_security(report: AuditReport):
     details_lines = []
 
     try:
-        from services.core.security import SafetyGovernance, AuthenticationService
-        sg = SafetyGovernance()
+        from services.core.security import AuthenticationService, SafetyGovernance
+        SafetyGovernance()
         details_lines.append("  ✅ SafetyGovernance modülü mevcut")
-        auth = AuthenticationService()
+        AuthenticationService()
         details_lines.append("  ✅ AuthenticationService modülü mevcut")
 
         from services.core.audit_log import AuditLog
-        al = AuditLog()
+        AuditLog()
         details_lines.append("  ✅ AuditLog modülü mevcut")
 
         # Config security
@@ -1868,7 +1868,7 @@ def audit_security(report: AuditReport):
                     recommended_fix="Güçlü secret_key tanımla"
                 ))
         else:
-            details_lines.append(f"  Ortam: development (security check relaxed)")
+            details_lines.append("  Ortam: development (security check relaxed)")
 
         # Immutable audit
         details_lines.append("  ⚠️ Immutable audit: Manuel doğrulama gerekli (append-only)")
@@ -1961,7 +1961,7 @@ def main():
     }
     with open("reports/full_audit_report.json", "w") as f:
         f.write(orjson.dumps(report_data, option=orjson.OPT_INDENT_2, default=str).decode())
-    print(f"\n📄 JSON rapor: reports/full_audit_report.json")
+    print("\n📄 JSON rapor: reports/full_audit_report.json")
 
     return report
 

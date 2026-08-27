@@ -15,7 +15,8 @@ import polars as pl
 import pytest
 
 from services.backtest.multi_asset_engine import (
-    MultiAssetBacktestEngine, MultiAssetConfig,
+    MultiAssetBacktestEngine,
+    MultiAssetConfig,
 )
 
 

@@ -7,10 +7,11 @@ Entity → Event → Importance → World State → Impact → Affected Stocks
 Bu zincir eksiksiz olmalı.
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
+
 from services.intelligence.llm_agent import llm_agent
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ class ProcessedNews:
 
     # NLP çıktıları
     language: str = "tr"
-    entities: List[Dict] = field(default_factory=list)
+    entities: list[dict] = field(default_factory=list)
     event_type: str = ""
     sentiment: float = 0.0
     importance: float = 0.0
@@ -35,24 +36,24 @@ class ProcessedNews:
     credibility: float = 0.5
 
     # Etki
-    affected_tickers: List[str] = field(default_factory=list)
-    affected_sectors: List[str] = field(default_factory=list)
-    world_state_delta: Dict[str, float] = field(default_factory=dict)
-    propagation_chain: List[Dict] = field(default_factory=list)
+    affected_tickers: list[str] = field(default_factory=list)
+    affected_sectors: list[str] = field(default_factory=list)
+    world_state_delta: dict[str, float] = field(default_factory=dict)
+    propagation_chain: list[dict] = field(default_factory=list)
 
     # LLM Ajan çıktıları
     key_insight: str = ""
     surprise_score: float = 0.5
     uncertainty_score: float = 0.3
-    regime_override: Optional[str] = None
-    tool_calls_made: List[str] = field(default_factory=list)
+    regime_override: str | None = None
+    tool_calls_made: list[str] = field(default_factory=list)
     is_llm_analyzed: bool = False
 
 
 class NewsPipeline:
     """Haber işleme pipeline'ı (LLM Agent tabanlı — RAG + WorldState + KnowledgeGraph)."""
 
-    def process(self, raw_news: Dict) -> ProcessedNews:
+    def process(self, raw_news: dict) -> ProcessedNews:
         """
         Ham haberi LLM Agent ile işleyerek yapılandırılmış veriye dönüştür.
 
@@ -89,7 +90,7 @@ class NewsPipeline:
 
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             source=raw_news.get("source", "unknown"),
             title=title,
             body=body,
@@ -110,17 +111,17 @@ class NewsPipeline:
             is_llm_analyzed=True,
         )
 
-    def _build_empty(self, raw_news: Dict) -> ProcessedNews:
+    def _build_empty(self, raw_news: dict) -> ProcessedNews:
         return ProcessedNews(
             news_id=raw_news.get("id", ""),
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             source=raw_news.get("source", "unknown"),
             title="",
         )
 
     def _compute_world_delta(
         self, event_type: str, sentiment: float, importance: float
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """World state değişimini hesapla."""
         delta = {}
 

@@ -17,11 +17,12 @@ Referanslar:
 - "Advances in Financial Machine Learning" (de Prado) - Ch.7
 """
 
-import numpy as np
-import polars as pl
-from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
+import numpy as np
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -33,10 +34,10 @@ class DelistingEvent:
     ticker: str
     delisting_date: datetime
     reason: str  # bankruptcy | merger | acquisition | voluntary | regulatory
-    final_price: Optional[float] = None
-    recovery_rate: Optional[float] = None  # İflas durumunda geri kazanım oranı
+    final_price: float | None = None
+    recovery_rate: float | None = None  # İflas durumunda geri kazanım oranı
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "delisting_date": self.delisting_date.isoformat(),
@@ -50,13 +51,13 @@ class DelistingEvent:
 class UniverseSnapshot:
     """Belirli bir tarihteki evren (universe) durumu."""
     date: datetime
-    active_tickers: Set[str]
-    delisted_tickers: Set[str]
+    active_tickers: set[str]
+    delisted_tickers: set[str]
     total_count: int
     active_count: int
     delisted_count: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date.isoformat(),
             "active_count": self.active_count,
@@ -74,9 +75,9 @@ class SurvivorshipBiasHandler:
     """
 
     def __init__(self):
-        self._delisting_events: List[DelistingEvent] = []
-        self._delisted_tickers: Dict[str, datetime] = {}  # ticker → delist date
-        self._active_tickers: Set[str] = set()
+        self._delisting_events: list[DelistingEvent] = []
+        self._delisted_tickers: dict[str, datetime] = {}  # ticker → delist date
+        self._active_tickers: set[str] = set()
 
     def register_delisting(self, event: DelistingEvent):
         """Delisting olayı kaydet."""
@@ -89,20 +90,20 @@ class SurvivorshipBiasHandler:
                     date=event.delisting_date.isoformat(),
                     reason=event.reason)
 
-    def register_delistings_batch(self, events: List[DelistingEvent]):
+    def register_delistings_batch(self, events: list[DelistingEvent]):
         """Toplu delisting kaydı."""
         for event in events:
             self.register_delisting(event)
 
-    def set_active_universe(self, tickers: Set[str]):
+    def set_active_universe(self, tickers: set[str]):
         """Aktif evreni tanımla (bugünkü hisseler)."""
         self._active_tickers = tickers
 
     def get_universe_at_date(
         self,
         target_date: datetime,
-        all_known_tickers: Set[str],
-    ) -> Set[str]:
+        all_known_tickers: set[str],
+    ) -> set[str]:
         """
         Belirli bir tarihteki evreni hesapla.
 
@@ -134,7 +135,7 @@ class SurvivorshipBiasHandler:
     def apply_survivorship_correction(
         self,
         returns: pl.DataFrame,
-        delistings: List[DelistingEvent],
+        delistings: list[DelistingEvent],
         ticker_col: str = "ticker",
         date_col: str = "date",
         return_col: str = "return",
@@ -182,7 +183,7 @@ class SurvivorshipBiasHandler:
         self,
         full_returns: pl.DataFrame,
         survivor_only_returns: pl.DataFrame,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         Survivorship bias büyüklüğünü hesapla.
 
@@ -220,9 +221,9 @@ class SurvivorshipBiasHandler:
         self,
         start_date: datetime,
         end_date: datetime,
-        all_known_tickers: Set[str],
+        all_known_tickers: set[str],
         interval_days: int = 30,
-    ) -> List[UniverseSnapshot]:
+    ) -> list[UniverseSnapshot]:
         """
         Dönem boyunca evren değişim raporu.
 
@@ -249,7 +250,7 @@ class SurvivorshipBiasHandler:
 
         return snapshots
 
-    def get_delisted_tickers(self, before_date: Optional[datetime] = None) -> List[DelistingEvent]:
+    def get_delisted_tickers(self, before_date: datetime | None = None) -> list[DelistingEvent]:
         """Belirli bir tarihten önce delist edilen hisseleri döndürür."""
         if before_date is None:
             return self._delisting_events.copy()
@@ -265,7 +266,7 @@ class BISTSurvivorshipDataLoader:
     """
 
     @staticmethod
-    def load_from_csv(filepath: str) -> List[DelistingEvent]:
+    def load_from_csv(filepath: str) -> list[DelistingEvent]:
         """CSV'den delisting verisi yükle."""
         df = pl.read_csv(filepath)
         events = []
@@ -280,7 +281,7 @@ class BISTSurvivorshipDataLoader:
         return events
 
     @staticmethod
-    def create_known_bist_delistings() -> List[DelistingEvent]:
+    def create_known_bist_delistings() -> list[DelistingEvent]:
         """
         Bilinen BIST delisting'lerini oluştur.
 

@@ -2,7 +2,8 @@
 
 Faktörler arası korelasyon, çoklu doğrusallık tespiti, diversifikasyon skoru.
 """
-from typing import Dict, Any, List
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -10,8 +11,8 @@ logger = structlog.get_logger()
 
 
 def calculate_factor_correlation(
-    factor_returns: Dict[str, List[float]],
-) -> Dict[str, Any]:
+    factor_returns: dict[str, list[float]],
+) -> dict[str, Any]:
     """Faktörler arası korelasyon matrisi.
 
     Args:
@@ -94,10 +95,10 @@ def calculate_factor_correlation(
 
 
 def calculate_rolling_correlation(
-    factor1_returns: List[float],
-    factor2_returns: List[float],
+    factor1_returns: list[float],
+    factor2_returns: list[float],
     window: int = 60,
-) -> List[float]:
+) -> list[float]:
     """Rolling korelasyon serisi.
 
     Args:

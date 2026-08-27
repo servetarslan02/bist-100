@@ -11,12 +11,13 @@ Signal -> Order Simulation:
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from services.core.bist_tick_size import round_to_bist_tick
-from services.paper_trading.market_microstructure_engine import market_microstructure, MarketMicrostructureEngine
+from services.paper_trading.market_microstructure_engine import MarketMicrostructureEngine, market_microstructure
 from services.paper_trading.synthetic_liquidity import LiquidityScenario, SyntheticOrderBookBuilder
 
 logger = structlog.get_logger()
@@ -33,7 +34,7 @@ class PaperExecutionEngine:
         min_commission: float = 1.0,
         slippage_base_pct: float = 0.05,      # %0.05 base
         slippage_max_pct: float = 0.5,        # %0.5 max
-        microstructure: Optional[MarketMicrostructureEngine] = None,
+        microstructure: MarketMicrostructureEngine | None = None,
     ):
         self.commission_rate = commission_rate
         self.exchange_fee_rate = exchange_fee_rate
@@ -44,7 +45,7 @@ class PaperExecutionEngine:
         self._daily_turnover_value: float = 0.0
         self.microstructure = microstructure or market_microstructure
 
-    def execute_call_auction(self, ticker: str, reference_price: float = 0.0) -> Dict[str, Any]:
+    def execute_call_auction(self, ticker: str, reference_price: float = 0.0) -> dict[str, Any]:
         """Açık artırma havuzundaki emirleri BIST denge fiyatıyla eşleştirir."""
         return self.microstructure.execute_call_auction(ticker=ticker, reference_price=reference_price)
 
@@ -62,10 +63,10 @@ class PaperExecutionEngine:
             "slippage_pct": 0.0,
             "status": "CREATED",
             "rejection_reason": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
-    def _validate_order(self, ticker, date, side, is_halted, market_phase, order_type, limit_price) -> Optional[str]:
+    def _validate_order(self, ticker, date, side, is_halted, market_phase, order_type, limit_price) -> str | None:
         """Sipariş validasyonu. Reddedilirse red nedeni döner, None ise geçti."""
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry as kap_registry
 
@@ -85,7 +86,7 @@ class PaperExecutionEngine:
 
         return None
 
-    def _check_bist_price_limits(self, ticker, side, execution_price, ref_price, price_limit_pct) -> Optional[str]:
+    def _check_bist_price_limits(self, ticker, side, execution_price, ref_price, price_limit_pct) -> str | None:
         """BIST tavan/taban ve devre kesici kilit kontrolü. Reddedilirse neden döner."""
         if ref_price <= 0:
             return None
@@ -115,14 +116,14 @@ class PaperExecutionEngine:
         volatility: float = 0.25,
         spread_pct: float = 0.1,
         sector: str = "",
-        reference_price: Optional[float] = None,
+        reference_price: float | None = None,
         price_limit_pct: float = 10.0,
         is_halted: bool = False,
         order_type: str = "MARKET",
-        limit_price: Optional[float] = None,
+        limit_price: float | None = None,
         market_phase: str = "CONTINUOUS",
         scenario: str = "NORMAL",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Sinyali sanal order'a cevir.
 
@@ -296,7 +297,7 @@ class PaperExecutionEngine:
         """Gunluk turnover'u sifirla."""
         self._daily_turnover_value = 0.0
 
-    def compute_transaction_cost_summary(self, orders: List[Dict[str, Any]]) -> Dict[str, float]:
+    def compute_transaction_cost_summary(self, orders: list[dict[str, Any]]) -> dict[str, float]:
         """Islem maliyet ozeti."""
         filled = [o for o in orders if o.get("status") in {"FILLED", "PARTIAL_FILL"}]
         total_commission = sum(o.get("commission", 0) for o in filled)

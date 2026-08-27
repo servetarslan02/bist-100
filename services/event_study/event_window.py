@@ -16,7 +16,7 @@ Calendar day kullanmanın sorunları:
 Çözüm: Tüm offset'ler trading day cinsinden, BIST takvimi ile dönüştürülür.
 """
 from datetime import datetime
-from typing import Tuple, Dict
+
 import numpy as np
 import structlog
 
@@ -59,7 +59,7 @@ class EventWindowManager:
     BIST takvimi (hafta sonları + resmi tatiller) otomatik uygulanır.
     """
 
-    def get_window(self, event_type: str = "DEFAULT") -> Tuple[int, int]:
+    def get_window(self, event_type: str = "DEFAULT") -> tuple[int, int]:
         """Event type'a göre event window döndür (trading day offset).
 
         Returns:
@@ -74,7 +74,7 @@ class EventWindowManager:
 
     def get_window_dates(
         self, event_date: datetime, event_type: str = "DEFAULT"
-    ) -> Tuple[datetime, datetime]:
+    ) -> tuple[datetime, datetime]:
         """Event window tarih aralığını döndür (TRADING DAY bazlı).
 
         Calendar day yerine BIST trading calendar kullanır.
@@ -104,7 +104,7 @@ class EventWindowManager:
         dates: np.ndarray,
         event_date: datetime,
         event_type: str = "DEFAULT",
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray]:
         """Event window verisini çıkar (TRADING DAY bazlı).
 
         Trading calendar kullanarak sadece iş günlerini seçer.
@@ -160,7 +160,7 @@ class EventWindowManager:
         dates: np.ndarray,
         event_date: datetime,
         event_type: str = "DEFAULT",
-    ) -> Dict[int, float]:
+    ) -> dict[int, float]:
         """Event günlerine göre hizalanmış getiri sözlüğü döndür (TRADING DAY).
 
         Calendar day offset yerine trading day offset kullanır.
@@ -189,7 +189,7 @@ class EventWindowManager:
 
     def get_sub_windows(
         self, event_type: str = "DEFAULT"
-    ) -> Dict[str, Tuple[int, int]]:
+    ) -> dict[str, tuple[int, int]]:
         """Alt pencereleri döndür (pre-event, event-day, post-event).
 
         Returns:

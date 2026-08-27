@@ -5,7 +5,6 @@ Opportunity Discovery Engine testleri.
 """
 
 import sys
-import os
 
 
 def test_opportunity_engine():
@@ -52,7 +51,7 @@ def test_opportunity_engine():
     # 3. Risk-adjusted score
     assert score_bull.risk_adjusted_score <= score_bull.opportunity_score
     passed += 1
-    print(f"  ✓ Risk-adjusted score")
+    print("  ✓ Risk-adjusted score")
 
     # 4. Decomposition
     assert len(score_bull.decomposition) == 10
@@ -119,7 +118,7 @@ def main():
     total_passed = 0
     total_failed = 0
 
-    print(f"\n--- Opportunity Discovery Engine ---")
+    print("\n--- Opportunity Discovery Engine ---")
     try:
         p, f = test_opportunity_engine()
         total_passed += p

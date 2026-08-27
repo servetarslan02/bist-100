@@ -8,11 +8,12 @@ Equipped with real-time financial tools:
 """
 
 import os
-import orjson
-import urllib.request
 import urllib.error
-from typing import Dict, Any, Optional
+import urllib.request
+from typing import Any
+
 import numpy as np
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +22,7 @@ logger = structlog.get_logger()
 # REAL INTERNAL SYSTEM TOOLS
 # ====================================================================
 
-def tool_get_stock_metrics(ticker: str) -> Dict[str, Any]:
+def tool_get_stock_metrics(ticker: str) -> dict[str, Any]:
     """Hisse senedinin anlik canli rasyo ve teknik gostergelerini getirir."""
     t = ticker.upper().replace(".IS", "").strip()
     try:
@@ -31,18 +32,18 @@ def tool_get_stock_metrics(ticker: str) -> Dict[str, Any]:
             latest_price = round(float(df['Close'].iloc[-1]), 2)
             prev_price = round(float(df['Close'].iloc[-2]), 2)
             change = round(float(((latest_price - prev_price) / prev_price) * 100), 2)
-            
+
             delta = df['Close'].diff()
             gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
             rs = gain / (loss + 1e-9)
             rsi = 100 - (100 / (1 + rs))
             rsi_14 = round(float(rsi.iloc[-1]), 1) if not np.isnan(rsi.iloc[-1]) else 50.0
-            
+
             sup = round(float(df['Low'].tail(20).min()), 2)
             res = round(float(df['High'].tail(20).max()), 2)
             mom20 = round(float(((latest_price - df['Close'].iloc[-20]) / df['Close'].iloc[-20]) * 100), 2) if len(df) >= 20 else change
-            
+
             return {
                 "ticker": t,
                 "price_tl": latest_price,
@@ -56,7 +57,7 @@ def tool_get_stock_metrics(ticker: str) -> Dict[str, Any]:
             }
     except Exception as e:
         logger.warning("tool_get_stock_metrics_failed", ticker=t, error=str(e))
-    
+
     return {
         "ticker": t,
         "price_tl": 100.0,
@@ -70,7 +71,7 @@ def tool_get_stock_metrics(ticker: str) -> Dict[str, Any]:
     }
 
 
-def tool_run_monte_carlo_forecast(ticker: str, days: int = 20, current_price: Optional[float] = None) -> Dict[str, Any]:
+def tool_run_monte_carlo_forecast(ticker: str, days: int = 20, current_price: float | None = None) -> dict[str, Any]:
     """Hisse icin canli Monte Carlo stokastik getiri simulasyonunu calistirir."""
     p = current_price
     if p is None or p <= 0:
@@ -111,7 +112,7 @@ def tool_run_monte_carlo_forecast(ticker: str, days: int = 20, current_price: Op
         }
 
 
-def tool_get_bist_macro_state() -> Dict[str, Any]:
+def tool_get_bist_macro_state() -> dict[str, Any]:
     """Borsa Istanbul genel piyasa rejimi ve makro durumunu getirir."""
     return {
         "regime": "BOĞA MOMENTUM (BULL_MOMENTUM)",
@@ -127,7 +128,7 @@ def tool_get_bist_macro_state() -> Dict[str, Any]:
     }
 
 
-def tool_get_portfolio_summary() -> Dict[str, Any]:
+def tool_get_portfolio_summary() -> dict[str, Any]:
     """Portfoy nakit, yatirim ve acik pozisyon durumunu getirir."""
     return {
         "total_capital_tl": 100000.0,
@@ -151,11 +152,11 @@ SYSTEM_TOOLS = {
 # GEMINI API CALL WITH INTENT RECOGNITION & TOOL CALLING
 # ====================================================================
 
-def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
+def call_gemini(prompt: str, system_instruction: str | None = None) -> str:
     """Gemini 3.7 Flash modeline canli sistem ve arac cagirimi ile soru sor."""
     tool_context = []
     prompt_upper = prompt.upper()
-    
+
     KNOWN_TICKERS = ["THYAO", "ASELS", "GARAN", "AKBNK", "ISCTR", "YKBNK", "KCHOL", "SAHOL", "TUPRS", "EREGL", "BIMAS", "FROTO", "PGSUS", "SISE", "ASTOR", "TCELL"]
     for t in KNOWN_TICKERS:
         if t in prompt_upper:
@@ -163,7 +164,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
             mc = tool_run_monte_carlo_forecast(t, days=20, current_price=m["price_tl"])
             tool_context.append(f"[CANLI SİSTEM VERİSİ - {t}]: Fiyat=₺{m['price_tl']}, Günlük Değişim=%{m['daily_change_pct']}, 14G RSI={m['rsi_14']}, F/K={m['pe_ratio']}, PD/DD={m['pb_ratio']}, Destek=₺{m['support_level']}, Direnç=₺{m['resistance_level']}")
             tool_context.append(f"[CANLI MONTE CARLO - {t} (20 Günlük)]: Beklenen Fiyat=₺{mc['expected_price']}, En Kötü %5=₺{mc['p5_worst_case']}, En İyi %95=₺{mc['p95_best_case']}, Kâr Olasılığı=%{mc['prob_profit_pct']}")
-    
+
     if "MAKRO" in prompt_upper or "PİYASA" in prompt_upper or "BORSA" in prompt_upper or "BIST" in prompt_upper:
         macro = tool_get_bist_macro_state()
         tool_context.append(f"[CANLI BIST MAKRO İSTİHBARAT]: Rejim={macro['regime']}, Piyasa Genişliği=%{macro['market_breadth_pct']}, Yükselen/Düşen={macro['advancing_stocks']}/{macro['declining_stocks']}, Risk İştahı=%{macro['risk_appetite_score_pct']}, Türkiye 5Y CDS={macro['turkey_cds_5y']}, DXY={macro['dxy_dollar_index']}, VIX={macro['vix_volatility']}")
@@ -176,7 +177,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
     if tool_context:
         full_prompt = "Aşağıdaki canlı sistem verilerini ve hesaplama sonuçlarını kullanarak soruyu yanıtla:\n" + "\n".join(tool_context) + f"\n\nKullanıcı Sorusu: {prompt}"
 
-    payload: Dict[str, Any] = {
+    payload: dict[str, Any] = {
         "contents": [
             {
                 "parts": [
@@ -189,7 +190,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
             "maxOutputTokens": 4096,
         }
     }
-    
+
     sys_prompt = system_instruction or "Sen ALPHA BIST kurumsal yapay zeka istihbarat motorusun (Gemini 3.7 Flash). Sistemdeki gerçek sayısal verileri ve Monte Carlo simülasyonlarını kullanarak KISA, NET VE ÖZ analiz yap."
     payload["systemInstruction"] = {
         "parts": [{"text": sys_prompt}]
@@ -197,7 +198,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
 
     api_key = os.getenv("GEMINI_API_KEY", "")
     models_to_try = [os.getenv("GEMINI_MODEL", "gemini-2.5-flash"), "gemini-2.5-flash", "gemini-3.7-flash"]
-    
+
     for model_name in models_to_try:
         if not api_key:
             break
@@ -216,7 +217,7 @@ def call_gemini(prompt: str, system_instruction: Optional[str] = None) -> str:
             continue
 
     # Fallback to local intelligent quantitative synthesis
-    return f"""### 📊 ALPHA BIST — Yapay Zeka İstihbarat & Kantitatif Değerlendirme
+    return """### 📊 ALPHA BIST — Yapay Zeka İstihbarat & Kantitatif Değerlendirme
 
 **1. Makro & Sektörel Görünüm:**
 BIST-100 genelinde risk iştahı pozitif (%68) ve yabancı takas oranı dengelenme sürecindedir. Sektörel rotasyonda sanayi ve ulaştırma hisseleri momentum liderliğini korumaktadır.
@@ -233,28 +234,28 @@ def analyze_company_gemini(
     ticker: str,
     price: float = 100.0,
     sector: str = "BIST",
-    rsi: Optional[float] = None,
-    pe: Optional[float] = None,
-    pb: Optional[float] = None,
-    support: Optional[float] = None,
-    resistance: Optional[float] = None,
+    rsi: float | None = None,
+    pe: float | None = None,
+    pb: float | None = None,
+    support: float | None = None,
+    resistance: float | None = None,
 ) -> str:
     """Sirket icin kisa, net ve kesin sayisal verilerle istihbarat raporu uretir."""
     sym = ticker.upper().replace(".IS", "").strip()
     live_p = price if price and price > 0 else 100.0
     mc = tool_run_monte_carlo_forecast(sym, days=20, current_price=live_p)
-    
+
     live_rsi = rsi if rsi is not None else 54.0
     live_pe = pe if pe is not None else 7.5
     live_pb = pb if pb is not None else 1.8
     live_sup = support if support is not None else round(live_p * 0.94, 2)
     live_res = resistance if resistance is not None else round(live_p * 1.08, 2)
-    
+
     tp_target = round(float(mc.get('expected_price', live_p * 1.10)), 2)
     sl_target = round(live_sup * 0.98, 2)
 
     decision = "GÜÇLÜ AL" if live_rsi < 45 or live_p >= live_res * 0.95 else ("KADEMELİ AL" if live_rsi <= 65 else "TUT")
-    
+
     prompt = f"""
 Sen ALPHA BIST Profesyonel Kantitatif Analistisin. Aşağıdaki gerçek verileri kullanarak KISA, NET VE DOĞRUDAN bir yatırım istihbarat özeti hazırla.
 
@@ -268,7 +269,7 @@ DESTEK (S1): ₺{live_sup:.2f} | DİRENÇ (R1): ₺{live_res:.2f}
 - Olası Zirve (En İyi %95): ₺{mc['p95_best_case']}
 """
     system_prompt = "Sen ALPHA BIST kantitatif araştırma motorusun. Kısa, net, profesyonel, sayısal verileri birebir doğru kullanan Türkçe analizler üretirsin."
-    
+
     api_res = call_gemini(prompt, system_prompt)
     if "Yapay Zeka İstihbarat" not in api_res and "BIST-100" not in api_res:
         return api_res

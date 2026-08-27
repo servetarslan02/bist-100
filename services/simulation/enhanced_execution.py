@@ -11,9 +11,10 @@ Gelişmiş execution simülasyonu:
 Kaynaklar: mbrenndoerfer Market Microstructure (2026), arXiv Agentic Trading (2026)
 """
 
-import numpy as np
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -37,7 +38,7 @@ class MarketImpactResult:
     regime_impact: float
     total_slippage: float
     fill_price: float
-    impact_breakdown: Dict[str, float]
+    impact_breakdown: dict[str, float]
 
 
 class SquareRootMarketImpact:
@@ -149,7 +150,7 @@ class EnhancedExecutionSimulator:
         volatility: float = 0.25,
         bid: float = 0,
         ask: float = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gelişmiş emir simülasyonu.
 
         Args:
@@ -230,7 +231,7 @@ class EnhancedExecutionSimulator:
         adv_value: float,
         volatility: float,
         regime: str = "RANGE",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Slippage modellerini karşılaştır.
 
         Args:

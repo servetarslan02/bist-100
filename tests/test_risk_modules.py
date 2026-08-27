@@ -11,10 +11,10 @@ Tüm yeni risk modülleri için kapsamlı test'ler:
 - Monitoring
 """
 
-import pytest
-import numpy as np
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import numpy as np
+import pytest
 
 # =====================================================
 # VaR/CVaR TESTS
@@ -259,7 +259,7 @@ class TestDrawdownResponseSystem:
     """Drawdown response testleri."""
 
     def setup_method(self):
-        from services.risk.drawdown_response import DrawdownResponseSystem, DrawdownAction
+        from services.risk.drawdown_response import DrawdownAction, DrawdownResponseSystem
         self.dds = DrawdownResponseSystem()
         self.DrawdownAction = DrawdownAction
 
@@ -309,7 +309,6 @@ class TestDrawdownResponseSystem:
         assert len(events) > 0
 
     def test_alert_message(self):
-        from services.risk.drawdown_response import DrawdownSeverity
         self.dds.update_equity(100000)
         state = self.dds.update_equity(94000)
         msg = self.dds.get_alert_message(state)
@@ -420,7 +419,7 @@ class TestRiskMonitor:
     """Risk monitoring testleri."""
 
     def setup_method(self):
-        from services.risk.monitoring import RiskMonitor, RiskMetricsSnapshot
+        from services.risk.monitoring import RiskMetricsSnapshot, RiskMonitor
         self.monitor = RiskMonitor()
         self.RiskMetricsSnapshot = RiskMetricsSnapshot
 
@@ -431,7 +430,7 @@ class TestRiskMonitor:
 
     def test_alert_on_high_var(self):
         metrics = self.RiskMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
             var_95=6000,  # 6% > 5% threshold
             cvar_95=8000,
@@ -452,7 +451,7 @@ class TestRiskMonitor:
 
     def test_alert_on_drawdown(self):
         metrics = self.RiskMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
             var_95=2000,
             cvar_95=3000,
@@ -473,7 +472,7 @@ class TestRiskMonitor:
 
     def test_no_alert_normal_conditions(self):
         metrics = self.RiskMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
             var_95=2000,  # 2% < 5% threshold
             cvar_95=3000,
@@ -493,7 +492,7 @@ class TestRiskMonitor:
         assert len(alerts) == 0
 
     def test_custom_rule(self):
-        from services.risk.monitoring import AlertRule, AlertType, AlertSeverity
+        from services.risk.monitoring import AlertRule, AlertSeverity, AlertType
         rule = AlertRule(
             rule_id="custom_test",
             name="Custom Test Rule",
@@ -516,7 +515,7 @@ class TestRiskMonitor:
         self.monitor.register_callback(lambda a: callback_called.append(a))
 
         metrics = self.RiskMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
             var_95=6000,  # Triggers alert
             cvar_95=8000,
@@ -590,12 +589,12 @@ class TestRiskIntegration:
 
     def test_monitoring_catches_all_alerts(self):
         """Monitoring tüm kritik durumları yakalamalı."""
-        from services.risk.monitoring import RiskMonitor, RiskMetricsSnapshot
+        from services.risk.monitoring import RiskMetricsSnapshot, RiskMonitor
         monitor = RiskMonitor()
 
         # Birden fazla kritik durum
         metrics = RiskMetricsSnapshot(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             portfolio_value=100000,
             var_95=6000,      # VaR breach
             cvar_95=10000,    # CVaR breach

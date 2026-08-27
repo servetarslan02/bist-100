@@ -7,16 +7,17 @@ fiyat ve portföy geçmişine doğru şekilde yansıtır.
 FAZ 1.5: Corporate Actions
 """
 
-from datetime import datetime, timezone, date
-from typing import Optional, List, Dict, Any
-from enum import Enum
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class ActionType(str, Enum):
+class ActionType(StrEnum):
     DIVIDEND = "DIVIDEND"              # Temettü
     STOCK_SPLIT = "STOCK_SPLIT"        # Bölünme
     BONUS_SHARE = "BONUS_SHARE"        # Bedelsiz sermaye artırımı
@@ -34,8 +35,8 @@ class CorporateAction:
     ticker: str
     action_type: ActionType
     ex_date: date               # Eski tarih (fiyat düzeltmesi bu tarihte yapılır)
-    record_date: Optional[date] = None  # Kayıt tarihi
-    payment_date: Optional[date] = None # Ödeme tarihi
+    record_date: date | None = None  # Kayıt tarihi
+    payment_date: date | None = None # Ödeme tarihi
 
     # Temettü
     dividend_per_share: float = 0.0
@@ -53,14 +54,14 @@ class CorporateAction:
     description: str = ""
     source: str = "KAP"
     is_confirmed: bool = True
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class CorporateActionsHandler:
     """Şirket olaylarını yönetir ve fiyat/portföy düzeltmeleri yapar."""
 
     def __init__(self):
-        self._actions: Dict[str, List[CorporateAction]] = {}  # ticker -> actions
+        self._actions: dict[str, list[CorporateAction]] = {}  # ticker -> actions
         self._applied: set = set()  # action_id'leri
 
     def add_action(self, action: CorporateAction):
@@ -78,7 +79,7 @@ class CorporateActionsHandler:
                     type=action.action_type.value,
                     ex_date=action.ex_date.isoformat())
 
-    def get_actions(self, ticker: str, start_date: Optional[date] = None, end_date: Optional[date] = None) -> List[CorporateAction]:
+    def get_actions(self, ticker: str, start_date: date | None = None, end_date: date | None = None) -> list[CorporateAction]:
         """Şirket olaylarını getir."""
         actions = self._actions.get(ticker, [])
 
@@ -156,11 +157,10 @@ class CorporateActionsHandler:
             if action.bonus_ratio > 0:
                 return int(quantity * (1 + action.bonus_ratio))
 
-        elif action.action_type == ActionType.RIGHTS_ISSUE:
-            if action.rights_ratio > 0:
-                # Her N hisseye 1 yeni hisse
-                new_shares = int(quantity * action.rights_ratio)
-                return quantity + new_shares
+        elif action.action_type == ActionType.RIGHTS_ISSUE and action.rights_ratio > 0:
+            # Her N hisseye 1 yeni hisse
+            new_shares = int(quantity * action.rights_ratio)
+            return quantity + new_shares
 
         return quantity
 
@@ -178,8 +178,8 @@ class CorporateActionsHandler:
     def adjust_historical_prices(
         self,
         ticker: str,
-        prices: List[Dict[str, Any]],
-    ) -> List[Dict[str, Any]]:
+        prices: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
         """Geçmiş fiyat serisini şirket olaylarına göre düzelt.
 
         Backtest'te kullanılır: bugünün bilinen olaylarıyla geçmişi düzelt.
@@ -230,7 +230,7 @@ class CorporateActionsHandler:
             return (price + action.rights_price * action.rights_ratio) / (1 + action.rights_ratio)
         return price
 
-    def load_from_kap(self, kap_events: List[Dict[str, Any]]):
+    def load_from_kap(self, kap_events: list[dict[str, Any]]):
         """KAP'tan gelen şirket olaylarını yükle."""
         if not kap_events:
             return
@@ -264,7 +264,7 @@ class CorporateActionsHandler:
                 logger.warning("Failed to process KAP event", error=str(e))
                 continue
 
-    def _classify_kap_event(self, event: Dict) -> Optional[ActionType]:
+    def _classify_kap_event(self, event: dict) -> ActionType | None:
         """KAP olayını sınıflandır."""
         title = event.get("title", "").lower()
         subject = event.get("subject", "").lower()
@@ -287,7 +287,7 @@ class CorporateActionsHandler:
 
         return None
 
-    def _extract_dividend_amount(self, event: Dict) -> float:
+    def _extract_dividend_amount(self, event: dict) -> float:
         """Temettü miktarını KAP açıklamasından çıkar."""
         import re
         text = event.get("title", "") + " " + event.get("summary", "")
@@ -310,7 +310,7 @@ class CorporateActionsHandler:
 
         return 0.0
 
-    def _extract_split_ratio(self, event: Dict) -> float:
+    def _extract_split_ratio(self, event: dict) -> float:
         """Bölünme oranını KAP açıklamasından çıkar."""
         import re
         text = event.get("title", "") + " " + event.get("summary", "")

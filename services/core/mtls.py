@@ -24,10 +24,11 @@ Kullanım:
 
 import os
 import ssl
-from pathlib import Path
-from typing import Optional, Dict, Any
 from dataclasses import dataclass
 from datetime import datetime
+from pathlib import Path
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -120,7 +121,7 @@ class CertificateManager:
     def __init__(self, config: MTLSConfig):
         self.config = config
 
-    def check_expiry(self, cert_path: str) -> Optional[datetime]:
+    def check_expiry(self, cert_path: str) -> datetime | None:
         """Sertifika son kullanma tarihini kontrol et."""
         try:
             import subprocess
@@ -150,7 +151,7 @@ class CertificateManager:
 
         return False
 
-    def get_cert_info(self, cert_path: str) -> Dict[str, Any]:
+    def get_cert_info(self, cert_path: str) -> dict[str, Any]:
         """Sertifika bilgilerini al."""
         try:
             import subprocess
@@ -170,7 +171,7 @@ class CertificateManager:
             logger.warning("Certificate info failed", path=cert_path, error=str(e))
         return {}
 
-    def get_all_status(self) -> Dict[str, Any]:
+    def get_all_status(self) -> dict[str, Any]:
         """Tüm sertifikaların durumu."""
         certs = {
             "ca": self.config.ca_cert,
@@ -207,14 +208,14 @@ class MTLSContext:
     Docker internal hostnames ile uyumlu.
     """
 
-    def __init__(self, config: Optional[MTLSConfig] = None):
+    def __init__(self, config: MTLSConfig | None = None):
         self.config = config or MTLSConfig()
         self.cert_manager = CertificateManager(self.config)
 
         if self.config.enabled:
             self.config.validate()
 
-    def create_server_context(self) -> Optional[ssl.SSLContext]:
+    def create_server_context(self) -> ssl.SSLContext | None:
         """Server SSL context oluştur.
 
         - Client sertifika doğrulama (mTLS)
@@ -256,7 +257,7 @@ class MTLSContext:
             logger.error("Failed to create server SSL context", error=str(e))
             return None
 
-    def create_client_context(self) -> Optional[ssl.SSLContext]:
+    def create_client_context(self) -> ssl.SSLContext | None:
         """Client SSL context oluştur.
 
         - Server sertifika doğrulama
@@ -296,7 +297,7 @@ class MTLSContext:
             logger.error("Failed to create client SSL context", error=str(e))
             return None
 
-    def get_uvicorn_ssl_args(self) -> Dict[str, str]:
+    def get_uvicorn_ssl_args(self) -> dict[str, str]:
         """Uvicorn SSL argümanları."""
         if not self.config.enabled:
             return {}
@@ -364,7 +365,7 @@ class MTLSContext:
             logger.error("Failed to create gRPC server TLS credentials", error=str(e))
             return None
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """mTLS durum bilgisi."""
         return {
             "enabled": self.config.enabled,
@@ -379,7 +380,7 @@ class MTLSContext:
 # Singleton & Helper Functions
 # =====================================================
 
-_mtls_context: Optional[MTLSContext] = None
+_mtls_context: MTLSContext | None = None
 
 
 def get_mtls_context() -> MTLSContext:
@@ -390,17 +391,17 @@ def get_mtls_context() -> MTLSContext:
     return _mtls_context
 
 
-def get_server_ssl() -> Optional[ssl.SSLContext]:
+def get_server_ssl() -> ssl.SSLContext | None:
     """Server SSL context (shortcut)."""
     return get_mtls_context().create_server_context()
 
 
-def get_client_ssl() -> Optional[ssl.SSLContext]:
+def get_client_ssl() -> ssl.SSLContext | None:
     """Client SSL context (shortcut)."""
     return get_mtls_context().create_client_context()
 
 
-def get_server_ssl_args() -> Dict[str, str]:
+def get_server_ssl_args() -> dict[str, str]:
     """Uvicorn SSL argümanları (shortcut)."""
     return get_mtls_context().get_uvicorn_ssl_args()
 
@@ -415,7 +416,7 @@ def get_grpc_server_credentials():
     return get_mtls_context().get_grpc_server_credentials()
 
 
-def get_mtls_status() -> Dict[str, Any]:
+def get_mtls_status() -> dict[str, Any]:
     """mTLS durum bilgisi (shortcut)."""
     return get_mtls_context().get_status()
 
@@ -511,7 +512,7 @@ def create_mtls_health_endpoint():
 
         healthy = status["enabled"]
         if status["enabled"]:
-            for cert_name, cert_info in status["certificates"].items():
+            for _cert_name, cert_info in status["certificates"].items():
                 if not cert_info.get("exists"):
                     healthy = False
                     break

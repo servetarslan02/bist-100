@@ -13,18 +13,20 @@ Kapsam:
 - Portfolio entegrasyon testi
 """
 
-import sys
-import os
 import asyncio
-import duckdb
-import time
+import sys
 
+import duckdb
+
+from services.core.database_dev import dev_db
 from services.core.db_lock import (
-    DatabaseLock, CoordinatedLock, LockMetrics,
-    get_lock_metrics, get_all_metrics, LOCK_ORDER,
+    LOCK_ORDER,
+    CoordinatedLock,
+    DatabaseLock,
+    get_all_metrics,
+    get_lock_metrics,
 )
 from services.portfolio.main import PortfolioService
-from services.core.database_dev import dev_db
 
 
 def fresh_db():
@@ -55,7 +57,7 @@ async def test_sqlite_lock_contention():
     """İki lock aynı anda yazı kilidi alamaz."""
     db = fresh_db()
     lock1 = DatabaseLock(db, dialect="sqlite", key="test_contention")
-    lock2 = DatabaseLock(db, dialect="sqlite", key="test_contention2")
+    DatabaseLock(db, dialect="sqlite", key="test_contention2")
     issues = []
 
     ok1 = await lock1.acquire()
@@ -185,8 +187,6 @@ async def test_pg_mock_lock():
     issues = []
 
     # PostgreSQL pg_advisory_lock SQL'i doğru mu?
-    expected_acquire = "pg_advisory_lock"
-    expected_release = "pg_advisory_unlock"
 
     # DatabaseLock PG metotlarını kontrol et
     lock = DatabaseLock(None, dialect="postgresql", key="test_pg")

@@ -9,33 +9,48 @@ Kullanım:
 """
 
 import asyncio
+from datetime import UTC, datetime
+
 import orjson
 import pytest
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
 
 # Test edilecek modüller
 from services.agents import (
-    AgentRole, AgentTask, AgentResult,
-    AgentToolRegistry, AIOutputValidator, AIFallback,
-    BaseAgent, AgentOrchestrator,
-    BaseLLMClient, OllamaLLMClient, LLMClientFactory, LLMConfig, LLMResponse,
-    parse_llm_json, validate_agent_output,
-    PromptFactory, PROMPT_VERSION,
-    ParallelAgentRunner, ParallelRunResult, AgentPipelineBuilder,
-    ConflictDetector, ConflictReport,
-    DebateEngine, DebateResult,
-    AgentMemory, WorkingMemory, EpisodicMemory, SemanticMemory,
-    MemoryConsolidator, MemoryEntry,
-    AgentCommunicationBus, AgentMessage, ConflictResolver, Resolution,
-    SynthesisEngine, SynthesisResult,
-    AgentSelfEvaluator, MultiAgentEvaluator,
-    RiskAssessor, RiskAssessment,
+    PROMPT_VERSION,
+    AgentCommunicationBus,
+    AgentMemory,
+    AgentMessage,
     AgentPipelineOrchestrator,
+    AgentResult,
+    AgentRole,
+    AgentSelfEvaluator,
+    AgentTask,
+    AgentToolRegistry,
+    AIFallback,
+    AIOutputValidator,
+    BaseAgent,
+    ConflictDetector,
+    ConflictResolver,
+    DebateEngine,
+    DebateResult,
+    EpisodicMemory,
+    LLMClientFactory,
+    LLMConfig,
+    MemoryConsolidator,
+    MemoryEntry,
+    MultiAgentEvaluator,
+    OllamaLLMClient,
+    ParallelAgentRunner,
+    ParallelRunResult,
+    PromptFactory,
+    Resolution,
+    RiskAssessor,
+    SynthesisEngine,
+    WorkingMemory,
+    parse_llm_json,
+    validate_agent_output,
 )
 from services.agents.agent_pipeline import PipelineResult
-
 
 # =====================================================
 # HELPERS
@@ -361,7 +376,7 @@ class TestFaz3_WorkingMemory:
                 direction="LONG",
                 confidence=0.7,
                 reasoning="test",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             ))
         assert len(wm.items) == 5  # max_items
         recent = wm.get_recent(limit=3)
@@ -613,11 +628,19 @@ class TestFaz7_Integration:
     def test_all_modules_importable(self):
         """Tüm modüllerin import edilebilir olduğunu doğrula."""
         from services.agents import (
-            AgentRole, AgentTask, AgentResult,
-            ParallelAgentRunner, ConflictDetector, DebateEngine,
-            AgentMemory, SynthesisEngine, RiskAssessor,
-            AgentPipelineOrchestrator, AgentCommunicationBus,
-            AgentSelfEvaluator, MultiAgentEvaluator,
+            AgentCommunicationBus,
+            AgentMemory,
+            AgentPipelineOrchestrator,
+            AgentResult,
+            AgentRole,
+            AgentSelfEvaluator,
+            AgentTask,
+            ConflictDetector,
+            DebateEngine,
+            MultiAgentEvaluator,
+            ParallelAgentRunner,
+            RiskAssessor,
+            SynthesisEngine,
         )
         assert AgentRole is not None
         assert AgentTask is not None

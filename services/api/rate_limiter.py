@@ -12,11 +12,11 @@ Limitler:
 - WebSocket: 100 mesaj/saniye
 """
 
-import time
 import asyncio
-from typing import Dict
-from dataclasses import dataclass
+import time
 from collections import defaultdict
+from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +30,7 @@ class RateLimitConfig:
 
 
 # Endpoint grup limitleri — Canlı Dashboard ve Sürekli Telemetri Uyumlu
-RATE_LIMITS: Dict[str, RateLimitConfig] = {
+RATE_LIMITS: dict[str, RateLimitConfig] = {
     "default": RateLimitConfig(max_requests=1000, window_seconds=60),
     "analysis": RateLimitConfig(max_requests=300, window_seconds=60),
     "backtest": RateLimitConfig(max_requests=60, window_seconds=60),
@@ -47,7 +47,7 @@ class InMemoryRateLimiter:
     """
 
     def __init__(self):
-        self._buckets: Dict[str, Dict[str, any]] = defaultdict(lambda: {
+        self._buckets: dict[str, dict[str, any]] = defaultdict(lambda: {
             "tokens": 100,
             "last_refill": time.monotonic(),
         })
@@ -57,7 +57,7 @@ class InMemoryRateLimiter:
         self,
         client_id: str,
         group: str = "default",
-    ) -> tuple[bool, Dict[str, any]]:
+    ) -> tuple[bool, dict[str, any]]:
         """Rate limit kontrolü.
 
         Args:

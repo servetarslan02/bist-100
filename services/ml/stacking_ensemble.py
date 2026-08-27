@@ -11,10 +11,11 @@ Nature (2026) metodolojisi: Ridge meta-learner.
 - Online weight adaptation
 - Regime-specific meta-learner
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -50,16 +51,16 @@ class StackingEnsemble:
     - Regime-specific meta-learner
     """
 
-    def __init__(self, config: Optional[StackingConfig] = None):
+    def __init__(self, config: StackingConfig | None = None):
         self._config = config or StackingConfig()
-        self._base_models: Dict[str, Any] = {}
+        self._base_models: dict[str, Any] = {}
         self._meta_learner = None
-        self._regime_meta_learners: Dict[str, Any] = {}  # regime → meta-learner
-        self._model_weights: Dict[str, float] = {}
-        self._regime_weights: Dict[str, Dict[str, float]] = {}  # regime → {model: weight}
+        self._regime_meta_learners: dict[str, Any] = {}  # regime → meta-learner
+        self._model_weights: dict[str, float] = {}
+        self._regime_weights: dict[str, dict[str, float]] = {}  # regime → {model: weight}
         self._is_fitted = False
-        self._training_history: List[Dict[str, Any]] = []
-        self._diversity_scores: Dict[str, float] = {}
+        self._training_history: list[dict[str, Any]] = []
+        self._diversity_scores: dict[str, float] = {}
 
     def add_model(self, name: str, model: Any, weight: float = 1.0):
         """Base model ekle."""
@@ -72,9 +73,9 @@ class StackingEnsemble:
         y_train: np.ndarray,
         X_val: np.ndarray,
         y_val: np.ndarray,
-        regimes_train: Optional[np.ndarray] = None,
-        regimes_val: Optional[np.ndarray] = None,
-    ) -> Dict[str, Any]:
+        regimes_train: np.ndarray | None = None,
+        regimes_val: np.ndarray | None = None,
+    ) -> dict[str, Any]:
         """Stacking ensemble eğit.
 
         Args:
@@ -151,7 +152,7 @@ class StackingEnsemble:
 
         # Training history
         self._training_history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "metrics": metrics,
             "n_base_models": len(self._base_models),
             "diversity_scores": self._diversity_scores,
@@ -165,7 +166,7 @@ class StackingEnsemble:
     def predict(
         self,
         X: np.ndarray,
-        regime: Optional[str] = None,
+        regime: str | None = None,
     ) -> np.ndarray:
         """Stacking prediction.
 
@@ -199,7 +200,7 @@ class StackingEnsemble:
     def predict_with_confidence(
         self,
         X: np.ndarray,
-        regime: Optional[str] = None,
+        regime: str | None = None,
     ) -> tuple:
         """Prediction + confidence (model agreement).
 
@@ -215,7 +216,7 @@ class StackingEnsemble:
 
         # Base model predictions
         all_preds = []
-        for name, model in self._base_models.items():
+        for _name, model in self._base_models.items():
             try:
                 if self._config.use_proba and hasattr(model, "predict_proba"):
                     preds = model.predict_proba(X)[:, 1]
@@ -230,7 +231,7 @@ class StackingEnsemble:
 
         # Model agreement
         preds_matrix = np.array(all_preds)
-        mean_pred = np.mean(preds_matrix, axis=0)
+        np.mean(preds_matrix, axis=0)
 
         # Confidence: 1 - normalized_std (yüksek = modeller uzlaşıyor)
         pred_std = np.std(preds_matrix, axis=0)
@@ -246,8 +247,8 @@ class StackingEnsemble:
     def predict_with_details(
         self,
         X: np.ndarray,
-        regime: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        regime: str | None = None,
+    ) -> dict[str, Any]:
         """Detaylı prediction — her modelin katkısı dahil.
 
         Returns:
@@ -290,7 +291,7 @@ class StackingEnsemble:
             "diversity_score": round(float(np.mean(list(self._diversity_scores.values()))) if self._diversity_scores else 0, 4),
         }
 
-    def get_model_weights(self, regime: Optional[str] = None) -> Dict[str, float]:
+    def get_model_weights(self, regime: str | None = None) -> dict[str, float]:
         """Model ağırlıklarını döndür.
 
         Args:
@@ -314,29 +315,29 @@ class StackingEnsemble:
                 if total > 0:
                     return {
                         name: round(float(abs(c) / total), 4)
-                        for (name, _), c in zip(self._base_models.items(), model_coefs)
+                        for (name, _), c in zip(self._base_models.items(), model_coefs, strict=False)
                     }
         except Exception as e:
             logger.debug("Handled exception", error=str(e), context="stacking_ensemble.py:318")
 
         return self._model_weights
 
-    def get_regime_weights(self) -> Dict[str, Dict[str, float]]:
+    def get_regime_weights(self) -> dict[str, dict[str, float]]:
         """Tüm rejim ağırlıklarını döndür."""
         return self._regime_weights
 
-    def get_diversity_scores(self) -> Dict[str, float]:
+    def get_diversity_scores(self) -> dict[str, float]:
         """Model diversity skorlarını döndür."""
         return self._diversity_scores
 
-    def get_training_history(self) -> List[Dict[str, Any]]:
+    def get_training_history(self) -> list[dict[str, Any]]:
         """Training history döndür."""
         return self._training_history
 
     def _get_meta_features(self, X: np.ndarray) -> np.ndarray:
         """Base model predictions'ı meta-feature olarak oluştur."""
         meta_features = np.zeros((len(X), len(self._base_models)))
-        for model_idx, (name, model) in enumerate(self._base_models.items()):
+        for model_idx, (_name, model) in enumerate(self._base_models.items()):
             try:
                 if self._config.use_proba and hasattr(model, "predict_proba"):
                     meta_features[:, model_idx] = model.predict_proba(X)[:, 1]
@@ -352,7 +353,7 @@ class StackingEnsemble:
 
     def _create_meta_learner(self):
         """Meta-learner oluştur."""
-        from sklearn.linear_model import Ridge, LogisticRegression, LinearRegression, ElasticNet
+        from sklearn.linear_model import ElasticNet, LinearRegression, LogisticRegression, Ridge
 
         if self._config.meta_learner_type == "ridge":
             return Ridge(alpha=1.0)
@@ -406,7 +407,7 @@ class StackingEnsemble:
 
         for i, name_i in enumerate(names):
             correlations = []
-            for j, name_j in enumerate(names):
+            for j, _name_j in enumerate(names):
                 if i != j:
                     corr = np.corrcoef(preds_matrix[i], preds_matrix[j])[0, 1]
                     if not np.isnan(corr):
@@ -464,7 +465,7 @@ class StackingEnsemble:
             except Exception as e:
                 logger.warning("regime_weight_computation_failed", regime=regime, error=str(e))
 
-    def _compute_validation_metrics(self, X_val: np.ndarray, y_val: np.ndarray) -> Dict[str, Any]:
+    def _compute_validation_metrics(self, X_val: np.ndarray, y_val: np.ndarray) -> dict[str, Any]:
         """Validation metrics hesapla."""
         val_pred = self.predict(X_val)
 
@@ -504,5 +505,5 @@ class StackingEnsemble:
         return self._is_fitted
 
     @property
-    def base_model_names(self) -> List[str]:
+    def base_model_names(self) -> list[str]:
         return list(self._base_models.keys())

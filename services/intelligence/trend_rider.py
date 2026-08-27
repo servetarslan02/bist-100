@@ -9,7 +9,8 @@ SIFIR STATİK VERİ & YÜZDE KURALI:
   kadar 1-2 aylık mega trendleri sonuna kadar sürer.
 """
 
-from typing import Dict, Any, Tuple
+from typing import Any
+
 import numpy as np
 import polars as pl
 import structlog
@@ -26,28 +27,28 @@ class TrendRiderEngine:
         self.atr_multiplier_entry = 2.0   # Giriş ATR çarpanı
         self.atr_multiplier_trail = 2.5   # Trailing stop ATR çarpanı
         self.atr_multiplier_target = 3.0  # Hedef fiyat ATR çarpanı
-        
+
         # Trend parametreleri
         self.fast_ma = 10                 # Hızlı hareketli ortalama
         self.slow_ma = 30                 # Yavaş hareketli ortalama
         self.trend_strength_threshold = 0.02  # Trend gücü eşiği
-        
+
         # Çıkış kuralları
         self.max_hold_days = 30           # Max tutma süresi (gün)
         self.profit_lock_pct = 0.05       # Kâr kilidi eşiği %5
         self.bear_crash_stop = 0.10       # Ayı piyasası stop %10
         self.volume_spike_ratio = 3.0     # Hacim spike oranı
-        
+
         # Durum takibi
-        self._active_positions: Dict[str, Dict] = {}
+        self._active_positions: dict[str, dict] = {}
 
     def evaluate_position_exit(
         self,
-        pos: Dict[str, Any],
+        pos: dict[str, Any],
         current_candle: pl.Series,
         history_df: pl.DataFrame,
         is_bear_crash: bool = False
-    ) -> Tuple[bool, float, str]:
+    ) -> tuple[bool, float, str]:
         """
         Mevcut pozisyonun dinamik çıkış sinyalini değerlendirir.
         Dönüş: (should_exit: bool, target_exit_price: float, exit_reason: str)
@@ -56,10 +57,10 @@ class TrendRiderEngine:
         p_high = float(current_candle["High"])
         p_low = float(current_candle["Low"])
         p_open = float(current_candle["Open"])
-        
+
         entry_price = float(pos["entry_price"])
         peak_price = float(pos.get("peak_price", entry_price))
-        
+
         # Zirve fiyatı güncelle
         if p_high > peak_price:
             peak_price = p_high
@@ -74,7 +75,7 @@ class TrendRiderEngine:
         n = len(closes)
 
         if n >= 15:
-            tr = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1])]
+            tr = [max(h - l, abs(h - c_prev), abs(l - c_prev)) for h, l, c_prev in zip(highs[1:], lows[1:], closes[:-1], strict=False)]
             atr14 = float(np.mean(tr[-14:]))
         else:
             atr14 = max(p_high - p_low, p_close * 0.03)
@@ -105,7 +106,7 @@ class TrendRiderEngine:
         # -------------------------------------------------------------
         # 4. 100% Dinamik Çok Kademeli İzleyen Stop (ATR-Based)
         # -------------------------------------------------------------
-        
+
         # A) Başlangıç Aşaması (Kazanç < 2.0x ATR): Dinamik Başlangıç Stopu (2.0x ATR)
         if gain_from_entry < (2.0 * atr14):
             dynamic_initial_stop = entry_price - (2.0 * atr14)

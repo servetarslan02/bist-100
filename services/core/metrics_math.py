@@ -6,6 +6,7 @@ Avoids DRY violations and ensures consistency across the platform.
 """
 import numpy as np
 
+
 def calculate_sharpe_ratio(returns: np.ndarray, risk_free_rate: float = 0.0, periods_per_year: int = 252) -> float:
     """Yıllıklandırılmış Sharpe Oranı."""
     if len(returns) == 0:

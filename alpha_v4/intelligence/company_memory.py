@@ -5,7 +5,7 @@ Future facts cannot be used for historical state reconstruction.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 @dataclass(frozen=True)
@@ -48,4 +48,4 @@ class CompanyMemory:
         return tuple(self._facts)
 
 
-UTC = timezone.utc
+UTC = UTC

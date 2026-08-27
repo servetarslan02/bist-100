@@ -1,7 +1,9 @@
 """Decisions API — Gerçek servislere bağlı."""
 
 from fastapi import APIRouter, Depends, Query
-from ..dependencies import get_current_user, check_rate_limit
+
+from ..dependencies import check_rate_limit, get_current_user
+
 router = APIRouter()
 
 
@@ -43,9 +45,10 @@ async def audit_trail(decision_id: str, user=Depends(get_current_user), _=Depend
 async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Phase 18 (AlphaEngine) tarafindan uretilen en guncel firsatlari getirir."""
     try:
-        from ...core.database import pg_fetch
         import orjson
-        
+
+        from ...core.database import pg_fetch
+
         query = """
             SELECT created_at, target_date, tickers, is_cash_regime, is_rebalance
             FROM paper_trade_portfolio
@@ -53,13 +56,13 @@ async def pending_opportunities(user=Depends(get_current_user), _=Depends(check_
             LIMIT 1
         """
         rows = await pg_fetch(query)
-        
+
         if not rows:
             return {"opportunities": [], "message": "Henuz gun sonu modeli (18:15) calismadi veya veri yok."}
-            
+
         row = rows[0]
         tickers = orjson.loads(row["tickers"]) if isinstance(row["tickers"], str) else row["tickers"]
-        
+
         return {
             "opportunities": tickers,
             "target_date": row["target_date"].isoformat(),

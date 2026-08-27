@@ -11,13 +11,14 @@ Features:
 - construction_progress: İnşaat ilerleme oranı
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_satellite_features(sat_data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+def compute_satellite_features(sat_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Uydu verisi feature'ları."""
     features = {}
 

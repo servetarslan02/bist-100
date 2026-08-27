@@ -13,9 +13,10 @@
 1 = tam risk-on (agresif alım)
 """
 
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -139,7 +140,7 @@ class RiskAppetiteEngine:
         rsi: float = 50.0,
         sentiment_score: float = 0.0,
         macro_score: float = 0.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Detaylı risk appetite hesaplama — her faktörün katkısını gösterir."""
         scores = {}
 
@@ -177,7 +178,7 @@ class RiskAppetiteEngine:
             "risk_appetite": round(float(np.clip(total, 0, 1)), 4),
             "contributions": contributions,
             "state": self._risk_appetite_state(total),
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def _risk_appetite_state(self, score: float) -> str:
@@ -192,7 +193,7 @@ class RiskAppetiteEngine:
             return "MODERATE_RISK_OFF"
         return "RISK_OFF"
 
-    def update_weights(self, weights: Dict[str, float]):
+    def update_weights(self, weights: dict[str, float]):
         """Ağırlıkları güncelle (backtest optimizasyonu sonrası)."""
         for factor, weight in weights.items():
             if factor in self._weights:

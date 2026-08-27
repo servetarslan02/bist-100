@@ -15,10 +15,11 @@ Portfolio:
 Kaynak: Du (2026) — Ledoit-Wolf; Oxford — volatility targeting
 """
 
-import numpy as np
-from datetime import datetime, timedelta
-from typing import Dict, Optional, Tuple, Any
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ logger = structlog.get_logger()
 @dataclass
 class PortfolioWeights:
     """Portföy ağırlıkları."""
-    weights: Dict[str, float]  # ticker → weight (0-1)
+    weights: dict[str, float]  # ticker → weight (0-1)
     total_weight: float
     n_positions: int
     max_weight: float
@@ -40,13 +41,13 @@ class RiskMetrics:
     portfolio_volatility: float
     concentration_hhi: float
     max_position_weight: float
-    sector_concentration: Dict[str, float]
+    sector_concentration: dict[str, float]
     correlation_risk: float
     var_95: float
     cvar_95: float
     var_99: float = 0.0
     cvar_99: float = 0.0
-    component_var: Optional[Dict[str, float]] = None
+    component_var: dict[str, float] | None = None
     risk_score: float = 0.0  # 0-100
 
 
@@ -57,7 +58,7 @@ class LedoitWolfCovariance:
     Küçük sample'larda daha stabil.
     """
 
-    def estimate(self, returns: np.ndarray, shrinkage: Optional[float] = None) -> np.ndarray:
+    def estimate(self, returns: np.ndarray, shrinkage: float | None = None) -> np.ndarray:
         """Kovaryans matrisi tahmin et.
 
         Args:
@@ -118,10 +119,10 @@ class VolatilityTargeter:
 
     def adjust_weights(
         self,
-        weights: Dict[str, float],
+        weights: dict[str, float],
         current_vol: float,
         target_vol: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Ağırlıkları volatility target'a göre ayarla."""
         leverage = self.compute_leverage(current_vol, target_vol)
 
@@ -186,10 +187,7 @@ class PositionSizer:
 
         # Stop'a göre maksimum zarar
         max_loss_per_share = stop_distance
-        if max_loss_per_share > 0:
-            shares_from_stop = int(position_value / max_loss_per_share)
-        else:
-            shares_from_stop = 0
+        shares_from_stop = int(position_value / max_loss_per_share) if max_loss_per_share > 0 else 0
 
         # Max position limit
         max_position_value = capital * (max_position_pct / 100)
@@ -208,10 +206,10 @@ class RebalanceEngine:
 
     def compute_rebalance(
         self,
-        current_weights: Dict[str, float],
-        target_weights: Dict[str, float],
+        current_weights: dict[str, float],
+        target_weights: dict[str, float],
         portfolio_value: float,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Rebalance emirleri hesapla.
 
         Returns:
@@ -262,7 +260,7 @@ class RebalanceEngine:
 class ConcentrationRisk:
     """Konsantrasyon riski hesaplama."""
 
-    def compute_hhi(self, weights: Dict[str, float]) -> float:
+    def compute_hhi(self, weights: dict[str, float]) -> float:
         """Herfindahl-Hirschman Index (HHI).
 
         HHI = sum(w_i²)
@@ -273,9 +271,9 @@ class ConcentrationRisk:
 
     def compute_sector_concentration(
         self,
-        weights: Dict[str, float],
-        sector_map: Dict[str, str],
-    ) -> Dict[str, float]:
+        weights: dict[str, float],
+        sector_map: dict[str, str],
+    ) -> dict[str, float]:
         """Sektör konsantrasyonu."""
         sector_weights = {}
         for ticker, weight in weights.items():
@@ -283,7 +281,7 @@ class ConcentrationRisk:
             sector_weights[sector] = sector_weights.get(sector, 0) + weight
         return sector_weights
 
-    def compute_max_concentration(self, weights: Dict[str, float]) -> Tuple[str, float]:
+    def compute_max_concentration(self, weights: dict[str, float]) -> tuple[str, float]:
         """En konsantre pozisyon."""
         if not weights:
             return "", 0.0
@@ -301,9 +299,9 @@ concentration_risk = ConcentrationRisk()
 
 def compute_full_risk_metrics(
     returns: np.ndarray,
-    weights: Dict[str, float],
+    weights: dict[str, float],
     cov_matrix: np.ndarray = None,
-    sector_map: Dict[str, str] = None,
+    sector_map: dict[str, str] = None,
     portfolio_value: float = 100000.0,
 ) -> RiskMetrics:
     """Kapsamlı risk metrikleri hesapla.
@@ -386,7 +384,7 @@ def compute_full_risk_metrics(
 # =====================================================
 # VIOP Hedging Entegrasyonu (B32)
 # =====================================================
-def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> Dict[str, Any]:
+def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> dict[str, Any]:
     """Portföy hedge önerisi."""
     try:
         from services.viop.hedging import hedge_portfolio
@@ -397,7 +395,7 @@ def suggest_hedge(portfolio_value: float, beta: float, futures_price: float) -> 
 
 
 def check_options_strategy(spot_price: float, strike: float, premium: float,
-                           strategy_type: str = "covered_call") -> Dict[str, Any]:
+                           strategy_type: str = "covered_call") -> dict[str, Any]:
     """Opsiyon stratejisi kontrolü."""
     try:
         from services.viop.strategies import create_covered_call, create_protective_put

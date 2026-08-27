@@ -13,9 +13,10 @@ Features:
 """
 
 import re
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
 import structlog
 
 from .base import BaseAdapter
@@ -30,7 +31,7 @@ class EksiSozlukAdapter(BaseAdapter):
     rate_limit = 5
 
     # BIST ticker → Ekşi başlık mapping
-    TICKER_TOPICS: Dict[str, List[str]] = {
+    TICKER_TOPICS: dict[str, list[str]] = {
         "THYAO": ["thy", "türk hava yolları", "turkish airlines", "thyao"],
         "GARAN": ["garanti bankası", "garanti bbva", "garanti"],
         "AKBNK": ["akbank"],
@@ -51,7 +52,7 @@ class EksiSozlukAdapter(BaseAdapter):
         "VESTL": ["vestel"],
     }
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Ekşi Sözlük verisi çek."""
         topics = self.TICKER_TOPICS.get(ticker.upper())
         if not topics:
@@ -70,13 +71,13 @@ class EksiSozlukAdapter(BaseAdapter):
                 "entries": all_entries,
                 "total_count": len(all_entries),
                 "ticker": ticker,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             logger.warning("Ekşi Sözlük scrape failed", ticker=ticker, error=str(e))
             return None
 
-    async def _scrape_topic(self, topic: str) -> List[Dict]:
+    async def _scrape_topic(self, topic: str) -> list[dict]:
         """Başlıktaki entry'leri çek."""
         try:
             import aiohttp
@@ -135,7 +136,7 @@ class EksiSozlukAdapter(BaseAdapter):
             logger.debug("Ekşi scrape error", topic=topic, error=str(e))
             return []
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """Ekşi Sözlük feature'ları hesapla."""
         if not data or not data.get("entries"):
             return {}

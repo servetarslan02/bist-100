@@ -5,11 +5,12 @@ Portföy hedge önerileri.
 Enhanced_options modülünden delegate eder.
 """
 
-from typing import Dict, Any
-from .enhanced_options import delta_hedger, DeltaHedger, DeltaHedgeResult
+from typing import Any
+
+from .enhanced_options import DeltaHedger, DeltaHedgeResult, delta_hedger
 
 
-def hedge_portfolio(portfolio_value: float, beta: float, futures_price: float) -> Dict[str, Any]:
+def hedge_portfolio(portfolio_value: float, beta: float, futures_price: float) -> dict[str, Any]:
     """Portföy hedge önerisi.
 
     Args:

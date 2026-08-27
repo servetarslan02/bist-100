@@ -7,8 +7,8 @@ Normal mod: 5 dakika beklemez.
 Event geldiğinde Tier 0'dan Tier 3'e atlayabilir.
 """
 
-from typing import Dict, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,10 +21,10 @@ class EventScanner:
     """
 
     def __init__(self):
-        self._pending_rescans: Dict[str, Dict] = {}  # ticker -> event data
-        self._last_rescan: Dict[str, datetime] = {}
+        self._pending_rescans: dict[str, dict] = {}  # ticker -> event data
+        self._last_rescan: dict[str, datetime] = {}
 
-    def on_event(self, event_type: str, event_data: Dict) -> List[str]:
+    def on_event(self, event_type: str, event_data: dict) -> list[str]:
         """
         Event geldiğinde etkilenen hisseleri döndür.
 
@@ -44,7 +44,7 @@ class EventScanner:
                     "importance": importance,
                     "direction": direction,
                     "title": event_data.get("title", ""),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
                 logger.info("KAP event → rescan", ticker=ticker, importance=importance, direction=direction)
 
@@ -62,7 +62,7 @@ class EventScanner:
                         "importance": importance,
                         "direction": direction,
                         "title": event_data.get("title", ""),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
                 logger.info("News event → rescan", tickers=affected, importance=importance, direction=direction)
 
@@ -83,7 +83,7 @@ class EventScanner:
                         "direction": direction,
                         "indicator": indicator,
                         "surprise": surprise,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
                 logger.info("Macro event → rescan", indicator=indicator,
                            surprise=surprise, affected_count=len(affected))
@@ -97,14 +97,14 @@ class EventScanner:
 
         return affected
 
-    def get_pending_rescans(self) -> Dict[str, Dict]:
+    def get_pending_rescans(self) -> dict[str, dict]:
         """Bekleyen yeniden tarama isteklerini döndür."""
         return self._pending_rescans.copy()
 
     def clear_rescan(self, ticker: str):
         """Yeniden tarama tamamlandı."""
         self._pending_rescans.pop(ticker, None)
-        self._last_rescan[ticker] = datetime.now(timezone.utc)
+        self._last_rescan[ticker] = datetime.now(UTC)
 
     def clear_all(self):
         """Tüm bekleyen taramaları temizle."""
@@ -117,12 +117,9 @@ class EventScanner:
 
         # Son yeniden taramadan bu yana 5 dakika geçtiyse
         last = self._last_rescan.get(ticker)
-        if last and (datetime.now(timezone.utc) - last).total_seconds() > 300:
-            return True
+        return bool(last and (datetime.now(UTC) - last).total_seconds() > 300)
 
-        return False
-
-    def _get_macro_affected_stocks(self, indicator: str, surprise: float) -> List[str]:
+    def _get_macro_affected_stocks(self, indicator: str, surprise: float) -> list[str]:
         """
         Makro olaydan etkilenen hisseleri sektör exposure graph'a göre belirle.
         Hard-coded liste yok — sektör_relationships kullanır.

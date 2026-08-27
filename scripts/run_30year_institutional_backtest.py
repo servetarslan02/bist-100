@@ -10,21 +10,23 @@ ALPHA BIST — 30-YILLIK KURUMSAL GERÇEK PİYASA BACKTEST MOTORU (1997 - 2026)
 - Fractional Kelly Pozisyon Boyutlandırma
 """
 
-import sys
 import os
-import yfinance as yf
-import polars as pl
-import numpy as np
-from datetime import datetime, timezone
+import sys
 import warnings
+
+import numpy as np
+import polars as pl
+import yfinance as yf
+
 warnings.filterwarnings('ignore')
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
-from services.intelligence.candle_patterns import candle_engine
 import structlog
+
+from services.intelligence.candle_patterns import candle_engine
 
 logger = structlog.get_logger(__name__)
 
@@ -61,7 +63,7 @@ def download_30y_data():
 
     print(f"  • {len(BIST_30Y_CORE_TICKERS)} Öncü BIST Hissesi indiriliyor...")
     stocks_raw = yf.download(BIST_30Y_CORE_TICKERS, start=start_date, end=end_date, progress=False, group_by="ticker")
-    
+
     stock_dict = {}
     for ticker in BIST_30Y_CORE_TICKERS:
         try:
@@ -95,7 +97,7 @@ def run_30year_backtest():
 
     COMMISSION_RATE = 0.0015
     SLIPPAGE_RATE = 0.0010
-    TOTAL_FEE_RATE = COMMISSION_RATE + SLIPPAGE_RATE  # %0.25
+    COMMISSION_RATE + SLIPPAGE_RATE  # %0.25
 
     # Ortak işlem günleri
     trading_dates = list(bm_df.index)

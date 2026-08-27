@@ -6,12 +6,11 @@ Multi-Instance Race Condition Testleri
 Sonuçta equity, cash ve positions tutarlı kalmalı.
 """
 
-import sys
-import os
-
 import asyncio
-from services.portfolio.main import PortfolioService
+import sys
+
 from services.core.database_dev import dev_db
+from services.portfolio.main import PortfolioService
 
 
 async def setup_db():
@@ -149,9 +148,9 @@ async def test_invariant_after_parallel_ops():
 
     # Invariant kontrolü
     if not acc1.get("invariant_check", True):
-        issues.append(f"SVC1 invariant bozuldu")
+        issues.append("SVC1 invariant bozuldu")
     if not acc2.get("invariant_check", True):
-        issues.append(f"SVC2 invariant bozuldu")
+        issues.append("SVC2 invariant bozuldu")
 
     # Cash tutarlılığı
     pf_row = await dev_db.pg_fetchrow("SELECT cash_balance FROM portfolios WHERE id = ?", svc1._portfolio_id)

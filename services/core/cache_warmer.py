@@ -10,7 +10,7 @@ Kullanım:
 
 import asyncio
 import time
-from typing import List
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +21,7 @@ class CacheWarmer:
 
     def __init__(self):
         self._warmed = False
-        self._warm_tasks: List[asyncio.Task] = []
+        self._warm_tasks: list[asyncio.Task] = []
 
     async def warm_all(self):
         """Tüm sıcak verileri paralel olarak yükle."""
@@ -67,8 +67,8 @@ class CacheWarmer:
     async def _warm_market_calendar(self) -> bool:
         """BIST seans takvimini yükle."""
         try:
-            from ..core.redis_helper import set_cached
             from ..core.market_calendar import get_market_calendar
+            from ..core.redis_helper import set_cached
             calendar = get_market_calendar()
             if calendar:
                 set_cached("market:calendar", calendar, ttl=86400)

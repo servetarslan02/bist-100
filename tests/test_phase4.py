@@ -5,7 +5,6 @@ Valuation Engine (Multiples, DCF, Scenarios) testleri.
 """
 
 import sys
-import os
 
 
 def test_valuation_engine():

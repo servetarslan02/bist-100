@@ -12,29 +12,37 @@ Kapsam:
 7. Old vs new engine equivalence
 """
 
-import sys
 import os
+import sys
 import time
-import orjson
-import duckdb
+from datetime import datetime, timedelta
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timedelta
-from pathlib import Path
 
-
-from services.backtest.portfolio_sim import (
-    PortfolioSimulatorV3, BISTCommissionModel, Trade, Position, EquitySnapshot,
+from services.backtest.engine_v4 import (
+    BacktestConfig,
+    BacktestEngineV4,
+    FeatureCache,
+    QualityCache,
 )
 from services.backtest.persistence import BacktestPersistence
-from services.backtest.engine_v4 import (
-    BacktestEngineV4, BacktestConfig, FeatureCache, QualityCache,
+from services.backtest.portfolio_sim import (
+    BISTCommissionModel,
+    PortfolioSimulatorV3,
 )
 from services.scanner.backtest_runner import (
-    ScannerBacktestRunner, PortfolioSimulator as PortfolioSimulatorV2,
-    FeatureCache as FeatureCacheV2, QualityCache as QualityCacheV2,
+    FeatureCache as FeatureCacheV2,
 )
-
+from services.scanner.backtest_runner import (
+    PortfolioSimulator as PortfolioSimulatorV2,
+)
+from services.scanner.backtest_runner import (
+    QualityCache as QualityCacheV2,
+)
+from services.scanner.backtest_runner import (
+    ScannerBacktestRunner,
+)
 
 # =====================================================
 # HELPERS
@@ -548,7 +556,7 @@ def test_engine_v4_persistence():
     if len(runs) != 1:
         issues.append(f"Runs: {len(runs)}")
     elif runs[0]["run_id"] != result.run_id:
-        issues.append(f"Run ID mismatch")
+        issues.append("Run ID mismatch")
 
     # Cleanup
     eng_mod.backtest_persistence = old_persist
@@ -817,11 +825,11 @@ def run_all():
     print(f"\n{'=' * 70}")
     print(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print(f"\n  HATALAR:")
+        print("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"    {i}. {issue}")
     if benchmark_results:
-        print(f"\n  BENCHMARK SONUÇLARI:")
+        print("\n  BENCHMARK SONUÇLARI:")
         for b in benchmark_results:
             print(b)
     print("=" * 70)

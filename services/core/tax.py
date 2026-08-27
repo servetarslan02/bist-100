@@ -9,8 +9,9 @@ BIST vergi oranları (2025-2026):
 Kaynak: GVK, SPK mevzuatı
 """
 from dataclasses import dataclass
-from typing import Optional
+
 import structlog
+
 logger = structlog.get_logger()
 
 # BIST vergi oranları (2025-2026)
@@ -57,7 +58,7 @@ class TaxResult:
     tax: float
     holding_days: int
     is_long_term: bool
-    tax_bracket: Optional[str] = None  # Hangi dilimde
+    tax_bracket: str | None = None  # Hangi dilimde
 
 
 def calculate_tax(

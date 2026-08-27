@@ -8,9 +8,9 @@ Kaynaklar: awesome-quant, SCANNER-NIHAI-SPEC.md
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -50,10 +50,10 @@ class ScanResult:
     event_score: float = 0.0
 
     # Gerekçe
-    evidence: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
+    evidence: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp.isoformat(),
@@ -92,17 +92,17 @@ class ScannerInterface(ABC):
     @abstractmethod
     def scan(
         self,
-        universe: List[str],
-        features_map: Dict[str, Dict[str, float]],
+        universe: list[str],
+        features_map: dict[str, dict[str, float]],
         market_regime: str = "RANGE",
         regime_confidence: float = 0.5,
-        ml_scores: Optional[Dict[str, float]] = None,
-        event_scores: Optional[Dict[str, float]] = None,
-        sentiment_scores: Optional[Dict[str, float]] = None,
-        fundamental_scores: Optional[Dict[str, float]] = None,
-        valuation_scores: Optional[Dict[str, float]] = None,
-        macro_scores: Optional[Dict[str, float]] = None,
-    ) -> List[ScanResult]:
+        ml_scores: dict[str, float] | None = None,
+        event_scores: dict[str, float] | None = None,
+        sentiment_scores: dict[str, float] | None = None,
+        fundamental_scores: dict[str, float] | None = None,
+        valuation_scores: dict[str, float] | None = None,
+        macro_scores: dict[str, float] | None = None,
+    ) -> list[ScanResult]:
         """Tüm evreni tara ve sonuçları döndür.
 
         Args:
@@ -124,10 +124,10 @@ class ScannerInterface(ABC):
     @abstractmethod
     def get_opportunities(
         self,
-        results: List[ScanResult],
+        results: list[ScanResult],
         top_n: int = 50,
         min_score: float = 50.0,
-    ) -> List[ScanResult]:
+    ) -> list[ScanResult]:
         """En iyi fırsatları seç.
 
         Args:
@@ -142,8 +142,8 @@ class ScannerInterface(ABC):
     @abstractmethod
     def generate_signals(
         self,
-        results: List[ScanResult],
-    ) -> List[ScanResult]:
+        results: list[ScanResult],
+    ) -> list[ScanResult]:
         """Sinyal üret.
 
         Args:
@@ -155,14 +155,14 @@ class ScannerInterface(ABC):
 
     def scan_and_rank(
         self,
-        universe: List[str],
-        features_map: Dict[str, Dict[str, float]],
+        universe: list[str],
+        features_map: dict[str, dict[str, float]],
         market_regime: str = "RANGE",
         regime_confidence: float = 0.5,
-        ml_scores: Optional[Dict[str, float]] = None,
-        event_scores: Optional[Dict[str, float]] = None,
+        ml_scores: dict[str, float] | None = None,
+        event_scores: dict[str, float] | None = None,
         top_n: int = 50,
-    ) -> List[ScanResult]:
+    ) -> list[ScanResult]:
         """Tam pipeline: scan → rank → signals.
 
         Backtest ve canlı tarama bu metodu kullanır.

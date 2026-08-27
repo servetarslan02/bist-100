@@ -11,8 +11,8 @@ Her snapshot için:
 PIT kuralı: available_at <= backtest_date olan snapshot kullanılır.
 """
 
-from typing import Dict, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 from ..data.historical_contracts import FundamentalSnapshot
@@ -24,15 +24,15 @@ class HistoricalFundamentalProvider:
     """yfinance'dan PIT-safe historical fundamental veri çeker."""
 
     def __init__(self, cache_ttl_seconds: int = 3600):
-        self._cache: Dict[str, List[FundamentalSnapshot]] = {}
-        self._cache_ts: Dict[str, float] = {}
+        self._cache: dict[str, list[FundamentalSnapshot]] = {}
+        self._cache_ts: dict[str, float] = {}
         self._cache_ttl = cache_ttl_seconds
 
     def fetch_historical_fundamentals(
         self,
         ticker: str,
         max_periods: int = 8,
-    ) -> List[FundamentalSnapshot]:
+    ) -> list[FundamentalSnapshot]:
         """Hisseye ait quarterly financial snapshot'ları çeker.
 
         Args:
@@ -43,10 +43,9 @@ class HistoricalFundamentalProvider:
             FundamentalSnapshot listesi (en yeniden eskiye sıralı)
         """
         # Cache kontrolü
-        now = datetime.now(timezone.utc).timestamp()
-        if ticker in self._cache:
-            if now - self._cache_ts.get(ticker, 0) < self._cache_ttl:
-                return self._cache[ticker]
+        now = datetime.now(UTC).timestamp()
+        if ticker in self._cache and now - self._cache_ts.get(ticker, 0) < self._cache_ttl:
+            return self._cache[ticker]
 
         snapshots = []
 
@@ -86,7 +85,7 @@ class HistoricalFundamentalProvider:
                             balance_sheet_data[period_end][str(metric)] = float(val)
 
             # Her dönem için snapshot oluştur
-            for i, col in enumerate(qf.columns[:max_periods]):
+            for _i, col in enumerate(qf.columns[:max_periods]):
                 period_end = str(col.date()) if hasattr(col, 'date') else str(col)[:10]
 
                 # Publication date: earnings_dates'den bul
@@ -139,7 +138,7 @@ class HistoricalFundamentalProvider:
     def _find_publication_date(
         self,
         period_end: str,
-        earnings_dates: Dict[str, str],
+        earnings_dates: dict[str, str],
     ) -> str:
         """Dönem sonuna en yakın earnings date'i bul.
 
@@ -166,9 +165,9 @@ class HistoricalFundamentalProvider:
 
     def _map_metrics(
         self,
-        raw_values: Dict[str, float],
+        raw_values: dict[str, float],
         ticker: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """yfinance ham metriklerini standart isimlere çevir."""
         mapped = {}
 

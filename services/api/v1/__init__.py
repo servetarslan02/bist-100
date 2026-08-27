@@ -6,24 +6,24 @@ Tüm v1 endpoint'leri.
 
 from fastapi import APIRouter
 
+from .agents import router as agents_router
+from .alternative import router as alternative_router
+from .backtest import router as backtest_router
+from .decisions import router as decisions_router
+from .event_study import router as event_study_router
+from .factors import router as factors_router
+from .intelligence import router as intelligence_router
+from .learning import router as learning_router
+from .macro import router as macro_router
 from .market import router as market_router
+from .models import router as models_router
 from .portfolio import router as portfolio_router
 from .risk import router as risk_router
-from .intelligence import router as intelligence_router
-from .decisions import router as decisions_router
-from .backtest import router as backtest_router
-from .learning import router as learning_router
-from .models import router as models_router
-from .agents import router as agents_router
 from .scanner import router as scanner_router
-from .macro import router as macro_router
-from .factors import router as factors_router
-from .alternative import router as alternative_router
-from .viop import router as viop_router
-from .event_study import router as event_study_router
-from .system import router as system_router
-from .ws import router as ws_router
 from .sse import router as sse_router
+from .system import router as system_router
+from .viop import router as viop_router
+from .ws import router as ws_router
 
 v1_router = APIRouter(prefix="/api/v1")
 

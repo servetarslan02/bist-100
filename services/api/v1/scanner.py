@@ -18,12 +18,13 @@ Endpoints:
 - POST /scanner/event — Event bildirimi
 """
 
-import time
 import asyncio
-from fastapi import APIRouter, Depends, Query
-import structlog
+import time
 
-from ..dependencies import get_current_user, check_rate_limit
+import structlog
+from fastapi import APIRouter, Depends, Query
+
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -80,7 +81,7 @@ async def scanner_signals(
                 ticker = p.get("ticker", "")
                 score = float(p.get("score", 0.0))
                 ui_score = min(99, max(45, int((score + 0.05) * 1000))) if score < 1 else int(score)
-                
+
                 live_item = radar_by_sym.get(ticker, {})
                 price = float(live_item.get("price", 0))
                 chg = float(live_item.get("change", 0))
@@ -98,11 +99,11 @@ async def scanner_signals(
                 elif chg > 3.0:
                     spec_cat = "VOLUME_BREAKOUT"
                     sig_type = "VOLUME_BREAKOUT"
-                    spec_rsn = f"20 Günlük Hacim ve Fiyat Kırılımı · Pozitif Alıcı Dominansı"
+                    spec_rsn = "20 Günlük Hacim ve Fiyat Kırılımı · Pozitif Alıcı Dominansı"
                 else:
                     spec_cat = "MOMENTUM_LEADER"
                     sig_type = "MOMENTUM_LEADER"
-                    spec_rsn = f"Sektörel Trend Liderliği · Pozitif Fiyat İvmesi"
+                    spec_rsn = "Sektörel Trend Liderliği · Pozitif Fiyat İvmesi"
 
                 target_1 = round(price * 1.12, 2)
                 target_2 = round(price * 1.20, 2)

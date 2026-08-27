@@ -1,12 +1,12 @@
-import sys
 import os
+import sys
+
 sys.path.insert(0, '/app')
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import time
-import orjson
 import asyncio
+from datetime import date, datetime
+
 import polars as pl
-from datetime import datetime, date, timezone
 
 print('=================================================================')
 print('   ALPHA BIST: END-TO-END AUTONOMOUS EXCHANGE ENGINE SIMULATION')
@@ -21,16 +21,16 @@ async def main():
     engine = AlphaEngine()
     universe = bist_universe.BIST_100_TICKERS[:25]
     print(f' -> Universe loaded: {len(universe)} BIST-100 tickers')
-    
+
     end_date = date.today().strftime('%Y-%m-%d')
     start_date = (pl.Series(end_date) - datetime.timedelta(days=400)).strftime('%Y-%m-%d')
-    
+
     market_data, bm_df, sector_map = engine.fetch_data(start_date, end_date, universe)
     print(f' -> Market data fetched for {len(market_data)} tickers')
-    
+
     trained = engine.train(market_data, bm_df, sector_map, start_date, end_date, optimize=False)
     print(f' -> Alpha Model trained: {trained} (Active Features: {len(engine.features)})')
-    
+
     predictions = engine.predict(market_data, bm_df, sector_map, end_date)
     print(f' -> Generated {len(predictions)} ranked stock predictions. Top 5 Picks:')
     for i, p in enumerate(predictions[:5], 1):
@@ -77,7 +77,7 @@ async def main():
     execution = PaperExecutionEngine()
     executed_orders = []
 
-    for tk, price, score, sector in approved_picks[:6]:
+    for tk, price, _score, sector in approved_picks[:6]:
         order = execution.execute_signal(
             date='2026-08-24',
             ticker=tk,
@@ -93,7 +93,7 @@ async def main():
             is_halted=False,
         )
         executed_orders.append(order)
-        res = test_portfolio.open_position(
+        test_portfolio.open_position(
             ticker=tk,
             quantity=order['quantity'],
             price=order['execution_price'],

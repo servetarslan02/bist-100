@@ -1,22 +1,22 @@
 """VIOP API — Gerçek veriyle çalışan endpoint'ler."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, List
 
-from ..dependencies import get_current_user, check_rate_limit
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ...viop.contract_catalog import viop_catalog
 from ...viop.enhanced_options import (
     black_scholes,
     calculate_greeks,
-    implied_volatility,
-    portfolio_greeks,
-    options_strategies,
-    delta_hedger,
-    span_margin,
-    futures_spot_arbitrage,
     check_put_call_parity,
+    delta_hedger,
+    futures_spot_arbitrage,
+    implied_volatility,
+    options_strategies,
+    portfolio_greeks,
+    span_margin,
     viop_risk,
 )
-from ...viop.contract_catalog import viop_catalog
+from ..dependencies import check_rate_limit, get_current_user
 
 router = APIRouter()
 
@@ -95,7 +95,7 @@ async def calculate_iv(
 
 @router.post("/greeks")
 async def get_portfolio_greeks(
-    positions: List[dict],
+    positions: list[dict],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -139,11 +139,13 @@ async def list_strategies(
 async def analyze_strategy(
     strategy: str = Query(..., description="Strateji adı"),
     spot: float = Query(..., description="Spot fiyat"),
-    params: dict = {},
+    params: dict = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
     """Strateji analizi yap."""
+    if params is None:
+        params = {}
     strat = options_strategies
 
     strategy_map = {
@@ -233,7 +235,7 @@ async def gamma_scalp(
 
 @router.post("/margin")
 async def calculate_margin(
-    positions: List[dict],
+    positions: list[dict],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -290,7 +292,7 @@ async def check_parity(
 
 @router.post("/risk")
 async def calculate_viop_risk(
-    viop_positions: List[dict],
+    viop_positions: list[dict],
     portfolio_value: float = Query(..., description="Portföy değeri"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
@@ -305,7 +307,7 @@ async def calculate_viop_risk(
 
 @router.get("/contracts")
 async def list_contracts(
-    category: Optional[str] = Query(None, description="Kategori filtresi (endeks/döviz/emtia)"),
+    category: str | None = Query(None, description="Kategori filtresi (endeks/döviz/emtia)"),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):

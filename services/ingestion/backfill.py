@@ -20,16 +20,18 @@ Kullanım:
 
 import asyncio
 import time
-from datetime import datetime, date, timedelta, timezone
-from typing import Dict, List, Optional, Tuple, Any, Callable
-from dataclasses import dataclass, field
-from enum import Enum
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class BackfillPriority(str, Enum):
+class BackfillPriority(StrEnum):
     CRITICAL = "CRITICAL"    # Son 1 gün
     HIGH = "HIGH"            # Son 1 hafta
     MEDIUM = "MEDIUM"        # Son 1 ay
@@ -59,7 +61,7 @@ class BackfillResult:
     gap_end: datetime
     bars_filled: int = 0
     success: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     duration_seconds: float = 0.0
 
 
@@ -71,7 +73,7 @@ class BackfillStats:
     gaps_failed: int = 0
     total_bars_filled: int = 0
     total_duration_seconds: float = 0.0
-    last_backfill_time: Optional[float] = None
+    last_backfill_time: float | None = None
 
 
 class BackfillManager:
@@ -100,14 +102,14 @@ class BackfillManager:
 
         self._stats = BackfillStats()
         self._running = False
-        self._progress: Dict[str, Any] = {}
+        self._progress: dict[str, Any] = {}
 
     async def detect_all_gaps(
         self,
-        tickers: Optional[List[str]] = None,
+        tickers: list[str] | None = None,
         clickhouse_client=None,
         pg_pool=None,
-    ) -> List[DataGap]:
+    ) -> list[DataGap]:
         """Tüm ticker'lar için veri boşluklarını tespit et.
 
         Args:
@@ -118,7 +120,7 @@ class BackfillManager:
         Returns:
             Tespit edilen boşluklar (öncelik sırasıyla)
         """
-        gaps: List[DataGap] = []
+        gaps: list[DataGap] = []
 
         if not tickers:
             # BIST listesini al
@@ -162,7 +164,7 @@ class BackfillManager:
         ticker: str,
         clickhouse_client=None,
         pg_pool=None,
-    ) -> List[DataGap]:
+    ) -> list[DataGap]:
         """Tek ticker için veri boşluklarını tespit et."""
         gaps = []
 
@@ -171,8 +173,8 @@ class BackfillManager:
 
         if last_date is None:
             # Hiç veri yok — tüm lookback periyodu boş
-            gap_start = datetime.now(timezone.utc) - timedelta(days=self._max_lookback_days)
-            gap_end = datetime.now(timezone.utc)
+            gap_start = datetime.now(UTC) - timedelta(days=self._max_lookback_days)
+            gap_end = datetime.now(UTC)
             gaps.append(DataGap(
                 ticker=ticker,
                 gap_start=gap_start,
@@ -184,7 +186,7 @@ class BackfillManager:
             return gaps
 
         # Son kayıt ile şu an arasındaki fark
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         gap_days = (now - last_date).total_seconds() / 86400
 
         if gap_days < 1:
@@ -220,7 +222,7 @@ class BackfillManager:
         ticker: str,
         clickhouse_client=None,
         pg_pool=None,
-    ) -> Optional[datetime]:
+    ) -> datetime | None:
         """Ticker için son kayıtlı tarihi bul."""
         # ClickHouse'dan dene
         if clickhouse_client:
@@ -251,9 +253,9 @@ class BackfillManager:
 
     async def backfill_all(
         self,
-        gaps: List[DataGap],
-        progress_callback: Optional[Callable] = None,
-    ) -> List[BackfillResult]:
+        gaps: list[DataGap],
+        progress_callback: Callable | None = None,
+    ) -> list[BackfillResult]:
         """Tüm boşlukları doldur.
 
         Args:
@@ -264,7 +266,7 @@ class BackfillManager:
             Her boşluk için sonuç
         """
         self._running = True
-        results: List[BackfillResult] = []
+        results: list[BackfillResult] = []
         start_time = time.time()
 
         logger.info("Starting backfill", total_gaps=len(gaps))
@@ -297,7 +299,7 @@ class BackfillManager:
 
         return results
 
-    async def _backfill_chunk(self, gaps: List[DataGap]) -> List[BackfillResult]:
+    async def _backfill_chunk(self, gaps: list[DataGap]) -> list[BackfillResult]:
         """Boşluk chunk'ını doldur."""
         results = []
 
@@ -422,7 +424,7 @@ class BackfillManager:
             "total_bars_filled": self._stats.total_bars_filled,
             "total_duration_seconds": round(self._stats.total_duration_seconds, 1),
             "last_backfill": datetime.fromtimestamp(
-                self._stats.last_backfill_time, tz=timezone.utc
+                self._stats.last_backfill_time, tz=UTC
             ).isoformat() if self._stats.last_backfill_time else None,
             "running": self._running,
         }

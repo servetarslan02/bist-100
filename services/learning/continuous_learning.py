@@ -12,11 +12,12 @@ ROADMAP v3.0 FAZ 7:
 KURAL: Sistem durmadan kendini güncellemeli, dünkü model bugünün piyasasına uymayabilir.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -32,8 +33,8 @@ class LearningCycle:
     regime: str
     action: str  # RETRAIN, DRIFT_DETECTED, A_B_TEST, HEALTH_CHECK
     status: str  # SUCCESS, FAILED, PENDING
-    metrics_before: Dict[str, float]
-    metrics_after: Dict[str, float]
+    metrics_before: dict[str, float]
+    metrics_after: dict[str, float]
     model_version: str
     notes: str = ""
 
@@ -41,10 +42,10 @@ class LearningCycle:
 @dataclass
 class ModelRegistry:
     """Model kayıt defteri."""
-    versions: List[Dict] = field(default_factory=list)
+    versions: list[dict] = field(default_factory=list)
     active_version: str = ""
     champion_version: str = ""
-    performance_history: List[Dict] = field(default_factory=list)
+    performance_history: list[dict] = field(default_factory=list)
 
 
 class ContinuousLearningPipeline:
@@ -52,10 +53,10 @@ class ContinuousLearningPipeline:
 
     def __init__(
         self,
-        retrain_interval_days: Optional[int] = None,
-        drift_check_interval: Optional[int] = None,
-        performance_window: Optional[int] = None,
-        min_samples_for_retrain: Optional[int] = None,
+        retrain_interval_days: int | None = None,
+        drift_check_interval: int | None = None,
+        performance_window: int | None = None,
+        min_samples_for_retrain: int | None = None,
     ):
         cfg = learning_settings
         self.retrain_interval_days = retrain_interval_days or cfg.retrain.max_interval_days
@@ -73,11 +74,11 @@ class ContinuousLearningPipeline:
         self._daily_performance: deque = deque(maxlen=252)
 
         # Son eğitim tarihi
-        self._last_retrain_date: Optional[datetime] = None
+        self._last_retrain_date: datetime | None = None
 
         # Drift durumu
         self._drift_detected = False
-        self._drift_features: List[str] = []
+        self._drift_features: list[str] = []
 
         logger.info("ContinuousLearningPipeline v3.0 initialized",
                    retrain_interval=retrain_interval_days,
@@ -86,11 +87,11 @@ class ContinuousLearningPipeline:
     def run_daily_pipeline(
         self,
         date: str,
-        features_map: Dict[str, Dict],
-        predictions: List[Dict],
-        actual_returns: Dict[str, float],
+        features_map: dict[str, dict],
+        predictions: list[dict],
+        actual_returns: dict[str, float],
         regime: str = "UNKNOWN",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Günlük pipeline çalıştır.
 
         Her gün sabah çalıştırılır:
@@ -103,7 +104,7 @@ class ContinuousLearningPipeline:
         results = {
             "date": date,
             "regime": regime,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # 1. Performans kaydet
@@ -125,7 +126,7 @@ class ContinuousLearningPipeline:
 
             # Macro features
             all_macro_features = {}
-            for ticker, feats in features_map.items():
+            for _ticker, feats in features_map.items():
                 all_macro_features.update(feats)
 
             if all_macro_features:
@@ -153,7 +154,7 @@ class ContinuousLearningPipeline:
 
             cycle = LearningCycle(
                 cycle_id=f"retrain_{date}",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 regime=regime,
                 action="RETRAIN",
                 status="SUCCESS" if retrain_result.get("success") else "FAILED",
@@ -182,9 +183,9 @@ class ContinuousLearningPipeline:
     def _record_daily_performance(
         self,
         date: str,
-        predictions: List[Dict],
-        actual_returns: Dict[str, float],
-    ) -> Dict[str, float]:
+        predictions: list[dict],
+        actual_returns: dict[str, float],
+    ) -> dict[str, float]:
         """Günlük performans kaydet."""
         if not predictions or not actual_returns:
             return {"date": date, "sharpe": 0, "ic": 0, "win_rate": 0, "return": 0}
@@ -207,8 +208,8 @@ class ContinuousLearningPipeline:
         if not returns:
             return {"date": date, "sharpe": 0, "ic": 0, "win_rate": 0, "return": 0}
 
-        from services.core.metrics_math import calculate_sharpe_ratio, calculate_ic, calculate_win_rate
-        
+        from services.core.metrics_math import calculate_ic, calculate_sharpe_ratio, calculate_win_rate
+
         returns_arr = np.array(returns)
         scores_arr = np.array(scores)
         actuals_arr = np.array(actuals)
@@ -237,7 +238,7 @@ class ContinuousLearningPipeline:
         # Her gün kontrol et
         return True
 
-    def _check_drift(self, features_map: Dict[str, Dict]) -> Dict[str, Any]:
+    def _check_drift(self, features_map: dict[str, dict]) -> dict[str, Any]:
         """Feature drift kontrolü."""
         from services.learning.super_intelligence import super_intelligence
 
@@ -246,7 +247,7 @@ class ContinuousLearningPipeline:
     def _should_retrain(
         self,
         date: str,
-        daily_metrics: Dict[str, float],
+        daily_metrics: dict[str, float],
     ) -> bool:
         """Yeniden eğitim gerekli mi?"""
         cfg = learning_settings.retrain
@@ -290,10 +291,10 @@ class ContinuousLearningPipeline:
 
     def _execute_retrain(
         self,
-        features_map: Dict[str, Dict],
-        actual_returns: Dict[str, float],
+        features_map: dict[str, dict],
+        actual_returns: dict[str, float],
         regime: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Yeniden eğitim çalıştır."""
         from services.learning.super_intelligence import super_intelligence
         from services.ml.ranking_model import ranking_model
@@ -312,19 +313,19 @@ class ContinuousLearningPipeline:
         result = ranking_model.train(
             features_map=features_map,
             returns=actual_returns,
-            date_groups={t: datetime.now(timezone.utc).strftime("%Y-%m-%d") for t in features_map},
+            date_groups={t: datetime.now(UTC).strftime("%Y-%m-%d") for t in features_map},
             regime=regime,
         )
 
         if result.get("success"):
-            self._last_retrain_date = datetime.now(timezone.utc)
+            self._last_retrain_date = datetime.now(UTC)
 
             # Super intelligence'a bildir
             super_intelligence.auto_retrain(training_data, {})
 
         return result
 
-    def _evaluate_ab_test(self, date: str) -> Optional[Dict]:
+    def _evaluate_ab_test(self, date: str) -> dict | None:
         """A/B test değerlendir."""
         from services.learning.super_intelligence import super_intelligence
 
@@ -340,7 +341,7 @@ class ContinuousLearningPipeline:
             "date": date,
         }
 
-    def _update_registry(self, date: str, results: Dict):
+    def _update_registry(self, date: str, results: dict):
         """Model kayıt defterini güncelle."""
         self._registry.performance_history.append({
             "date": date,
@@ -349,7 +350,7 @@ class ContinuousLearningPipeline:
             "drift": results.get("drift_check", {}).get("drift_detected", False),
         })
 
-    def get_learning_report(self) -> Dict[str, Any]:
+    def get_learning_report(self) -> dict[str, Any]:
         """Öğrenme raporu oluştur."""
         recent_cycles = list(self._cycles)[-10:]
         recent_performance = list(self._daily_performance)[-30:]
@@ -380,7 +381,7 @@ class ContinuousLearningPipeline:
             "last_retrain": self._last_retrain_date.isoformat() if self._last_retrain_date else None,
         }
 
-    def export_state(self) -> Dict[str, Any]:
+    def export_state(self) -> dict[str, Any]:
         """Pipeline durumunu dışa aktar."""
         return {
             "cycles": [{
@@ -401,7 +402,7 @@ class ContinuousLearningPipeline:
             "drift_detected": self._drift_detected,
         }
 
-    def import_state(self, state: Dict[str, Any]):
+    def import_state(self, state: dict[str, Any]):
         """Pipeline durumunu içe aktar."""
         self._registry.versions = state.get("registry", {}).get("versions", [])
         self._registry.active_version = state.get("registry", {}).get("active_version", "")

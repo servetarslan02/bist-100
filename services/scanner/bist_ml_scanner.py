@@ -6,10 +6,11 @@ Eğitilen LightGBM + CatBoost + XGBoost modellerini yükleyip
 20G Breakout ve Dip Dönüşü sinyalleri üretir.
 """
 
+from pathlib import Path
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import List, Dict, Any
-from pathlib import Path
 import structlog
 
 logger = structlog.get_logger()
@@ -38,7 +39,7 @@ class BistMLScanner:
                 except Exception as e:
                     logger.warning(f"Model yüklenemedi: {m_name}, hata: {e}")
 
-    def scan_all_opportunities(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def scan_all_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
         """Tüm BIST evrenini ML ensemble ile tarar ve en yüksek skorlu fırsatları döner."""
         if not self.stock_dict:
             self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
@@ -88,10 +89,10 @@ class BistMLScanner:
             ret_1d = change_pct
             ret_5d = float(((latest_p - closes[-5]) / max(closes[-5], 1e-4)) * 100.0) if len(closes) >= 5 else 0.0
             ret_20d = float(((latest_p - closes[-20]) / max(closes[-20], 1e-4)) * 100.0) if len(closes) >= 20 else 0.0
-            
+
             avg_vol20 = float(np.mean(volumes[-20:])) if len(volumes) >= 20 else float(volumes[-1])
             vol_surge = float(volumes[-1] / max(avg_vol20, 1.0))
-            
+
             high_20 = float(np.max(highs[-20:])) if len(highs) >= 20 else latest_p
             near_20d_high = 1.0 if latest_p >= (high_20 * 0.98) else 0.0
 
@@ -120,12 +121,12 @@ class BistMLScanner:
                 pred_scores.append(self.models["xgboost"].predict(feat_vec)[0] * 0.30)
 
             raw_score = float(np.sum(pred_scores)) if pred_scores else (buyer_press / 100.0)
-            
+
             # Sinyal Sınıflandırması
             spec_category = "WATCH"
             sig_name = "TUT"
             dir_str = "HOLD"
-            
+
             if is_breakout:
                 spec_category = "HIGH_CONVICTION" if raw_score > 0.10 else "VOLUME_BREAKOUT"
                 sig_name = "20G BREAKOUT AL"

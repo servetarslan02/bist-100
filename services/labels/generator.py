@@ -20,9 +20,9 @@ Look-ahead bias = ölüm.
 Kaynak: Du (2026) — target variable design, cross-sectional ranking
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -32,9 +32,9 @@ logger = structlog.get_logger()
 class LabelResult:
     """Label sonucu."""
     ticker: str
-    labels: Dict[str, np.ndarray]  # label_name → values
+    labels: dict[str, np.ndarray]  # label_name → values
     valid_mask: np.ndarray          # Label hesaplanabilir mi?
-    stats: Dict[str, float]         # İstatistikler
+    stats: dict[str, float]         # İstatistikler
 
 
 class LabelGenerator:
@@ -48,8 +48,8 @@ class LabelGenerator:
         ticker: str,
         close: np.ndarray,
         mask: np.ndarray,
-        sector_returns: Optional[np.ndarray] = None,
-        benchmark_returns: Optional[np.ndarray] = None,
+        sector_returns: np.ndarray | None = None,
+        benchmark_returns: np.ndarray | None = None,
         purge_days: int = 0,
     ) -> LabelResult:
         """Tek hisse için tüm label'ları üret.
@@ -161,9 +161,9 @@ class LabelGenerator:
 
     def generate_cross_sectional_ranks(
         self,
-        all_labels: Dict[str, np.ndarray],
+        all_labels: dict[str, np.ndarray],
         label_name: str = "y_5d",
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """Tüm hisseler için cross-sectional rank üret.
 
         Args:
@@ -210,7 +210,7 @@ class LabelGenerator:
 
         return ranks
 
-    def get_label_names(self) -> List[str]:
+    def get_label_names(self) -> list[str]:
         """Tüm label isimlerini döndür."""
         names = []
         for period in self.FORWARD_PERIODS:

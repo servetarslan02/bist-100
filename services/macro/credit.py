@@ -8,13 +8,14 @@ Kredi büyüme feature'ları:
 - credit_momentum: Kredi momentum
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_credit_features(credit_data: Dict[str, Any]) -> Dict[str, float]:
+def compute_credit_features(credit_data: dict[str, Any]) -> dict[str, float]:
     """Kredi büyüme feature'ları.
 
     Args:

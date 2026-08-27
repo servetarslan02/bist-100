@@ -6,10 +6,11 @@ Her teknolojinin değerini kanıtlamak için gerçek benchmark'lar.
     python benchmarks/tech_benchmarks.py
 """
 
-import time
-import orjson
-import sys
 import os
+import sys
+import time
+
+import orjson
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -17,8 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 def benchmark_json_serialization():
     """ORJSON vs json — API response hız karşılaştırması."""
-    import orjson as stdlib_json
     import orjson
+    import orjson as stdlib_json
 
     # Test data — gerçekçi API response'u
     data = {
@@ -68,9 +69,10 @@ def benchmark_json_serialization():
 def benchmark_dataframe():
     """Polars vs Pandas — DataFrame işlem hız karşılaştırması."""
     try:
-        import polars as pl
-        import numpy as np
         from datetime import datetime, timedelta
+
+        import numpy as np
+        import polars as pl
 
         # Test data — BIST benzeri OHLCV verisi
         n_rows = 100_000
@@ -90,7 +92,7 @@ def benchmark_dataframe():
         start = time.perf_counter()
         for _ in range(10):
             df_pd = pl.DataFrame(data)
-            result_pd = df_pd.group_by("ticker").agg(
+            df_pd.group_by("ticker").agg(
                 {"close": "mean", "volume": "sum", "high": "max", "low": "min"}
             )
         pandas_time = time.perf_counter() - start
@@ -99,7 +101,7 @@ def benchmark_dataframe():
         start = time.perf_counter()
         for _ in range(10):
             df_pl = pl.DataFrame(data)
-            result_pl = (
+            (
                 df_pl.lazy()
                 .group_by("ticker")
                 .agg(
@@ -132,9 +134,9 @@ def benchmark_ml_training():
     """LightGBM vs CatBoost vs XGBoost — Training hız karşılaştırması."""
     try:
         import lightgbm as lgb
+        import numpy as np  # noqa: F401
         import xgboost as xgb
         from catboost import CatBoostClassifier
-        import numpy as np
         from sklearn.datasets import make_classification
 
         # Test data — BIST benzeri classification
@@ -221,7 +223,7 @@ def _compute_auc(y_true, y_pred):
             return 0.5
 
         # Sort by prediction
-        pairs = sorted(zip(y_pred, y_true), reverse=True)
+        pairs = sorted(zip(y_pred, y_true, strict=False), reverse=True)
         tp = 0
         fp = 0
         auc = 0.0

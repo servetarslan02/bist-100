@@ -4,9 +4,10 @@ PyTorch LSTM — multi-layer, bidirectional, attention mechanism,
 multi-horizon prediction, walk-forward desteği, proper training loop.
 """
 import os
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ class LSTMConfig:
     epochs: int = 100
     early_stopping_patience: int = 10
     sequence_length: int = 20
-    target_horizons: List[int] = field(default_factory=lambda: [1, 5, 20])
+    target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20])
     device: str = "cpu"
 
 
@@ -69,20 +70,20 @@ class StockLSTM:
     - Feature importance via gradient
     """
 
-    def __init__(self, config: Optional[LSTMConfig] = None):
+    def __init__(self, config: LSTMConfig | None = None):
         self._config = config or LSTMConfig()
         self._model = None
         self._scaler = None
-        self._training_history: List[Dict[str, Any]] = []
+        self._training_history: list[dict[str, Any]] = []
         self._is_trained = False
 
     def train(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-    ) -> Dict[str, Any]:
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+    ) -> dict[str, Any]:
         """LSTM eğit.
 
         Args:
@@ -227,7 +228,7 @@ class StockLSTM:
         except Exception:
             return np.zeros(len(X))
 
-    def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def _create_sequences(self, X: np.ndarray, y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Sequence formatına dönüştür."""
         if len(X) < self._config.sequence_length:
             return np.array([]), np.array([])
@@ -264,10 +265,7 @@ class StockLSTM:
 
             def forward(self, x):
                 lstm_out, _ = self.lstm(x)
-                if self.attention is not None:
-                    context = self.attention(lstm_out)
-                else:
-                    context = lstm_out[:, -1, :]
+                context = self.attention(lstm_out) if self.attention is not None else lstm_out[:, -1, :]
                 return self.fc(context)
 
         model = LSTMModel(self._config, torch, nn)

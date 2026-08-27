@@ -9,15 +9,14 @@ Test edilen:
 """
 
 import sys
-import os
-import numpy as np
 
+import numpy as np
 
 # ===================== CONFIG TESTS =====================
 
 def test_config_load():
     """Config yükleniyor mu?"""
-    from services.learning.config.learning_config import learning_settings, LearningSettings
+    from services.learning.config.learning_config import LearningSettings, learning_settings
 
     assert learning_settings is not None
     assert isinstance(learning_settings, LearningSettings)
@@ -471,14 +470,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 0 TEST SONUÇLARI")
+    print("📊 FAZ 0 TEST SONUÇLARI")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

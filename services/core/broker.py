@@ -4,11 +4,12 @@ Broker-independent order interface.
 Paper broker dahil — gerçek broker henüz bağlanmadı.
 """
 
-import uuid
 import time
-from enum import Enum
-from typing import Optional, Dict, Any
+import uuid
 from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -52,10 +53,10 @@ class BrokerInterface:
     def cancel_order(self, order_id: str) -> bool:
         raise NotImplementedError
 
-    def get_order_status(self, order_id: str) -> Optional[Order]:
+    def get_order_status(self, order_id: str) -> Order | None:
         raise NotImplementedError
 
-    def get_positions(self) -> Dict[str, Any]:
+    def get_positions(self) -> dict[str, Any]:
         raise NotImplementedError
 
     def is_connected(self) -> bool:
@@ -67,9 +68,9 @@ class PaperBroker(BrokerInterface):
 
     def __init__(self, initial_capital: float = 1_000_000, slippage_bps: float = 5.0):
         self._capital = initial_capital
-        self._positions: Dict[str, Dict] = {}
-        self._orders: Dict[str, Order] = {}
-        self._idempotency_keys: Dict[str, str] = {}
+        self._positions: dict[str, dict] = {}
+        self._orders: dict[str, Order] = {}
+        self._idempotency_keys: dict[str, str] = {}
         self._slippage_bps = slippage_bps  # basis points (5 bps = %0.05)
 
     def submit_order(self, order: Order) -> Order:
@@ -134,10 +135,10 @@ class PaperBroker(BrokerInterface):
             return True
         return False
 
-    def get_order_status(self, order_id: str) -> Optional[Order]:
+    def get_order_status(self, order_id: str) -> Order | None:
         return self._orders.get(order_id)
 
-    def get_positions(self) -> Dict[str, Any]:
+    def get_positions(self) -> dict[str, Any]:
         return dict(self._positions)
 
     def is_connected(self) -> bool:

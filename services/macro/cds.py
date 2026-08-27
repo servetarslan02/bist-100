@@ -8,14 +8,15 @@ CDS spread feature'ları:
 - risk_level: Risk seviyesi (düşük/orta/yüksek/çok yüksek)
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import numpy as np
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_cds_features(cds_data: Dict[str, Any]) -> Dict[str, float]:
+def compute_cds_features(cds_data: dict[str, Any]) -> dict[str, float]:
     """CDS spread feature'ları.
 
     Args:

@@ -3,11 +3,11 @@
 Binlerce değişken arasındaki ilişkileri keşfeden pipeline.
 """
 
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime
 import structlog
 
 logger = structlog.get_logger()
@@ -16,28 +16,28 @@ logger = structlog.get_logger()
 @dataclass
 class FeatureDiscoveryResult:
     """Feature discovery sonucu."""
-    selected_features: List[str]
-    feature_importance: Dict[str, float]
-    feature_interactions: List[Dict[str, Any]]
-    stability_scores: Dict[str, float]
-    leakage_flags: Dict[str, bool]
-    regime_importance: Dict[str, Dict[str, float]]
+    selected_features: list[str]
+    feature_importance: dict[str, float]
+    feature_interactions: list[dict[str, Any]]
+    stability_scores: dict[str, float]
+    leakage_flags: dict[str, bool]
+    regime_importance: dict[str, dict[str, float]]
 
 
 class FeatureDiscoveryPipeline:
     """Feature discovery and selection pipeline."""
 
     def __init__(self):
-        self.raw_features: List[str] = []
-        self.candidate_features: List[str] = []
-        self.selected_features: List[str] = []
+        self.raw_features: list[str] = []
+        self.candidate_features: list[str] = []
+        self.selected_features: list[str] = []
 
     def discover(
         self,
         feature_data: pl.DataFrame,
         target: pl.Series,
-        feature_names: List[str],
-        regime_labels: Optional[pl.Series] = None,
+        feature_names: list[str],
+        regime_labels: pl.Series | None = None,
     ) -> FeatureDiscoveryResult:
         """
         Run full feature discovery pipeline.
@@ -136,8 +136,8 @@ class FeatureDiscoveryPipeline:
     # =====================================================
 
     def _generate_interactions(
-        self, data: pl.DataFrame, feature_names: List[str]
-    ) -> Tuple[pl.DataFrame, List[str]]:
+        self, data: pl.DataFrame, feature_names: list[str]
+    ) -> tuple[pl.DataFrame, list[str]]:
         """Generate pairwise feature interactions."""
         new_data = data.clone()
         new_names = list(feature_names)
@@ -178,8 +178,8 @@ class FeatureDiscoveryPipeline:
     # =====================================================
 
     def _mutual_information(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
-    ) -> Dict[str, float]:
+        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
+    ) -> dict[str, float]:
         """Compute mutual information between features and target."""
         from sklearn.feature_selection import mutual_info_regression
 
@@ -195,15 +195,15 @@ class FeatureDiscoveryPipeline:
 
         mi_scores = mutual_info_regression(X, y, random_state=42, n_neighbors=5)
 
-        return dict(zip(feature_names, mi_scores))
+        return dict(zip(feature_names, mi_scores, strict=False))
 
     # =====================================================
     # Step 3: Correlation Filter
     # =====================================================
 
     def _correlation_filter(
-        self, data: pl.DataFrame, feature_names: List[str], threshold: float = 0.95
-    ) -> List[str]:
+        self, data: pl.DataFrame, feature_names: list[str], threshold: float = 0.95
+    ) -> list[str]:
         """Remove highly correlated features — Polars only."""
         # Polars correlation matrix — numpy ile hesapla
         selected = data.select(feature_names).to_numpy()
@@ -229,11 +229,10 @@ class FeatureDiscoveryPipeline:
     # =====================================================
 
     def _permutation_importance(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
-    ) -> Dict[str, float]:
+        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
+    ) -> dict[str, float]:
         """Compute permutation importance using LightGBM."""
         import lightgbm as lgb
-        from sklearn.model_selection import cross_val_score
 
         X = data.select(feature_names).to_numpy()
         y = target.to_numpy()
@@ -252,15 +251,15 @@ class FeatureDiscoveryPipeline:
         from sklearn.inspection import permutation_importance
         result = permutation_importance(model, X, y, n_repeats=5, random_state=42)
 
-        return dict(zip(feature_names, result.importances_mean))
+        return dict(zip(feature_names, result.importances_mean, strict=False))
 
     # =====================================================
     # Step 5: SHAP (Simplified)
     # =====================================================
 
     def _shap_importance(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
-    ) -> Dict[str, float]:
+        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
+    ) -> dict[str, float]:
         """Compute SHAP-based feature importance."""
         import lightgbm as lgb
 
@@ -283,19 +282,19 @@ class FeatureDiscoveryPipeline:
             explainer = shap.TreeExplainer(model)
             shap_values = explainer.shap_values(X[:500])  # sample for speed
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
-            return dict(zip(feature_names, mean_abs_shap))
+            return dict(zip(feature_names, mean_abs_shap, strict=False))
         except ImportError:
             # Fallback: use built-in feature importance
             importance = model.feature_importances_
-            return dict(zip(feature_names, importance))
+            return dict(zip(feature_names, importance, strict=False))
 
     # =====================================================
     # Step 6: Feature Stability
     # =====================================================
 
     def _feature_stability(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
-    ) -> Dict[str, float]:
+        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
+    ) -> dict[str, float]:
         """Check if feature importance is stable across time periods."""
         import lightgbm as lgb
 
@@ -340,10 +339,10 @@ class FeatureDiscoveryPipeline:
     # =====================================================
 
     def _detect_leakage(
-        self, data: pl.DataFrame, target: pl.Series, feature_names: List[str]
-    ) -> Dict[str, bool]:
+        self, data: pl.DataFrame, target: pl.Series, feature_names: list[str]
+    ) -> dict[str, bool]:
         """Detect if any feature leaks future information.
-        
+
         Temporal validation: feature'in gelecekteki target ile korelasyonu
         geçmişteki target ile korelasyonundan yüksekse leakage olabilir.
         """
@@ -393,9 +392,9 @@ class FeatureDiscoveryPipeline:
         self,
         data: pl.DataFrame,
         target: pl.Series,
-        feature_names: List[str],
+        feature_names: list[str],
         regime_labels: pl.Series,
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> dict[str, dict[str, float]]:
         """Compute feature importance per market regime."""
         import lightgbm as lgb
 
@@ -417,7 +416,7 @@ class FeatureDiscoveryPipeline:
             model.fit(X_regime, y_regime)
 
             importance = model.feature_importances_
-            result[str(regime)] = dict(zip(feature_names, importance))
+            result[str(regime)] = dict(zip(feature_names, importance, strict=False))
 
         return result
 
@@ -427,12 +426,12 @@ class FeatureDiscoveryPipeline:
 
     def _final_selection(
         self,
-        features: List[str],
-        perm_importance: Dict[str, float],
-        shap_importance: Dict[str, float],
-        stability: Dict[str, float],
-        leakage: Dict[str, bool],
-    ) -> List[str]:
+        features: list[str],
+        perm_importance: dict[str, float],
+        shap_importance: dict[str, float],
+        stability: dict[str, float],
+        leakage: dict[str, bool],
+    ) -> list[str]:
         """Final feature selection combining all signals."""
         selected = []
 

@@ -3,10 +3,9 @@ ALPHA BIST — CANLI VERİ VE DİNAMİKLİK DENETİMİ (0 SAHTE VERİ KONTROLÜ)
 Tüm API uç noktalarını ve veri sağlayıcılarını sorgulayarak gelen verilerin gerçekliğini kanıtlar.
 """
 
-import sys
-import os
 import asyncio
-import orjson
+import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
@@ -22,8 +21,8 @@ async def audit_all_live_data():
     # 1. Canlı KAP ve Finans Haberleri
     from services.ingestion.providers.news_provider import news_provider
     news = await news_provider.fetch_financial_news_rss(max_items=5)
-    print(f"\n[1. KAYNAK: KAP & Finans Haberleri]")
-    print(f"  • Veri Türü: Canlı RSS / Web Feed (Dinamik)")
+    print("\n[1. KAYNAK: KAP & Finans Haberleri]")
+    print("  • Veri Türü: Canlı RSS / Web Feed (Dinamik)")
     if news:
         print(f"  • Alınan Son Haber: \"{news[0].get('title', '')}\"")
         print(f"  • Kaynak: {news[0].get('source', '')} | Eşleşen Hisse: {news[0].get('matched_ticker')}")
@@ -31,8 +30,8 @@ async def audit_all_live_data():
     # 2. Canlı Küresel Makro
     from services.ingestion.providers.macro_provider import MacroProvider
     macro = await MacroProvider().fetch_yahoo_macro()
-    print(f"\n[2. KAYNAK: Küresel Makro & Emtialar]")
-    print(f"  • Veri Türü: Canlı Borsa & FX Verisi (Dinamik)")
+    print("\n[2. KAYNAK: Küresel Makro & Emtialar]")
+    print("  • Veri Türü: Canlı Borsa & FX Verisi (Dinamik)")
     print(f"  • Dolar/TL (USDTRY): {macro.get('USDTRY', {}).get('price')} TL")
     print(f"  • Dolar Endeksi (DXY): {macro.get('DXY', {}).get('price')}")
     print(f"  • Brent Petrol: ${macro.get('BRENT', {}).get('price')}")
@@ -41,8 +40,8 @@ async def audit_all_live_data():
     # 3. Canlı BIST Fiyatları ve BIST Evreni
     from services.ingestion.bist_universe import bist_universe
     tickers = bist_universe.get_tickers()
-    print(f"\n[3. KAYNAK: BIST Hisse Evreni]")
-    print(f"  • Veri Türü: Dinamik BIST Hisseleri Listesi")
+    print("\n[3. KAYNAK: BIST Hisse Evreni]")
+    print("  • Veri Türü: Dinamik BIST Hisseleri Listesi")
     print(f"  • Toplam Hisse Sayısı: {len(tickers)} hisse")
     print(f"  • İlk 5 Hisse: {tickers[:5]}")
     print(f"  • Son 5 Hisse: {tickers[-5:]}")
@@ -50,7 +49,7 @@ async def audit_all_live_data():
     # 4. Canlı Temel Analiz Verileri
     from services.ingestion.providers.fundamental_provider import FundamentalProvider
     fund = await FundamentalProvider().fetch_fundamentals("THYAO")
-    print(f"\n[4. KAYNAK: Canlı Şirket Rasyoları (THYAO)]")
+    print("\n[4. KAYNAK: Canlı Şirket Rasyoları (THYAO)]")
     print(f"  • F/K (P/E): {fund.get('pe_ratio')}")
     print(f"  • PD/DD (P/B): {fund.get('pb_ratio')}")
     print(f"  • Piyasa Değeri: {fund.get('market_cap')}")

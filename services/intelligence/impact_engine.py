@@ -3,10 +3,11 @@
 Olayların varlıklara nasıl yayıldığını modelleyen motor.
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -29,16 +30,16 @@ class PropagationResult:
     source_event_type: str
     source_event_id: str
     timestamp: datetime
-    affected_instruments: List[Dict[str, Any]]
-    world_state_delta: Dict[str, float]
-    propagation_chain: List[Dict[str, Any]]
+    affected_instruments: list[dict[str, Any]]
+    world_state_delta: dict[str, float]
+    propagation_chain: list[dict[str, Any]]
 
 
 # =====================================================
 # Propagation Rules (50+ kural)
 # =====================================================
 
-PROPAGATION_RULES: List[PropagationRule] = [
+PROPAGATION_RULES: list[PropagationRule] = [
     # === FED ===
     PropagationRule("FED_RATE_HIKE", "USD_INDEX", +0.8, 0, 0.9),
     PropagationRule("FED_RATE_HIKE", "EM_RISK", -0.6, 0, 0.85),
@@ -122,15 +123,15 @@ class ImpactEngine:
 
     def __init__(self):
         self.rules = PROPAGATION_RULES
-        self._instrument_sector_map: Dict[str, List[str]] = {}
-        self._sector_stocks: Dict[str, List[int]] = {}
+        self._instrument_sector_map: dict[str, list[str]] = {}
+        self._sector_stocks: dict[str, list[int]] = {}
 
-    def load_sector_map(self, instrument_sector: Dict[str, str]):
+    def load_sector_map(self, instrument_sector: dict[str, str]):
         """Load instrument → sector mapping."""
         self._instrument_sector_map = instrument_sector
 
         # Reverse: sector → instruments
-        sector_stocks: Dict[str, List[str]] = {}
+        sector_stocks: dict[str, list[str]] = {}
         for ticker, sector in instrument_sector.items():
             if sector not in sector_stocks:
                 sector_stocks[sector] = []
@@ -140,10 +141,10 @@ class ImpactEngine:
     def propagate(
         self,
         event_type: str,
-        event_data: Dict[str, Any],
+        event_data: dict[str, Any],
         event_id: str,
-        current_world_state: Dict[str, float],
-        instrument_states: Dict[str, Dict],
+        current_world_state: dict[str, float],
+        instrument_states: dict[str, dict],
     ) -> PropagationResult:
         """
         Propagate an event through the impact graph.
@@ -161,7 +162,7 @@ class ImpactEngine:
             return PropagationResult(
                 source_event_type=event_type,
                 source_event_id=event_id,
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 affected_instruments=[],
                 world_state_delta={},
                 propagation_chain=[],
@@ -206,7 +207,7 @@ class ImpactEngine:
 
             elif rule.target == "ALL_STOCKS":
                 # Market-wide impact
-                for ticker in self._instrument_sector_map.keys():
+                for ticker in self._instrument_sector_map:
                     affected.append({
                         "ticker": ticker,
                         "impact": impact_magnitude,
@@ -264,7 +265,7 @@ class ImpactEngine:
         return PropagationResult(
             source_event_type=event_type,
             source_event_id=event_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             affected_instruments=list(aggregated.values()),
             world_state_delta=world_delta,
             propagation_chain=chain,
@@ -278,16 +279,17 @@ impact_engine = ImpactEngine()
 # =====================================================
 # B31 Event Study entegrasyonu
 # =====================================================
-def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, market_returns: list) -> Dict[str, Any]:
+def analyze_event_impact(ticker: str, event_type: str, stock_returns: list, market_returns: list) -> dict[str, Any]:
     """Event study ile olay etkisi analizi."""
     try:
-        from services.event_study.kap_event import analyze_kap_event_simple
+        from datetime import datetime, timezone  # noqa: F401
+
         from services.event_study.impact import calculate_event_impact
-        from datetime import datetime, timezone
+        from services.event_study.kap_event import analyze_kap_event_simple
         result = analyze_kap_event_simple(
             ticker=ticker,
             event_description=event_type,
-            event_date=datetime.now(timezone.utc),
+            event_date=datetime.now(UTC),
             stock_returns=np.array(stock_returns),
             market_returns=np.array(market_returns),
         )

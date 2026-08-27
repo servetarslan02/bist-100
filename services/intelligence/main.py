@@ -1,22 +1,29 @@
 """ALPHA BIST - Intelligence Service (AI/LLM Integration)"""
 
 import asyncio
-import orjson
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import httpx
+import orjson
 import structlog
 
 from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, redis_get,
-    redis_set, redis_hgetall,
+    close_databases,
+    init_databases,
+    pg_fetch,
+    redis_get,
+    redis_hgetall,
+    redis_set,
+)
+from ..core.event_bus import (
+    EventConsumer,
+    EventType,
+    ensure_topics,
+    publish_event,
 )
 from ..core.event_schema import CanonicalEvent
-from ..core.event_bus import (
-    ensure_topics, EventType,
-    EventConsumer, publish_event,
-)
 from ..core.logging import setup_logging
 from .spec_engine import spec_engine
 from .world_state import world_state_manager
@@ -168,13 +175,13 @@ class IntelligenceService:
         except Exception as e:
             logger.error("KAP analysis error", error=str(e))
 
-    def analyze_ticker(self, ticker: str, features: Dict, market_state: Dict = None,
-                       fundamentals: Dict = None, news: list = None) -> Dict[str, Any]:
+    def analyze_ticker(self, ticker: str, features: dict, market_state: dict = None,
+                       fundamentals: dict = None, news: list = None) -> dict[str, Any]:
         """Tek hisse için tam intelligence analizi — tüm modülleri kullanır.
 
         Bu metod orchestrator tarafından çağrılır.
         """
-        result = {"ticker": ticker, "timestamp": datetime.now(timezone.utc).isoformat()}
+        result = {"ticker": ticker, "timestamp": datetime.now(UTC).isoformat()}
         if market_state is None: market_state = {}
         if fundamentals is None: fundamentals = {}
 
@@ -305,9 +312,9 @@ class IntelligenceService:
 
         return result
 
-    async def _build_context(self, ticker: str, event_data: Dict) -> Dict[str, Any]:
+    async def _build_context(self, ticker: str, event_data: dict) -> dict[str, Any]:
         """Build enriched context for LLM analysis.
-        
+
         v1.1: Knowledge graph, historical analogues, prediction history,
         model uncertainty, scenario results, counterfactuals,
         news cluster, event propagation, portfolio exposure eklenendi.
@@ -315,7 +322,7 @@ class IntelligenceService:
         context = {
             "ticker": ticker,
             "event_data": event_data,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         try:
@@ -392,7 +399,7 @@ class IntelligenceService:
 
         return context
 
-    async def _analyze_with_llm(self, prompt: str, context: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def _analyze_with_llm(self, prompt: str, context: dict[str, Any]) -> dict[str, Any] | None:
         """Send analysis request to LLM (Ollama)."""
         try:
             # Build the full prompt
@@ -429,7 +436,7 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
             if response.status_code == 200:
                 result = response.json()
                 raw_response = result.get("response", "")
-                
+
                 # Try to parse structured JSON from LLM
                 parsed = None
                 try:
@@ -438,19 +445,19 @@ Return ONLY valid JSON, no other text. Do not give financial advice."""
                     json_match = re.search(r'\{[^{}]*\}', raw_response, re.DOTALL)
                     if json_match:
                         parsed = orjson.loads(json_match.group())
-                        
+
                         # Gerekli alanları doğrula
                         required = ["assessment", "direction", "confidence"]
                         if not all(k in parsed for k in required):
                             parsed = None
                 except (orjson.JSONDecodeError, Exception):
                     parsed = None
-                
+
                 return {
                     "analysis": raw_response,
                     "structured": parsed,
                     "model": settings.ollama_model,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                     "eval_count": result.get("eval_count", 0),
                     "eval_duration_ms": result.get("eval_duration", 0) / 1000000,
                 }

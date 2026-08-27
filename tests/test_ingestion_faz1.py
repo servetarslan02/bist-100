@@ -4,20 +4,15 @@ ALPHA BIST — Ingestion Faz 1 Tests
 Reconciliation, Point-in-Time, Deduplication, Incremental testleri.
 """
 
-import asyncio
-import pytest
 import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock
+from datetime import UTC, datetime, timedelta
 
-import sys
-import os
+import pytest
 
-from services.ingestion.reconciliation import SourceReconciler, ReconciliationResult
-from services.ingestion.point_in_time import PointInTimeValidator
 from services.ingestion.deduplication import EventDeduplicator
 from services.ingestion.incremental import IncrementalFetcher
-
+from services.ingestion.point_in_time import PointInTimeValidator
+from services.ingestion.reconciliation import SourceReconciler
 
 # =====================================================
 # Reconciliation Tests
@@ -317,15 +312,15 @@ class TestIncrementalFetcher:
         fetcher = IncrementalFetcher(default_lookback_hours=2)
         since = fetcher.get_since("NEW_TICKER")
         # 2 saat öncesine yakın olmalı
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         assert (now - since).total_seconds() < 7200 + 10  # 2 saat + tolerans
 
     def test_get_since_after_fetch(self):
         """Çekme sonrası since güncellenir."""
         fetcher = IncrementalFetcher()
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         fetcher.mark_fetched("THYAO")
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
         since = fetcher.get_since("THYAO")
         assert before <= since <= after
 

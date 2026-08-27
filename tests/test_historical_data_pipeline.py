@@ -6,18 +6,15 @@ PIT-safe historical fundamental, KAP, news, catalyst testleri.
 """
 
 import sys
-import os
-import numpy as np
-import polars as pl
-from datetime import datetime, timedelta
-
 
 
 def _make_repo_with_fixtures():
     """Test fixture'ları ile repository oluştur."""
     from services.data.historical_contracts import (
-        InMemoryHistoricalRepository, FundamentalSnapshot,
-        EventSnapshot, CatalystSnapshot,
+        CatalystSnapshot,
+        EventSnapshot,
+        FundamentalSnapshot,
+        InMemoryHistoricalRepository,
     )
 
     repo = InMemoryHistoricalRepository()
@@ -250,8 +247,8 @@ def test_kap_publication_pit():
 
 def test_kap_duplicate_event():
     """Aynı KAP event'i tekrar eklenmemeli."""
-    from services.data.historical_contracts import InMemoryHistoricalRepository, EventSnapshot
     from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
     issues = []
 
     repo = InMemoryHistoricalRepository()
@@ -357,8 +354,8 @@ def test_news_ticker_matching():
 
 def test_news_duplicate_event():
     """Aynı haber tekrar eklenmemeli."""
-    from services.data.historical_contracts import InMemoryHistoricalRepository, EventSnapshot
     from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
     issues = []
 
     repo = InMemoryHistoricalRepository()
@@ -481,8 +478,8 @@ def test_historical_snapshot_deterministic():
 
 def test_future_mutation_invariance():
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
-    from services.data.historical_contracts import InMemoryHistoricalRepository, EventSnapshot
     from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.historical_contracts import EventSnapshot, InMemoryHistoricalRepository
     issues = []
 
     repo = InMemoryHistoricalRepository()
@@ -547,8 +544,8 @@ def test_missing_data_behavior():
 
 def test_stale_data_behavior():
     """Eski veri STALE olarak işaretlenmeli."""
-    from services.data.historical_contracts import InMemoryHistoricalRepository, FundamentalSnapshot
     from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.historical_contracts import FundamentalSnapshot, InMemoryHistoricalRepository
     issues = []
 
     repo = InMemoryHistoricalRepository()
@@ -614,8 +611,8 @@ def test_complete_historical_snapshot():
 
 def test_canonical_fundamental_score():
     """Historical fundamental veri canonical skoru etkiliyor mu?"""
-    from services.data.historical_adapter import HistoricalDataAdapter
     from services.core.canonical_scoring import canonical_scoring
+    from services.data.historical_adapter import HistoricalDataAdapter
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -639,8 +636,8 @@ def test_canonical_fundamental_score():
 
 def test_canonical_news_score():
     """Historical news sentiment canonical skoru etkiliyor mu?"""
-    from services.data.historical_adapter import HistoricalDataAdapter
     from services.core.canonical_scoring import canonical_scoring
+    from services.data.historical_adapter import HistoricalDataAdapter
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -666,8 +663,8 @@ def test_canonical_news_score():
 
 def test_canonical_catalyst_score():
     """Historical catalyst canonical skoru etkiliyor mu?"""
-    from services.data.historical_adapter import HistoricalDataAdapter
     from services.core.canonical_scoring import canonical_scoring
+    from services.data.historical_adapter import HistoricalDataAdapter
     issues = []
 
     repo = _make_repo_with_fixtures()
@@ -754,7 +751,7 @@ def run_all():
     print(f"\n{'=' * 60}")
     print(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print(f"\n  HATALAR:")
+        print("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"    {i}. {issue}")
     print("=" * 60)

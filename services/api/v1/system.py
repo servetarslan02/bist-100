@@ -1,30 +1,32 @@
 """System API — Canlı mikroservis, veritabanı deposu, telemetri ve alarm motoru (100% Gerçek Veri)."""
 
-import time
 import asyncio
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException
-from typing import Dict, Any, List
+import time
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
+from fastapi import APIRouter, Depends, HTTPException
+
 try:
     import psutil
 except ImportError:
     psutil = None
 
-from ..dependencies import get_current_user, check_rate_limit
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
 
 
-def _get_system_resources() -> Dict[str, Any]:
+def _get_system_resources() -> dict[str, Any]:
     """psutil uzerinden gercek CPU, RAM ve Disk kullanimini olcer."""
     try:
         if psutil:
             vm = psutil.virtual_memory()
             cpu = psutil.cpu_percent(interval=None)
             disk = psutil.disk_usage('/')
-            
+
             return {
                 "cpu_pct": round(cpu, 1),
                 "memory_pct": round(vm.percent, 1),
@@ -61,7 +63,7 @@ def _get_system_resources() -> Dict[str, Any]:
 async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Sistem durumu — mikroservis saglik ve canlilik kontrolu."""
     services = {}
-    
+
     # PostgreSQL
     try:
         from ...core.database import pg_fetchval
@@ -131,7 +133,7 @@ async def status(user=Depends(get_current_user), _=Depends(check_rate_limit)):
         "resources": resources,
         "system_details": system_details,
         "pipeline_stats": pipeline_stats,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
 
 
@@ -182,13 +184,13 @@ async def get_databases_info(user=Depends(get_current_user), _=Depends(check_rat
     pg_tables = []
     pg_total_rows = 0
     try:
-        from ...core.database import pg_fetchval, pg_fetch
+        from ...core.database import pg_fetch, pg_fetchval
         t0 = time.time()
         res_pg = await pg_fetchval("SELECT pg_size_pretty(pg_database_size(current_database()))")
         pg_lat = round((time.time() - t0) * 1000, 1)
         if res_pg:
             pg_size = str(res_pg)
-            
+
         rows = await pg_fetch("""
             SELECT relname AS table_name, n_live_tup AS row_count, pg_size_pretty(pg_total_relation_size(relid)) AS total_size
             FROM pg_stat_user_tables
@@ -367,8 +369,8 @@ async def get_system_alerts(user=Depends(get_current_user), _=Depends(check_rate
     if _ALERTS_CACHE and (now_ts - _ALERTS_CACHE_TIME < 30):
         return _ALERTS_CACHE
 
-    now = datetime.now(timezone.utc)
-    alerts: List[Dict[str, Any]] = []
+    now = datetime.now(UTC)
+    alerts: list[dict[str, Any]] = []
 
     # 1. ML Ensemble Fırsat Alarmları
     try:
@@ -458,7 +460,7 @@ async def optimize_storage(user=Depends(get_current_user), _=Depends(check_rate_
             "status": "success",
             "message": "ClickHouse, PostgreSQL ve Redis dağıtık depolama indeksleri başarıyla optimize edildi.",
             "reclaimed_space": reclaimed,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     except Exception as e:
-        raise HTTPException(500, f"Storage optimization error: {e}")
+        raise HTTPException(500, f"Storage optimization error: {e}") from e

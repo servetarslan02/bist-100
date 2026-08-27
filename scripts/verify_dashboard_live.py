@@ -3,8 +3,9 @@ ALPHA BIST — CANLI WEB DASHBOARD, KAP/HABER VE MAKRO ENTEGRASYON KANITI
 Web arayüzünde '/', '/dashboard', '/api/v1/alternative/news' ve '/api/v1/alternative/macro' uç noktalarını doğrular.
 """
 
-import sys
 import os
+import sys
+
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, os.path.abspath("."))

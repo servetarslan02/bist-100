@@ -14,11 +14,12 @@ Kullanım:
     await provisioner.provision_all()
 """
 
-import orjson
 import os
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -43,9 +44,9 @@ class DatasourceConfig:
     url: str
     access: str = "proxy"
     is_default: bool = False
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_grafana_payload(self) -> Dict[str, Any]:
+    def to_grafana_payload(self) -> dict[str, Any]:
         payload = {
             "name": self.name,
             "type": self.type,
@@ -70,11 +71,11 @@ class DashboardVersion:
 class GrafanaProvisioner:
     """Grafana dashboard ve datasource provisioning."""
 
-    def __init__(self, config: Optional[GrafanaConfig] = None):
+    def __init__(self, config: GrafanaConfig | None = None):
         self._config = config or GrafanaConfig()
-        self._versions: List[DashboardVersion] = []
-        self._provisioned_dashboards: Dict[str, int] = {}  # uid → version
-        self._provisioned_datasources: List[str] = []
+        self._versions: list[DashboardVersion] = []
+        self._provisioned_dashboards: dict[str, int] = {}  # uid → version
+        self._provisioned_datasources: list[str] = []
 
     # =====================================================
     # DATASOURCE
@@ -141,7 +142,7 @@ class GrafanaProvisioner:
     # =====================================================
 
     async def provision_dashboard(self, file_path: str, folder_id: int = 0,
-                                  overwrite: bool = True) -> Optional[int]:
+                                  overwrite: bool = True) -> int | None:
         """Dashboard JSON dosyasını Grafana'ya yükle.
 
         Returns:
@@ -175,40 +176,39 @@ class GrafanaProvisioner:
             auth_parts = self._config.auth.split(":")
             auth = aiohttp.BasicAuth(auth_parts[0], auth_parts[1]) if len(auth_parts) == 2 else None
 
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    url, json=payload, auth=auth,
-                    timeout=aiohttp.ClientTimeout(total=self._config.timeout),
-                    ssl=self._config.verify_ssl,
-                ) as resp:
-                    if resp.status in (200, 201):
-                        result = await resp.json()
-                        version = result.get("version", 1)
-                        uid = payload["dashboard"]["uid"]
-                        title = payload["dashboard"].get("title", "unknown")
+            async with aiohttp.ClientSession() as session, session.post(
+                url, json=payload, auth=auth,
+                timeout=aiohttp.ClientTimeout(total=self._config.timeout),
+                ssl=self._config.verify_ssl,
+            ) as resp:
+                if resp.status in (200, 201):
+                    result = await resp.json()
+                    version = result.get("version", 1)
+                    uid = payload["dashboard"]["uid"]
+                    title = payload["dashboard"].get("title", "unknown")
 
-                        self._provisioned_dashboards[uid] = version
-                        self._versions.append(DashboardVersion(
-                            uid=uid, title=title, version=version,
-                            provisioned_at=str(__import__('datetime').datetime.now(
-                                __import__('datetime').timezone.utc)),
-                            file_path=str(path),
-                        ))
+                    self._provisioned_dashboards[uid] = version
+                    self._versions.append(DashboardVersion(
+                        uid=uid, title=title, version=version,
+                        provisioned_at=str(__import__('datetime').datetime.now(
+                            __import__('datetime').timezone.utc)),
+                        file_path=str(path),
+                    ))
 
-                        logger.info("Dashboard provisioned",
-                                  title=title, version=version, uid=uid)
-                        return version
-                    else:
-                        body = await resp.text()
-                        logger.error("Dashboard provisioning failed",
-                                   status=resp.status, body=body[:200])
-                        return None
+                    logger.info("Dashboard provisioned",
+                              title=title, version=version, uid=uid)
+                    return version
+                else:
+                    body = await resp.text()
+                    logger.error("Dashboard provisioning failed",
+                               status=resp.status, body=body[:200])
+                    return None
 
         except Exception as e:
             logger.error("Dashboard provisioning error", path=file_path, error=str(e))
             return None
 
-    async def provision_all(self) -> Dict[str, Any]:
+    async def provision_all(self) -> dict[str, Any]:
         """Tüm dashboard dosyalarını yükle."""
         results = {"dashboards": {}, "datasources": {}, "errors": []}
 
@@ -240,7 +240,7 @@ class GrafanaProvisioner:
     # VERSION HISTORY
     # =====================================================
 
-    def get_version_history(self) -> List[Dict[str, Any]]:
+    def get_version_history(self) -> list[dict[str, Any]]:
         """Dashboard versiyon geçmişi."""
         return [
             {
@@ -253,7 +253,7 @@ class GrafanaProvisioner:
             for v in self._versions
         ]
 
-    def get_provisioning_status(self) -> Dict[str, Any]:
+    def get_provisioning_status(self) -> dict[str, Any]:
         """Provisioning durumu."""
         return {
             "grafana_url": self._config.url,

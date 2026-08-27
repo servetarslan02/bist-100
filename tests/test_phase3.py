@@ -5,7 +5,6 @@ World State, Regime Engine, Macro Sensitivity testleri.
 """
 
 import sys
-import os
 
 
 def test_world_state():
@@ -46,7 +45,6 @@ def test_world_state():
     print("  ✓ VIX normalize")
 
     # 5. Invariant (0-1 arası)
-    import numpy as np
     vec = state.to_vector()
     vec[0] = 1.5  # Geçersiz
     state.from_vector(vec)
@@ -83,7 +81,7 @@ def test_world_state():
 
 def test_regime_engine():
     """Regime Engine testleri."""
-    from services.intelligence.regime import regime_engine, Regime
+    from services.intelligence.regime import Regime, regime_engine
 
     passed = 0
     failed = 0

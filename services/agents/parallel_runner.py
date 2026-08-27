@@ -10,12 +10,17 @@ FAZ 1: Paralel Çalışma
 
 import asyncio
 import time
-from typing import Dict, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 from .agent_system import (
-    AgentRole, AgentTask, AgentResult, BaseAgent, AIFallback,
+    AgentResult,
+    AgentRole,
+    AgentTask,
+    AIFallback,
+    BaseAgent,
 )
 from .llm_client import BaseLLMClient
 
@@ -25,12 +30,12 @@ logger = structlog.get_logger()
 @dataclass
 class ParallelRunResult:
     """Paralel çalıştırma sonucu."""
-    results: Dict[AgentRole, AgentResult]
+    results: dict[AgentRole, AgentResult]
     total_duration_ms: float
     success_count: int
     failure_count: int
     timeout_count: int
-    agent_durations: Dict[str, float] = field(default_factory=dict)
+    agent_durations: dict[str, float] = field(default_factory=dict)
 
     @property
     def success_rate(self) -> float:
@@ -70,9 +75,9 @@ class ParallelAgentRunner:
 
     async def run_agents(
         self,
-        agents: Dict[AgentRole, BaseAgent],
-        tasks: Dict[AgentRole, AgentTask],
-        llm_client: Optional[BaseLLMClient] = None,
+        agents: dict[AgentRole, BaseAgent],
+        tasks: dict[AgentRole, AgentTask],
+        llm_client: BaseLLMClient | None = None,
     ) -> ParallelRunResult:
         """Tüm agent'ları paralel çalıştır.
 
@@ -125,7 +130,7 @@ class ParallelAgentRunner:
         timeout_count = 0
         agent_durations = {}
 
-        for (role, agent, task), result in zip(agent_tasks, gathered_results):
+        for (role, _agent, task), result in zip(agent_tasks, gathered_results, strict=False):
             if isinstance(result, asyncio.TimeoutError):
                 timeout_count += 1
                 results[role] = self._create_timeout_result(task, role)
@@ -172,7 +177,7 @@ class ParallelAgentRunner:
         role: AgentRole,
         agent: BaseAgent,
         task: AgentTask,
-        llm_client: Optional[BaseLLMClient],
+        llm_client: BaseLLMClient | None,
     ) -> AgentResult:
         """Tek agent'ı semaphore ile çalıştır."""
         async with self._semaphore:
@@ -181,7 +186,7 @@ class ParallelAgentRunner:
                     agent.execute(task, llm_client),
                     timeout=self.timeout_seconds,
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 raise
             except Exception as e:
                 logger.error("Agent execution error", role=role.value, error=str(e))
@@ -243,10 +248,10 @@ class ParallelAgentRunner:
 class AgentPipelineBuilder:
     """Agent pipeline builder — kolay kullanım için."""
 
-    def __init__(self, llm_client: Optional[BaseLLMClient] = None):
+    def __init__(self, llm_client: BaseLLMClient | None = None):
         self.llm_client = llm_client
         self._runner = ParallelAgentRunner()
-        self._agents: Dict[AgentRole, BaseAgent] = {}
+        self._agents: dict[AgentRole, BaseAgent] = {}
 
     def with_runner(self, runner: ParallelAgentRunner) -> "AgentPipelineBuilder":
         self._runner = runner
@@ -268,7 +273,7 @@ class AgentPipelineBuilder:
     async def run(
         self,
         ticker: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
     ) -> ParallelRunResult:
         """Pipeline'ı çalıştır."""
         # Task'ları oluştur

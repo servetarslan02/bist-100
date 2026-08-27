@@ -10,11 +10,12 @@ Tarihsel makro veri deposu — point-in-time:
 KURAL: Backtest'te sadece o tarihte bilinen veriyi kullan.
 """
 
-import orjson
 import os
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -35,7 +36,7 @@ class MacroHistoricalStore:
 
     def __init__(self, storage_path: str = "data/macro_historical.json"):
         self._storage_path = storage_path
-        self._data: Dict[str, Dict[str, List[Dict]]] = {}  # indicator → {date → [values]}
+        self._data: dict[str, dict[str, list[dict]]] = {}  # indicator → {date → [values]}
         self._load()
 
     def save(
@@ -62,7 +63,7 @@ class MacroHistoricalStore:
         entry = {
             "value": value,
             "source": source,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         self._data[indicator][date].append(entry)
@@ -74,7 +75,7 @@ class MacroHistoricalStore:
         self,
         date: str,
         indicator: str,
-    ) -> Optional[float]:
+    ) -> float | None:
         """Belirli tarihteki veriyi getir (point-in-time).
 
         Args:
@@ -97,12 +98,12 @@ class MacroHistoricalStore:
         self,
         date: str,
         indicator: str,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Belirli tarihten önceki en son veriyi getir (PIT)."""
         indicator_data = self._data.get(indicator, {})
 
         # Tarihten önceki tüm tarihleri bul
-        earlier_dates = [d for d in indicator_data.keys() if d <= date]
+        earlier_dates = [d for d in indicator_data if d <= date]
 
         if not earlier_dates:
             return None
@@ -122,7 +123,7 @@ class MacroHistoricalStore:
         indicator: str,
         start_date: str,
         end_date: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Tarih aralığındaki veriyi getir."""
         indicator_data = self._data.get(indicator, {})
 
@@ -139,7 +140,7 @@ class MacroHistoricalStore:
 
         return result
 
-    def get_latest(self, indicator: str) -> Optional[Dict[str, Any]]:
+    def get_latest(self, indicator: str) -> dict[str, Any] | None:
         """Son veriyi getir."""
         indicator_data = self._data.get(indicator, {})
 
@@ -159,7 +160,7 @@ class MacroHistoricalStore:
     def backfill(
         self,
         indicator: str,
-        data: List[Dict[str, Any]],
+        data: list[dict[str, Any]],
     ):
         """Toplu veri yükleme (backfill).
 
@@ -179,11 +180,11 @@ class MacroHistoricalStore:
 
         logger.info("Backfill completed", indicator=indicator, count=count)
 
-    def get_available_indicators(self) -> List[str]:
+    def get_available_indicators(self) -> list[str]:
         """Mevcut göstergeleri listele."""
         return list(self._data.keys())
 
-    def get_date_range(self, indicator: str) -> Optional[Dict[str, str]]:
+    def get_date_range(self, indicator: str) -> dict[str, str] | None:
         """Göstergenin tarih aralığını döndür."""
         indicator_data = self._data.get(indicator, {})
 
@@ -198,7 +199,7 @@ class MacroHistoricalStore:
             "total_points": len(dates),
         }
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Rapor."""
         indicators = self.get_available_indicators()
         total_points = sum(
@@ -219,7 +220,7 @@ class MacroHistoricalStore:
         """Veriyi dosyadan yükle."""
         if os.path.exists(self._storage_path):
             try:
-                with open(self._storage_path, "r") as f:
+                with open(self._storage_path) as f:
                     self._data = orjson.loads(f.read())
                 logger.info("Historical store loaded",
                            indicators=len(self._data),

@@ -9,8 +9,7 @@ Pipeline:
   market.tick → state update → feature update → light scan → candidate?
 """
 
-from typing import Dict, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 import structlog
@@ -25,18 +24,18 @@ class LiveScanner:
     """
 
     def __init__(self):
-        self._states: Dict[str, Dict] = {}  # ticker -> state
+        self._states: dict[str, dict] = {}  # ticker -> state
         self._scan_count: int = 0
-        self._candidates: Dict[str, float] = {}  # ticker -> score
+        self._candidates: dict[str, float] = {}  # ticker -> score
 
     def process_tick(self, ticker: str, price: float, volume: int,
-                     timestamp: Optional[datetime] = None) -> Optional[Dict]:
+                     timestamp: datetime | None = None) -> dict | None:
         """
         Tick işle → state güncelle → aday mı?
 
         Returns: None (normal) veya candidate dict (ilginç hareket)
         """
-        ts = timestamp or datetime.now(timezone.utc)
+        ts = timestamp or datetime.now(UTC)
 
         # State yoksa oluştur
         if ticker not in self._states:
@@ -90,7 +89,7 @@ class LiveScanner:
 
         return None
 
-    def _check_candidate(self, ticker: str, state: Dict) -> Optional[Dict]:
+    def _check_candidate(self, ticker: str, state: dict) -> dict | None:
         """Bu hisse aday mı?"""
         vol_z = state.get("vol_z", 0)
         tick_change = abs(state.get("tick_change_pct", 0))
@@ -134,7 +133,7 @@ class LiveScanner:
 
         return None
 
-    def get_candidates(self) -> Dict[str, float]:
+    def get_candidates(self) -> dict[str, float]:
         """Aktif adayları döndür."""
         return self._candidates.copy()
 
@@ -142,11 +141,11 @@ class LiveScanner:
         """Adayı temizle."""
         self._candidates.pop(ticker, None)
 
-    def get_state(self, ticker: str) -> Optional[Dict]:
+    def get_state(self, ticker: str) -> dict | None:
         """Hisse state'ini döndür."""
         return self._states.get(ticker)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "tracked_tickers": len(self._states),

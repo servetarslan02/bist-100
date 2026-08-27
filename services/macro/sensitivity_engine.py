@@ -10,12 +10,12 @@ Dinamik sektör-macro hassasiyet — rolling korelasyon:
 KURAL: Sabit hassasiyet yok — her şey rolling korelasyon.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
-import structlog
+from datetime import UTC, datetime
+from typing import Any
 
+import numpy as np
+import structlog
 
 logger = structlog.get_logger()
 
@@ -40,7 +40,7 @@ class SensitivityResult:
     n_observations: int = 0
     window_days: int = 60
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "sector": self.sector,
             "usdtry_sensitivity": round(self.usdtry_sensitivity, 4),
@@ -100,17 +100,17 @@ class DynamicSensitivityEngine:
         self._min_observations = min_observations
 
         # Rolling data
-        self._sector_returns: Dict[str, List[float]] = {}  # sector → returns
-        self._macro_values: Dict[str, List[float]] = {}    # macro_var → values
+        self._sector_returns: dict[str, list[float]] = {}  # sector → returns
+        self._macro_values: dict[str, list[float]] = {}    # macro_var → values
 
         # Company overrides
-        self._company_overrides: Dict[str, CompanySensitivity] = {}
+        self._company_overrides: dict[str, CompanySensitivity] = {}
 
         # Cache
-        self._sensitivity_cache: Dict[str, SensitivityResult] = {}
-        self._last_cache_update: Optional[datetime] = None
+        self._sensitivity_cache: dict[str, SensitivityResult] = {}
+        self._last_cache_update: datetime | None = None
 
-    def update(self, sector_returns: Dict[str, float], macro_values: Dict[str, float]):
+    def update(self, sector_returns: dict[str, float], macro_values: dict[str, float]):
         """Günlük güncelleme — rolling window'a veri ekle.
 
         Args:
@@ -192,7 +192,7 @@ class DynamicSensitivityEngine:
 
         # Cache
         self._sensitivity_cache[sector] = result
-        self._last_cache_update = datetime.now(timezone.utc)
+        self._last_cache_update = datetime.now(UTC)
 
         return result
 
@@ -234,8 +234,8 @@ class DynamicSensitivityEngine:
         ticker: str,
         sector: str,
         daily_return: float,
-        macro_changes: Dict[str, float],
-    ) -> Dict[str, float]:
+        macro_changes: dict[str, float],
+    ) -> dict[str, float]:
         """Factor decomposition — hangi faktör ne kadar katkı yaptı.
 
         Args:
@@ -273,7 +273,7 @@ class DynamicSensitivityEngine:
 
         return contributions
 
-    def compute_all_sensitivities(self) -> Dict[str, SensitivityResult]:
+    def compute_all_sensitivities(self) -> dict[str, SensitivityResult]:
         """Tüm sektörler için hassasiyet hesapla."""
         results = {}
         all_sectors = set(list(self._sector_returns.keys()) + list(self.DEFAULT_SENSITIVITIES.keys()))
@@ -281,7 +281,7 @@ class DynamicSensitivityEngine:
             results[sector] = self.compute_dynamic_sensitivity(sector)
         return results
 
-    def get_sensitivity_summary(self) -> Dict[str, Any]:
+    def get_sensitivity_summary(self) -> dict[str, Any]:
         """Hassasiyet özeti — en hassas sektörler."""
         all_sens = self.compute_all_sensitivities()
 
@@ -304,9 +304,9 @@ class DynamicSensitivityEngine:
 
     def _compute_rolling_corr(
         self,
-        sector_returns: List[float],
+        sector_returns: list[float],
         macro_var: str,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Rolling korelasyon hesapla.
 
         Returns:
@@ -357,7 +357,7 @@ class DynamicSensitivityEngine:
 
     def _compute_sensitivity_trend(
         self,
-        sector_returns: List[float],
+        sector_returns: list[float],
         macro_var: str,
     ) -> str:
         """Sensitivite trendi — son 20 gün vs önceki 20 gün."""

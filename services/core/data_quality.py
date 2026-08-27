@@ -10,10 +10,11 @@ KURAL: Execute edilemeyen fiyat kullanma!
 """
 
 import copy as _copy
-import polars as pl
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -25,11 +26,11 @@ class TradabilityMask:
     ticker: str
     timestamp: datetime
     is_tradable: bool
-    reasons: List[str]
+    reasons: list[str]
     price_mask: float = 1.0
     volume_mask: float = 1.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp.isoformat(),
@@ -44,7 +45,7 @@ class DataQualityEngine:
     """Veri kalitesi ve tradability kontrol motoru."""
 
     def __init__(self):
-        self._masks: Dict[str, TradabilityMask] = {}
+        self._masks: dict[str, TradabilityMask] = {}
         logger.info("DataQualityEngine initialized")
 
     def check_tradability(
@@ -56,7 +57,7 @@ class DataQualityEngine:
         close: float,
         volume: float,
         prev_close: float,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ) -> TradabilityMask:
         """Hisse tradability kontrolü."""
         reasons = []
@@ -108,7 +109,7 @@ class DataQualityEngine:
 
         mask = TradabilityMask(
             ticker=ticker,
-            timestamp=timestamp or datetime.now(timezone.utc),
+            timestamp=timestamp or datetime.now(UTC),
             is_tradable=is_tradable,
             reasons=reasons if reasons else ["OK"],
             price_mask=price_mask,
@@ -121,7 +122,7 @@ class DataQualityEngine:
 
         return mask
 
-    def apply_mask(self, raw_data: Dict[str, Any], mask: TradabilityMask, *, copy: bool = False) -> Dict[str, Any]:
+    def apply_mask(self, raw_data: dict[str, Any], mask: TradabilityMask, *, copy: bool = False) -> dict[str, Any]:
         """Ham veriye mask uygula."""
         if copy:
             raw_data = _copy.deepcopy(raw_data)
@@ -129,18 +130,17 @@ class DataQualityEngine:
             for col in ["open", "high", "low", "close"]:
                 if col in raw_data:
                     raw_data[col] = None
-        if mask.volume_mask == 0.0:
-            if "volume" in raw_data:
-                raw_data["volume"] = None
+        if mask.volume_mask == 0.0 and "volume" in raw_data:
+            raw_data["volume"] = None
         return raw_data
 
-    def get_mask(self, ticker: str) -> Optional[TradabilityMask]:
+    def get_mask(self, ticker: str) -> TradabilityMask | None:
         return self._masks.get(ticker)
 
     def get_untradable_count(self) -> int:
         return sum(1 for m in self._masks.values() if not m.is_tradable)
 
-    def get_mask_stats(self) -> Dict[str, Any]:
+    def get_mask_stats(self) -> dict[str, Any]:
         total = len(self._masks)
         untradable = self.get_untradable_count()
         return {
@@ -150,7 +150,7 @@ class DataQualityEngine:
             "reasons_breakdown": self._get_reasons_breakdown(),
         }
 
-    def _get_reasons_breakdown(self) -> Dict[str, int]:
+    def _get_reasons_breakdown(self) -> dict[str, int]:
         reasons = {}
         for mask in self._masks.values():
             for reason in mask.reasons:
@@ -168,7 +168,7 @@ class QualityIssue:
     check: str
     severity: str
     message: str
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
     affected_rows: int = 0
 
     def __post_init__(self):
@@ -187,7 +187,7 @@ class QualityIssue:
 class QualityReport:
     ticker: str
     total_rows: int
-    issues: List[QualityIssue]
+    issues: list[QualityIssue]
     quality_score: float
     passed: bool
 

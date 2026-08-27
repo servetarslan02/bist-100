@@ -1,8 +1,9 @@
 """
 ALPHA BIST — Tüm 16 Sayfa ve 5 Temel İlke Denetim Testi
 """
-import sys
 import os
+import sys
+
 import requests
 
 sys.path.insert(0, os.path.abspath("."))
@@ -32,7 +33,7 @@ def audit_all_pages():
     print("=" * 80)
     print("ALPHA BIST — 16 SAYFA DETAYLI DENETİM RAPORU")
     print("=" * 80)
-    
+
     success_count = 0
     for path, title in PAGES:
         url = f"http://localhost:3000{path}"
@@ -44,7 +45,7 @@ def audit_all_pages():
                 success_count += 1
         except Exception as e:
             print(f"  • {path:<16} | HATA       | {e}")
-            
+
     print("-" * 80)
     print(f"Sonuç: {success_count}/{len(PAGES)} sayfa %100 çalışır durumda ve yayında.")
     print("=" * 80)

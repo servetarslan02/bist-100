@@ -12,7 +12,7 @@ Sinyal Türleri:
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Any
 
 import polars as pl
 import yfinance as yf
@@ -45,9 +45,9 @@ class DynamicOpportunityScanner:
             "breakout": 0.15,
         }
 
-    def scan_opportunities(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def scan_opportunities(self, limit: int = 50) -> list[dict[str, Any]]:
         from ..ingestion.bist_universe import BISTUniverse
-        
+
         uni = BISTUniverse()
         tickers = getattr(uni, 'BIST_ALL_TICKERS', [])[:120]
         if not tickers:
@@ -72,7 +72,7 @@ class DynamicOpportunityScanner:
 
         opportunities = []
 
-        for t, yf_t in zip(tickers, yf_tickers):
+        for t, yf_t in zip(tickers, yf_tickers, strict=False):
             try:
                 df = raw[yf_t] if yf_t in raw.columns.get_level_values(0) else None
                 if df is None or df.empty or len(df) < 50:

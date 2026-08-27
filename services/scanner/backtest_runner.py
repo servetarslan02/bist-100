@@ -13,15 +13,16 @@ Optimizasyonlar:
 Geçmiş versiyonla aynı finansal sonuçları üretir.
 """
 
+from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass
 import structlog
 
-from ..features.calculator import feature_calculator
-from ..core.tradability_mask import TradabilityMask
 from ..core.data_quality import DataQualityChecker as DataQualityV2
+from ..core.tradability_mask import TradabilityMask
+from ..features.calculator import feature_calculator
 
 logger = structlog.get_logger()
 
@@ -41,7 +42,7 @@ class BacktestTrade:
     slippage: float
     pnl: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date, "ticker": self.ticker,
             "direction": self.direction, "quantity": self.quantity,
@@ -57,7 +58,7 @@ class BacktestSignal:
     signal: str
     score: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"date": self.date, "ticker": self.ticker,
                 "signal": self.signal, "score": round(self.score, 2)}
 
@@ -72,7 +73,7 @@ class DailySnapshot:
     drawdown: float
     daily_return: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "date": self.date, "equity": round(self.equity, 2),
             "cash": round(self.cash, 2),
@@ -93,13 +94,13 @@ class BacktestResult:
     look_ahead_violations: int
     survivorship_violations: int
     data_quality_issues: int
-    signals: List[BacktestSignal]
-    trades: List[BacktestTrade]
-    portfolio: Dict[str, Any]
-    performance: Dict[str, Any]
-    equity_curve: List[Dict[str, Any]]
+    signals: list[BacktestSignal]
+    trades: list[BacktestTrade]
+    portfolio: dict[str, Any]
+    performance: dict[str, Any]
+    equity_curve: list[dict[str, Any]]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "start_date": self.start_date, "end_date": self.end_date,
             "total_scans": self.total_scans,
@@ -122,15 +123,15 @@ class FeatureCache:
     """Ticker bazında feature cache. Tarih değişince invalidation."""
 
     def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
-        self._date_cache: Dict[str, str] = {}  # ticker → son hesap tarihi
+        self._cache: dict[str, dict[str, Any]] = {}
+        self._date_cache: dict[str, str] = {}  # ticker → son hesap tarihi
 
-    def get(self, ticker: str, date: str) -> Optional[Dict[str, Any]]:
+    def get(self, ticker: str, date: str) -> dict[str, Any] | None:
         if ticker in self._cache and self._date_cache.get(ticker) == date:
             return self._cache[ticker]
         return None
 
-    def set(self, ticker: str, date: str, features: Dict[str, Any]):
+    def set(self, ticker: str, date: str, features: dict[str, Any]):
         self._cache[ticker] = features
         self._date_cache[ticker] = date
 
@@ -147,9 +148,9 @@ class QualityCache:
     """Data quality sonucu cache."""
 
     def __init__(self):
-        self._cache: Dict[str, Tuple[bool, float]] = {}
+        self._cache: dict[str, tuple[bool, float]] = {}
 
-    def get(self, ticker: str) -> Optional[Tuple[bool, float]]:
+    def get(self, ticker: str) -> tuple[bool, float] | None:
         return self._cache.get(ticker)
 
     def set(self, ticker: str, passed: bool, score: float):
@@ -180,16 +181,16 @@ class PortfolioSimulator:
         self._slippage_rate = slippage_rate
         self._max_position_pct = max_position_pct
         self._max_positions = max_positions
-        self._positions: Dict[str, Dict[str, Any]] = {}
-        self._trades: List[BacktestTrade] = []
-        self._daily_snapshots: List[DailySnapshot] = []
+        self._positions: dict[str, dict[str, Any]] = {}
+        self._trades: list[BacktestTrade] = []
+        self._daily_snapshots: list[DailySnapshot] = []
         self._high_water_mark = initial_capital
         self._prev_equity = initial_capital
 
     def can_buy(self) -> bool:
         return len(self._positions) < self._max_positions and self._cash > 0
 
-    def execute_buy(self, ticker: str, price: float, date: str) -> Optional[BacktestTrade]:
+    def execute_buy(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
         if ticker in self._positions or not self.can_buy():
             return None
         if price <= 0 or np.isnan(price):
@@ -230,7 +231,7 @@ class PortfolioSimulator:
             self._trades = self._trades[-5000:]
         return trade
 
-    def execute_sell(self, ticker: str, price: float, date: str) -> Optional[BacktestTrade]:
+    def execute_sell(self, ticker: str, price: float, date: str) -> BacktestTrade | None:
         if ticker not in self._positions:
             return None
         if price <= 0 or np.isnan(price):
@@ -260,7 +261,7 @@ class PortfolioSimulator:
         del self._positions[ticker]
         return trade
 
-    def update_equity(self, prices: Dict[str, float], date: str):
+    def update_equity(self, prices: dict[str, float], date: str):
         """Günlük equity snapshot."""
         market_value = sum(
             pos["quantity"] * prices.get(t, pos["entry_price"])
@@ -281,7 +282,7 @@ class PortfolioSimulator:
         ))
         self._prev_equity = equity
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         if not self._daily_snapshots:
             # Trade-based metrics only
             sell_trades = [t for t in self._trades if t.direction == "SELL"]
@@ -374,11 +375,11 @@ class ScannerBacktestRunner:
 
     def run(
         self,
-        market_data: Dict[str, pl.DataFrame],
+        market_data: dict[str, pl.DataFrame],
         lookback_days: int = 120,
-        universe_at_date: Optional[List[str]] = None,
+        universe_at_date: list[str] | None = None,
         signal_threshold: float = 60.0,
-        benchmark_data: Optional[pl.DataFrame] = None,
+        benchmark_data: pl.DataFrame | None = None,
     ) -> BacktestResult:
         """Optimize edilmiş backtest."""
         import time as _time
@@ -540,7 +541,7 @@ class ScannerBacktestRunner:
             portfolio={}, performance={}, equity_curve=[],
         )
 
-    def _compute_score(self, features: Dict[str, Any]) -> float:
+    def _compute_score(self, features: dict[str, Any]) -> float:
         """Opportunity score — alpha_scanner ile aynı mantık.
 
         Ağırlıklar:
@@ -552,7 +553,8 @@ class ScannerBacktestRunner:
         - regime_fit: 10%
         - technical: 20% (event ve ML yerine)
         """
-        _s = lambda v: float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
+        def _s(v):
+            return float(v.flat[0]) if isinstance(v, np.ndarray) and v.size > 0 else float(v) if v is not None else 0
 
         # Momentum skoru
         roc_5d = _s(features.get("roc_5d", 0))

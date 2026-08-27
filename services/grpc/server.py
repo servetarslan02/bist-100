@@ -11,6 +11,7 @@ Kullanım:
 
 import asyncio
 import time
+
 import structlog
 
 try:
@@ -21,8 +22,7 @@ except ImportError:
 
 # Generated protobuf imports
 try:
-    from .generated import market_pb2
-    from .generated import market_pb2_grpc
+    from .generated import market_pb2, market_pb2_grpc
     HAS_PROTOBUF = True
 except ImportError:
     HAS_PROTOBUF = False

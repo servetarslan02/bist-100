@@ -14,8 +14,9 @@ KURAL: Risk Gate 'NO_TRADE' diyebilmeli. Sistem hicbir kosulda
 islem yapmak zorunda olmamali.
 """
 
-from typing import Dict, List, Any
 from collections import defaultdict
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -72,7 +73,7 @@ class PaperRiskGate:
         sector: str = "",
         data_quality_ok: bool = True,
         model_version_valid: bool = True,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Tum risk check'lerini calistir."""
         checks = []
 
@@ -110,21 +111,18 @@ class PaperRiskGate:
 
         return checks
 
-    def is_trade_allowed(self, checks: List[Dict[str, Any]]) -> bool:
+    def is_trade_allowed(self, checks: list[dict[str, Any]]) -> bool:
         """Tum check'lerden gecildi mi?"""
-        for check in checks:
-            if check["result"] in ("BLOCK", "NO_TRADE"):
-                return False
-        return True
+        return all(check["result"] not in ("BLOCK", "NO_TRADE") for check in checks)
 
-    def get_block_reason(self, checks: List[Dict[str, Any]]) -> str:
+    def get_block_reason(self, checks: list[dict[str, Any]]) -> str:
         """Block sebebini birlestir."""
         blocks = [c for c in checks if c["result"] in ("BLOCK", "NO_TRADE")]
         return "; ".join(f"{c['check_name']}: {c['details']}" for c in blocks)
 
     # ===================== INDIVIDUAL CHECKS =====================
 
-    def _check_kill_switch(self) -> Dict[str, Any]:
+    def _check_kill_switch(self) -> dict[str, Any]:
         if self._kill_switch_active:
             return {
                 "check_name": "kill_switch",
@@ -134,7 +132,7 @@ class PaperRiskGate:
             }
         return {"check_name": "kill_switch", "result": "PASS", "details": "OK", "severity": "INFO"}
 
-    def _check_data_quality(self, ok: bool) -> Dict[str, Any]:
+    def _check_data_quality(self, ok: bool) -> dict[str, Any]:
         if not ok:
             return {
                 "check_name": "data_quality",
@@ -144,7 +142,7 @@ class PaperRiskGate:
             }
         return {"check_name": "data_quality", "result": "PASS", "details": "OK", "severity": "INFO"}
 
-    def _check_model_validity(self, valid: bool) -> Dict[str, Any]:
+    def _check_model_validity(self, valid: bool) -> dict[str, Any]:
         if not valid:
             return {
                 "check_name": "model_validity",
@@ -154,7 +152,7 @@ class PaperRiskGate:
             }
         return {"check_name": "model_validity", "result": "PASS", "details": "OK", "severity": "INFO"}
 
-    def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> Dict[str, Any]:
+    def _check_position_size(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
         if side == "SELL":
             return {"check_name": "position_size", "result": "PASS", "details": "SELL side — no position size limit", "severity": "INFO"}
 
@@ -180,7 +178,7 @@ class PaperRiskGate:
             }
         return {"check_name": "position_size", "result": "PASS", "details": f"{position_pct:.1f}% <= {self.max_position_pct}%", "severity": "INFO"}
 
-    def _check_sector_concentration(self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str) -> Dict[str, Any]:
+    def _check_sector_concentration(self, portfolio, ticker: str, side: str, quantity: int, price: float, sector: str) -> dict[str, Any]:
         if not sector or side == "SELL":
             return {"check_name": "sector_concentration", "result": "PASS", "details": "No sector or SELL side", "severity": "INFO"}
 
@@ -207,7 +205,7 @@ class PaperRiskGate:
             }
         return {"check_name": "sector_concentration", "result": "PASS", "details": f"Max sector {max_sector_pct:.1f}% <= {self.max_sector_pct}%", "severity": "INFO"}
 
-    def _check_portfolio_exposure(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> Dict[str, Any]:
+    def _check_portfolio_exposure(self, portfolio, ticker: str, side: str, quantity: int, price: float) -> dict[str, Any]:
         total_value = portfolio.get_total_value()
         if total_value <= 0:
             return {"check_name": "portfolio_exposure", "result": "PASS", "details": "Portfolio value is zero", "severity": "INFO"}
@@ -231,7 +229,7 @@ class PaperRiskGate:
             }
         return {"check_name": "portfolio_exposure", "result": "PASS", "details": f"{exposure_pct:.1f}% <= {self.max_portfolio_exposure_pct}%", "severity": "INFO"}
 
-    def _check_drawdown(self, portfolio) -> Dict[str, Any]:
+    def _check_drawdown(self, portfolio) -> dict[str, Any]:
         current_dd = portfolio.get_current_drawdown()
 
         if current_dd >= self.kill_switch_drawdown_pct:
@@ -254,7 +252,7 @@ class PaperRiskGate:
 
         return {"check_name": "drawdown", "result": "PASS", "details": f"{current_dd:.1f}% < {self.max_drawdown_pct}%", "severity": "INFO"}
 
-    def _check_daily_loss(self, portfolio) -> Dict[str, Any]:
+    def _check_daily_loss(self, portfolio) -> dict[str, Any]:
         if len(portfolio._equity_curve) < 2:
             return {"check_name": "daily_loss", "result": "PASS", "details": "Not enough history", "severity": "INFO"}
 

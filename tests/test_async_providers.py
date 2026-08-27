@@ -9,14 +9,13 @@ Kapsam:
 - Config loading
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
+
 import orjson
-import tempfile
 
-from services.core.async_http import AsyncHTTPClient, get_client, close_all_clients
-
+from services.core.async_http import AsyncHTTPClient, close_all_clients, get_client
 
 # =====================================================
 # ASYNC HTTP CLIENT TESTS
@@ -52,7 +51,6 @@ async def test_client_singleton():
 
 async def test_client_timeout():
     """Timeout çalışmalı."""
-    issues = []
 
     client = AsyncHTTPClient(timeout=0.1, max_retries=1)
 
@@ -144,9 +142,9 @@ async def test_kap_provider_async():
     """KAP provider async methodlara sahip olmalı."""
     issues = []
 
-    from services.ingestion.providers.kap_provider import kap_provider
-
     import inspect
+
+    from services.ingestion.providers.kap_provider import kap_provider
     if not inspect.iscoroutinefunction(kap_provider.fetch_disclosures):
         issues.append("fetch_disclosures async değil")
     if not inspect.iscoroutinefunction(kap_provider.fetch_company_info):
@@ -160,9 +158,9 @@ async def test_news_provider_async():
     """News provider zaten async olmalı."""
     issues = []
 
-    from services.ingestion.providers.news_provider import NewsProvider
-
     import inspect
+
+    from services.ingestion.providers.news_provider import NewsProvider
     provider = NewsProvider()
     if not inspect.iscoroutinefunction(provider.fetch_financial_news_rss):
         issues.append("fetch_news async değil")

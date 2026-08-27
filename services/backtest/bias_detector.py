@@ -13,11 +13,12 @@ Referanslar:
 - arXiv Momentum-Gated Framework (2026) - bias prevention protocols
 """
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -29,11 +30,11 @@ class BiasViolation:
     violation_type: str  # look_ahead | label_leakage | feature_leakage | fold_leakage
     severity: str  # critical | warning | info
     timestamp: datetime
-    feature_name: Optional[str]
+    feature_name: str | None
     description: str
-    data_point: Optional[Dict[str, Any]] = None
+    data_point: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -47,7 +48,7 @@ class BiasViolation:
 class BiasReport:
     """Bias tespit raporu."""
     total_checks: int = 0
-    violations: List[BiasViolation] = field(default_factory=list)
+    violations: list[BiasViolation] = field(default_factory=list)
     critical_count: int = 0
     warning_count: int = 0
     is_clean: bool = True
@@ -60,7 +61,7 @@ class BiasReport:
         elif violation.severity == "warning":
             self.warning_count += 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_checks": self.total_checks,
             "violations": [v.to_dict() for v in self.violations],
@@ -82,7 +83,7 @@ class LookAheadBiasDetector:
     """
 
     def __init__(self):
-        self.violations: List[BiasViolation] = []
+        self.violations: list[BiasViolation] = []
 
     def validate_feature_timestamps(
         self,
@@ -203,7 +204,7 @@ class LookAheadBiasDetector:
             report.add_violation(BiasViolation(
                 violation_type="label_leakage",
                 severity="critical",
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 feature_name="purge_validation",
                 description=f"Purge days ({purge_days}) < label horizon ({label_horizon_days}). "
                            f"Minimum purge should be {min_purge} days to prevent label leakage.",
@@ -280,7 +281,7 @@ class LookAheadBiasDetector:
         self,
         data: pl.DataFrame,
         report_date_col: str = "report_date",
-        revision_col: Optional[str] = "revision_version",
+        revision_col: str | None = "revision_version",
     ) -> BiasReport:
         """
         Revize edilmiş verinin orijinal tarihte kullanılmadığını doğrula.
@@ -303,7 +304,7 @@ class LookAheadBiasDetector:
                     report.add_violation(BiasViolation(
                         violation_type="look_ahead",
                         severity="warning",
-                        timestamp=datetime.now(timezone.utc),
+                        timestamp=datetime.now(UTC),
                         feature_name="data_revision",
                         description=f"Multiple revisions found for report date {name}. "
                                    f"Only the first (as-reported) version should be used in backtest.",
@@ -312,7 +313,7 @@ class LookAheadBiasDetector:
 
         return report
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Toplam bias tespit özeti."""
         critical = sum(1 for v in self.violations if v.severity == "critical")
         warnings = sum(1 for v in self.violations if v.severity == "warning")
@@ -350,7 +351,7 @@ class BiasDetectorMiddleware:
         label_horizon_days: int = 5,
         feature_window_days: int = 20,
         purge_days: int = 5,
-    ) -> Tuple[bool, BiasReport]:
+    ) -> tuple[bool, BiasReport]:
         """
         Tarama öncesi bias kontrolü.
 
@@ -395,7 +396,7 @@ class BiasDetectorMiddleware:
         purge_days: int,
         embargo_days: int,
         label_horizon_days: int,
-    ) -> Tuple[bool, BiasReport]:
+    ) -> tuple[bool, BiasReport]:
         """Walk-forward fold bias kontrolü."""
         if not self.enabled:
             return True, BiasReport()

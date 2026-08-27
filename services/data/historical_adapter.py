@@ -11,7 +11,8 @@ Bu adapter:
 - Missing veriyi 50 ile doldurmaz (data_quality olarak işaretler)
 """
 
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -25,7 +26,7 @@ logger = structlog.get_logger()
 class HistoricalDataAdapter:
     """Historical data repository → canonical scoring adapter."""
 
-    def __init__(self, repository: Optional[HistoricalDataRepository] = None):
+    def __init__(self, repository: HistoricalDataRepository | None = None):
         if repository is None:
             from .persistent_repository import PersistentHistoricalRepository
             self._repo = PersistentHistoricalRepository()
@@ -36,7 +37,7 @@ class HistoricalDataAdapter:
         self,
         ticker: str,
         current_date: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Historical fundamental snapshot'tan feature dict üret.
 
         PIT kuralı: available_at <= current_date
@@ -148,7 +149,7 @@ class HistoricalDataAdapter:
         ticker: str,
         current_date: str,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Historical KAP event'lerinden Motor5 formatında event listesi üret.
 
         PIT kuralı: published_at <= current_date
@@ -185,7 +186,7 @@ class HistoricalDataAdapter:
         ticker: str,
         current_date: str,
         limit: int = 20,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Historical news event'lerinden Motor5 formatında event listesi üret.
 
         PIT kuralı: published_at <= current_date
@@ -223,7 +224,7 @@ class HistoricalDataAdapter:
         self,
         ticker: str,
         current_date: str,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Historical catalyst event'lerinden Motor6 formatında event listesi üret.
 
         PIT kuralı: announcement_date <= current_date
@@ -258,9 +259,9 @@ class HistoricalDataAdapter:
 
     def compute_sentiment(
         self,
-        kap_events: List[Dict],
-        news_events: List[Dict],
-    ) -> Dict[str, float]:
+        kap_events: list[dict],
+        news_events: list[dict],
+    ) -> dict[str, float]:
         """KAP + News event'lerinden sentiment feature'ları üret.
 
         Mevcut keyword sentiment sistemi ile uyumlu.
@@ -274,7 +275,7 @@ class HistoricalDataAdapter:
 
             # Ağırlıklı ortalama
             if sum(importances) > 0:
-                weighted = sum(s * i for s, i in zip(sentiments, importances)) / sum(importances)
+                weighted = sum(s * i for s, i in zip(sentiments, importances, strict=False)) / sum(importances)
             else:
                 weighted = np.mean(sentiments) if sentiments else 0
 
@@ -289,7 +290,7 @@ class HistoricalDataAdapter:
             importances = [e.get("importance", 0.5) for e in news_events]
 
             if sum(importances) > 0:
-                weighted = sum(s * i for s, i in zip(sentiments, importances)) / sum(importances)
+                weighted = sum(s * i for s, i in zip(sentiments, importances, strict=False)) / sum(importances)
             else:
                 weighted = np.mean(sentiments) if sentiments else 0
 
@@ -305,8 +306,8 @@ class HistoricalDataAdapter:
 
     def compute_catalyst_features(
         self,
-        catalyst_events: List[Dict],
-    ) -> Dict[str, Any]:
+        catalyst_events: list[dict],
+    ) -> dict[str, Any]:
         """Catalyst event'lerinden Motor6 feature'ları üret."""
         features = {}
 

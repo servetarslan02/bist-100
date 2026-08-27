@@ -22,12 +22,12 @@ SSD Koruma Stratejisi:
 """
 
 import os
-import sys
-import time
+import platform
 import secrets
 import subprocess
+import sys
+import time
 import webbrowser
-import platform
 from pathlib import Path
 
 import structlog
@@ -250,7 +250,7 @@ def find_cgroup_v2_path(pid: str) -> str:
         return unified_cgroup
 
     try:
-        with open(f"/proc/{pid}/cgroup", "r") as f:
+        with open(f"/proc/{pid}/cgroup") as f:
             for line in f:
                 if line.startswith("0::"):
                     cgroup_path = line.strip().split("::")[1]
@@ -322,7 +322,7 @@ def apply_ssd_write_limit():
             with open(io_max_path, "w") as f:
                 f.write(f"{device_id} wbps={SSD_WRITE_LIMIT_BYTES}")
 
-            with open(io_max_path, "r") as f:
+            with open(io_max_path) as f:
                 verify = f.read().strip()
 
             if str(SSD_WRITE_LIMIT_BYTES) in verify:
@@ -348,7 +348,7 @@ def apply_ssd_write_limit():
 
 def wait_for_containers_healthy(timeout_s: int = 180):
     """Tüm container'ların healthy olmasını bekle."""
-    print("\n[*] Servislerin hazır olması bekleniyor (maks {}sn)...".format(timeout_s))
+    print(f"\n[*] Servislerin hazır olması bekleniyor (maks {timeout_s}sn)...")
     start = time.time()
     last_status = {}
 
@@ -619,7 +619,7 @@ def main():
     # 3. Docker Compose Up
     print("\n[ADIM 3/7] Mikro-servisler Docker Compose ile ayağa kaldırılıyor...")
     try:
-        result = subprocess.run(
+        subprocess.run(
             ["docker", "compose", "up", "-d", "--build"],
             cwd=str(PROJECT_ROOT),
             check=True,
@@ -666,9 +666,9 @@ def main():
     print("\n" + "=" * 72)
     print("      ✅ ALPHA BIST BAŞARIYLA ÇALIŞIYOR!")
     print(f"      SSD Yazma Limiti: {SSD_WRITE_LIMIT_MBPS} MB/s")
-    print(f"      Backup: Her gün 02:00")
-    print(f"      Autoheal: Aktif")
-    print(f"      Resilience: Doğrulandı")
+    print("      Backup: Her gün 02:00")
+    print("      Autoheal: Aktif")
+    print("      Resilience: Doğrulandı")
     print("=" * 72)
     print("\n  Durdurmak için: docker compose down")
     print("  Loglar için:    docker compose logs -f")

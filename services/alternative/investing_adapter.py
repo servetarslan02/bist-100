@@ -12,9 +12,10 @@ Features:
 - investing_technical_rating: Teknik rating
 """
 
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
 import structlog
 
 from .base import BaseAdapter
@@ -29,7 +30,7 @@ class InvestingAdapter(BaseAdapter):
     rate_limit = 5
 
     # BIST ticker → Investing.com URL mapping
-    TICKER_URLS: Dict[str, str] = {
+    TICKER_URLS: dict[str, str] = {
         "THYAO": "thyao",
         "GARAN": "garan",
         "AKBNK": "akbnk",
@@ -50,7 +51,7 @@ class InvestingAdapter(BaseAdapter):
         "ISCTR": "isctr",
     }
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Investing.com verisi çek."""
         slug = self.TICKER_URLS.get(ticker.upper())
         if not slug:
@@ -63,7 +64,7 @@ class InvestingAdapter(BaseAdapter):
             logger.warning("Investing.com scrape failed", ticker=ticker, error=str(e))
             return None
 
-    async def _scrape_comments(self, slug: str, ticker: str) -> Dict[str, Any]:
+    async def _scrape_comments(self, slug: str, ticker: str) -> dict[str, Any]:
         """Yorumları scrape et."""
         try:
             import aiohttp
@@ -102,7 +103,7 @@ class InvestingAdapter(BaseAdapter):
                         "total_count": len(comments),
                         "technical_rating": rating_text,
                         "ticker": ticker,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
 
         except ImportError:
@@ -112,7 +113,7 @@ class InvestingAdapter(BaseAdapter):
             logger.debug("Investing.com scrape error", error=str(e))
             return {}
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """Investing.com feature'ları hesapla."""
         if not data or not data.get("comments"):
             return {}

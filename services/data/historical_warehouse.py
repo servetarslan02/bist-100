@@ -7,11 +7,11 @@ Tekrar tekrar internetten indirmeye gerek kalmadan 0.05 saniyede anında yükler
 """
 
 import os
-import polars as pl
+
 import duckdb
-import yfinance as yf
-from typing import Dict, Tuple
+import polars as pl
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -59,7 +59,7 @@ class HistoricalDataWarehouse:
         except Exception:
             return False
 
-    def download_and_save_warehouse(self, force_refresh: bool = False) -> Tuple[int, int]:
+    def download_and_save_warehouse(self, force_refresh: bool = False) -> tuple[int, int]:
         if self.is_cached() and not force_refresh:
             logger.info("30 yıllık yerel veri deposu zaten mevcut.")
             return len(BIST_ALL_KEY_TICKERS), 7277
@@ -98,7 +98,7 @@ class HistoricalDataWarehouse:
         logger.info(f"Yerel depo başarıyla kaydedildi: {DB_FILE}")
         return len(all_dfs), len(bm_df)
 
-    def load_30y_data(self) -> Tuple[pl.DataFrame, Dict[str, pl.DataFrame]]:
+    def load_30y_data(self) -> tuple[pl.DataFrame, dict[str, pl.DataFrame]]:
         """Yerel diskten 30 yıllık veriyi hafızaya yükler."""
         if not self.is_cached():
             self.download_and_save_warehouse()
@@ -110,7 +110,7 @@ class HistoricalDataWarehouse:
         bm_df = pl.from_pandas(bm_pandas)
         comb_df = pl.from_pandas(comb_pandas)
 
-        stock_dict: Dict[str, pl.DataFrame] = {}
+        stock_dict: dict[str, pl.DataFrame] = {}
         if "symbol" in comb_df.columns:
             for sym in comb_df["symbol"].unique().to_list():
                 df_sym = comb_df.filter(pl.col("symbol") == sym).drop("symbol").sort("Date")

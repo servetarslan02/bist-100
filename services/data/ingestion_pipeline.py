@@ -11,15 +11,17 @@ Incremental, PIT-safe, deduplication destekli veri ingestion.
 - Deduplication deterministic
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 from .historical_contracts import (
-    EventSnapshot, CatalystSnapshot,
+    CatalystSnapshot,
+    EventSnapshot,
 )
-from .persistent_repository import PersistentHistoricalRepository
 from .historical_fundamental_provider import HistoricalFundamentalProvider
+from .persistent_repository import PersistentHistoricalRepository
 
 logger = structlog.get_logger()
 
@@ -36,16 +38,16 @@ class HistoricalIngestionPipeline:
     def __init__(
         self,
         repository: PersistentHistoricalRepository,
-        fundamental_provider: Optional[HistoricalFundamentalProvider] = None,
+        fundamental_provider: HistoricalFundamentalProvider | None = None,
     ):
         self._repo = repository
         self._fund_provider = fundamental_provider or HistoricalFundamentalProvider()
 
     def ingest_fundamentals(
         self,
-        tickers: List[str],
+        tickers: list[str],
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Ticker'lar için historical fundamental veri çek ve kaydet.
 
         Args:
@@ -62,7 +64,7 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
-                hours_since = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:  # 1 saatten az geçtiyse skip
                     logger.info("Fundamental ingestion skipped (too recent)",
                               hours_since=round(hours_since, 1))
@@ -103,7 +105,7 @@ class HistoricalIngestionPipeline:
         if success_count > 0:
             self._repo.set_last_ingestion_time(
                 "fundamental",
-                datetime.now(timezone.utc).isoformat()
+                datetime.now(UTC).isoformat()
             )
 
         logger.info("Fundamental ingestion completed",
@@ -113,10 +115,10 @@ class HistoricalIngestionPipeline:
 
     def ingest_kap_events(
         self,
-        tickers: List[str],
+        tickers: list[str],
         days_back: int = 365,
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Ticker'lar için historical KAP event'leri çek ve kaydet.
 
         Args:
@@ -133,7 +135,7 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
-                hours_since = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:
                     logger.info("KAP ingestion skipped (too recent)",
                               hours_since=round(hours_since, 1))
@@ -148,8 +150,8 @@ class HistoricalIngestionPipeline:
             logger.error("KAP provider not available")
             return {"status": "error", "reason": "provider_unavailable"}
 
-        from_date = (datetime.now(timezone.utc) - timedelta(days=days_back)).strftime("%Y-%m-%d")
-        to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        from_date = (datetime.now(UTC) - timedelta(days=days_back)).strftime("%Y-%m-%d")
+        to_date = datetime.now(UTC).strftime("%Y-%m-%d")
 
         success_count = 0
         for ticker in tickers:
@@ -200,7 +202,7 @@ class HistoricalIngestionPipeline:
         if success_count > 0:
             self._repo.set_last_ingestion_time(
                 "kap",
-                datetime.now(timezone.utc).isoformat()
+                datetime.now(UTC).isoformat()
             )
 
         logger.info("KAP ingestion completed",
@@ -210,9 +212,9 @@ class HistoricalIngestionPipeline:
 
     def ingest_news_events(
         self,
-        tickers: List[str],
+        tickers: list[str],
         force: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """RSS feed'lerden güncel haberleri çek ve kaydet.
 
         NOT: RSS sadece son günleri döndürür. Historical news verisi için
@@ -230,7 +232,7 @@ class HistoricalIngestionPipeline:
         if not force and last_ingestion:
             try:
                 last_dt = datetime.fromisoformat(last_ingestion)
-                hours_since = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+                hours_since = (datetime.now(UTC) - last_dt).total_seconds() / 3600
                 if hours_since < 1:
                     logger.info("News ingestion skipped (too recent)")
                     return {"status": "skipped", "reason": "too_recent"}
@@ -292,7 +294,7 @@ class HistoricalIngestionPipeline:
 
         self._repo.set_last_ingestion_time(
             "news",
-            datetime.now(timezone.utc).isoformat()
+            datetime.now(UTC).isoformat()
         )
 
         logger.info("News ingestion completed",
@@ -302,8 +304,8 @@ class HistoricalIngestionPipeline:
 
     def derive_catalysts_from_events(
         self,
-        tickers: List[str],
-    ) -> Dict[str, Any]:
+        tickers: list[str],
+    ) -> dict[str, Any]:
         """KAP event'lerinden catalyst snapshot'ları türet.
 
         Catalyst = gelecekte gerçekleşecek bir olayın announcement'ı.
@@ -358,7 +360,7 @@ class HistoricalIngestionPipeline:
         return results
 
     @staticmethod
-    def _category_to_catalyst_type(category: str) -> Optional[str]:
+    def _category_to_catalyst_type(category: str) -> str | None:
         """KAP kategorisini catalyst türüne çevir."""
         mapping = {
             "FINANCIAL_REPORT": "EARNINGS",

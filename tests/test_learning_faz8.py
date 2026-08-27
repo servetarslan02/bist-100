@@ -12,9 +12,7 @@ Health monitoring testing:
 """
 
 import sys
-import os
-from datetime import datetime, timezone, timedelta
-
+from datetime import UTC, datetime
 
 
 def test_init():
@@ -101,7 +99,7 @@ def test_overall_status_warning():
     # Manuel warning ekle
     m._module_status["test"] = ModuleHealth(
         module="test", status="WARNING",
-        last_check=datetime.now(timezone.utc).isoformat(),
+        last_check=datetime.now(UTC).isoformat(),
         error_count=0, last_error=None, uptime_hours=0,
     )
 
@@ -190,7 +188,7 @@ def test_error_updates_module_status():
     # Manuel modül status ekle
     m._module_status["test"] = ModuleHealth(
         module="test", status="HEALTHY",
-        last_check=datetime.now(timezone.utc).isoformat(),
+        last_check=datetime.now(UTC).isoformat(),
         error_count=0, last_error=None, uptime_hours=0,
     )
 
@@ -262,7 +260,7 @@ def test_module_health_fields():
     m = LearningHealthMonitor()
     report = m.check_health()
 
-    for name, health in report.modules.items():
+    for _name, health in report.modules.items():
         assert hasattr(health, 'module')
         assert hasattr(health, 'status')
         assert hasattr(health, 'last_check')
@@ -310,14 +308,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 8 TEST SONUÇLARI (Health Monitor)")
+    print("📊 FAZ 8 TEST SONUÇLARI (Health Monitor)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

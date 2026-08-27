@@ -3,11 +3,14 @@
 Microsoft Qlib ile BIST verisi entegrasyonu.
 Feature store, data handler, model integration.
 """
-import numpy as np
-import polars as pl
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
 import structlog
+
+if TYPE_CHECKING:
+    import polars as pl
 
 logger = structlog.get_logger()
 
@@ -18,8 +21,8 @@ class QlibConfig:
     data_dir: str = "data/qlib"
     provider: str = "csv"  # csv, yfinance, qlib
     cache_dir: str = "data/qlib_cache"
-    feature_columns: List[str] = field(default_factory=list)
-    label_columns: List[str] = field(default_factory=lambda: ["label_5d"])
+    feature_columns: list[str] = field(default_factory=list)
+    label_columns: list[str] = field(default_factory=lambda: ["label_5d"])
     train_start: str = "2020-01-01"
     train_end: str = "2024-01-01"
     valid_start: str = "2024-01-01"
@@ -40,10 +43,10 @@ class QlibBIST:
     - Backtest entegrasyonu
     """
 
-    def __init__(self, config: Optional[QlibConfig] = None):
+    def __init__(self, config: QlibConfig | None = None):
         self.config = config or QlibConfig()
-        self._data_cache: Dict[str, pl.DataFrame] = {}
-        self._feature_store: Dict[str, np.ndarray] = {}
+        self._data_cache: dict[str, pl.DataFrame] = {}
+        self._feature_store: dict[str, np.ndarray] = {}
         self._is_initialized = False
 
     def prepare_data(
@@ -51,9 +54,9 @@ class QlibBIST:
         ticker: str,
         start_date: str,
         end_date: str,
-        features: Optional[np.ndarray] = None,
-        prices: Optional[np.ndarray] = None,
-    ) -> Dict[str, Any]:
+        features: np.ndarray | None = None,
+        prices: np.ndarray | None = None,
+    ) -> dict[str, Any]:
         """Qlib formatında veri hazırla.
 
         Args:
@@ -90,9 +93,9 @@ class QlibBIST:
 
     def create_qlib_dataset(
         self,
-        data: Dict[str, Dict[str, Any]],
+        data: dict[str, dict[str, Any]],
         label_horizon: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Qlib dataset oluştur — train/valid/test split.
 
         Args:
@@ -159,7 +162,7 @@ class QlibBIST:
 
         return dataset
 
-    def get_feature_store(self) -> Dict[str, np.ndarray]:
+    def get_feature_store(self) -> dict[str, np.ndarray]:
         """Feature store döndür."""
         return self._feature_store
 
@@ -167,7 +170,7 @@ class QlibBIST:
         """Feature store'a ekle."""
         self._feature_store[name] = features
 
-    def get_cached_data(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def get_cached_data(self, ticker: str) -> dict[str, Any] | None:
         """Cache'den veri döndür."""
         return self._data_cache.get(ticker)
 
@@ -175,7 +178,7 @@ class QlibBIST:
         """Cache'i temizle."""
         self._data_cache.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         return {
             "cached_tickers": len(self._data_cache),

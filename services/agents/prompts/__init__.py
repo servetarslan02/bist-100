@@ -6,7 +6,8 @@ BIST-specific kurallar dahil.
 Version tracking ile.
 """
 
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
+
 import orjson
 import structlog
 
@@ -16,7 +17,7 @@ logger = structlog.get_logger()
 PROMPT_VERSION = "v1.0"
 
 
-def _format_features(features: Dict[str, float], limit: int = 20) -> str:
+def _format_features(features: dict[str, float], limit: int = 20) -> str:
     """Feature'ları okunabilir formata çevir."""
     if not features:
         return "Mevcut değil"
@@ -31,7 +32,7 @@ def _format_features(features: Dict[str, float], limit: int = 20) -> str:
     return "\n".join(lines)
 
 
-def _format_context(context: Dict[str, Any]) -> str:
+def _format_context(context: dict[str, Any]) -> str:
     """Context'i prompt için formatla."""
     parts = []
 
@@ -483,7 +484,7 @@ class PromptFactory:
         cls,
         template_name: str,
         ticker: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         **kwargs,
     ) -> tuple:
         """Prompt şablonunu döndür (system_prompt, user_prompt)."""
@@ -536,6 +537,6 @@ class PromptFactory:
         cls._templates[name] = {"system": system, "user": user}
 
     @classmethod
-    def list_templates(cls) -> List[str]:
+    def list_templates(cls) -> list[str]:
         """Mevcut şablonları listele."""
         return list(cls._templates.keys())

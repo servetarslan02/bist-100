@@ -12,20 +12,22 @@ Kapsam:
 - Policy-based notification routing
 """
 
-import sys
-import os
-import orjson
 import asyncio
-import time
+import os
+import sys
 import tempfile
+import time
+
+import orjson
 
 from services.core.alert_policy import (
-    AlertPolicy, SilenceRule, FALLBACK_ESCALATION_TIMEOUT_S,
-    FALLBACK_NOTIFICATION_ROUTING, ensure_default_config,
+    FALLBACK_ESCALATION_TIMEOUT_S,
+    FALLBACK_NOTIFICATION_ROUTING,
+    AlertPolicy,
+    ensure_default_config,
 )
-from services.core.alerting import AlertingSystem, Alert, AlertType, AlertStatus
-from services.core.monitoring_security import JWTProvider, AuthResult
-
+from services.core.alerting import AlertingSystem
+from services.core.monitoring_security import JWTProvider
 
 # =====================================================
 # POLICY CONFIG TESTS

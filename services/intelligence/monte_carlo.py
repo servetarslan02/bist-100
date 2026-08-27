@@ -11,9 +11,10 @@ Fiyat yolu simülasyonu:
 FAZ 5.1-5.2: Monte Carlo Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -49,7 +50,7 @@ class MonteCarloResult:
     max_drawdown_sim: float    # Simülasyondaki max drawdown
 
     # Paths (opsiyonel, son 100 yol)
-    sample_paths: Optional[np.ndarray] = None
+    sample_paths: np.ndarray | None = None
 
 
 @dataclass
@@ -85,7 +86,7 @@ class MonteCarloEngine:
         volatility_annual: float,
         horizon_days: int = 20,
         num_simulations: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> MonteCarloResult:
         """Fiyat yolu simülasyonu (Geometric Brownian Motion).
 
@@ -101,7 +102,7 @@ class MonteCarloEngine:
 
         # Günlük parametreler
         dt = 1 / 252  # 1 iş günü
-        mu_daily = expected_return_annual * dt
+        expected_return_annual * dt
         sigma_daily = volatility_annual * np.sqrt(dt)
 
         # Simülasyon
@@ -184,11 +185,11 @@ class MonteCarloEngine:
 
     def simulate_portfolio(
         self,
-        positions: List[Dict[str, Any]],
+        positions: list[dict[str, Any]],
         correlation_matrix: np.ndarray,
         horizon_days: int = 20,
         num_simulations: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> PortfolioMonteCarloResult:
         """Portföy seviyesinde Monte Carlo.
 

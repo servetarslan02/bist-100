@@ -14,30 +14,31 @@ Bölüm 18: Veri / AI Gerçeklik ve Kanıt Doğrulama
 """
 
 import re
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from enum import Enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class ClaimType(str, Enum):
+class ClaimType(StrEnum):
     FACT = "FACT"              # Kaynakta doğrudan yazan
     INFERENCE = "INFERENCE"    # Veriden çıkarılan
     PREDICTION = "PREDICTION"  # Gelecek tahmini
     OPINION = "OPINION"        # Yorum/değerlendirme
 
 
-class VerificationResult(str, Enum):
+class VerificationResult(StrEnum):
     VERIFIED = "VERIFIED"          # Doğrulandı
     UNVERIFIED = "UNVERIFIED"      # Doğrulanamadı
     REJECTED = "REJECTED"          # Reddedildi (yanlış)
     CONTRADICTED = "CONTRADICTED"  # Çelişkili
 
 
-class SourceReliability(str, Enum):
+class SourceReliability(StrEnum):
     PRIMARY = "PRIMARY"        # Resmi kaynak (KAP, TCMB)
     FINANCIAL = "FINANCIAL"    # Güvenilir finansal veri
     NEWS = "NEWS"              # Güvenilir haber
@@ -53,8 +54,8 @@ class Claim:
     text: str
     source: str
     source_type: SourceReliability
-    timestamp: Optional[str] = None
-    ticker: Optional[str] = None
+    timestamp: str | None = None
+    ticker: str | None = None
 
 
 @dataclass
@@ -67,8 +68,8 @@ class VerifiedClaim:
     source_reliability: SourceReliability
     timestamp_valid: bool
     cross_check_passed: bool
-    contradictions: List[str]
-    supporting_evidence: List[str]
+    contradictions: list[str]
+    supporting_evidence: list[str]
     explanation: str
 
 
@@ -92,7 +93,7 @@ class EvidenceVerificationEngine:
         "reddit.com": SourceReliability.SOCIAL,
     }
 
-    def extract_claims(self, text: str, ticker: str = "", source: str = "ai") -> List[Claim]:
+    def extract_claims(self, text: str, ticker: str = "", source: str = "ai") -> list[Claim]:
         """Metinden iddiaları çıkar."""
         claims = []
 
@@ -119,8 +120,8 @@ class EvidenceVerificationEngine:
     def verify_claim(
         self,
         claim: Claim,
-        available_data: Dict[str, Any] = None,
-        cross_check_sources: List[str] = None,
+        available_data: dict[str, Any] = None,
+        cross_check_sources: list[str] = None,
     ) -> VerifiedClaim:
         """Tek bir iddiayı doğrula."""
         contradictions = []
@@ -138,8 +139,8 @@ class EvidenceVerificationEngine:
             try:
                 ts = datetime.fromisoformat(claim.timestamp.replace("Z", "+00:00"))
                 if ts.tzinfo is None:
-                    ts = ts.replace(tzinfo=timezone.utc)
-                now = datetime.now(timezone.utc)
+                    ts = ts.replace(tzinfo=UTC)
+                now = datetime.now(UTC)
                 # Gelecek timestamp şüpheli
                 if ts > now:
                     timestamp_valid = False
@@ -187,9 +188,9 @@ class EvidenceVerificationEngine:
 
     def verify_batch(
         self,
-        claims: List[Claim],
-        available_data: Dict[str, Any] = None,
-    ) -> List[VerifiedClaim]:
+        claims: list[Claim],
+        available_data: dict[str, Any] = None,
+    ) -> list[VerifiedClaim]:
         """Toplu doğrulama."""
         return [self.verify_claim(c, available_data) for c in claims]
 
@@ -232,8 +233,8 @@ class EvidenceVerificationEngine:
         source_reliability: SourceReliability,
         timestamp_valid: bool,
         cross_check_passed: bool,
-        contradictions: List[str],
-        supporting: List[str],
+        contradictions: list[str],
+        supporting: list[str],
     ) -> float:
         """Evidence score hesapla (0-100)."""
         score = 50.0
@@ -281,7 +282,7 @@ class EvidenceVerificationEngine:
         claim_type: ClaimType,
         result: VerificationResult,
         score: float,
-        contradictions: List[str],
+        contradictions: list[str],
     ) -> str:
         """Açıklama üret."""
         parts = [f"Claim type: {claim_type.value}"]
@@ -301,8 +302,8 @@ class EvidenceVerificationEngine:
     def detect_hallucination(
         self,
         ai_output: str,
-        available_data: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        available_data: dict[str, Any],
+    ) -> dict[str, Any]:
         """AI çıktısında hallucination tespiti."""
         issues = []
 

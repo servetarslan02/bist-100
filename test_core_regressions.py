@@ -1,8 +1,9 @@
-import sys, logging
+import logging
+
 logging.basicConfig(level=logging.ERROR)
 
 def test_data_quality():
-    from services.core.data_quality import data_quality, TradabilityMask
+    from services.core.data_quality import TradabilityMask, data_quality
     mask = TradabilityMask('THYAO', '2026-08-21T00:00:00Z', is_tradable=False, reasons=['test'], price_mask=0.0, volume_mask=0.0)
     raw_data = {'open': 10.0, 'high': 11.0, 'low': 9.0, 'close': 11.0, 'volume': 0, 'some_other_field': 42}
     result = data_quality.apply_mask(raw_data, mask)
@@ -15,8 +16,9 @@ def test_data_quality():
         print('FAIL')
 
 def test_event_bus():
-    from services.core.event_bus import InMemoryRedis
     import asyncio
+
+    from services.core.event_bus import InMemoryRedis
     redis = InMemoryRedis()
     async def run():
         redis._queues = None

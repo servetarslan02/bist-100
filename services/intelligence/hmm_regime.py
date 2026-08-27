@@ -20,11 +20,11 @@ Kullanım:
     result = detector.predict_regime(returns, volatility)
 """
 
-import numpy as np
-from typing import Dict, List, Optional
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -43,10 +43,10 @@ class HMMRegimeResult:
     """HMM rejim sonucu."""
     regime: str                      # BULL, BEAR, HIGH_VOL, LOW_VOL
     confidence: float                # En yüksek olasılık
-    probabilities: Dict[str, float]  # Tüm rejim olasılıkları
+    probabilities: dict[str, float]  # Tüm rejim olasılıkları
     regime_index: int                # 0-3 arası rejim indeksi
-    transition_matrix: Optional[np.ndarray] = None
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    transition_matrix: np.ndarray | None = None
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class HMMRegimeDetector:
@@ -71,12 +71,12 @@ class HMMRegimeDetector:
         self.rolling_window = rolling_window
         self.retrain_interval = retrain_interval
 
-        self._model: Optional[object] = None
+        self._model: object | None = None
         self._is_fitted: bool = False
         self._last_train_size: int = 0
         self._last_retrain_index: int = 0
         self._regime_history: deque = deque(maxlen=500)
-        self._transition_matrix: Optional[np.ndarray] = None
+        self._transition_matrix: np.ndarray | None = None
 
     def fit(self, returns: np.ndarray, volatility: np.ndarray) -> bool:
         """
@@ -201,7 +201,7 @@ class HMMRegimeDetector:
         self,
         returns: np.ndarray,
         volatility: np.ndarray,
-    ) -> List[HMMRegimeResult]:
+    ) -> list[HMMRegimeResult]:
         """
         Rolling rejim tespiti.
 
@@ -242,7 +242,7 @@ class HMMRegimeDetector:
 
         return results
 
-    def _assign_regime_names(self, probabilities: np.ndarray) -> List[str]:
+    def _assign_regime_names(self, probabilities: np.ndarray) -> list[str]:
         """
         Rejim indekslerini anlamlı isimlere eşle.
 
@@ -334,7 +334,7 @@ class HMMRegimeDetector:
         max_entropy = np.log2(self.n_regimes) if self.n_regimes > 1 else 1
         return round(float(entropy / (self.n_regimes * max_entropy)), 4)
 
-    def get_transition_matrix(self) -> Optional[Dict[str, Dict[str, float]]]:
+    def get_transition_matrix(self) -> dict[str, dict[str, float]] | None:
         """Geçiş matrisi (okunabilir format)."""
         if self._transition_matrix is None:
             return None
@@ -347,7 +347,7 @@ class HMMRegimeDetector:
 
         return matrix
 
-    def get_regime_duration_stats(self) -> Dict[str, float]:
+    def get_regime_duration_stats(self) -> dict[str, float]:
         """Rejim süre istatistikleri."""
         if not self._regime_history:
             return {}
@@ -382,7 +382,7 @@ class HMMRegimeDetector:
             for regime, durs in durations.items()
         }
 
-    def get_history(self, limit: int = 20) -> List[Dict]:
+    def get_history(self, limit: int = 20) -> list[dict]:
         """Son rejim tahminleri."""
         history = self._regime_history[-limit:]
         return [
@@ -401,7 +401,7 @@ class HMMRegimeDetector:
         return self._is_fitted
 
     @property
-    def current_regime(self) -> Optional[str]:
+    def current_regime(self) -> str | None:
         """Mevcut rejim."""
         if self._regime_history:
             return self._regime_history[-1].regime

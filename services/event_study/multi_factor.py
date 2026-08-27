@@ -3,8 +3,8 @@
 Fama-French 3-Factor ve 5-Factor modeli ile expected return hesaplama.
 BIST için SMB (Small Minus Big) ve HML (High Minus Low) factor'leri.
 """
+
 import numpy as np
-from typing import Dict, Optional
 import structlog
 
 logger = structlog.get_logger()
@@ -25,11 +25,11 @@ class MultiFactorModel:
         self,
         stock_returns: np.ndarray,
         market_returns: np.ndarray,
-        smb_returns: Optional[np.ndarray] = None,
-        hml_returns: Optional[np.ndarray] = None,
-        rmw_returns: Optional[np.ndarray] = None,
-        cma_returns: Optional[np.ndarray] = None,
-    ) -> Dict[str, float]:
+        smb_returns: np.ndarray | None = None,
+        hml_returns: np.ndarray | None = None,
+        rmw_returns: np.ndarray | None = None,
+        cma_returns: np.ndarray | None = None,
+    ) -> dict[str, float]:
         """Modeli estimation window verisi ile eğit.
 
         Args:
@@ -88,7 +88,7 @@ class MultiFactorModel:
             + self.params["beta_cma"] * cma
         )
 
-    def get_params(self) -> Dict[str, float]:
+    def get_params(self) -> dict[str, float]:
         """Model parametrelerini döndür."""
         return self.params or {}
 
@@ -135,7 +135,7 @@ class FamaFrenchFactors:
         size_threshold: float = 0.5,
         bm_threshold_low: float = 0.3,
         bm_threshold_high: float = 0.7,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """Hisseleri Fama-French kategorilerine ayır.
 
         Args:

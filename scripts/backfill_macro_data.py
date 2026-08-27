@@ -9,10 +9,9 @@ Kullanım:
     python3 scripts/backfill_macro_data.py --indicators USDTRY,CPI
 """
 
-import sys
-import os
-import orjson
 import argparse
+import os
+import sys
 from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -112,7 +111,7 @@ def main():
     # Rapor
     from services.macro.historical_store import macro_historical_store
     report = macro_historical_store.get_report()
-    print(f"\n=== Backfill Tamamlandı ===")
+    print("\n=== Backfill Tamamlandı ===")
     print(f"Toplam gösterge: {report['indicators']}")
     print(f"Toplam veri noktası: {report['total_data_points']}")
 

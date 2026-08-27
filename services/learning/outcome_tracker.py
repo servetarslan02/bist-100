@@ -10,9 +10,11 @@ Tahmin sonuçlarını otomatik takip eder:
 Bu modül learning'in çalışması için KRİTİK.
 """
 
-from typing import Dict, List, Any, Optional, Callable
-from datetime import datetime, timezone, timedelta
 from collections import deque
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -33,7 +35,7 @@ class OutcomeTracker:
         self._pending: deque = deque(maxlen=5000)  # Sonuç bekleyen tahminler
         self._checked_today: set = set()
 
-    def add_prediction(self, prediction: Dict):
+    def add_prediction(self, prediction: dict):
         """Yeni tahmin ekle — outcome takibi başlat."""
         ticker = prediction.get("ticker", "")
         predicted_direction = prediction.get("predicted_direction", "")
@@ -52,8 +54,8 @@ class OutcomeTracker:
             "ticker": ticker,
             "predicted_direction": predicted_direction,
             "entry_price": entry_price,
-            "entry_time": prediction.get("timestamp", datetime.now(timezone.utc).isoformat()),
-            "check_after": (datetime.now(timezone.utc) + timedelta(days=wait_days)).isoformat(),
+            "entry_time": prediction.get("timestamp", datetime.now(UTC).isoformat()),
+            "check_after": (datetime.now(UTC) + timedelta(days=wait_days)).isoformat(),
             "horizon": horizon,
             "checked": False,
         })
@@ -64,7 +66,7 @@ class OutcomeTracker:
                      ticker=ticker, prediction_id=prediction_id,
                      check_after=f"{wait_days} days")
 
-    async def _default_price_fetcher(self, ticker: str) -> Optional[float]:
+    async def _default_price_fetcher(self, ticker: str) -> float | None:
         """Varsayılan fiyat çekici — ingestion katmanından fiyat çeker."""
         try:
             from services.ingestion.providers.yfinance_provider import YFinanceProvider
@@ -86,7 +88,7 @@ class OutcomeTracker:
 
         return None
 
-    async def check_pending_outcomes(self, learning_system, price_fetcher: Optional[Callable] = None) -> List[Dict]:
+    async def check_pending_outcomes(self, learning_system, price_fetcher: Callable | None = None) -> list[dict]:
         """Bekleyen tahminleri kontrol et ve outcome kaydet.
 
         Args:
@@ -99,7 +101,7 @@ class OutcomeTracker:
         if price_fetcher is None:
             price_fetcher = self._default_price_fetcher
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         results = []
 
         for pending in self._pending:
@@ -109,7 +111,7 @@ class OutcomeTracker:
             # Zamanı geldi mi?
             check_after = datetime.fromisoformat(pending["check_after"])
             if check_after.tzinfo is None:
-                check_after = check_after.replace(tzinfo=timezone.utc)
+                check_after = check_after.replace(tzinfo=UTC)
             if now < check_after:
                 continue
 
@@ -182,8 +184,8 @@ class OutcomeTracker:
         try:
             entry = datetime.fromisoformat(entry_time_str)
             if entry.tzinfo is None:
-                entry = entry.replace(tzinfo=timezone.utc)
-            now = datetime.now(timezone.utc)
+                entry = entry.replace(tzinfo=UTC)
+            now = datetime.now(UTC)
             return max(0, (now - entry).days)
         except Exception:
             return 0
@@ -192,7 +194,7 @@ class OutcomeTracker:
         """Bekleyen tahmin sayısı."""
         return len([p for p in self._pending if not p["checked"]])
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         total = len(self._pending)
         checked = len([p for p in self._pending if p["checked"]])
@@ -203,7 +205,7 @@ class OutcomeTracker:
         }
 
 
-    async def run_pending_check(self) -> List[Dict]:
+    async def run_pending_check(self) -> list[dict]:
         """Scheduler'dan çağrılabilir — learning_system ve price_fetcher otomatik bağlanır."""
         learning_system = None
         try:

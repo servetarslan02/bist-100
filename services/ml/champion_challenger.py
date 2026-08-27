@@ -3,12 +3,13 @@
 Shadow mode, multi-metric A/B test, auto-promote/reject,
 rollback, multi-metric comparison, detailed reporting.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from scipy import stats
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
+from scipy import stats
 
 logger = structlog.get_logger()
 
@@ -43,8 +44,8 @@ class PromotionDecision:
     """Promote/reject kararı."""
     should_promote: bool
     reason: str
-    ab_results: Dict[str, ABTestResult]
-    multi_metric_results: List[MultiMetricResult]
+    ab_results: dict[str, ABTestResult]
+    multi_metric_results: list[MultiMetricResult]
     overall_winner: str
     confidence: float
 
@@ -68,15 +69,15 @@ class ChampionChallenger:
         significance_level: float = 0.05,
         min_samples: int = 30,
         auto_promote_threshold: float = 0.05,
-        metrics_to_compare: Optional[List[str]] = None,
+        metrics_to_compare: list[str] | None = None,
     ):
         self.significance_level = significance_level
         self.min_samples = min_samples
         self.auto_promote_threshold = auto_promote_threshold
         self.metrics_to_compare = metrics_to_compare or ["return", "ic", "sharpe", "win_rate"]
-        self._shadow_results: Dict[str, Dict[str, List[float]]] = {}  # model → {metric: [values]}
-        self._champion_results: Dict[str, List[float]] = {}  # metric → [values]
-        self._history: List[Dict[str, Any]] = []
+        self._shadow_results: dict[str, dict[str, list[float]]] = {}  # model → {metric: [values]}
+        self._champion_results: dict[str, list[float]] = {}  # metric → [values]
+        self._history: list[dict[str, Any]] = []
 
     def record_shadow_result(self, model_key: str, metric_name: str, value: float):
         """Shadow mode sonucu kaydet."""
@@ -95,7 +96,7 @@ class ChampionChallenger:
     def record_batch(
         self,
         model_key: str,
-        metrics: Dict[str, float],
+        metrics: dict[str, float],
         is_champion: bool = False,
     ):
         """Toplu sonuç kaydet."""
@@ -172,7 +173,7 @@ class ChampionChallenger:
         logger.info("ab_test_completed", challenger=challenger_key, metric=metric_name, winner=winner, p_value=p_value)
         return result
 
-    def run_multi_metric_test(self, challenger_key: str) -> List[MultiMetricResult]:
+    def run_multi_metric_test(self, challenger_key: str) -> list[MultiMetricResult]:
         """Tüm metrikler için karşılaştırma."""
         results = []
 
@@ -289,7 +290,7 @@ class ChampionChallenger:
 
         # History
         self._history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "challenger_key": challenger_key,
             "decision": decision.should_promote,
             "reason": decision.reason,
@@ -308,7 +309,7 @@ class ChampionChallenger:
             return True
         return False
 
-    def get_shadow_summary(self) -> Dict[str, Any]:
+    def get_shadow_summary(self) -> dict[str, Any]:
         """Shadow mode özet istatistikleri."""
         summary = {}
         for model_key, metrics in self._shadow_results.items():
@@ -325,7 +326,7 @@ class ChampionChallenger:
             summary[model_key] = model_summary
         return summary
 
-    def get_champion_summary(self) -> Dict[str, Any]:
+    def get_champion_summary(self) -> dict[str, Any]:
         """Champion özet istatistikleri."""
         summary = {}
         for metric_name, values in self._champion_results.items():
@@ -337,11 +338,11 @@ class ChampionChallenger:
                 }
         return summary
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> list[dict[str, Any]]:
         """Decision history."""
         return self._history
 
-    def reset(self, challenger_key: Optional[str] = None):
+    def reset(self, challenger_key: str | None = None):
         """Sonuçları sıfırla."""
         if challenger_key:
             self._shadow_results.pop(challenger_key, None)

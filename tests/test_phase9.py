@@ -5,7 +5,6 @@ Signal Fusion, Conflict Detection, Explainability testleri.
 """
 
 import sys
-import os
 
 
 def test_signal_fusion():
@@ -64,7 +63,7 @@ def test_signal_fusion():
     result3 = signal_fusion_engine.fuse_signals("BEAR", signals_short, "BEAR")
     assert result3.fused_direction == "SHORT"
     passed += 1
-    print(f"  ✓ All SHORT → fused SHORT")
+    print("  ✓ All SHORT → fused SHORT")
 
     # 4. Explainability
     assert len(result.reasons) > 0
@@ -102,7 +101,7 @@ def main():
     total_passed = 0
     total_failed = 0
 
-    print(f"\n--- Signal Fusion Engine ---")
+    print("\n--- Signal Fusion Engine ---")
     try:
         p, f = test_signal_fusion()
         total_passed += p

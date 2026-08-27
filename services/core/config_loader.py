@@ -14,10 +14,11 @@ Kullanım:
     secret = config.get_secret("jwt_secret")  # ENV'den okur
 """
 
-import orjson
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -29,7 +30,7 @@ class ConfigLoader:
     """Config dosyası + environment override."""
 
     _instance: Optional["ConfigLoader"] = None
-    _config: Dict[str, Any] = {}
+    _config: dict[str, Any] = {}
     _env_prefix: str = "ALPHA_"
     _environment: str = "development"
 
@@ -129,7 +130,7 @@ class ConfigLoader:
     def is_test(self) -> bool:
         return self._environment == "test"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Config dict (secrets hariç)."""
         return dict(self._config)
 
@@ -184,7 +185,7 @@ class ConfigLoader:
         config[keys[-1]] = value
 
     @staticmethod
-    def _deep_merge(base: Dict, override: Dict):
+    def _deep_merge(base: dict, override: dict):
         """Deep merge: override değerleri base'e uygula."""
         for key, value in override.items():
             if key in base and isinstance(base[key], dict) and isinstance(value, dict):

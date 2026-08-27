@@ -8,8 +8,9 @@ Makro olay takvimi:
 - get_event_impact(): Olay etkisi
 """
 
-from typing import Dict, List, Any
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -80,12 +81,12 @@ MACRO_EVENTS = {
 }
 
 
-def get_macro_events() -> Dict[str, Dict]:
+def get_macro_events() -> dict[str, dict]:
     """Tüm makro olayları getir."""
     return MACRO_EVENTS
 
 
-def get_upcoming_events(days: int = 7) -> List[Dict[str, Any]]:
+def get_upcoming_events(days: int = 7) -> list[dict[str, Any]]:
     """Yaklaşan makro olayları getir.
 
     Args:
@@ -94,7 +95,7 @@ def get_upcoming_events(days: int = 7) -> List[Dict[str, Any]]:
     Returns:
         Yaklaşan olaylar listesi
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     upcoming = []
 
     # TCMB PPK - ayın belirli günleri
@@ -127,7 +128,7 @@ def get_upcoming_events(days: int = 7) -> List[Dict[str, Any]]:
     return sorted(upcoming, key=lambda x: x["days_until"])
 
 
-def get_event_impact(event_type: str) -> Dict[str, Any]:
+def get_event_impact(event_type: str) -> dict[str, Any]:
     """Olay etkisini getir."""
     event = MACRO_EVENTS.get(event_type)
     if not event:
@@ -148,7 +149,7 @@ def get_event_impact(event_type: str) -> Dict[str, Any]:
     }
 
 
-def _get_tcmb_dates(year: int) -> List[datetime]:
+def _get_tcmb_dates(year: int) -> list[datetime]:
     """TCMB PPK toplantı tarihleri."""
     # Yaklaşık tarihler (her ayın 3. veya 4. haftası)
     dates = []

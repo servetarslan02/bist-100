@@ -4,16 +4,17 @@ Tüm bileşenleri tek bir MarketStateOutput'ta birleştirir.
 API ve event bus için standart format.
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from .breadth_engine import BreadthResult
 from .component_states import ComponentStates
 from .ensemble_regime import EnsembleResult
-from .transition_tracker import TransitionStats
 from .multi_timeframe import MultiTimeframeResult
+from .transition_tracker import TransitionStats
 
 logger = structlog.get_logger()
 
@@ -23,7 +24,7 @@ class MarketStateOutput:
     """Market state'in nihai çıktı formatı — tüm bileşenler birleşik."""
 
     # Meta
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     version: str = "2.0"
 
     # Regime (ensemble)
@@ -36,7 +37,7 @@ class MarketStateOutput:
     confidence_trend: str = "STABLE"
 
     # Breadth
-    breadth: Dict[str, Any] = field(default_factory=dict)
+    breadth: dict[str, Any] = field(default_factory=dict)
 
     # Component States
     momentum_state: str = "NEUTRAL"
@@ -56,20 +57,20 @@ class MarketStateOutput:
     risk_appetite_state: str = "NEUTRAL"
 
     # Multi-timeframe
-    daily_state: Dict[str, Any] = field(default_factory=dict)
-    weekly_state: Dict[str, Any] = field(default_factory=dict)
+    daily_state: dict[str, Any] = field(default_factory=dict)
+    weekly_state: dict[str, Any] = field(default_factory=dict)
     multi_tf_alignment: float = 1.0
-    multi_tf_divergences: List[str] = field(default_factory=list)
+    multi_tf_divergences: list[str] = field(default_factory=list)
 
     # Ensemble details
-    ensemble_methods: Dict[str, Any] = field(default_factory=dict)
-    hmm_probabilities: Dict[str, float] = field(default_factory=dict)
+    ensemble_methods: dict[str, Any] = field(default_factory=dict)
+    hmm_probabilities: dict[str, float] = field(default_factory=dict)
 
     # Transition stats
     total_transitions: int = 0
-    transition_matrix: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    transition_matrix: dict[str, dict[str, float]] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Tam output dict."""
         return {
             "timestamp": self.timestamp.isoformat(),
@@ -121,13 +122,13 @@ class MarketStateFormatter:
 
     def format(
         self,
-        breadth: Optional[BreadthResult] = None,
-        components: Optional[ComponentStates] = None,
-        ensemble: Optional[EnsembleResult] = None,
-        transition: Optional[TransitionStats] = None,
+        breadth: BreadthResult | None = None,
+        components: ComponentStates | None = None,
+        ensemble: EnsembleResult | None = None,
+        transition: TransitionStats | None = None,
         risk_appetite: float = 0.5,
         risk_appetite_state: str = "NEUTRAL",
-        multi_tf: Optional[MultiTimeframeResult] = None,
+        multi_tf: MultiTimeframeResult | None = None,
     ) -> MarketStateOutput:
         """Tüm bileşenleri birleştir.
 
@@ -185,13 +186,13 @@ class MarketStateFormatter:
 
     def format_json(
         self,
-        breadth: Optional[BreadthResult] = None,
-        components: Optional[ComponentStates] = None,
-        ensemble: Optional[EnsembleResult] = None,
-        transition: Optional[TransitionStats] = None,
+        breadth: BreadthResult | None = None,
+        components: ComponentStates | None = None,
+        ensemble: EnsembleResult | None = None,
+        transition: TransitionStats | None = None,
         risk_appetite: float = 0.5,
         risk_appetite_state: str = "NEUTRAL",
-        multi_tf: Optional[MultiTimeframeResult] = None,
+        multi_tf: MultiTimeframeResult | None = None,
     ) -> str:
         """JSON string olarak formatla."""
         import orjson

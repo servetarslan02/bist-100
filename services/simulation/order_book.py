@@ -10,9 +10,10 @@ Basit order book simülasyonu:
 Kaynak: mbrenndoerfer Market Microstructure (2026)
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -31,8 +32,8 @@ class OrderBookSnapshot:
     """Order book anlık görüntüsü."""
     ticker: str
     timestamp: float
-    bids: List[OrderBookLevel]  # En yüksekten en düşüğe
-    asks: List[OrderBookLevel]  # En düşükten en yükseğe
+    bids: list[OrderBookLevel]  # En yüksekten en düşüğe
+    asks: list[OrderBookLevel]  # En düşükten en yükseğe
 
     @property
     def best_bid(self) -> float:
@@ -181,7 +182,7 @@ class OrderBookSimulator:
         book: OrderBookSnapshot,
         side: str,
         quantity: int,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Market emrini order book üzerinde simüle et.
 
         Emir book'daki seviyeleri tüketir (walk the book).
@@ -258,7 +259,7 @@ class OrderBookSimulator:
         self,
         book: OrderBookSnapshot,
         order_value: float = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Likidite skoru hesapla.
 
         0-100 arası skor:

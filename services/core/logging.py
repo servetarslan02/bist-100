@@ -1,8 +1,9 @@
 """ALPHA BIST - Structured Logging"""
 
-import structlog
 import logging
 import sys
+
+import structlog
 
 
 def setup_logging(log_level: str = "INFO"):

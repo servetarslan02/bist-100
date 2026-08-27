@@ -10,11 +10,13 @@ Walk-forward validated retrain orchestrator:
 KURAL: Walk-forward başarısızsa → retrain yapma.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import deque
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -43,7 +45,7 @@ class RetrainResult:
     success: bool
     version_id: str
     reason: str
-    wf_metrics: Optional[WalkForwardMetrics]
+    wf_metrics: WalkForwardMetrics | None
     shadow_started: bool
     timestamp: str
     training_samples: int
@@ -55,17 +57,17 @@ class RetrainEngine:
 
     def __init__(self):
         self._retrain_history: deque = deque(maxlen=500)
-        self._last_retrain: Optional[RetrainResult] = None
+        self._last_retrain: RetrainResult | None = None
         self._retrain_count: int = 0
 
     def validate_and_retrain(
         self,
         model_fn: Callable,
-        features_map: Dict[str, np.ndarray],
-        returns: Dict[str, float],
-        dates: List[Any],
+        features_map: dict[str, np.ndarray],
+        returns: dict[str, float],
+        dates: list[Any],
         regime: str = "UNKNOWN",
-        feature_fn: Optional[Callable] = None,
+        feature_fn: Callable | None = None,
     ) -> RetrainResult:
         """Walk-forward validation ile retrain.
 
@@ -97,7 +99,7 @@ class RetrainEngine:
             return RetrainResult(
                 success=False, version_id="", reason="Walk-forward validation failed",
                 wf_metrics=None, shadow_started=False,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 training_samples=0, regime=regime,
             )
 
@@ -111,7 +113,7 @@ class RetrainEngine:
             return RetrainResult(
                 success=False, version_id=version_id, reason=reason,
                 wf_metrics=wf_metrics, shadow_started=False,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 training_samples=sum(len(v) for v in features_map.values()) if isinstance(next(iter(features_map.values())), np.ndarray) else 0,
                 regime=regime,
             )
@@ -131,7 +133,7 @@ class RetrainEngine:
                     success=False, version_id=version_id,
                     reason=f"Insufficient training data: {len(X)} < {cfg.min_samples}",
                     wf_metrics=wf_metrics, shadow_started=False,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     training_samples=len(X), regime=regime,
                 )
 
@@ -142,7 +144,7 @@ class RetrainEngine:
                 success=True, version_id=version_id,
                 reason="Walk-forward validation passed",
                 wf_metrics=wf_metrics, shadow_started=True,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 training_samples=len(X), regime=regime,
             )
 
@@ -165,11 +167,11 @@ class RetrainEngine:
                 success=False, version_id=version_id,
                 reason=f"Training error: {str(e)}",
                 wf_metrics=wf_metrics, shadow_started=False,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
                 training_samples=0, regime=regime,
             )
 
-    def get_retrain_report(self) -> Dict[str, Any]:
+    def get_retrain_report(self) -> dict[str, Any]:
         """Retrain raporu."""
         if not self._last_retrain:
             return {"status": "No retrain data"}
@@ -201,12 +203,12 @@ class RetrainEngine:
     def _run_walk_forward(
         self,
         model_fn: Callable,
-        features_map: Dict[str, np.ndarray],
-        returns: Dict[str, float],
-        dates: List[Any],
-        feature_fn: Optional[Callable],
+        features_map: dict[str, np.ndarray],
+        returns: dict[str, float],
+        dates: list[Any],
+        feature_fn: Callable | None,
         cfg: Any,
-    ) -> Optional[WalkForwardMetrics]:
+    ) -> WalkForwardMetrics | None:
         """Walk-forward validation çalıştır."""
         try:
             # Tarihleri datetime'a çevir
@@ -278,7 +280,7 @@ class RetrainEngine:
             logger.error("Walk-forward failed", error=str(e))
             return None
 
-    def _generate_wf_splits(self, dates: List, cfg: Any) -> List[Dict]:
+    def _generate_wf_splits(self, dates: list, cfg: Any) -> list[dict]:
         """Walk-forward split'leri oluştur."""
         splits = []
         total = len(dates)
@@ -305,12 +307,12 @@ class RetrainEngine:
     def _evaluate_split(
         self,
         model_fn: Callable,
-        features_map: Dict[str, np.ndarray],
-        returns: Dict[str, float],
-        dates: List,
-        split: Dict,
-        feature_fn: Optional[Callable],
-    ) -> Optional[Dict[str, float]]:
+        features_map: dict[str, np.ndarray],
+        returns: dict[str, float],
+        dates: list,
+        split: dict,
+        feature_fn: Callable | None,
+    ) -> dict[str, float] | None:
         """Tek split değerlendir."""
         # Feature matrix hazırla (tüm veri)
         try:
@@ -374,8 +376,8 @@ class RetrainEngine:
 
     def _prepare_features(
         self,
-        features_map: Dict[str, np.ndarray],
-        feature_fn: Optional[Callable],
+        features_map: dict[str, np.ndarray],
+        feature_fn: Callable | None,
     ) -> np.ndarray:
         """Feature matrix hazırla."""
         if feature_fn:
@@ -383,7 +385,7 @@ class RetrainEngine:
 
         # Dict of arrays → matrix
         arrays = []
-        for name, values in features_map.items():
+        for _name, values in features_map.items():
             if isinstance(values, np.ndarray) and values.ndim == 1:
                 arrays.append(values)
 
@@ -396,10 +398,10 @@ class RetrainEngine:
 
     def _prepare_features_for_dates(
         self,
-        features_map: Dict[str, np.ndarray],
-        dates: List,
-        feature_fn: Optional[Callable],
-    ) -> Optional[np.ndarray]:
+        features_map: dict[str, np.ndarray],
+        dates: list,
+        feature_fn: Callable | None,
+    ) -> np.ndarray | None:
         """Belirli tarihler için feature matrix."""
         try:
             X = self._prepare_features(features_map, feature_fn)
@@ -423,7 +425,7 @@ class RetrainEngine:
 
     def _generate_version_id(self) -> str:
         """Versiyon ID oluştur."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         import hashlib
         random_hash = hashlib.md5(str(np.random.random()).encode()).hexdigest()[:6]
         return f"retrain_{timestamp}_{random_hash}"

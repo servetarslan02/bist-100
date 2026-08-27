@@ -12,10 +12,11 @@ Entity ilişki ağı:
 FAZ 10.1: Knowledge Graph
 """
 
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
 from collections import deque
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
+
 import orjson
 import structlog
 
@@ -28,8 +29,8 @@ class Entity:
     entity_id: str
     entity_type: str   # company, sector, person, event, macro, product
     name: str
-    aliases: List[str] = field(default_factory=list)
-    properties: Dict[str, Any] = field(default_factory=dict)
+    aliases: list[str] = field(default_factory=list)
+    properties: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -39,16 +40,16 @@ class Relation:
     target_id: str
     relation_type: str  # belongs_to, supplies, manages, affected_by, correlated_with
     strength: float = 1.0
-    properties: Dict[str, Any] = field(default_factory=dict)
+    properties: dict[str, Any] = field(default_factory=dict)
 
 
 class KnowledgeGraph:
     """Knowledge graph motoru."""
 
     def __init__(self):
-        self._entities: Dict[str, Entity] = {}
+        self._entities: dict[str, Entity] = {}
         self._relations: deque = deque(maxlen=50000)
-        self._index: Dict[str, List[str]] = {}  # entity_id -> [relation_id]
+        self._index: dict[str, list[str]] = {}  # entity_id -> [relation_id]
 
     def add_entity(self, entity: Entity):
         """Entity ekle."""
@@ -67,11 +68,11 @@ class KnowledgeGraph:
             self._index[relation.target_id] = []
         self._index[relation.target_id].append(str(idx))
 
-    def get_entity(self, entity_id: str) -> Optional[Entity]:
+    def get_entity(self, entity_id: str) -> Entity | None:
         """Entity getir."""
         return self._entities.get(entity_id)
 
-    def get_relations(self, entity_id: str) -> List[Relation]:
+    def get_relations(self, entity_id: str) -> list[Relation]:
         """Entity'nin tüm ilişkilerini getir."""
         relation_indices = self._index.get(entity_id, [])
         return [self._relations[int(i)] for i in relation_indices if int(i) < len(self._relations)]
@@ -79,8 +80,8 @@ class KnowledgeGraph:
     def get_related_entities(
         self,
         entity_id: str,
-        relation_type: Optional[str] = None,
-    ) -> List[Tuple[Entity, Relation]]:
+        relation_type: str | None = None,
+    ) -> list[tuple[Entity, Relation]]:
         """İlişkili entity'leri getir."""
         relations = self.get_relations(entity_id)
         result = []
@@ -101,7 +102,7 @@ class KnowledgeGraph:
         source_id: str,
         target_id: str,
         max_depth: int = 3,
-    ) -> Optional[List[str]]:
+    ) -> list[str] | None:
         """İki entity arasındaki yolu bul (BFS)."""
         if source_id == target_id:
             return [source_id]
@@ -113,7 +114,7 @@ class KnowledgeGraph:
             next_queue = []
             for path in queue:
                 current = path[-1]
-                for entity, rel in self.get_related_entities(current):
+                for entity, _rel in self.get_related_entities(current):
                     if entity.entity_id == target_id:
                         return path + [entity.entity_id]
                     if entity.entity_id not in visited:
@@ -130,7 +131,7 @@ class KnowledgeGraph:
         source_id: str,
         impact: float,
         max_depth: int = 2,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Etkiyi graf üzerinden yay."""
         impacts = {source_id: impact}
         visited = {source_id}
@@ -236,7 +237,7 @@ class KnowledgeGraph:
         except Exception as e:
             logger.warning("Failed to load knowledge graph", path=path, error=str(e))
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Graph istatistikleri."""
         type_counts = {}
         for e in self._entities.values():

@@ -10,12 +10,13 @@ Otomatik devre kesici tetikleme:
 Kaynak: Borsa İstanbul, Ağustos 2025 duyuruları
 """
 
-from typing import Dict, Optional, List, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
 import structlog
 
-from services.core.market_session_fsm import bist_session_fsm, BISTMarketPhase
+from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 
 logger = structlog.get_logger()
 
@@ -31,10 +32,10 @@ class CircuitBreakerEvent:
     threshold_pct: float
     triggered_at: datetime
     duration_minutes: int
-    feature_code: Optional[str] = None
+    feature_code: str | None = None
     market_phase: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "event_type": self.event_type,
@@ -59,8 +60,8 @@ class AutoCircuitBreakerEngine:
     """
 
     def __init__(self):
-        self._events: List[CircuitBreakerEvent] = []
-        self._triggered_today: Dict[str, List[float]] = {}  # ticker → [threshold_pct, ...]
+        self._events: list[CircuitBreakerEvent] = []
+        self._triggered_today: dict[str, list[float]] = {}  # ticker → [threshold_pct, ...]
         self._bist100_reference: float = 0.0  # Önceki kapanış
         self._bist100_current: float = 0.0
         self._ebdks_triggered_today: int = 0
@@ -69,7 +70,7 @@ class AutoCircuitBreakerEngine:
         """BIST-100 referans fiyatını (önceki kapanış) ayarla."""
         self._bist100_reference = reference_price
 
-    def update_bist100_price(self, current_price: float) -> Optional[CircuitBreakerEvent]:
+    def update_bist100_price(self, current_price: float) -> CircuitBreakerEvent | None:
         """BIST-100 güncel fiyatını güncelle ve EBDKS kontrolü yap.
 
         Args:
@@ -134,7 +135,7 @@ class AutoCircuitBreakerEngine:
         current_price: float,
         reference_price: float,
         market_type: str = "ana",
-    ) -> Optional[CircuitBreakerEvent]:
+    ) -> CircuitBreakerEvent | None:
         """Pay bazında devre kesici kontrolü.
 
         Args:
@@ -205,11 +206,11 @@ class AutoCircuitBreakerEngine:
         bist_session_fsm.clear_ebdks()
         logger.info("Devre kesici günlük sayaçları sıfırlandı")
 
-    def get_events_today(self) -> List[Dict[str, Any]]:
+    def get_events_today(self) -> list[dict[str, Any]]:
         """Bugünkü tüm devre kesici olaylarını döndür."""
         return [e.to_dict() for e in self._events]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
             "ebdks_triggered_today": self._ebdks_triggered_today,

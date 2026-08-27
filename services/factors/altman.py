@@ -2,7 +2,8 @@
 
 Orijinal Altman (1968) + Türkiye'ye özgü düzeltme (enflasyon, kur, sektör).
 """
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,10 +27,10 @@ ZONES = {"safe": 2.99, "grey": 1.81}
 
 
 def calculate_z_score(
-    financials: Dict[str, Any],
+    financials: dict[str, Any],
     sector: str = "OTHER",
     turkey_adjusted: bool = True,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Altman Z-Score — detaylı, Türkiye düzeltmeli.
 
     Args:
@@ -89,7 +90,7 @@ def calculate_z_score(
         "adjustments": {"inflation": inf_adj, "fx": fx_adj, "sector": sec_adj},
         "components": {
             "wc_ta": round(wc_ta, 4),
-            "re_ta": round(reta := re_ta, 4),
+            "re_ta": round(_reta := re_ta, 4),
             "ebit_ta": round(ebit_ta, 4),
             "equity_debt": round(equity_debt, 4),
             "sales_ta": round(sales_ta, 4),
@@ -100,7 +101,7 @@ def calculate_z_score(
     return result
 
 
-def calculate_z_score_simple(financials: Dict[str, Any]) -> float:
+def calculate_z_score_simple(financials: dict[str, Any]) -> float:
     """Basitleştirilmiş Z-Score (backward compatibility)."""
     result = calculate_z_score(financials, turkey_adjusted=False)
     return result["z_score"]

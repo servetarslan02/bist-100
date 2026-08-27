@@ -16,8 +16,9 @@ Features:
 """
 
 import asyncio
+from typing import Any
+
 import numpy as np
-from typing import Dict, Any, Optional, List
 import structlog
 
 from .base import BaseAdapter
@@ -32,7 +33,7 @@ class GoogleTrendsAdapter(BaseAdapter):
     rate_limit = 10  # pytrends için düşük limit
 
     # BIST hisse → arama terimleri mapping
-    TICKER_SEARCH_TERMS: Dict[str, List[str]] = {
+    TICKER_SEARCH_TERMS: dict[str, list[str]] = {
         "THYAO": ["thyao", "türk hava yolları", "turkish airlines"],
         "GARAN": ["garanti", "garanti bankası"],
         "AKBNK": ["akbank"],
@@ -70,7 +71,7 @@ class GoogleTrendsAdapter(BaseAdapter):
                 return None
         return self._pytrends
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Google Trends verisi çek."""
         pytrends = self._get_pytrends()
         if pytrends is None:
@@ -89,7 +90,7 @@ class GoogleTrendsAdapter(BaseAdapter):
             logger.warning("Google Trends fetch failed", ticker=ticker, error=str(e))
             return None
 
-    def _fetch_trends(self, pytrends, search_terms: List[str]) -> Dict[str, Any]:
+    def _fetch_trends(self, pytrends, search_terms: list[str]) -> dict[str, Any]:
         """pytrends ile veri çek (sync)."""
         try:
             pytrends.build_payload(
@@ -130,7 +131,7 @@ class GoogleTrendsAdapter(BaseAdapter):
             logger.warning("pytrends fetch error", error=str(e))
             return {}
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """Google Trends feature'ları hesapla."""
         if not data:
             return {}

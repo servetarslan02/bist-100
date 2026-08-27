@@ -11,11 +11,10 @@ Tüm scheduler modülleri için kapsamlı test'ler:
 - Holiday Provider (dynamic + fallback)
 """
 
-import pytest
 import asyncio
-import time
-from datetime import datetime, time as dt_time, timezone, timedelta, date
+from datetime import UTC, date, datetime, timedelta, timezone
 
+import pytest
 
 # =====================================================
 # HOLIDAY PROVIDER TESTS
@@ -231,7 +230,7 @@ class TestDBJobTracker:
         from services.scheduler.unified_scheduler import JobResult
         result = JobResult(
             job_type="test", status="SUCCESS",
-            duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+            duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
         )
         success = asyncio.run(self.tracker.record_job(result))
         assert success is True
@@ -243,7 +242,7 @@ class TestDBJobTracker:
         for i in range(5):
             result = JobResult(
                 job_type=f"test_{i}", status="SUCCESS",
-                duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+                duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
             )
             asyncio.run(self.tracker.record_job(result))
 
@@ -256,12 +255,12 @@ class TestDBJobTracker:
         # Başarılı
         asyncio.run(self.tracker.record_job(JobResult(
             job_type="test", status="SUCCESS",
-            duration_ms=100.0, timestamp=datetime.now(timezone.utc).isoformat()
+            duration_ms=100.0, timestamp=datetime.now(UTC).isoformat()
         )))
         # Başarısız
         asyncio.run(self.tracker.record_job(JobResult(
             job_type="test", status="FAILED",
-            duration_ms=50.0, timestamp=datetime.now(timezone.utc).isoformat(),
+            duration_ms=50.0, timestamp=datetime.now(UTC).isoformat(),
             error="test error"
         )))
 
@@ -494,7 +493,7 @@ class TestLearningScheduler:
 
     def test_should_run_not_yet(self):
         config = self.scheduler._jobs["learning_cycle"]
-        config.last_run = datetime.now(timezone.utc).isoformat()
+        config.last_run = datetime.now(UTC).isoformat()
         assert self.scheduler._should_run(config) is False
 
     def test_get_status(self):
@@ -627,10 +626,10 @@ class TestSchedulerIntegration:
 
     def test_scheduler_with_monitor(self):
         """Scheduler + monitor entegrasyonu."""
-        from services.scheduler.unified_scheduler import UnifiedScheduler
         from services.scheduler.job_monitor import JobMonitor
+        from services.scheduler.unified_scheduler import UnifiedScheduler
 
-        scheduler = UnifiedScheduler()
+        UnifiedScheduler()
         monitor = JobMonitor()
 
         # Job kaydet
@@ -648,14 +647,14 @@ class TestSchedulerIntegration:
         workflow = DailyWorkflow()
         market = MarketSessionManager()
 
-        phase = market.current_phase()
+        market.current_phase()
         status = workflow.get_status()
         assert status.current_phase is not None
 
     def test_learning_with_monitor(self):
         """Learning + monitor entegrasyonu."""
-        from services.scheduler.learning_scheduler import LearningScheduler
         from services.scheduler.job_monitor import JobMonitor
+        from services.scheduler.learning_scheduler import LearningScheduler
 
         learning = LearningScheduler()
         monitor = JobMonitor()
@@ -685,9 +684,7 @@ class TestSchedulerIntegration:
 
     def test_priority_based_execution_order(self):
         """Priority'ye göre job sıralaması doğru olmalı."""
-        from services.scheduler.unified_scheduler import (
-            UnifiedScheduler, JobConfig
-        )
+        from services.scheduler.unified_scheduler import UnifiedScheduler
 
         scheduler = UnifiedScheduler()
 
@@ -703,9 +700,7 @@ class TestSchedulerIntegration:
 
     def test_holiday_blocks_trading(self):
         """Tatil gününde trading job'ları çalışmamalı."""
-        from services.scheduler.unified_scheduler import (
-            MarketSessionManager, HolidayProvider, MarketPhase
-        )
+        from services.scheduler.unified_scheduler import HolidayProvider, MarketPhase, MarketSessionManager
 
         provider = HolidayProvider()
         # Yarını tatil ekle

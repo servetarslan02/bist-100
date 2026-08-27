@@ -9,10 +9,11 @@ Kalıcı model hafızası:
 """
 
 import os
-import orjson
+from datetime import UTC, datetime
+from typing import Any
+
 import duckdb
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -107,10 +108,10 @@ class ModelMemoryStore:
         market_regime: str,
         prediction_horizon: str,
         entry_price: float,
-        features: Optional[Dict[str, Any]] = None,
+        features: dict[str, Any] | None = None,
     ):
         """Yeni tahmin kaydeder."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
             conn.execute(
                 """
@@ -127,7 +128,7 @@ class ModelMemoryStore:
                 )
             )
 
-    def save_batch_records(self, records: List[Dict[str, Any]]):
+    def save_batch_records(self, records: list[dict[str, Any]]):
         """Büyük hacimli tahmin ve outcome kayıtlarını tek atomik işlemde toplu kaydeder."""
         if not records:
             return
@@ -143,7 +144,7 @@ class ModelMemoryStore:
             m_id = r["model_id"]
             m_ver = r.get("model_version", "v1.0")
             ticker = r["ticker"]
-            t_stamp = r.get("timestamp", datetime.now(timezone.utc).isoformat())
+            t_stamp = r.get("timestamp", datetime.now(UTC).isoformat())
             pred_dir = r.get("predicted_direction", "UP").upper()
             conf = float(r.get("confidence", 0.65))
             regime = r.get("market_regime", "BULL_TREND")
@@ -201,10 +202,10 @@ class ModelMemoryStore:
         self,
         prediction_id: str,
         actual_price: float,
-        evaluated_at: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        evaluated_at: str | None = None,
+    ) -> dict[str, Any] | None:
         """Bekleyen tahmine gerçek piyasa sonucunu bağlar ve net PnL hesaplar."""
-        now = evaluated_at or datetime.now(timezone.utc).isoformat()
+        now = evaluated_at or datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
             row = conn.execute("SELECT * FROM predictions WHERE prediction_id = ?", (prediction_id,)).fetchone()
             if not row:
@@ -261,7 +262,7 @@ class ModelMemoryStore:
         self,
         model_id: str,
         limit: int = 500,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Modelin değerlendirilmiş tahmin ve outcome geçmişini döndürür."""
         with self._get_conn() as conn:
             cursor = conn.execute(
@@ -283,12 +284,12 @@ class ModelMemoryStore:
         self,
         model_id: str,
         model_version: str,
-        metrics: Dict[str, Any],
+        metrics: dict[str, Any],
         reliability_score: float,
         fusion_weight: float,
     ):
         """Modelin anlık metrik ve güvenilirlik kaydını ekler."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
             conn.execute(
                 """
@@ -309,16 +310,16 @@ class ModelMemoryStore:
                 )
             )
 
-    def record_fusion_weights(self, weights: Dict[str, float], market_regime: str):
+    def record_fusion_weights(self, weights: dict[str, float], market_regime: str):
         """Güncel sinyal ağırlıklarını geçmişe kaydeder."""
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         with self._get_conn() as conn:
             conn.execute(
                 "INSERT INTO fusion_weights_history (timestamp, market_regime, weights_json) VALUES (?, ?, ?)",
                 (now, market_regime, orjson.dumps(weights).decode())
             )
 
-    def get_latest_metrics_all_models(self) -> List[Dict[str, Any]]:
+    def get_latest_metrics_all_models(self) -> list[dict[str, Any]]:
         """Tüm modellerin en son metrik kayıtlarını getirir."""
         with self._get_conn() as conn:
             cursor = conn.execute(

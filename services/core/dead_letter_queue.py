@@ -4,13 +4,16 @@ v2.0: Artık PersistentDeadLetterQueue kullanılıyor — restart sonrası kaybo
 In-memory DLQ yerine DuckDB tabanlı persistent DLQ.
 """
 
+import enum
+from datetime import UTC
+
 import structlog
 
 logger = structlog.get_logger()
 
 # Persistent DLQ kullan — restart sonrası kaybolmaz
 try:
-    from .persistent_dlq import PersistentDeadLetterQueue, DLQStatus, DLQEntry
+    from .persistent_dlq import DLQEntry, DLQStatus, PersistentDeadLetterQueue
 
     class DeadLetterQueue(PersistentDeadLetterQueue):
         """Backward-compatible wrapper — PersistentDeadLetterQueue kullanır."""
@@ -24,12 +27,11 @@ except Exception as e:
     # Fallback: in-memory (son çare)
     import hashlib
     import time
-    from typing import Dict, List, Optional, Any, Callable
     from dataclasses import dataclass, field
-    from datetime import datetime, timezone, timedelta
-    from enum import Enum
+    from datetime import datetime, timedelta
+    from typing import Any
 
-    class DLQStatus(str, Enum):
+    class DLQStatus(enum.StrEnum):
         PENDING = "PENDING"
         RETRYING = "RETRYING"
         RESOLVED = "RESOLVED"
@@ -45,10 +47,10 @@ except Exception as e:
         retry_count: int = 0
         max_retries: int = 3
         status: DLQStatus = DLQStatus.PENDING
-        created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-        last_retry_at: Optional[datetime] = None
-        next_retry_at: Optional[datetime] = None
-        resolved_at: Optional[datetime] = None
+        created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+        last_retry_at: datetime | None = None
+        next_retry_at: datetime | None = None
+        resolved_at: datetime | None = None
 
         def to_dict(self):
             return {
@@ -72,14 +74,14 @@ except Exception as e:
                 return False
             if self.next_retry_at is None:
                 return True
-            return datetime.now(timezone.utc) >= self.next_retry_at
+            return datetime.now(UTC) >= self.next_retry_at
 
     class InMemoryDeadLetterQueue:
         """Fallback in-memory DLQ."""
         def __init__(self, max_entries=10000):
-            self._entries: Dict[str, DLQEntry] = {}
+            self._entries: dict[str, DLQEntry] = {}
             self._max_entries = max_entries
-            self._retry_handlers: Dict[str, Any] = {}
+            self._retry_handlers: dict[str, Any] = {}
             self._total_pushed = 0
             self._total_retried = 0
             self._total_resolved = 0
@@ -98,7 +100,7 @@ except Exception as e:
                 entry_id=entry_id, event_id=event_id, event_type=event_type,
                 payload=payload, error=error, retry_count=retry_count,
                 max_retries=max_retries,
-                next_retry_at=datetime.now(timezone.utc) + timedelta(seconds=backoff),
+                next_retry_at=datetime.now(UTC) + timedelta(seconds=backoff),
             )
             self._entries[entry_id] = entry
             self._total_pushed += 1

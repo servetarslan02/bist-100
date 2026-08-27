@@ -14,10 +14,11 @@ Kullanım:
 """
 
 import hashlib
-import orjson
 import time
-from typing import Dict, List, Optional, Any
 from collections import OrderedDict
+from typing import Any
+
+import orjson
 import structlog
 
 from . import redis_helper
@@ -32,9 +33,9 @@ class FeatureStore:
         self,
         max_size: int = 10000,
         default_ttl: int = 3600,
-        redis_url: Optional[str] = None,
+        redis_url: str | None = None,
     ):
-        self._cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self._cache: OrderedDict[str, dict[str, Any]] = OrderedDict()
         self._max_size = max_size
         self._default_ttl = default_ttl
         self._redis = None
@@ -48,7 +49,7 @@ class FeatureStore:
         else:
             logger.info("Feature store Redis unavailable, using in-memory only")
 
-    def _make_key(self, ticker: str, date: str, features: List[str]) -> str:
+    def _make_key(self, ticker: str, date: str, features: list[str]) -> str:
         """Cache key oluştur."""
         feat_hash = hashlib.md5(",".join(sorted(features)).encode()).hexdigest()[:8]
         return f"feat:{ticker}:{date}:{feat_hash}"
@@ -57,8 +58,8 @@ class FeatureStore:
         self,
         ticker: str,
         date: str,
-        feature_names: List[str],
-    ) -> Optional[Dict[str, float]]:
+        feature_names: list[str],
+    ) -> dict[str, float] | None:
         """Cache'den feature getir."""
         key = self._make_key(ticker, date, feature_names)
 
@@ -94,9 +95,9 @@ class FeatureStore:
         self,
         ticker: str,
         date: str,
-        features: Dict[str, float],
-        ttl: Optional[int] = None,
-        feature_names: Optional[List[str]] = None,
+        features: dict[str, float],
+        ttl: int | None = None,
+        feature_names: list[str] | None = None,
     ):
         """Cache'e feature kaydet."""
         if feature_names is None:
@@ -122,7 +123,7 @@ class FeatureStore:
             except Exception as e:
                 logger.debug("feature_store_redis_set_failed", key=key, error=str(e))
 
-    def invalidate(self, ticker: str, date: Optional[str] = None):
+    def invalidate(self, ticker: str, date: str | None = None):
         """Cache'i temizle."""
         prefix = f"feat:{ticker}:"
         keys_to_remove = [k for k in self._cache if k.startswith(prefix)]
@@ -137,7 +138,7 @@ class FeatureStore:
             except Exception as e:
                 logger.debug("feature_store_redis_invalidate_failed", ticker=ticker, error=str(e))
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Cache istatistikleri."""
         total = self._hits + self._misses
         return {

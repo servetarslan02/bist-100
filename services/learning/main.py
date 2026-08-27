@@ -1,19 +1,26 @@
 """ALPHA BIST - Learning Service (ML Training, Validation, Champion/Challenger)"""
 
 import asyncio
-import orjson
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
+import orjson
 import polars as pl
 import structlog
 
 from ..core.database import (
-    init_databases, close_databases, pg_fetch, pg_fetchrow, pg_execute,
     ch_execute,
+    close_databases,
+    init_databases,
+    pg_execute,
+    pg_fetch,
+    pg_fetchrow,
+    pg_fetchval,
 )
 from ..core.event_bus import (
-    ensure_topics, EventConsumer,
+    EventConsumer,
+    ensure_topics,
 )
 from ..core.logging import setup_logging
 
@@ -57,7 +64,7 @@ class LearningService:
 
                 # Check if training is needed
                 last_training = await self._get_last_training_time()
-                hours_since = (datetime.now(timezone.utc) - last_training).total_seconds() / 3600 if last_training else 999
+                hours_since = (datetime.now(UTC) - last_training).total_seconds() / 3600 if last_training else 999
 
                 if hours_since >= 168:  # Weekly
                     await self._train_all_models()
@@ -126,7 +133,7 @@ class LearningService:
                     model.train(X_train, y_train, X_val, y_val)
 
                     # Evaluate
-                    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+                    from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
                     y_pred = model.predict(X_val)
 
                     metrics = {
@@ -156,7 +163,7 @@ class LearningService:
         except Exception as e:
             logger.error("Training cycle failed", error=str(e))
 
-    async def _prepare_training_data(self) -> Optional[pl.DataFrame]:
+    async def _prepare_training_data(self) -> pl.DataFrame | None:
         """Prepare training data from ClickHouse."""
         try:
             # Get historical features and outcomes
@@ -224,7 +231,7 @@ class LearningService:
         except Exception as e:
             logger.error("Outcome tracking error", error=str(e))
 
-    async def _get_actual_return(self, instrument_id: int, start_date, days: int) -> Optional[Dict]:
+    async def _get_actual_return(self, instrument_id: int, start_date, days: int) -> dict | None:
         """Get actual return for a prediction."""
         try:
             result = ch_execute("""
@@ -252,7 +259,7 @@ class LearningService:
         except Exception:
             return None
 
-    async def _get_last_training_time(self) -> Optional[datetime]:
+    async def _get_last_training_time(self) -> datetime | None:
         """Get last training time."""
         row = await pg_fetchrow("""
             SELECT MAX(created_at) as last_training
@@ -261,7 +268,7 @@ class LearningService:
         """)
         return row["last_training"] if row else None
 
-    async def _register_model(self, name: str, config, metrics: Dict):
+    async def _register_model(self, name: str, config, metrics: dict):
         """Register model in database."""
         await pg_execute("""
             INSERT INTO models (name, description, model_type, framework, target_variable, features, hyperparameters, status)
@@ -320,7 +327,7 @@ async def main():
 # =====================================================
 # Learning Modül Bağlantıları
 # =====================================================
-def get_learning_systems() -> Dict[str, Any]:
+def get_learning_systems() -> dict[str, Any]:
     """Tüm learning servislerini getir."""
     result = {}
     try:

@@ -9,9 +9,10 @@ ROADMAP v3.0: Regresyon değil sıralama!
 KURAL: En iyi hisseyi bul, fiyat tahmini yapma!
 """
 
-import numpy as np
-from typing import Dict, List, Any, Tuple
 from collections import defaultdict
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -43,10 +44,10 @@ class LearningToRankModel:
 
     def prepare_training_data(
         self,
-        features_map: Dict[str, Dict],
-        returns: Dict[str, float],  # Gelecek dönem getirileri
-        date_groups: Dict[str, str],  # Her hissenin tarihi (group için)
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        features_map: dict[str, dict],
+        returns: dict[str, float],  # Gelecek dönem getirileri
+        date_groups: dict[str, str],  # Her hissenin tarihi (group için)
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Eğitim verisi hazırla."""
 
         X = []
@@ -88,7 +89,7 @@ class LearningToRankModel:
         X: np.ndarray,
         y: np.ndarray,
         groups: np.ndarray,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Model eğit."""
 
         try:
@@ -119,7 +120,7 @@ class LearningToRankModel:
             importance = self._model.feature_importances_
             self._feature_importance = {
                 name: float(imp)
-                for name, imp in zip(self._feature_names, importance)
+                for name, imp in zip(self._feature_names, importance, strict=False)
             }
 
             logger.info("Ranker trained successfully",
@@ -144,8 +145,8 @@ class LearningToRankModel:
 
     def rank(
         self,
-        features_map: Dict[str, Dict],
-    ) -> List[Dict[str, Any]]:
+        features_map: dict[str, dict],
+    ) -> list[dict[str, Any]]:
         """Hisseleri sırala."""
 
         if not self._is_trained or self._model is None:
@@ -174,7 +175,7 @@ class LearningToRankModel:
 
         # Sırala (düşük tahmin = üst sıra)
         ranked = sorted(
-            zip(tickers, predictions),
+            zip(tickers, predictions, strict=False),
             key=lambda x: x[1]
         )
 
@@ -188,7 +189,7 @@ class LearningToRankModel:
             for i, (ticker, pred) in enumerate(ranked)
         ]
 
-    def _fallback_rank(self, features_map: Dict[str, Dict]) -> List[Dict[str, Any]]:
+    def _fallback_rank(self, features_map: dict[str, dict]) -> list[dict[str, Any]]:
         """Model yoksa rule-based fallback."""
 
         scores = []
@@ -225,7 +226,7 @@ class LearningToRankModel:
             for i, (ticker, score) in enumerate(scores)
         ]
 
-    def get_feature_importance(self) -> Dict[str, float]:
+    def get_feature_importance(self) -> dict[str, float]:
         """Feature importance."""
         if self._is_trained:
             return dict(sorted(

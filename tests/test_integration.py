@@ -12,10 +12,9 @@ Kural: Bu test Gercek veri ile calisir. Mock yok.
 """
 
 import sys
-import os
+from datetime import UTC, date, datetime, timedelta
 
 import polars as pl
-from datetime import datetime, timezone, date, timedelta
 
 
 def test_yahoo_finance_fetch():
@@ -85,9 +84,9 @@ def test_sector_map():
 def test_daily_pipeline():
     """Gunluk pipeline calistir."""
     print("\n[Test] Daily pipeline...")
+    from services.core.orchestrator import orchestrator
     from services.data.data_source import data_source
     from services.ingestion.bist_universe import bist_universe
-    from services.core.orchestrator import orchestrator
 
     # Sadece 3 hisse ile test (hizli)
     test_tickers = ["THYAO.IS", "GARAN.IS", "XU100.IS"]
@@ -96,9 +95,9 @@ def test_daily_pipeline():
 
     assert len(market_data) > 0, "Veri yuklenemedi!"
 
-    sector_map = {t: bist_universe.get_ticker_sector(t) for t in market_data.keys()}
+    sector_map = {t: bist_universe.get_ticker_sector(t) for t in market_data}
 
-    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date = datetime.now(UTC).strftime("%Y-%m-%d")
     report = orchestrator.run_full_pipeline(
         date=date,
         market_data=market_data,

@@ -5,8 +5,9 @@ KAP haber akışı için duygu analizi.
 Türkçe finansal kelime dağarcığı.
 """
 
-from typing import Dict, Any, Optional, List
 import re
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,7 +28,7 @@ class NewsSentimentAnalyzer:
         "azaldı", "kaybetti", "negatif", "risk", "iflas", "borç",
     }
 
-    def analyze(self, text: str, ticker: Optional[str] = None) -> Dict[str, Any]:
+    def analyze(self, text: str, ticker: str | None = None) -> dict[str, Any]:
         """Haber metnini analiz et."""
         if not text:
             return {"sentiment": "NEUTRAL", "score": 0.0, "confidence": 0.0}
@@ -68,10 +69,10 @@ class NewsSentimentAnalyzer:
             result["ticker"] = ticker
         return result
 
-    def analyze_batch(self, texts: List[Dict[str, str]]) -> List[Dict[str, Any]]:
+    def analyze_batch(self, texts: list[dict[str, str]]) -> list[dict[str, Any]]:
         return [self.analyze(item.get("text", ""), item.get("ticker")) for item in texts]
 
-    def get_market_sentiment(self, analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def get_market_sentiment(self, analyses: list[dict[str, Any]]) -> dict[str, Any]:
         if not analyses:
             return {"overall": "NEUTRAL", "score": 0.0}
 

@@ -11,12 +11,11 @@ Tüm yeni scanner modülleri için test'ler:
 - Scan API
 """
 
-import pytest
-import time
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
+import pytest
 
 # =====================================================
 # DEDUPLICATION TESTS
@@ -204,7 +203,7 @@ class TestScanPersistence:
             price=250.0,
             volume=1000000,
             features={"rsi": 65, "momentum": 5.2},
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
         self.persistence.save_scan_result(record)
 
@@ -239,7 +238,7 @@ class TestScanPersistence:
                 price=100.0,
                 volume=500000,
                 features={},
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             )
             self.persistence.save_scan_result(record)
 
@@ -263,7 +262,7 @@ class TestScanPersistence:
                 price=250.0,
                 volume=1000000,
                 features={},
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             )
             self.persistence.save_scan_result(record)
 
@@ -320,13 +319,13 @@ class TestScanPerformanceTracker:
         self.tracker.record_signal_outcome(SignalOutcome(
             ticker="THYAO", signal_type="MOMENTUM", direction="LONG",
             score=80, confidence=0.8, entry_price=250.0,
-            entry_time=datetime.now(timezone.utc).isoformat(),
+            entry_time=datetime.now(UTC).isoformat(),
             exit_price=260.0, return_pct=4.0, correct=True,
         ))
         self.tracker.record_signal_outcome(SignalOutcome(
             ticker="GARAN", signal_type="BREAKOUT", direction="LONG",
             score=70, confidence=0.7, entry_price=100.0,
-            entry_time=datetime.now(timezone.utc).isoformat(),
+            entry_time=datetime.now(UTC).isoformat(),
             exit_price=95.0, return_pct=-5.0, correct=False,
         ))
 
@@ -340,7 +339,7 @@ class TestScanPerformanceTracker:
             self.tracker.record_signal_outcome(SignalOutcome(
                 ticker=f"T{i}", signal_type="MOMENTUM", direction="LONG",
                 score=80, confidence=0.8, entry_price=100.0,
-                entry_time=datetime.now(timezone.utc).isoformat(),
+                entry_time=datetime.now(UTC).isoformat(),
                 exit_price=105.0, return_pct=5.0, correct=True,
             ))
 
@@ -421,7 +420,7 @@ class TestCustomFilterEngine:
     """Custom filter testleri."""
 
     def setup_method(self):
-        from services.scanner.custom_filters import CustomFilterEngine, CustomFilter
+        from services.scanner.custom_filters import CustomFilter, CustomFilterEngine
         self.engine = CustomFilterEngine()
         self.CustomFilter = CustomFilter
 
@@ -569,8 +568,8 @@ class TestScannerIntegration:
 
     def test_alert_with_filter(self):
         """Alert sistemi filtre ile entegrasyon."""
-        from services.scanner.scan_alerts import ScanAlertManager
         from services.scanner.custom_filters import CustomFilterEngine
+        from services.scanner.scan_alerts import ScanAlertManager
 
         alert_mgr = ScanAlertManager()
         filter_eng = CustomFilterEngine()
@@ -594,8 +593,8 @@ class TestScannerIntegration:
 
     def test_scheduler_with_dedup(self):
         """Scheduler dedup ile entegrasyon."""
-        from services.scanner.scan_scheduler import AdaptiveScanScheduler
         from services.scanner.deduplicator import ScanDeduplicator
+        from services.scanner.scan_scheduler import AdaptiveScanScheduler
 
         scheduler = AdaptiveScanScheduler()
         dedup = ScanDeduplicator(cooldown_seconds=5)

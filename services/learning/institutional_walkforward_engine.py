@@ -21,16 +21,16 @@ Bu motor:
      Toplam Ödenen Komisyon, Aylık Getiri Matrisi ve 5-Rejim Dağılımı.
 """
 
+from datetime import timedelta
+from typing import Any
+
+import lightgbm as lgb
 import numpy as np
 import polars as pl
-import yfinance as yf
-from datetime import timedelta
-from typing import Dict, List, Any, Tuple
-import lightgbm as lgb
-from catboost import CatBoostClassifier
-import xgboost as xgb
-
 import structlog
+import xgboost as xgb
+import yfinance as yf
+from catboost import CatBoostClassifier
 
 logger = structlog.get_logger(__name__)
 
@@ -53,10 +53,10 @@ def _yf_to_polars(yf_df) -> pl.DataFrame:
     return pl.from_pandas(df)
 
 
-def load_all_market_data() -> Tuple[Dict[str, pl.DataFrame], pl.Series]:
+def load_all_market_data() -> tuple[dict[str, pl.DataFrame], pl.Series]:
     """Tüm BIST hisse ve XU100 benchmark verilerini indirir."""
     logger.info("📥 Gerçek BIST Verileri İndiriliyor...")
-    stock_data: Dict[str, pl.DataFrame] = {}
+    stock_data: dict[str, pl.DataFrame] = {}
     for ticker in BIST_TICKERS:
         try:
             raw = yf.download(ticker, period="2y", progress=False, interval="1d")
@@ -152,7 +152,7 @@ def detect_market_regime(xu100_series: pl.Series, current_date) -> str:
 class ModelTrainer:
     """Her fold için gerçek ML modellerini geçmiş verilerle eğiten sınıf."""
 
-    def __init__(self, feature_cols: List[str]):
+    def __init__(self, feature_cols: list[str]):
         self.feature_cols = feature_cols
         self.lgb_model = None
         self.cat_model = None
@@ -190,7 +190,7 @@ class ModelTrainer:
         )
         self.xgb_model.fit(X, y_cls)
 
-    def predict_batch_day(self, tickers: List[str], features_list: List[Dict[str, float]]) -> Dict[str, Dict[str, float]]:
+    def predict_batch_day(self, tickers: list[str], features_list: list[dict[str, float]]) -> dict[str, dict[str, float]]:
         """Tüm hisseler için tek seferde batch tahmin üretir."""
         X_mat = np.array([[f.get(col, 0.0) for col in self.feature_cols] for f in features_list])
         n = len(tickers)
@@ -244,7 +244,7 @@ def run_institutional_walkforward_backtest():
     ]
 
     # Her hisse için feature matrisi
-    features_by_ticker: Dict[str, pl.DataFrame] = {}
+    features_by_ticker: dict[str, pl.DataFrame] = {}
     for tk, df in stock_data.items():
         fdf = extract_point_in_time_features(df)
         if len(fdf) >= 120:
@@ -271,10 +271,10 @@ def run_institutional_walkforward_backtest():
 
     INITIAL_CAPITAL = 10_000_000.0
     portfolio_cash = INITIAL_CAPITAL
-    positions: Dict[str, Dict[str, Any]] = {}
-    portfolio_equity_curve: List[Dict[str, Any]] = []
-    benchmark_equity_curve: List[Dict[str, Any]] = []
-    equal_weight_equity_curve: List[Dict[str, Any]] = []
+    positions: dict[str, dict[str, Any]] = {}
+    portfolio_equity_curve: list[dict[str, Any]] = []
+    benchmark_equity_curve: list[dict[str, Any]] = []
+    equal_weight_equity_curve: list[dict[str, Any]] = []
 
     total_transaction_costs = 0.0
     total_trades_count = 0
@@ -282,7 +282,7 @@ def run_institutional_walkforward_backtest():
     losing_trades = 0
     gross_profits = 0.0
     gross_losses = 0.0
-    daily_returns_strategy: List[float] = []
+    daily_returns_strategy: list[float] = []
 
     start_xu100 = float(xu100_close[0]) if len(xu100_close) > 0 else 1.0
 
@@ -290,8 +290,8 @@ def run_institutional_walkforward_backtest():
     retrain_freq = 20
     current_fold = 0
 
-    monthly_performance: Dict[str, Dict[str, float]] = {}
-    regime_pnl: Dict[str, Dict[str, float]] = {
+    monthly_performance: dict[str, dict[str, float]] = {}
+    regime_pnl: dict[str, dict[str, float]] = {
         "BULL_TREND": {"pnl": 0.0, "trades": 0, "wins": 0},
         "BEAR_MARKET": {"pnl": 0.0, "trades": 0, "wins": 0},
         "SIDEWAYS_RANGE": {"pnl": 0.0, "trades": 0, "wins": 0},
@@ -301,13 +301,13 @@ def run_institutional_walkforward_backtest():
 
     TOTAL_FRICTION = 0.00074 + 0.00050
 
-    pending_evaluations: List[Dict[str, Any]] = []
+    pending_evaluations: list[dict[str, Any]] = []
     completed_wins = {m: 0 for m in models}
     completed_totals = {m: 0 for m in models}
 
     logger.info(f"\n🚀 Walk-Forward Simülasyonu Başlıyor ({len(eval_dates)} gün)...", flush=True)
 
-    def _get_row(fdf: pl.DataFrame, date_val) -> Dict[str, float]:
+    def _get_row(fdf: pl.DataFrame, date_val) -> dict[str, float]:
         """Belirli bir tarihteki satırı dict olarak döndür."""
         if "Date" in fdf.columns:
             row_df = fdf.filter(pl.col("Date") == date_val)

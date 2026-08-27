@@ -10,8 +10,9 @@ v2.0 Yenilikler:
 - Newey-West HAC standard errors (otokorelasyon düzeltmesi)
 - Factor verisi yoksa otomatik fallback (Market Model)
 """
+from typing import Literal
+
 import numpy as np
-from typing import Tuple, Dict, Optional, Literal
 import structlog
 
 logger = structlog.get_logger()
@@ -23,12 +24,12 @@ def calculate_expected_return(
     stock_returns: np.ndarray,
     market_returns: np.ndarray,
     model: ModelType = "market",
-    smb_returns: Optional[np.ndarray] = None,
-    hml_returns: Optional[np.ndarray] = None,
-    rmw_returns: Optional[np.ndarray] = None,
-    cma_returns: Optional[np.ndarray] = None,
+    smb_returns: np.ndarray | None = None,
+    hml_returns: np.ndarray | None = None,
+    rmw_returns: np.ndarray | None = None,
+    cma_returns: np.ndarray | None = None,
     hac_lags: int = 0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Expected return modeli — parametre tahmini.
 
     Args:
@@ -71,7 +72,7 @@ def calculate_expected_return(
 
 def _market_model(
     stock_returns: np.ndarray, market_returns: np.ndarray, hac_lags: int = 0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Basit Market Model: E[R] = α + β × R_m."""
     X = np.column_stack([np.ones(len(market_returns)), market_returns])
     y = stock_returns
@@ -114,10 +115,10 @@ def _market_model(
 def _fama_french_3(
     stock_returns: np.ndarray,
     market_returns: np.ndarray,
-    smb_returns: Optional[np.ndarray],
-    hml_returns: Optional[np.ndarray],
+    smb_returns: np.ndarray | None,
+    hml_returns: np.ndarray | None,
     hac_lags: int = 0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Fama-French 3-Factor Model: E[R] = α + β_m×R_m + β_smb×SMB + β_hml×HML."""
     if smb_returns is None or hml_returns is None:
         logger.warning("fama_french_3_missing_factors_falling_back_to_market")
@@ -167,12 +168,12 @@ def _fama_french_3(
 def _fama_french_5(
     stock_returns: np.ndarray,
     market_returns: np.ndarray,
-    smb_returns: Optional[np.ndarray],
-    hml_returns: Optional[np.ndarray],
-    rmw_returns: Optional[np.ndarray],
-    cma_returns: Optional[np.ndarray],
+    smb_returns: np.ndarray | None,
+    hml_returns: np.ndarray | None,
+    rmw_returns: np.ndarray | None,
+    cma_returns: np.ndarray | None,
     hac_lags: int = 0,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Fama-French 5-Factor Model."""
     if smb_returns is None or hml_returns is None:
         return _market_model(stock_returns, market_returns, hac_lags=hac_lags)
@@ -230,7 +231,7 @@ def _fama_french_5(
 
 def _newey_west_se(
     X: np.ndarray, residuals: np.ndarray, lags: int
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Newey-West HAC (Heteroskedasticity and Autocorrelation Consistent) standard errors.
 
     Otokorelasyon ve heteroskedastisite olduğunda OLS standard errors bias'lıdır.
@@ -287,7 +288,7 @@ def _newey_west_se(
 
 
 def calculate_expected_return_value(
-    params: Dict[str, float],
+    params: dict[str, float],
     market_return: float,
     smb: float = 0.0,
     hml: float = 0.0,
@@ -308,7 +309,7 @@ def calculate_expected_return_value(
     )
 
 
-def _default_params(model: ModelType) -> Dict[str, float]:
+def _default_params(model: ModelType) -> dict[str, float]:
     """Varsayılan parametreler (yeterli veri yoksa)."""
     return {
         "alpha": 0.0,
@@ -327,7 +328,7 @@ def _default_params(model: ModelType) -> Dict[str, float]:
 # Backward compatibility — eski API
 def calculate_expected_return_simple(
     stock_returns: np.ndarray, market_returns: np.ndarray
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Eski API uyumluluğu — (alpha, beta) döndür."""
     result = calculate_expected_return(stock_returns, market_returns, model="market")
     return result["alpha"], result["beta_market"]

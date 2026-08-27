@@ -7,9 +7,10 @@ Stop-loss ve target hesaplaması ATR bazlı.
 FAZ 8: Decision Engine
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -25,8 +26,8 @@ class DecisionInput:
     """Karar motoru girdisi (ATR eklendi)."""
     ticker: str
     price: float
-    features: Dict[str, Any] = field(default_factory=dict)
-    signals: Dict[str, Any] = field(default_factory=dict)
+    features: dict[str, Any] = field(default_factory=dict)
+    signals: dict[str, Any] = field(default_factory=dict)
     regime: str = "UNKNOWN"
     ml_score: float = 50.0
     ml_confidence: float = 0.5
@@ -69,8 +70,8 @@ class Decision:
     direction: str  # LONG, SHORT
     confidence: float
     score: float
-    reasons: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
     target_price: float = 0.0
     stop_price: float = 0.0
     position_size: float = 0.0
@@ -453,7 +454,7 @@ class DecisionEngine:
 
         return round(stop_price, 2), round(target_price, 2)
 
-    def _assess_risks(self, inp: DecisionInput) -> List[str]:
+    def _assess_risks(self, inp: DecisionInput) -> list[str]:
         """Risk değerlendirmesi."""
         risks = []
         f = inp.features
@@ -485,7 +486,7 @@ class DecisionEngine:
 
         return risks
 
-    def _generate_reasons(self, inp: DecisionInput, score: float) -> List[str]:
+    def _generate_reasons(self, inp: DecisionInput, score: float) -> list[str]:
         """Karar nedenleri."""
         reasons = []
         f = inp.features
@@ -577,10 +578,9 @@ class DecisionEngine:
             action = "SELL"
 
         # Risk kontrolü — risk_score düşükse pozisyon küçült veya engelle
-        if score.risk_score < 30:
-            if action in ("BUY", "SELL"):
-                action = "HOLD"  # Çok riskli — pozisyon açma
-                direction = "NEUTRAL"
+        if score.risk_score < 30 and action in ("BUY", "SELL"):
+            action = "HOLD"  # Çok riskli — pozisyon açma
+            direction = "NEUTRAL"
 
         # Stop ve Target hesaplama (price verilmişse — ATR bazlı)
         stop_price = 0.0

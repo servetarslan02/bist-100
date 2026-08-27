@@ -9,15 +9,16 @@ Kurumsal BIST Seans, Risk, Eşleşme ve T+2 Takas Entegrasyonu:
 - Tam Audit Trail ve Performans Metrikleri
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
-from .virtual_portfolio import VirtualPortfolio
 from .paper_execution import PaperExecutionEngine, paper_execution
-from .state_store import PaperStateStore
-from .performance_tracker import PerformanceTracker
 from .paper_risk_gate import PaperRiskGate
+from .performance_tracker import PerformanceTracker
+from .state_store import PaperStateStore
+from .virtual_portfolio import VirtualPortfolio
 
 logger = structlog.get_logger()
 
@@ -30,9 +31,9 @@ class PaperTradingOrchestrator:
         champion_version: str = "LambdaRank_v3_LOCKED",
         initial_capital: float = 1_000_000.0,
         db_path: str = "data/paper_trading_state.db",
-        store: Optional[PaperStateStore] = None,
-        state_store: Optional[PaperStateStore] = None,
-        execution: Optional[PaperExecutionEngine] = None,
+        store: PaperStateStore | None = None,
+        state_store: PaperStateStore | None = None,
+        execution: PaperExecutionEngine | None = None,
         require_next_open: bool = True,
         strict_t2: bool = True,
         scenario: str = "NORMAL",
@@ -61,8 +62,8 @@ class PaperTradingOrchestrator:
     def recover_from_downtime(
         self,
         current_date: str,
-        prices: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, Any]:
+        prices: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         """PC kapalıyken geçen günleri telafi et.
 
         Yapılanlar:
@@ -154,22 +155,22 @@ class PaperTradingOrchestrator:
     def process_daily_cycle(
         self,
         date: str,
-        signals: List[Dict[str, Any]],
-        prices: Dict[str, float],
-        volumes: Optional[Dict[str, int]] = None,
-        reference_prices: Optional[Dict[str, float]] = None,
-        sector_map: Optional[Dict[str, str]] = None,
+        signals: list[dict[str, Any]],
+        prices: dict[str, float],
+        volumes: dict[str, int] | None = None,
+        reference_prices: dict[str, float] | None = None,
+        sector_map: dict[str, str] | None = None,
         benchmark_return_pct: float = 0.0,
         circuit_breaker_active: bool = False,
         data_quality_ok: bool = True,
-        next_open_prices: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, Any]:
+        next_open_prices: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         """Günlük simülasyon döngüsünü kurumsal BIST kurallarıyla çalıştırır."""
         logger.info("Starting daily paper trading cycle", date=date, num_signals=len(signals))
 
-        orders_today: List[Dict[str, Any]] = []
-        trades_today: List[Dict[str, Any]] = []
-        errors: List[str] = []
+        orders_today: list[dict[str, Any]] = []
+        trades_today: list[dict[str, Any]] = []
+        errors: list[str] = []
 
         volumes = volumes or {}
         reference_prices = reference_prices or {}
@@ -264,19 +265,19 @@ class PaperTradingOrchestrator:
     def run_daily_cycle(
         self,
         date: str,
-        market_data: Optional[Dict[str, Any]] = None,
-        sector_map: Optional[Dict[str, str]] = None,
-        champion_signals: Optional[List[Dict[str, Any]]] = None,
-        signals: Optional[List[Dict[str, Any]]] = None,
-        prices: Optional[Dict[str, float]] = None,
-        volumes: Optional[Dict[str, int]] = None,
-        reference_prices: Optional[Dict[str, float]] = None,
+        market_data: dict[str, Any] | None = None,
+        sector_map: dict[str, str] | None = None,
+        champion_signals: list[dict[str, Any]] | None = None,
+        signals: list[dict[str, Any]] | None = None,
+        prices: dict[str, float] | None = None,
+        volumes: dict[str, int] | None = None,
+        reference_prices: dict[str, float] | None = None,
         benchmark_return_pct: float = 0.0,
         circuit_breaker_active: bool = False,
         data_quality_ok: bool = True,
-        next_open_prices: Optional[Dict[str, float]] = None,
+        next_open_prices: dict[str, float] | None = None,
         is_morning_execution: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Test/Replay ve Canlı için ortak günlük döngü arayüzü."""
         import polars as pl
 
@@ -364,7 +365,7 @@ class PaperTradingOrchestrator:
 
                             start_20 = max(0, curr_idx - 19) if isinstance(curr_idx, int) else 0
                             hist_slice = df[start_20 : curr_idx + 1] if isinstance(curr_idx, int) else df
-                            
+
                             highs_list = [float(_get_val(r, "high", "High", default=0.0)) for _, r in hist_slice.iterrows()]
                             lows_list = [float(_get_val(r, "low", "Low", default=0.0)) for _, r in hist_slice.iterrows()]
                             vols_list = [float(_get_val(r, "volume", "Volume", default=0.0)) for _, r in hist_slice.iterrows()]
@@ -400,7 +401,7 @@ class PaperTradingOrchestrator:
             next_open_prices=next_open_dict,
         )
 
-    def queue_pending_signals(self, signals: List[Dict[str, Any]], date: str) -> Dict[str, Any]:
+    def queue_pending_signals(self, signals: list[dict[str, Any]], date: str) -> dict[str, Any]:
         """18:15 EOD: Sinyalleri ertesi seans acilisi (09:55-10:00) icin 'bekleyen emir' olarak kaydeder."""
         valid_sigs = [s for s in signals if s.get("model_version") == self._champion_version]
         self.store.save_pending_signals(valid_sigs, date)
@@ -412,11 +413,11 @@ class PaperTradingOrchestrator:
     def execute_pending_signals(
         self,
         date: str,
-        market_data: Optional[Dict[str, Any]] = None,
-        sector_map: Optional[Dict[str, str]] = None,
+        market_data: dict[str, Any] | None = None,
+        sector_map: dict[str, str] | None = None,
         benchmark_return_pct: float = 0.0,
         data_quality_ok: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """09:55-10:00 Sabah Acilisi: Bekleyen sinyalleri T+1 gercek acilis fiyatlariyla yurutur."""
         pending = self.store.load_pending_signals()
         if not pending:
@@ -438,7 +439,7 @@ class PaperTradingOrchestrator:
             logger.warning("Morning execution incomplete; keeping pending signals for retry", date=date, status=report.get("status"))
         return report
 
-    def mark_to_market_cycle(self, prices: Dict[str, float], date: str) -> Dict[str, Any]:
+    def mark_to_market_cycle(self, prices: dict[str, float], date: str) -> dict[str, Any]:
         """Gun sonu portfoy mark-to-market degerlemesi ve T+2 takas kaydirimi."""
         self.portfolio.mark_to_market(prices, date)
         self.portfolio.roll_settlement_day()
@@ -447,11 +448,11 @@ class PaperTradingOrchestrator:
 
     def run_backtest_replay(
         self,
-        market_data: Dict[str, Any],
-        sector_map: Dict[str, str],
-        signals_by_date: Dict[str, List[Dict[str, Any]]],
-        benchmark_returns: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, Any]:
+        market_data: dict[str, Any],
+        sector_map: dict[str, str],
+        signals_by_date: dict[str, list[dict[str, Any]]],
+        benchmark_returns: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         """Tarihsel veride adım adım replay."""
         benchmark_returns = benchmark_returns or {}
         dates = sorted(list(signals_by_date.keys()))
@@ -470,7 +471,7 @@ class PaperTradingOrchestrator:
 
         return self.get_full_report()
 
-    def get_full_report(self) -> Dict[str, Any]:
+    def get_full_report(self) -> dict[str, Any]:
         equity_curve = self.portfolio.get_equity_curve()
         trades = self.portfolio.get_trades()
         metrics = self.performance.compute_full_metrics(equity_curve, trades)
@@ -486,14 +487,14 @@ class PaperTradingOrchestrator:
     def _process_signal(
         self,
         date: str,
-        signal: Dict[str, Any],
-        prices: Dict[str, float],
-        volumes: Dict[str, int],
-        reference_prices: Dict[str, float],
-        sector_map: Dict[str, str],
+        signal: dict[str, Any],
+        prices: dict[str, float],
+        volumes: dict[str, int],
+        reference_prices: dict[str, float],
+        sector_map: dict[str, str],
         data_quality_ok: bool = True,
-        next_open_prices: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, Any]:
+        next_open_prices: dict[str, float] | None = None,
+    ) -> dict[str, Any]:
         ticker = signal.get("ticker", "")
         direction = signal.get("direction", "")
         price = prices.get(ticker, 0.0)
@@ -564,8 +565,8 @@ class PaperTradingOrchestrator:
             return {}
 
         # 4. Likidite ve Mikro-Yapı Metrikleri (YALNIZCA T anına kadar olan geçmiş veri - SIFIR VERİ SIZINTISI)
-        from services.paper_trading.synthetic_liquidity import SyntheticLiquidityEstimator
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
+        from services.paper_trading.synthetic_liquidity import SyntheticLiquidityEstimator
 
         hist = getattr(self, "_history_cache", {}).get(ticker, {})
         high_prev = float(hist.get("high_prev", signal.get("high_prev", 0.0)))
@@ -652,9 +653,9 @@ class PaperTradingOrchestrator:
 
     # ===================== AUDIT HELPERS =====================
 
-    def _audit_signal(self, date: str, signal: Dict[str, Any]):
+    def _audit_signal(self, date: str, signal: dict[str, Any]):
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
             "entry_type": "SIGNAL",
             "ticker": signal.get("ticker"),
@@ -666,9 +667,9 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_order(self, date: str, order: Dict[str, Any]):
+    def _audit_order(self, date: str, order: dict[str, Any]):
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
             "entry_type": "ORDER",
             "ticker": order["ticker"],
@@ -678,18 +679,18 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_performance(self, date: str, perf: Dict[str, Any]):
+    def _audit_performance(self, date: str, perf: dict[str, Any]):
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
             "entry_type": "PERFORMANCE",
             "reason": f"portfolio_value={perf['portfolio_value']:.2f}, return={perf['cumulative_return_pct']:.2f}%",
         }
         self.store.append_audit(entry)
 
-    def _audit_no_trade(self, date: str, reason: str, ticker: Optional[str] = None):
+    def _audit_no_trade(self, date: str, reason: str, ticker: str | None = None):
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
             "entry_type": "NO_TRADE",
             "ticker": ticker,
@@ -697,9 +698,9 @@ class PaperTradingOrchestrator:
         }
         self.store.append_audit(entry)
 
-    def _audit_error(self, date: str, error_type: str, message: str, ticker: Optional[str] = None):
+    def _audit_error(self, date: str, error_type: str, message: str, ticker: str | None = None):
         entry = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "date": date,
             "entry_type": "ERROR",
             "ticker": ticker,

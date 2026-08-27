@@ -6,11 +6,11 @@ Model dosyasından yükler, inference yapar.
 """
 
 import pickle
-import orjson
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from pathlib import Path
-from datetime import datetime
+from typing import Any
+
+import numpy as np
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -23,8 +23,8 @@ class MLModelLoader:
     """
 
     def __init__(self):
-        self._models: Dict[str, Any] = {}
-        self._model_configs: Dict[str, Dict] = {}
+        self._models: dict[str, Any] = {}
+        self._model_configs: dict[str, dict] = {}
         self._loaded = False
 
     def load_models(self, model_dir: str = "ml/saved_models") -> int:
@@ -68,7 +68,7 @@ class MLModelLoader:
         logger.info("ML models loaded", count=loaded)
         return loaded
 
-    def predict(self, model_name: str, features: Dict[str, float]) -> Optional[Dict[str, float]]:
+    def predict(self, model_name: str, features: dict[str, float]) -> dict[str, float] | None:
         """
         Tek bir model ile tahmin yap.
 
@@ -110,7 +110,7 @@ class MLModelLoader:
             logger.warning("Prediction failed", model=model_name, error=str(e))
             return None
 
-    def predict_ensemble(self, features: Dict[str, float]) -> Dict[str, float]:
+    def predict_ensemble(self, features: dict[str, float]) -> dict[str, float]:
         """
         Tüm modellerden tahmin al ve birleştir.
 
@@ -120,7 +120,7 @@ class MLModelLoader:
             return self._quant_proxy(features)
 
         predictions = {}
-        for name, model in self._models.items():
+        for name, _model in self._models.items():
             pred = self.predict(name, features)
             if pred:
                 predictions[name] = pred
@@ -157,7 +157,7 @@ class MLModelLoader:
             "source": "ml_ensemble",
         }
 
-    def _quant_proxy(self, features: Dict[str, float]) -> Dict[str, float]:
+    def _quant_proxy(self, features: dict[str, float]) -> dict[str, float]:
         """
         Quant Probability Proxy — gerçek model yoksa kullanılır.
         Feature-based heuristic.
@@ -184,7 +184,7 @@ class MLModelLoader:
             "source": "quant_proxy",
         }
 
-    def get_status(self) -> Dict:
+    def get_status(self) -> dict:
         """Model durumu."""
         return {
             "loaded": self._loaded,

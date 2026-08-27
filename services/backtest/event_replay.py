@@ -19,12 +19,14 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency ve tekrar-oynatılabilirlik
 """
 
-import orjson
 import hashlib
-import polars as pl
-from typing import Dict, List, Optional, Any, Callable, Tuple
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
+import orjson
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -35,14 +37,14 @@ class SystemState:
     """Sistem durumu snapshot'ı."""
     timestamp: datetime
     cash: float
-    positions: Dict[str, Dict[str, Any]]
-    pending_orders: List[Dict[str, Any]]
+    positions: dict[str, dict[str, Any]]
+    pending_orders: list[dict[str, Any]]
     regime: str
-    feature_cache: Dict[str, Any]
+    feature_cache: dict[str, Any]
     model_version: str
     config_hash: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "cash": self.cash,
@@ -62,10 +64,10 @@ class ReplayDecision:
     action: str  # BUY | SELL | HOLD | NO_ACTION
     score: float
     confidence: float
-    features: Dict[str, float]
+    features: dict[str, float]
     reasoning: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -83,9 +85,9 @@ class AuditRecord:
     event_id: str
     timestamp: datetime
     event_type: str  # market_data | signal | trade | decision | state_change
-    data: Dict[str, Any]
-    state_before: Optional[SystemState] = None
-    state_after: Optional[SystemState] = None
+    data: dict[str, Any]
+    state_before: SystemState | None = None
+    state_after: SystemState | None = None
     hash_chain: str = ""  # Önceki hash'e zincirleme
 
     def compute_hash(self, prev_hash: str = "") -> str:
@@ -105,10 +107,10 @@ class ReplaySnapshot:
     timestamp: datetime
     equity: float
     cash: float
-    positions: Dict[str, Dict]
-    decisions: List[ReplayDecision]
-    trades: List[Dict[str, Any]]
-    market_state: Dict[str, Any]
+    positions: dict[str, dict]
+    decisions: list[ReplayDecision]
+    trades: list[dict[str, Any]]
+    market_state: dict[str, Any]
 
 
 class EnhancedReplayEngine:
@@ -119,9 +121,9 @@ class EnhancedReplayEngine:
     """
 
     def __init__(self):
-        self._handlers: Dict[str, Callable] = {}
-        self._audit_trail: List[AuditRecord] = []
-        self._state_snapshots: List[SystemState] = []
+        self._handlers: dict[str, Callable] = {}
+        self._audit_trail: list[AuditRecord] = []
+        self._state_snapshots: list[SystemState] = []
         self._current_hash: str = "genesis"
 
     def register_handler(self, event_type: str, handler: Callable):
@@ -133,7 +135,7 @@ class EnhancedReplayEngine:
         self,
         timestamp: datetime,
         cash: float,
-        positions: Dict[str, Dict],
+        positions: dict[str, dict],
         regime: str = "UNKNOWN",
         model_version: str = "v1",
         config_hash: str = "",
@@ -154,7 +156,7 @@ class EnhancedReplayEngine:
             self._state_snapshots = self._state_snapshots[-1000:]
         return state
 
-    def restore_snapshot(self, snapshot: SystemState) -> Dict[str, Any]:
+    def restore_snapshot(self, snapshot: SystemState) -> dict[str, Any]:
         """Snapshot'tan durum geri yükle."""
         return {
             "cash": snapshot.cash,
@@ -168,9 +170,9 @@ class EnhancedReplayEngine:
         target_date: datetime,
         market_data: pl.DataFrame,
         initial_state: SystemState,
-        feature_engine: Optional[Callable] = None,
-        signal_engine: Optional[Callable] = None,
-    ) -> Tuple[List[ReplayDecision], List[Dict[str, Any]], List[AuditRecord]]:
+        feature_engine: Callable | None = None,
+        signal_engine: Callable | None = None,
+    ) -> tuple[list[ReplayDecision], list[dict[str, Any]], list[AuditRecord]]:
         """
         Belirli bir günü yeniden oynat.
 
@@ -346,10 +348,10 @@ class EnhancedReplayEngine:
 
     def compare_decisions(
         self,
-        expected: List[ReplayDecision],
-        actual: List[ReplayDecision],
+        expected: list[ReplayDecision],
+        actual: list[ReplayDecision],
         tolerance: float = 0.01,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Beklenen ve gerçekleşen kararları karşılaştır.
 
@@ -408,7 +410,7 @@ class EnhancedReplayEngine:
         self,
         timestamp: datetime,
         event_type: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
     ):
         """Audit event kaydet."""
         record = AuditRecord(
@@ -422,7 +424,7 @@ class EnhancedReplayEngine:
         if len(self._audit_trail) > 1000:
             self._audit_trail = self._audit_trail[-1000:]
 
-    def get_audit_trail(self) -> List[Dict[str, Any]]:
+    def get_audit_trail(self) -> list[dict[str, Any]]:
         """Audit trail'i döndür."""
         return [r.to_dict() for r in self._audit_trail]
 

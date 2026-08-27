@@ -1,31 +1,34 @@
 """ALPHA BIST - Data Ingestion Service (Main Entry Point)"""
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import Dict
+from datetime import UTC, datetime, timedelta
+
 import structlog
 
 from ..core.config import settings
+from ..core.connectivity import connectivity_monitor
 from ..core.database import (
-    init_databases, close_databases,
+    close_databases,
+    init_databases,
+)
+from ..core.event_bus import (
+    EventType,
+    ensure_topics,
+    flush_producer,
+    publish_event,
 )
 from ..core.event_schema import CanonicalEvent
-from ..core.event_bus import (
-    ensure_topics, publish_event, EventType,
-    flush_producer,
-)
 from ..core.logging import setup_logging
-from ..core.connectivity import connectivity_monitor
-from .bist_universe import bist_universe, get_sector, BIST_INDICES
+from .bist_universe import BIST_INDICES, bist_universe, get_sector
 
 # Dinamik hisse listesi — otomatik keşif aktif
 BIST_STOCKS = bist_universe.BIST_100_TICKERS
 BIST_ALL = bist_universe.BIST_ALL_TICKERS
-from .providers.yfinance_provider import yfinance_provider
 from .providers.kap_provider import kap_provider
-from .providers.tcmb_provider import tcmb_provider
 from .providers.news_provider import news_provider
 from .providers.social_provider import social_provider
+from .providers.tcmb_provider import tcmb_provider
+from .providers.yfinance_provider import yfinance_provider
 
 logger = structlog.get_logger()
 
@@ -35,7 +38,7 @@ class IngestionService:
 
     def __init__(self):
         self._running = False
-        self._instrument_map: Dict[str, int] = {}  # ticker -> instrument_id
+        self._instrument_map: dict[str, int] = {}  # ticker -> instrument_id
 
     async def start(self):
         """Start the ingestion service."""
@@ -59,7 +62,7 @@ class IngestionService:
         logger.info("Ingestion Service started",
                     instruments=len(self._instrument_map),
                     universe_size=len(BIST_ALL))
-        
+
         # Start loops in the background
         self._tasks = [
             asyncio.create_task(self._market_data_loop()),
@@ -68,7 +71,7 @@ class IngestionService:
             asyncio.create_task(self._news_loop()),
             asyncio.create_task(self._social_loop())
         ]
-        
+
         # Keep the service running
         while self._running:
             await asyncio.sleep(1)
@@ -139,7 +142,7 @@ class IngestionService:
             sector = get_sector(ticker)
 
             # Get sector_id
-            sector_row = await pg_execute("""
+            await pg_execute("""
                 SELECT id FROM sectors WHERE code = $1
             """, sector)
 
@@ -274,8 +277,8 @@ class IngestionService:
                 logger.info("Starting KAP fetch cycle")
 
                 # Fetch recent disclosures
-                from_date = (datetime.now(timezone.utc) - timedelta(hours=1)).strftime("%Y-%m-%d")
-                to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                from_date = (datetime.now(UTC) - timedelta(hours=1)).strftime("%Y-%m-%d")
+                to_date = datetime.now(UTC).strftime("%Y-%m-%d")
 
                 disclosures = await kap_provider.fetch_disclosures(
                     from_date=from_date,
@@ -482,7 +485,7 @@ async def main():
     """Main entry point for the ingestion service."""
     # Start health server
     await _health_server()
-    
+
     service = IngestionService()
     try:
         await service.start()

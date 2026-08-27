@@ -8,8 +8,9 @@ Araçlar Gemini Function Calling schema formatında tanımlanır,
 böylece hem gerçek API hem de mock modunda kullanılabilir.
 """
 
-from typing import Dict, List, Any, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -228,7 +229,7 @@ class LLMToolExecutor:
     Herhangi bir bağımlılık yüklü değilse graceful fallback döner.
     """
 
-    def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    def execute(self, tool_name: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """Araç çağrısını çalıştır ve sonucu döndür."""
         logger.info("LLM tool call", tool=tool_name, args=list(arguments.keys()))
 
@@ -256,7 +257,7 @@ class LLMToolExecutor:
             return {"error": str(exc), "tool": tool_name}
 
     # ── Araç 1: World State ──────────────────────────────────────────────────
-    def _get_world_state(self) -> Dict[str, Any]:
+    def _get_world_state(self) -> dict[str, Any]:
         try:
             from services.intelligence.world_state import world_state_manager
             state = world_state_manager.get_state_dict()
@@ -270,7 +271,7 @@ class LLMToolExecutor:
             }
 
     # ── Araç 2: Knowledge Graph ──────────────────────────────────────────────
-    def _get_knowledge_graph(self, entity_id: str) -> Dict[str, Any]:
+    def _get_knowledge_graph(self, entity_id: str) -> dict[str, Any]:
         try:
             from services.intelligence.knowledge_graph import knowledge_graph
             relations = knowledge_graph.get_related_entities(entity_id)
@@ -293,7 +294,7 @@ class LLMToolExecutor:
             }
 
     # ── Araç 3: Research Memory (RAG) ────────────────────────────────────────
-    def _get_research_memory(self, ticker: str, limit: int = 5) -> Dict[str, Any]:
+    def _get_research_memory(self, ticker: str, limit: int = 5) -> dict[str, Any]:
         try:
             from services.intelligence.research_memory import research_memory
             history = research_memory.get_ticker_history(ticker, limit=limit)
@@ -308,7 +309,7 @@ class LLMToolExecutor:
             }
 
     # ── Araç 4: Ticker Features ──────────────────────────────────────────────
-    def _get_ticker_features(self, ticker: str) -> Dict[str, Any]:
+    def _get_ticker_features(self, ticker: str) -> dict[str, Any]:
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -316,7 +317,7 @@ class LLMToolExecutor:
         }
 
     # ── Araç 5: Regime ───────────────────────────────────────────────────────
-    def _get_regime(self) -> Dict[str, Any]:
+    def _get_regime(self) -> dict[str, Any]:
         try:
             from services.intelligence.regime import regime_engine
             regime = regime_engine.get_regime()
@@ -336,7 +337,7 @@ class LLMToolExecutor:
             }
 
     # ── Araç 6: Ensemble Forecast ────────────────────────────────────────────
-    def _get_ensemble_forecast(self, ticker: str) -> Dict[str, Any]:
+    def _get_ensemble_forecast(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.ensemble_forecast import ensemble_forecaster
             result = ensemble_forecaster.get_latest(ticker)
@@ -361,7 +362,7 @@ class LLMToolExecutor:
         }
 
     # ── Araç 7: Signal Conflicts ─────────────────────────────────────────────
-    def _get_signal_conflicts(self, ticker: str) -> Dict[str, Any]:
+    def _get_signal_conflicts(self, ticker: str) -> dict[str, Any]:
         return {
             "status": "available_in_context",
             "ticker": ticker,
@@ -369,7 +370,7 @@ class LLMToolExecutor:
         }
 
     # ── Araç 8: SPEC Score ───────────────────────────────────────────────────
-    def _get_spec_score(self, ticker: str) -> Dict[str, Any]:
+    def _get_spec_score(self, ticker: str) -> dict[str, Any]:
         try:
             from services.intelligence.spec_engine import spec_engine
             result = spec_engine.get_latest(ticker)
@@ -397,7 +398,7 @@ class LLMToolExecutor:
         new_regime: str,
         reason: str,
         confidence: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Kara Kuğu koruması: LLM piyasa rejimini acil günceller.
         Güvenlik: confidence < 0.80 ise redder.
@@ -437,7 +438,7 @@ class LLMToolExecutor:
                 "message": f"Rejim '{new_regime}' olarak güncellendi.",
                 "reason": reason,
                 "confidence": confidence,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except (ImportError, AttributeError):
             logger.error("Regime override failed: regime_engine not available")
@@ -454,15 +455,16 @@ class LLMToolExecutor:
         thesis: str,
         direction: str,
         confidence: float,
-        key_risks: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
+        key_risks: list[str] | None = None,
+    ) -> dict[str, Any]:
         try:
-            from services.intelligence.research_memory import research_memory, ResearchRecord
             import uuid
+
+            from services.intelligence.research_memory import ResearchRecord, research_memory
             record = ResearchRecord(
                 record_id=str(uuid.uuid4())[:8],
                 ticker=ticker,
-                date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+                date=datetime.now(UTC).strftime("%Y-%m-%d"),
                 thesis=thesis[:200],
                 evidence=[],
                 risks=key_risks or [],

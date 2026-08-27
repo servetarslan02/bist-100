@@ -12,19 +12,17 @@ Kapsam:
 - Invariant failure tracking
 """
 
-import sys
-import os
 import asyncio
-import time
+import sys
 
-from services.core.monitoring import PortfolioMonitor
+from services.core.database_dev import dev_db
 from services.core.db_lock import (
-    DatabaseLock, get_lock_metrics, get_all_metrics, get_health_report,
-    LockMetrics,
+    get_health_report,
+    get_lock_metrics,
 )
+from services.core.monitoring import PortfolioMonitor
 from services.core.observability import prometheus_metrics
 from services.portfolio.main import PortfolioService
-from services.core.database_dev import dev_db
 
 
 async def setup_portfolio():
@@ -180,9 +178,8 @@ async def test_health_status_change():
 
     health = await monitor.get_health_detailed()
     # Invariant bozulduğunda UNHEALTHY olmalı
-    if not svc._pm.get_accounting_summary().get("invariant_check", True):
-        if health["status"] != "UNHEALTHY":
-            issues.append(f"Invariant bozuldu ama status: {health['status']} (beklenen: UNHEALTHY)")
+    if not svc._pm.get_accounting_summary().get("invariant_check", True) and health["status"] != "UNHEALTHY":
+        issues.append(f"Invariant bozuldu ama status: {health['status']} (beklenen: UNHEALTHY)")
 
     svc._pm._cash = 100000  # Geri al
     await svc.stop()

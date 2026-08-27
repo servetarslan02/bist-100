@@ -5,14 +5,15 @@ Güçlü boğada trendi sonuna kadar sağan, krizde ise anında nakde geçen asi
 Tüm 24 CPU çekirdeğini ve RAM'i tam kapasite kullanır.
 """
 
-from typing import Dict, List, Tuple
-from dataclasses import dataclass
-import numpy as np
-import polars as pl
-import optuna
 import os
-import structlog
 import warnings
+from dataclasses import dataclass
+
+import numpy as np
+import optuna
+import polars as pl
+import structlog
+
 warnings.filterwarnings('ignore')
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -60,7 +61,7 @@ class OptimizationTrialResult:
 class AsymmetricBayesianOptimizer:
     """24 Çekirdekli Asimetrik Bayesian Optimizasyon Motoru."""
 
-    def __init__(self, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame]):
+    def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame]):
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
@@ -302,11 +303,11 @@ class AsymmetricBayesianOptimizer:
             fitness_score=round(fitness, 3)
         )
 
-    def run_asymmetric_study(self, n_trials: int = 500) -> Tuple[StrategyParameters, List[OptimizationTrialResult]]:
+    def run_asymmetric_study(self, n_trials: int = 500) -> tuple[StrategyParameters, list[OptimizationTrialResult]]:
         """24 çekirdekli asimetrik optimizasyon çalışması."""
         num_cores = max(1, os.cpu_count() or 4)
         logger.info(f"Asimetrik Rejim Optimizasyonu başlatılıyor... ({n_trials} Deneme, {num_cores} CPU Çekirdeği)")
-        trial_results: List[OptimizationTrialResult] = []
+        trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
             params = StrategyParameters(

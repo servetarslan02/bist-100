@@ -17,21 +17,22 @@ FAZ 6: Full Pipeline Integration
 """
 
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
+from .agent_memory import AgentMemory, MemoryConsolidator
 from .agent_system import AgentRole, BaseAgent
-from .llm_client import BaseLLMClient
-from .parallel_runner import ParallelAgentRunner, ParallelRunResult
+from .communication_bus import AgentCommunicationBus, ConflictResolver, Resolution
 from .conflict_detector import ConflictDetector, ConflictReport
 from .debate_engine import DebateEngine, DebateResult
-from .risk_assessor import RiskAssessor, RiskAssessment
-from .synthesis_engine import SynthesisEngine, SynthesisResult
-from .agent_memory import AgentMemory, MemoryConsolidator
+from .llm_client import BaseLLMClient
+from .parallel_runner import ParallelAgentRunner, ParallelRunResult
+from .risk_assessor import RiskAssessment, RiskAssessor
 from .self_evaluator import MultiAgentEvaluator
-from .communication_bus import AgentCommunicationBus, ConflictResolver, Resolution
+from .synthesis_engine import SynthesisEngine, SynthesisResult
 
 logger = structlog.get_logger()
 
@@ -44,12 +45,12 @@ class PipelineResult:
     synthesis: SynthesisResult
     parallel_result: ParallelRunResult
     conflict_report: ConflictReport
-    debate_result: Optional[DebateResult]
+    debate_result: DebateResult | None
     risk_assessment: RiskAssessment
     resolution: Resolution
     total_duration_ms: float
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "ticker": self.ticker,
             "timestamp": self.timestamp,
@@ -84,13 +85,13 @@ class AgentPipelineOrchestrator:
 
     def __init__(
         self,
-        llm_client: Optional[BaseLLMClient] = None,
+        llm_client: BaseLLMClient | None = None,
         max_concurrent: int = 6,
         agent_timeout: int = 120,
         enable_debate: bool = True,
         enable_memory: bool = True,
         enable_self_eval: bool = True,
-        memory_path: Optional[str] = None,  # F-028: None yerine varsayılan yol kullan
+        memory_path: str | None = None,  # F-028: None yerine varsayılan yol kullan
     ):
         self.llm_client = llm_client
         self.max_concurrent = max_concurrent
@@ -115,7 +116,7 @@ class AgentPipelineOrchestrator:
 
         # Agent hafızası
         # F-028: Varsayılan memory path — restart sonrası kaybolmayı önler
-        self._memories: Dict[str, AgentMemory] = {}
+        self._memories: dict[str, AgentMemory] = {}
         if enable_memory:
             _default_path = memory_path or "data/agent_memory"
             import os
@@ -131,12 +132,12 @@ class AgentPipelineOrchestrator:
     async def run(
         self,
         ticker: str,
-        features: Dict[str, float],
-        context: Optional[Dict[str, Any]] = None,
-        sector: Optional[str] = None,
-        regime: Optional[str] = None,
-        price: Optional[float] = None,
-        portfolio_info: Optional[Dict] = None,
+        features: dict[str, float],
+        context: dict[str, Any] | None = None,
+        sector: str | None = None,
+        regime: str | None = None,
+        price: float | None = None,
+        portfolio_info: dict | None = None,
     ) -> PipelineResult:
         """Tam agent pipeline çalıştır.
 
@@ -233,7 +234,7 @@ class AgentPipelineOrchestrator:
 
         result = PipelineResult(
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             synthesis=synthesis,
             parallel_result=parallel_result,
             conflict_report=conflict_report,
@@ -256,9 +257,9 @@ class AgentPipelineOrchestrator:
     def _create_tasks(
         self,
         ticker: str,
-        roles: List[AgentRole],
-        context: Dict[str, Any],
-    ) -> Dict[AgentRole, Any]:
+        roles: list[AgentRole],
+        context: dict[str, Any],
+    ) -> dict[AgentRole, Any]:
         """Task'ları oluştur."""
         from .agent_system import AgentTask
 
@@ -284,7 +285,7 @@ class AgentPipelineOrchestrator:
     async def _update_memories(
         self,
         ticker: str,
-        results: Dict[AgentRole, Any],
+        results: dict[AgentRole, Any],
         synthesis: SynthesisResult,
     ):
         """Memory'leri güncelle."""
@@ -299,14 +300,14 @@ class AgentPipelineOrchestrator:
                     reasoning=result.reasoning,
                 )
 
-    async def evaluate_agents(self) -> Dict[str, Any]:
+    async def evaluate_agents(self) -> dict[str, Any]:
         """Tüm agent'ları değerlendir."""
         if not self.enable_self_eval:
             return {"enabled": False}
 
         return self.multi_evaluator.evaluate_all(self._memories)
 
-    async def consolidate_memories(self) -> Dict[str, Any]:
+    async def consolidate_memories(self) -> dict[str, Any]:
         """Memory'leri birleştir."""
         if not self.enable_memory:
             return {"enabled": False}
@@ -316,7 +317,7 @@ class AgentPipelineOrchestrator:
             results[role_name] = await self.consolidator.consolidate(memory)
         return results
 
-    def get_memory_summary(self) -> Dict[str, Any]:
+    def get_memory_summary(self) -> dict[str, Any]:
         """Memory özetini getir."""
         if not self.enable_memory:
             return {"enabled": False}

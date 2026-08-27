@@ -7,15 +7,13 @@ ALPHA BIST — Çok Modelli Ensemble Eğitim Motoru (LightGBM + XGBoost + CatBoo
 - Modelleri 'ml/saved_models/' Dizinine Pickle/JSON Formatında Kaydetme
 """
 
-import os
-import sys
-import orjson
-import pickle
-from datetime import datetime, timezone
-import numpy as np
-import polars as pl
-from typing import Dict, Any, List, Tuple
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import orjson
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -37,7 +35,7 @@ except ImportError:
     cb = None
 
 from sklearn.ensemble import ExtraTreesRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import r2_score
 
 
 class BistEnsembleTrainer:
@@ -56,13 +54,13 @@ class BistEnsembleTrainer:
         self.save_dir.mkdir(parents=True, exist_ok=True)
         self.models = {}
 
-    def train_all(self) -> Dict[str, Any]:
+    def train_all(self) -> dict[str, Any]:
         """Tüm modelleri eğitir, test eder ve ensemble üretir."""
         logger.info(f"Model eğitimi başlatılıyor (Özellik sayısı: {len(self.feature_cols)})...")
-        
+
         X_train = self.train_df[self.feature_cols].to_numpy()
         y_train = self.train_df[self.target_col].to_numpy()
-        
+
         X_oos = self.oos_df[self.feature_cols].to_numpy()
         y_oos = self.oos_df[self.target_col].to_numpy()
 
@@ -82,19 +80,19 @@ class BistEnsembleTrainer:
                 random_state=42
             )
             lgb_model.fit(X_train, y_train)
-            lgb_train_pred = lgb_model.predict(X_train)
+            lgb_model.predict(X_train)
             lgb_oos_pred = lgb_model.predict(X_oos)
-            
+
             lgb_r2 = r2_score(y_oos, lgb_oos_pred)
             lgb_ic = float(np.corrcoef(y_oos, lgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
-            
+
             self.models['lightgbm'] = lgb_model
             results["lightgbm"] = {
                 "r2": round(float(lgb_r2), 4),
                 "ic": round(float(lgb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
-                    for feat, imp in zip(self.feature_cols, lgb_model.feature_importances_)
+                    for feat, imp in zip(self.feature_cols, lgb_model.feature_importances_, strict=False)
                 }
             }
             from services.core.safe_pickle import safe_pickle_dump
@@ -117,14 +115,14 @@ class BistEnsembleTrainer:
             xgb_oos_pred = xgb_model.predict(X_oos)
             xgb_r2 = r2_score(y_oos, xgb_oos_pred)
             xgb_ic = float(np.corrcoef(y_oos, xgb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
-            
+
             self.models['xgboost'] = xgb_model
             results["xgboost"] = {
                 "r2": round(float(xgb_r2), 4),
                 "ic": round(float(xgb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
-                    for feat, imp in zip(self.feature_cols, xgb_model.feature_importances_)
+                    for feat, imp in zip(self.feature_cols, xgb_model.feature_importances_, strict=False)
                 }
             }
             safe_pickle_dump(xgb_model, str(self.save_dir / "xgboost_model.pkl"))
@@ -145,14 +143,14 @@ class BistEnsembleTrainer:
             cb_oos_pred = cb_model.predict(X_oos)
             cb_r2 = r2_score(y_oos, cb_oos_pred)
             cb_ic = float(np.corrcoef(y_oos, cb_oos_pred)[0, 1]) if len(y_oos) > 10 else 0.0
-            
+
             self.models['catboost'] = cb_model
             results["catboost"] = {
                 "r2": round(float(cb_r2), 4),
                 "ic": round(float(cb_ic), 4),
                 "feature_importances": {
                     feat: round(float(imp), 4)
-                    for feat, imp in zip(self.feature_cols, cb_model.get_feature_importance())
+                    for feat, imp in zip(self.feature_cols, cb_model.get_feature_importance(), strict=False)
                 }
             }
             safe_pickle_dump(cb_model, str(self.save_dir / "catboost_model.pkl"))
@@ -176,10 +174,7 @@ class BistEnsembleTrainer:
         if "extratrees" in self.models:
             preds.append(self.models["extratrees"].predict(X_oos) * 0.15)
 
-        if preds:
-            ensemble_pred = np.sum(preds, axis=0)
-        else:
-            ensemble_pred = et_oos_pred
+        ensemble_pred = np.sum(preds, axis=0) if preds else et_oos_pred
 
         ens_r2 = r2_score(y_oos, ensemble_pred)
         ens_ic = float(np.corrcoef(y_oos, ensemble_pred)[0, 1]) if len(y_oos) > 10 else 0.0
@@ -199,7 +194,7 @@ class BistEnsembleTrainer:
         sorted_importance = dict(sorted(combined_importance.items(), key=lambda item: item[1], reverse=True))
 
         summary = {
-            "trained_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "trained_date": datetime.now(UTC).strftime("%Y-%m-%d"),
             "train_samples": len(self.train_df),
             "oos_samples": len(self.oos_df),
             "features": self.feature_cols,

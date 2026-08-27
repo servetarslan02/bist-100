@@ -12,32 +12,39 @@ FAZ 0: Temel altyapı refactor
 """
 
 import asyncio
-import orjson
 import hashlib
 import re
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
+import orjson
 import structlog
 
 from .llm_client import (
-    BaseLLMClient, parse_llm_json,
+    BaseLLMClient,
+    parse_llm_json,
 )
+from .prompts import PROMPT_VERSION, PromptFactory
 from .schemas import (
-    Direction, RiskLevel, SynthesisResultSchema,
-    DebateArgumentSchema, RiskAssessmentSchema,
-    validate_agent_output, TechnicalOutputSchema,
-    FundamentalOutputSchema, NewsOutputSchema,
+    DebateArgumentSchema,
+    Direction,
+    FundamentalOutputSchema,
     MacroOutputSchema,
+    NewsOutputSchema,
+    RiskAssessmentSchema,
+    RiskLevel,
+    SynthesisResultSchema,
+    TechnicalOutputSchema,
+    validate_agent_output,
 )
-from .prompts import PromptFactory, PROMPT_VERSION
 
 logger = structlog.get_logger()
 
 
-class AgentRole(str, Enum):
+class AgentRole(StrEnum):
     RESEARCH = "RESEARCH"
     NEWS = "NEWS"
     MACRO = "MACRO"
@@ -59,11 +66,11 @@ class AgentTask:
     agent_role: AgentRole
     ticker: str
     prompt: str
-    context: Dict[str, Any]
+    context: dict[str, Any]
     max_steps: int = 10
     timeout_seconds: int = 120
-    template_name: Optional[str] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    template_name: str | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -73,15 +80,15 @@ class AgentResult:
     agent_role: AgentRole
     ticker: str
     success: bool
-    output: Dict[str, Any]
+    output: dict[str, Any]
     confidence: float
-    evidence: List[str]
+    evidence: list[str]
     reasoning: str
     model_version: str
     prompt_version: str
     input_hash: str
     duration_ms: float
-    error: Optional[str] = None
+    error: str | None = None
     tokens_in: int = 0
     tokens_out: int = 0
 
@@ -138,7 +145,7 @@ class AIOutputValidator:
     """AI çıktısını doğrula — 5 katmanlı hallucination koruması."""
 
     @staticmethod
-    def validate(llm_output: str, expected_schema: Optional[str] = None) -> Dict[str, Any]:
+    def validate(llm_output: str, expected_schema: str | None = None) -> dict[str, Any]:
         """AI çıktısını doğrula.
 
         Pipeline:
@@ -186,9 +193,8 @@ class AIOutputValidator:
 
         if "score" in parsed:
             score = parsed["score"]
-            if isinstance(score, (int, float)):
-                if score < 0 or score > 100:
-                    errors.append(f"Score out of range: {score}")
+            if isinstance(score, (int, float)) and (score < 0 or score > 100):
+                errors.append(f"Score out of range: {score}")
 
         if "direction" in parsed:
             valid_directions = [d.value for d in Direction]
@@ -204,9 +210,8 @@ class AIOutputValidator:
         # 5. Source validation
         if "source" in parsed:
             source = parsed["source"]
-            if isinstance(source, str) and source.startswith("http"):
-                if not re.match(r'https?://', source):
-                    errors.append(f"Suspicious source URL: {source}")
+            if isinstance(source, str) and source.startswith("http") and not re.match(r'https?://', source):
+                errors.append(f"Suspicious source URL: {source}")
 
         # 6. F-030: Price/Date hallucination validation
         if "price" in parsed:
@@ -219,23 +224,21 @@ class AIOutputValidator:
 
         if "target_price" in parsed:
             tp = parsed["target_price"]
-            if isinstance(tp, (int, float)):
-                if tp <= 0:
-                    errors.append(f"Invalid target_price (<=0): {tp}")
+            if isinstance(tp, (int, float)) and tp <= 0:
+                errors.append(f"Invalid target_price (<=0): {tp}")
 
         if "stop_loss" in parsed:
             sl = parsed["stop_loss"]
-            if isinstance(sl, (int, float)):
-                if sl <= 0:
-                    errors.append(f"Invalid stop_loss (<=0): {sl}")
+            if isinstance(sl, (int, float)) and sl <= 0:
+                errors.append(f"Invalid stop_loss (<=0): {sl}")
 
         if "date" in parsed:
             date_str = str(parsed["date"])
             try:
-                from datetime import datetime, timezone
+                from datetime import datetime
                 dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 # Gelecek tarih kontrolü (1 yıldan fazla ileri)
-                if dt.year > datetime.now(timezone.utc).year + 1:
+                if dt.year > datetime.now(UTC).year + 1:
                     errors.append(f"Future date too far: {date_str}")
             except (ValueError, TypeError):
                 logger.warning("Caught (ValueError, TypeError) in validate", exc_info=True)
@@ -248,7 +251,7 @@ class AIFallback:
     """LLM çalışmadığında rule-based fallback."""
 
     @staticmethod
-    def rule_based_analysis(features: Dict[str, float], ticker: str) -> Dict[str, Any]:
+    def rule_based_analysis(features: dict[str, float], ticker: str) -> dict[str, Any]:
         """LLM yokken kural tabanlı analiz."""
         score = 50.0
         reasons = []
@@ -314,7 +317,7 @@ class BaseAgent:
     def __init__(
         self,
         role: AgentRole,
-        llm_client: Optional[BaseLLMClient] = None,
+        llm_client: BaseLLMClient | None = None,
         model_version: str = "auto",
         prompt_version: str = PROMPT_VERSION,
     ):
@@ -326,7 +329,7 @@ class BaseAgent:
     async def execute(
         self,
         task: AgentTask,
-        llm_client: Optional[BaseLLMClient] = None,
+        llm_client: BaseLLMClient | None = None,
     ) -> AgentResult:
         """Görevi çalıştır."""
         start = time.monotonic()
@@ -420,7 +423,7 @@ class BaseAgent:
         self,
         task: AgentTask,
         client: BaseLLMClient,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """LLM çağrısı — prompt template ile."""
 
         # Prompt template kullan (varsa)
@@ -479,9 +482,9 @@ Kurallar: Sadece verilen verilere dayan. JSON formatında yanıt ver. Confidence
 class AgentOrchestrator:
     """Agent'ları yöneten üst katman v2.0."""
 
-    def __init__(self, llm_client: Optional[BaseLLMClient] = None):
-        self._agents: Dict[AgentRole, BaseAgent] = {}
-        self._results: List[AgentResult] = []
+    def __init__(self, llm_client: BaseLLMClient | None = None):
+        self._agents: dict[AgentRole, BaseAgent] = {}
+        self._results: list[AgentResult] = []
         self.llm_client = llm_client
 
     def register_agent(self, agent: BaseAgent):
@@ -495,9 +498,9 @@ class AgentOrchestrator:
     async def run_research_pipeline(
         self,
         ticker: str,
-        context: Dict[str, Any],
-        llm_client: Optional[BaseLLMClient] = None,
-    ) -> Dict[str, Any]:
+        context: dict[str, Any],
+        llm_client: BaseLLMClient | None = None,
+    ) -> dict[str, Any]:
         """Tam araştırma pipeline'ı çalıştır."""
         client = llm_client or self.llm_client
         results = {}
@@ -518,7 +521,7 @@ class AgentOrchestrator:
         async def _run_agent(role):
             agent = self._agents.get(role) or BaseAgent(role, llm_client=client)
             task = AgentTask(
-                task_id=f"{ticker}-{role.value}-{datetime.now(timezone.utc).strftime('%H%M%S')}",
+                task_id=f"{ticker}-{role.value}-{datetime.now(UTC).strftime('%H%M%S')}",
                 agent_role=role,
                 ticker=ticker,
                 prompt=f"Analyze {ticker} from {role.value} perspective",
@@ -545,7 +548,7 @@ class AgentOrchestrator:
             AgentRole.SYNTHESIS, llm_client=client
         )
         synth_task = AgentTask(
-            task_id=f"{ticker}-SYNTHESIS-{datetime.now(timezone.utc).strftime('%H%M%S')}",
+            task_id=f"{ticker}-SYNTHESIS-{datetime.now(UTC).strftime('%H%M%S')}",
             agent_role=AgentRole.SYNTHESIS,
             ticker=ticker,
             prompt=f"Synthesize all analysis for {ticker}",
@@ -560,7 +563,7 @@ class AgentOrchestrator:
 
         return {
             "ticker": ticker,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "results": {
                 k: {
                     "direction": v.output.get("direction", "NEUTRAL"),
@@ -574,7 +577,7 @@ class AgentOrchestrator:
             "overall_confidence": synth_result.confidence,
         }
 
-    def get_recent_results(self, limit: int = 10) -> List[Dict]:
+    def get_recent_results(self, limit: int = 10) -> list[dict]:
         """Son sonuçları getir."""
         return [
             {
@@ -593,7 +596,7 @@ class AgentOrchestrator:
 agent_orchestrator = AgentOrchestrator()
 
 
-def run_agent_analysis(ticker: str, features: Dict, news: list = None) -> Dict[str, Any]:
+def run_agent_analysis(ticker: str, features: dict, news: list = None) -> dict[str, Any]:
     """Agent tabanlı analiz çalıştır (sync wrapper)."""
     result = {"ticker": ticker}
     try:

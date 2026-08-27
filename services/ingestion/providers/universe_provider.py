@@ -3,13 +3,13 @@ ALPHA BIST — BIST Universe Auto-Discovery Provider v2.0
 TÜM BIST hisselerini (600+ hisse) ve endeks üyeliklerini dinamik olarak keşfeder ve günceller.
 """
 
-import requests
-import orjson
 import re
-from typing import Dict, List
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone, timedelta
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import orjson
+import requests
 import structlog
 
 logger = structlog.get_logger()
@@ -24,7 +24,7 @@ class StockInfo:
     sub_sector: str = ""
     market_cap: float = 0.0
     avg_volume_20d: float = 0.0
-    index_membership: List[str] = None
+    index_membership: list[str] = None
     listing_status: str = "ACTIVE"  # ACTIVE, SUSPENDED, DELISTED
     isin: str = ""
     currency: str = "TRY"
@@ -35,7 +35,7 @@ class StockInfo:
         if self.index_membership is None:
             self.index_membership = []
         if not self.last_updated:
-            self.last_updated = datetime.now(timezone.utc).isoformat()
+            self.last_updated = datetime.now(UTC).isoformat()
 
 
 class LiveUniverseScraper:
@@ -50,9 +50,9 @@ class LiveUniverseScraper:
         })
         self.timeout = 10
 
-    def discover_all_bist_stocks(self) -> Dict[str, StockInfo]:
+    def discover_all_bist_stocks(self) -> dict[str, StockInfo]:
         """Tüm kaynakları tarayarak eksiksiz BIST hisse evrenini keşfet."""
-        discovered: Dict[str, StockInfo] = {}
+        discovered: dict[str, StockInfo] = {}
 
         # 1. Kaynak: Mynet Finans BIST Tam Liste
         try:
@@ -118,10 +118,6 @@ class LiveUniverseScraper:
 
     def _guess_sector(self, ticker: str, name: str) -> str:
         """Hisse sembolü veya isminden sektörü tahmin et / eşle."""
-        KNOWN_SECTOR_PREFIXES = {
-            "BANK": "BANKACILIK", "GYO": "INSAAT_GYO", "YO": "MENKUL_KIYMET",
-            "ENR": "ENERJI", "GES": "ENERJI", "YEN": "ENERJI",
-        }
         name_u = (name + " " + ticker).upper()
         if any(w in name_u for w in ["BANK", "BANKASI", "GARAN", "AKBNK", "ISCTR", "YKBNK", "HALKB", "VAKBN", "TSKB", "ALBRK", "QNB"]):
             return "BANKACILIK"
@@ -162,14 +158,14 @@ class UniverseAutoUpdater:
 
     def __init__(self):
         self.scraper = LiveUniverseScraper()
-        self._universe: Dict[str, StockInfo] = {}
-        self._indices: Dict[str, List[str]] = {
+        self._universe: dict[str, StockInfo] = {}
+        self._indices: dict[str, list[str]] = {
             "XU100": [],
             "XU030": [],
             "XU050": [],
         }
 
-    def get_universe(self, force_refresh: bool = False) -> Dict[str, StockInfo]:
+    def get_universe(self, force_refresh: bool = False) -> dict[str, StockInfo]:
         """Güncel hisse evrenini döndür."""
         if not force_refresh and self._is_cache_valid():
             self._load_from_cache()
@@ -178,10 +174,10 @@ class UniverseAutoUpdater:
 
         return self.refresh_universe()
 
-    def refresh_universe(self) -> Dict[str, StockInfo]:
+    def refresh_universe(self) -> dict[str, StockInfo]:
         """Hisse evrenini tüm canlı kaynaklardan sıfırdan çek ve güncelle."""
         logger.info("Starting complete live BIST universe auto-discovery...")
-        
+
         # 1. Canlı kaynaklardan tüm BIST hisselerini çek
         live_stocks = self.scraper.discover_all_bist_stocks()
         if live_stocks:
@@ -219,16 +215,16 @@ class UniverseAutoUpdater:
             "KRDMD", "OYAKC", "PETKM", "PGSUS", "SAHOL", "SASA", "SISE", "TAVHL", "TCELL", "THYAO",
             "TOASO", "TUPRS", "YKBNK"
         ]
-        
+
         all_syms = set(self._universe.keys())
         xu100 = [s for s in BIST_100_BENCHMARK if s in all_syms]
         # Eğer benchmark'ta olmayan varsa kalanını evrenden ekle
-        for s in self._universe.keys():
+        for s in self._universe:
             if len(xu100) >= 100:
                 break
             if s not in xu100:
                 xu100.append(s)
-                
+
         self._indices["XU100"] = xu100
         self._indices["XU030"] = [s for s in BIST_30_BENCHMARK if s in all_syms]
         self._indices["XU050"] = xu100[:50]
@@ -243,25 +239,25 @@ class UniverseAutoUpdater:
                 members.append("XU050")
             info.index_membership = members
 
-    def get_index_members(self, index: str = "XU100") -> List[str]:
+    def get_index_members(self, index: str = "XU100") -> list[str]:
         """Endeks üyelerini döndür."""
         if not self._universe:
             self.get_universe()
         return self._indices.get(index, [])
 
-    def get_tickers_by_sector(self, sector: str) -> List[str]:
+    def get_tickers_by_sector(self, sector: str) -> list[str]:
         """Sektöre göre hisseleri döndür."""
         if not self._universe:
             self.get_universe()
         return [t for t, info in self._universe.items() if info.sector == sector.upper()]
 
-    def get_all_sectors(self) -> List[str]:
+    def get_all_sectors(self) -> list[str]:
         """Tüm sektörleri döndür."""
         if not self._universe:
             self.get_universe()
         return sorted(list(set(info.sector for info in self._universe.values())))
 
-    def get_sector_stats(self) -> Dict[str, int]:
+    def get_sector_stats(self) -> dict[str, int]:
         """Sektör bazlı istatistikler."""
         if not self._universe:
             self.get_universe()
@@ -281,15 +277,15 @@ class UniverseAutoUpdater:
         if not self.CACHE_FILE.exists():
             return False
         try:
-            mtime = datetime.fromtimestamp(self.CACHE_FILE.stat().st_mtime, tz=timezone.utc)
-            return (datetime.now(timezone.utc) - mtime) < timedelta(hours=self.CACHE_TTL_HOURS)
+            mtime = datetime.fromtimestamp(self.CACHE_FILE.stat().st_mtime, tz=UTC)
+            return (datetime.now(UTC) - mtime) < timedelta(hours=self.CACHE_TTL_HOURS)
         except Exception:
             return False
 
     def _load_from_cache(self):
         """Cache'den yükle."""
         try:
-            with open(self.CACHE_FILE, "r", encoding="utf-8") as f:
+            with open(self.CACHE_FILE, encoding="utf-8") as f:
                 data = orjson.loads(f.read())
             self._universe = {}
             for ticker, info_dict in data.get("universe", {}).items():
@@ -305,7 +301,7 @@ class UniverseAutoUpdater:
             data = {
                 "universe": {t: asdict(info) for t, info in self._universe.items()},
                 "indices": self._indices,
-                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "saved_at": datetime.now(UTC).isoformat(),
                 "total_count": len(self._universe),
             }
             with open(self.CACHE_FILE, "w", encoding="utf-8") as f:
@@ -317,19 +313,19 @@ class UniverseAutoUpdater:
 # Singleton
 universe_updater = UniverseAutoUpdater()
 
-def get_current_universe() -> Dict[str, StockInfo]:
+def get_current_universe() -> dict[str, StockInfo]:
     return universe_updater.get_universe()
 
-def get_bist_100() -> List[str]:
+def get_bist_100() -> list[str]:
     return universe_updater.get_index_members("XU100")
 
-def get_bist_30() -> List[str]:
+def get_bist_30() -> list[str]:
     return universe_updater.get_index_members("XU030")
 
-def get_bist_50() -> List[str]:
+def get_bist_50() -> list[str]:
     return universe_updater.get_index_members("XU050")
 
-def get_all_tickers() -> List[str]:
+def get_all_tickers() -> list[str]:
     return list(universe_updater.get_universe().keys())
 
 def get_sector(ticker: str) -> str:

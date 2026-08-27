@@ -22,12 +22,13 @@ Kullanım:
         await backfill_manager.backfill_all(...)
 """
 
-import duckdb
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
+
+import duckdb
 import structlog
 
 logger = structlog.get_logger()
@@ -54,7 +55,7 @@ class DowntimeTracker:
     def __init__(self, db_path: str = "data/downtime.db"):
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._startup_time: Optional[float] = None
+        self._startup_time: float | None = None
         self._downtime_seconds: float = 0.0
         self._init_db()
 
@@ -93,7 +94,7 @@ class DowntimeTracker:
     def record_shutdown(self):
         """Kapanış zamanını kaydet (graceful shutdown'ta çağrılır)."""
         now = time.time()
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
 
         with self._connect() as conn:
             conn.execute("""
@@ -113,7 +114,7 @@ class DowntimeTracker:
         self._startup_time = time.time()
         self._downtime_seconds = self._calculate_downtime()
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         catchup_level = self.get_catchup_level()
 
         # Son shutdown kaydını güncelle
@@ -193,10 +194,10 @@ class DowntimeTracker:
             conn.execute("""
                 INSERT OR REPLACE INTO downtime_config (key, value, updated_at)
                 VALUES (?, ?, ?)
-            """, (key, value, datetime.now(timezone.utc).isoformat()))
+            """, (key, value, datetime.now(UTC).isoformat()))
             conn.commit()
 
-    def _get_config(self, key: str) -> Optional[str]:
+    def _get_config(self, key: str) -> str | None:
         """Config anahtarını oku."""
         with self._connect() as conn:
             row = conn.execute(
@@ -212,7 +213,7 @@ class DowntimeTracker:
         """Downtime süresini saniye olarak döndür."""
         return self._downtime_seconds
 
-    def needs_catchup(self) -> Dict[str, bool]:
+    def needs_catchup(self) -> dict[str, bool]:
         """Hangi catch-up'lar gerekli?"""
         downtime = timedelta(seconds=self._downtime_seconds)
         return {
@@ -233,7 +234,7 @@ class DowntimeTracker:
         else:
             return "none"
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
             "downtime_seconds": round(self._downtime_seconds, 1),
@@ -247,7 +248,7 @@ class DowntimeTracker:
             "persistent": True,
         }
 
-    def get_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Downtime geçmişini döndür."""
         with self._connect() as conn:
             rows = conn.execute("""

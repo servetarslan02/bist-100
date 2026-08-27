@@ -12,13 +12,14 @@ Features:
 - search_volume_change: Arama hacmi değişim
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_web_features(scraped_data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+def compute_web_features(scraped_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Web scraping feature'ları."""
     features = {}
 

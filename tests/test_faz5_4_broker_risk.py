@@ -5,10 +5,7 @@ Broker Abstraction + Risk Gate + Circuit Breaker
 """
 
 import sys
-import os
 import time
-
-
 
 # ────────────────────────────────────────────────────────────
 # 1. Broker — valid order
@@ -16,7 +13,7 @@ import time
 
 def test_broker_valid_order():
     """Geçerli order fill edilmeli."""
-    from services.core.broker import PaperBroker, Order, OrderSide, OrderStatus
+    from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
     passed = 0
     failed = 0
@@ -33,7 +30,7 @@ def test_broker_valid_order():
     assert result.avg_fill_price == 300.0
     assert broker.get_positions().get("THYAO", {}).get("qty") == 100
 
-    print(f"  ✓ Valid order: FILLED, qty=100, price=300")
+    print("  ✓ Valid order: FILLED, qty=100, price=300")
     passed += 1
 
     return passed, failed
@@ -45,7 +42,7 @@ def test_broker_valid_order():
 
 def test_broker_rejected_order():
     """Yetersiz sermaye ile order reddedilmeli."""
-    from services.core.broker import PaperBroker, Order, OrderSide, OrderStatus
+    from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
     passed = 0
     failed = 0
@@ -72,7 +69,7 @@ def test_broker_rejected_order():
 
 def test_broker_duplicate_order():
     """Aynı idempotency_key ile iki order engellenmeli."""
-    from services.core.broker import PaperBroker, Order, OrderSide, OrderStatus
+    from services.core.broker import Order, OrderSide, PaperBroker
 
     passed = 0
     failed = 0
@@ -106,7 +103,7 @@ def test_broker_duplicate_order():
 
 def test_broker_cancel_order():
     """Order iptal edilebilmeli."""
-    from services.core.broker import PaperBroker, Order, OrderSide, OrderStatus
+    from services.core.broker import Order, OrderSide, PaperBroker
 
     passed = 0
     failed = 0
@@ -122,7 +119,7 @@ def test_broker_cancel_order():
     cancelled = broker.cancel_order("cancel_test")
     assert not cancelled, "Filled order should not be cancellable"
 
-    print(f"  ✓ Cancel: filled order not cancellable")
+    print("  ✓ Cancel: filled order not cancellable")
     passed += 1
 
     return passed, failed
@@ -329,7 +326,7 @@ def test_circuit_breaker_recovery():
     cb.record_success()
     assert cb.state == CircuitState.CLOSED
 
-    print(f"  ✓ Circuit recovery: CLOSED→OPEN→HALF_OPEN→CLOSED")
+    print("  ✓ Circuit recovery: CLOSED→OPEN→HALF_OPEN→CLOSED")
     passed += 1
 
     return passed, failed
@@ -361,7 +358,7 @@ def test_circuit_breaker_half_open_failure():
     cb.record_failure()  # Half-open failure
     assert cb.state == CircuitState.OPEN
 
-    print(f"  ✓ Half-open failure: re-OPENED")
+    print("  ✓ Half-open failure: re-OPENED")
     passed += 1
 
     return passed, failed
@@ -373,7 +370,7 @@ def test_circuit_breaker_half_open_failure():
 
 def test_broker_sell_no_position():
     """Pozisyon olmadan satış reddedilmeli."""
-    from services.core.broker import PaperBroker, Order, OrderSide, OrderStatus
+    from services.core.broker import Order, OrderSide, OrderStatus, PaperBroker
 
     passed = 0
     failed = 0
@@ -412,7 +409,7 @@ def test_risk_gate_portfolio_exposure():
         "A": {"qty": 100, "avg_cost": 5000},  # 500,000
         "B": {"qty": 100, "avg_cost": 4500},  # 450,000
     }
-    total = sum(p["qty"] * p["avg_cost"] for p in positions.values())  # 950,000
+    sum(p["qty"] * p["avg_cost"] for p in positions.values())  # 950,000
 
     decision = gate.check_order(
         ticker="C", side="BUY", quantity=10, price=100,

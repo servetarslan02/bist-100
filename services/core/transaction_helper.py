@@ -15,10 +15,13 @@ Referanslar:
 """
 
 import asyncio
+import hashlib
 import time
-from typing import Dict, List, Optional, Any, Callable
-from dataclasses import dataclass
+from collections.abc import Callable
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -34,7 +37,7 @@ class TransactionMetrics:
     timed_out: int = 0
     total_duration_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_transactions": self.total_transactions,
             "committed": self.committed,
@@ -54,7 +57,7 @@ class QueryMetrics:
     duration_ms: float
     rows_affected: int = 0
     success: bool = True
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class TransactionHelper:
@@ -88,7 +91,7 @@ class TransactionHelper:
         self._max_retries = max_retries
         self._retry_base_delay = retry_base_delay
         self._metrics = TransactionMetrics()
-        self._query_log: List[QueryMetrics] = []
+        self._query_log: list[QueryMetrics] = []
 
     def set_pool(self, pool: Any):
         """Connection pool'u ayarla."""
@@ -97,7 +100,7 @@ class TransactionHelper:
     @asynccontextmanager
     async def atomic(
         self,
-        timeout_seconds: Optional[float] = None,
+        timeout_seconds: float | None = None,
         read_only: bool = False,
     ):
         """
@@ -144,7 +147,7 @@ class TransactionHelper:
                         duration_ms=round(duration, 2),
                         queries=len(self._query_log))
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self._metrics.timed_out += 1
             if tx:
                 await tx.rollback()
@@ -171,8 +174,8 @@ class TransactionHelper:
     @asynccontextmanager
     async def atomic_with_retry(
         self,
-        max_retries: Optional[int] = None,
-        timeout_seconds: Optional[float] = None,
+        max_retries: int | None = None,
+        timeout_seconds: float | None = None,
         read_only: bool = False,
     ):
         """
@@ -231,9 +234,9 @@ class TransactionHelper:
 
     async def execute_batch(
         self,
-        operations: List[Callable],
-        timeout_seconds: Optional[float] = None,
-    ) -> List[Any]:
+        operations: list[Callable],
+        timeout_seconds: float | None = None,
+    ) -> list[Any]:
         """
         Toplu atomic işlem.
 
@@ -259,11 +262,11 @@ class TransactionHelper:
 
         return results
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Transaction metrikleri."""
         return self._metrics.to_dict()
 
-    def get_slow_queries(self, threshold_ms: float = 1000) -> List[Dict[str, Any]]:
+    def get_slow_queries(self, threshold_ms: float = 1000) -> list[dict[str, Any]]:
         """Yavaş sorguları listele."""
         slow = [q for q in self._query_log if q.duration_ms > threshold_ms]
         return [
@@ -289,7 +292,7 @@ class TransactionConnection:
     Sorgu metriklerini otomatik toplar.
     """
 
-    def __init__(self, conn: Any, query_log: List[QueryMetrics]):
+    def __init__(self, conn: Any, query_log: list[QueryMetrics]):
         self._conn = conn
         self._query_log = query_log
 
@@ -320,7 +323,7 @@ class TransactionConnection:
             ))
             raise
 
-    async def fetch(self, query: str, *args) -> List[Any]:
+    async def fetch(self, query: str, *args) -> list[Any]:
         """Fetch sorgusu."""
         start = time.monotonic()
         query_hash = hashlib.md5(query.encode()).hexdigest()[:8]

@@ -8,8 +8,10 @@
 - LOW_VOLATILITY (Düşük Volatilite / Sıkışma)
 """
 
+from datetime import UTC, datetime, timedelta
+
 import numpy as np
-from datetime import datetime, timezone, timedelta
+
 from services.learning.learning_pipeline import LearningPipeline
 from services.learning.model_memory_store import ModelMemoryStore
 
@@ -80,7 +82,7 @@ def run_large_scale_simulation():
     total_per_model = 1000
     all_batch_records = []
     np.random.seed(42)
-    start_date = datetime.now(timezone.utc) - timedelta(days=500)
+    start_date = datetime.now(UTC) - timedelta(days=500)
 
     print(f"Generating {total_per_model} walk-forward samples per model ({total_per_model * 6} total records)...")
     for m_id, prof in models_profile.items():
@@ -96,7 +98,6 @@ def run_large_scale_simulation():
             ticker = tickers[i % len(tickers)]
             pred_dir = "UP" if (selected_reg["drift"] > 0 or np.random.rand() > 0.45) else "DOWN"
             is_win = (np.random.rand() < true_prob)
-            act_dir = pred_dir if is_win else ("DOWN" if pred_dir == "UP" else "UP")
 
             if is_win:
                 ret_pct = abs(np.random.normal(prof["mean_win_pct"], selected_reg["vol"]))

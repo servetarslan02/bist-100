@@ -11,9 +11,10 @@ Kurumsal Düzey Borsa İstanbul Sanal Portföy Yönetimi:
 """
 
 import uuid
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
 from collections import defaultdict
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -35,14 +36,14 @@ class VirtualPortfolio:
         self.unsettled_cash_t1: float = 0.0             # 1 gün sonra takası tamamlanacak nakit
         self.unsettled_cash_t2: float = 0.0             # 2 gün sonra takası tamamlanacak nakit
         self.blocked_cash: float = 0.0                  # Açık limit emirler için bloke bakiye
-        
-        # Brüt takas aynı gün alım lotları (gün içi satış engeli)
-        self.gross_settlement_intraday: Dict[str, int] = defaultdict(int)
 
-        self._positions: Dict[str, Dict[str, Any]] = {}
-        self._trades: List[Dict[str, Any]] = []
-        self._orders: List[Dict[str, Any]] = []
-        self._equity_curve: List[Dict[str, Any]] = []
+        # Brüt takas aynı gün alım lotları (gün içi satış engeli)
+        self.gross_settlement_intraday: dict[str, int] = defaultdict(int)
+
+        self._positions: dict[str, dict[str, Any]] = {}
+        self._trades: list[dict[str, Any]] = []
+        self._orders: list[dict[str, Any]] = []
+        self._equity_curve: list[dict[str, Any]] = []
         self._state_store = state_store
         self._max_equity = initial_capital
         self._current_date = ""
@@ -139,7 +140,7 @@ class VirtualPortfolio:
             "equity_curve": self._equity_curve,
             "trades": self._trades,
             "orders": self._orders,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
         }
         self._state_store.save_portfolio_state(snapshot)
         self._state_store.save_positions(list(self._positions.values()))
@@ -155,7 +156,7 @@ class VirtualPortfolio:
         date: str = "",
         commission: float = 0.0,
         is_gross_settlement: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Yeni pozisyon aç veya mevcut pozisyonu artır (T+2 ve Brüt Takas uyumlu)."""
         cost = quantity * price
         total_cost = cost + commission
@@ -186,7 +187,7 @@ class VirtualPortfolio:
                 "market_value": quantity * price,
                 "sector": sector,
                 "entry_date": date,
-                "last_update": datetime.now(timezone.utc).isoformat(),
+                "last_update": datetime.now(UTC).isoformat(),
             }
             logger.info("Position opened", ticker=ticker, quantity=quantity, price=price, avg_cost=avg_with_commission)
 
@@ -202,11 +203,11 @@ class VirtualPortfolio:
         self,
         ticker: str,
         price: float,
-        quantity: Optional[int] = None,
+        quantity: int | None = None,
         date: str = "",
         commission: float = 0.0,
         reason: str = "EXIT_SIGNAL",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Pozisyon kapat veya kısmi satış yap (T+2 Takas valörü ve Brüt Takas korumalı)."""
         if ticker not in self._positions:
             return {"success": False, "error": "NO_POSITION", "ticker": ticker}
@@ -261,7 +262,7 @@ class VirtualPortfolio:
             pos["quantity"] = remaining_qty
             pos["current_price"] = price
             pos["market_value"] = remaining_qty * price
-            pos["last_update"] = datetime.now(timezone.utc).isoformat()
+            pos["last_update"] = datetime.now(UTC).isoformat()
             logger.info("Position partially sold", ticker=ticker, sold_qty=sold_quantity, remaining_qty=remaining_qty, realized_pnl=realized_pnl)
 
         self._current_date = date
@@ -274,11 +275,11 @@ class VirtualPortfolio:
             "trade": trade,
         }
 
-    def mark_to_market(self, prices: Dict[str, float], date: str, record_equity: bool = True):
+    def mark_to_market(self, prices: dict[str, float], date: str, record_equity: bool = True):
         """Mark-to-Market değerlemesi yap."""
         self.update_prices(prices, date, record_equity=record_equity)
 
-    def update_prices(self, prices: Dict[str, float], date: str, record_equity: bool = True):
+    def update_prices(self, prices: dict[str, float], date: str, record_equity: bool = True):
         """Fiyatları mark-to-market yap; istenirse gün sonu equity kaydı oluştur."""
         self._current_date = date
         for ticker, price in prices.items():
@@ -313,7 +314,7 @@ class VirtualPortfolio:
         ratio: float = 0.0,
         cash_amount: float = 0.0,
         date: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """KAP Kurumsal İşlemlerini portföye uygula."""
         pos = self._positions.get(ticker)
         if not pos:
@@ -341,7 +342,7 @@ class VirtualPortfolio:
 
     # ===================== QUERIES =====================
 
-    _price_cache: Dict[str, float] = {}
+    _price_cache: dict[str, float] = {}
     _price_cache_ts: float = 0.0
     _PRICE_CACHE_TTL: float = 2.0  # saniye
 
@@ -373,7 +374,7 @@ class VirtualPortfolio:
         except Exception:
             logger.warning("Caught Exception in _sync_live_prices", exc_info=True)
 
-    def force_refresh_prices(self, date: str = "") -> Dict[str, float]:
+    def force_refresh_prices(self, date: str = "") -> dict[str, float]:
         """Açılışta tüm pozisyonların fiyatlarını zorla güncelle.
 
         Kaynak sırası:
@@ -408,6 +409,7 @@ class VirtualPortfolio:
             missing = [t for t in self._positions if t not in updated]
             if missing:
                 import asyncio
+
                 from services.core.database import pg_fetch
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
@@ -468,11 +470,11 @@ class VirtualPortfolio:
                 total += (price - cost) * qty
         return total
 
-    def get_position(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def get_position(self, ticker: str) -> dict[str, Any] | None:
         self._sync_live_prices()
         return self._positions.get(ticker)
 
-    def get_all_positions(self) -> List[Dict[str, Any]]:
+    def get_all_positions(self) -> list[dict[str, Any]]:
         """Açık pozisyonları şirket adı, anlık kâr/zarar ve portföy ağırlığıyla zenginleştirerek döner."""
         self._sync_live_prices()
         try:
@@ -514,7 +516,7 @@ class VirtualPortfolio:
         result.sort(key=lambda x: x.get("market_value", 0.0), reverse=True)
         return result
 
-    def get_orders(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_orders(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Emir geçmişini yükle."""
         orders = []
         if self._state_store:
@@ -543,7 +545,7 @@ class VirtualPortfolio:
             orders = orders[:limit]
         return orders
 
-    def get_sector_weights(self) -> Dict[str, float]:
+    def get_sector_weights(self) -> dict[str, float]:
         """Sektörel ağırlıklar."""
         total = self.get_total_value()
         if total <= 0:
@@ -553,14 +555,14 @@ class VirtualPortfolio:
             sector_values[pos.get("sector", "UNKNOWN")] += pos["market_value"]
         return {s: round(v / total, 4) for s, v in sector_values.items()}
 
-    def get_position_weights(self) -> Dict[str, float]:
+    def get_position_weights(self) -> dict[str, float]:
         """Hisse bazlı ağırlıklar."""
         total = self.get_total_value()
         if total <= 0:
             return {}
         return {t: round(p["market_value"] / total, 4) for t, p in self._positions.items()}
 
-    def get_trades(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
+    def get_trades(self, limit: int | None = None) -> list[dict[str, Any]]:
         if self._trades:
             trades = self._trades
         elif self._state_store:
@@ -575,7 +577,7 @@ class VirtualPortfolio:
             trades = trades[:limit]
         return trades
 
-    def get_equity_curve(self) -> List[Dict[str, Any]]:
+    def get_equity_curve(self) -> list[dict[str, Any]]:
         if self._equity_curve:
             return self._equity_curve
         if self._state_store:
@@ -611,7 +613,7 @@ class VirtualPortfolio:
             tot = self.get_total_value()
         return max(0.0, ((self._max_equity - tot) / self._max_equity) * 100.0)
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Portföy özet metrikleri."""
         total_val = self.get_total_value()
         unrealized = self.get_unrealized_pnl()
@@ -647,7 +649,7 @@ class VirtualPortfolio:
             "last_date": self._current_date,
         }
 
-    def _holding_days(self, entry_date: Optional[str], exit_date: str) -> int:
+    def _holding_days(self, entry_date: str | None, exit_date: str) -> int:
         """İki tarih arası gün sayısı."""
         if not entry_date or not exit_date:
             return 0

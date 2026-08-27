@@ -8,11 +8,12 @@ ALPHA BIST — Research Memory & Context v1.0
 - Data Lineage
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
 import orjson
 import structlog
 
@@ -26,10 +27,10 @@ class ResearchRecord:
     ticker: str
     date: str
     thesis: str
-    evidence: List[str]
-    risks: List[str]
-    prediction: Dict[str, Any]
-    outcome: Optional[Dict[str, Any]] = None
+    evidence: list[str]
+    risks: list[str]
+    prediction: dict[str, Any]
+    outcome: dict[str, Any] | None = None
     model_version: str = ""
     prompt_version: str = ""
     confidence: float = 0.0
@@ -41,8 +42,8 @@ class LineageNode:
     node_type: str  # raw_data, feature, model, prediction, decision, order, fill
     node_id: str
     timestamp: str
-    parent_ids: List[str] = field(default_factory=list)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    parent_ids: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class ResearchMemory:
@@ -50,7 +51,7 @@ class ResearchMemory:
 
     def __init__(self):
         self._records: deque = deque(maxlen=10000)
-        self._ticker_index: Dict[str, List[ResearchRecord]] = {}
+        self._ticker_index: dict[str, list[ResearchRecord]] = {}
 
     def add_record(self, record: ResearchRecord):
         """Araştırma kaydı ekle."""
@@ -67,7 +68,7 @@ class ResearchMemory:
             self._ticker_index[record.ticker] = []
         self._ticker_index[record.ticker].append(record)
 
-    def get_ticker_history(self, ticker: str, limit: int = 10) -> List[Dict]:
+    def get_ticker_history(self, ticker: str, limit: int = 10) -> list[dict]:
         """Ticker araştırma geçmişi."""
         records = self._ticker_index.get(ticker, [])[-limit:]
         return [
@@ -81,7 +82,7 @@ class ResearchMemory:
             for r in records
         ]
 
-    def get_recent(self, limit: int = 20) -> List[Dict]:
+    def get_recent(self, limit: int = 20) -> list[dict]:
         """Son araştırmalar."""
         records = list(self._records)[-limit:]
         return [
@@ -100,7 +101,7 @@ class ResearchMemory:
         thesis: str,
         direction: str,
         confidence: float,
-        key_risks: Optional[List[str]] = None,
+        key_risks: list[str] | None = None,
         model_version: str = "llm_agent_v1",
     ) -> ResearchRecord:
         """
@@ -125,7 +126,7 @@ class ResearchMemory:
         record = ResearchRecord(
             record_id=str(uuid.uuid4())[:8],
             ticker=ticker,
-            date=datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            date=datetime.now(UTC).strftime("%Y-%m-%d"),
             thesis=thesis[:200],
             evidence=[],
             risks=key_risks or [],
@@ -180,7 +181,7 @@ class ResearchMemory:
 class ResearchContextEngine:
     """AI'ya ilgili context oluşturma."""
 
-    def build_context(self, ticker: str, features: Dict, market_state: Dict, news: List, kap: List, signals: List, predictions: List) -> Dict[str, Any]:
+    def build_context(self, ticker: str, features: dict, market_state: dict, news: list, kap: list, signals: list, predictions: list) -> dict[str, Any]:
         """Her analiz için ilgili veriyi topla."""
         return {
             "ticker": ticker,
@@ -190,7 +191,7 @@ class ResearchContextEngine:
             "recent_kap": kap[:5],
             "recent_signals": signals[:5],
             "prediction_history": predictions[:10],
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
 
@@ -198,14 +199,14 @@ class DataLineage:
     """Veri lineage takibi."""
 
     def __init__(self):
-        self._nodes_by_key: Dict[str, LineageNode] = {}
-        self._children_index: Dict[str, List[str]] = {}
+        self._nodes_by_key: dict[str, LineageNode] = {}
+        self._children_index: dict[str, list[str]] = {}
         self._keys: deque = deque(maxlen=10000)
 
     def add_node(self, node: LineageNode):
         """Lineage düğümü ekle."""
         key = f"{node.node_type}:{node.node_id}"
-        
+
         # Eğer maxlen ulaşıldıysa eskisini sil
         if len(self._keys) == self._keys.maxlen:
             oldest_key = self._keys.popleft()
@@ -225,7 +226,7 @@ class DataLineage:
             if key not in self._children_index[parent_id]:
                 self._children_index[parent_id].append(key)
 
-    def trace_forward(self, node_type: str, node_id: str) -> List[Dict]:
+    def trace_forward(self, node_type: str, node_id: str) -> list[dict]:
         """İleriye doğru izle (raw → feature → model → prediction)."""
         key = f"{node_type}:{node_id}"
         node = self._nodes_by_key.get(key)
@@ -247,7 +248,7 @@ class DataLineage:
                 result.extend(self.trace_forward(child.node_type, child.node_id))
         return result
 
-    def trace_backward(self, node_type: str, node_id: str) -> List[Dict]:
+    def trace_backward(self, node_type: str, node_id: str) -> list[dict]:
         """Geriye doğru izle (prediction → model → feature → raw)."""
         key = f"{node_type}:{node_id}"
         node = self._nodes_by_key.get(key)

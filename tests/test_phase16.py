@@ -5,16 +5,18 @@ Portfolio Enhancements, Universe Enhancements, Security testleri.
 """
 
 import sys
-import os
 
 
 def test_portfolio_enhancements():
     """Portfolio Enhancements testleri."""
+
     from services.portfolio.enhancements import (
-        tax_model, dividend_handler, benchmark_engine,
-        performance_attribution, multi_currency,
+        benchmark_engine,
+        dividend_handler,
+        multi_currency,
+        performance_attribution,
+        tax_model,
     )
-    import numpy as np
 
     passed = 0
     failed = 0
@@ -84,8 +86,10 @@ def test_portfolio_enhancements():
 def test_universe_enhancements():
     """Universe Enhancements testleri."""
     from services.ingestion.universe_enhancements import (
-        universe_enhancements, cross_source_reconciliation,
-        outlier_detector, survivorship_bias,
+        cross_source_reconciliation,
+        outlier_detector,
+        survivorship_bias,
+        universe_enhancements,
     )
 
     passed = 0
@@ -153,9 +157,14 @@ def test_universe_enhancements():
 def test_security():
     """Security & Governance testleri."""
     from services.core.security import (
-        auth_service, authz_service, secret_redaction,
-        system_state, safety_governance,
-        Role, Permission, User,
+        Permission,
+        Role,
+        User,
+        auth_service,
+        authz_service,
+        safety_governance,
+        secret_redaction,
+        system_state,
     )
 
     passed = 0
@@ -182,26 +191,26 @@ def test_security():
     assert validated is not None
     assert validated.username == "testuser"
     passed += 1
-    print(f"  ✓ Token validated")
+    print("  ✓ Token validated")
 
     # 4. Wrong password
     bad_token = auth_service.authenticate("testuser", "wrongpassword")
     assert bad_token is None
     passed += 1
-    print(f"  ✓ Wrong password rejected")
+    print("  ✓ Wrong password rejected")
 
     # 5. Authorization - analyst can run backtest
     assert authz_service.check_permission(user, Permission.RUN_BACKTEST)
     assert not authz_service.check_permission(user, Permission.LIVE_EXECUTION)
     passed += 1
-    print(f"  ✓ Authorization: ANALYST can backtest, cannot execute")
+    print("  ✓ Authorization: ANALYST can backtest, cannot execute")
 
     # 6. Authorization - admin can do everything
     admin = User(user_id="admin", username="admin", role=Role.ADMIN)
     assert authz_service.check_permission(admin, Permission.LIVE_EXECUTION)
     assert authz_service.check_permission(admin, Permission.MANAGE_USERS)
     passed += 1
-    print(f"  ✓ Admin has all permissions")
+    print("  ✓ Admin has all permissions")
 
     # 7. Secret redaction
     text = 'API_KEY=ghp_abc123def456 and Bearer sk-proj-xyz789'
@@ -209,7 +218,7 @@ def test_security():
     assert "ghp_abc123" not in redacted
     assert "sk-proj-xyz789" not in redacted
     passed += 1
-    print(f"  ✓ Secrets redacted")
+    print("  ✓ Secrets redacted")
 
     # 8. System state machine
     system_state.transition("INITIALIZING", "startup")
@@ -226,7 +235,7 @@ def test_security():
     assert not safety_governance.validate_ai_action("bypass_risk", {})
     assert not safety_governance.validate_ai_action("modify_portfolio", {"source": "ai"})
     passed += 1
-    print(f"  ✓ Safety governance: AI restrictions enforced")
+    print("  ✓ Safety governance: AI restrictions enforced")
 
     return passed, failed
 

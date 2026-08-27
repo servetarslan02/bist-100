@@ -10,10 +10,10 @@ Kullanım:
     report = await health_reporter.generate_report()
 """
 
-import asyncio
 import time
-from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,8 +27,8 @@ class HealthReporter:
     """
 
     def __init__(self):
-        self._last_report: Optional[Dict] = None
-        self._report_history: List[Dict] = []
+        self._last_report: dict | None = None
+        self._report_history: list[dict] = []
         self._max_history = 100
 
     async def generate_report(
@@ -36,12 +36,12 @@ class HealthReporter:
         clickhouse_client=None,
         pg_pool=None,
         redis_client=None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tam sağlık raporu üret."""
         start_time = time.time()
 
         report = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "uptime": self._get_uptime(),
             "components": {},
             "overall_health": "HEALTHY",
@@ -168,7 +168,7 @@ class HealthReporter:
 
         return report
 
-    def _get_uptime(self) -> Dict[str, Any]:
+    def _get_uptime(self) -> dict[str, Any]:
         """Process uptime bilgisi."""
         try:
             import psutil
@@ -182,15 +182,15 @@ class HealthReporter:
         except ImportError:
             return {"status": "psutil not installed"}
 
-    def get_last_report(self) -> Optional[Dict]:
+    def get_last_report(self) -> dict | None:
         """Son raporu döndür."""
         return self._last_report
 
-    def get_history(self, limit: int = 10) -> List[Dict]:
+    def get_history(self, limit: int = 10) -> list[dict]:
         """Rapor geçmişini döndür."""
         return self._report_history[-limit:]
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Özet bilgi."""
         if not self._last_report:
             return {"status": "no_report_yet"}

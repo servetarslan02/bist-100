@@ -9,9 +9,9 @@ BIST takas kuralları:
 Kaynak: Borsa İstanbul Takas Esasları
 """
 
-from datetime import date, timedelta
-from typing import Optional
 from dataclasses import dataclass
+from datetime import date, timedelta
+
 import structlog
 
 logger = structlog.get_logger()
@@ -34,7 +34,7 @@ class SettlementCalculator:
     # Brüt takas: T+0
     GROSS_SETTLEMENT_DAYS = 0
 
-    def __init__(self, holidays: Optional[set] = None):
+    def __init__(self, holidays: set | None = None):
         self._holidays = holidays or set()
 
     def set_holidays(self, holidays: set):
@@ -44,9 +44,7 @@ class SettlementCalculator:
         """Bu gün işlem günü mü?"""
         if d.weekday() >= 5:
             return False
-        if d.strftime("%Y-%m-%d") in self._holidays:
-            return False
-        return True
+        return d.strftime("%Y-%m-%d") not in self._holidays
 
     def add_trading_days(self, start_date: date, days: int) -> date:
         """İşlem günü ekleyerek takas gününü hesapla."""

@@ -19,12 +19,13 @@ Kullanım:
 """
 
 import asyncio
-import orjson
 import time
-from typing import AsyncIterator
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import StreamingResponse
+from collections.abc import AsyncIterator
+
+import orjson
 import structlog
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import StreamingResponse
 
 logger = structlog.get_logger()
 

@@ -4,15 +4,16 @@ Uçtan uca Otonom Öğrenme Döngüsü:
 DATA -> FEATURES -> TRAIN -> PREDICT -> STORE PREDICTION -> OUTCOME -> PERFORMANCE -> RELIABILITY -> FUSION WEIGHTS -> NEXT PREDICTION
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
+from ..intelligence.signal_fusion import SignalFusionEngine
+from .model_memory_store import ModelMemoryStore
 from .model_performance_engine import ModelPerformanceEngine, PerformanceMetrics
 from .model_trust_engine import ModelTrustEngine, ModelTrustScore
-from .model_memory_store import ModelMemoryStore
 from .performance_reporter import ModelPerformanceReporter
-from ..intelligence.signal_fusion import SignalFusionEngine
 
 logger = structlog.get_logger()
 
@@ -22,9 +23,9 @@ class LearningPipeline:
 
     def __init__(
         self,
-        memory_store: Optional[ModelMemoryStore] = None,
-        trust_engine: Optional[ModelTrustEngine] = None,
-        fusion_engine: Optional[SignalFusionEngine] = None,
+        memory_store: ModelMemoryStore | None = None,
+        trust_engine: ModelTrustEngine | None = None,
+        fusion_engine: SignalFusionEngine | None = None,
     ):
         self.store = memory_store or ModelMemoryStore()
         self.trust_engine = trust_engine or ModelTrustEngine()
@@ -53,8 +54,8 @@ class LearningPipeline:
         entry_price: float,
         market_regime: str = "BULL_MOMENTUM",
         prediction_horizon: str = "1-5D",
-        features: Optional[Dict[str, Any]] = None,
-        model_version: Optional[str] = None,
+        features: dict[str, Any] | None = None,
+        model_version: str | None = None,
     ) -> str:
         """1. Adım: Modelin ürettiği tahmini hafızaya kaydet."""
         version = model_version or "v1.0"
@@ -63,7 +64,7 @@ class LearningPipeline:
                 version = m["version"]
                 break
 
-        pred_id = f"PRED_{model_id}_{ticker}_{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S%f')}"
+        pred_id = f"PRED_{model_id}_{ticker}_{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
         self.store.save_prediction(
             prediction_id=pred_id,
             model_id=model_id,
@@ -82,8 +83,8 @@ class LearningPipeline:
         self,
         prediction_id: str,
         actual_price: float,
-        evaluated_at: Optional[str] = None,
-    ) -> Optional[Dict[str, Any]]:
+        evaluated_at: str | None = None,
+    ) -> dict[str, Any] | None:
         """2. Adım: Piyasa sonucunu tahminle eşleştir ve net PnL hesapla."""
         return self.store.save_outcome(
             prediction_id=prediction_id,
@@ -94,12 +95,12 @@ class LearningPipeline:
     def run_learning_cycle(
         self,
         current_regime: str = "BULL_MOMENTUM",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """3. Adım: Tüm modellerin geçmişini değerlendir, güven skorlarını ve sinyal ağırlıklarını güncelle."""
-        all_metrics: List[PerformanceMetrics] = []
-        all_trust_scores: List[ModelTrustScore] = []
-        window_250_metrics: List[PerformanceMetrics] = []
-        window_500_metrics: List[PerformanceMetrics] = []
+        all_metrics: list[PerformanceMetrics] = []
+        all_trust_scores: list[ModelTrustScore] = []
+        window_250_metrics: list[PerformanceMetrics] = []
+        window_500_metrics: list[PerformanceMetrics] = []
 
         for m_info in self.registered_models:
             m_id = m_info["id"]
@@ -107,7 +108,7 @@ class LearningPipeline:
 
             # Modelin değerlendirilmiş tahminlerini çek
             evaluated_data = self.store.get_evaluated_predictions_for_model(m_id, limit=2000)
-            
+
             # Kapsamlı performans metriklerini hesapla (Tüm örneklem)
             metrics = self.perf_engine.calculate_metrics(
                 model_id=m_id,
@@ -141,12 +142,12 @@ class LearningPipeline:
 
         # Signal Fusion için normalize adaptif ağırlıkları hesapla
         fusion_weights = self.trust_engine.calculate_ensemble_weights(all_trust_scores)
-        
+
         # Signal Fusion motoruna yeni adaptif ağırlıkları yükle
         self.fusion_engine.set_adaptive_weights(fusion_weights)
 
         # Deftere ve geçmiş kayıtlarına yaz
-        for ts, met in zip(all_trust_scores, all_metrics):
+        for ts, met in zip(all_trust_scores, all_metrics, strict=False):
             self.store.record_metrics_snapshot(
                 model_id=ts.model_id,
                 model_version=ts.model_version,
@@ -173,7 +174,7 @@ class LearningPipeline:
 
         return {
             "success": True,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "models_evaluated": len(all_metrics),
             "current_regime": current_regime,
             "fusion_weights": fusion_weights,
@@ -184,9 +185,9 @@ class LearningPipeline:
 
     def simulate_walk_forward_learning_backtest(
         self,
-        historical_predictions_stream: List[Dict[str, Any]],
+        historical_predictions_stream: list[dict[str, Any]],
         regime: str = "BULL_MOMENTUM",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Look-ahead bias olmadan kronolojik walk-forward öğrenme simülasyonu."""
         # Tahminleri zamana göre sırala (Zero look-ahead bias)
         sorted_events = sorted(
@@ -215,13 +216,13 @@ class LearningPipeline:
         # Öğrenme döngüsünü tetikle
         return self.run_learning_cycle(current_regime=regime)
 
-    def check_and_catchup_if_needed(self) -> Dict[str, Any]:
+    def check_and_catchup_if_needed(self) -> dict[str, Any]:
         """PC kapali kaldiginda kacirilan egitim dongulerini ve eksik verileri kontrol edip telafi eder."""
         try:
             latest = self.store.get_latest_metrics_all_models()
             should_run = False
             reason = ""
-            
+
             if not latest:
                 should_run = True
                 reason = "Ilk baslatma veya kayitli metrik bulunamadi"
@@ -230,7 +231,7 @@ class LearningPipeline:
                 if last_time_str:
                     try:
                         last_dt = datetime.fromisoformat(last_time_str.replace("Z", "+00:00"))
-                        now_dt = datetime.now(timezone.utc)
+                        now_dt = datetime.now(UTC)
                         diff_hours = (now_dt - last_dt).total_seconds() / 3600.0
                         if diff_hours >= 6.0:
                             should_run = True
@@ -239,7 +240,7 @@ class LearningPipeline:
                         logger.debug("date_parse_failed", error=str(e))
                         should_run = True
                         reason = "Tarih ayrıştırma"
-            
+
             if should_run:
                 logger.info("ml_catchup_triggered", reason=reason)
                 return self.run_learning_cycle(current_regime="BULL_MOMENTUM")

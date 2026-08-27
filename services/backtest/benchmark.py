@@ -12,9 +12,10 @@ Metrikler:
 6. Up/Down Capture Ratio
 """
 
-import numpy as np
-from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -37,7 +38,7 @@ class BenchmarkComparison:
     r_squared: float
     num_observations: int
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "benchmark": self.benchmark_name,
             "strategy_return_pct": round(self.strategy_return_pct, 2),
@@ -176,8 +177,8 @@ class BenchmarkComparator:
 
     @staticmethod
     def from_equity_curves(
-        strategy_equity: List[Tuple[str, float]],
-        benchmark_equity: List[Tuple[str, float]],
+        strategy_equity: list[tuple[str, float]],
+        benchmark_equity: list[tuple[str, float]],
         benchmark_name: str = "BIST100",
     ) -> BenchmarkComparison:
         """Equity curve'lerden karşılaştırma yap."""
@@ -194,8 +195,8 @@ class BenchmarkComparator:
 
     @staticmethod
     def generate_report(
-        comparisons: List[BenchmarkComparison],
-    ) -> Dict[str, Any]:
+        comparisons: list[BenchmarkComparison],
+    ) -> dict[str, Any]:
         """Çoklu benchmark karşılaştırma raporu."""
         if not comparisons:
             return {"error": "No comparisons provided"}

@@ -7,17 +7,16 @@ P0-1: Security hardened.
 - Secret minimum length kontrolü.
 """
 
-import sys
-import os
 import logging
-from typing import Optional
+import os
+import sys
 
 try:
-    from pydantic_settings import BaseSettings, SettingsConfigDict
     from pydantic import Field, field_validator, model_validator
+    from pydantic_settings import BaseSettings, SettingsConfigDict
     _PYDANTIC_V2 = True
 except ImportError:
-    from pydantic.v1 import BaseSettings, Field, validator, root_validator
+    from pydantic.v1 import BaseSettings, Field, root_validator, validator
     _PYDANTIC_V2 = False
 
 logger = logging.getLogger(__name__)
@@ -46,7 +45,7 @@ class Settings(BaseSettings):
     postgres_db: str = Field(default="alpha_bist", alias="POSTGRES_DB")
     postgres_user: str = Field(default="alpha", alias="POSTGRES_USER")
     postgres_password: str = Field(default="", alias="POSTGRES_PASSWORD")
-    postgres_replica_host: Optional[str] = Field(default=None, alias="POSTGRES_REPLICA_HOST")
+    postgres_replica_host: str | None = Field(default=None, alias="POSTGRES_REPLICA_HOST")
     postgres_replica_port: int = Field(default=5433, alias="POSTGRES_REPLICA_PORT")
 
     # Sharding
@@ -87,13 +86,13 @@ class Settings(BaseSettings):
     ollama_base_url: str = Field(default="http://host.docker.internal:11434", alias="OLLAMA_BASE_URL")
     ollama_model: str = Field(default="gemma4:12b-q4_0", alias="OLLAMA_MODEL")
     llm_context_size: int = Field(default=8192, alias="LLM_CONTEXT_SIZE")
-    gemini_api_key: Optional[str] = Field(default=None, alias="GEMINI_API_KEY")
+    gemini_api_key: str | None = Field(default=None, alias="GEMINI_API_KEY")
     gemini_model: str = Field(default="gemini-3.7-flash", alias="GEMINI_MODEL")
 
     # Data Sources
-    tcmb_evds_api_key: Optional[str] = Field(default=None, alias="TCMB_EVDS_API_KEY")
-    news_api_key: Optional[str] = Field(default=None, alias="NEWS_API_KEY")
-    alpha_vantage_key: Optional[str] = Field(default=None, alias="ALPHA_VANTAGE_KEY")
+    tcmb_evds_api_key: str | None = Field(default=None, alias="TCMB_EVDS_API_KEY")
+    news_api_key: str | None = Field(default=None, alias="NEWS_API_KEY")
+    alpha_vantage_key: str | None = Field(default=None, alias="ALPHA_VANTAGE_KEY")
 
     # Security — NO defaults in production
     secret_key: str = Field(default="", alias="SECRET_KEY")
@@ -104,12 +103,12 @@ class Settings(BaseSettings):
 
     # Broker
     broker_type: str = Field(default="paper", alias="BROKER_TYPE")
-    broker_api_key: Optional[str] = Field(default=None, alias="BROKER_API_KEY")
-    broker_api_secret: Optional[str] = Field(default=None, alias="BROKER_API_SECRET")
-    broker_account_id: Optional[str] = Field(default=None, alias="BROKER_ACCOUNT_ID")
+    broker_api_key: str | None = Field(default=None, alias="BROKER_API_KEY")
+    broker_api_secret: str | None = Field(default=None, alias="BROKER_API_SECRET")
+    broker_account_id: str | None = Field(default=None, alias="BROKER_ACCOUNT_ID")
 
     # KAP
-    kap_api_key: Optional[str] = Field(default=None, alias="KAP_API_KEY")
+    kap_api_key: str | None = Field(default=None, alias="KAP_API_KEY")
 
     # DB Pool
     db_pool_min: int = Field(default=2, alias="DB_POOL_MIN")
@@ -241,7 +240,7 @@ class Settings(BaseSettings):
             extra = "allow"
 
         @root_validator
-        def _validate_production_security_v1(cls, values):
+        def _validate_production_security_v1(self, values):
             config = values
             if str(config.get("app_env", "development")).lower() not in ("production", "prod", "staging"):
                 return values
@@ -273,13 +272,13 @@ class Settings(BaseSettings):
             return values
 
         @validator("app_port")
-        def _validate_port_v1(cls, v: int) -> int:
+        def _validate_port_v1(self, v: int) -> int:
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid port: {v}")
             return v
 
         @validator("postgres_port")
-        def _validate_pg_port_v1(cls, v: int) -> int:
+        def _validate_pg_port_v1(self, v: int) -> int:
             if not 1 <= v <= 65535:
                 raise ValueError(f"Invalid PostgreSQL port: {v}")
             return v
@@ -289,7 +288,7 @@ def get_settings() -> Settings:
     """Settings'i güvenli şekilde yükle."""
     if os.path.exists(".env"):
         try:
-            with open(".env", "r", encoding="utf-8") as f:
+            with open(".env", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if line and not line.startswith("#") and "=" in line:

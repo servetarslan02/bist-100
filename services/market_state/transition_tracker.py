@@ -12,11 +12,12 @@ Kaynaklar:
 - arXiv RMATS (2026): Hierarchical HMM regime boundary detection
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
-from dataclasses import dataclass, field
 from collections import Counter
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -38,15 +39,15 @@ class TransitionStats:
     """Rejim geçiş istatistikleri."""
     total_observations: int = 0
     total_transitions: int = 0
-    regime_distribution: Dict[str, int] = field(default_factory=dict)
+    regime_distribution: dict[str, int] = field(default_factory=dict)
     avg_duration_days: float = 0.0
     stability_score: float = 1.0
     current_regime: str = "UNKNOWN"
     current_duration_days: float = 0.0
-    transition_matrix: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    transition_matrix: dict[str, dict[str, float]] = field(default_factory=dict)
     confidence_trend: str = "STABLE"  # INCREASING / DECREASING / STABLE
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_observations": self.total_observations,
             "total_transitions": self.total_transitions,
@@ -74,22 +75,22 @@ class RegimeTransitionTracker:
         self._stability_window = stability_window
 
         # History
-        self._history: List[Dict[str, Any]] = []
-        self._transitions: List[TransitionRecord] = []
+        self._history: list[dict[str, Any]] = []
+        self._transitions: list[TransitionRecord] = []
 
         # Transition counts (for probability matrix)
-        self._transition_counts: Dict[str, Dict[str, int]] = {}
+        self._transition_counts: dict[str, dict[str, int]] = {}
 
         # Current state
-        self._current_regime: Optional[str] = None
-        self._current_start: Optional[datetime] = None
+        self._current_regime: str | None = None
+        self._current_start: datetime | None = None
         self._current_confidence: float = 0.0
 
     def record(
         self,
         regime: str,
         confidence: float,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
     ):
         """Rejim kaydet, geçiş tespit et.
 
@@ -99,7 +100,7 @@ class RegimeTransitionTracker:
             timestamp: Zaman damgası (opsiyonel, varsayılan: now)
         """
         if timestamp is None:
-            timestamp = datetime.now(timezone.utc)
+            timestamp = datetime.now(UTC)
 
         # History'ye ekle
         self._history.append({
@@ -177,7 +178,7 @@ class RegimeTransitionTracker:
         stability = self._compute_stability()
 
         # Mevcut rejim süresi
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         current_duration = self._calculate_duration(self._current_start, now)
 
         # Geçiş matrisi
@@ -215,10 +216,10 @@ class RegimeTransitionTracker:
         """Mevcut rejimin süresi (gün)."""
         if self._current_start is None:
             return 0.0
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         return self._calculate_duration(self._current_start, now)
 
-    def get_recent_transitions(self, limit: int = 10) -> List[Dict]:
+    def get_recent_transitions(self, limit: int = 10) -> list[dict]:
         """Son N geçiş."""
         recent = self._transitions[-limit:]
         return [
@@ -259,7 +260,7 @@ class RegimeTransitionTracker:
 
         return stability
 
-    def _compute_transition_matrix(self) -> Dict[str, Dict[str, float]]:
+    def _compute_transition_matrix(self) -> dict[str, dict[str, float]]:
         """Geçiş olasılıkları matrisi."""
         matrix = {}
 
@@ -299,21 +300,21 @@ class RegimeTransitionTracker:
             return "DECREASING"
         return "STABLE"
 
-    def _calculate_duration(self, start: Optional[datetime], end: datetime) -> float:
+    def _calculate_duration(self, start: datetime | None, end: datetime) -> float:
         """Süre hesapla (gün)."""
         if start is None:
             return 0.0
 
         try:
             if start.tzinfo is None:
-                start = start.replace(tzinfo=timezone.utc)
+                start = start.replace(tzinfo=UTC)
             if end.tzinfo is None:
-                end = end.replace(tzinfo=timezone.utc)
+                end = end.replace(tzinfo=UTC)
             return (end - start).total_seconds() / 86400
         except Exception:
             return 0.0
 
-    def check_alerts(self) -> List[Dict[str, Any]]:
+    def check_alerts(self) -> list[dict[str, Any]]:
         """Alert kontrolü — rejim değişimi, kararlılık, beklenmedik geçiş.
 
         Returns:
@@ -325,7 +326,7 @@ class RegimeTransitionTracker:
         if self._transitions:
             last = self._transitions[-1]
             # Son 1 saat içinde geçiş var mı?
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             hours_since = (now - last.timestamp).total_seconds() / 3600
 
             if hours_since < 1:

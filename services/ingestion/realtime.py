@@ -11,11 +11,12 @@ FAZ 1: Real-time data
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import Any
 
-import yfinance as yf
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -31,9 +32,9 @@ class RealtimeDataProvider:
 
     def __init__(self):
         self._running = False
-        self._handlers: List[Callable] = []
-        self._last_prices: Dict[str, float] = {}
-        self._last_update: Dict[str, datetime] = {}
+        self._handlers: list[Callable] = []
+        self._last_prices: dict[str, float] = {}
+        self._last_update: dict[str, datetime] = {}
         self._poll_interval = 300  # 5 dakika (yfinance delayed)
         self._provider = "yfinance"  # Default
 
@@ -43,7 +44,7 @@ class RealtimeDataProvider:
         if len(self._handlers) > 100:
             self._handlers = self._handlers[-100:]
 
-    async def start(self, tickers: List[str], provider: str = "yfinance"):
+    async def start(self, tickers: list[str], provider: str = "yfinance"):
         """Veri akışını başlat."""
         self._running = True
         self._provider = provider
@@ -57,7 +58,7 @@ class RealtimeDataProvider:
         else:
             logger.error("Unknown provider", provider=provider)
 
-    async def _yfinance_polling(self, tickers: List[str]):
+    async def _yfinance_polling(self, tickers: list[str]):
         """yfinance ile polling (5 dakika aralıkla)."""
 
         while self._running:
@@ -74,10 +75,7 @@ class RealtimeDataProvider:
                     for ticker in chunk:
                         try:
                             # yf returns a DataFrame where columns might be a MultiIndex if multiple tickers
-                            if len(chunk) == 1:
-                                td = data.dropna()
-                            else:
-                                td = data[f"{ticker}.IS"].dropna()
+                            td = data.dropna() if len(chunk) == 1 else data[f"{ticker}.IS"].dropna()
 
                             if len(td) > 0:
                                 latest = td.iloc[-1]
@@ -91,7 +89,7 @@ class RealtimeDataProvider:
                                 # Güncelle
                                 self._last_prices[ticker] = price
                                 from datetime import timedelta
-                                self._last_update[ticker] = datetime.now(timezone.utc) - timedelta(minutes=15)
+                                self._last_update[ticker] = datetime.now(UTC) - timedelta(minutes=15)
 
                                 # Handler'ları çağır
                                 for handler in self._handlers:
@@ -104,7 +102,7 @@ class RealtimeDataProvider:
                                         logger.warning("Handler error", ticker=ticker, error=str(e))
                         except Exception as e:
                             logger.debug("Handled exception", error=str(e), ticker=ticker)
-                    
+
                     # Rate limit protection between chunks
                     await asyncio.sleep(1)
 
@@ -118,21 +116,21 @@ class RealtimeDataProvider:
                 logger.error("yfinance polling error", error=str(e))
                 await asyncio.sleep(60)
 
-    async def _matriks_streaming(self, tickers: List[str]):
+    async def _matriks_streaming(self, tickers: list[str]):
         """Matriks streaming (WebSocket)."""
         # Matriks API entegrasyonu
         logger.info("Matriks streaming not yet implemented, falling back to yfinance")
         await self._yfinance_polling(tickers)
 
-    def get_last_price(self, ticker: str) -> Optional[float]:
+    def get_last_price(self, ticker: str) -> float | None:
         """Son fiyat."""
         return self._last_prices.get(ticker)
 
-    def get_all_prices(self) -> Dict[str, float]:
+    def get_all_prices(self) -> dict[str, float]:
         """Tüm son fiyatlar."""
         return dict(self._last_prices)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         return {
             "provider": self._provider,

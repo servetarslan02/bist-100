@@ -6,14 +6,15 @@ ALPHA BIST — Mum Formasyonları Ampirik Eğitim & Trend Rider 30 Yıllık Test
 3. 30 Yıllık Gerçek BIST Verisi üzerinde Sıfır Suni Faiz ile Trend Rider motorunu test eder.
 """
 
-import sys
 import os
-import yfinance as yf
-import polars as pl
-import numpy as np
-import lightgbm as lgb
-from datetime import datetime
+import sys
 import warnings
+
+import lightgbm as lgb
+import numpy as np
+import polars as pl
+import yfinance as yf
+
 warnings.filterwarnings('ignore')
 
 sys.path.insert(0, os.path.abspath("."))
@@ -21,8 +22,8 @@ if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 from services.intelligence.candle_patterns import candle_engine
-from services.ml.candle_feature_engineer import candle_feature_engineer
 from services.intelligence.trend_rider import trend_rider
+from services.ml.candle_feature_engineer import candle_feature_engineer
 
 BIST_CORE_STOCKS = [
     "THYAO.IS", "GARAN.IS", "AKBNK.IS", "ISCTR.IS", "YKBNK.IS",
@@ -39,7 +40,7 @@ def main():
     print("=" * 85)
     print("1. BIST-100 GEÇMİŞ VERİLERİ İNDİRİLİYOR (1997 - 2026)")
     print("=" * 85)
-    
+
     bm_df = yf.download(BENCHMARK_TICKER, start="1997-01-01", end="2026-08-23", progress=False)
     if isinstance(bm_df.columns, list):
         bm_df.columns = [c[0] for c in bm_df.columns]
@@ -65,7 +66,7 @@ def main():
     print("BIST-100 hisselerinin tüm tarihsel seansları taranarak 10 günlük ileri getiri hesaplandı:\n")
 
     edge_table = candle_feature_engineer.compute_empirical_edge_table(stock_dict, forward_days=10)
-    
+
     if not edge_table.empty:
         cols_to_print = ["Formasyon", "BIST Örneklem Sayısı", "Kazanma Oranı (Win Rate)", "Ort. 10G Getiri %", "Kâr / Zarar Çarpanı (PF)", "Beklenen Değer (Expectancy %)", "Model Öneri Derecesi"]
         print(edge_table[cols_to_print].to_string(index=False))
@@ -94,7 +95,7 @@ def main():
             p_now = float(closes[i])
             p_fwd = float(closes[i + 10])
             label = 1 if (p_fwd - p_now) / p_now >= 0.04 else 0
-            
+
             X_list.append(row_feat)
             y_list.append(label)
 
@@ -116,7 +117,7 @@ def main():
     imp = model.feature_importance(importance_type="gain")
     df_imp = pl.DataFrame({"Özellik (Mum/Price Action)": feature_names, "Öğrenilen Model Ağırlığı (Gain)": imp})
     df_imp = df_imp.sort(by="Öğrenilen Model Ağırlığı (Gain)", reverse=True)
-    
+
     print("🧠 Model Tarafından Öğrenilen Mum Özellik Ağırlıkları (Feature Importance):")
     print(df_imp.to_string(index=False))
     print("✓ Model eğitimi başarıyla tamamlandı!\n")

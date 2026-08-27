@@ -16,8 +16,9 @@ Token yönetimi:
 import hmac
 import os
 import time
-from typing import Optional, Dict, Any, List
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -35,10 +36,10 @@ class AuthConfig:
 class MonitoringAuth:
     """Monitoring endpoint authentication."""
 
-    def __init__(self, config: Optional[AuthConfig] = None):
+    def __init__(self, config: AuthConfig | None = None):
         self._config = config or AuthConfig()
-        self._rate_limiter: Dict[str, list] = {}
-        self._failed_attempts: Dict[str, int] = {}
+        self._rate_limiter: dict[str, list] = {}
+        self._failed_attempts: dict[str, int] = {}
 
         # Token'ları environment'dan yükle
         if not self._config.metrics_token:
@@ -96,7 +97,7 @@ class MonitoringAuth:
                          client_ip=client_ip,
                          count=self._failed_attempts[client_ip])
 
-    def get_auth_status(self) -> Dict[str, Any]:
+    def get_auth_status(self) -> dict[str, Any]:
         """Authentication durumu."""
         return {
             "auth_enabled": self._config.enabled,
@@ -116,7 +117,7 @@ class MonitoringAuth:
 
 
 # Token extraction helpers
-def extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
+def extract_bearer_token(authorization: str | None) -> str | None:
     """Authorization header'dan Bearer token çıkar."""
     if not authorization:
         return None
@@ -126,7 +127,7 @@ def extract_bearer_token(authorization: Optional[str]) -> Optional[str]:
     return None
 
 
-def extract_api_key(headers: dict) -> Optional[str]:
+def extract_api_key(headers: dict) -> str | None:
     """X-API-Key header'dan key çıkar."""
     return headers.get("x-api-key") or headers.get("X-API-Key")
 
@@ -145,7 +146,7 @@ class AuthProvider:
             async def verify(self, token, request) -> AuthResult: ...
     """
 
-    async def verify(self, token: str, request_context: Dict[str, Any] = None) -> "AuthResult":
+    async def verify(self, token: str, request_context: dict[str, Any] = None) -> "AuthResult":
         """Token doğrula."""
         raise NotImplementedError
 
@@ -158,7 +159,7 @@ class AuthResult:
     """Auth sonucu."""
     authenticated: bool
     user_id: str = ""
-    roles: List[str] = field(default_factory=list)
+    roles: list[str] = field(default_factory=list)
     error: str = ""
 
     def has_role(self, role: str) -> bool:
@@ -168,13 +169,13 @@ class AuthResult:
 class StaticTokenProvider(AuthProvider):
     """Static token auth (mevcut sistem)."""
 
-    def __init__(self, tokens: Dict[str, List[str]]):
+    def __init__(self, tokens: dict[str, list[str]]):
         """
         tokens: {"token_value": ["role1", "role2"], ...}
         """
         self._tokens = tokens
 
-    async def verify(self, token: str, request_context: Dict[str, Any] = None) -> AuthResult:
+    async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not token:
             return AuthResult(authenticated=False, error="No token provided")
 
@@ -208,10 +209,10 @@ class JWTProvider(AuthProvider):
         self._role_claim = role_claim
         self._jwks_url = jwks_url
         self._jwks_cache_ttl_s = jwks_cache_ttl_s
-        self._jwks_cache: Dict[str, Any] = {}
+        self._jwks_cache: dict[str, Any] = {}
         self._jwks_last_fetch: float = 0
 
-    async def verify(self, token: str, request_context: Dict[str, Any] = None) -> AuthResult:
+    async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not token:
             return AuthResult(authenticated=False, error="No token")
 
@@ -279,19 +280,18 @@ class JWTProvider(AuthProvider):
 
         try:
             import aiohttp
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    self._jwks_url,
-                    timeout=aiohttp.ClientTimeout(total=10),
-                ) as resp:
-                    if resp.status == 200:
-                        jwks = await resp.json()
-                        for key in jwks.get("keys", []):
-                            kid = key.get("kid", "")
-                            if kid:
-                                self._jwks_cache[kid] = key
-                        self._jwks_last_fetch = now
-                        logger.info("JWKS refreshed", keys=len(self._jwks_cache))
+            async with aiohttp.ClientSession() as session, session.get(
+                self._jwks_url,
+                timeout=aiohttp.ClientTimeout(total=10),
+            ) as resp:
+                if resp.status == 200:
+                    jwks = await resp.json()
+                    for key in jwks.get("keys", []):
+                        kid = key.get("kid", "")
+                        if kid:
+                            self._jwks_cache[kid] = key
+                    self._jwks_last_fetch = now
+                    logger.info("JWKS refreshed", keys=len(self._jwks_cache))
         except Exception as e:
             logger.warning("JWKS refresh failed", error=str(e))
 
@@ -314,7 +314,7 @@ class OAuthProvider(AuthProvider):
             secret=secret, issuer=issuer, audience=audience, role_claim=role_claim,
         )
 
-    async def verify(self, token: str, request_context: Dict[str, Any] = None) -> AuthResult:
+    async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         if not self._secret:
             return AuthResult(authenticated=False, error="OAuth not configured (no secret)")
         return await self._jwt_provider.verify(token, request_context)
@@ -332,14 +332,14 @@ class AuthManager:
     """Çoklu auth provider yöneticisi + RBAC."""
 
     def __init__(self):
-        self._providers: List[AuthProvider] = []
+        self._providers: list[AuthProvider] = []
 
     def add_provider(self, provider: AuthProvider):
         self._providers.append(provider)
         if len(self._providers) > 100:
             self._providers = self._providers[-100:]
 
-    async def verify(self, token: str, request_context: Dict[str, Any] = None) -> AuthResult:
+    async def verify(self, token: str, request_context: dict[str, Any] = None) -> AuthResult:
         """Tüm provider'ları dene — ilk başarılı olanı döndür."""
         for provider in self._providers:
             result = await provider.verify(token, request_context)
@@ -363,7 +363,7 @@ class AuthManager:
                          roles=result.roles,
                          error=f"Permission denied: {permission} (roles: {result.roles})")
 
-    def get_providers(self) -> List[str]:
+    def get_providers(self) -> list[str]:
         return [p.name() for p in self._providers]
 
 

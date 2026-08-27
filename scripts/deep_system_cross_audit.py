@@ -3,11 +3,10 @@ ALPHA BIST — Derinlemesine Çapraz Sistem Denetim Aracı (Deep System Cross-Au
 Tüm kod tabanını baştan aşağı tarayarak metodolojik, matematiksel, mimari ve finansal YANLIŞLARI tespit eder.
 """
 
-import os
+import glob
 import re
 import sys
-import glob
-import ast
+
 import structlog
 
 logger = structlog.get_logger(__name__)
@@ -37,7 +36,7 @@ all_files = list(set(services_files + backtest_files))
 
 for filepath in all_files:
     try:
-        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+        with open(filepath, encoding="utf-8", errors="ignore") as f:
             content = f.read()
             lines = content.splitlines()
 
@@ -72,7 +71,7 @@ for filepath in all_files:
                     if "volume" not in content and "liquidity" not in content:
                         findings["unrealistic_execution_assumptions"].append((filepath, i, line.strip()))
 
-    except Exception as e:
+    except Exception:
         logger.warning("Caught Exception in module_level", exc_info=True)
 
 # Raporla

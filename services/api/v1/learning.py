@@ -1,12 +1,13 @@
 """Learning API — Uçtan uca Model Training & Performance Learning Servisleri."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body, BackgroundTasks
-from typing import Dict, Any
-from datetime import datetime, timezone
-import structlog
+from datetime import UTC, datetime
+from typing import Any
 
-from ..dependencies import get_current_user, check_rate_limit
+import structlog
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query
+
 from ...learning.learning_pipeline import LearningPipeline
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -106,7 +107,7 @@ async def performance_report(user=Depends(get_current_user), _=Depends(check_rat
             ]
             for m in latest:
                 lines.append(f"| {m.get('model_id')} | {m.get('sharpe_ratio', 1.8):.2f} | %{(m.get('direction_accuracy', 0.55)*100):.1f} | %{m.get('reliability_score', 85.0):.1f} | %{(m.get('recommended_fusion_weight', 0.25)*100):.1f} |")
-            
+
             lines.extend([
                 "",
                 "## 🎯 Sinyal Füzyon Kararı",
@@ -118,17 +119,17 @@ async def performance_report(user=Depends(get_current_user), _=Depends(check_rat
             _cached_report = {
                 "success": True,
                 "markdown": md,
-                "generated_at": datetime.now(timezone.utc).isoformat(),
+                "generated_at": datetime.now(UTC).isoformat(),
                 "models_count": len(latest),
             }
             return _cached_report
     except Exception as e:
         logger.warning("learning_report_fallback", error=str(e))
-    
+
     return {
         "success": True,
         "markdown": "# ALPHA BIST — MLOps Model Öğrenme Raporu\n\nModeller sürekli olarak canlı veriyle güncellenmektedir.",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "models_count": 4,
     }
 
@@ -148,7 +149,7 @@ async def trigger_learning_cycle(
         res = _pipeline.run_learning_cycle(current_regime=regime)
         return res
     except Exception as e:
-        raise HTTPException(500, f"Learning cycle execution failed: {e}")
+        raise HTTPException(500, f"Learning cycle execution failed: {e}") from e
 
 
 def _run_learning_cycle(regime: str):
@@ -161,7 +162,7 @@ def _run_learning_cycle(regime: str):
 
 @router.post("/record_prediction")
 async def record_prediction(
-    payload: Dict[str, Any] = Body(...),
+    payload: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
@@ -180,12 +181,12 @@ async def record_prediction(
         )
         return {"success": True, "prediction_id": pred_id}
     except Exception as e:
-        raise HTTPException(500, f"Record prediction failed: {e}")
+        raise HTTPException(500, f"Record prediction failed: {e}") from e
 
 
 @router.post("/record_outcome")
 async def record_outcome(
-    payload: Dict[str, Any] = Body(...),
+    payload: dict[str, Any] = Body(...),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
@@ -199,7 +200,7 @@ async def record_outcome(
             raise HTTPException(404, "Prediction ID not found")
         return {"success": True, "outcome": res}
     except Exception as e:
-        raise HTTPException(500, f"Record outcome failed: {e}")
+        raise HTTPException(500, f"Record outcome failed: {e}") from e
 
 
 @router.get("/calibration")

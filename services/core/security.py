@@ -11,8 +11,8 @@ ALPHA BIST — Security & Governance v1.0
 
 import hashlib
 import hmac
-import secrets
 import re
+import secrets
 
 # passlib for better password hashing (optional, fallback to hashlib)
 try:
@@ -28,16 +28,17 @@ try:
     _USE_CRYPTO = True
 except ImportError:
     _USE_CRYPTO = False
-from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
-from enum import Enum
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class Role(str, Enum):
+class Role(StrEnum):
     VIEWER = "VIEWER"
     ANALYST = "ANALYST"
     OPERATOR = "OPERATOR"
@@ -45,7 +46,7 @@ class Role(str, Enum):
     SYSTEM = "SYSTEM"
 
 
-class Permission(str, Enum):
+class Permission(StrEnum):
     READ_MARKET = "READ_MARKET"
     READ_PORTFOLIO = "READ_PORTFOLIO"
     RUN_BACKTEST = "RUN_BACKTEST"
@@ -57,7 +58,7 @@ class Permission(str, Enum):
 
 
 # Role → Permission mapping
-ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
+ROLE_PERMISSIONS: dict[Role, set[Permission]] = {
     Role.VIEWER: {Permission.READ_MARKET, Permission.READ_PORTFOLIO},
     Role.ANALYST: {Permission.READ_MARKET, Permission.READ_PORTFOLIO, Permission.RUN_BACKTEST, Permission.RUN_SCENARIO},
     Role.OPERATOR: {Permission.READ_MARKET, Permission.READ_PORTFOLIO, Permission.RUN_BACKTEST, Permission.RUN_SCENARIO, Permission.CHANGE_CONFIG},
@@ -74,17 +75,17 @@ class User:
     role: Role
     password_hash: str = ""
     session_token: str = ""
-    token_expires: Optional[datetime] = None
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    last_login: Optional[datetime] = None
+    token_expires: datetime | None = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_login: datetime | None = None
 
 
 class AuthenticationService:
     """Kimlik doğrulama servisi."""
 
     def __init__(self):
-        self._users: Dict[str, User] = {}
-        self._sessions: Dict[str, str] = {}  # token → user_id
+        self._users: dict[str, User] = {}
+        self._sessions: dict[str, str] = {}  # token → user_id
 
     def create_user(self, username: str, password: str, role: Role = Role.VIEWER) -> User:
         """Kullanıcı oluştur."""
@@ -101,7 +102,7 @@ class AuthenticationService:
         logger.info("User created", username=username, role=role.value)
         return user
 
-    def authenticate(self, username: str, password: str) -> Optional[str]:
+    def authenticate(self, username: str, password: str) -> str | None:
         """Kimlik doğrula, JWT token döndür."""
         user = self._find_user(username)
         if not user:
@@ -111,7 +112,7 @@ class AuthenticationService:
             return None
 
         # JWT token oluştur (jwt_manager ile)
-        from .jwt_manager import jwt_manager, TokenType
+        from .jwt_manager import TokenType, jwt_manager
         permissions = [p.value for p in ROLE_PERMISSIONS.get(user.role, set())]
         token = jwt_manager.generate_token(
             user_id=user.user_id,
@@ -120,16 +121,16 @@ class AuthenticationService:
             token_type=TokenType.ACCESS,
         )
         user.session_token = token
-        user.token_expires = datetime.now(timezone.utc) + timedelta(hours=24)
-        user.last_login = datetime.now(timezone.utc)
+        user.token_expires = datetime.now(UTC) + timedelta(hours=24)
+        user.last_login = datetime.now(UTC)
         self._sessions[token] = user.user_id
 
         logger.info("User authenticated", username=username)
         return token
 
-    def validate_token(self, token: str) -> Optional[User]:
+    def validate_token(self, token: str) -> User | None:
         """JWT token doğrula."""
-        from .jwt_manager import jwt_manager, JWTError
+        from .jwt_manager import JWTError, jwt_manager
         try:
             claims = jwt_manager.validate_token(token)
         except JWTError:
@@ -163,7 +164,7 @@ class AuthenticationService:
         except Exception:
             return False
 
-    def _find_user(self, username: str) -> Optional[User]:
+    def _find_user(self, username: str) -> User | None:
         """Kullanıcı bul."""
         for user in self._users.values():
             if user.username == username:
@@ -210,8 +211,8 @@ class SystemStateMachine:
 
     def __init__(self):
         self._state = "STARTING"
-        self._substates: Dict[str, str] = {}
-        self._history: List[Dict] = []
+        self._substates: dict[str, str] = {}
+        self._history: list[dict] = []
 
     @property
     def state(self) -> str:
@@ -228,7 +229,7 @@ class SystemStateMachine:
             "from": old_state,
             "to": new_state,
             "reason": reason,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._history) > 1000:
             self._history = self._history[-1000:]
@@ -238,7 +239,7 @@ class SystemStateMachine:
         """Alt bileşen durumu."""
         self._substates[component] = state
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Sistem sağlık durumu."""
         return {
             "state": self._state,
@@ -261,7 +262,7 @@ class SafetyGovernance:
     ]
 
     @staticmethod
-    def validate_ai_action(action: str, context: Dict) -> bool:
+    def validate_ai_action(action: str, context: dict) -> bool:
         """AI eyleminin güvenli olup olmadığını kontrol et."""
         # Risk bypass
         if action == "bypass_risk":
@@ -291,7 +292,7 @@ safety_governance = SafetyGovernance()
 
 # === Encryption Utilities (optional, requires cryptography) ===
 
-def encrypt_data(data: str, key: Optional[bytes] = None) -> bytes:
+def encrypt_data(data: str, key: bytes | None = None) -> bytes:
     """Encrypt string data using Fernet (AES-128-CBC).
 
     Args:

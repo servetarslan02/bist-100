@@ -6,9 +6,10 @@ ALPHA BIST — Event Priority Queue v1.0
 """
 
 import asyncio
-from typing import Dict, List, Callable, Optional
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 logger = structlog.get_logger()
@@ -18,11 +19,11 @@ logger = structlog.get_logger()
 class EventTask:
     """Event görevi."""
     event_type: str
-    event_data: Dict
+    event_data: dict
     ticker: str
     importance: float
     priority: int  # 1=en yüksek, 5=en düşük
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class EventPriorityQueue:
@@ -35,9 +36,9 @@ class EventPriorityQueue:
     def __init__(self, max_workers: int = 5):
         self._queue: asyncio.PriorityQueue = asyncio.PriorityQueue()
         self._max_workers = max_workers
-        self._workers: List[asyncio.Task] = []
+        self._workers: list[asyncio.Task] = []
         self._running = False
-        self._handler: Optional[Callable] = None
+        self._handler: Callable | None = None
         self._processed_count = 0
 
     def set_handler(self, handler: Callable):
@@ -62,8 +63,8 @@ class EventPriorityQueue:
         self._workers.clear()
         logger.info("Event queue stopped", processed=self._processed_count)
 
-    async def submit(self, event_type: str, event_data: Dict,
-                     affected_tickers: List[str]):
+    async def submit(self, event_type: str, event_data: dict,
+                     affected_tickers: list[str]):
         """
         Event'i kuyruğa ekle.
         Her etkilenen hisse için ayrı task oluşturulur.
@@ -119,13 +120,13 @@ class EventPriorityQueue:
                                    worker=name, ticker=task.ticker,
                                    error=str(e))
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except Exception as e:
                 logger.error("Worker error", worker=name, error=str(e))
                 await asyncio.sleep(0.1)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "queue_size": self._queue.qsize(),

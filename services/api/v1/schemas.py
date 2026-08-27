@@ -8,10 +8,10 @@ Bu modeller:
 - API sözleşmesini tanımlar
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any
 
+from pydantic import BaseModel, Field
 
 # =====================================================
 # BASE RESPONSES
@@ -20,7 +20,7 @@ from datetime import datetime
 class BaseResponse(BaseModel):
     """Tüm API response'ları için base model."""
     success: bool = True
-    message: Optional[str] = None
+    message: str | None = None
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
 
 
@@ -28,14 +28,14 @@ class ErrorResponse(BaseModel):
     """Hata response modeli."""
     success: bool = False
     error: str
-    detail: Optional[str] = None
+    detail: str | None = None
     status_code: int = 500
 
 
 class PaginatedResponse(BaseModel):
     """Sayfalı response modeli."""
     success: bool = True
-    data: List[Any]
+    data: list[Any]
     total: int
     page: int = 1
     page_size: int = 50
@@ -48,8 +48,8 @@ class PaginatedResponse(BaseModel):
 class InstrumentInfo(BaseModel):
     """Hisse bilgisi."""
     ticker: str
-    name: Optional[str] = None
-    sector: Optional[str] = None
+    name: str | None = None
+    sector: str | None = None
     price: float = 0.0
     change_pct: float = 0.0
     volume: int = 0
@@ -69,18 +69,18 @@ class MarketStateResponse(BaseModel):
     """Piyasa durumu."""
     regime: str = "UNKNOWN"
     confidence: float = 0.0
-    istanbul_time: Optional[str] = None
+    istanbul_time: str | None = None
     is_trading: bool = False
     is_open: bool = False
 
 
 class RadarResponse(BaseModel):
     """Piyasa radarı."""
-    data: List[Dict[str, Any]]
+    data: list[dict[str, Any]]
     count: int
     errors: int = 0
     status: str = "ok"
-    cached_at: Optional[str] = None
+    cached_at: str | None = None
     from_cache: bool = False
 
 
@@ -110,7 +110,7 @@ class PortfolioSummary(BaseModel):
     realized_pnl_total: float
     commission_total: float
     positions_count: int
-    positions: List[PositionInfo]
+    positions: list[PositionInfo]
 
 
 class TradeInfo(BaseModel):
@@ -207,8 +207,8 @@ class ScannerStatus(BaseModel):
 class LearningStatus(BaseModel):
     """Öğrenme durumu."""
     total_cycles: int
-    active_version: Optional[str] = None
-    champion_version: Optional[str] = None
+    active_version: str | None = None
+    champion_version: str | None = None
     drift_detected: bool = False
     retrain_needed: bool = False
 
@@ -218,7 +218,7 @@ class ModelInfo(BaseModel):
     model_name: str
     version: str
     trust_score: float
-    last_trained: Optional[str] = None
+    last_trained: str | None = None
     status: str = "active"
 
 
@@ -230,7 +230,7 @@ class RegimeInfo(BaseModel):
     """Rejim bilgisi."""
     regime: str
     confidence: float
-    description: Optional[str] = None
+    description: str | None = None
 
 
 class SimulationResult(BaseModel):
@@ -310,4 +310,4 @@ class HealthCheck(BaseModel):
     status: str = "ok"
     version: str = "1.0"
     timestamp: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    services: Dict[str, str] = {}
+    services: dict[str, str] = {}

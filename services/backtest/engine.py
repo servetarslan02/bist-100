@@ -12,11 +12,13 @@ Geçmiş veriler üzerinde strateji testi:
 FAZ 12: Backtest Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
+
 from services.portfolio.portfolio_manager import CommissionModel
 
 logger = structlog.get_logger()
@@ -69,9 +71,9 @@ class BacktestResult:
     initial_capital: float
     final_capital: float
     metrics: BacktestMetrics
-    trades: List[BacktestTrade]
-    equity_curve: List[float]
-    drawdown_curve: List[float]
+    trades: list[BacktestTrade]
+    equity_curve: list[float]
+    drawdown_curve: list[float]
 
 
 class BacktestEngine:
@@ -109,7 +111,7 @@ class BacktestEngine:
         volume: float,
         quantity: int,
         max_participation: float = 0.10,
-    ) -> Tuple[bool, int]:
+    ) -> tuple[bool, int]:
         """F-011: Likidite kısıtı kontrolü.
 
         Günlük hacmin %10'undan fazlasını almamaya çalış.
@@ -273,11 +275,11 @@ class BacktestEngine:
         import csv
         import os
         from collections import defaultdict
-        
+
         """Backtest calistir (CANONICAL ENGINE)."""
         if not signals:
             return BacktestResult(strategy_name, "", "", initial_capital, initial_capital, self._compute_metrics([], [], initial_capital, []), [], [], [])
-            
+
         if commission_rate is not None:
             _cm = CommissionModel(broker_rate=commission_rate/2, exchange_rate=commission_rate/2)
         else:
@@ -289,30 +291,30 @@ class BacktestEngine:
         equity_curve = []
         exposure_history = []
         trade_id = 0
-        
+
         trades_writer = None
         daily_writer = None
         trades_file = None
         daily_file = None
-        
+
         if dump_ledger:
             os.makedirs('data/ledgers', exist_ok=True)
             trades_csv_path = 'data/ledgers/continuous_oos_trades.csv'
             daily_csv_path = 'data/ledgers/continuous_oos_daily.csv'
-            
+
             # For continuous OOS, we want to overwrite cleanly
             trades_file = open(trades_csv_path, 'w', newline='', encoding='utf-8')
             daily_file = open(daily_csv_path, 'w', newline='', encoding='utf-8')
-            
+
             trades_writer = csv.writer(trades_file)
             daily_writer = csv.writer(daily_file)
-            
+
             trades_writer.writerow(['trade_id', 'ticker', 'side', 'signal_timestamp', 'execution_timestamp', 'signal_price', 'execution_price', 'quantity', 'gross_value', 'slippage', 'commission', 'other_cost', 'cash_before', 'cash_after', 'equity_before', 'equity_after', 'fold_id', 'reason', 'exit_reason'])
             daily_writer.writerow(['date', 'cash', 'market_value', 'gross_exposure', 'net_exposure', 'equity', 'daily_return', 'drawdown', 'fold_id'])
         # Tarihleri normalize et (YYYY-MM-DD string)
         all_dates = set()
         price_lookup = {}
-        
+
         for ticker, rows in price_data.items():
             for row in rows:
                 d = str(row["date"])[:10]
@@ -320,11 +322,11 @@ class BacktestEngine:
                 if d not in price_lookup:
                     price_lookup[d] = {}
                 price_lookup[d][ticker] = row
-                
+
         all_dates = sorted(list(all_dates))
         if not all_dates:
             all_dates = sorted(list(set([str(s["date"])[:10] for s in signals])))
-            
+
         signals_by_date = defaultdict(list)
         for sig in signals:
             sig_d = str(sig["date"])[:10]
@@ -332,7 +334,7 @@ class BacktestEngine:
             if sig_d not in all_dates:
                 all_dates.append(sig_d)
         all_dates = sorted(list(set(all_dates)))
-        
+
         peak_equity = initial_capital
         prev_equity = initial_capital
 
@@ -364,7 +366,7 @@ class BacktestEngine:
         if dump_ledger:
             trades_file.close()
             daily_file.close()
-        
+
         metrics = self._compute_metrics(trades, equity_curve, initial_capital, exposure_history)
 
         return BacktestResult(
@@ -373,7 +375,7 @@ class BacktestEngine:
             metrics=metrics, trades=trades, equity_curve=equity_curve, drawdown_curve=self._compute_drawdown_curve(equity_curve),
         )
 
-    def _compute_metrics(self, trades: List[BacktestTrade], equity_curve: List[float], initial_capital: float, exposure_history: Optional[List[float]] = None) -> BacktestMetrics:
+    def _compute_metrics(self, trades: list[BacktestTrade], equity_curve: list[float], initial_capital: float, exposure_history: list[float] | None = None) -> BacktestMetrics:
         """Performans metrikleri hesapla."""
         if not trades:
             return BacktestMetrics(
@@ -458,7 +460,7 @@ class BacktestEngine:
             exposure_pct=round(float(np.mean(exposure_history)) * 100, 2) if exposure_history else 0.0,
         )
 
-    def _compute_drawdown_curve(self, equity_curve: List[float]) -> List[float]:
+    def _compute_drawdown_curve(self, equity_curve: list[float]) -> list[float]:
         """Drawdown eğrisi hesapla."""
         if not equity_curve:
             return []
@@ -479,7 +481,7 @@ backtest_engine = BacktestEngine()
 # =====================================================
 # Backtest Modül Bağlantıları
 # =====================================================
-def get_backtest_systems() -> Dict[str, Any]:
+def get_backtest_systems() -> dict[str, Any]:
     """Tüm backtest modüllerini getir."""
     systems = {}
     try:

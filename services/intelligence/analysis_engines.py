@@ -16,8 +16,8 @@ Ek analiz motorları:
 - Data Confidence Engine
 """
 
+
 import numpy as np
-from typing import Dict, List
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +26,7 @@ logger = structlog.get_logger()
 class PriceActionEngine:
     """Price Action analiz motoru."""
 
-    def detect_patterns(self, open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray) -> Dict[str, float]:
+    def detect_patterns(self, open_: np.ndarray, high: np.ndarray, low: np.ndarray, close: np.ndarray) -> dict[str, float]:
         """Fiyat paternlerini tespit et."""
         n = len(close)
         if n < 5:
@@ -76,7 +76,7 @@ class PriceActionEngine:
 class SupportResistanceEngine:
     """Support/Resistance seviye tespiti."""
 
-    def compute_levels(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 20) -> Dict[str, float]:
+    def compute_levels(self, high: np.ndarray, low: np.ndarray, close: np.ndarray, period: int = 20) -> dict[str, float]:
         """Destek ve direnç seviyeleri."""
         n = len(close)
         if n < period:
@@ -114,7 +114,7 @@ class SupportResistanceEngine:
 class VolumeEngine:
     """Volume analiz motoru."""
 
-    def compute(self, close: np.ndarray, volume: np.ndarray) -> Dict[str, float]:
+    def compute(self, close: np.ndarray, volume: np.ndarray) -> dict[str, float]:
         """Hacim analizi."""
         n = len(close)
         if n < 20:
@@ -148,7 +148,7 @@ class VolumeEngine:
 class SectorEngine:
     """Sektör analiz motoru."""
 
-    def compute_sector_momentum(self, sector_returns: Dict[str, List[float]]) -> Dict[str, float]:
+    def compute_sector_momentum(self, sector_returns: dict[str, list[float]]) -> dict[str, float]:
         """Sektör momentum hesapla."""
         features = {}
         for sector, returns in sector_returns.items():
@@ -168,7 +168,7 @@ class SectorEngine:
 class RelativeStrengthEngine:
     """Göreceli güç motoru."""
 
-    def compute(self, stock_returns: List[float], benchmark_returns: List[float], period: int = 20) -> Dict[str, float]:
+    def compute(self, stock_returns: list[float], benchmark_returns: list[float], period: int = 20) -> dict[str, float]:
         """Göreceli güç hesapla."""
         if len(stock_returns) < period or len(benchmark_returns) < period:
             return {}
@@ -188,7 +188,7 @@ class RelativeStrengthEngine:
 class CorrelationEngine:
     """Korelasyon motoru."""
 
-    def compute_rolling_correlation(self, series_a: List[float], series_b: List[float], window: int = 20) -> float:
+    def compute_rolling_correlation(self, series_a: list[float], series_b: list[float], window: int = 20) -> float:
         """Rolling korelasyon hesapla."""
         if len(series_a) < window or len(series_b) < window:
             return 0.0
@@ -206,7 +206,7 @@ class CorrelationEngine:
 class DrawdownEngine:
     """Drawdown motoru."""
 
-    def compute(self, equity_curve: List[float]) -> Dict[str, float]:
+    def compute(self, equity_curve: list[float]) -> dict[str, float]:
         """Drawdown hesapla."""
         if not equity_curve or len(equity_curve) < 2:
             return {}
@@ -239,7 +239,7 @@ class DrawdownEngine:
 class PositionRiskEngine:
     """Pozisyon risk motoru."""
 
-    def compute(self, position_value: float, portfolio_value: float, volatility: float, correlation: float) -> Dict[str, float]:
+    def compute(self, position_value: float, portfolio_value: float, volatility: float, correlation: float) -> dict[str, float]:
         """Pozisyon risk metrikleri."""
         if portfolio_value <= 0:
             return {}
@@ -259,12 +259,12 @@ class PositionRiskEngine:
 class ModelRiskEngine:
     """Model risk motoru."""
 
-    def compute_reliability(self, predictions: List[float], actuals: List[float]) -> Dict[str, float]:
+    def compute_reliability(self, predictions: list[float], actuals: list[float]) -> dict[str, float]:
         """Model güvenilirliği hesapla."""
         if len(predictions) != len(actuals) or len(predictions) < 5:
             return {"model_reliability": 0.5}
 
-        errors = [abs(p - a) for p, a in zip(predictions, actuals)]
+        errors = [abs(p - a) for p, a in zip(predictions, actuals, strict=False)]
         mean_error = np.mean(errors)
         np.std(errors)
 
@@ -287,7 +287,7 @@ class ModelRiskEngine:
 class DataConfidenceEngine:
     """Veri güvenilirliği motoru."""
 
-    def compute(self, data_quality: float, model_reliability: float, source_reliability: float, agreement: float) -> Dict[str, float]:
+    def compute(self, data_quality: float, model_reliability: float, source_reliability: float, agreement: float) -> dict[str, float]:
         """Genel güvenilirlik skoru."""
         # Weighted average
         confidence = (

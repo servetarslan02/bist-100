@@ -13,11 +13,12 @@ FAZ 2: Bull/Bear Debate
 """
 
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
-from .agent_system import AgentRole, AgentTask, AgentResult, BaseAgent
+from .agent_system import AgentResult, AgentRole, AgentTask, BaseAgent
 from .llm_client import BaseLLMClient
 
 logger = structlog.get_logger()
@@ -30,13 +31,13 @@ class DebateRound:
     bull_direction: str = "NEUTRAL"
     bull_confidence: float = 0.0
     bull_reasoning: str = ""
-    bull_evidence: List[str] = field(default_factory=list)
+    bull_evidence: list[str] = field(default_factory=list)
     bear_direction: str = "NEUTRAL"
     bear_confidence: float = 0.0
     bear_reasoning: str = ""
-    bear_evidence: List[str] = field(default_factory=list)
+    bear_evidence: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "round": self.round_num,
             "bull": {
@@ -57,14 +58,14 @@ class DebateResult:
     """Tartışma sonucu."""
     consensus: str  # LONG, SHORT, NEUTRAL, NO_TRADE
     consensus_confidence: float
-    rounds: List[DebateRound]
+    rounds: list[DebateRound]
     agreement: bool
     total_rounds: int
     total_duration_ms: float = 0.0
     bull_final_confidence: float = 0.0
     bear_final_confidence: float = 0.0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "consensus": self.consensus,
             "consensus_confidence": self.consensus_confidence,
@@ -105,10 +106,10 @@ class DebateEngine:
     async def run_debate(
         self,
         ticker: str,
-        context: Dict[str, Any],
-        bull_agent: Optional[BaseAgent] = None,
-        bear_agent: Optional[BaseAgent] = None,
-        llm_client: Optional[BaseLLMClient] = None,
+        context: dict[str, Any],
+        bull_agent: BaseAgent | None = None,
+        bear_agent: BaseAgent | None = None,
+        llm_client: BaseLLMClient | None = None,
     ) -> DebateResult:
         """Bull/Bear tartışması çalıştır.
 
@@ -130,7 +131,7 @@ class DebateEngine:
         if bear_agent is None:
             bear_agent = BaseAgent(AgentRole.BEAR, llm_client=llm_client)
 
-        history: List[DebateRound] = []
+        history: list[DebateRound] = []
         bull_arg = None
         bear_arg = None
 
@@ -205,13 +206,13 @@ class DebateEngine:
         self,
         round_num: int,
         ticker: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         bull_agent: BaseAgent,
         bear_agent: BaseAgent,
-        llm_client: Optional[BaseLLMClient],
-        bull_arg: Optional[DebateRound],
-        bear_arg: Optional[DebateRound],
-        history: List[DebateRound],
+        llm_client: BaseLLMClient | None,
+        bull_arg: DebateRound | None,
+        bear_arg: DebateRound | None,
+        history: list[DebateRound],
     ) -> DebateRound:
         """Tek tur tartışma çalıştır."""
 
@@ -268,10 +269,10 @@ class DebateEngine:
         self,
         round_num: int,
         ticker: str,
-        context: Dict[str, Any],
-        bear_arg: Optional[DebateRound],
-        history: List[DebateRound],
-    ) -> Dict[str, str]:
+        context: dict[str, Any],
+        bear_arg: DebateRound | None,
+        history: list[DebateRound],
+    ) -> dict[str, str]:
         """Bull prompt değişkenlerini oluştur."""
         if round_num == 0:
             return {}  # Template kendi prompt'unu oluşturur
@@ -284,10 +285,10 @@ class DebateEngine:
         self,
         round_num: int,
         ticker: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         bull_result: AgentResult,
-        history: List[DebateRound],
-    ) -> Dict[str, str]:
+        history: list[DebateRound],
+    ) -> dict[str, str]:
         """Bear prompt değişkenlerini oluştur."""
         if round_num <= 1:
             bull_reasoning = bull_result.reasoning if bull_result else ""
@@ -295,7 +296,7 @@ class DebateEngine:
         else:
             return {"debate_summary": self._summarize_history(history)}
 
-    def _summarize_history(self, history: List[DebateRound]) -> str:
+    def _summarize_history(self, history: list[DebateRound]) -> str:
         """Tartışma geçmişini özetle."""
         lines = []
         for r in history:

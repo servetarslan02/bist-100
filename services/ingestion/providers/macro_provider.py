@@ -9,11 +9,11 @@ v2.0: Async refactor + detaylı EVDS + BIST'e özgü makro göstergeler
 
 import asyncio
 import concurrent.futures
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Optional, Any
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
-import yfinance as yf
 import structlog
+import yfinance as yf
 
 from ...core.async_http import get_client
 
@@ -72,10 +72,10 @@ class MacroProvider:
     def __init__(self):
         self._client = get_client("macro", timeout=20.0, max_retries=3)
         self._tcmb_client = get_client("tcmb", timeout=30.0, max_retries=3)
-        self._cache: Dict[str, Any] = {}
+        self._cache: dict[str, Any] = {}
         self._cache_ttl = 300  # 5 dakika cache
 
-    async def fetch_yahoo_macro(self) -> Dict[str, Any]:
+    async def fetch_yahoo_macro(self) -> dict[str, Any]:
         """Yahoo Finance makro verileri (async)."""
 
         # Use thread pool for sync yfinance calls
@@ -91,7 +91,7 @@ class MacroProvider:
                         "price": info.get("regularMarketPrice", 0),
                         "change_pct": info.get("regularMarketChangePercent", 0),
                         "source": "yahoo",
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "timestamp": datetime.now(UTC).isoformat(),
                     }
                 result = await asyncio.wait_for(
                     loop.run_in_executor(executor, _get),
@@ -115,15 +115,15 @@ class MacroProvider:
         logger.info("Yahoo macro data fetched", count=len(output))
         return output
 
-    async def fetch_tcmb_macro(self, api_key: Optional[str] = None) -> Dict[str, Any]:
+    async def fetch_tcmb_macro(self, api_key: str | None = None) -> dict[str, Any]:
         """TCMB EVDS makro verileri (async, detaylı)."""
         if not api_key:
             logger.debug("TCMB EVDS API key not configured")
             return {}
 
         results = {}
-        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%d-%m-%Y")
+        end_date = datetime.now(UTC).strftime("%d-%m-%Y")
+        start_date = (datetime.now(UTC) - timedelta(days=30)).strftime("%d-%m-%Y")
 
         async def _fetch_series(name: str, series_code: str) -> tuple:
             try:
@@ -163,7 +163,7 @@ class MacroProvider:
         logger.info("TCMB macro data fetched", count=len(results))
         return results
 
-    async def fetch_fred_data(self, api_key: Optional[str] = None) -> Dict[str, Any]:
+    async def fetch_fred_data(self, api_key: str | None = None) -> dict[str, Any]:
         """FRED makro verileri (async)."""
         if not api_key:
             logger.debug("FRED API key not configured")
@@ -220,7 +220,7 @@ class MacroProvider:
         logger.info("FRED data fetched", count=len(results))
         return results
 
-    async def fetch_ecb_data(self) -> Dict[str, Any]:
+    async def fetch_ecb_data(self) -> dict[str, Any]:
         """ECB makro verileri (async)."""
         results = {}
         try:
@@ -243,7 +243,7 @@ class MacroProvider:
 
         return results
 
-    async def fetch_bist_macro_indicators(self) -> Dict[str, Any]:
+    async def fetch_bist_macro_indicators(self) -> dict[str, Any]:
         """BIST'e özgü makro göstergeler (async).
 
         - BIST 100 volatilite (VIX proxy)
@@ -290,7 +290,7 @@ class MacroProvider:
             else:
                 indicators["dollar_strength"] = "WEAK"
 
-        indicators["timestamp"] = datetime.now(timezone.utc).isoformat()
+        indicators["timestamp"] = datetime.now(UTC).isoformat()
         indicators["source"] = "composite"
 
         logger.info("BIST macro indicators computed",
@@ -299,7 +299,7 @@ class MacroProvider:
 
         return indicators
 
-    async def fetch_all(self, tcmb_api_key: Optional[str] = None, fred_api_key: Optional[str] = None) -> Dict[str, Any]:
+    async def fetch_all(self, tcmb_api_key: str | None = None, fred_api_key: str | None = None) -> dict[str, Any]:
         """Tüm makro verileri çek (async, paralel)."""
         tasks = [
             self.fetch_yahoo_macro(),

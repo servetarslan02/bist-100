@@ -4,12 +4,11 @@ Geçmişi canlıymış gibi oynatır.
 "13 Mart 2025 10:37'de ne biliyorsam sadece onu kullanarak karar ver."
 """
 
-import orjson
-import pickle
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Callable, Tuple
-from dataclasses import dataclass, field
-from pathlib import Path
+from typing import Any
+
 import numpy as np
 import polars as pl
 import structlog
@@ -34,7 +33,7 @@ class ReplayEvent:
     """Replay sırasında oluşan olay."""
     timestamp: datetime
     event_type: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
 
 @dataclass
@@ -55,10 +54,10 @@ class ReplayTrade:
 class ReplayResult:
     """Replay sonucu."""
     config: ReplayConfig
-    trades: List[ReplayTrade]
-    equity_curve: List[Tuple[datetime, float]]
-    metrics: Dict[str, float]
-    predictions: List[Dict[str, Any]]
+    trades: list[ReplayTrade]
+    equity_curve: list[tuple[datetime, float]]
+    metrics: dict[str, float]
+    predictions: list[dict[str, Any]]
 
 
 class ReplayEngine:
@@ -68,8 +67,8 @@ class ReplayEngine:
     """
 
     def __init__(self):
-        self._handlers: Dict[str, Callable] = {}
-        self._state: Dict[str, Any] = {}
+        self._handlers: dict[str, Callable] = {}
+        self._state: dict[str, Any] = {}
 
     def on(self, event_type: str, handler: Callable):
         """Event handler kaydet."""
@@ -77,7 +76,7 @@ class ReplayEngine:
         return self
 
     def run(self, config: ReplayConfig, historical_data: pl.DataFrame,
-            events: Optional[List[ReplayEvent]] = None) -> ReplayResult:
+            events: list[ReplayEvent] | None = None) -> ReplayResult:
         """
         Replay çalıştır.
 
@@ -94,10 +93,10 @@ class ReplayEngine:
         # Initialize
         capital = config.initial_capital
         cash = capital
-        positions: Dict[str, Dict] = {}
-        trades: List[ReplayTrade] = []
-        equity_curve: List[Tuple[datetime, float]] = []
-        predictions: List[Dict[str, Any]] = []
+        positions: dict[str, dict] = {}
+        trades: list[ReplayTrade] = []
+        equity_curve: list[tuple[datetime, float]] = []
+        predictions: list[dict[str, Any]] = []
 
         # Sort data by timestamp
         data = historical_data.sort("timestamp")
@@ -206,8 +205,8 @@ class ReplayEngine:
             predictions=predictions,
         )
 
-    def _execute_trade(self, trade_data: Dict, prices: Dict[str, float],
-                       config: ReplayConfig, timestamp: datetime) -> Optional[ReplayTrade]:
+    def _execute_trade(self, trade_data: dict, prices: dict[str, float],
+                       config: ReplayConfig, timestamp: datetime) -> ReplayTrade | None:
         """İşlemi simüle et (slippage + commission)."""
         ticker = trade_data.get("ticker")
         side = trade_data.get("side")
@@ -221,10 +220,7 @@ class ReplayEngine:
         price = prices[ticker]
 
         # Apply slippage
-        if side == "BUY":
-            exec_price = price * (1 + config.slippage_rate)
-        else:
-            exec_price = price * (1 - config.slippage_rate)
+        exec_price = price * (1 + config.slippage_rate) if side == "BUY" else price * (1 - config.slippage_rate)
 
         # Commission
         commission = quantity * exec_price * config.commission_rate
@@ -241,9 +237,9 @@ class ReplayEngine:
             signal_type=signal_type,
         )
 
-    def _calculate_metrics(self, equity_curve: List[Tuple[datetime, float]],
-                           trades: List[ReplayTrade],
-                           config: ReplayConfig) -> Dict[str, float]:
+    def _calculate_metrics(self, equity_curve: list[tuple[datetime, float]],
+                           trades: list[ReplayTrade],
+                           config: ReplayConfig) -> dict[str, float]:
         """Performans metrikleri hesapla."""
         if not equity_curve:
             return {}
@@ -259,10 +255,7 @@ class ReplayEngine:
         ann_return = ((equities[-1] / config.initial_capital) ** (365 / max(days, 1)) - 1) * 100
 
         # Sharpe ratio (annualized)
-        if len(returns) > 1 and np.std(returns) > 0:
-            sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252)
-        else:
-            sharpe = 0
+        sharpe = np.mean(returns) / np.std(returns) * np.sqrt(252) if len(returns) > 1 and np.std(returns) > 0 else 0
 
         # Max drawdown
         peak = equities[0]
@@ -331,7 +324,7 @@ class WalkForwardValidator:
         self.embargo_days = embargo_days
 
     def split(self, data: pl.DataFrame, date_column: str = "timestamp"
-              ) -> List[Tuple[pl.DataFrame, pl.DataFrame, datetime, datetime]]:
+              ) -> list[tuple[pl.DataFrame, pl.DataFrame, datetime, datetime]]:
         """
         Walk-forward split'leri üret.
 
@@ -379,9 +372,9 @@ class WalkForwardValidator:
         logger.info("Walk-forward splits generated", count=len(splits))
         return splits
 
-    def validate(self, data: pl.DataFrame, feature_names: List[str],
+    def validate(self, data: pl.DataFrame, feature_names: list[str],
                  target_column: str, date_column: str = "timestamp"
-                 ) -> Dict[str, Any]:
+                 ) -> dict[str, Any]:
         """
         Walk-forward validation çalıştır.
 

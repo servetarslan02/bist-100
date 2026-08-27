@@ -8,11 +8,10 @@ ML Production Parity:
 """
 
 import sys
-import os
+from datetime import date, timedelta
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timedelta, date
-
 
 
 def _make_ohlcv(n_days, start_price=100.0, seed=42):
@@ -35,7 +34,7 @@ def _make_ohlcv(n_days, start_price=100.0, seed=42):
 
 def test_canonical_feature_registry():
     """Feature registry regex yerine statik listeden türetilmeli."""
-    from services.core.canonical_scoring import get_canonical_features, CANONICAL_FEATURE_REGISTRY
+    from services.core.canonical_scoring import CANONICAL_FEATURE_REGISTRY, get_canonical_features
 
     passed = 0
     failed = 0
@@ -101,8 +100,9 @@ def test_walk_forward_uses_registry():
 def test_multi_horizon_model():
     """MultiHorizonModel birden fazla horizon modeli tutmalı."""
     from services.ml.lightgbm_trainer import (
-        MultiHorizonModel, TrainedModel, LightGBMTrainer, MLModelConfig,
-        DEFAULT_TARGETS, compute_target, TargetSpec
+        LightGBMTrainer,
+        MLModelConfig,
+        MultiHorizonModel,
     )
 
     passed = 0
@@ -132,7 +132,7 @@ def test_multi_horizon_model():
     # 5d modeli eğit
     returns_5d = {}
     for key in features_map:
-        parts = key.split("::")
+        key.split("::")
         # Sadece mevcut returns'ı kullan (5d target zaten)
         returns_5d[key] = returns[key]
     config_5d = MLModelConfig(num_boost_round=5, early_stopping_rounds=2, purge_gap_days=5, target_horizon=5)
@@ -297,8 +297,8 @@ def test_feature_parity():
 
 def test_multi_horizon_backward_compat():
     """MultiHorizonModel canonical_scoring.predict() ile uyumlu olmalı."""
-    from services.ml.lightgbm_trainer import MultiHorizonModel, TrainedModel, LightGBMTrainer, MLModelConfig
-    from services.core.canonical_scoring import canonical_scoring, CanonicalScore
+    from services.core.canonical_scoring import CanonicalScore, canonical_scoring
+    from services.ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, MultiHorizonModel
 
     passed = 0
     failed = 0
@@ -352,7 +352,7 @@ def test_multi_horizon_backward_compat():
 
 def test_horizon_fallback():
     """Yetersiz veride o horizon modeli üretilmemeli."""
-    from services.ml.lightgbm_trainer import MultiHorizonModel, DEFAULT_TARGETS
+    from services.ml.lightgbm_trainer import MultiHorizonModel
 
     passed = 0
     failed = 0

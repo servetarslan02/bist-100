@@ -11,9 +11,9 @@ Mimari:
 KURAL: confidence != win_probability. Ayri degiskenler.
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -51,12 +51,12 @@ class PositionSizer:
 
     def calculate_position_sizes(
         self,
-        opportunities: List[Dict],
+        opportunities: list[dict],
         portfolio_value: float,
         current_volatility: float,
         regime: str = "UNKNOWN",
         calibrator=None,  # ScoreCalibrator instance
-    ) -> List[PositionSize]:
+    ) -> list[PositionSize]:
         """Tum pozisyon buyukluklerini hesapla."""
 
         logger.debug("debug_output", message=f"\n[POSITION SIZING v4.0] opportunities={len(opportunities)}, portfolio={portfolio_value:,.0f}, regime={regime}")
@@ -97,7 +97,7 @@ class PositionSizer:
 
             # NaN/Inf/Zero kontrolu
             if not self._is_valid(score) or not self._is_valid(confidence) or not self._is_valid(volatility):
-                logger.debug("debug_output", message=f"    -> SKIP: invalid input")
+                logger.debug("debug_output", message="    -> SKIP: invalid input")
                 continue
 
             # === CALIBRATION: score -> win_probability ===
@@ -136,7 +136,7 @@ class PositionSizer:
                 logger.debug("debug_output", message=f"    kelly={kelly:.4f} (regime={regime})")
 
                 if kelly <= 0:
-                    logger.debug("debug_output", message=f"    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
+                    logger.debug("debug_output", message="    -> SKIP: kelly<=0 (negative expectation, NO TRADE is correct)")
                     continue
 
                 base_weight = kelly
@@ -144,10 +144,10 @@ class PositionSizer:
                 # Cold-start: Kelly devre disi
                 # Negatif expected_return → NO TRADE
                 if expected_return < 0:
-                    logger.debug("debug_output", message=f"    -> SKIP: expected_return<0 (NO TRADE)")
+                    logger.debug("debug_output", message="    -> SKIP: expected_return<0 (NO TRADE)")
                     continue
 
-                logger.debug("debug_output", message=f"    COLD-START: Kelly disabled, using score-based weight")
+                logger.debug("debug_output", message="    COLD-START: Kelly disabled, using score-based weight")
                 # Score semantigi: yuksek = iyi. En iyi score = 1.0, en kotu = 0.1
                 base_weight = max(0.1, min(1.0, score / 20.0))
                 kelly = 0.0  # Kelly uygulanmadi
@@ -172,7 +172,7 @@ class PositionSizer:
             logger.debug("debug_output", message=f"    weight_clamped={weight:.6f} (max_pos={max_pos})")
 
             if weight <= 0.001:
-                logger.debug("debug_output", message=f"    -> SKIP: weight too small")
+                logger.debug("debug_output", message="    -> SKIP: weight too small")
                 continue
 
             # Risk yuzdesi
@@ -206,7 +206,7 @@ class PositionSizer:
                 pos.risk_pct = round(pos.risk_pct * scale, 2)
 
         if not positions:
-            logger.debug("debug_output", message=f"  WARNING: 0 pozisyon uretildi!")
+            logger.debug("debug_output", message="  WARNING: 0 pozisyon uretildi!")
 
         return positions
 
@@ -236,10 +236,10 @@ class PositionSizer:
         logger.debug("debug_output", message=f"      [KELLY] p={win_prob:.4f}, avg_win={avg_win:.4f}, avg_loss={avg_loss:.4f}, regime={regime}")
 
         if avg_loss <= 0:
-            logger.debug("debug_output", message=f"      -> avg_loss<=0, kelly=0")
+            logger.debug("debug_output", message="      -> avg_loss<=0, kelly=0")
             return 0.0
         if win_prob <= 0 or win_prob >= 1:
-            logger.debug("debug_output", message=f"      -> win_prob out of range, kelly=0")
+            logger.debug("debug_output", message="      -> win_prob out of range, kelly=0")
             return 0.0
 
         q = 1 - win_prob
@@ -252,7 +252,7 @@ class PositionSizer:
 
         # raw_kelly negatifse expectation negatif -> NO TRADE (dogru davranis)
         if raw_kelly <= 0:
-            logger.debug("debug_output", message=f"      -> raw_kelly<=0 (negative expectation, NO TRADE)")
+            logger.debug("debug_output", message="      -> raw_kelly<=0 (negative expectation, NO TRADE)")
             return 0.0
 
         kelly = max(0, min(1, raw_kelly))
@@ -276,9 +276,7 @@ class PositionSizer:
         """NaN/Inf/None kontrolu."""
         if val is None:
             return False
-        if np.isnan(val) or np.isinf(val):
-            return False
-        return True
+        return not (np.isnan(val) or np.isinf(val))
 
     def calculate_var_based_position_limit(
         self,
@@ -348,7 +346,7 @@ class _PositionSizerCompat(PositionSizer):
         volatility: float = 0.2,
         correlation_to_portfolio: float = 0.0,
         var_based_limit: float = 0.0,
-        returns: Optional[np.ndarray] = None,
+        returns: np.ndarray | None = None,
     ) -> _CalcResult:
         """Tek pozisyon boyutu — risk bütçesi yöntemi.
 

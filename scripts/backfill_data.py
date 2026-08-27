@@ -10,14 +10,15 @@ Kullanım:
 """
 
 import argparse
-import sys
-import os
 import asyncio
+import os
+import sys
 from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import structlog
+
 logger = structlog.get_logger()
 
 
@@ -25,7 +26,8 @@ async def backfill_ticker(ticker: str, start_date: str, end_date: str):
     """Tek ticker için historical data yükle."""
     try:
         import yfinance as yf
-        from services.core.database import pg_execute, pg_fetchval
+
+        from services.core.database import pg_execute
 
         yf_ticker = f"{ticker}.IS"
         data = yf.download(yf_ticker, start=start_date, end=end_date, progress=False)
@@ -35,7 +37,7 @@ async def backfill_ticker(ticker: str, start_date: str, end_date: str):
             return 0
 
         count = 0
-        for idx, row in data.iterrows():
+        for idx, _row in data.iterrows():
             date_str = str(idx.date())
             try:
                 await pg_execute(

@@ -11,10 +11,7 @@ Test edilen:
 """
 
 import sys
-import os
-import numpy as np
-
-
+from datetime import UTC
 
 # ===================== FAZ 3: RETRAIN ENGINE =====================
 
@@ -54,9 +51,9 @@ def test_feature_tracker_trends():
 
     tracker = FeatureImportanceTracker()
     # Manuel veri ekle
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
     for i in range(10):
-        date = (datetime.now(timezone.utc) - timedelta(days=i)).strftime("%Y-%m-%d")
+        date = (datetime.now(UTC) - timedelta(days=i)).strftime("%Y-%m-%d")
         tracker._history.append(
             type('Record', (), {
                 'date': date, 'feature': 'rsi_14', 'importance': 0.1 + i*0.01,
@@ -439,14 +436,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 3-9 TEST SONUÇLARI")
+    print("📊 FAZ 3-9 TEST SONUÇLARI")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

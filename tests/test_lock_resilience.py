@@ -13,18 +13,18 @@ Kapsam:
 - Portfolio health status
 """
 
-import sys
-import os
 import asyncio
-import duckdb
-import time
+import sys
 
+import duckdb
+
+from services.core.database_dev import dev_db
 from services.core.db_lock import (
-    DatabaseLock, CoordinatedLock, LockMetrics,
-    get_lock_metrics, get_all_metrics, get_health_report,
+    DatabaseLock,
+    get_health_report,
+    get_lock_metrics,
 )
 from services.portfolio.main import PortfolioService
-from services.core.database_dev import dev_db
 
 
 def fresh_db():
@@ -146,7 +146,7 @@ async def test_health_report():
     issues = []
 
     # Birkaç lock operasyonu yap
-    for i in range(3):
+    for _i in range(3):
         lock = DatabaseLock(db, dialect="sqlite", key="test_health")
         await lock.acquire()
         await lock.release()
@@ -175,7 +175,7 @@ async def test_lock_timeout_logging():
     issues = []
 
     # Çok kısa timeout ile lock
-    lock = DatabaseLock(db, dialect="sqlite", key="test_timeout_log",
+    DatabaseLock(db, dialect="sqlite", key="test_timeout_log",
                         timeout_ms=1, max_retries=1, base_retry_ms=1)
 
     # Lock al ve hemen başka bir lock deneyelim (farklı key ile)
@@ -203,7 +203,7 @@ async def test_long_transaction():
     await lock.acquire()
 
     # 500ms "uzun işlem"
-    for i in range(10):
+    for _i in range(10):
         db.execute("SAVEPOINT sp_test")
         db.execute("RELEASE SAVEPOINT sp_test")
         await asyncio.sleep(0.05)
@@ -283,7 +283,7 @@ async def test_metrics_after_operations():
     await svc.start()
 
     # Birkaç işlem yap
-    for i in range(5):
+    for _i in range(5):
         await svc.execute_buy("X", 10, 100.0, instrument_id=xid)
 
     metrics = svc.get_lock_metrics()

@@ -16,10 +16,11 @@ Referanslar:
 - Marcos López de Prado - "Advances in Financial Machine ML" Ch.7
 """
 
-import polars as pl
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from typing import Any
+
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -41,7 +42,7 @@ class PITRecord:
         """Yayın gecikmesi (gün)."""
         return (self.publish_date - self.report_date).days
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "data_id": self.data_id,
             "ticker": self.ticker,
@@ -60,10 +61,10 @@ class PITViolation:
     violation_type: str  # future_data | revision_leakage | timing_error
     severity: str  # critical | warning | info
     description: str
-    record: Optional[PITRecord] = None
-    decision_time: Optional[datetime] = None
+    record: PITRecord | None = None
+    decision_time: datetime | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "type": self.violation_type,
             "severity": self.severity,
@@ -76,7 +77,7 @@ class PITViolation:
 class PITValidationReport:
     """PIT doğrulama raporu."""
     total_records: int = 0
-    violations: List[PITViolation] = field(default_factory=list)
+    violations: list[PITViolation] = field(default_factory=list)
     critical_count: int = 0
     warning_count: int = 0
     is_valid: bool = True
@@ -89,7 +90,7 @@ class PITValidationReport:
         elif violation.severity == "warning":
             self.warning_count += 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_records": self.total_records,
             "violations": [v.to_dict() for v in self.violations],
@@ -107,8 +108,8 @@ class PointInTimeValidator:
     """
 
     def __init__(self):
-        self._registry: Dict[str, List[PITRecord]] = {}  # ticker → records
-        self._corporate_actions: List[Dict[str, Any]] = []
+        self._registry: dict[str, list[PITRecord]] = {}  # ticker → records
+        self._corporate_actions: list[dict[str, Any]] = []
 
     def register_record(self, record: PITRecord):
         """PIT kaydı oluştur."""
@@ -157,7 +158,7 @@ class PointInTimeValidator:
         action_type: str,  # dividend | split | rights_issue | merger
         ex_date: datetime,
         record_date: datetime,
-        details: Dict[str, Any],
+        details: dict[str, Any],
     ):
         """Kurumsal işlem (temettü, bölünme vb.) kaydı oluştur."""
         self._corporate_actions.append({
@@ -174,8 +175,8 @@ class PointInTimeValidator:
         self,
         ticker: str,
         decision_time: datetime,
-        data_type: Optional[str] = None,
-    ) -> List[PITRecord]:
+        data_type: str | None = None,
+    ) -> list[PITRecord]:
         """
         Karar anında mevcut olan verileri döndürür.
 
@@ -197,7 +198,7 @@ class PointInTimeValidator:
         self,
         ticker: str,
         decision_time: datetime,
-    ) -> Optional[PITRecord]:
+    ) -> PITRecord | None:
         """
         Karar anında mevcut olan en güncel temel veriyi döndürür.
 
@@ -224,7 +225,7 @@ class PointInTimeValidator:
         report_date: datetime,
         revision_version: int,
         decision_time: datetime,
-    ) -> Tuple[bool, Optional[PITViolation]]:
+    ) -> tuple[bool, PITViolation | None]:
         """
         Temel veri erişiminin PIT kurallarına uygunluğunu doğrula.
 
@@ -290,7 +291,7 @@ class PointInTimeValidator:
         feature_df: pl.DataFrame,
         ticker: str,
         decision_time: datetime,
-        feature_cols: List[str],
+        feature_cols: list[str],
         timestamp_col: str = "timestamp",
     ) -> PITValidationReport:
         """
@@ -354,7 +355,7 @@ class PointInTimeValidator:
         label_timestamp: datetime,
         label_horizon_days: int,
         purge_days: int,
-    ) -> Tuple[bool, Optional[PITViolation]]:
+    ) -> tuple[bool, PITViolation | None]:
         """
         Label üretiminin PIT uyumluluğunu doğrula.
 
@@ -378,7 +379,7 @@ class PointInTimeValidator:
 
         return True, None
 
-    def get_registry_stats(self) -> Dict[str, Any]:
+    def get_registry_stats(self) -> dict[str, Any]:
         """Kayıt istatistikleri."""
         total_records = sum(len(records) for records in self._registry.values())
         by_type = {}
@@ -407,7 +408,7 @@ class PITDataAdapter:
         ticker_col: str = "ticker",
         report_date_col: str = "report_date",
         publish_date_col: str = "publish_date",
-    ) -> List[PITRecord]:
+    ) -> list[PITRecord]:
         """Temel veri DataFrame'ini PIT kayıtlarına dönüştür."""
         records = []
         for _, row in df.iterrows():
@@ -425,7 +426,7 @@ class PITDataAdapter:
         df: pl.DataFrame,
         ticker_col: str = "ticker",
         date_col: str = "date",
-    ) -> List[PITRecord]:
+    ) -> list[PITRecord]:
         """Fiyat verisi DataFrame'ini PIT kayıtlarına dönüştür."""
         records = []
         for _, row in df.iterrows():

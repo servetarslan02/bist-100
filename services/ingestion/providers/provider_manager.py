@@ -7,9 +7,11 @@ Primary provider → quality check → secondary provider → cross-validation �
 Bir provider bozulursa ALPHA'nın gözü kapanmaz.
 """
 
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timezone
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -20,8 +22,8 @@ class ProviderHealth:
     """Provider sağlık durumu."""
     name: str
     is_healthy: bool = True
-    last_success: Optional[datetime] = None
-    last_failure: Optional[datetime] = None
+    last_success: datetime | None = None
+    last_failure: datetime | None = None
     consecutive_failures: int = 0
     avg_latency_ms: float = 0
     success_rate: float = 1.0
@@ -43,9 +45,9 @@ class ProviderManager:
     """
 
     def __init__(self):
-        self._providers: Dict[str, Dict[str, Callable]] = {}  # data_type -> {name: func}
-        self._health: Dict[str, ProviderHealth] = {}
-        self._priority: Dict[str, List[str]] = {}  # data_type -> [provider_names]
+        self._providers: dict[str, dict[str, Callable]] = {}  # data_type -> {name: func}
+        self._health: dict[str, ProviderHealth] = {}
+        self._priority: dict[str, list[str]] = {}  # data_type -> [provider_names]
 
     def register_provider(self, data_type: str, name: str, func: Callable, priority: int = 0):
         """Veri sağlayıcı kaydet."""
@@ -62,7 +64,7 @@ class ProviderManager:
 
         logger.info("Provider registered", data_type=data_type, name=name, priority=priority)
 
-    async def fetch(self, data_type: str, **kwargs) -> Optional[ProviderResult]:
+    async def fetch(self, data_type: str, **kwargs) -> ProviderResult | None:
         """
         Veri çek — failover ile.
         Önce primary, başarısız olursa secondary.
@@ -81,15 +83,15 @@ class ProviderManager:
             if not func:
                 continue
 
-            start = datetime.now(timezone.utc)
+            start = datetime.now(UTC)
             try:
                 result = func(**kwargs)
-                latency = (datetime.now(timezone.utc) - start).total_seconds() * 1000
+                latency = (datetime.now(UTC) - start).total_seconds() * 1000
 
                 # Sağlık güncelle
                 if health:
                     health.is_healthy = True
-                    health.last_success = datetime.now(timezone.utc)
+                    health.last_success = datetime.now(UTC)
                     health.consecutive_failures = 0
                     health.avg_latency_ms = (health.avg_latency_ms * 0.9) + (latency * 0.1)
                     health.success_rate = min(1.0, health.success_rate + 0.01)
@@ -97,7 +99,7 @@ class ProviderManager:
                 return ProviderResult(
                     provider=provider_name,
                     data=result,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     latency_ms=latency,
                     quality=1.0,
                 )
@@ -106,14 +108,14 @@ class ProviderManager:
                 logger.warning("Provider failed", provider=provider_name, error=str(e))
                 if health:
                     health.is_healthy = health.consecutive_failures < 10
-                    health.last_failure = datetime.now(timezone.utc)
+                    health.last_failure = datetime.now(UTC)
                     health.consecutive_failures += 1
                     health.success_rate = max(0, health.success_rate - 0.05)
 
         logger.error("All providers failed", data_type=data_type)
         return None
 
-    def get_health(self) -> Dict[str, Dict]:
+    def get_health(self) -> dict[str, dict]:
         """Tüm provider'ların sağlık durumu."""
         return {
             name: {

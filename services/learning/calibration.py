@@ -12,11 +12,12 @@ Model confidence kalibrasyonu:
 KURAL: Model %90 confidence veriyorsa, gerçekten %90 olmalı.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -44,8 +45,8 @@ class CalibrationResult:
     mce: float  # Maximum Calibration Error
     overconfident: bool
     underconfident: bool
-    bins: List[CalibrationBin]
-    regime_calibration: Dict[str, Dict]  # regime → {brier, ece, overconfident}
+    bins: list[CalibrationBin]
+    regime_calibration: dict[str, dict]  # regime → {brier, ece, overconfident}
     suggested_adjustment: float  # Platt scaling adjustment
     sample_count: int
     confidence: str  # HIGH, MEDIUM, LOW (sonuca güven)
@@ -64,14 +65,14 @@ class ConfidenceCalibrator:
 
     def __init__(self):
         self._calibration_history: deque = deque(maxlen=1000)
-        self._platt_params: Dict[str, PlattScalingParams] = {}  # regime → params
-        self._last_calibration: Optional[CalibrationResult] = None
+        self._platt_params: dict[str, PlattScalingParams] = {}  # regime → params
+        self._last_calibration: CalibrationResult | None = None
 
     def calibrate(
         self,
-        predictions: List[Dict],
-        n_bins: Optional[int] = None,
-        regime: Optional[str] = None,
+        predictions: list[dict],
+        n_bins: int | None = None,
+        regime: str | None = None,
     ) -> CalibrationResult:
         """Calibration analizi yap.
 
@@ -87,10 +88,7 @@ class ConfidenceCalibrator:
         n_bins = n_bins or cfg.n_bins
 
         # Filtrele
-        if regime:
-            filtered = [p for p in predictions if p.get("regime") == regime]
-        else:
-            filtered = predictions
+        filtered = [p for p in predictions if p.get("regime") == regime] if regime else predictions
 
         # Minimum sample kontrolü
         if len(filtered) < cfg.min_samples:
@@ -129,7 +127,7 @@ class ConfidenceCalibrator:
         confidence_level = self._assess_confidence(len(filtered), ece)
 
         result = CalibrationResult(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             brier_score=round(brier, 4),
             ece=round(ece, 4),
             mce=round(mce, 4),
@@ -156,7 +154,7 @@ class ConfidenceCalibrator:
     def adjust_confidence(
         self,
         raw_confidence: float,
-        regime: Optional[str] = None,
+        regime: str | None = None,
     ) -> float:
         """Platt scaling ile confidence ayarla.
 
@@ -194,8 +192,8 @@ class ConfidenceCalibrator:
 
     def fit_platt_scaling(
         self,
-        predictions: List[Dict],
-        regime: Optional[str] = None,
+        predictions: list[dict],
+        regime: str | None = None,
     ) -> PlattScalingParams:
         """Platt scaling parametrelerini fit et.
 
@@ -254,7 +252,7 @@ class ConfidenceCalibrator:
 
         return params
 
-    def get_calibration_report(self) -> Dict[str, Any]:
+    def get_calibration_report(self) -> dict[str, Any]:
         """Calibration raporu."""
         if not self._last_calibration:
             return {"status": "No calibration data"}
@@ -293,7 +291,7 @@ class ConfidenceCalibrator:
         confidences: np.ndarray,
         outcomes: np.ndarray,
         n_bins: int,
-    ) -> List[CalibrationBin]:
+    ) -> list[CalibrationBin]:
         """Calibration bin'leri oluştur."""
         bins = []
         bin_edges = np.linspace(0, 1, n_bins + 1)
@@ -329,7 +327,7 @@ class ConfidenceCalibrator:
 
     def _expected_calibration_error(
         self,
-        bins: List[CalibrationBin],
+        bins: list[CalibrationBin],
         total_count: int,
     ) -> float:
         """ECE: Ağırlıklı ortalama miscalibration."""
@@ -339,31 +337,25 @@ class ConfidenceCalibrator:
         ece = sum(b.miscalibration * b.count for b in bins) / total_count
         return float(ece)
 
-    def _max_calibration_error(self, bins: List[CalibrationBin]) -> float:
+    def _max_calibration_error(self, bins: list[CalibrationBin]) -> float:
         """MCE: En kötü bin miscalibration."""
         if not bins:
             return 0.0
         return float(max(b.miscalibration for b in bins))
 
-    def _check_overconfidence(self, bins: List[CalibrationBin]) -> bool:
+    def _check_overconfidence(self, bins: list[CalibrationBin]) -> bool:
         """Overconfidence: predicted > actual (çok fazla güveniyor)."""
         cfg = learning_settings.calibration
-        for b in bins:
-            if b.avg_predicted > b.avg_actual + cfg.overconfidence_threshold:
-                return True
-        return False
+        return any(b.avg_predicted > b.avg_actual + cfg.overconfidence_threshold for b in bins)
 
-    def _check_underconfidence(self, bins: List[CalibrationBin]) -> bool:
+    def _check_underconfidence(self, bins: list[CalibrationBin]) -> bool:
         """Underconfidence: actual > predicted (yeterince güvenmiyor)."""
         cfg = learning_settings.calibration
-        for b in bins:
-            if b.avg_actual > b.avg_predicted + cfg.overconfidence_threshold:
-                return True
-        return False
+        return any(b.avg_actual > b.avg_predicted + cfg.overconfidence_threshold for b in bins)
 
     def _suggest_platt_adjustment(
         self,
-        bins: List[CalibrationBin],
+        bins: list[CalibrationBin],
         confidences: np.ndarray,
         outcomes: np.ndarray,
     ) -> float:
@@ -384,9 +376,9 @@ class ConfidenceCalibrator:
 
     def _calibrate_by_regime(
         self,
-        predictions: List[Dict],
+        predictions: list[dict],
         n_bins: int,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Rejim bazlı calibration."""
         regime_groups = defaultdict(list)
         for p in predictions:
@@ -424,10 +416,10 @@ class ConfidenceCalibrator:
             return "MEDIUM"
         return "LOW"
 
-    def _empty_result(self, count: int, regime: Optional[str]) -> CalibrationResult:
+    def _empty_result(self, count: int, regime: str | None) -> CalibrationResult:
         """Boş calibration sonucu."""
         return CalibrationResult(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             brier_score=0.0,
             ece=0.0,
             mce=0.0,

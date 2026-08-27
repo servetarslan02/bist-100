@@ -9,11 +9,12 @@ Kaynaklar:
 - arXiv 2605.19337 — Agentic Trading Meta-Analiz (2026)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from scipy.optimize import minimize
+from typing import Any
+
+import numpy as np
 import structlog
+from scipy.optimize import minimize
 
 logger = structlog.get_logger()
 
@@ -21,8 +22,8 @@ logger = structlog.get_logger()
 @dataclass
 class RiskParityResult:
     """Risk parity sonucu."""
-    weights: Dict[str, float]        # ticker → weight
-    risk_contributions: Dict[str, float]  # ticker → risk katkısı (%)
+    weights: dict[str, float]        # ticker → weight
+    risk_contributions: dict[str, float]  # ticker → risk katkısı (%)
     portfolio_volatility: float
     diversification_ratio: float
     optimization_success: bool
@@ -43,8 +44,8 @@ class RiskParityOptimizer:
     def optimize(
         self,
         cov_matrix: np.ndarray,
-        tickers: List[str],
-        target_risk_contributions: Optional[Dict[str, float]] = None,
+        tickers: list[str],
+        target_risk_contributions: dict[str, float] | None = None,
     ) -> RiskParityResult:
         """Risk parity ağırlıkları hesapla.
 
@@ -114,7 +115,7 @@ class RiskParityOptimizer:
         self,
         cov_matrix: np.ndarray,
         target_rc: np.ndarray,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Risk parity optimizasyonu çöz."""
         n = cov_matrix.shape[0]
 
@@ -178,8 +179,8 @@ class RiskParityOptimizer:
     def compute_risk_budget_weights(
         self,
         cov_matrix: np.ndarray,
-        tickers: List[str],
-        risk_budgets: Dict[str, float],
+        tickers: list[str],
+        risk_budgets: dict[str, float],
     ) -> RiskParityResult:
         """Risk bütçesi bazlı ağırlıklar.
 
@@ -199,8 +200,8 @@ class RiskParityOptimizer:
     def compare_with_equal_weight(
         self,
         cov_matrix: np.ndarray,
-        tickers: List[str],
-    ) -> Dict[str, Any]:
+        tickers: list[str],
+    ) -> dict[str, Any]:
         """Risk parity vs equal weight karşılaştırması."""
         n = len(tickers)
 

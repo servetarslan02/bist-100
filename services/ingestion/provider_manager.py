@@ -20,14 +20,16 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Callable
-from datetime import datetime, timezone
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
-from .circuit_breaker import CircuitBreakerManager, CircuitBreakerError
+from .circuit_breaker import CircuitBreakerError, CircuitBreakerManager
 from .rate_limiter import RateLimiter, rate_limiter
-from .retry_policy import RetryPolicy, RetryExhaustedError, get_retry_policy
+from .retry_policy import RetryExhaustedError, RetryPolicy, get_retry_policy
 
 logger = structlog.get_logger()
 
@@ -51,7 +53,7 @@ class ProviderResult:
     latency_ms: float
     quality: float = 1.0
     source: str = ""
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -59,8 +61,8 @@ class ProviderHealth:
     """Provider sağlık durumu."""
     name: str
     is_healthy: bool = True
-    last_success: Optional[datetime] = None
-    last_failure: Optional[datetime] = None
+    last_success: datetime | None = None
+    last_failure: datetime | None = None
     consecutive_failures: int = 0
     avg_latency_ms: float = 0
     success_rate: float = 1.0
@@ -79,14 +81,14 @@ class ProviderManager:
 
     def __init__(
         self,
-        rate_limiter_instance: Optional[RateLimiter] = None,
-        circuit_breaker_manager: Optional[CircuitBreakerManager] = None,
+        rate_limiter_instance: RateLimiter | None = None,
+        circuit_breaker_manager: CircuitBreakerManager | None = None,
     ):
-        self._providers: Dict[str, List[ProviderConfig]] = {}  # data_type → providers
-        self._health: Dict[str, ProviderHealth] = {}
+        self._providers: dict[str, list[ProviderConfig]] = {}  # data_type → providers
+        self._health: dict[str, ProviderHealth] = {}
         self._rate_limiter = rate_limiter_instance or rate_limiter
         self._cb_manager = circuit_breaker_manager or CircuitBreakerManager()
-        self._retry_policies: Dict[str, RetryPolicy] = {}
+        self._retry_policies: dict[str, RetryPolicy] = {}
 
     def register(
         self,
@@ -95,8 +97,8 @@ class ProviderManager:
         func: Callable,
         priority: int = 0,
         timeout_s: float = 30.0,
-        retry_policy: Optional[RetryPolicy] = None,
-        circuit_breaker_config: Optional[Dict] = None,
+        retry_policy: RetryPolicy | None = None,
+        circuit_breaker_config: dict | None = None,
     ):
         """Provider kaydet."""
         if data_type not in self._providers:
@@ -142,7 +144,7 @@ class ProviderManager:
         *args,
         use_reconciliation: bool = False,
         **kwargs,
-    ) -> Optional[ProviderResult]:
+    ) -> ProviderResult | None:
         """
         Veri çek — failover ile.
 
@@ -198,7 +200,7 @@ class ProviderManager:
                 cb.record_success()
                 if health:
                     health.is_healthy = True
-                    health.last_success = datetime.now(timezone.utc)
+                    health.last_success = datetime.now(UTC)
                     health.consecutive_failures = 0
                     health.total_requests += 1
                     health.total_successes += 1
@@ -213,7 +215,7 @@ class ProviderManager:
                 return ProviderResult(
                     provider=name,
                     data=result,
-                    timestamp=datetime.now(timezone.utc),
+                    timestamp=datetime.now(UTC),
                     latency_ms=round(latency_ms, 2),
                     source=name,
                 )
@@ -222,7 +224,7 @@ class ProviderManager:
                 cb.record_failure()
                 if health:
                     health.is_healthy = health.consecutive_failures < 10
-                    health.last_failure = datetime.now(timezone.utc)
+                    health.last_failure = datetime.now(UTC)
                     health.consecutive_failures += 1
                     health.total_requests += 1
                     health.total_failures += 1
@@ -240,7 +242,7 @@ class ProviderManager:
                 cb.record_failure()
                 if health:
                     health.is_healthy = health.consecutive_failures < 10
-                    health.last_failure = datetime.now(timezone.utc)
+                    health.last_failure = datetime.now(UTC)
                     health.consecutive_failures += 1
                     health.total_requests += 1
                     health.total_failures += 1
@@ -258,10 +260,10 @@ class ProviderManager:
     async def fetch_multi(
         self,
         data_type: str,
-        tickers: List[str],
+        tickers: list[str],
         *args,
         **kwargs,
-    ) -> Dict[str, Optional[ProviderResult]]:
+    ) -> dict[str, ProviderResult | None]:
         """
         Çoklu ticker için paralel fetch.
 
@@ -300,7 +302,7 @@ class ProviderManager:
             timeout=provider_config.timeout_s,
         )
 
-    def get_health(self) -> Dict[str, Dict]:
+    def get_health(self) -> dict[str, dict]:
         """Tüm provider sağlık durumları."""
         return {
             name: {
@@ -317,22 +319,22 @@ class ProviderManager:
             for name, h in self._health.items()
         }
 
-    def get_circuit_breaker_states(self) -> Dict[str, Dict]:
+    def get_circuit_breaker_states(self) -> dict[str, dict]:
         """Tüm circuit breaker durumları."""
         return self._cb_manager.get_all_states()
 
-    def get_rate_limiter_stats(self) -> Dict[str, Dict]:
+    def get_rate_limiter_stats(self) -> dict[str, dict]:
         """Tüm rate limiter istatistikleri."""
         return self._rate_limiter.get_all_stats()
 
-    def get_retry_stats(self) -> Dict[str, Dict]:
+    def get_retry_stats(self) -> dict[str, dict]:
         """Tüm retry istatistikleri."""
         return {
             name: policy.get_stats()
             for name, policy in self._retry_policies.items()
         }
 
-    def get_full_status(self) -> Dict[str, Any]:
+    def get_full_status(self) -> dict[str, Any]:
         """Tam durum raporu."""
         return {
             "providers": self.get_health(),

@@ -8,8 +8,9 @@ Sermaye Piyasası Kurulu uyumluluk:
 - Algoritmik trading bildirimi
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,13 +22,13 @@ class ComplianceResult:
     violation: bool = False
     action: str = ""        # "OK", "NOTIFY", "BLOCK"
     reason: str = ""
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
             self.details = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "notification_required": self.notification_required,
             "violation": self.violation,

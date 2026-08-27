@@ -11,10 +11,10 @@ Distributed tracing için OpenTelemetry entegrasyonu.
 
 Kullanım:
     from services.core.otel import setup_telemetry, get_tracer
-    
+
     # Uygulama başlangıcında
     setup_telemetry(service_name="alpha-api")
-    
+
     # Kod içinde
     tracer = get_tracer(__name__)
     with tracer.start_as_current_span("operation") as span:
@@ -23,7 +23,7 @@ Kullanım:
 """
 
 import os
-from typing import Optional
+
 import structlog
 
 logger = structlog.get_logger()
@@ -35,11 +35,11 @@ _tracer = None
 
 def setup_telemetry(
     service_name: str = "alpha-bist",
-    endpoint: Optional[str] = None,
+    endpoint: str | None = None,
     enabled: bool = True,
 ) -> None:
     """OpenTelemetry'yi başlat.
-    
+
     Args:
         service_name: Servis adı
         endpoint: OTLP endpoint (örn: http://localhost:4317)
@@ -53,10 +53,10 @@ def setup_telemetry(
 
     try:
         from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import SERVICE_NAME, Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-        from opentelemetry.sdk.resources import Resource, SERVICE_NAME
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 
         # Resource oluştur
         resource = Resource.create({

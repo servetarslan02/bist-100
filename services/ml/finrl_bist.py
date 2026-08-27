@@ -3,9 +3,10 @@
 Gymnasium uyumlu trading environment — multi-stock,
 portfolio management, transaction cost, proper reward.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -39,10 +40,10 @@ class BISTTradingEnv:
 
     def __init__(
         self,
-        features: Dict[str, np.ndarray],  # {ticker: (time, features)}
-        prices: Dict[str, np.ndarray],    # {ticker: (time,)}
-        tickers: List[str],
-        config: Optional[BISTEnvConfig] = None,
+        features: dict[str, np.ndarray],  # {ticker: (time, features)}
+        prices: dict[str, np.ndarray],    # {ticker: (time,)}
+        tickers: list[str],
+        config: BISTEnvConfig | None = None,
     ):
         self.features = features
         self.prices = prices
@@ -52,7 +53,7 @@ class BISTTradingEnv:
         # State
         self._current_step = 0
         self._capital = self.config.initial_capital
-        self._positions: Dict[str, float] = {t: 0.0 for t in tickers}  # shares
+        self._positions: dict[str, float] = {t: 0.0 for t in tickers}  # shares
         self._portfolio_values = [self.config.initial_capital]
         self._n_steps = min(len(v) for v in prices.values()) if prices else 0
 
@@ -175,7 +176,7 @@ class BISTTradingEnv:
         else:
             return (self._portfolio_values[-1] / self.config.initial_capital) - 1.0
 
-    def get_metrics(self) -> Dict[str, Any]:
+    def get_metrics(self) -> dict[str, Any]:
         """Performans metrikleri."""
         values = np.array(self._portfolio_values)
         total_return = (values[-1] / self.config.initial_capital) - 1.0

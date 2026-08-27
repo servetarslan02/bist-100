@@ -11,17 +11,16 @@ Test kapsamı:
 - Paralel işlem güvenliği
 """
 
-import sys
-import os
 import asyncio
-import duckdb
+import sys
 import time
 
-from services.core.migrations.runner import MigrationRunner, MigrationLockError
-from services.portfolio.main import PortfolioService
-from services.core.database_dev import dev_db
-
+import duckdb
 import structlog
+
+from services.core.database_dev import dev_db
+from services.core.migrations.runner import MigrationLockError, MigrationRunner
+from services.portfolio.main import PortfolioService
 
 logger = structlog.get_logger(__name__)
 

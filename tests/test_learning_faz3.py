@@ -14,11 +14,9 @@ Walk-forward validated retrain testing:
 """
 
 import sys
-import os
+from datetime import datetime, timedelta
+
 import numpy as np
-from datetime import datetime, timezone, timedelta
-
-
 
 # ===================== HELPERS =====================
 
@@ -223,7 +221,7 @@ def test_prepare_features_empty():
     engine = RetrainEngine()
     try:
         engine._prepare_features({}, None)
-        assert False, "Hata vermeliydi"
+        raise AssertionError("Hata vermeliydi")
     except ValueError:
         print("✅ Prepare features empty → ValueError")
 
@@ -232,8 +230,8 @@ def test_prepare_features_empty():
 
 def test_evaluate_wf_metrics_pass():
     """İyi metriklerle retrain kabul edilmeli."""
-    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
     from services.learning.config.learning_config import learning_settings
+    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
 
     engine = RetrainEngine()
     cfg = learning_settings.retrain
@@ -253,8 +251,8 @@ def test_evaluate_wf_metrics_pass():
 
 def test_evaluate_wf_metrics_low_correlation():
     """Düşük korelasyonla retrain reddedilmeli."""
-    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
     from services.learning.config.learning_config import learning_settings
+    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
 
     engine = RetrainEngine()
     cfg = learning_settings.retrain
@@ -274,8 +272,8 @@ def test_evaluate_wf_metrics_low_correlation():
 
 def test_evaluate_wf_metrics_low_accuracy():
     """Düşük doğrulukla retrain reddedilmeli."""
-    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
     from services.learning.config.learning_config import learning_settings
+    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
 
     engine = RetrainEngine()
     cfg = learning_settings.retrain
@@ -295,8 +293,8 @@ def test_evaluate_wf_metrics_low_accuracy():
 
 def test_evaluate_wf_metrics_low_pass_rate():
     """Düşük pass rate ile retrain reddedilmeli."""
-    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
     from services.learning.config.learning_config import learning_settings
+    from services.learning.retrain_engine import RetrainEngine, WalkForwardMetrics
 
     engine = RetrainEngine()
     cfg = learning_settings.retrain
@@ -498,14 +496,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 3 TEST SONUÇLARI (Retrain Engine)")
+    print("📊 FAZ 3 TEST SONUÇLARI (Retrain Engine)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

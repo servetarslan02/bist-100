@@ -10,10 +10,11 @@ Makro değişkenler arası korelasyon takibi:
 KURAL: Korelasyon zamanla değişir — rolling window ile takip et.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -59,18 +60,18 @@ class MacroCorrelationTracker:
 
     def __init__(self):
         self._window = macro_config.correlation.window_days
-        self._history: Dict[str, List[float]] = {}
-        self._timestamps: Dict[str, List[str]] = {}
-        self._correlation_history: Dict[str, List[float]] = {}  # pair → [corr1, corr2, ...]
+        self._history: dict[str, list[float]] = {}
+        self._timestamps: dict[str, list[str]] = {}
+        self._correlation_history: dict[str, list[float]] = {}  # pair → [corr1, corr2, ...]
         self._pair_key = lambda v1, v2: f"{v1}_{v2}" if v1 < v2 else f"{v2}_{v1}"
 
-    def update(self, macro_data: Dict[str, float]):
+    def update(self, macro_data: dict[str, float]):
         """Günlük veri güncelle.
 
         Args:
             macro_data: {variable_name: value}
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         for key, value in macro_data.items():
             if key not in self._history:
@@ -89,7 +90,7 @@ class MacroCorrelationTracker:
         self,
         var1: str,
         var2: str,
-    ) -> Optional[CorrelationResult]:
+    ) -> CorrelationResult | None:
         """İki değişken arası korelasyon hesapla."""
         cfg = macro_config.correlation
 
@@ -144,7 +145,7 @@ class MacroCorrelationTracker:
             window_days=n,
         )
 
-    def get_correlation_matrix(self) -> Dict[str, Dict[str, float]]:
+    def get_correlation_matrix(self) -> dict[str, dict[str, float]]:
         """Tüm değişkenler arası korelasyon matrisi."""
         variables = list(self._history.keys())
         matrix = {}
@@ -160,7 +161,7 @@ class MacroCorrelationTracker:
 
         return matrix
 
-    def detect_correlation_breakdown(self) -> List[CorrelationBreakdown]:
+    def detect_correlation_breakdown(self) -> list[CorrelationBreakdown]:
         """Korelasyon bozulması tespit et."""
         cfg = macro_config.correlation
         breakdowns = []
@@ -201,7 +202,7 @@ class MacroCorrelationTracker:
 
         return breakdowns
 
-    def compute_correlation_features(self) -> Dict[str, float]:
+    def compute_correlation_features(self) -> dict[str, float]:
         """Korelasyon feature'ları üret."""
         cfg = macro_config.correlation
         features = {}
@@ -233,7 +234,7 @@ class MacroCorrelationTracker:
 
         return features
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Korelasyon raporu."""
         cfg = macro_config.correlation
         pairs_data = []

@@ -9,11 +9,12 @@ Referanslar:
 - BACKTEST-NIHAI-SPEC.md - Section 6
 """
 
-import numpy as np
-from typing import Dict, Any, Tuple
 from dataclasses import dataclass
-from scipy import stats
+from typing import Any
+
+import numpy as np
 import structlog
+from scipy import stats
 
 logger = structlog.get_logger()
 
@@ -33,7 +34,7 @@ class DeflatedSharpeResult:
     is_significant: bool  # p < 0.05
     confidence_level: str  # high | medium | low | not_significant
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "observed_sharpe": round(self.observed_sharpe, 4),
             "expected_max_sharpe": round(self.expected_max_sharpe, 4),
@@ -66,7 +67,7 @@ class DeflatedSharpeCalculator:
         skewness: float = 0.0,
         kurtosis: float = 3.0,
         periods_per_year: int = 1,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         N stratejiden beklenen max Sharpe'ı hesapla.
 
@@ -157,10 +158,7 @@ class DeflatedSharpeCalculator:
         )
 
         # Deflated Sharpe = (SR - E[max_SR]) / Std[max_SR]
-        if std_max_sr > 0:
-            deflated_sr = (observed_sharpe - expected_max_sr) / std_max_sr
-        else:
-            deflated_sr = 0.0
+        deflated_sr = (observed_sharpe - expected_max_sr) / std_max_sr if std_max_sr > 0 else 0.0
 
         # p-value (one-tailed test)
         p_value = 1 - stats.norm.cdf(deflated_sr)
@@ -299,7 +297,7 @@ class ProbabilisticSharpeRatio:
         returns: np.ndarray,
         benchmark_sharpe: float = 0.0,
         periods_per_year: int = 252,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Getiri serisinden PSR hesapla."""
         if len(returns) < 2:
             return {"psr": 0.0, "observed_sharpe": 0.0}

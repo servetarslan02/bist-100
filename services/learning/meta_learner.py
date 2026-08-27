@@ -10,11 +10,12 @@ Rejim-specific model selection ve ensemble optimization:
 KURAL: Rejim değişince model seçimi de değişmeli.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -37,7 +38,7 @@ class MetaLearner:
     """Rejim-specific model selection ve ensemble optimization."""
 
     def __init__(self):
-        self._regime_performance: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+        self._regime_performance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
         self._model_history: deque = deque(maxlen=5000)
         self._current_regime: str = "UNKNOWN"
 
@@ -45,7 +46,7 @@ class MetaLearner:
         self,
         model_id: str,
         regime: str,
-        metrics: Dict[str, float],
+        metrics: dict[str, float],
     ):
         """Rejim bazlı performans kaydet."""
         scores = self._regime_performance[regime][model_id]
@@ -60,10 +61,10 @@ class MetaLearner:
             sharpe=metrics.get("sharpe", 0),
             win_rate=metrics.get("win_rate", 0),
             ic=metrics.get("ic", 0),
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         ))
 
-    def select_best_model(self, regime: str) -> Optional[str]:
+    def select_best_model(self, regime: str) -> str | None:
         """Rejim için en iyi modeli seç."""
         if regime not in self._regime_performance:
             return None
@@ -84,9 +85,9 @@ class MetaLearner:
 
     def calculate_ensemble_weights(
         self,
-        models: List[str],
+        models: list[str],
         regime: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Dynamic ensemble weights — rejime göre."""
         weights = {}
         total_score = 0
@@ -110,7 +111,7 @@ class MetaLearner:
 
         return {m: round(w / total_score, 4) for m, w in weights.items()}
 
-    def predict_decay(self, model_id: str) -> Dict[str, Any]:
+    def predict_decay(self, model_id: str) -> dict[str, Any]:
         """Model decay prediction — ne zaman retrain gerekli?"""
         cfg = learning_settings.meta_learning
 
@@ -139,7 +140,7 @@ class MetaLearner:
 
         return {"decay_predicted": False, "trend": round(trend, 6)}
 
-    def get_regime_summary(self) -> Dict[str, Any]:
+    def get_regime_summary(self) -> dict[str, Any]:
         """Rejim özet raporu."""
         summary = {}
         for regime, models in self._regime_performance.items():
@@ -154,7 +155,7 @@ class MetaLearner:
             summary[regime] = model_avgs
         return summary
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Rapor."""
         return {
             "current_regime": self._current_regime,

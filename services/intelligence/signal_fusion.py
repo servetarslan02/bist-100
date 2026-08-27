@@ -10,9 +10,10 @@ Tüm sinyalleri birleştirir:
 FAZ 9: Decision & Risk Engine Integration
 """
 
-from typing import Dict, List, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -52,16 +53,16 @@ class FusedSignal:
 
     # Çelişki
     has_conflict: bool = False
-    conflict_details: List[str] = field(default_factory=list)
+    conflict_details: list[str] = field(default_factory=list)
 
     # Açıklama
-    reasons: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
+    reasons: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
     invalidation: str = ""
 
     # Self-check
     self_check_passed: bool = True
-    self_check_warnings: List[str] = field(default_factory=list)
+    self_check_warnings: list[str] = field(default_factory=list)
 
 class SignalFusionEngine:
     """Sinyal birleştirme motoru."""
@@ -106,7 +107,7 @@ class SignalFusionEngine:
     }
 
     def __init__(self):
-        self._adaptive_weights: Dict[str, float] = {}
+        self._adaptive_weights: dict[str, float] = {}
         self._restore_weights()
 
     def _restore_weights(self):
@@ -130,7 +131,7 @@ class SignalFusionEngine:
         except Exception:
             logger.warning("Caught Exception in _persist_weights", exc_info=True)
 
-    def set_adaptive_weights(self, weights: Dict[str, float]):
+    def set_adaptive_weights(self, weights: dict[str, float]):
         """Model Learning sisteminden gelen dinamik güvenilirlik ağırlıklarını kaydeder."""
         if not weights:
             return
@@ -143,7 +144,7 @@ class SignalFusionEngine:
             self._adaptive_weights = {k: round(v / tot, 4) for k, v in valid.items()}
             self._persist_weights()
 
-    def get_current_weights(self, market_regime: str = "RANGE") -> Dict[str, float]:
+    def get_current_weights(self, market_regime: str = "RANGE") -> dict[str, float]:
         """Aktif ağırlıkları getirir (Adaptif + Rejim harmanı)."""
         base = dict(self._adaptive_weights) if self._adaptive_weights else dict(self.DEFAULT_WEIGHTS)
         if market_regime in self.REGIME_WEIGHT_OVERRIDES:
@@ -155,13 +156,13 @@ class SignalFusionEngine:
     def fuse_signals(
         self,
         ticker: str,
-        signals: Dict[str, Any],
+        signals: dict[str, Any],
         market_regime: str = "RANGE",
     ) -> FusedSignal:
         """Tüm sinyalleri birleştir."""
         result = FusedSignal(
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
         )
 
         # Bileşen yönleri ve skorları
@@ -227,7 +228,7 @@ class SignalFusionEngine:
 
         return result
 
-    def _detect_conflicts(self, signals: Dict) -> Tuple[bool, List[str]]:
+    def _detect_conflicts(self, signals: dict) -> tuple[bool, list[str]]:
         """Sinyal çakışması tespit et."""
         conflicts = []
 
@@ -257,7 +258,7 @@ class SignalFusionEngine:
 
         return len(conflicts) > 0, conflicts
 
-    def _generate_reasons(self, result: FusedSignal, signals: Dict) -> List[str]:
+    def _generate_reasons(self, result: FusedSignal, signals: dict) -> list[str]:
         """Gerekçe üret."""
         reasons = []
 
@@ -276,7 +277,7 @@ class SignalFusionEngine:
 
         return reasons
 
-    def _generate_risks(self, result: FusedSignal, signals: Dict) -> List[str]:
+    def _generate_risks(self, result: FusedSignal, signals: dict) -> list[str]:
         """Risk üret."""
         risks = []
 
@@ -298,7 +299,7 @@ class SignalFusionEngine:
 
         return risks
 
-    def _generate_invalidation(self, result: FusedSignal, signals: Dict) -> str:
+    def _generate_invalidation(self, result: FusedSignal, signals: dict) -> str:
         """Geçersizlik koşulu üret."""
         if result.fused_direction == "LONG":
             return "Fiyat destek seviyesinin altına düşerse veya momentum terse dönerse"
@@ -306,7 +307,7 @@ class SignalFusionEngine:
             return "Fiyat direnç seviyesini yukarı kırarsa veya fundamental bozulursa"
         return "Belirgin bir yön yok"
 
-    def _self_check(self, result: FusedSignal, signals: Dict) -> Tuple[bool, List[str]]:
+    def _self_check(self, result: FusedSignal, signals: dict) -> tuple[bool, list[str]]:
         """Sonuç sorgulama."""
         warnings = []
 

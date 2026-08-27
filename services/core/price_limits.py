@@ -10,8 +10,9 @@ BIST fiyat limitleri (Eylül 2025 sonrası — tüm pazarlarda standart):
 Kaynak: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -28,7 +29,7 @@ class PriceLimitResult:
     upper_limit: float = 0.0
     lower_limit: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "limit_hit": self.limit_hit,
             "direction": self.direction,
@@ -78,11 +79,11 @@ class PriceLimitMonitor:
     }
 
     def __init__(self):
-        self._custom_limits: Dict[str, float] = {}
-        self._post_cb_tickers: Dict[str, float] = {}  # Devre kesici sonrası daraltılmış marj
+        self._custom_limits: dict[str, float] = {}
+        self._post_cb_tickers: dict[str, float] = {}  # Devre kesici sonrası daraltılmış marj
         self._ipo_tickers: set = set()  # Halka arz günü (limit yok)
         self._corp_action_tickers: set = set()  # Kurumsal işlem sonrası (bedelsiz/bölünme)
-        self._market_type: Dict[str, str] = {}  # Hisse → pazar tipi
+        self._market_type: dict[str, str] = {}  # Hisse → pazar tipi
 
     def set_custom_limit(self, ticker: str, limit_pct: float):
         """Özel limit ata (volatil hisseler)."""

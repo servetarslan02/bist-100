@@ -15,16 +15,18 @@ Kullanım:
 """
 
 import time
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import structlog
 
-from ..core.data_quality import DataQualityChecker as DataQualityV2, QualityReport
-from ..features.calculator import FeatureCalculator
+from ..core.data_quality import DataQualityChecker as DataQualityV2
+from ..core.data_quality import QualityReport
 from ..core.tradability_mask import TradabilityMask
+from ..features.calculator import FeatureCalculator
 
 logger = structlog.get_logger()
 
@@ -33,12 +35,12 @@ logger = structlog.get_logger()
 class PipelineResult:
     ticker: str
     accepted: bool
-    quality_report: Optional[QualityReport]
-    features: Optional[Dict[str, Any]]
+    quality_report: QualityReport | None
+    features: dict[str, Any] | None
     rejection_reason: str = ""
     processing_time_ms: float = 0.0
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "ticker": self.ticker,
             "accepted": self.accepted,
@@ -55,11 +57,11 @@ class PipelineReport:
     accepted: int
     rejected: int
     avg_quality_score: float
-    results: List[PipelineResult]
-    audit_log: List[Dict[str, Any]]
+    results: list[PipelineResult]
+    audit_log: list[dict[str, Any]]
     elapsed_s: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total": self.total,
             "accepted": self.accepted,
@@ -70,7 +72,7 @@ class PipelineReport:
             "rejection_reasons": self._count_rejections(),
         }
 
-    def _count_rejections(self) -> Dict[str, int]:
+    def _count_rejections(self) -> dict[str, int]:
         reasons = {}
         for r in self.results:
             if not r.accepted and r.rejection_reason:
@@ -91,9 +93,9 @@ class DataPipeline:
         self._tm = TradabilityMask()
         self._min_quality_score = min_quality_score
         self._require_passing = require_passing
-        self._audit_log: List[Dict[str, Any]] = []
+        self._audit_log: list[dict[str, Any]] = []
 
-    def process(self, market_data: Dict[str, pl.DataFrame]) -> PipelineReport:
+    def process(self, market_data: dict[str, pl.DataFrame]) -> PipelineReport:
         """Tüm market verisini işle."""
         start = time.time()
         results = []
@@ -192,7 +194,7 @@ class DataPipeline:
     def _add_audit(self, ticker: str, action: str, reason: str, quality_score: float):
         """Audit kaydı."""
         self._audit_log.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "ticker": ticker,
             "action": action,
             "reason": reason,

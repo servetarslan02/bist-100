@@ -14,9 +14,10 @@ Bu modül:
 - Decision Engine'e yapılandırılmış girdi sağlar
 """
 
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -57,7 +58,7 @@ class ScoreVector:
     timestamp: str = ""
     regime: str = "UNKNOWN"
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Skor vektörünü dict'e çevir."""
         return {
             "technical": self.technical,
@@ -74,7 +75,7 @@ class ScoreVector:
             "data_quality": self.data_quality,
         }
 
-    def get_opportunity_dimensions(self) -> Dict[str, float]:
+    def get_opportunity_dimensions(self) -> dict[str, float]:
         """Fırsat boyutlarını döndür (risk ve data_quality hariç)."""
         return {k: v for k, v in self.to_dict().items()
                 if k not in ("risk", "data_quality")}
@@ -100,7 +101,7 @@ class CanonicalScore:
     direction: str = "NEUTRAL"       # LONG / SHORT / NEUTRAL
 
     # Decomposition
-    decomposition: Dict[str, float] = field(default_factory=dict)
+    decomposition: dict[str, float] = field(default_factory=dict)
 
     # Metadata
     ticker: str = ""
@@ -110,7 +111,7 @@ class CanonicalScore:
     nonzero_dimensions: int = 0
 
     # ML model bilgisi
-    ml_score: Optional[float] = None    # ML prediction (0-100)
+    ml_score: float | None = None    # ML prediction (0-100)
     ml_confidence: float = 0.0          # ML güven skoru (0-1)
     rule_score: float = 0.0             # Rule-based skor (ML blend öncesi)
 
@@ -188,7 +189,7 @@ class CanonicalScoringPipeline:
     def compute_score_vector(
         self,
         ticker: str,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         regime: str = "UNKNOWN",
     ) -> ScoreVector:
         """Feature'lardan çok boyutlu skor vektörü üret.
@@ -198,7 +199,7 @@ class CanonicalScoringPipeline:
         """
         sv = ScoreVector(
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             regime=regime,
         )
 
@@ -243,7 +244,7 @@ class CanonicalScoringPipeline:
     def compute_canonical_score(
         self,
         ticker: str,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         regime: str = "UNKNOWN",
         ml_model=None,
     ) -> CanonicalScore:
@@ -283,10 +284,7 @@ class CanonicalScoringPipeline:
                 structlog.get_logger().warning("ML prediction failed, falling back to rule-based", error=str(e))
 
         # Ensemble: ML varsa %70 ML + %30 rule-based
-        if ml_score is not None:
-            opportunity_score = 0.7 * ml_score + 0.3 * rule_score
-        else:
-            opportunity_score = rule_score
+        opportunity_score = 0.7 * ml_score + 0.3 * rule_score if ml_score is not None else rule_score
 
         # Risk skoru (0-100, yüksek = güvenli)
         risk_score = vector.risk
@@ -311,7 +309,7 @@ class CanonicalScoringPipeline:
             direction=direction,
             decomposition=decomposition,
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             regime=regime,
             feature_count=len(features),
             nonzero_dimensions=vector.get_nonzero_count(),
@@ -323,7 +321,7 @@ class CanonicalScoringPipeline:
     def score(
         self,
         ticker: str,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         regime: str = "UNKNOWN",
         ml_model=None,
     ) -> CanonicalScore:
@@ -335,7 +333,7 @@ class CanonicalScoringPipeline:
     # BOYUT HESAPLAMA (mevcut rule-based score ile uyumlu)
     # =====================================================
 
-    def _score_technical(self, f: Dict) -> float:
+    def _score_technical(self, f: dict) -> float:
         """Teknik skor (RSI, MACD, Bollinger, ADX)."""
         score = 50.0
 
@@ -373,7 +371,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_momentum(self, f: Dict) -> float:
+    def _score_momentum(self, f: dict) -> float:
         """Momentum skoru."""
         score = 50.0
 
@@ -403,7 +401,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_relative_strength(self, f: Dict) -> float:
+    def _score_relative_strength(self, f: dict) -> float:
         """Relatif güç skoru."""
         score = 50.0
 
@@ -418,7 +416,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_volume(self, f: Dict) -> float:
+    def _score_volume(self, f: dict) -> float:
         """Hacim skoru."""
         score = 50.0
 
@@ -433,7 +431,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_fundamental(self, f: Dict) -> float:
+    def _score_fundamental(self, f: dict) -> float:
         """Fundamental skor."""
         score = 50.0
 
@@ -457,7 +455,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_news_sentiment(self, f: Dict) -> float:
+    def _score_news_sentiment(self, f: dict) -> float:
         """Haber sentiment skoru."""
         score = 50.0
 
@@ -476,7 +474,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_catalyst(self, f: Dict) -> float:
+    def _score_catalyst(self, f: dict) -> float:
         """Katalizör skoru."""
         score = 50.0
 
@@ -492,7 +490,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_mean_reversion(self, f: Dict) -> float:
+    def _score_mean_reversion(self, f: dict) -> float:
         """Mean reversion skoru."""
         score = 50.0
 
@@ -517,7 +515,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_seasonality(self, f: Dict) -> float:
+    def _score_seasonality(self, f: dict) -> float:
         """Mevsimsellik skoru."""
         score = 50.0
 
@@ -537,7 +535,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_regime_fit(self, f: Dict, regime: str) -> float:
+    def _score_regime_fit(self, f: dict, regime: str) -> float:
         """Rejim uyumu skoru."""
         mom = self._s(f.get("momentum_20d", 0))
 
@@ -553,7 +551,7 @@ class CanonicalScoringPipeline:
         fit = regime_fit.get(regime, {"LONG": 50, "SHORT": 50})
         return fit.get(direction, 50)
 
-    def _score_risk(self, f: Dict) -> float:
+    def _score_risk(self, f: dict) -> float:
         """Risk skoru (0-100, yüksek = güvenli)."""
         score = 70.0
 
@@ -590,7 +588,7 @@ class CanonicalScoringPipeline:
 
         return max(0, min(100, score))
 
-    def _score_data_quality(self, f: Dict) -> float:
+    def _score_data_quality(self, f: dict) -> float:
         """Veri kalitesi skoru (0-100).
 
         Feature availability, freshness, completeness.
@@ -630,13 +628,10 @@ class CanonicalScoringPipeline:
         """Yön belirle."""
         mom = vector.momentum
         technical = vector.technical
-        vector.relative_strength
 
         if opportunity_score < 40:
             return "SHORT"
-        elif opportunity_score > 60:
-            return "LONG"
-        elif mom > 55 and technical > 55:
+        elif opportunity_score > 60 or mom > 55 and technical > 55:
             return "LONG"
         elif mom < 45 and technical < 45:
             return "SHORT"
@@ -665,7 +660,7 @@ class CanonicalScoringPipeline:
 # Regex veya source parsing GEREKTİRMEZ.
 #
 # Kural: Yeni feature eklendiğinde BURAYA da ekle.
-CANONICAL_FEATURE_REGISTRY: List[str] = [
+CANONICAL_FEATURE_REGISTRY: list[str] = [
     # Motor 1: Relatif Güç
     "rs_vs_bist_1d", "rs_vs_bist_5d", "rs_vs_bist_20d", "rs_vs_bist_60d",
     "rs_vs_sector_5d", "rs_vs_peers_5d", "rs_trend", "rs_peer_rank",
@@ -713,15 +708,15 @@ CANONICAL_FEATURE_REGISTRY: List[str] = [
 CANONICAL_FEATURE_REGISTRY = list(dict.fromkeys(CANONICAL_FEATURE_REGISTRY))
 
 
-def get_canonical_features() -> List[str]:
+def get_canonical_features() -> list[str]:
     """Canonical feature listesini döndür (tek kaynak)."""
     return list(CANONICAL_FEATURE_REGISTRY)
 
 
 def validate_model_feature_contract(
     model,
-    registry: Optional[List[str]] = None,
-) -> Tuple[bool, List[str]]:
+    registry: list[str] | None = None,
+) -> tuple[bool, list[str]]:
     """Model'in feature_names'inin registry ile tutarlılığını kontrol et.
 
     Registry'de olmayan feature'lar warning üretir.

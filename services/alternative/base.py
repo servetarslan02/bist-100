@@ -12,10 +12,11 @@ Temel altyapı:
 import asyncio
 import time
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -62,7 +63,7 @@ class RateLimiter:
 # CIRCUIT BREAKER
 # =====================================================
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     CLOSED = "CLOSED"      # Normal çalışma
     OPEN = "OPEN"          # Servis kesik, istek yok
     HALF_OPEN = "HALF_OPEN"  # Test aşaması
@@ -141,11 +142,11 @@ class QualityReport:
     """Veri kalitesi raporu."""
     is_valid: bool
     score: float  # 0-1
-    issues: List[str] = field(default_factory=list)
+    issues: list[str] = field(default_factory=list)
     checks_passed: int = 0
     checks_failed: int = 0
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "is_valid": self.is_valid,
             "score": round(self.score, 4),
@@ -169,10 +170,10 @@ class DataQualityValidator:
 
     def validate(
         self,
-        data: Optional[Dict[str, Any]],
+        data: dict[str, Any] | None,
         source: str = "unknown",
-        expected_fields: Optional[List[str]] = None,
-        max_age_hours: Optional[int] = None,
+        expected_fields: list[str] | None = None,
+        max_age_hours: int | None = None,
     ) -> QualityReport:
         """Veri kalitesi kontrolü."""
         issues = []
@@ -229,14 +230,12 @@ class DataQualityValidator:
         # 6. Range check (confidence/score 0-1 veya 0-100)
         for key, val in data.items():
             if isinstance(val, (int, float)):
-                if "confidence" in key.lower() or "ratio" in key.lower():
-                    if val < -1 or val > 1.5:
-                        issues.append(f"{key}={val} out of expected range")
-                        checks_failed += 1
-                if "score" in key.lower():
-                    if val < -50 or val > 150:
-                        issues.append(f"{key}={val} out of expected range")
-                        checks_failed += 1
+                if ("confidence" in key.lower() or "ratio" in key.lower()) and (val < -1 or val > 1.5):
+                    issues.append(f"{key}={val} out of expected range")
+                    checks_failed += 1
+                if "score" in key.lower() and (val < -50 or val > 150):
+                    issues.append(f"{key}={val} out of expected range")
+                    checks_failed += 1
 
         # 7. Staleness check
         if max_age_hours and "timestamp" in data:
@@ -250,7 +249,7 @@ class DataQualityValidator:
                     ts_dt = None
 
                 if ts_dt:
-                    age_hours = (datetime.now(timezone.utc) - ts_dt).total_seconds() / 3600
+                    age_hours = (datetime.now(UTC) - ts_dt).total_seconds() / 3600
                     if age_hours > max_age_hours:
                         issues.append(f"Data is {age_hours:.1f}h old (max: {max_age_hours}h)")
                         checks_failed += 1
@@ -300,18 +299,18 @@ class BaseAdapter(ABC):
         if self.circuit_breaker is None:
             self.circuit_breaker = CircuitBreaker()
         self._validator = DataQualityValidator()
-        self._cache: Dict[str, Any] = {}
-        self._cache_ttl: Dict[str, float] = {}
+        self._cache: dict[str, Any] = {}
+        self._cache_ttl: dict[str, float] = {}
 
     @abstractmethod
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """Veri topla. Alt sınıflar implement etmeli."""
 
     @abstractmethod
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """Feature hesapla. Alt sınıflar implement etmeli."""
 
-    async def fetch(self, ticker: str, **kwargs) -> Dict[str, float]:
+    async def fetch(self, ticker: str, **kwargs) -> dict[str, float]:
         """Tam pipeline: collect → validate → compute_features.
 
         Bu method orchestrator tarafından çağrılır.
@@ -375,11 +374,11 @@ class BaseAdapter(ABC):
             self.circuit_breaker.record_failure()
             return self._empty_features()
 
-    def _empty_features(self) -> Dict[str, float]:
+    def _empty_features(self) -> dict[str, float]:
         """Boş feature dict döndür."""
         return {}
 
-    def _get_cached(self, key: str) -> Optional[Dict[str, float]]:
+    def _get_cached(self, key: str) -> dict[str, float] | None:
         """Cache'den oku."""
         if key in self._cache:
             ttl = self._cache_ttl.get(key, 0)
@@ -390,13 +389,13 @@ class BaseAdapter(ABC):
                 del self._cache_ttl[key]
         return None
 
-    def _set_cached(self, key: str, value: Dict[str, float], ttl_seconds: Optional[int] = None):
+    def _set_cached(self, key: str, value: dict[str, float], ttl_seconds: int | None = None):
         """Cache'e yaz."""
         ttl = ttl_seconds if ttl_seconds is not None else self.DEFAULT_CACHE_TTL
         self._cache[key] = value
         self._cache_ttl[key] = time.time() + ttl
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Adapter durumu."""
         return {
             "source": self.source_name,
@@ -414,22 +413,22 @@ class AdapterRegistry:
     """Adapter kayıt ve yönetim merkezi."""
 
     def __init__(self):
-        self._adapters: Dict[str, BaseAdapter] = {}
+        self._adapters: dict[str, BaseAdapter] = {}
 
     def register(self, adapter: BaseAdapter):
         """Adapter kaydet."""
         self._adapters[adapter.source_name] = adapter
         logger.info("Adapter registered", source=adapter.source_name)
 
-    def get(self, source_name: str) -> Optional[BaseAdapter]:
+    def get(self, source_name: str) -> BaseAdapter | None:
         """Adapter getir."""
         return self._adapters.get(source_name)
 
-    def list_adapters(self) -> List[str]:
+    def list_adapters(self) -> list[str]:
         """Kayıtlı adapter'ları listele."""
         return list(self._adapters.keys())
 
-    def get_all_status(self) -> Dict[str, Any]:
+    def get_all_status(self) -> dict[str, Any]:
         """Tüm adapter durumları."""
         return {
             name: adapter.get_status()
@@ -439,8 +438,8 @@ class AdapterRegistry:
     async def collect_all(
         self,
         ticker: str,
-        sources: Optional[List[str]] = None,
-    ) -> Dict[str, Dict[str, float]]:
+        sources: list[str] | None = None,
+    ) -> dict[str, dict[str, float]]:
         """Tüm (veya belirtilen) kaynaklardan veri topla."""
         target_adapters = {
             name: adapter for name, adapter in self._adapters.items()
@@ -459,7 +458,7 @@ class AdapterRegistry:
             return_exceptions=True,
         )
 
-        for (name, _), result in zip(tasks.items(), gathered):
+        for (name, _), result in zip(tasks.items(), gathered, strict=False):
             if isinstance(result, Exception):
                 logger.error("Adapter failed", source=name, error=str(result))
                 results[name] = {}

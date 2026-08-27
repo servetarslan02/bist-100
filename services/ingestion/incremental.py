@@ -15,9 +15,9 @@ Kullanım:
 """
 
 import time
-from typing import Dict, Optional, List
-from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+
 import structlog
 
 logger = structlog.get_logger()
@@ -28,9 +28,9 @@ class FetchState:
     """Ticker çekme durumu."""
     ticker: str
     last_fetch_time: float          # Epoch time
-    last_fetch_timestamp: Optional[datetime] = None
+    last_fetch_timestamp: datetime | None = None
     fetch_count: int = 0
-    last_error: Optional[str] = None
+    last_error: str | None = None
     last_success: bool = True
 
 
@@ -52,7 +52,7 @@ class IncrementalFetcher:
     """
 
     def __init__(self, default_lookback_hours: int = 1):
-        self._states: Dict[str, FetchState] = {}
+        self._states: dict[str, FetchState] = {}
         self._default_lookback_hours = default_lookback_hours
         self._stats = IncrementalStats()
 
@@ -88,7 +88,7 @@ class IncrementalFetcher:
         self,
         ticker: str,
         success: bool = True,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         """Çekme zamanını güncelle."""
         now = time.time()
@@ -98,12 +98,12 @@ class IncrementalFetcher:
             state = FetchState(
                 ticker=ticker,
                 last_fetch_time=now,
-                last_fetch_timestamp=datetime.now(timezone.utc),
+                last_fetch_timestamp=datetime.now(UTC),
             )
             self._states[ticker] = state
 
         state.last_fetch_time = now
-        state.last_fetch_timestamp = datetime.now(timezone.utc)
+        state.last_fetch_timestamp = datetime.now(UTC)
         state.fetch_count += 1
         state.last_success = success
         state.last_error = error
@@ -123,7 +123,7 @@ class IncrementalFetcher:
         if state and state.last_fetch_timestamp:
             return state.last_fetch_timestamp
 
-        return datetime.now(timezone.utc) - timedelta(
+        return datetime.now(UTC) - timedelta(
             hours=self._default_lookback_hours
         )
 
@@ -132,7 +132,7 @@ class IncrementalFetcher:
         state = self._states.get(ticker)
         return state.fetch_count if state else 0
 
-    def get_all_states(self) -> Dict[str, Dict]:
+    def get_all_states(self) -> dict[str, dict]:
         """Tüm ticker durumları."""
         return {
             ticker: {
@@ -164,7 +164,7 @@ class IncrementalFetcher:
     def get_stale_tickers(
         self,
         max_age_seconds: int = 3600,
-    ) -> List[str]:
+    ) -> list[str]:
         """
         Belirli süredir çekilmemiş ticker'ları döndür.
 
@@ -183,7 +183,7 @@ class IncrementalFetcher:
 
         return stale
 
-    def reset(self, ticker: Optional[str] = None):
+    def reset(self, ticker: str | None = None):
         """Sıfırla."""
         if ticker:
             self._states.pop(ticker, None)

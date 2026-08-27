@@ -16,8 +16,9 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,8 +28,8 @@ logger = structlog.get_logger()
 class PhaseResult:
     """Faz sonucu."""
     phase: str
-    modules: Dict[str, Any] = field(default_factory=dict)
-    errors: Dict[str, str] = field(default_factory=dict)
+    modules: dict[str, Any] = field(default_factory=dict)
+    errors: dict[str, str] = field(default_factory=dict)
     elapsed_ms: float = 0.0
 
     @property
@@ -44,12 +45,12 @@ class PhaseResult:
 class ParallelPipelineResult:
     """Pipeline sonucu."""
     ticker: str
-    phases: Dict[str, PhaseResult] = field(default_factory=dict)
+    phases: dict[str, PhaseResult] = field(default_factory=dict)
     total_elapsed_ms: float = 0.0
-    modules_used: List[str] = field(default_factory=list)
-    modules_failed: List[str] = field(default_factory=list)
+    modules_used: list[str] = field(default_factory=list)
+    modules_failed: list[str] = field(default_factory=list)
 
-    def get_module_result(self, module_name: str) -> Optional[Any]:
+    def get_module_result(self, module_name: str) -> Any | None:
         """Modül sonucunu getir."""
         for phase_result in self.phases.values():
             if module_name in phase_result.modules:
@@ -104,8 +105,8 @@ class ParallelIntelligencePipeline:
     async def run(
         self,
         ticker: str,
-        features: Dict[str, Any],
-        market_data: Optional[Any] = None,
+        features: dict[str, Any],
+        market_data: Any | None = None,
         regime: str = "UNKNOWN",
     ) -> ParallelPipelineResult:
         """Tüm pipeline'ı paralel çalıştır."""
@@ -148,7 +149,7 @@ class ParallelIntelligencePipeline:
 
         return result
 
-    async def _run_phase1(self, ticker: str, features: Dict) -> PhaseResult:
+    async def _run_phase1(self, ticker: str, features: dict) -> PhaseResult:
         """Phase 1: Context — regime + world_state + macro + factor."""
         start = time.time()
         result = PhaseResult(phase="context")
@@ -163,7 +164,7 @@ class ParallelIntelligencePipeline:
 
         done = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-        for (name, _), outcome in zip(tasks.items(), done):
+        for (name, _), outcome in zip(tasks.items(), done, strict=False):
             if isinstance(outcome, Exception):
                 result.errors[name] = str(outcome)[:100]
             elif outcome is not None:
@@ -172,7 +173,7 @@ class ParallelIntelligencePipeline:
         result.elapsed_ms = round((time.time() - start) * 1000, 2)
         return result
 
-    async def _run_phase2(self, ticker: str, features: Dict) -> PhaseResult:
+    async def _run_phase2(self, ticker: str, features: dict) -> PhaseResult:
         """Phase 2: Analysis — technical + fundamental + sentiment + news."""
         start = time.time()
         result = PhaseResult(phase="analysis")
@@ -186,7 +187,7 @@ class ParallelIntelligencePipeline:
 
         done = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-        for (name, _), outcome in zip(tasks.items(), done):
+        for (name, _), outcome in zip(tasks.items(), done, strict=False):
             if isinstance(outcome, Exception):
                 result.errors[name] = str(outcome)[:100]
             elif outcome is not None:
@@ -195,7 +196,7 @@ class ParallelIntelligencePipeline:
         result.elapsed_ms = round((time.time() - start) * 1000, 2)
         return result
 
-    async def _run_phase3(self, ticker: str, features: Dict) -> PhaseResult:
+    async def _run_phase3(self, ticker: str, features: dict) -> PhaseResult:
         """Phase 3: Forecast — forecasting + monte_carlo + probability."""
         start = time.time()
         result = PhaseResult(phase="forecast")
@@ -209,7 +210,7 @@ class ParallelIntelligencePipeline:
 
         done = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-        for (name, _), outcome in zip(tasks.items(), done):
+        for (name, _), outcome in zip(tasks.items(), done, strict=False):
             if isinstance(outcome, Exception):
                 result.errors[name] = str(outcome)[:100]
             elif outcome is not None:
@@ -219,7 +220,7 @@ class ParallelIntelligencePipeline:
         return result
 
     async def _run_phase4(
-        self, ticker: str, features: Dict,
+        self, ticker: str, features: dict,
         phase1: PhaseResult, phase2: PhaseResult, phase3: PhaseResult,
     ) -> PhaseResult:
         """Phase 4: Fusion + SPEC + TradePlan (sıralı)."""
@@ -253,7 +254,7 @@ class ParallelIntelligencePipeline:
         result.elapsed_ms = round((time.time() - start) * 1000, 2)
         return result
 
-    async def _run_phase5(self, ticker: str, features: Dict) -> PhaseResult:
+    async def _run_phase5(self, ticker: str, features: dict) -> PhaseResult:
         """Phase 5: Knowledge + Memory (paralel)."""
         start = time.time()
         result = PhaseResult(phase="knowledge")
@@ -267,7 +268,7 @@ class ParallelIntelligencePipeline:
 
         done = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
-        for (name, _), outcome in zip(tasks.items(), done):
+        for (name, _), outcome in zip(tasks.items(), done, strict=False):
             if isinstance(outcome, Exception):
                 result.errors[name] = str(outcome)[:100]
             elif outcome is not None:
@@ -286,11 +287,11 @@ class ParallelIntelligencePipeline:
             return None
         try:
             return await asyncio.wait_for(func(*args), timeout=30)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Module timeout", module=name)
             return None
 
-    async def _run_regime(self, ticker: str, features: Dict) -> Dict:
+    async def _run_regime(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("regime")
         if not mod:
             return {}
@@ -298,7 +299,7 @@ class ParallelIntelligencePipeline:
         result = engine.detect_regime(features)
         return {"regime": result.regime.value, "confidence": result.confidence}
 
-    async def _run_hmm_regime(self, ticker: str, features: Dict) -> Dict:
+    async def _run_hmm_regime(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("hmm_regime")
         if not mod:
             return {}
@@ -309,7 +310,7 @@ class ParallelIntelligencePipeline:
         result = detector.predict_regime(returns, vol)
         return {"regime": result.regime, "confidence": result.confidence, "probabilities": result.probabilities}
 
-    async def _run_world_state(self, features: Dict) -> Dict:
+    async def _run_world_state(self, features: dict) -> dict:
         mod = self._modules.get("world_state")
         if not mod:
             return {}
@@ -317,21 +318,21 @@ class ParallelIntelligencePipeline:
         state = wsm.current_state
         return {"state": str(state)} if state else {}
 
-    async def _run_macro_sensitivity(self, ticker: str, features: Dict) -> Dict:
+    async def _run_macro_sensitivity(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("macro_sensitivity")
         if not mod:
             return {}
         ms = mod.MacroSensitivityEngine()
         return ms.get_company_sensitivity(ticker=ticker, sector="UNKNOWN") or {}
 
-    async def _run_factor(self, ticker: str, features: Dict) -> Dict:
+    async def _run_factor(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("factor_engine")
         if not mod:
             return {}
         fe = mod.FactorEngine()
         return fe.compute_factor_scores(ticker=ticker, fundamentals=features, technicals=features) or {}
 
-    async def _run_analysis_engines(self, features: Dict) -> Dict:
+    async def _run_analysis_engines(self, features: dict) -> dict:
         mod = self._modules.get("analysis_engines")
         if not mod:
             return {}
@@ -343,7 +344,7 @@ class ParallelIntelligencePipeline:
         patterns = pa.detect_patterns(open_, high, low, close)
         return {"patterns": str(patterns)} if patterns is not None else {}
 
-    async def _run_evidence(self, ticker: str) -> Dict:
+    async def _run_evidence(self, ticker: str) -> dict:
         mod = self._modules.get("evidence_engine")
         if not mod:
             return {}
@@ -351,7 +352,7 @@ class ParallelIntelligencePipeline:
         claims = ee.extract_claims(text="", ticker=ticker)
         return {"claims_count": len(claims) if claims else 0}
 
-    async def _run_impact(self, ticker: str, features: Dict) -> Dict:
+    async def _run_impact(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("impact_engine")
         if not mod:
             return {}
@@ -362,14 +363,14 @@ class ParallelIntelligencePipeline:
             instrument_states={},
         ) or {}
 
-    async def _run_kap_extractor(self, ticker: str) -> Dict:
+    async def _run_kap_extractor(self, ticker: str) -> dict:
         mod = self._modules.get("kap_extractor")
         if not mod:
             return {}
         ke = mod.KAPExtractor()
         return ke.extract(ticker=ticker, kap_id="", title="", summary="") or {}
 
-    async def _run_forecasting(self, ticker: str, features: Dict) -> Dict:
+    async def _run_forecasting(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("forecasting")
         if not mod:
             return {}
@@ -380,7 +381,7 @@ class ParallelIntelligencePipeline:
             return {"predicted_return": f.predicted_return, "probability": f.probability_positive, "horizon": f.horizon_days}
         return {}
 
-    async def _run_monte_carlo(self, ticker: str, features: Dict) -> Dict:
+    async def _run_monte_carlo(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("monte_carlo")
         if not mod:
             return {}
@@ -394,14 +395,14 @@ class ParallelIntelligencePipeline:
         )
         return {"expected_return": result.expected_return, "prob_positive": result.prob_positive, "var_95": result.var_95}
 
-    async def _run_probability(self, ticker: str, features: Dict) -> Dict:
+    async def _run_probability(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("probability")
         if not mod:
             return {}
         pe = mod.ProbabilityEngine()
         return pe.compute_return_distribution(ticker=ticker, historical_returns=[]) or {}
 
-    async def _run_scenario(self, ticker: str, features: Dict) -> Dict:
+    async def _run_scenario(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("scenario")
         if not mod:
             return {}
@@ -409,7 +410,7 @@ class ParallelIntelligencePipeline:
         scenario_input = mod.ScenarioInput(name="base", description="Base case")
         return se.run_scenario(scenario=scenario_input, positions=[]) or {}
 
-    async def _run_signal_fusion(self, ticker: str, features: Dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult) -> Dict:
+    async def _run_signal_fusion(self, ticker: str, features: dict, p1: PhaseResult, p2: PhaseResult, p3: PhaseResult) -> dict:
         mod = self._modules.get("signal_fusion")
         if not mod:
             return {}
@@ -459,7 +460,7 @@ class ParallelIntelligencePipeline:
         result = sf.fuse_signals(ticker, signals, regime)
         return result.__dict__ if hasattr(result, "__dict__") else {}
 
-    async def _run_spec(self, ticker: str, features: Dict, phase1: PhaseResult) -> Dict:
+    async def _run_spec(self, ticker: str, features: dict, phase1: PhaseResult) -> dict:
         mod = self._modules.get("spec_engine")
         if not mod:
             return {}
@@ -469,7 +470,7 @@ class ParallelIntelligencePipeline:
             market_state={"regime": phase1.modules.get("regime", {}).get("regime", "UNKNOWN")},
         ) or {}
 
-    async def _run_trade_planner(self, ticker: str, features: Dict, fusion_modules: Dict) -> Dict:
+    async def _run_trade_planner(self, ticker: str, features: dict, fusion_modules: dict) -> dict:
         mod = self._modules.get("trade_planner")
         if not mod:
             return {}
@@ -480,27 +481,27 @@ class ParallelIntelligencePipeline:
             spec_score=0.0, spec_category="NEUTRAL",
         ) or {}
 
-    async def _run_knowledge_graph(self, ticker: str) -> Dict:
+    async def _run_knowledge_graph(self, ticker: str) -> dict:
         mod = self._modules.get("knowledge_graph")
         if not mod:
             return {}
         mod.KnowledgeGraph()
         return {"loaded": True}
 
-    async def _run_research_memory(self, ticker: str) -> Dict:
+    async def _run_research_memory(self, ticker: str) -> dict:
         mod = self._modules.get("research_memory")
         if not mod:
             return {}
         rm = mod.ResearchMemory()
         return rm.get_ticker_history(ticker=ticker, limit=5) or {}
 
-    async def _run_news_pipeline(self, ticker: str) -> Dict:
+    async def _run_news_pipeline(self, ticker: str) -> dict:
         mod = self._modules.get("news_pipeline")
         if not mod:
             return {}
         return {"available": True}
 
-    async def _run_prediction_layer(self, ticker: str, features: Dict) -> Dict:
+    async def _run_prediction_layer(self, ticker: str, features: dict) -> dict:
         mod = self._modules.get("prediction_layer")
         if not mod:
             return {}

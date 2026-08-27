@@ -11,9 +11,10 @@ VIOP sözleşme kataloğu:
 Kaynak: Borsa İstanbul resmi
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -31,7 +32,7 @@ class VIOPContract:
     tick_value: float        # Tick değeri (TL)
     margin_rate: float       # Teminat oranı (%)
     settlement: str          # Takas yöntemi (nakdi/fiziki)
-    expiry_months: List[int]  # Vade ayları
+    expiry_months: list[int]  # Vade ayları
     exchange: str = "BIST"
     category: str = ""       # endeks, döviz, emtia
 
@@ -176,7 +177,7 @@ class VIOPContractCatalog:
         ),
     }
 
-    def get_contract(self, symbol: str) -> Optional[VIOPContract]:
+    def get_contract(self, symbol: str) -> VIOPContract | None:
         """Sözleşme bilgisi al.
 
         Args:
@@ -187,7 +188,7 @@ class VIOPContractCatalog:
         """
         return self.CONTRACTS.get(symbol)
 
-    def get_all_contracts(self) -> Dict[str, VIOPContract]:
+    def get_all_contracts(self) -> dict[str, VIOPContract]:
         """Tüm sözleşmeleri al.
 
         Returns:
@@ -195,7 +196,7 @@ class VIOPContractCatalog:
         """
         return self.CONTRACTS
 
-    def get_contracts_by_category(self, category: str) -> List[VIOPContract]:
+    def get_contracts_by_category(self, category: str) -> list[VIOPContract]:
         """Kategoriye göre sözleşmeler.
 
         Args:
@@ -206,7 +207,7 @@ class VIOPContractCatalog:
         """
         return [c for c in self.CONTRACTS.values() if c.category == category]
 
-    def get_expiry_dates(self, symbol: str, year: int = 2026) -> List[date]:
+    def get_expiry_dates(self, symbol: str, year: int = 2026) -> list[date]:
         """Vade tarihlerini al.
 
         Args:
@@ -236,7 +237,7 @@ class VIOPContractCatalog:
 
         return sorted(dates)
 
-    def get_next_expiry(self, symbol: str) -> Optional[date]:
+    def get_next_expiry(self, symbol: str) -> date | None:
         """Bir sonrade vade tarihi.
 
         Args:
@@ -292,7 +293,7 @@ class VIOPContractCatalog:
 
         return quantity * (exit_price - entry_price) * contract.contract_size
 
-    def to_dict(self, symbol: str) -> Optional[Dict[str, Any]]:
+    def to_dict(self, symbol: str) -> dict[str, Any] | None:
         """Sözleşme bilgisini sözlüğe çevir.
 
         Args:

@@ -4,10 +4,11 @@ SHAP history tracking, PSI (Population Stability Index),
 feature importance trend analizi, multi-metric drift detection,
 auto-remediation suggestions, drift alerting.
 """
-import numpy as np
-from typing import Dict, Any, List
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -35,7 +36,7 @@ class DriftSummary:
     alert_features: int
     critical_features: int
     overall_drift_score: float
-    recommendations: List[str]
+    recommendations: list[str]
 
 
 class FeatureDriftDetector:
@@ -64,27 +65,27 @@ class FeatureDriftDetector:
         self.importance_change_threshold = importance_change_threshold
         self.n_bins = n_bins
         self.alert_cooldown_hours = alert_cooldown_hours
-        self._shap_history: List[Dict[str, Any]] = []
-        self._feature_distributions: List[Dict[str, np.ndarray]] = []
-        self._drift_history: List[Dict[str, Any]] = []
-        self._last_alert: Dict[str, datetime] = {}
+        self._shap_history: list[dict[str, Any]] = []
+        self._feature_distributions: list[dict[str, np.ndarray]] = []
+        self._drift_history: list[dict[str, Any]] = []
+        self._last_alert: dict[str, datetime] = {}
 
-    def record_shap(self, shap_values: Dict[str, float]):
+    def record_shap(self, shap_values: dict[str, float]):
         """SHAP importance kaydet."""
         self._shap_history.append({
             **shap_values,
-            "_timestamp": datetime.now(timezone.utc).isoformat(),
+            "_timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._shap_history) > 1000:
             self._shap_history = self._shap_history[-1000:]
 
-    def record_distribution(self, feature_data: Dict[str, np.ndarray]):
+    def record_distribution(self, feature_data: dict[str, np.ndarray]):
         """Feature dağılımı kaydet (PSI hesaplama için)."""
         self._feature_distributions.append(feature_data)
         if len(self._feature_distributions) > 500:
             self._feature_distributions = self._feature_distributions[-500:]
 
-    def check_drift(self) -> List[DriftReport]:
+    def check_drift(self) -> list[DriftReport]:
         """Tüm feature'lar için kapsamlı drift kontrolü."""
         reports = []
 
@@ -141,7 +142,7 @@ class FeatureDriftDetector:
 
         # Drift history
         self._drift_history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "n_drifted": sum(1 for r in reports if r.drift_detected),
             "n_alerts": sum(1 for r in reports if r.alert),
             "n_critical": sum(1 for r in reports if r.severity == "CRITICAL"),
@@ -187,23 +188,23 @@ class FeatureDriftDetector:
             recommendations=recommendations,
         )
 
-    def get_alerts(self) -> List[DriftReport]:
+    def get_alerts(self) -> list[DriftReport]:
         """Sadece alarm olan drift'leri döndür."""
         return [r for r in self.check_drift() if r.alert]
 
-    def get_critical_alerts(self) -> List[DriftReport]:
+    def get_critical_alerts(self) -> list[DriftReport]:
         """Sadece CRITICAL drift'leri döndür."""
         return [r for r in self.check_drift() if r.severity == "CRITICAL"]
 
-    def get_drift_history(self) -> List[Dict[str, Any]]:
+    def get_drift_history(self) -> list[dict[str, Any]]:
         """Drift history."""
         return self._drift_history
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> list[dict[str, Any]]:
         """SHAP history."""
         return self._shap_history
 
-    def _compute_trend(self, historical: List[float], current: float) -> str:
+    def _compute_trend(self, historical: list[float], current: float) -> str:
         """Importance trend hesapla."""
         if len(historical) < 3:
             return "stable"
@@ -247,7 +248,7 @@ class FeatureDriftDetector:
         else:
             return ""
 
-    def _check_distribution_drift(self, reports: List[DriftReport]):
+    def _check_distribution_drift(self, reports: list[DriftReport]):
         """Distribution-based drift kontrolü (PSI)."""
         current_dist = self._feature_distributions[-1]
         reference_dist = self._feature_distributions[0]

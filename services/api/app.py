@@ -18,15 +18,17 @@ NOT: Bu dosya CANONICAL production entry point'tir.
 - main.py → DEPRECATED (eski entry point)
 """
 
+import asyncio
 import os
 import time
-import asyncio
-from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, ORJSONResponse
 from starlette.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+
 try:
     import orjson
 except ImportError:
@@ -34,16 +36,16 @@ except ImportError:
 import structlog
 from fastapi.responses import Response as FastAPIResponse
 
-from .v1 import v1_router
+from ..core.database import check_db_health, init_databases
+from ..core.otel import setup_telemetry
 from .rate_limiter import rate_limiter
-from ..core.database import init_databases, close_databases, check_db_health
-from ..core.otel import setup_telemetry, shutdown_telemetry
+from .v1 import v1_router
 
 logger = structlog.get_logger()
 
 
 @asynccontextmanager
-async def _startup_services() -> Optional[asyncio.Task]:
+async def _startup_services() -> asyncio.Task | None:
     """Servisleri başlat, refresh task döndür."""
     await init_databases()
 
@@ -76,8 +78,10 @@ async def _startup_services() -> Optional[asyncio.Task]:
 def _start_background_tasks(refresh_task) -> dict:
     """Arka plan görevlerini başlat."""
     from .background_tasks import (
-        radar_cache_refresher, ml_learning_scheduler,
-        auto_storage_optimizer, paper_trading_scheduler,
+        auto_storage_optimizer,
+        ml_learning_scheduler,
+        paper_trading_scheduler,
+        radar_cache_refresher,
     )
     return {
         "radar": asyncio.create_task(radar_cache_refresher()),
@@ -113,7 +117,7 @@ async def _start_nats():
 async def _start_service_mesh():
     """Service mesh başlat."""
     try:
-        from ..core.service_mesh import service_mesh, init_service_mesh
+        from ..core.service_mesh import init_service_mesh, service_mesh
         init_service_mesh()
         return asyncio.create_task(service_mesh.start_monitoring())
     except Exception as e:
@@ -270,7 +274,6 @@ def create_app() -> FastAPI:
     @app.get("/health")
     @app.get("/api/health")
     async def health():
-        from datetime import datetime, timezone
         db_health = await check_db_health()
 
         # NATS sağlık kontrolü
@@ -303,7 +306,7 @@ def create_app() -> FastAPI:
         all_healthy = all(v in ("healthy", "disabled") for v in all_services.values())
         return {
             "status": "healthy" if all_healthy else "degraded",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "version": "2.0.0",
             "server": "canonical (app.py)",
             "services": all_services,
@@ -312,11 +315,10 @@ def create_app() -> FastAPI:
     @app.get("/health/detailed")
     async def health_detailed():
         """Detaylı sağlık raporu."""
-        from datetime import datetime, timezone
         db_health = await check_db_health()
         return {
             "status": "healthy" if all(v == "healthy" for v in db_health.values()) else "degraded",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "version": "2.0.0",
             "server": "canonical (app.py)",
             "services": db_health,
@@ -330,7 +332,7 @@ def create_app() -> FastAPI:
     @app.get("/metrics")
     async def metrics():
         """Prometheus metrics endpoint."""
-        from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+        from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
         return FastAPIResponse(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     return app

@@ -16,32 +16,33 @@ Yetenekler:
   - Hafızaya yazma (gelecek RAG için)
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 # Bağımlılıklar — kendi modüllerimiz
 from services.intelligence.llm_client import llm_client
-from services.intelligence.llm_tools import llm_tool_executor, TOOL_SCHEMAS
 from services.intelligence.llm_context_builder import llm_context_builder
+from services.intelligence.llm_tools import TOOL_SCHEMAS, llm_tool_executor
 
 
 @dataclass
 class AgentAnalysis:
     """LLM Ajan analiz çıktısı."""
-    ticker: Optional[str]
+    ticker: str | None
     analysis_type: str                   # news | kap | signal_fusion | narrative
 
     # Ana çıktılar
-    entities: List[Dict] = field(default_factory=list)
+    entities: list[dict] = field(default_factory=list)
     event_type: str = "OTHER"
     sentiment: float = 0.0               # -1.0 ile +1.0
     importance: float = 0.1
-    affected_tickers: List[str] = field(default_factory=list)
-    affected_sectors: List[str] = field(default_factory=list)
+    affected_tickers: list[str] = field(default_factory=list)
+    affected_sectors: list[str] = field(default_factory=list)
     surprise_score: float = 0.5
     uncertainty_score: float = 0.3
 
@@ -51,18 +52,18 @@ class AgentAnalysis:
     ai_confidence: float = 0.5
 
     # Rejim override (varsa)
-    regime_override: Optional[str] = None
+    regime_override: str | None = None
     regime_override_reason: str = ""
 
     # Türkçe açıklama
     narrative: str = ""
     key_insight: str = ""
-    key_risks: List[str] = field(default_factory=list)
+    key_risks: list[str] = field(default_factory=list)
 
     # Meta
-    tool_calls_made: List[str] = field(default_factory=list)
+    tool_calls_made: list[str] = field(default_factory=list)
     timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     is_mock: bool = False
 
@@ -78,8 +79,8 @@ class LLMAgent:
     def analyze_news(
         self,
         text: str,
-        ticker: Optional[str] = None,
-        sector: Optional[str] = None,
+        ticker: str | None = None,
+        sector: str | None = None,
     ) -> AgentAnalysis:
         """
         Haber analizi — RAG ve WorldState bağlamlı.
@@ -134,7 +135,7 @@ class LLMAgent:
         ticker: str,
         title: str,
         summary: str = "",
-        kap_history: Optional[List[Dict]] = None,
+        kap_history: list[dict] | None = None,
     ) -> AgentAnalysis:
         """
         KAP bildirimi analizi — şirket geçmişiyle karşılaştırmalı.
@@ -179,10 +180,10 @@ class LLMAgent:
     def compute_signal_meta_score(
         self,
         ticker: str,
-        signals: Dict[str, Any],
-        conflict_details: List[str],
-        features: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        signals: dict[str, Any],
+        conflict_details: list[str],
+        features: dict[str, Any],
+    ) -> dict[str, Any]:
         """
         Signal Fusion meta-skoru.
         LLM tüm çelişen sinyalleri okuyup kendi hakem kararını üretir.
@@ -232,8 +233,8 @@ class LLMAgent:
     def generate_decision_narrative(
         self,
         ticker: str,
-        decision: Dict[str, Any],
-        features: Dict[str, Any],
+        decision: dict[str, Any],
+        features: dict[str, Any],
         price: float,
     ) -> str:
         """
@@ -261,7 +262,7 @@ Maksimum 3 cümle. Formatı:
     def _react_loop(
         self,
         prompt: str,
-        context: Dict[str, Any],
+        context: dict[str, Any],
         analysis_type: str,
     ) -> tuple:
         """
@@ -312,7 +313,7 @@ Maksimum 3 cümle. Formatı:
 
     # ── Prompt Üreticiler ────────────────────────────────────────────────────
 
-    def _build_news_prompt(self, text: str, ticker: Optional[str]) -> str:
+    def _build_news_prompt(self, text: str, ticker: str | None) -> str:
         ticker_context = f"İlgili hisse: {ticker}." if ticker else ""
         return f"""Sen BIST-100 uzmanı bir finansal analistsın. {ticker_context}
 Aşağıdaki haberi analiz et. Gerekirse araçları kullanarak:
@@ -326,7 +327,7 @@ HABER:
 Analizini tamamla ve yapılandırılmış JSON çıktı ver."""
 
     def _build_kap_prompt(
-        self, ticker: str, text: str, history: Optional[List[Dict]]
+        self, ticker: str, text: str, history: list[dict] | None
     ) -> str:
         history_note = ""
         if history:
@@ -347,8 +348,8 @@ geçmiş bildirimleri göz önünde bulundurarak belirle."""
     def _build_signal_prompt(
         self,
         ticker: str,
-        signals: Dict[str, Any],
-        conflicts: List[str],
+        signals: dict[str, Any],
+        conflicts: list[str],
     ) -> str:
         signal_summary = ", ".join(
             f"{k}: {v.get('direction', 'N')} ({v.get('score', 50):.0f})"

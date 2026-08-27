@@ -14,7 +14,8 @@ LLM: Ollama (gemma4:12b-q4_0 veya benzeri Türkçe model)
 
 import asyncio
 import time
-from typing import Dict, Any, List
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -57,7 +58,7 @@ class LLMSentimentAnalyzer:
 
     def __init__(self, llm_client=None):
         self._llm_client = llm_client
-        self._cache: Dict[str, tuple] = {}  # key → (result, cached_at)
+        self._cache: dict[str, tuple] = {}  # key → (result, cached_at)
 
     def set_llm_client(self, client):
         """LLM client ayarla."""
@@ -68,7 +69,7 @@ class LLMSentimentAnalyzer:
         text: str,
         ticker: str = "",
         source: str = "unknown",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Metin sentiment analizi yap.
 
         Args:
@@ -105,7 +106,7 @@ class LLMSentimentAnalyzer:
 
         return result
 
-    async def _llm_analyze(self, text: str, ticker: str, source: str) -> Dict[str, Any]:
+    async def _llm_analyze(self, text: str, ticker: str, source: str) -> dict[str, Any]:
         """LLM ile sentiment analizi."""
         try:
             user_prompt = SENTIMENT_USER_PROMPT.format(
@@ -141,7 +142,7 @@ class LLMSentimentAnalyzer:
             logger.warning("LLM sentiment failed", error=str(e))
             return self._keyword_analyze(text)
 
-    def _keyword_analyze(self, text: str) -> Dict[str, Any]:
+    def _keyword_analyze(self, text: str) -> dict[str, Any]:
         """Keyword-based sentiment with negation handling (fallback)."""
         text_lower = text.lower()
         words = text_lower.split()
@@ -217,7 +218,7 @@ class LLMSentimentAnalyzer:
             "source": "keyword_fallback",
         }
 
-    def _neutral_result(self) -> Dict[str, Any]:
+    def _neutral_result(self) -> dict[str, Any]:
         """Nötr sonuç."""
         return {
             "sentiment_score": 0.0,
@@ -232,8 +233,8 @@ class LLMSentimentAnalyzer:
 
     async def analyze_batch(
         self,
-        texts: List[Dict[str, str]],
-    ) -> List[Dict[str, Any]]:
+        texts: list[dict[str, str]],
+    ) -> list[dict[str, Any]]:
         """Toplu sentiment analizi.
 
         Args:
@@ -249,7 +250,7 @@ class LLMSentimentAnalyzer:
         ]
         return await asyncio.gather(*tasks, return_exceptions=True)
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Cache istatistikleri."""
         return {
             "cache_size": len(self._cache),

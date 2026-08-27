@@ -11,13 +11,13 @@ Tüm pipeline tek motor:
 """
 
 import time
-import numpy as np
-from typing import Dict, List, Optional, Any
 from datetime import datetime
+from typing import Any
 
+import numpy as np
 import polars as pl
-import yfinance as yf
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -26,40 +26,41 @@ class AlphaEngine:
     """ALPHA'nın ana motoru — v2.0"""
 
     def __init__(self):
-        self._universe: List[str] = []
-        self._features_map: Dict[str, Dict[str, float]] = {}
-        self._ml_scores: Dict[str, float] = {}
-        self._event_scores: Dict[str, float] = {}
+        self._universe: list[str] = []
+        self._features_map: dict[str, dict[str, float]] = {}
+        self._ml_scores: dict[str, float] = {}
+        self._event_scores: dict[str, float] = {}
         self._market_regime: str = "RANGE"
         self._regime_confidence: float = 0.5
-        self._last_scan_results: List = []
-        self._last_scan_summary: Dict = {}
+        self._last_scan_results: list = []
+        self._last_scan_summary: dict = {}
         self._scan_count: int = 0
         self._running: bool = False
 
         # Katmanlar
-        from .live_scanner import live_scanner
-        from .event_scanner import event_scanner
-        from .event_queue import event_queue
         from ml.model_loader import ml_model_loader
+
+        from .event_queue import event_queue
+        from .event_scanner import event_scanner
+        from .live_scanner import live_scanner
         self._live = live_scanner
         self._events = event_scanner
         self._queue = event_queue
         self._ml_loader = ml_model_loader
 
         # Yeni modüller (SCANNER-NIHAI-SPEC entegrasyonu)
+        from .custom_filters import custom_filter_engine
         from .deduplicator import scan_deduplicator
-        from .scan_persistence import scan_persistence
         from .performance_tracker import performance_tracker
         from .scan_alerts import scan_alert_manager
-        from .custom_filters import custom_filter_engine
+        from .scan_persistence import scan_persistence
         self._dedup = scan_deduplicator
         self._persistence = scan_persistence
         self._perf_tracker = performance_tracker
         self._alert_manager = scan_alert_manager
         self._filter_engine = custom_filter_engine
 
-    def load_universe(self, tickers: List[str]):
+    def load_universe(self, tickers: list[str]):
         """BIST evrenini yükle."""
         try:
             self._universe = tickers
@@ -73,7 +74,7 @@ class AlphaEngine:
     # =====================================================
 
     def process_tick(self, ticker: str, price: float, volume: int,
-                     timestamp: Optional[datetime] = None) -> Optional[Dict]:
+                     timestamp: datetime | None = None) -> dict | None:
         """
         Her tick'te çalışır. Çok düşük maliyetli.
         State update → candidate check → event score güncelle.
@@ -109,7 +110,7 @@ class AlphaEngine:
     # Layer 2: Batch Scanner (belirli aralıklarla)
     # =====================================================
 
-    async def run_batch_scan(self) -> Dict[str, Any]:
+    async def run_batch_scan(self) -> dict[str, Any]:
         """
         Tam batch tarama. 800 hisse → data → features → scanner → signals.
         Günde 5-6 kez çalışır (09:50, 12:00, 15:00, 17:50).
@@ -142,7 +143,7 @@ class AlphaEngine:
 
         # 6. Deduplication kontrolü — sadece tarama gereken hisseler
         universe_to_scan = []
-        for ticker in self._features_map.keys():
+        for ticker in self._features_map:
             if self._dedup.should_scan(ticker):
                 universe_to_scan.append(ticker)
 
@@ -229,7 +230,7 @@ class AlphaEngine:
     # Layer 3: Event Scanner (haber/KAP geldiğinde)
     # =====================================================
 
-    def on_event(self, event_type: str, event_data: Dict) -> List[Dict]:
+    def on_event(self, event_type: str, event_data: dict) -> list[dict]:
         """
         Event geldiğinde çalışır.
         1. Etkilenen hisseleri bul
@@ -302,7 +303,7 @@ class AlphaEngine:
 
         # 6. Alert kontrolü
         if results:
-            new_alerts = self._alert_manager.check_scan_results(
+            self._alert_manager.check_scan_results(
                 results, regime=self._market_regime
             )
 
@@ -341,8 +342,9 @@ class AlphaEngine:
             logger.error("Data fetch error", error=str(e))
             return None
 
-    def _compute_all_features(self, data) -> Dict[str, Dict[str, float]]:
+    def _compute_all_features(self, data) -> dict[str, dict[str, float]]:
         import polars as pl
+
         from ..features.calculator import feature_calculator
         features_map = {}
 
@@ -372,7 +374,7 @@ class AlphaEngine:
         advancing = declining = 0
         volatilities, momentums = [], []
 
-        for ticker, features in self._features_map.items():
+        for _ticker, features in self._features_map.items():
             ret = features.get("return_1d", 0)
             if ret > 0: advancing += 1
             elif ret < 0: declining += 1
@@ -396,7 +398,7 @@ class AlphaEngine:
         elif avg_vol < 12: return "LOW-VOLATILITY", 0.6
         else: return "RANGE", 0.5
 
-    def _compute_single_feature(self, ticker: str) -> Optional[Dict[str, float]]:
+    def _compute_single_feature(self, ticker: str) -> dict[str, float] | None:
         """Tek hisse için hızlı feature hesaplama (event fallback)."""
         from ..features.calculator import feature_calculator
 
@@ -422,10 +424,10 @@ class AlphaEngine:
 
         return None
 
-    def _compute_ml_scores(self) -> Dict[str, float]:
+    def _compute_ml_scores(self) -> dict[str, float]:
         """
         ML skorları — gerçek model varsa kullanır, yoksa quant proxy.
-        
+
         ml/model_loader.py'daki MLModelLoader:
         - Eğitilmiş model varsa → ML ensemble inference
         - Yoksa → Quant Probability Proxy (feature-based heuristic)
@@ -456,11 +458,11 @@ class AlphaEngine:
 
         return scores
 
-    def get_last_summary(self) -> Dict:
+    def get_last_summary(self) -> dict:
         """Son tarama ozetini dondur."""
         return self._last_scan_summary
 
-    def get_last_results(self) -> List:
+    def get_last_results(self) -> list:
         """Son tarama sonuclarini dondur."""
         return self._last_scan_results
 
@@ -468,11 +470,11 @@ class AlphaEngine:
         """Mevcut piyasa rejimini dondur."""
         return self._market_regime
 
-    def get_live_candidates(self) -> Dict:
+    def get_live_candidates(self) -> dict:
         """Canlı adaylari dondur."""
         return self._live.get_candidates()
 
-    def get_event_candidates(self) -> Dict:
+    def get_event_candidates(self) -> dict:
         """Event adaylarini dondur."""
         return self._events.get_pending_rescans()
 

@@ -1,9 +1,9 @@
-# -*- coding: utf-8 -*-
 """Backtest API - Gerçek servislere bağlı."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
 import structlog
-from ..dependencies import get_current_user, check_rate_limit
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -21,7 +21,7 @@ async def run_backtest(
     try:
         return {"status": "started", "ticker": ticker, "period": period, "strategy": strategy, "message": "Backtest queued"}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/results/{backtest_id}")
@@ -59,7 +59,7 @@ async def walk_forward(
     try:
         return {"status": "started", "ticker": ticker, "n_folds": n_folds}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/deflated-sharpe")

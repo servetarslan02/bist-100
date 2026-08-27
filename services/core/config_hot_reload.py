@@ -15,15 +15,17 @@ Referanslar:
 - CORE-NIHAI-SPEC.md - Section 2.3
 """
 
-import os
-import orjson
-import time
 import asyncio
 import hashlib
-from typing import Dict, List, Optional, Any, Callable, Tuple
+import os
+import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any, Optional
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -37,11 +39,11 @@ class ConfigChange:
     file_path: str
     old_hash: str
     new_hash: str
-    changed_keys: List[str]
+    changed_keys: list[str]
     applied: bool
-    error: Optional[str] = None
+    error: str | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "change_id": self.change_id,
             "timestamp": self.timestamp.isoformat(),
@@ -79,13 +81,13 @@ class ConfigHotReload:
         self._auto_apply = auto_apply
         self._validate_before_apply = validate_before_apply
 
-        self._callbacks: List[Callable] = []
-        self._validators: List[Callable] = []
+        self._callbacks: list[Callable] = []
+        self._validators: list[Callable] = []
         self._last_modified: float = 0
         self._last_hash: str = ""
-        self._current_config: Dict[str, Any] = {}
+        self._current_config: dict[str, Any] = {}
         self._running = False
-        self._change_history: List[ConfigChange] = []
+        self._change_history: list[ConfigChange] = []
         self._max_history = 100
 
     def on_change(self, callback: Callable):
@@ -136,7 +138,7 @@ class ConfigHotReload:
         self._running = False
         logger.info("Config hot-reload stopped")
 
-    def _load_config(self) -> Dict[str, Any]:
+    def _load_config(self) -> dict[str, Any]:
         """Config dosyasını yükle."""
         try:
             content = self._config_path.read_text()
@@ -214,9 +216,9 @@ class ConfigHotReload:
 
     def _find_changed_keys(
         self,
-        old: Dict[str, Any],
-        new: Dict[str, Any],
-    ) -> List[str]:
+        old: dict[str, Any],
+        new: dict[str, Any],
+    ) -> list[str]:
         """Değişen anahtarları bul."""
         changed = []
         all_keys = set(old.keys()) | set(new.keys())
@@ -229,7 +231,7 @@ class ConfigHotReload:
 
         return changed
 
-    def _validate_config(self, config: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def _validate_config(self, config: dict[str, Any]) -> tuple[bool, str | None]:
         """Config'i validate et."""
         for validator in self._validators:
             try:
@@ -242,9 +244,9 @@ class ConfigHotReload:
 
     async def _notify_callbacks(
         self,
-        old_config: Dict[str, Any],
-        new_config: Dict[str, Any],
-        changed_keys: List[str],
+        old_config: dict[str, Any],
+        new_config: dict[str, Any],
+        changed_keys: list[str],
     ):
         """Callback'leri bildir."""
         for callback in self._callbacks:
@@ -262,9 +264,9 @@ class ConfigHotReload:
         self,
         old_hash: str,
         new_hash: str,
-        changed_keys: List[str],
+        changed_keys: list[str],
         applied: bool,
-        error: Optional[str] = None,
+        error: str | None = None,
     ):
         """Değişiklik kaydet."""
         import hashlib as hl
@@ -274,7 +276,7 @@ class ConfigHotReload:
 
         change = ConfigChange(
             change_id=change_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             file_path=str(self._config_path),
             old_hash=old_hash,
             new_hash=new_hash,
@@ -287,15 +289,15 @@ class ConfigHotReload:
         if len(self._change_history) > self._max_history:
             self._change_history = self._change_history[-self._max_history:]
 
-    def get_current_config(self) -> Dict[str, Any]:
+    def get_current_config(self) -> dict[str, Any]:
         """Mevcut config'i döndür."""
         return self._current_config.copy()
 
-    def get_change_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_change_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Değişiklik geçmişi."""
         return [c.to_dict() for c in self._change_history[-limit:]]
 
-    def force_reload(self) -> Dict[str, Any]:
+    def force_reload(self) -> dict[str, Any]:
         """Zorla yeniden yükle."""
         old_config = self._current_config.copy()
         new_config = self._load_config()
@@ -388,7 +390,7 @@ class SettingsBridge:
     def __init__(self, reloader: Optional["ConfigHotReload"] = None):
         self._reloader = reloader or config_hot_reload
         self._watching = False
-        self._settings_history: List[Tuple[datetime, Dict[str, Any]]] = []
+        self._settings_history: list[tuple[datetime, dict[str, Any]]] = []
         self._max_history = 50
 
     def start_watching(self):
@@ -410,7 +412,7 @@ class SettingsBridge:
         self._watching = False
         logger.info("SettingsBridge stopped")
 
-    def _validate_no_secrets(self, config: Dict[str, Any]) -> Tuple[bool, Optional[str]]:
+    def _validate_no_secrets(self, config: dict[str, Any]) -> tuple[bool, str | None]:
         """JSON config'de secret alan varsa reddet."""
         for key in config:
             if key.lower() in self._SECRET_FIELDS:
@@ -419,9 +421,9 @@ class SettingsBridge:
 
     async def _on_config_change(
         self,
-        old_config: Dict[str, Any],
-        new_config: Dict[str, Any],
-        changed_keys: List[str],
+        old_config: dict[str, Any],
+        new_config: dict[str, Any],
+        changed_keys: list[str],
     ):
         """Config değişikliğinde Settings güncelle."""
         import services.core.config as config_module
@@ -447,14 +449,13 @@ class SettingsBridge:
             new_settings = config_module.Settings(**merged)
 
             # Global settings referansını güncelle (atomik swap)
-            config_module.settings
             config_module.settings = new_settings
 
             # modül seviyesinde de güncelle
             config_module.get_settings = lambda: new_settings
 
             # Geçmişe kaydet
-            self._settings_history.append((datetime.now(timezone.utc), safe_changes))
+            self._settings_history.append((datetime.now(UTC), safe_changes))
             if len(self._settings_history) > self._max_history:
                 self._settings_history = self._settings_history[-self._max_history:]
 
@@ -472,7 +473,7 @@ class SettingsBridge:
             )
             # Rollback: eski settings korunur (zaten değiştirilmedi)
 
-    def get_settings_history(self) -> List[Dict[str, Any]]:
+    def get_settings_history(self) -> list[dict[str, Any]]:
         """Settings değişiklik geçmişi."""
         return [
             {"timestamp": ts.isoformat(), "changes": changes}

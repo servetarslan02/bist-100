@@ -18,9 +18,10 @@ Kullanım:
     filtered = pit.filter_available(data, "market_price", query_ts)
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -43,7 +44,7 @@ class PointInTimeValidator:
     """
 
     # Veri tipleri için gecikme süreleri
-    DATA_DELAYS: Dict[str, PITConfig] = {
+    DATA_DELAYS: dict[str, PITConfig] = {
         "market_price": PITConfig(
             data_type="market_price",
             delay=timedelta(minutes=15),
@@ -121,11 +122,11 @@ class PointInTimeValidator:
 
     def filter_available(
         self,
-        data: List[Dict],
+        data: list[dict],
         data_type: str,
         query_timestamp: datetime,
         timestamp_field: str = "timestamp",
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """
         Sadece o tarihte bilinen veriyi döndür.
 
@@ -149,10 +150,7 @@ class PointInTimeValidator:
                 continue
 
             try:
-                if isinstance(ts_str, datetime):
-                    data_ts = ts_str
-                else:
-                    data_ts = datetime.fromisoformat(str(ts_str))
+                data_ts = ts_str if isinstance(ts_str, datetime) else datetime.fromisoformat(str(ts_str))
 
                 if self.is_available_at(data_type, data_ts, query_timestamp):
                     filtered.append(item)
@@ -172,11 +170,11 @@ class PointInTimeValidator:
 
     def validate_no_lookahead(
         self,
-        data: List[Dict],
+        data: list[dict],
         data_type: str,
         query_timestamp: datetime,
         timestamp_field: str = "timestamp",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Look-ahead bias kontrolü — sadece doğrulama, filtreleme yapmaz.
 
@@ -195,10 +193,7 @@ class PointInTimeValidator:
                 continue
 
             try:
-                if isinstance(ts_str, datetime):
-                    data_ts = ts_str
-                else:
-                    data_ts = datetime.fromisoformat(str(ts_str))
+                data_ts = ts_str if isinstance(ts_str, datetime) else datetime.fromisoformat(str(ts_str))
 
                 if not self.is_available_at(data_type, data_ts, query_timestamp):
                     violations.append({
@@ -217,7 +212,7 @@ class PointInTimeValidator:
             "violation_count": len(violations),
         }
 
-    def get_delay(self, data_type: str) -> Optional[timedelta]:
+    def get_delay(self, data_type: str) -> timedelta | None:
         """Veri tipi için gecikme süresini döndür."""
         config = self.DATA_DELAYS.get(data_type)
         return config.delay if config else None

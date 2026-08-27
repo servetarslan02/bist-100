@@ -20,11 +20,13 @@ Kullanım:
 """
 
 import asyncio
+import random
 import time
 import uuid
-from typing import Optional, Any, Dict
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -47,8 +49,8 @@ class LockMetrics:
     total_wait_ms: float = 0.0
     max_wait_ms: float = 0.0
     last_acquisition_ms: float = 0.0
-    last_timeout_at: Optional[float] = None
-    last_error_at: Optional[float] = None
+    last_timeout_at: float | None = None
+    last_error_at: float | None = None
     created_at: float = field(default_factory=time.time)
 
     def record_acquisition(self, wait_ms: float):
@@ -78,7 +80,7 @@ class LockMetrics:
     def record_crash_recovery(self):
         self.total_crash_recoveries += 1
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         avg = self.total_wait_ms / self.total_acquisitions if self.total_acquisitions else 0
         uptime_s = time.time() - self.created_at
         return {
@@ -95,7 +97,7 @@ class LockMetrics:
             "uptime_seconds": round(uptime_s, 1),
         }
 
-    def health_status(self) -> Dict[str, Any]:
+    def health_status(self) -> dict[str, Any]:
         """Sağlık durumu."""
         now = time.time()
         issues = []
@@ -124,7 +126,7 @@ class LockMetrics:
 
 
 # Global metrics per lock key
-_metrics: Dict[str, LockMetrics] = {}
+_metrics: dict[str, LockMetrics] = {}
 
 
 def get_lock_metrics(key: str) -> LockMetrics:
@@ -133,11 +135,11 @@ def get_lock_metrics(key: str) -> LockMetrics:
     return _metrics[key]
 
 
-def get_all_metrics() -> Dict[str, Dict]:
+def get_all_metrics() -> dict[str, dict]:
     return {k: v.to_dict() for k, v in _metrics.items()}
 
 
-def get_health_report() -> Dict[str, Any]:
+def get_health_report() -> dict[str, Any]:
     """Tüm lock'ların sağlık raporu."""
     report = {}
     overall_healthy = True
@@ -200,9 +202,9 @@ class DatabaseLock:
         self._lease_renewal_interval_s = lease_renewal_interval_s
         self._stale_lock_timeout_s = stale_lock_timeout_s
         self._acquired = False
-        self._acquire_time: Optional[float] = None
+        self._acquire_time: float | None = None
         self._owner_id = f"lock_{uuid.uuid4().hex[:8]}"
-        self._renewal_task: Optional[asyncio.Task] = None
+        self._renewal_task: asyncio.Task | None = None
 
     @property
     def key(self) -> str:

@@ -3,7 +3,8 @@
 9 kriter, ağırlıklı, detaylı analiz.
 Her kriter için değer, eşik ve sonuç döndürür.
 """
-from typing import Dict, Any, Optional
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -23,10 +24,10 @@ DEFAULT_WEIGHTS = {
 
 
 def calculate_f_score(
-    financials: Dict[str, Any],
-    financials_prev: Optional[Dict[str, Any]] = None,
-    weights: Optional[Dict[str, float]] = None,
-) -> Dict[str, Any]:
+    financials: dict[str, Any],
+    financials_prev: dict[str, Any] | None = None,
+    weights: dict[str, float] | None = None,
+) -> dict[str, Any]:
     """Piotroski F-Score — detaylı, ağırlıklı.
 
     Args:
@@ -140,7 +141,7 @@ def calculate_f_score(
     return result
 
 
-def calculate_f_score_simple(financials: Dict[str, Any]) -> int:
+def calculate_f_score_simple(financials: dict[str, Any]) -> int:
     """Basitleştirilmiş F-Score (backward compatibility)."""
     result = calculate_f_score(financials)
     return result["f_score"]

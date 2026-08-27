@@ -11,9 +11,8 @@ Test edilen:
 """
 
 import sys
-import os
-import numpy as np
 
+import numpy as np
 
 
 def test_brier_score_perfect():
@@ -67,7 +66,7 @@ def test_brier_score_overconfident():
     # %90 confidence ama sadece %50 doğru
     np.random.seed(42)
     predictions = []
-    for i in range(100):
+    for _i in range(100):
         predictions.append({
             "confidence": 0.9,
             "outcome": 1 if np.random.random() < 0.5 else 0,
@@ -104,7 +103,7 @@ def test_ece_calibrated():
     cal = ConfidenceCalibrator()
     np.random.seed(42)
     predictions = []
-    for i in range(200):
+    for _i in range(200):
         conf = np.random.uniform(0.3, 0.9)
         # Confidence kadar doğru
         outcome = 1 if np.random.random() < conf else 0
@@ -121,7 +120,7 @@ def test_bins_created():
     cal = ConfidenceCalibrator()
     np.random.seed(42)
     predictions = []
-    for i in range(200):
+    for _i in range(200):
         conf = np.random.uniform(0, 1)
         outcome = 1 if np.random.random() < conf else 0
         predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
@@ -163,7 +162,7 @@ def test_platt_scaling_fit():
     cal = ConfidenceCalibrator()
     np.random.seed(42)
     predictions = []
-    for i in range(100):
+    for _i in range(100):
         conf = np.random.uniform(0.3, 0.9)
         outcome = 1 if np.random.random() < conf else 0
         predictions.append({"confidence": conf, "outcome": outcome})
@@ -226,7 +225,7 @@ def test_confidence_level():
     # Yeterli sample, düşük ECE → HIGH
     np.random.seed(42)
     predictions = []
-    for i in range(250):
+    for _i in range(250):
         conf = np.random.uniform(0.4, 0.6)
         outcome = 1 if np.random.random() < conf else 0
         predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
@@ -242,7 +241,7 @@ def test_calibration_report():
     cal = ConfidenceCalibrator()
     np.random.seed(42)
     predictions = []
-    for i in range(100):
+    for _i in range(100):
         conf = np.random.uniform(0.3, 0.9)
         outcome = 1 if np.random.random() < conf else 0
         predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
@@ -276,7 +275,7 @@ def test_multiple_calibrations():
 
     for _ in range(3):
         predictions = []
-        for i in range(50):
+        for _i in range(50):
             conf = np.random.uniform(0.3, 0.9)
             outcome = 1 if np.random.random() < conf else 0
             predictions.append({"confidence": conf, "outcome": outcome, "regime": "BULL"})
@@ -319,14 +318,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 1 TEST SONUÇLARI (Calibration)")
+    print("📊 FAZ 1 TEST SONUÇLARI (Calibration)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

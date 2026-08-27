@@ -7,16 +7,17 @@ Kullanım:
     python3 -m pytest tests/test_api.py -v
 """
 
-import pytest
 import time
-from unittest.mock import MagicMock
+
+import pytest
 
 from services.api.auth import (
-    JWTHandler, APIKeyManager, RBACChecker, Role, TokenPayload,
-    jwt_handler, api_key_manager, rbac_checker,
+    APIKeyManager,
+    JWTHandler,
+    Role,
+    rbac_checker,
 )
-from services.api.rate_limiter import InMemoryRateLimiter, rate_limiter
-
+from services.api.rate_limiter import InMemoryRateLimiter
 
 # =====================================================
 # AUTH TESTS

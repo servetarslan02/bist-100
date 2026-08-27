@@ -4,10 +4,11 @@ Birden fazla hisse için event study — ortalama CAR, t-test,
 event type breakdown, sector breakdown, regression analysis.
 MacKinlay (1997) metodolojisi.
 """
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Optional, Any
-from scipy import stats
 import structlog
+from scipy import stats
 
 logger = structlog.get_logger()
 
@@ -17,9 +18,9 @@ class CrossSectionalEventStudy:
 
     def analyze(
         self,
-        event_cars: List[Dict[str, Any]],
-        group_by: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        event_cars: list[dict[str, Any]],
+        group_by: str | None = None,
+    ) -> dict[str, Any]:
         """Cross-sectional event study.
 
         Args:
@@ -86,8 +87,8 @@ class CrossSectionalEventStudy:
 
     def analyze_by_type(
         self,
-        event_cars: List[Dict[str, Any]],
-    ) -> Dict[str, Dict[str, Any]]:
+        event_cars: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
         """Event type bazlı ayrı ayrı analysis.
 
         Returns:
@@ -108,8 +109,8 @@ class CrossSectionalEventStudy:
 
     def analyze_by_sector(
         self,
-        event_cars: List[Dict[str, Any]],
-    ) -> Dict[str, Dict[str, Any]]:
+        event_cars: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
         """Sektör bazlı ayrı ayrı analysis.
 
         Returns:
@@ -130,9 +131,9 @@ class CrossSectionalEventStudy:
 
     def regression_analysis(
         self,
-        event_cars: List[Dict[str, Any]],
-        features: List[str],
-    ) -> Dict[str, Any]:
+        event_cars: list[dict[str, Any]],
+        features: list[str],
+    ) -> dict[str, Any]:
         """CAR'ı event features'a karşı regresyon.
 
         CAR = β0 + β1×feature1 + β2×feature2 + ... + ε
@@ -196,8 +197,8 @@ class CrossSectionalEventStudy:
             return {"error": str(e)}
 
     def _group_breakdown(
-        self, event_cars: List[Dict[str, Any]], group_key: str
-    ) -> Dict[str, Dict[str, Any]]:
+        self, event_cars: list[dict[str, Any]], group_key: str
+    ) -> dict[str, dict[str, Any]]:
         """Grup bazlı breakdown."""
         groups = {}
         for e in event_cars:
@@ -226,7 +227,7 @@ class CrossSectionalEventStudy:
 
         return breakdown
 
-    def _empty_result(self) -> Dict[str, Any]:
+    def _empty_result(self) -> dict[str, Any]:
         """Boş sonuç."""
         return {
             "average_car": 0.0,

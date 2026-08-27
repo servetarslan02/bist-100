@@ -5,7 +5,7 @@ Walk-forward, Precision@K, IC, Deflated Sharpe testleri.
 """
 
 import sys
-import os
+
 import numpy as np
 
 
@@ -202,7 +202,7 @@ def test_walk_forward_run():
     for fold in result.folds:
         assert fold.test_start > fold.train_end  # Purge gap
     passed += 1
-    print(f"  ✓ Fold details verified")
+    print("  ✓ Fold details verified")
 
     return passed, failed
 

@@ -13,16 +13,18 @@ Kaynaklar: APScheduler best practices, Endüstri standardı
 """
 
 import math
-from typing import Dict, List, Optional, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class JobStatus(str, Enum):
+class JobStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILED = "FAILED"
     TIMEOUT = "TIMEOUT"
@@ -38,7 +40,7 @@ class JobRecord:
     status: JobStatus
     duration_ms: float
     timestamp: str
-    error: Optional[str] = None
+    error: str | None = None
     retry_count: int = 0
     phase: str = ""
     triggered_by: str = "scheduler"
@@ -69,12 +71,12 @@ class JobMonitor:
     def __init__(self, max_history: int = 1000, slow_threshold_ms: float = 30000):
         self._max_history = max_history
         self._slow_threshold = slow_threshold_ms
-        self._records: List[JobRecord] = []
-        self._alerts: List[JobAlert] = []
-        self._callbacks: List[Callable] = []
+        self._records: list[JobRecord] = []
+        self._alerts: list[JobAlert] = []
+        self._callbacks: list[Callable] = []
 
         # Consecutive failure tracking
-        self._consecutive_failures: Dict[str, int] = {}
+        self._consecutive_failures: dict[str, int] = {}
 
     def record_job(
         self,
@@ -101,7 +103,7 @@ class JobMonitor:
             job_type=job_type,
             status=JobStatus(status),
             duration_ms=duration_ms,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             error=error,
             retry_count=retry_count,
             phase=phase,
@@ -128,7 +130,7 @@ class JobMonitor:
                     job_type=job_type,
                     message=f"{job_type}: {self._consecutive_failures[job_type]} ardışık failure!",
                     severity="CRITICAL",
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                 ))
         else:
             self._consecutive_failures[job_type] = 0
@@ -140,10 +142,10 @@ class JobMonitor:
                 job_type=job_type,
                 message=f"{job_type}: {duration_ms:.0f}ms (eşik: {self._slow_threshold:.0f}ms)",
                 severity="WARNING",
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             ))
 
-    def get_stats(self, job_type: str = None) -> Dict[str, Any]:
+    def get_stats(self, job_type: str = None) -> dict[str, Any]:
         """Job istatistikleri.
 
         Args:
@@ -202,7 +204,7 @@ class JobMonitor:
         failed = sum(1 for r in records if r.status == JobStatus.FAILED)
         return round(failed / len(records), 4)
 
-    def get_slow_jobs(self, threshold_ms: float = None) -> List[Dict[str, Any]]:
+    def get_slow_jobs(self, threshold_ms: float = None) -> list[dict[str, Any]]:
         """Yavaş job'ları al.
 
         Args:
@@ -225,7 +227,7 @@ class JobMonitor:
             for r in slow[-20:]  # Son 20
         ]
 
-    def get_alerts(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_alerts(self, limit: int = 50) -> list[dict[str, Any]]:
         """Alert'leri al.
 
         Args:
@@ -271,11 +273,11 @@ class JobMonitor:
             except Exception as e:
                 logger.error("Alert callback error", error=str(e))
 
-    def get_all_job_types(self) -> List[str]:
+    def get_all_job_types(self) -> list[str]:
         """Tüm job türlerini al."""
         return list(set(r.job_type for r in self._records))
 
-    def get_summary(self) -> Dict[str, Any]:
+    def get_summary(self) -> dict[str, Any]:
         """Genel özet."""
         job_types = self.get_all_job_types()
 
@@ -296,7 +298,7 @@ class JobMonitor:
         self._consecutive_failures.clear()
 
     @staticmethod
-    def _percentile(data: List[float], percentile: float) -> float:
+    def _percentile(data: list[float], percentile: float) -> float:
         """Percentile hesapla (numpy bağımlılığı yok)."""
         if not data:
             return 0.0

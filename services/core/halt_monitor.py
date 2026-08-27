@@ -9,8 +9,10 @@ ALPHA BIST — Halt Monitor
 - SPK geçici işlem yasağı
 """
 
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,11 +23,11 @@ class HaltStatus:
     halted: bool
     reason: str = ""
     halt_type: str = ""          # KAP, CORPORATE, SPK, CIRCUIT_BREAKER
-    expected_resume: Optional[str] = None
+    expected_resume: str | None = None
     action: str = ""             # "WAIT", "CANCEL_ORDERS", "NO_ACTION"
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "halted": self.halted,
             "reason": self.reason,
@@ -39,7 +41,7 @@ class HaltMonitor:
     """Şirket bazlı durdurma takibi — SQLite persistence ile."""
 
     def __init__(self):
-        self._halted_tickers: Dict[str, HaltStatus] = {}
+        self._halted_tickers: dict[str, HaltStatus] = {}
         self._restore_state()
 
     def add_halt(
@@ -47,7 +49,7 @@ class HaltMonitor:
         ticker: str,
         reason: str,
         halt_type: str = "KAP",
-        expected_resume: Optional[str] = None,
+        expected_resume: str | None = None,
     ):
         """Hisse durdurma ekle."""
         self._halted_tickers[ticker] = HaltStatus(
@@ -74,7 +76,7 @@ class HaltMonitor:
 
         return HaltStatus(halted=False, action="NO_ACTION")
 
-    def get_all_halted(self) -> Dict[str, HaltStatus]:
+    def get_all_halted(self) -> dict[str, HaltStatus]:
         """Tüm durdurulan hisseleri getir."""
         return dict(self._halted_tickers)
 
@@ -92,7 +94,7 @@ class HaltMonitor:
                 with state_store._connect() as conn:
                     conn.execute(
                         "INSERT OR REPLACE INTO halt_states (ticker, reason, halt_type, expected_resume, action, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                        (ticker, status.reason, status.halt_type, status.expected_resume, status.action, datetime.now(timezone.utc).isoformat())
+                        (ticker, status.reason, status.halt_type, status.expected_resume, status.action, datetime.now(UTC).isoformat())
                     )
         except Exception as e:
             logger.debug("Halt persist skipped", ticker=ticker, error=str(e))

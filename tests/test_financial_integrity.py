@@ -12,17 +12,18 @@ Kapsam:
 - Multi-instance invariant doğrulama
 """
 
-import sys
-import os
 import asyncio
-import duckdb
+import sys
 
-from services.portfolio.portfolio_manager import (
-    PortfolioManager, MAX_TRADES, MAX_CASH_LEDGER,
-    MAX_POSITION_HISTORY, MAX_EQUITY_CURVE,
-)
-from services.portfolio.main import PortfolioService
 from services.core.database_dev import dev_db
+from services.portfolio.main import PortfolioService
+from services.portfolio.portfolio_manager import (
+    MAX_CASH_LEDGER,
+    MAX_EQUITY_CURVE,
+    MAX_POSITION_HISTORY,
+    MAX_TRADES,
+    PortfolioManager,
+)
 
 
 async def setup():
@@ -280,7 +281,7 @@ async def test_oversell_prevention():
     pm.open_position("X", "LONG", 100, 100.0, commission=50)
 
     # 200 adet satmaya çalış
-    result = pm.close_position("X", 110.0, commission=50)
+    pm.close_position("X", 110.0, commission=50)
     # Bu 100 adet kapatır (tamamı)
 
     # Tekrar satmaya çalış (pozisyon yok)

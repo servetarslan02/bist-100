@@ -3,10 +3,10 @@ ALPHA BIST — Zero Mock / Real Data Verification Suite
 Tüm API uç noktalarını tarar ve hiçbir sahte/mock/dummy veri olmadığını doğrular.
 """
 
-import sys
 import asyncio
+import sys
+
 import httpx
-import orjson
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -30,7 +30,7 @@ async def run_audit():
     print("=" * 75)
     print("ALPHA BIST -- SIFIR SAHTE VERI (ZERO-MOCK) KAPSAMLI DENETIM TESTI")
     print("=" * 75)
-    
+
     passed = 0
     failed = 0
 
@@ -41,15 +41,15 @@ async def run_audit():
                 t0 = asyncio.get_event_loop().time()
                 res = await client.get(url)
                 lat = (asyncio.get_event_loop().time() - t0) * 1000
-                
+
                 if res.status_code != 200:
                     print(f"[HATA - {res.status_code}] {desc} ({path})")
                     failed += 1
                     continue
-                
+
                 body_text = res.text
                 has_mock = any(kw.lower() in body_text.lower() for kw in MOCK_KEYWORDS)
-                
+
                 if has_mock:
                     print(f"[SAHTE VERI TESPIT EDILDI] {desc} ({path})")
                     failed += 1

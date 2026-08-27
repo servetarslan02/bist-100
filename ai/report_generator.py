@@ -4,8 +4,9 @@ ALPHA BIST — Report Generator
 Otomatik rapor oluşturma agent'ı.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional, List
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -15,9 +16,9 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 class ReportGenerator:
     """Otomatik rapor üretici."""
 
-    def generate_daily_report(self, date: Optional[str] = None,
-                              market_summary: Optional[Dict[str, Any]] = None,
-                              signals: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+    def generate_daily_report(self, date: str | None = None,
+                              market_summary: dict[str, Any] | None = None,
+                              signals: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Günlük rapor üret."""
         target_date = date or datetime.now(_TZ_ISTANBUL).strftime("%Y-%m-%d")
         result = {"date": target_date, "timestamp": datetime.now(_TZ_ISTANBUL).isoformat(), "type": "daily"}

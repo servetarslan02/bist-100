@@ -13,14 +13,13 @@ Test kapsamı:
 - Veri koruma
 """
 
-import sys
-import os
-import hashlib
-
 import asyncio
-import duckdb
+import sys
 from pathlib import Path
-from services.core.migrations.runner import MigrationRunner, MigrationFile
+
+import duckdb
+
+from services.core.migrations.runner import MigrationFile, MigrationRunner
 
 
 def fresh_db():

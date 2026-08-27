@@ -5,19 +5,19 @@ ALPHA BIST — Walk-Forward Canonical Scoring Tests
 Walk-forward sisteminin canonical scoring pipeline ile entegrasyon testleri.
 """
 
-import sys
 import os
-import numpy as np
-import polars as pl
+import sys
 import tempfile
 from datetime import datetime, timedelta
 
+import numpy as np
+import polars as pl
 
 
 def _make_market_data(n_stocks=8, n_days=380, seed=42):
     np.random.seed(seed)
     market = {}
-    dates = pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
+    pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
     for i in range(n_stocks):
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
@@ -45,10 +45,12 @@ def _make_benchmark(market, seed=99):
 
 def _make_historical_repo():
     """Test için historical repository oluştur."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
     from services.data.historical_contracts import (
-        FundamentalSnapshot, EventSnapshot, CatalystSnapshot,
+        CatalystSnapshot,
+        EventSnapshot,
+        FundamentalSnapshot,
     )
+    from services.data.persistent_repository import PersistentHistoricalRepository
 
     fd, path = tempfile.mkstemp(suffix='.db')
     os.close(fd)
@@ -88,8 +90,8 @@ def _make_historical_repo():
 
 def test_wf_canonical_mode_works():
     """Walk-forward canonical modda çalışıyor mu?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -127,8 +129,8 @@ def test_wf_canonical_mode_works():
 
 def test_wf_legacy_mode_unchanged():
     """Walk-forward legacy mode hiç değişmemiş mi?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -158,8 +160,8 @@ def test_wf_legacy_mode_unchanged():
 
 def test_wf_with_historical_repo():
     """Walk-forward historical repository ile çalışıyor mu?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -226,8 +228,8 @@ def test_fold_data_pit_safe():
 
 def test_train_test_leakage():
     """Train verisi test'e sızıyor mu?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -263,8 +265,8 @@ def test_train_test_leakage():
 
 def test_canonical_score_deterministic_in_wf():
     """Walk-forward canonical skorlar deterministic mi?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380, seed=42)
@@ -293,7 +295,7 @@ def test_canonical_score_deterministic_in_wf():
     if results[0].total_folds != results[1].total_folds:
         issues.append(f"Fold sayısı farklı: {results[0].total_folds} vs {results[1].total_folds}")
 
-    for f1, f2 in zip(results[0].folds, results[1].folds):
+    for f1, f2 in zip(results[0].folds, results[1].folds, strict=False):
         if f1.total_return_pct != f2.total_return_pct:
             issues.append(f"Fold {f1.fold_id} return farklı: {f1.total_return_pct} vs {f2.total_return_pct}")
             break
@@ -307,8 +309,8 @@ def test_canonical_score_deterministic_in_wf():
 
 def test_future_data_mutation_invariance():
     """Gelecek veri değişimi geçmiş fold sonuçlarını etkilememeli."""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380, seed=42)
@@ -369,8 +371,8 @@ def test_future_data_mutation_invariance():
 
 def test_historical_data_used_in_fold():
     """Historical veri fold'larda gerçekten kullanılıyor mu?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -427,8 +429,8 @@ def test_historical_data_used_in_fold():
 
 def test_regime_in_walk_forward():
     """Regime değişimi walk-forward'da doğru mu?"""
-    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     from services.backtest.engine_v4 import BacktestConfig
+    from services.backtest.walk_forward_runner import WalkForwardBacktestRunner
     issues = []
 
     market = _make_market_data(8, 380)
@@ -528,7 +530,7 @@ def run_all():
     print(f"\n{'=' * 60}")
     print(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print(f"\n  HATALAR:")
+        print("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"    {i}. {issue}")
     print("=" * 60)

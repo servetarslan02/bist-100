@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
-from typing import Dict, List, Optional
 import structlog
 
 logger = structlog.get_logger()
@@ -91,10 +90,10 @@ class FeatureEngine:
         self,
         ticker: str,
         df: pl.DataFrame,
-        benchmark_df: Optional[pl.DataFrame] = None,
-        sector_returns: Optional[pl.Series] = None,
-        universe_returns: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, float]:
+        benchmark_df: pl.DataFrame | None = None,
+        sector_returns: pl.Series | None = None,
+        universe_returns: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """Tüm feature'ları hesapla ve tek dict olarak döndür."""
         if df is None or len(df) < 20:
             return {}
@@ -106,7 +105,7 @@ class FeatureEngine:
         high = df["High"].cast(pl.Float64) if "High" in df.columns else close
         low = df["Low"].cast(pl.Float64) if "Low" in df.columns else close
 
-        features: Dict[str, float] = {}
+        features: dict[str, float] = {}
 
         # A) Price Context
         features.update(self._price_context(close, high, low))
@@ -142,7 +141,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # A) Price Context
     # ------------------------------------------------------------------ #
-    def _price_context(self, close: pl.Series, high: pl.Series, low: pl.Series) -> Dict:
+    def _price_context(self, close: pl.Series, high: pl.Series, low: pl.Series) -> dict:
         f = {}
         n = len(close)
 
@@ -191,7 +190,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # B) Relative Strength
     # ------------------------------------------------------------------ #
-    def _relative_strength_vs_bm(self, close: pl.Series, bm_close: pl.Series) -> Dict:
+    def _relative_strength_vs_bm(self, close: pl.Series, bm_close: pl.Series) -> dict:
         f = {}
         stock_ret = close.pct_change()
         bm_ret = bm_close.pct_change()
@@ -212,7 +211,7 @@ class FeatureEngine:
 
         return f
 
-    def _relative_strength_vs_sector(self, close: pl.Series, sect: pl.Series) -> Dict:
+    def _relative_strength_vs_sector(self, close: pl.Series, sect: pl.Series) -> dict:
         f = {}
         stock_ret = close.pct_change()
 
@@ -229,7 +228,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # C) Trend Quality
     # ------------------------------------------------------------------ #
-    def _trend_quality(self, close: pl.Series) -> Dict:
+    def _trend_quality(self, close: pl.Series) -> dict:
         f = {}
         n = len(close)
         if n < 20:
@@ -283,7 +282,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # D) Volume
     # ------------------------------------------------------------------ #
-    def _volume_features(self, close: pl.Series, volume: pl.Series) -> Dict:
+    def _volume_features(self, close: pl.Series, volume: pl.Series) -> dict:
         f = {}
         n = len(volume)
         if n < 20:
@@ -334,7 +333,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # E) Risk
     # ------------------------------------------------------------------ #
-    def _risk_features(self, close: pl.Series, high: pl.Series, low: pl.Series) -> Dict:
+    def _risk_features(self, close: pl.Series, high: pl.Series, low: pl.Series) -> dict:
         f = {}
         n = len(close)
         returns = close.pct_change().drop_nulls()
@@ -367,8 +366,8 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     def _cross_sectional(
         self, ticker: str, close: pl.Series,
-        universe_returns: Dict[str, float],
-    ) -> Dict:
+        universe_returns: dict[str, float],
+    ) -> dict:
         f = {}
         all_rets = list(universe_returns.values())
         if len(all_rets) < 5:
@@ -393,7 +392,7 @@ class FeatureEngine:
     # ------------------------------------------------------------------ #
     # G) Fundamental Proxy
     # ------------------------------------------------------------------ #
-    def _fundamental_proxy(self, close: pl.Series, volume: pl.Series) -> Dict:
+    def _fundamental_proxy(self, close: pl.Series, volume: pl.Series) -> dict:
         f = {}
         n = len(close)
 
@@ -416,15 +415,15 @@ class FeatureEngine:
 # Helper: Tüm evreni tek seferde hesapla
 # ------------------------------------------------------------------ #
 def compute_universe_features(
-    market_data: Dict[str, pl.DataFrame],
+    market_data: dict[str, pl.DataFrame],
     benchmark_df: pl.DataFrame,
-    sector_map: Dict[str, str],
-) -> Dict[str, Dict[str, float]]:
+    sector_map: dict[str, str],
+) -> dict[str, dict[str, float]]:
     """Tüm hisseler için feature'ları hesapla."""
     engine = FeatureEngine()
 
     # Normalize
-    normalized_data: Dict[str, pl.DataFrame] = {}
+    normalized_data: dict[str, pl.DataFrame] = {}
     for ticker, df in market_data.items():
         if df is not None and len(df) > 0:
             normalized_data[ticker] = engine._normalize(df)
@@ -434,7 +433,7 @@ def compute_universe_features(
         benchmark_df = engine._normalize(benchmark_df)
 
     # Her hisse için son günlük return
-    universe_returns: Dict[str, float] = {}
+    universe_returns: dict[str, float] = {}
     for ticker, df in market_data.items():
         if df is not None and len(df) >= 2:
             try:
@@ -445,9 +444,9 @@ def compute_universe_features(
                 logger.warning("Caught Exception in compute_universe_features", exc_info=True)
 
     # Sektör bazlı ortalama return
-    sector_series: Dict[str, pl.Series] = {}
+    sector_series: dict[str, pl.Series] = {}
     if sector_map:
-        sector_dfs: Dict[str, List] = {}
+        sector_dfs: dict[str, list] = {}
         for ticker, df in market_data.items():
             if df is None or len(df) == 0:
                 continue
@@ -469,7 +468,7 @@ def compute_universe_features(
                     logger.warning("Sector series computation failed", sector=sect, exc_info=True)
 
     # Her hisse için hesapla
-    result: Dict[str, Dict[str, float]] = {}
+    result: dict[str, dict[str, float]] = {}
     for ticker, df in market_data.items():
         if df is None or len(df) == 0:
             continue

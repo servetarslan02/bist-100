@@ -8,12 +8,12 @@ FAZ 3: News & Sentiment
 """
 
 import asyncio
-import aiohttp
-import feedparser
 import time
 import urllib.parse
-from typing import Dict, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timedelta, timezone
+
+import aiohttp
+import feedparser
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +21,7 @@ logger = structlog.get_logger()
 def compute_financial_sentiment(title: str, summary: str = "") -> float:
     """Metin üzerinden gerçek, deterministik Türkçe ve İngilizce finansal NLP duygu skoru üretir (-1.0 ile +1.0 arası)."""
     text = f"{title} {summary}".lower()
-    
+
     pos_weights = {
         "rekor": 0.8, "tavan": 0.9, "kâr": 0.6, "karını artırdı": 0.75, "katladı": 0.8,
         "anlaşma": 0.6, "ihale": 0.65, "sipariş": 0.6, "büyüme": 0.5, "yükseliş": 0.55,
@@ -31,7 +31,7 @@ def compute_financial_sentiment(title: str, summary: str = "") -> float:
         "outperform": 0.6, "buy": 0.5, "upgrade": 0.65, "kazandı": 0.6, "lider": 0.4,
         "faiz indirimi": 0.55, "enflasyon düştü": 0.65, "cari fazla": 0.6, "ihracat rekoru": 0.7,
     }
-    
+
     neg_weights = {
         "taban": -0.9, "zarar": -0.7, "düşüş": -0.5, "çöküş": -0.85, "kayıp": -0.6,
         "dava": -0.6, "ceza": -0.75, "soruşturma": -0.65, "iptal": -0.7, "iflas": -0.95,
@@ -41,22 +41,22 @@ def compute_financial_sentiment(title: str, summary: str = "") -> float:
         "enflasyon": -0.50, "zam": -0.40, "faiz artışı": -0.50, "borç": -0.45, "yaptırım": -0.55,
         "cari açık": -0.50, "bütçe açığı": -0.55, "işsizlik": -0.45, "pahallılık": -0.50,
     }
-    
+
     score = 0.0
     matches = 0
     for phrase, w in pos_weights.items():
         if phrase in text:
             score += w
             matches += 1
-            
+
     for phrase, w in neg_weights.items():
         if phrase in text:
             score += w
             matches += 1
-            
+
     if matches == 0:
         return 0.0  # Kesin ve net Nötr (%0)
-        
+
     final_score = max(-1.0, min(1.0, score / max(1, matches)))
     return round(final_score, 2)
 
@@ -64,15 +64,12 @@ def compute_financial_sentiment(title: str, summary: str = "") -> float:
 def is_relevant_to_bist_and_macro(title: str, summary: str = "") -> bool:
     """Borsa İstanbul ve Türkiye makroekonomisi ile sıfır ilgisi olan üçüncü dünya/yerel gürültü haberlerini eler."""
     text = f"{title} {summary}".lower()
-    
+
     irrelevant_geos = [
-        "venezuela", "sri lanka", "somali", "nijerya", "peru", "kongo", 
+        "venezuela", "sri lanka", "somali", "nijerya", "peru", "kongo",
         "zimbabve", "haiti", "patriot hareketliliği", "yunanistan'da patriot", "starlink cihazı"
     ]
-    if any(geo in text for geo in irrelevant_geos):
-        return False
-        
-    return True
+    return not any(geo in text for geo in irrelevant_geos)
 
 
 class NewsProvider:
@@ -229,7 +226,7 @@ class NewsProvider:
         self._rss_feeds = self._load_rss_feeds()
         logger.info("NewsProvider initialized", feeds=len(self._rss_feeds))
 
-    def _load_rss_feeds(self) -> List[str]:
+    def _load_rss_feeds(self) -> list[str]:
         """RSS feed URL'lerini yükle."""
         # Önce config'den dene
         try:
@@ -251,7 +248,7 @@ class NewsProvider:
             "https://www.dunya.com/rss?kategori=sirketler",
         ]
 
-    async def fetch_financial_news_rss(self, max_items: int = 50) -> List[Dict]:
+    async def fetch_financial_news_rss(self, max_items: int = 50) -> list[dict]:
         """Tüm RSS beslemelerini paralel (eşzamanlı) olarak anında çeker."""
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -268,11 +265,11 @@ class NewsProvider:
                         for entry in feed.entries[:15]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
-                            
+
                             # Finans dışı genel gürültü filtresi
                             noise_keywords = [
-                                "sakatlık", "futbol", "maç", "süper lig", "dizi", "ünlü", "magazin", 
-                                "şampiyonlar ligi", "kandil", "hava durumu", "sıcaklıklar", "ösym", 
+                                "sakatlık", "futbol", "maç", "süper lig", "dizi", "ünlü", "magazin",
+                                "şampiyonlar ligi", "kandil", "hava durumu", "sıcaklıklar", "ösym",
                                 "ags sonuçları", "şans oyunları", "milli piyango", "deprem", "namaz"
                             ]
                             if any(k in f"{t} {s}".lower() for k in noise_keywords):
@@ -286,7 +283,7 @@ class NewsProvider:
                                     import calendar
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
-                                    dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
+                                    dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
                                     logger.warning("Caught Exception in _fetch_single_feed", exc_info=True)
@@ -319,7 +316,7 @@ class NewsProvider:
         logger.info(f"Fetched {len(all_news)} news items across {len(self._rss_feeds)} sources in parallel")
         return all_news
 
-    async def fetch_official_kap_disclosures(self, max_items: int = 25) -> List[Dict]:
+    async def fetch_official_kap_disclosures(self, max_items: int = 25) -> list[dict]:
         """Doğrudan KAP (Kamuyu Aydınlatma Platformu) resmi şirket bildirimlerini çeker."""
         url = "https://news.google.com/rss/search?q=%22KAP%22+hisse+bildirimi+borsa&hl=tr&gl=TR&ceid=TR:tr"
         headers = {
@@ -337,7 +334,7 @@ class NewsProvider:
                         for entry in feed.entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
-                            
+
                             pub_str = ""
                             epoch = time.time()
                             if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -345,7 +342,7 @@ class NewsProvider:
                                     import calendar
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
-                                    dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
+                                    dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
                                     logger.warning("Caught Exception in fetch_official_kap_disclosures", exc_info=True)
@@ -366,7 +363,7 @@ class NewsProvider:
             logger.debug(f"Official KAP fetch note: {e}")
         return items
 
-    async def fetch_official_tcmb_news(self, max_items: int = 25) -> List[Dict]:
+    async def fetch_official_tcmb_news(self, max_items: int = 25) -> list[dict]:
         """Doğrudan TCMB (Merkez Bankası) ve Makroekonomi duyuru ve kararlarını çeker."""
         url = "https://news.google.com/rss/search?q=%22TCMB%22+OR+%22Merkez+Bankas%C4%B1%22+faiz+OR+enflasyon+OR+rezerv&hl=tr&gl=TR&ceid=TR:tr"
         headers = {
@@ -384,7 +381,7 @@ class NewsProvider:
                         for entry in feed.entries[:max_items]:
                             t = entry.get("title", "")
                             s = entry.get("summary", "")
-                            
+
                             pub_str = ""
                             epoch = time.time()
                             if hasattr(entry, "published_parsed") and entry.published_parsed:
@@ -392,7 +389,7 @@ class NewsProvider:
                                     import calendar
                                     epoch = float(calendar.timegm(entry.published_parsed))
                                     tr_tz = timezone(timedelta(hours=3))
-                                    dt = datetime.fromtimestamp(epoch, tz=timezone.utc).astimezone(tr_tz)
+                                    dt = datetime.fromtimestamp(epoch, tz=UTC).astimezone(tr_tz)
                                     pub_str = dt.strftime("%d.%m %H:%M")
                                 except Exception:
                                     logger.warning("Caught Exception in fetch_official_tcmb_news", exc_info=True)
@@ -413,7 +410,7 @@ class NewsProvider:
             logger.debug(f"Official TCMB fetch note: {e}")
         return items
 
-    async def fetch_news_for_ticker(self, ticker: str, max_items: int = 15) -> List[Dict]:
+    async def fetch_news_for_ticker(self, ticker: str, max_items: int = 15) -> list[dict]:
         """629 BIST hissesinin her biri için dinamik, özel canlı haber ve KAP taraması yapar."""
         ticker_clean = ticker.replace(".IS", "").upper().strip()
         all_news = []
@@ -451,7 +448,7 @@ class NewsProvider:
 
         return all_news
 
-    def match_news_to_ticker(self, news: Dict, ticker: str) -> bool:
+    def match_news_to_ticker(self, news: dict, ticker: str) -> bool:
         """Haberi hisseyle eşleştir — TÜM BIST HİSSELERİ İÇİN DİNAMİK.
 
         Öncelik sırası:
@@ -496,10 +493,7 @@ class NewsProvider:
 
         # 4. COMPANY_NAME_MAP eşleşmesi
         company_alias = self.COMPANY_NAME_MAP.get(ticker_lower, "")
-        if company_alias and company_alias.lower() in text_lower:
-            return True
-
-        return False
+        return bool(company_alias and company_alias.lower() in text_lower)
 
 # Singleton
 news_provider = NewsProvider()

@@ -1,6 +1,7 @@
 import urllib.request
+
 import orjson
-import sys
+
 
 def verify_all():
     print("=" * 75)
@@ -34,7 +35,7 @@ def verify_all():
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=5) as resp:
-                status = resp.getcode()
+                resp.getcode()
                 html = resp.read().decode("utf-8", errors="ignore")
                 print(f"  [OK 200] {p:<25} -> {len(html):,} bytes HTML")
         except Exception as e:
@@ -61,7 +62,7 @@ def verify_all():
         try:
             req = urllib.request.Request(url, headers={"X-User-Id": "1"})
             with urllib.request.urlopen(req, timeout=5) as resp:
-                status = resp.getcode()
+                resp.getcode()
                 raw = resp.read().decode("utf-8")
                 data = orjson.loads(raw)
                 item_count = len(data) if isinstance(data, list) else len(data.keys())

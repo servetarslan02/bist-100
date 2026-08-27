@@ -16,13 +16,14 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - 2.4 Idempotency
 """
 
-import orjson
 import hashlib
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -33,15 +34,15 @@ class SystemCheckpoint:
     """Sistem checkpoint'i."""
     checkpoint_id: str
     timestamp: datetime
-    config_snapshot: Dict[str, Any]
-    portfolio_state: Dict[str, Any]
-    model_state: Optional[Dict[str, Any]]
-    feature_cache_state: Dict[str, Any]
+    config_snapshot: dict[str, Any]
+    portfolio_state: dict[str, Any]
+    model_state: dict[str, Any] | None
+    feature_cache_state: dict[str, Any]
     random_seed: int
     execution_counter: int
     hash_state: str  # Deterministik hash
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "checkpoint_id": self.checkpoint_id,
             "timestamp": self.timestamp.isoformat(),
@@ -71,10 +72,10 @@ class DeterministicRecovery:
     aynı sonuçları garanti eder.
     """
 
-    def __init__(self, storage_path: Optional[str] = None):
+    def __init__(self, storage_path: str | None = None):
         self._storage_path = Path(storage_path) if storage_path else Path(".alpha_checkpoints")
         self._storage_path.mkdir(parents=True, exist_ok=True)
-        self._checkpoints: List[SystemCheckpoint] = []
+        self._checkpoints: list[SystemCheckpoint] = []
         self._current_seed: int = 42
         self._execution_counter: int = 0
 
@@ -86,10 +87,10 @@ class DeterministicRecovery:
 
     def create_checkpoint(
         self,
-        config: Dict[str, Any],
-        portfolio_state: Dict[str, Any],
-        model_state: Optional[Dict[str, Any]] = None,
-        feature_cache: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any],
+        portfolio_state: dict[str, Any],
+        model_state: dict[str, Any] | None = None,
+        feature_cache: dict[str, Any] | None = None,
     ) -> SystemCheckpoint:
         """
         Sistem checkpoint'i oluştur.
@@ -103,11 +104,11 @@ class DeterministicRecovery:
         Returns:
             SystemCheckpoint
         """
-        checkpoint_id = f"cp_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
+        checkpoint_id = f"cp_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}_{self._execution_counter:06d}"
 
         checkpoint = SystemCheckpoint(
             checkpoint_id=checkpoint_id,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             config_snapshot=config.copy(),
             portfolio_state=portfolio_state.copy(),
             model_state=model_state.copy() if model_state else None,
@@ -131,8 +132,8 @@ class DeterministicRecovery:
 
     def restore_checkpoint(
         self,
-        checkpoint_id: Optional[str] = None,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any], int]:
+        checkpoint_id: str | None = None,
+    ) -> tuple[dict[str, Any], dict[str, Any], int]:
         """
         Checkpoint'ten durum geri yükle.
 
@@ -184,10 +185,10 @@ class DeterministicRecovery:
     def validate_determinism(
         self,
         func: Any,
-        args: Tuple,
+        args: tuple,
         expected_result: Any,
         tolerance: float = 1e-10,
-    ) -> Tuple[bool, Any]:
+    ) -> tuple[bool, Any]:
         """
         Fonksiyonun deterministik olduğunu doğrula.
 
@@ -216,7 +217,7 @@ class DeterministicRecovery:
         elif isinstance(expected_result, list):
             is_det = all(
                 abs(a - e) < tolerance
-                for a, e in zip(actual, expected_result)
+                for a, e in zip(actual, expected_result, strict=False)
                 if isinstance(a, (int, float)) and isinstance(e, (int, float))
             )
         else:
@@ -233,10 +234,10 @@ class DeterministicRecovery:
         self,
         original_run_id: str,
         reproduction_run_id: str,
-        original_metrics: Dict[str, float],
-        reproduction_metrics: Dict[str, float],
+        original_metrics: dict[str, float],
+        reproduction_metrics: dict[str, float],
         tolerance: float = 0.001,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Reproducibility raporu oluştur.
 
@@ -297,7 +298,7 @@ class DeterministicRecovery:
                           checkpoint_id=checkpoint.checkpoint_id,
                           error=str(e))
 
-    def _load_checkpoint(self, checkpoint_id: str) -> Optional[SystemCheckpoint]:
+    def _load_checkpoint(self, checkpoint_id: str) -> SystemCheckpoint | None:
         """Checkpoint'i diskten yükle."""
         filepath = self._storage_path / f"{checkpoint_id}.json"
         if not filepath.exists():
@@ -323,7 +324,7 @@ class DeterministicRecovery:
                         error=str(e))
             return None
 
-    def list_checkpoints(self) -> List[Dict[str, Any]]:
+    def list_checkpoints(self) -> list[dict[str, Any]]:
         """Mevcut checkpoint'leri listele."""
         checkpoints = []
         for filepath in sorted(self._storage_path.glob("cp_*.json")):
@@ -356,32 +357,32 @@ class IdempotencyGuard:
     """
 
     def __init__(self):
-        self._executed_operations: Dict[str, Any] = {}
+        self._executed_operations: dict[str, Any] = {}
 
-    def compute_operation_hash(self, operation: str, params: Dict[str, Any]) -> str:
+    def compute_operation_hash(self, operation: str, params: dict[str, Any]) -> str:
         """İşlem hash'i hesapla."""
         content = f"{operation}:{orjson.dumps(params, option=orjson.OPT_SORT_KEYS, default=str).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def is_already_executed(self, operation: str, params: Dict[str, Any]) -> bool:
+    def is_already_executed(self, operation: str, params: dict[str, Any]) -> bool:
         """İşlem daha önce yapılmış mı?"""
         op_hash = self.compute_operation_hash(operation, params)
         return op_hash in self._executed_operations
 
-    def record_execution(self, operation: str, params: Dict[str, Any], result: Any):
+    def record_execution(self, operation: str, params: dict[str, Any], result: Any):
         """İşlem kaydı yap."""
         op_hash = self.compute_operation_hash(operation, params)
         self._executed_operations[op_hash] = {
             "operation": operation,
             "params": params,
             "result": result,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
     def get_or_execute(
         self,
         operation: str,
-        params: Dict[str, Any],
+        params: dict[str, Any],
         func: Any,
         *args,
         **kwargs,

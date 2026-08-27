@@ -8,11 +8,11 @@ Debate gerekip gerekmediğini belirler.
 FAZ 2: Conflict Detection
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
+
 import structlog
 
-from .agent_system import AgentRole, AgentResult
+from .agent_system import AgentResult, AgentRole
 
 logger = structlog.get_logger()
 
@@ -22,10 +22,10 @@ class ConflictReport:
     """Çelişki raporu."""
     has_conflict: bool
     is_unanimous: bool
-    long_agents: List[AgentRole] = field(default_factory=list)
-    short_agents: List[AgentRole] = field(default_factory=list)
-    neutral_agents: List[AgentRole] = field(default_factory=list)
-    no_trade_agents: List[AgentRole] = field(default_factory=list)
+    long_agents: list[AgentRole] = field(default_factory=list)
+    short_agents: list[AgentRole] = field(default_factory=list)
+    neutral_agents: list[AgentRole] = field(default_factory=list)
+    no_trade_agents: list[AgentRole] = field(default_factory=list)
     requires_debate: bool = False
     conflict_score: float = 0.0  # 0-1 arası, 1 = tam çelişki
 
@@ -42,7 +42,7 @@ class ConflictReport:
         return self.long_count + self.short_count + len(self.neutral_agents)
 
     @property
-    def majority_direction(self) -> Optional[str]:
+    def majority_direction(self) -> str | None:
         """Çoğunluk yönü."""
         if self.long_count > self.short_count:
             return "LONG"
@@ -50,7 +50,7 @@ class ConflictReport:
             return "SHORT"
         return None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "has_conflict": self.has_conflict,
             "is_unanimous": self.is_unanimous,
@@ -80,8 +80,8 @@ class ConflictDetector:
 
     def detect(
         self,
-        results: Dict[AgentRole, AgentResult],
-        exclude_roles: Optional[List[AgentRole]] = None,
+        results: dict[AgentRole, AgentResult],
+        exclude_roles: list[AgentRole] | None = None,
     ) -> ConflictReport:
         """Çelişki tespit et.
 
@@ -172,8 +172,8 @@ class ConflictDetector:
 
     def detect_cross_agent_conflicts(
         self,
-        results: Dict[AgentRole, AgentResult],
-    ) -> List[Dict]:
+        results: dict[AgentRole, AgentResult],
+    ) -> list[dict]:
         """Agent'lar arası detaylı çelişki analizi."""
         conflicts = []
         valid = {r: res for r, res in results.items() if res.success}

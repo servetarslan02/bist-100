@@ -12,14 +12,15 @@ Kurumsal operasyon: diff, optimistic locking, webhook, batch silence.
 """
 
 import asyncio
-import orjson
+import copy
 import os
 import time
-import copy
-from pathlib import Path
-from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -53,17 +54,17 @@ WEBHOOK_RETRY_DELAY_S = 1.0
 @dataclass
 class PolicyDiff:
     """Policy değişiklik farkı."""
-    changed_fields: List[str] = field(default_factory=list)
-    added_keys: List[str] = field(default_factory=list)
-    removed_keys: List[str] = field(default_factory=list)
-    old_values: Dict[str, Any] = field(default_factory=dict)
-    new_values: Dict[str, Any] = field(default_factory=dict)
+    changed_fields: list[str] = field(default_factory=list)
+    added_keys: list[str] = field(default_factory=list)
+    removed_keys: list[str] = field(default_factory=list)
+    old_values: dict[str, Any] = field(default_factory=dict)
+    new_values: dict[str, Any] = field(default_factory=dict)
 
     @property
     def has_changes(self) -> bool:
         return bool(self.changed_fields or self.added_keys or self.removed_keys)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "has_changes": self.has_changes,
             "changed_fields": self.changed_fields,
@@ -90,13 +91,13 @@ class PolicyAuditEntry:
     action: str
     version: int
     actor: str
-    details: Dict[str, Any]
-    diff: Optional[Dict[str, Any]] = None
+    details: dict[str, Any]
+    diff: dict[str, Any] | None = None
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "timestamp": self.timestamp,
-            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat(),
+            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
             "action": self.action, "version": self.version,
             "actor": self.actor, "details": self.details,
         }
@@ -111,8 +112,8 @@ class PolicyAuditEntry:
 
 @dataclass
 class SilenceRule:
-    alert_type: Optional[str] = None
-    fingerprint: Optional[str] = None
+    alert_type: str | None = None
+    fingerprint: str | None = None
     start_time: float = 0.0
     end_time: float = 0.0
     reason: str = ""
@@ -133,11 +134,9 @@ class SilenceRule:
             return False
         if self.alert_type and self.alert_type != alert_type:
             return False
-        if self.fingerprint and self.fingerprint != fingerprint:
-            return False
-        return True
+        return not (self.fingerprint and self.fingerprint != fingerprint)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "alert_type": self.alert_type, "fingerprint": self.fingerprint,
             "start_time": self.start_time, "end_time": self.end_time,
@@ -148,7 +147,7 @@ class SilenceRule:
 
     @staticmethod
     def _ts_iso(ts: float) -> str:
-        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat() if ts else ""
+        return datetime.fromtimestamp(ts, tz=UTC).isoformat() if ts else ""
 
 
 # =====================================================
@@ -161,17 +160,17 @@ class VersionConflictError(Exception):
 
 @dataclass
 class AlertPolicy:
-    escalation_timeouts: Dict[str, int] = field(default_factory=lambda: dict(FALLBACK_ESCALATION_TIMEOUT_S))
-    notification_routing: Dict[str, List[str]] = field(default_factory=lambda: dict(FALLBACK_NOTIFICATION_ROUTING))
-    severity_thresholds: Dict[str, float] = field(default_factory=lambda: dict(FALLBACK_SEVERITY_THRESHOLDS))
-    silence_rules: List[SilenceRule] = field(default_factory=list)
-    _config_path: Optional[str] = None
+    escalation_timeouts: dict[str, int] = field(default_factory=lambda: dict(FALLBACK_ESCALATION_TIMEOUT_S))
+    notification_routing: dict[str, list[str]] = field(default_factory=lambda: dict(FALLBACK_NOTIFICATION_ROUTING))
+    severity_thresholds: dict[str, float] = field(default_factory=lambda: dict(FALLBACK_SEVERITY_THRESHOLDS))
+    silence_rules: list[SilenceRule] = field(default_factory=list)
+    _config_path: str | None = None
     _last_modified: float = 0.0
     _version: int = 0
-    _history: List[Dict[str, Any]] = field(default_factory=list)
-    _audit_log: List[PolicyAuditEntry] = field(default_factory=list)
-    _webhook_urls: List[str] = field(default_factory=list)
-    _lock_owner: Optional[str] = None
+    _history: list[dict[str, Any]] = field(default_factory=list)
+    _audit_log: list[PolicyAuditEntry] = field(default_factory=list)
+    _webhook_urls: list[str] = field(default_factory=list)
+    _lock_owner: str | None = None
     _lock_expires: float = 0.0
 
     # =====================================================
@@ -226,8 +225,8 @@ class AlertPolicy:
     # POLICY UPDATE (with optimistic locking)
     # =====================================================
 
-    def update(self, new_config: Dict[str, Any], actor: str = "api",
-               expected_version: int = 0) -> Dict[str, Any]:
+    def update(self, new_config: dict[str, Any], actor: str = "api",
+               expected_version: int = 0) -> dict[str, Any]:
         """Policy güncelle (optimistic locking ile).
 
         Args:
@@ -283,13 +282,13 @@ class AlertPolicy:
     # POLICY DIFF
     # =====================================================
 
-    def compute_diff(self, new_config: Dict[str, Any]) -> PolicyDiff:
+    def compute_diff(self, new_config: dict[str, Any]) -> PolicyDiff:
         """İki config arasındaki farkı hesapla (uygulamadan)."""
         old_dict = self.to_dict()
         return self._compute_diff(old_dict, new_config)
 
     @staticmethod
-    def _compute_diff(old: Dict[str, Any], new: Dict[str, Any]) -> PolicyDiff:
+    def _compute_diff(old: dict[str, Any], new: dict[str, Any]) -> PolicyDiff:
         """Diff hesaplama."""
         diff = PolicyDiff()
 
@@ -313,7 +312,7 @@ class AlertPolicy:
 
         return diff
 
-    def three_way_diff(self, base_version: int, version_a: int, version_b: int) -> Dict[str, Any]:
+    def three_way_diff(self, base_version: int, version_a: int, version_b: int) -> dict[str, Any]:
         """Üçlü karşılaştırma: base ile iki versiyon arasındaki farkları bul.
 
         Returns:
@@ -378,7 +377,7 @@ class AlertPolicy:
             "conflict_fields": list(both_changed.keys()),
         }
 
-    def _get_history_version(self, version: int) -> Optional[Dict[str, Any]]:
+    def _get_history_version(self, version: int) -> dict[str, Any] | None:
         """History'den belirli versiyonu getir."""
         if version == self._version:
             return self.to_dict()
@@ -423,20 +422,20 @@ class AlertPolicy:
         """Kilitli mi?"""
         return self._lock_owner is not None and self._lock_expires > time.time()
 
-    def get_lock_info(self) -> Dict[str, Any]:
+    def get_lock_info(self) -> dict[str, Any]:
         """Kilit bilgisi."""
         return {
             "locked": self.is_locked(),
             "owner": self._lock_owner,
             "expires_at": self._lock_expires,
-            "expires_iso": datetime.fromtimestamp(self._lock_expires, tz=timezone.utc).isoformat() if self._lock_expires else None,
+            "expires_iso": datetime.fromtimestamp(self._lock_expires, tz=UTC).isoformat() if self._lock_expires else None,
         }
 
     # =====================================================
     # ROLLBACK
     # =====================================================
 
-    def rollback(self, target_version: int = 0, actor: str = "api") -> Dict[str, Any]:
+    def rollback(self, target_version: int = 0, actor: str = "api") -> dict[str, Any]:
         if not self._history:
             return {"success": False, "error": "No history"}
 
@@ -468,7 +467,7 @@ class AlertPolicy:
     # WEBHOOK NOTIFICATION
     # =====================================================
 
-    def set_webhook_urls(self, urls: List[str]):
+    def set_webhook_urls(self, urls: list[str]):
         """Policy değişiklik webhook URL'leri."""
         self._webhook_urls = urls
 
@@ -481,7 +480,7 @@ class AlertPolicy:
             "event": "policy_change",
             "action": action,
             "version": self._version,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "diff": diff.to_dict(),
         }
 
@@ -502,26 +501,25 @@ class AlertPolicy:
                 except Exception:
                     logger.warning("Webhook notification failed (no event loop)")
 
-    async def _send_webhook(self, url: str, payload: Dict[str, Any]):
+    async def _send_webhook(self, url: str, payload: dict[str, Any]):
         """Webhook gönder (retry ile)."""
         import aiohttp
         last_error = None
         for attempt in range(WEBHOOK_RETRY_COUNT):
             try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.post(
-                        url, json=payload,
-                        headers={"Content-Type": "application/json"},
-                        timeout=aiohttp.ClientTimeout(total=10),
-                    ) as resp:
-                        if resp.status < 400:
-                            logger.info("Policy webhook sent", url=url, status=resp.status,
-                                       attempt=attempt + 1)
-                            return True
-                        else:
-                            last_error = f"HTTP {resp.status}"
-                            logger.warning("Policy webhook failed", url=url, status=resp.status,
-                                         attempt=attempt + 1)
+                async with aiohttp.ClientSession() as session, session.post(
+                    url, json=payload,
+                    headers={"Content-Type": "application/json"},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    if resp.status < 400:
+                        logger.info("Policy webhook sent", url=url, status=resp.status,
+                                   attempt=attempt + 1)
+                        return True
+                    else:
+                        last_error = f"HTTP {resp.status}"
+                        logger.warning("Policy webhook failed", url=url, status=resp.status,
+                                     attempt=attempt + 1)
             except Exception as e:
                 last_error = str(e)
                 logger.warning("Policy webhook error", url=url, error=str(e),
@@ -556,8 +554,8 @@ class AlertPolicy:
             self._persist_silence_to_db(rule, db)
         return rule
 
-    def batch_add_silences(self, rules_config: List[Dict[str, Any]],
-                           created_by: str = "system", db=None) -> List[Dict[str, Any]]:
+    def batch_add_silences(self, rules_config: list[dict[str, Any]],
+                           created_by: str = "system", db=None) -> list[dict[str, Any]]:
         """Toplu susturma ekleme (transaction, batch limit ile)."""
         # Batch size limit
         if len(rules_config) > MAX_BATCH_SILENCE_SIZE:
@@ -600,8 +598,8 @@ class AlertPolicy:
         })
         return results
 
-    def batch_remove_silences(self, filters: List[Dict[str, str]],
-                              actor: str = "api", db=None) -> Dict[str, int]:
+    def batch_remove_silences(self, filters: list[dict[str, str]],
+                              actor: str = "api", db=None) -> dict[str, int]:
         """Toplu susturma kaldırma (transaction)."""
         removed_count = 0
         removed_rules = []
@@ -660,7 +658,7 @@ class AlertPolicy:
         self._cleanup_expired_silences()
         return any(r.matches(alert_type, fingerprint) for r in self.silence_rules)
 
-    def get_active_silences(self) -> List[Dict[str, Any]]:
+    def get_active_silences(self) -> list[dict[str, Any]]:
         self._cleanup_expired_silences()
         return [r.to_dict() for r in self.silence_rules if r.is_active]
 
@@ -706,7 +704,7 @@ class AlertPolicy:
     # VALIDATION / QUERIES
     # =====================================================
 
-    def validate(self) -> List[str]:
+    def validate(self) -> list[str]:
         errors = []
         for alert_type, timeout in self.escalation_timeouts.items():
             if not isinstance(timeout, (int, float)) or timeout < 0:
@@ -722,19 +720,19 @@ class AlertPolicy:
                     errors.append(f"Invalid channel: {ch}")
         return errors
 
-    def get_escalation_timeout(self, alert_type: str) -> Optional[int]:
+    def get_escalation_timeout(self, alert_type: str) -> int | None:
         return self.escalation_timeouts.get(alert_type)
 
-    def get_notification_channels(self, severity: str) -> List[str]:
+    def get_notification_channels(self, severity: str) -> list[str]:
         return self.notification_routing.get(severity, ["log"])
 
     def get_threshold(self, key: str, default: float = 0.0) -> float:
         return self.severity_thresholds.get(key, default)
 
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> list[dict[str, Any]]:
         return self._history[-20:]
 
-    def get_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
         return [e.to_dict() for e in self._audit_log[-limit:]]
 
     # =====================================================
@@ -751,7 +749,7 @@ class AlertPolicy:
         if len(self._history) > 50:
             self._history = self._history[-50:]
 
-    def _add_audit(self, action: str, details: Dict[str, Any], diff: PolicyDiff = None):
+    def _add_audit(self, action: str, details: dict[str, Any], diff: PolicyDiff = None):
         entry = PolicyAuditEntry(
             timestamp=time.time(), action=action,
             version=self._version, actor=details.get("actor", "system"),
@@ -774,7 +772,7 @@ class AlertPolicy:
     def _cleanup_expired_silences(self):
         self.silence_rules = [r for r in self.silence_rules if not r.is_expired]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "version": self._version,
             "escalation_timeouts": self.escalation_timeouts,
@@ -783,7 +781,7 @@ class AlertPolicy:
         }
 
     @classmethod
-    def _from_dict(cls, data: Dict[str, Any], config_path: str = "") -> "AlertPolicy":
+    def _from_dict(cls, data: dict[str, Any], config_path: str = "") -> "AlertPolicy":
         policy = cls(_config_path=config_path)
         policy._last_modified = os.path.getmtime(config_path) if config_path and os.path.exists(config_path) else 0
         policy._version = data.get("version", 0)

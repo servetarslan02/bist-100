@@ -20,32 +20,36 @@ v2.0 Değişiklikleri:
 """
 
 import asyncio
-import orjson
-from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from datetime import UTC, datetime
+
 import numpy as np
+import orjson
 import structlog
 
 from ..core.config import settings
 from ..core.database import (
-    init_databases, close_databases, ch_insert,
+    ch_insert,
+    close_databases,
+    init_databases,
     redis_set,
 )
-from ..core.event_schema import CanonicalEvent, EventType
 from ..core.event_bus import (
-    ensure_topics, EventConsumer, publish_event,
+    EventConsumer,
+    ensure_topics,
+    publish_event,
 )
+from ..core.event_schema import CanonicalEvent, EventType
 from ..core.logging import setup_logging
 
 # Market State v2.0 modülleri
-from .breadth_engine import MarketBreadthEngine, BreadthResult
+from .breadth_engine import BreadthResult, MarketBreadthEngine
 from .component_states import ComponentStateEngine, ComponentStates
 from .ensemble_regime import EnsembleRegimeDetector, EnsembleResult
-from .transition_tracker import RegimeTransitionTracker
-from .risk_appetite import RiskAppetiteEngine
+from .monitoring import market_state_monitor
 from .multi_timeframe import MultiTimeframeEngine, MultiTimeframeResult
 from .output_formatter import MarketStateFormatter, MarketStateOutput
-from .monitoring import market_state_monitor
+from .risk_appetite import RiskAppetiteEngine
+from .transition_tracker import RegimeTransitionTracker
 
 logger = structlog.get_logger()
 
@@ -70,8 +74,8 @@ class MarketStateService:
         self._consumer: EventConsumer = None
 
         # Instrument states
-        self._instrument_states: Dict[int, Dict] = {}
-        self._ticker_map: Dict[str, int] = {}
+        self._instrument_states: dict[int, dict] = {}
+        self._ticker_map: dict[str, int] = {}
 
         # v2.0 Engines
         self._breadth_engine = MarketBreadthEngine(
@@ -103,15 +107,15 @@ class MarketStateService:
 
         # State
         self._current_regime: str = "UNKNOWN"
-        self._last_update: Optional[datetime] = None
-        self._last_market_state: Optional[MarketStateOutput] = None
+        self._last_update: datetime | None = None
+        self._last_market_state: MarketStateOutput | None = None
 
         # HMM returns/volatility history
-        self._returns_history: List[float] = []
-        self._volatility_history: List[float] = []
+        self._returns_history: list[float] = []
+        self._volatility_history: list[float] = []
 
         # World state (macro)
-        self._world_state: Dict[str, float] = {}
+        self._world_state: dict[str, float] = {}
 
         # News sentiment
         self._news_sentiment: float = 0.0
@@ -160,18 +164,18 @@ class MarketStateService:
         logger.info("Market State Engine v2.0 stopped")
 
     # API getter methods
-    def get_current_state(self) -> Optional[MarketStateOutput]:
+    def get_current_state(self) -> MarketStateOutput | None:
         """Mevcut market state döndür (API için)."""
         return self._last_market_state
 
-    def get_breadth(self) -> Optional[BreadthResult]:
+    def get_breadth(self) -> BreadthResult | None:
         """Son breadth sonucu döndür (API için)."""
         states = list(self._instrument_states.values())
         if not states:
             return None
         return self._breadth_engine.compute(states)
 
-    def get_ensemble_regime(self) -> Optional[EnsembleResult]:
+    def get_ensemble_regime(self) -> EnsembleResult | None:
         """Son ensemble regime sonucu döndür (API için)."""
         if not self._instrument_states:
             return None
@@ -184,11 +188,11 @@ class MarketStateService:
         volatility = np.array(self._volatility_history) if self._volatility_history else None
         return self._ensemble_detector.detect(features, returns, volatility)
 
-    def get_transition_tracker(self) -> Optional[RegimeTransitionTracker]:
+    def get_transition_tracker(self) -> RegimeTransitionTracker | None:
         """Transition tracker'ı döndür (API için)."""
         return self._transition_tracker
 
-    def get_multi_timeframe(self) -> Optional[MultiTimeframeResult]:
+    def get_multi_timeframe(self) -> MultiTimeframeResult | None:
         """Son multi-timeframe sonucu döndür (API için)."""
         if not self._instrument_states:
             return None
@@ -294,7 +298,7 @@ class MarketStateService:
                         self._volatility_history = self._volatility_history[-500:]
 
             # Recompute periodically
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             if self._last_update is None or (now - self._last_update).seconds > 30:
                 await self._compute_market_state()
                 self._last_update = now
@@ -397,7 +401,7 @@ class MarketStateService:
             # 9. Store in ClickHouse
             try:
                 ch_insert("market_states", [[
-                    datetime.now(timezone.utc),
+                    datetime.now(UTC),
                     ensemble.regime,
                     float(ensemble.confidence),
                     float(components.avg_momentum),
@@ -474,7 +478,7 @@ class MarketStateService:
         self,
         breadth: BreadthResult,
         components: ComponentStates,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Regime engine için feature dict oluştur."""
         return {
             "breadth_pct": breadth.pct_advancing,
@@ -487,7 +491,7 @@ class MarketStateService:
             "global_momentum": self._world_state.get("global_risk_appetite", 0.5) * 10,
         }
 
-    def _compute_weekly_aggregate(self, daily_states: List[Dict]) -> List[Dict]:
+    def _compute_weekly_aggregate(self, daily_states: list[dict]) -> list[dict]:
         """Günlük verilerden haftalık aggregate üret.
 
         Her hisse için haftalık ortalama change_pct ve momentum hesaplar.

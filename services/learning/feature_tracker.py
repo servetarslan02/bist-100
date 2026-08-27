@@ -10,11 +10,12 @@ SHAP-based feature importance tracking:
 KURAL: Hangi feature ne kadar önemli, trend nasıl değişiyor?
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
 from collections import defaultdict, deque
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import numpy as np
 import structlog
 
 from services.learning.config.learning_config import learning_settings
@@ -40,7 +41,7 @@ class FeatureTrend:
     avg_importance: float
     trend: str  # increasing, decreasing, stable
     volatility: float
-    regime_specific: Dict[str, float]
+    regime_specific: dict[str, float]
 
 
 class FeatureImportanceTracker:
@@ -48,18 +49,18 @@ class FeatureImportanceTracker:
 
     def __init__(self):
         self._history: deque = deque(maxlen=10000)
-        self._last_importance: Dict[str, float] = {}
-        self._regime_importance: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+        self._last_importance: dict[str, float] = {}
+        self._regime_importance: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
 
     def track(
         self,
         model: Any,
-        feature_names: List[str],
+        feature_names: list[str],
         X: np.ndarray,
         date: str,
         regime: str = "UNKNOWN",
         model_version: str = "v1",
-        sample_size: Optional[int] = None,
+        sample_size: int | None = None,
     ):
         """Feature importance kaydet.
 
@@ -109,8 +110,8 @@ class FeatureImportanceTracker:
     def get_trends(
         self,
         top_n: int = 20,
-        window_days: Optional[int] = None,
-    ) -> Dict[str, FeatureTrend]:
+        window_days: int | None = None,
+    ) -> dict[str, FeatureTrend]:
         """Feature importance trendleri.
 
         Args:
@@ -123,7 +124,7 @@ class FeatureImportanceTracker:
         cfg = learning_settings.feature_importance
         window_days = window_days or cfg.trend_window_days
 
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=window_days)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(days=window_days)).isoformat()
         recent = [h for h in self._history if h.date > cutoff]
 
         if not recent:
@@ -168,7 +169,7 @@ class FeatureImportanceTracker:
 
         return sorted_trends
 
-    def get_regime_importance(self, regime: str) -> Dict[str, float]:
+    def get_regime_importance(self, regime: str) -> dict[str, float]:
         """Rejim-specific feature importance."""
         # _regime_importance'dan veya _history'den hesapla
         if regime in self._regime_importance and self._regime_importance[regime]:
@@ -195,8 +196,8 @@ class FeatureImportanceTracker:
 
     def suggest_feature_selection(
         self,
-        min_importance: Optional[float] = None,
-    ) -> List[str]:
+        min_importance: float | None = None,
+    ) -> list[str]:
         """Düşük importance'lı feature'ları öner (çıkarılabilir)."""
         cfg = learning_settings.feature_importance
         min_importance = min_importance or cfg.min_importance_threshold
@@ -207,7 +208,7 @@ class FeatureImportanceTracker:
             if trend.avg_importance < min_importance and trend.trend == "decreasing"
         ]
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Feature importance raporu."""
         trends = self.get_trends(top_n=10)
         return {

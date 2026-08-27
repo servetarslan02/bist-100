@@ -5,14 +5,15 @@ Tüm CPU çekirdeklerini ve RAM'i kullanarak 30 yıllık BIST verisi üzerinde
 saniyede yüzlerce denemeyi paralel (Multiprocessing) olarak icra eder.
 """
 
-from typing import Dict, List, Tuple
-from dataclasses import dataclass
-import numpy as np
-import polars as pl
-import optuna
 import os
-import structlog
 import warnings
+from dataclasses import dataclass
+
+import numpy as np
+import optuna
+import polars as pl
+import structlog
+
 warnings.filterwarnings('ignore')
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
@@ -63,7 +64,7 @@ class OptimizationTrialResult:
 class BayesianMetricOptimizer:
     """Tüm CPU çekirdeklerini kullanan yüksek hızlı optimizasyon motoru."""
 
-    def __init__(self, bm_df: pl.DataFrame, stock_dict: Dict[str, pl.DataFrame]):
+    def __init__(self, bm_df: pl.DataFrame, stock_dict: dict[str, pl.DataFrame]):
         self.bm_df = bm_df
         self.stock_dict = stock_dict
         self._precompute_technicals()
@@ -300,11 +301,11 @@ class BayesianMetricOptimizer:
             fitness_score=round(fitness, 3)
         )
 
-    def run_bayesian_study(self, n_trials: int = 500) -> Tuple[StrategyParameters, List[OptimizationTrialResult]]:
+    def run_bayesian_study(self, n_trials: int = 500) -> tuple[StrategyParameters, list[OptimizationTrialResult]]:
         """Tüm CPU çekirdeklerini kullanarak paralel Optuna optimizasyonu yapar."""
         num_cores = max(1, os.cpu_count() or 4)
         logger.info(f"Yüksek hızlı Bayesian optimizasyon başlatılıyor... ({n_trials} Deneme, {num_cores} CPU Çekirdeği)")
-        trial_results: List[OptimizationTrialResult] = []
+        trial_results: list[OptimizationTrialResult] = []
 
         def objective(trial: optuna.Trial) -> float:
             params = StrategyParameters(

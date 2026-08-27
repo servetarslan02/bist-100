@@ -14,12 +14,13 @@ Referanslar:
 - OpenTelemetry specification
 """
 
-import uuid
-import time
 import asyncio
 import contextvars
-from typing import Dict, List, Optional, Any
+import time
+import uuid
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -27,19 +28,19 @@ logger = structlog.get_logger()
 # F-025: OpenTelemetry integration (optional)
 try:
     from opentelemetry import trace as otel_trace
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     _OTEL_AVAILABLE = True
 except ImportError:
     _OTEL_AVAILABLE = False
     otel_trace = None
 
 # Context variable for correlation ID propagation
-correlation_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+correlation_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
 )
-span_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+span_id_var: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "span_id", default=None
 )
 
@@ -48,15 +49,15 @@ span_id_var: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 class Span:
     """Tek bir tracing span'i."""
     span_id: str
-    parent_id: Optional[str]
+    parent_id: str | None
     correlation_id: str
     operation: str
     service: str
     start_time: float
-    end_time: Optional[float] = None
+    end_time: float | None = None
     status: str = "OK"  # OK, ERROR, TIMEOUT
-    attributes: Dict[str, Any] = field(default_factory=dict)
-    events: List[Dict[str, Any]] = field(default_factory=list)
+    attributes: dict[str, Any] = field(default_factory=dict)
+    events: list[dict[str, Any]] = field(default_factory=list)
 
     @property
     def duration_ms(self) -> float:
@@ -68,14 +69,14 @@ class Span:
         self.end_time = time.monotonic()
         self.status = status
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None):
         self.events.append({
             "name": name,
             "timestamp": time.time(),
             "attributes": attributes or {},
         })
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "span_id": self.span_id,
             "parent_id": self.parent_id,
@@ -93,9 +94,9 @@ class Span:
 class Trace:
     """Bir request'in tam trace'i."""
     correlation_id: str
-    spans: List[Span] = field(default_factory=list)
+    spans: list[Span] = field(default_factory=list)
     start_time: float = field(default_factory=time.monotonic)
-    end_time: Optional[float] = None
+    end_time: float | None = None
 
     @property
     def total_duration_ms(self) -> float:
@@ -103,7 +104,7 @@ class Trace:
             return (time.monotonic() - self.start_time) * 1000
         return (self.end_time - self.start_time) * 1000
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "correlation_id": self.correlation_id,
             "total_duration_ms": round(self.total_duration_ms, 2),
@@ -133,8 +134,8 @@ class DistributedTracer:
 
     def __init__(self, service_name: str = "alpha-bist"):
         self._service_name = service_name
-        self._traces: Dict[str, Trace] = {}
-        self._active_spans: Dict[str, Span] = {}
+        self._traces: dict[str, Trace] = {}
+        self._active_spans: dict[str, Span] = {}
         self._max_traces = 1000
         self._slow_threshold_ms = 1000  # 1 saniye
 
@@ -169,7 +170,7 @@ class DistributedTracer:
         self._traces[corr_id] = trace
 
         # Root span
-        span = self.start_span(operation, correlation_id=corr_id)
+        self.start_span(operation, correlation_id=corr_id)
 
         logger.debug("Trace started",
                     correlation_id=corr_id,
@@ -180,9 +181,9 @@ class DistributedTracer:
     def start_span(
         self,
         operation: str,
-        parent_id: Optional[str] = None,
-        correlation_id: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        parent_id: str | None = None,
+        correlation_id: str | None = None,
+        attributes: dict[str, Any] | None = None,
     ) -> Span:
         """
         Yeni span başlat.
@@ -237,7 +238,7 @@ class DistributedTracer:
                           duration_ms=round(span.duration_ms, 2),
                           threshold_ms=self._slow_threshold_ms)
 
-    def finish_trace(self, correlation_id: Optional[str] = None):
+    def finish_trace(self, correlation_id: str | None = None):
         """Trace'i bitir."""
         corr_id = correlation_id or correlation_id_var.get()
         if corr_id and corr_id in self._traces:
@@ -252,16 +253,16 @@ class DistributedTracer:
             for k in oldest:
                 del self._traces[k]
 
-    def get_current_correlation_id(self) -> Optional[str]:
+    def get_current_correlation_id(self) -> str | None:
         """Mevcut correlation ID."""
         return correlation_id_var.get()
 
-    def get_trace(self, correlation_id: str) -> Optional[Dict[str, Any]]:
+    def get_trace(self, correlation_id: str) -> dict[str, Any] | None:
         """Trace'i getir."""
         trace = self._traces.get(correlation_id)
         return trace.to_dict() if trace else None
 
-    def get_slow_traces(self, threshold_ms: Optional[float] = None) -> List[Dict[str, Any]]:
+    def get_slow_traces(self, threshold_ms: float | None = None) -> list[dict[str, Any]]:
         """Yavaş trace'leri listele."""
         threshold = threshold_ms or self._slow_threshold_ms
         slow = [
@@ -270,7 +271,7 @@ class DistributedTracer:
         ]
         return [t.to_dict() for t in sorted(slow, key=lambda t: t.total_duration_ms, reverse=True)[:20]]
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Tracing istatistikleri."""
         durations = [t.total_duration_ms for t in self._traces.values()]
         return {
@@ -288,7 +289,7 @@ class SpanContextManager:
         self._tracer = tracer
         self._operation = operation
         self._kwargs = kwargs
-        self._span: Optional[Span] = None
+        self._span: Span | None = None
 
     def __enter__(self) -> Span:
         self._span = self._tracer.start_span(self._operation, **self._kwargs)

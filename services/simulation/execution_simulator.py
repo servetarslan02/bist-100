@@ -10,16 +10,16 @@ Gercekci sanal islem:
 FAZ 10: Order & Execution Simulator
 """
 
-from typing import Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     CREATED = "CREATED"
     VALIDATED = "VALIDATED"
     RISK_APPROVED = "RISK_APPROVED"
@@ -33,12 +33,12 @@ class OrderStatus(str, Enum):
     FAILED = "FAILED"
 
 
-class OrderSide(str, Enum):
+class OrderSide(StrEnum):
     BUY = "BUY"
     SELL = "SELL"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     MARKET = "MARKET"
     LIMIT = "LIMIT"
     STOP_LIMIT = "STOP_LIMIT"
@@ -61,8 +61,8 @@ class Order:
     avg_fill_price: float = 0.0
     commission: float = 0.0
     slippage: float = 0.0
-    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    filled_at: Optional[datetime] = None
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    filled_at: datetime | None = None
     source: str = "DECISION"
     decision_id: str = ""
     risk_id: str = ""
@@ -81,7 +81,7 @@ class Fill:
     price: float
     commission: float
     slippage: float
-    filled_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    filled_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class ExecutionSimulator:
@@ -139,10 +139,7 @@ class ExecutionSimulator:
 
         # Uygulanacak fiyat
         if order.order_type == OrderType.MARKET:
-            if order.side == OrderSide.BUY:
-                fill_price = market_price * (1 + slippage)
-            else:
-                fill_price = market_price * (1 - slippage)
+            fill_price = market_price * (1 + slippage) if order.side == OrderSide.BUY else market_price * (1 - slippage)
         elif order.order_type == OrderType.LIMIT:
             if order.side == OrderSide.BUY:
                 fill_price = min(order.price, market_price * (1 + slippage))
@@ -181,7 +178,7 @@ class ExecutionSimulator:
         order.avg_fill_price = round(fill_price, 4)
         order.commission = round(commission, 2)
         order.slippage = round(slippage * 100, 4)  # Yuzde olarak
-        order.filled_at = datetime.now(timezone.utc)
+        order.filled_at = datetime.now(UTC)
 
         logger.info("Order executed",
                     order_id=order.order_id,
@@ -250,7 +247,7 @@ class ExecutionSimulator:
             price=order.avg_fill_price,
             commission=order.commission,
             slippage=order.slippage,
-            filled_at=order.filled_at or datetime.now(timezone.utc),
+            filled_at=order.filled_at or datetime.now(UTC),
         )
 
 

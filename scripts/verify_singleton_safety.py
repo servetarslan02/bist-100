@@ -5,8 +5,8 @@ Singleton Thread-Safety Verification Script
 Bu script singleton'ların asyncio ortamında güvenli olduğunu doğrular.
 """
 
-import sys
 import os
+import sys
 
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +17,7 @@ def analyze_class_safety(class_name, module_path):
     print(f"📊 {class_name} Analizi")
     print(f"{'='*60}")
 
-    with open(module_path, 'r') as f:
+    with open(module_path) as f:
         content = f.read()
 
     # Find class definition
@@ -28,12 +28,12 @@ def analyze_class_safety(class_name, module_path):
         return
 
     class_code = class_match.group(0)
-    lines = class_code.split('\n')
+    class_code.split('\n')
 
     # Analyze
     has_async = bool(re.search(r'async def|await ', class_code))
     self_writes = len(re.findall(r'self\.[a-z_]+ =', class_code))
-    init_writes = len(re.findall(r'def __init__.*?(?=\n    def |\Z)', class_code, re.DOTALL)[0].split('\n')) if 'def __init__' in class_code else 0
+    len(re.findall(r'def __init__.*?(?=\n    def |\Z)', class_code, re.DOTALL)[0].split('\n')) if 'def __init__' in class_code else 0
 
     # Count methods
     methods = re.findall(r'    def (\w+)', class_code)
@@ -45,27 +45,27 @@ def analyze_class_safety(class_name, module_path):
     print(f"  self atamaları: {self_writes}")
 
     # Safety assessment
-    print(f"\n  🔍 Güvenlik Değerlendirmesi:")
+    print("\n  🔍 Güvenlik Değerlendirmesi:")
 
     if has_async:
-        print(f"  ⚠️  Async methodlar var — await noktalarında yarış olabilir")
+        print("  ⚠️  Async methodlar var — await noktalarında yarış olabilir")
     else:
-        print(f"  ✅ Tüm methodlar sync — atomik çalışır (GIL koruması)")
+        print("  ✅ Tüm methodlar sync — atomik çalışır (GIL koruması)")
 
     if self_writes <= 1:  # Only __init__
-        print(f"  ✅ Stateless — paylaşımlı durum yok")
+        print("  ✅ Stateless — paylaşımlı durum yok")
     else:
         print(f"  ⚠️  Mutable state var ({self_writes} atama) — paylaşımlı durum mevcut")
-        print(f"     → Bu kasıtlı olabilir (cache, model, vs.)")
+        print("     → Bu kasıtlı olabilir (cache, model, vs.)")
 
     # Check for locks
     has_locks = 'Lock' in class_code or 'lock' in class_code
     if has_locks:
-        print(f"  ✅ Lock mekanizması mevcut")
+        print("  ✅ Lock mekanizması mevcut")
     elif self_writes > 1 and has_async:
-        print(f"  ❌ Lock mekanizması YOK — async ortamda riskli")
+        print("  ❌ Lock mekanizması YOK — async ortamda riskli")
     elif self_writes > 1:
-        print(f"  ℹ️  Lock yok ama sync methodlar GIL tarafından korunur")
+        print("  ℹ️  Lock yok ama sync methodlar GIL tarafından korunur")
 
     return {
         'class': class_name,

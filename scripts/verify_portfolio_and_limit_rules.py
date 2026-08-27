@@ -6,8 +6,8 @@ ALPHA BIST — PORTFÖY LİMİTLERİ, TAVAN/TABAN YÖNETİMİ, NAKİT DİNAMİĞ
 4. Piyasa Rejimine Göre Dinamik Nakit Dağılımı (%100 Nakit Koruması)
 """
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 

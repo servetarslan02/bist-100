@@ -5,8 +5,9 @@ Prometheus bağımlılığı yok — in-memory counter/gauge/histogram.
 """
 
 import time
-from typing import Dict, Any, Optional
 from collections import defaultdict
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -20,31 +21,31 @@ class ProductionMetrics:
     """
 
     def __init__(self):
-        self._counters: Dict[str, float] = defaultdict(float)
-        self._gauges: Dict[str, float] = {}
-        self._histograms: Dict[str, list] = defaultdict(list)
+        self._counters: dict[str, float] = defaultdict(float)
+        self._gauges: dict[str, float] = {}
+        self._histograms: dict[str, list] = defaultdict(list)
         self._last_reset = time.time()
 
-    def inc(self, name: str, value: float = 1.0, labels: Optional[Dict] = None):
+    def inc(self, name: str, value: float = 1.0, labels: dict | None = None):
         """Counter artır."""
         key = self._key(name, labels)
         self._counters[key] += value
 
-    def set_gauge(self, name: str, value: float, labels: Optional[Dict] = None):
+    def set_gauge(self, name: str, value: float, labels: dict | None = None):
         """Gauge ayarla."""
         key = self._key(name, labels)
         self._gauges[key] = value
 
-    def observe(self, name: str, value: float, labels: Optional[Dict] = None):
+    def observe(self, name: str, value: float, labels: dict | None = None):
         """Histogram gözlem."""
         key = self._key(name, labels)
         self._histograms[key].append(value)
 
-    def timer(self, name: str, labels: Optional[Dict] = None):
+    def timer(self, name: str, labels: dict | None = None):
         """Context manager — zaman ölçümü."""
         return _Timer(self, name, labels)
 
-    def get_all(self) -> Dict[str, Any]:
+    def get_all(self) -> dict[str, Any]:
         """Tüm metrikleri döndür."""
         result = {
             "counters": dict(self._counters),
@@ -72,7 +73,7 @@ class ProductionMetrics:
         self._last_reset = time.time()
 
     @staticmethod
-    def _key(name: str, labels: Optional[Dict]) -> str:
+    def _key(name: str, labels: dict | None) -> str:
         if labels:
             label_str = ",".join(f"{k}={v}" for k, v in sorted(labels.items()))
             return f"{name}{{{label_str}}}"
@@ -82,7 +83,7 @@ class ProductionMetrics:
 class _Timer:
     """Context manager for timing."""
 
-    def __init__(self, metrics: ProductionMetrics, name: str, labels: Optional[Dict]):
+    def __init__(self, metrics: ProductionMetrics, name: str, labels: dict | None):
         self._metrics = metrics
         self._name = name
         self._labels = labels

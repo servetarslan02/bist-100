@@ -13,10 +13,12 @@ Kullanım:
     result = engine.forecast(features, horizon=5, regime="BULL")
 """
 
-import numpy as np
-from typing import Dict, Callable, Any
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -29,7 +31,7 @@ class ModelForecast:
     predicted_return: float
     confidence: float
     horizon_days: int
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -40,12 +42,12 @@ class EnsembleResult:
     ensemble_prediction: float
     ensemble_confidence: float
     model_agreement: float        # 0-1, yüksek = modeller hemfikir
-    model_predictions: Dict[str, float]
-    model_confidences: Dict[str, float]
+    model_predictions: dict[str, float]
+    model_confidences: dict[str, float]
     regime: str
-    weights_used: Dict[str, float]
+    weights_used: dict[str, float]
     calibrated_confidence: float  # Kalibre edilmiş güven
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class EnsembleForecaster:
@@ -71,8 +73,8 @@ class EnsembleForecaster:
     }
 
     def __init__(self):
-        self._models: Dict[str, Callable] = {}
-        self._performance: Dict[str, Dict] = {}  # model → {accuracy, sharpe, ic}
+        self._models: dict[str, Callable] = {}
+        self._performance: dict[str, dict] = {}  # model → {accuracy, sharpe, ic}
 
     def register_model(self, name: str, predict_fn: Callable):
         """Model kaydet."""
@@ -81,7 +83,7 @@ class EnsembleForecaster:
 
     def forecast(
         self,
-        features: Dict[str, Any],
+        features: dict[str, Any],
         horizon: int = 5,
         regime: str = "UNKNOWN",
         ticker: str = "",
@@ -99,8 +101,8 @@ class EnsembleForecaster:
             EnsembleResult
         """
         # Her modelden tahmin al
-        forecasts: Dict[str, float] = {}
-        confidences: Dict[str, float] = {}
+        forecasts: dict[str, float] = {}
+        confidences: dict[str, float] = {}
 
         for name, model_fn in self._models.items():
             try:
@@ -172,7 +174,7 @@ class EnsembleForecaster:
             calibrated_confidence=round(calibrated, 4),
         )
 
-    def _heuristic_predict(self, features: Dict, horizon: int) -> float:
+    def _heuristic_predict(self, features: dict, horizon: int) -> float:
         """Heuristic tahmin (fallback)."""
         momentum = features.get("momentum_20d", 0)
         rsi = features.get("rsi_14", 50)
@@ -209,16 +211,16 @@ class EnsembleForecaster:
         self._performance[model_name] = {
             "accuracy": accuracy,
             "sharpe": sharpe,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(UTC).isoformat(),
         }
 
-    def get_model_performance(self) -> Dict[str, Dict]:
+    def get_model_performance(self) -> dict[str, dict]:
         """Model performansları."""
         return self._performance
 
 
 # Built-in models
-def heuristic_model(features: Dict, horizon: int) -> tuple:
+def heuristic_model(features: dict, horizon: int) -> tuple:
     """Heuristic model."""
     momentum = features.get("momentum_20d", 0)
     rsi = features.get("rsi_14", 50)
@@ -232,7 +234,7 @@ def heuristic_model(features: Dict, horizon: int) -> tuple:
     return pred, conf
 
 
-def momentum_model(features: Dict, horizon: int) -> tuple:
+def momentum_model(features: dict, horizon: int) -> tuple:
     """Momentum model."""
     mom_5d = features.get("momentum_5d", 0)
     mom_20d = features.get("momentum_20d", 0)
@@ -241,7 +243,7 @@ def momentum_model(features: Dict, horizon: int) -> tuple:
     return pred, conf
 
 
-def statistical_model(features: Dict, horizon: int) -> tuple:
+def statistical_model(features: dict, horizon: int) -> tuple:
     """Statistical model (mean reversion)."""
     rsi = features.get("rsi_14", 50)
     bb_position = features.get("bb_position", 0.5)

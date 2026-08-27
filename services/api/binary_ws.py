@@ -26,7 +26,8 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, Any, Optional, Set
+from typing import Any
+
 import structlog
 
 try:
@@ -313,7 +314,7 @@ class ProtobufMessage:
         return msg.SerializeToString()
 
     @classmethod
-    def decode(cls, data: bytes) -> Dict[str, Any]:
+    def decode(cls, data: bytes) -> dict[str, Any]:
         """Protobuf binary → Dict."""
         if not HAS_PROTOBUF:
             return cls._fallback_decode(data)
@@ -450,7 +451,7 @@ class ProtobufMessage:
         return orjson.dumps(data)
 
     @classmethod
-    def _fallback_decode(cls, data: bytes) -> Dict[str, Any]:
+    def _fallback_decode(cls, data: bytes) -> dict[str, Any]:
         """Protobuf decode başarısızsa orjson fallback."""
         try:
             return orjson.loads(data)
@@ -466,9 +467,9 @@ class BinaryWebSocket:
     """
 
     def __init__(self):
-        self._clients: Set = set()
+        self._clients: set = set()
         self._running = False
-        self._msg_handler: Optional[callable] = None
+        self._msg_handler: callable | None = None
 
     def on_message(self, handler: callable):
         """Mesaj handler'ı kaydet."""
@@ -589,7 +590,7 @@ class BinaryWebSocket:
         )
         await self._broadcast_binary(message)
 
-    async def broadcast_json(self, data: Dict[str, Any]):
+    async def broadcast_json(self, data: dict[str, Any]):
         """JSON fallback — eski istemciler için."""
         message = orjson.dumps(data, default=str)
         await self._broadcast_binary(message)
@@ -633,7 +634,7 @@ class BinaryWebSocket:
                 logger.warning("Caught Exception in stop", exc_info=True)
         self._clients.clear()
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         return {
             "clients": len(self._clients),

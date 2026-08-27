@@ -1,9 +1,9 @@
 """
 Test Turkish financial portals: Doviz.com, Bigpara, Mynet, IsYatirim
 """
-import requests
-import orjson
 import sys
+
+import requests
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')

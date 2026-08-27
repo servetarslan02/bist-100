@@ -8,8 +8,8 @@ Backtest'te kullanılan tüm historical veriler bu contract'lar üzerinden geçe
 KURAL: publication_date <= current_date olmayan veri KULLANILAMAZ.
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -21,7 +21,7 @@ class FundamentalSnapshot:
     ticker: str
     period_end: str            # Dönem sonu (YYYY-MM-DD) — örn: 2025-06-30
     available_at: str          # Açıklanma tarihi (YYYY-MM-DD) — örn: 2025-08-14
-    values: Dict[str, Any]     # Fundamental değerler
+    values: dict[str, Any]     # Fundamental değerler
     source: str = "unknown"
     status: str = "FRESH"      # FRESH / STALE / MISSING / UNKNOWN
 
@@ -74,7 +74,7 @@ class HistoricalDataRepository:
         self,
         ticker: str,
         as_of_date: str,
-    ) -> List[FundamentalSnapshot]:
+    ) -> list[FundamentalSnapshot]:
         """Belirli tarihte bilinen fundamental snapshot'ları döndür.
 
         Args:
@@ -90,8 +90,8 @@ class HistoricalDataRepository:
         self,
         ticker: str,
         as_of_date: str,
-        event_types: Optional[List[str]] = None,
-    ) -> List[EventSnapshot]:
+        event_types: list[str] | None = None,
+    ) -> list[EventSnapshot]:
         """Belirli tarihte bilinen KAP/News event'lerini döndür.
 
         Args:
@@ -108,7 +108,7 @@ class HistoricalDataRepository:
         self,
         ticker: str,
         as_of_date: str,
-    ) -> List[CatalystSnapshot]:
+    ) -> list[CatalystSnapshot]:
         """Belirli tarihte bilinen catalyst'leri döndür.
 
         Args:
@@ -137,13 +137,13 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
     """In-memory historical repository (test ve fixture için)."""
 
     def __init__(self):
-        self._fundamentals: List[FundamentalSnapshot] = []
-        self._events: List[EventSnapshot] = []
-        self._catalysts: List[CatalystSnapshot] = []
+        self._fundamentals: list[FundamentalSnapshot] = []
+        self._events: list[EventSnapshot] = []
+        self._catalysts: list[CatalystSnapshot] = []
 
     def get_fundamental_snapshots(
         self, ticker: str, as_of_date: str,
-    ) -> List[FundamentalSnapshot]:
+    ) -> list[FundamentalSnapshot]:
         return sorted(
             [s for s in self._fundamentals
              if s.ticker == ticker and s.available_at <= as_of_date],
@@ -153,8 +153,8 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
 
     def get_event_snapshots(
         self, ticker: str, as_of_date: str,
-        event_types: Optional[List[str]] = None,
-    ) -> List[EventSnapshot]:
+        event_types: list[str] | None = None,
+    ) -> list[EventSnapshot]:
         events = [
             s for s in self._events
             if s.ticker == ticker and s.published_at[:10] <= as_of_date
@@ -165,7 +165,7 @@ class InMemoryHistoricalRepository(HistoricalDataRepository):
 
     def get_catalyst_snapshots(
         self, ticker: str, as_of_date: str,
-    ) -> List[CatalystSnapshot]:
+    ) -> list[CatalystSnapshot]:
         return sorted(
             [s for s in self._catalysts
              if s.ticker == ticker and s.announcement_date <= as_of_date],

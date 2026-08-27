@@ -1,4 +1,5 @@
 import urllib.request
+
 import orjson
 
 tests = [

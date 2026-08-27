@@ -16,20 +16,21 @@ Kaynaklar:
 """
 
 import time
-from typing import Dict, Any, Optional, List
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from .base import adapter_registry
-from .google_trends import google_trends_adapter
 from .bkm_adapter import bkm_adapter
-from .kariyer_net import kariyer_net_adapter
 from .eksi_sozluk import eksi_sozluk_adapter
+from .feature_store import feature_store
+from .google_trends import google_trends_adapter
 from .investing_adapter import investing_adapter
-from .satellite_adapter import satellite_adapter
+from .kariyer_net import kariyer_net_adapter
 from .llm_sentiment import llm_sentiment
 from .reconciliation import reconciler
-from .feature_store import feature_store
+from .satellite_adapter import satellite_adapter
 
 logger = structlog.get_logger()
 
@@ -42,8 +43,8 @@ class AlternativeFeatureEngine:
 
     def __init__(self, llm_client=None):
         self._initialized = False
-        self._feature_cache: Dict[str, Dict[str, float]] = {}
-        self._feature_cache_ttl: Dict[str, float] = {}
+        self._feature_cache: dict[str, dict[str, float]] = {}
+        self._feature_cache_ttl: dict[str, float] = {}
         self._cache_ttl_seconds = 3600  # 1 hour
 
         # LLM client'ı sentiment analyzer'a bağla
@@ -71,10 +72,10 @@ class AlternativeFeatureEngine:
     async def compute_all_features(
         self,
         ticker: str,
-        sources: Optional[List[str]] = None,
-        sector: Optional[str] = None,
-        extra_data: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, float]:
+        sources: list[str] | None = None,
+        sector: str | None = None,
+        extra_data: dict[str, Any] | None = None,
+    ) -> dict[str, float]:
         """Tüm alternative data kaynaklarından feature hesapla.
 
         Args:
@@ -98,7 +99,7 @@ class AlternativeFeatureEngine:
                 return self._feature_cache[cache_key]
 
         # Paralel veri toplama
-        all_features: Dict[str, float] = {}
+        all_features: dict[str, float] = {}
 
         # 1. Adapter'lardan veri topla
         adapter_results = await adapter_registry.collect_all(ticker, sources)
@@ -126,7 +127,7 @@ class AlternativeFeatureEngine:
         all_features.update(composite)
 
         # 6. Feature store'a yaz
-        feature_store.put(ticker, datetime.now(timezone.utc).strftime("%Y-%m-%d"), all_features)
+        feature_store.put(ticker, datetime.now(UTC).strftime("%Y-%m-%d"), all_features)
 
         duration = (time.monotonic() - start) * 1000
 
@@ -147,8 +148,8 @@ class AlternativeFeatureEngine:
     async def _compute_llm_features(
         self,
         ticker: str,
-        extra_data: Dict[str, Any],
-    ) -> Dict[str, float]:
+        extra_data: dict[str, Any],
+    ) -> dict[str, float]:
         """LLM sentiment feature'ları hesapla."""
         features = {}
 
@@ -190,7 +191,7 @@ class AlternativeFeatureEngine:
 
         return features
 
-    def _compute_composite_features(self, features: Dict[str, float]) -> Dict[str, float]:
+    def _compute_composite_features(self, features: dict[str, float]) -> dict[str, float]:
         """Cross-source bileşik feature'lar."""
         composite = {}
 
@@ -227,7 +228,7 @@ class AlternativeFeatureEngine:
 
         return composite
 
-    def get_feature_names(self) -> List[str]:
+    def get_feature_names(self) -> list[str]:
         """Tüm mümkün feature adları."""
         return [
             # Google Trends
@@ -269,7 +270,7 @@ class AlternativeFeatureEngine:
             "price_vs_competitors",
         ]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Engine durumu."""
         return {
             "initialized": self._initialized,

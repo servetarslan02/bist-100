@@ -17,9 +17,9 @@ Mask = 0 → Fiyat güvenilir DEĞİL, feature hesaplamasından çıkar
 Kaynak: Du (2026) — mask-first design tek başına +0.44 Sharpe katkısı
 """
 
-import numpy as np
-from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +30,7 @@ class MaskResult:
     """Mask sonucu."""
     ticker: str
     mask: np.ndarray        # 1 = valid, 0 = invalid
-    reason: Dict[int, str]  # index → neden invalid
+    reason: dict[int, str]  # index → neden invalid
     valid_count: int
     total_count: int
     valid_pct: float
@@ -57,7 +57,7 @@ class TradabilityMask:
         low: np.ndarray,
         close: np.ndarray,
         volume: np.ndarray,
-        prev_close: Optional[np.ndarray] = None,
+        prev_close: np.ndarray | None = None,
         is_small_cap: bool = False,
     ) -> MaskResult:
         """Fiyat serisi için tradability mask hesapla.
@@ -165,9 +165,9 @@ class TradabilityMask:
 
     def apply_mask_to_features(
         self,
-        features: Dict[str, np.ndarray],
+        features: dict[str, np.ndarray],
         mask: np.ndarray,
-    ) -> Dict[str, np.ndarray]:
+    ) -> dict[str, np.ndarray]:
         """Feature'lara mask uygula — invalid günleri NaN yap.
 
         Kritik: Mask=0 olan günler feature hesaplamasında KULLANILMAMALI.
@@ -188,7 +188,7 @@ class TradabilityMask:
         close: np.ndarray,
         volume: np.ndarray,
         mask: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Fiyat dizilerine mask uygula."""
         return (
             np.where(mask == 1, open_, np.nan),
@@ -198,7 +198,7 @@ class TradabilityMask:
             np.where(mask == 1, volume, np.nan),
         )
 
-    def get_mask_stats(self, mask: np.ndarray) -> Dict:
+    def get_mask_stats(self, mask: np.ndarray) -> dict:
         """Mask istatistikleri."""
         total = len(mask)
         valid = int(np.sum(mask))

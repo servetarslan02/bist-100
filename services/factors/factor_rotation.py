@@ -2,7 +2,8 @@
 
 Rejime göre faktör rotasyonu, momentum-based rotation, dynamic weighting.
 """
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -39,10 +40,10 @@ REGIME_FACTOR_MAP = {
 
 
 def detect_regime(
-    market_returns: List[float],
+    market_returns: list[float],
     volatility_window: int = 20,
     trend_window: int = 60,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Piyasa rejimini tespit et.
 
     Args:
@@ -104,9 +105,9 @@ def detect_regime(
 
 def get_rotation_weights(
     regime: str,
-    current_weights: Optional[Dict[str, float]] = None,
+    current_weights: dict[str, float] | None = None,
     rotation_strength: float = 0.5,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """Rejime göre faktör ağırlıklarını döndür.
 
     Args:
@@ -138,9 +139,9 @@ def get_rotation_weights(
 
 
 def calculate_rotation_signal(
-    factor_performance: Dict[str, float],
+    factor_performance: dict[str, float],
     lookback_periods: int = 20,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Faktör momentum sinyali — hangi faktörler performans gösteriyor.
 
     Args:

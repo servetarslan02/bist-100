@@ -12,18 +12,17 @@ Kapsam:
 - Audit log completeness
 """
 
-import sys
-import os
-import orjson
 import asyncio
+import sys
+
 import duckdb
-import time
+import structlog
 
 from services.core.alert_policy import (
-    AlertPolicy, PolicyDiff, VersionConflictError, SilenceRule,
+    AlertPolicy,
+    PolicyDiff,
+    VersionConflictError,
 )
-from services.core.alerting import AlertingSystem
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -457,9 +456,8 @@ async def test_batch_silence_audit():
 
     # Detail kontrolü
     batch_add = [e for e in audit if e.get("action") == "batch_silence_add"]
-    if batch_add:
-        if batch_add[0].get("details", {}).get("count") != 2:
-            issues.append(f"batch count: {batch_add[0].get('details', {}).get('count')}")
+    if batch_add and batch_add[0].get("details", {}).get("count") != 2:
+        issues.append(f"batch count: {batch_add[0].get('details', {}).get('count')}")
 
     return "Batch Silence Audit", len(issues) == 0, issues
 

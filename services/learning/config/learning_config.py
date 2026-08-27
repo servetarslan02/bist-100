@@ -5,8 +5,9 @@ Tüm eşikler, parametreler ve konfigürasyonlar tek merkezden yönetilir.
 Hardcoded değerler YASAKTIR — hepsi buradan okunur.
 """
 
-from pydantic import BaseModel, Field
 import os
+
+from pydantic import BaseModel, Field
 
 
 class CalibrationConfig(BaseModel):

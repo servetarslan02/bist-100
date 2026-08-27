@@ -10,9 +10,10 @@ ROADMAP v3.0 FAZ 1, 4:
 KURAL: Gelecek veriyi train'de kullanmak = ölüm.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -62,8 +63,8 @@ class WalkForwardResult:
     worst_fold_return: float
     best_fold_return: float
     deflated_sharpe: float
-    folds: List[WalkForwardFold]
-    summary: Dict[str, Any] = field(default_factory=dict)
+    folds: list[WalkForwardFold]
+    summary: dict[str, Any] = field(default_factory=dict)
 
 
 class WalkForwardEngine:
@@ -92,8 +93,8 @@ class WalkForwardEngine:
 
     def create_folds(
         self,
-        dates: List[str],
-    ) -> List[Dict[str, Any]]:
+        dates: list[str],
+    ) -> list[dict[str, Any]]:
         """Purge + embargo korumalı fold'lar oluştur.
 
         Returns:
@@ -140,15 +141,15 @@ class WalkForwardEngine:
 
     def run_walk_forward(
         self,
-        predictions: Optional[List[Dict[str, Any]]] = None,  # {date, ticker, score, predicted_return}
-        actual_returns: Optional[Dict[str, Dict[str, float]]] = None,  # {date: {ticker: return}}
-        dates: Optional[List[str]] = None,
+        predictions: list[dict[str, Any]] | None = None,  # {date, ticker, score, predicted_return}
+        actual_returns: dict[str, dict[str, float]] | None = None,  # {date: {ticker: return}}
+        dates: list[str] | None = None,
         # Geriye uyumlu alternatif parametreler (test_phase11_12)
-        signals: Optional[List[Dict[str, Any]]] = None,
-        price_data: Optional[Dict] = None,
-        train_days: Optional[int] = None,
-        test_days: Optional[int] = None,
-        step_days: Optional[int] = None,
+        signals: list[dict[str, Any]] | None = None,
+        price_data: dict | None = None,
+        train_days: int | None = None,
+        test_days: int | None = None,
+        step_days: int | None = None,
     ) -> WalkForwardResult:
         """Walk-forward validation çalıştır.
 
@@ -254,11 +255,11 @@ class WalkForwardEngine:
 
     def _calculate_fold_metrics(
         self,
-        predictions: List[Dict],
-        actual_returns: Dict[str, Dict[str, float]],
+        predictions: list[dict],
+        actual_returns: dict[str, dict[str, float]],
         start_date: str,
         end_date: str,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Tek fold için metrik hesapla."""
         if not predictions:
             return {}
@@ -378,7 +379,7 @@ class WalkForwardEngine:
 
         return max(0, adjusted_sharpe * np.sqrt(252))
 
-    def _aggregate_results(self, folds: List[WalkForwardFold]) -> WalkForwardResult:
+    def _aggregate_results(self, folds: list[WalkForwardFold]) -> WalkForwardResult:
         """Fold sonuçlarını birleştir."""
         if not folds:
             return self._empty_result()

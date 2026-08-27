@@ -11,8 +11,9 @@ Kullanım:
     await r.set("key", "value")
 """
 
-import os
 import asyncio
+import os
+
 import structlog
 
 try:

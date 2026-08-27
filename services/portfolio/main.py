@@ -9,15 +9,17 @@ v2.0: PortfolioManager v2.0 muhasebe altyapısıyla uyumlu.
 
 import asyncio
 import os
-from datetime import datetime, timezone, date
-from typing import Dict, List, Any, Optional
+from datetime import UTC, date, datetime
+from typing import Any
+
 import structlog
 
-from ..core.database import pg_fetch, pg_fetchrow, pg_execute, pg_fetchval, get_pg_pool
-from ..core.db_lock import CoordinatedLock, get_all_metrics, get_health_report
 from ..core.config_watcher import ConfigWatcher
+from ..core.database import get_pg_pool, pg_execute, pg_fetch, pg_fetchrow, pg_fetchval
+from ..core.db_lock import CoordinatedLock, get_all_metrics, get_health_report
 from ..portfolio.portfolio_manager import (
-    PortfolioManager, CommissionModel,
+    CommissionModel,
+    PortfolioManager,
 )
 
 logger = structlog.get_logger()
@@ -34,15 +36,15 @@ class PortfolioService:
 
     def __init__(self, initial_capital: float = 10000000.0):
         self._running = False
-        self._portfolio_id: Optional[int] = None
+        self._portfolio_id: int | None = None
         self._pm = PortfolioManager(initial_capital=initial_capital)
         self._commission_model = CommissionModel()
-        self._position_cache: Dict[str, Dict] = {}
+        self._position_cache: dict[str, dict] = {}
         self._last_snapshot_date: str = ""
         self._daily_realized_pnl: float = 0.0
         self._daily_commission: float = 0.0
         self._trade_lock = asyncio.Lock()  # Fallback in-process lock
-        self._coordinated_lock: Optional[CoordinatedLock] = None  # Initialized in start()
+        self._coordinated_lock: CoordinatedLock | None = None  # Initialized in start()
 
     # =====================================================
     # LIFECYCLE
@@ -94,7 +96,7 @@ class PortfolioService:
                 logger.warning("Equity snapshot save failed during stop", error=str(e))
         logger.info("Portfolio Service v2.0 stopped")
 
-    def _on_config_change(self, new_config: Dict[str, Any]):
+    def _on_config_change(self, new_config: dict[str, Any]):
         """Config değişikliğinde çağrılır."""
         try:
             # Risk limitlerini güncelle
@@ -116,9 +118,9 @@ class PortfolioService:
     def _safe_parse_ts(raw) -> datetime:
         """Timestamp'i güvenli şekilde datetime'a çevir."""
         if not raw:
-            return datetime.now(timezone.utc)
+            return datetime.now(UTC)
         if isinstance(raw, datetime):
-            return raw if raw.tzinfo else raw.replace(tzinfo=timezone.utc)
+            return raw if raw.tzinfo else raw.replace(tzinfo=UTC)
         try:
             s = str(raw).strip()
             # ISO format: 2026-08-17T04:00:00+00:00 veya 2026-08-17 04:00:00
@@ -126,9 +128,9 @@ class PortfolioService:
                 return datetime.fromisoformat(s.replace('Z', '+00:00'))
             # Naive timestamp → UTC varsay
             dt = datetime.fromisoformat(s)
-            return dt.replace(tzinfo=timezone.utc)
+            return dt.replace(tzinfo=UTC)
         except (ValueError, TypeError):
-            return datetime.now(timezone.utc)
+            return datetime.now(UTC)
 
     async def _load_state(self):
         """DB'den portföy durumunu eksiksiz yükle.
@@ -273,7 +275,7 @@ class PortfolioService:
                    equity_curve_points=len(self._pm._equity_curve),
                    daily_pnl_points=len(self._pm._daily_pnl))
 
-    async def get_closed_positions(self, limit: int = 50) -> List[Dict]:
+    async def get_closed_positions(self, limit: int = 50) -> list[dict]:
         """Kapalı pozisyonların tarihsel kayıtları.
 
         ticker doğrudan position_history'den alınır (instruments JOIN yok).
@@ -286,7 +288,7 @@ class PortfolioService:
         """, self._portfolio_id, limit)
         return rows
 
-    async def get_daily_pnl_history(self, limit: int = 252) -> List[Dict]:
+    async def get_daily_pnl_history(self, limit: int = 252) -> list[dict]:
         """Günlük P&L geçmişi."""
         try:
             rows = await pg_fetch(
@@ -367,7 +369,7 @@ class PortfolioService:
         stop_price: float = 0.0,
         target_price: float = 0.0,
         sector: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Alım işlemi — v2.0 muhasebe ile (race-safe)."""
         if not self._running:
             return {"success": False, "error": "Servis çalışmıyor"}
@@ -395,7 +397,7 @@ class PortfolioService:
         quantity: int,
         price: float,
         instrument_id: int = 0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Satış işlemi — v2.0 muhasebe ile (race-safe)."""
         if not self._running:
             return {"success": False, "error": "Servis çalışmıyor"}
@@ -415,7 +417,7 @@ class PortfolioService:
         except RuntimeError as e:
             return {"success": False, "error": str(e)}
 
-    async def update_prices(self, prices: Dict[str, float]):
+    async def update_prices(self, prices: dict[str, float]):
         """Fiyat güncelle + equity snapshot."""
         self._pm.update_prices(prices)
 
@@ -454,7 +456,7 @@ class PortfolioService:
     async def _execute_buy_atomic(
         self, ticker, quantity, price, instrument_id,
         stop_price, target_price, sector
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Atomik alım işlemi (lock altında çağrılır)."""
         commission = self._commission_model.calculate(quantity * price)
 
@@ -489,7 +491,7 @@ class PortfolioService:
 
     async def _execute_sell_atomic(
         self, ticker, quantity, price, instrument_id
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Atomik satış işlemi (lock altında çağrılır)."""
         if ticker not in self._pm._positions:
             return {"success": False, "error": f"{ticker} pozisyonu yok"}
@@ -531,11 +533,11 @@ class PortfolioService:
 
         return result
 
-    def get_lock_metrics(self) -> Dict[str, Any]:
+    def get_lock_metrics(self) -> dict[str, Any]:
         """Lock performans metrikleri."""
         return get_all_metrics()
 
-    def get_health_status(self) -> Dict[str, Any]:
+    def get_health_status(self) -> dict[str, Any]:
         """Portfolio servis sağlık durumu (lock durumu dahil)."""
         lock_health = get_health_report()
         pf = self._pm.get_portfolio()
@@ -623,7 +625,7 @@ class PortfolioService:
             "current_price": price,
         }
 
-    async def _persist_sell(self, ticker: str, quantity: int, price: float, commission: float, result: Dict, instrument_id: int = 0):
+    async def _persist_sell(self, ticker: str, quantity: int, price: float, commission: float, result: dict, instrument_id: int = 0):
         """Satışı DB'ye kaydet."""
         realized_pnl = result.get("realized_pnl", 0)
 
@@ -734,15 +736,15 @@ class PortfolioService:
     # QUERIES — DB-backed
     # =====================================================
 
-    async def get_portfolio(self) -> Dict[str, Any]:
+    async def get_portfolio(self) -> dict[str, Any]:
         """Portföy durumu (in-memory + DB doğrulama)."""
         return self._pm.get_portfolio()
 
-    async def get_accounting(self) -> Dict[str, Any]:
+    async def get_accounting(self) -> dict[str, Any]:
         """Muhasebe özeti."""
         return self._pm.get_accounting_summary()
 
-    async def get_cash_ledger(self, limit: int = 100) -> List[Dict]:
+    async def get_cash_ledger(self, limit: int = 100) -> list[dict]:
         """DB'den nakit hareket geçmişi."""
         rows = await pg_fetch(
             "SELECT * FROM cash_ledger WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
@@ -750,7 +752,7 @@ class PortfolioService:
         )
         return rows
 
-    async def get_position_history(self, ticker: str = "", limit: int = 100) -> List[Dict]:
+    async def get_position_history(self, ticker: str = "", limit: int = 100) -> list[dict]:
         """DB'den pozisyon geçmişi."""
         if ticker:
             rows = await pg_fetch(
@@ -764,7 +766,7 @@ class PortfolioService:
             )
         return rows
 
-    async def get_equity_snapshots(self, limit: int = 252) -> List[Dict]:
+    async def get_equity_snapshots(self, limit: int = 252) -> list[dict]:
         """DB'den equity snapshot'ları."""
         rows = await pg_fetch(
             "SELECT * FROM equity_snapshots WHERE portfolio_id = ? ORDER BY id DESC LIMIT ?",
@@ -772,15 +774,15 @@ class PortfolioService:
         )
         return rows
 
-    async def get_metrics(self) -> Dict[str, Any]:
+    async def get_metrics(self) -> dict[str, Any]:
         """Performans metrikleri."""
         return self._pm.get_metrics()
 
-    async def get_risk_metrics(self) -> Dict[str, Any]:
+    async def get_risk_metrics(self) -> dict[str, Any]:
         """Risk metrikleri."""
         return self._pm.get_risk_metrics()
 
-    async def get_trade_history(self, limit: int = 100) -> List[Dict]:
+    async def get_trade_history(self, limit: int = 100) -> list[dict]:
         """Trade geçmişi."""
         return self._pm.get_trade_history(limit)
 
@@ -792,11 +794,17 @@ portfolio_service = PortfolioService()
 # =====================================================
 # Portfolio Enhancements Entegrasyonu
 # =====================================================
-def get_portfolio_enhancements() -> Dict[str, Any]:
+def get_portfolio_enhancements() -> dict[str, Any]:
     """Portfolio enhancement servislerini getir."""
     result = {}
     try:
-        from .enhancements import TaxModel, DividendHandler, BenchmarkEngine, PerformanceAttribution, MultiCurrencyHandler
+        from .enhancements import (
+            BenchmarkEngine,
+            DividendHandler,
+            MultiCurrencyHandler,
+            PerformanceAttribution,
+            TaxModel,
+        )
         result["tax_model"] = TaxModel()
         result["dividend_handler"] = DividendHandler()
         result["benchmark_engine"] = BenchmarkEngine()

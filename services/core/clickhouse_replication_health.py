@@ -8,6 +8,7 @@ Kullanım:
 """
 
 import structlog
+
 from .database import ch_execute
 
 logger = structlog.get_logger()

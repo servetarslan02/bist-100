@@ -2,7 +2,8 @@
 
 Risk-adjusted, sector-neutral, regime-based ranking.
 """
-from typing import Dict, Any, List, Optional
+from typing import Any
+
 import numpy as np
 import structlog
 
@@ -24,12 +25,12 @@ REGIME_WEIGHTS = {
 
 
 def rank_stocks(
-    universe: List[Dict[str, Any]],
-    factor_weights: Optional[Dict[str, float]] = None,
+    universe: list[dict[str, Any]],
+    factor_weights: dict[str, float] | None = None,
     regime: str = "NORMAL",
     sector_neutral: bool = False,
     risk_adjust: bool = True,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """Çok faktörlü hisse sıralaması — risk-adjusted.
 
     Args:
@@ -130,14 +131,14 @@ def rank_stocks(
 
 
 def get_top_n(
-    ranked: List[Dict[str, Any]], n: int = 10
-) -> List[Dict[str, Any]]:
+    ranked: list[dict[str, Any]], n: int = 10
+) -> list[dict[str, Any]]:
     """İlk N hisseyi döndür."""
     return ranked[:n]
 
 
 def get_bottom_n(
-    ranked: List[Dict[str, Any]], n: int = 10
-) -> List[Dict[str, Any]]:
+    ranked: list[dict[str, Any]], n: int = 10
+) -> list[dict[str, Any]]:
     """Son N hisseyi döndür."""
     return ranked[-n:]

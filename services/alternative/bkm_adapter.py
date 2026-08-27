@@ -18,8 +18,9 @@ Features:
 """
 
 import re
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from .base import BaseAdapter
@@ -53,7 +54,7 @@ class BKMAdapter(BaseAdapter):
         "SAGLIK": "healthcare",
     }
 
-    async def collect(self, ticker: str, **kwargs) -> Optional[Dict[str, Any]]:
+    async def collect(self, ticker: str, **kwargs) -> dict[str, Any] | None:
         """BKM verisi çek — web scraping."""
         try:
             data = await self._scrape_bkm_page()
@@ -68,7 +69,7 @@ class BKMAdapter(BaseAdapter):
             logger.warning("BKM data fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def _scrape_bkm_page(self) -> Optional[Dict[str, Any]]:
+    async def _scrape_bkm_page(self) -> dict[str, Any] | None:
         """BKM kart verileri sayfasını scrape et."""
         try:
             import aiohttp
@@ -78,18 +79,17 @@ class BKMAdapter(BaseAdapter):
                 "Accept-Language": "tr-TR,tr;q=0.9",
             }
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    self.BKM_URL,
-                    headers=headers,
-                    timeout=aiohttp.ClientTimeout(total=15),
-                ) as resp:
-                    if resp.status != 200:
-                        logger.warning("BKM page returned non-200", status=resp.status)
-                        return None
+            async with aiohttp.ClientSession() as session, session.get(
+                self.BKM_URL,
+                headers=headers,
+                timeout=aiohttp.ClientTimeout(total=15),
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning("BKM page returned non-200", status=resp.status)
+                    return None
 
-                    html = await resp.text()
-                    return self._parse_bkm_html(html)
+                html = await resp.text()
+                return self._parse_bkm_html(html)
 
         except ImportError:
             logger.warning("beautifulsoup4 not installed")
@@ -98,7 +98,7 @@ class BKMAdapter(BaseAdapter):
             logger.warning("BKM scrape error", error=str(e))
             return None
 
-    def _parse_bkm_html(self, html: str) -> Optional[Dict[str, Any]]:
+    def _parse_bkm_html(self, html: str) -> dict[str, Any] | None:
         """BKM HTML'inden kart verilerini çıkar.
 
         BKM sayfası genellikle tablo formatında veri sunar:
@@ -112,7 +112,7 @@ class BKMAdapter(BaseAdapter):
 
             soup = BeautifulSoup(html, "html.parser")
             result = {
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "source": "bkm_web",
             }
 
@@ -183,7 +183,7 @@ class BKMAdapter(BaseAdapter):
         except ValueError:
             return 0.0
 
-    def compute_features(self, data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+    def compute_features(self, data: dict[str, Any], ticker: str) -> dict[str, float]:
         """BKM feature'ları hesapla."""
         if not data:
             return {}
@@ -206,7 +206,7 @@ class BKMAdapter(BaseAdapter):
 
         return features
 
-    def _calc_seasonal_dev(self, data: Dict[str, Any]) -> float:
+    def _calc_seasonal_dev(self, data: dict[str, Any]) -> float:
         """Mevsimsel sapma hesapla."""
         growth = data.get("growth_yoy", 0)
         sector_growth = data.get("sector_growth", 0)

@@ -17,13 +17,14 @@ KURAL: Tahmin modeli / skor formülü DEĞİŞTİRİLMEZ — engine ne üretiyor
 """
 
 import hashlib
+from dataclasses import dataclass, field
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
 import structlog
 
-from .engine_v4 import BacktestEngineV4, BacktestConfig, BacktestResultV4
+from .engine_v4 import BacktestConfig, BacktestEngineV4, BacktestResultV4
 from .walk_forward import WalkForwardEngine
 
 logger = structlog.get_logger()
@@ -55,9 +56,9 @@ class FoldBacktestResult:
     elapsed_seconds: float = 0.0
     persisted: bool = False
     leakage_ok: bool = True
-    leakage_errors: List[str] = field(default_factory=list)
+    leakage_errors: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {k: v for k, v in self.__dict__.items()}
 
 
@@ -77,10 +78,10 @@ class WalkForwardBacktestResult:
     deflated_sharpe: float
     total_trades: int
     all_leakage_ok: bool
-    folds: List[FoldBacktestResult]
-    summary: Dict[str, Any] = field(default_factory=dict)
+    folds: list[FoldBacktestResult]
+    summary: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         d = {k: v for k, v in self.__dict__.items() if k != "folds"}
         d = d.with_columns(pl.lit([f.to_dict() for f in self.folds]).alias('folds'))
         return d
@@ -91,7 +92,7 @@ class WalkForwardBacktestRunner:
 
     def __init__(
         self,
-        backtest_config: Optional[BacktestConfig] = None,
+        backtest_config: BacktestConfig | None = None,
         purge_days: int = 5,
         embargo_days: int = 5,
         train_days: int = 252,
@@ -111,10 +112,10 @@ class WalkForwardBacktestRunner:
 
     def run(
         self,
-        market_data: Dict[str, pl.DataFrame],
-        universe_at_date: Optional[List[str]] = None,
-        benchmark_data: Optional[pl.DataFrame] = None,
-        run_id: Optional[str] = None,
+        market_data: dict[str, pl.DataFrame],
+        universe_at_date: list[str] | None = None,
+        benchmark_data: pl.DataFrame | None = None,
+        run_id: str | None = None,
         persist: bool = True,
     ) -> WalkForwardBacktestResult:
         """Walk-forward backtest çalıştır.
@@ -142,7 +143,7 @@ class WalkForwardBacktestRunner:
             logger.warning("No walk-forward folds", dates=len(dates))
             return self._empty_result(run_id)
 
-        fold_results: List[FoldBacktestResult] = []
+        fold_results: list[FoldBacktestResult] = []
 
         for fold_id, fold in enumerate(folds, 1):
             fold_run_id = f"{run_id}_fold{fold_id:03d}"
@@ -230,7 +231,7 @@ class WalkForwardBacktestRunner:
 
     def _train_fold_model(
         self,
-        pit_data: Dict[str, pl.DataFrame],
+        pit_data: dict[str, pl.DataFrame],
         train_start: str,
         train_end: str,
         benchmark_data=None,
@@ -248,14 +249,14 @@ class WalkForwardBacktestRunner:
             TrainedModel veya None
         """
         try:
-            from ..ml.lightgbm_trainer import LightGBMTrainer, MLModelConfig, DEFAULT_TARGETS
             from ..features.calculator import feature_calculator
-            from ..ml.training_validator import training_validator, cross_sectional_normalizer
+            from ..ml.lightgbm_trainer import DEFAULT_TARGETS, LightGBMTrainer, MLModelConfig
+            from ..ml.training_validator import cross_sectional_normalizer, training_validator
         except ImportError:
             return None
 
         # 1) Train window verisini kes
-        train_data: Dict[str, pl.DataFrame] = {}
+        train_data: dict[str, pl.DataFrame] = {}
         ts_start = pl.Series(train_start)
         ts_end = pl.Series(train_end)
         for ticker, df in pit_data.items():
@@ -269,9 +270,9 @@ class WalkForwardBacktestRunner:
 
         # 2) Her ticker × her uygun gün için sample oluştur
         calc = feature_calculator
-        features_map: Dict[str, Dict] = {}
-        returns: Dict[str, float] = {}
-        date_groups: Dict[str, str] = {}
+        features_map: dict[str, dict] = {}
+        returns: dict[str, float] = {}
+        date_groups: dict[str, str] = {}
 
         # En büyük horizon kadar son günleri atla (horizon-aware)
         max_horizon = self.FORWARD_DAYS  # Varsayılan 5d
@@ -355,7 +356,7 @@ class WalkForwardBacktestRunner:
             )
             # CS feature isimlerini topla
             sample_feats = list(features_map.values())[0] if features_map else {}
-            cs_feature_names = sorted([k for k in sample_feats.keys() if k.endswith('_cs_zscore')])
+            cs_feature_names = sorted([k for k in sample_feats if k.endswith('_cs_zscore')])
             # Feature listesini güncelle (orijinal + CS)
             all_feature_names = feature_names + cs_feature_names
             all_feature_names = list(dict.fromkeys(all_feature_names))  # Unique, order preserved
@@ -367,7 +368,7 @@ class WalkForwardBacktestRunner:
             all_feature_names = feature_names
 
         # 7) Multi-horizon eğitim (1d, 5d, 20d, 60d)
-        from ..ml.lightgbm_trainer import MultiHorizonModel, DEFAULT_TARGETS
+        from ..ml.lightgbm_trainer import DEFAULT_TARGETS, MultiHorizonModel
 
         multi_model = MultiHorizonModel(
             primary_horizon=self.FORWARD_DAYS,
@@ -392,7 +393,7 @@ class WalkForwardBacktestRunner:
                 continue
 
             # Bu horizon için target hesapla (sadece features_map'teki sample'lar için)
-            horizon_returns: Dict[str, float] = {}
+            horizon_returns: dict[str, float] = {}
             for ticker, df in train_data.items():
                 close_all = df['Close'].to_numpy()
                 n = len(df)
@@ -451,8 +452,9 @@ class WalkForwardBacktestRunner:
 
         # Model metadata'yı DB'ye kaydet (best-effort, crash etmez)
         try:
-            from ..core.model_persistence import model_persistence
             import threading
+
+            from ..core.model_persistence import model_persistence
             version = f"fold_{train_start}_{train_end}_h{'_'.join(str(h) for h in multi_model.available_horizons)}"
 
             def _save():
@@ -480,7 +482,7 @@ class WalkForwardBacktestRunner:
 
         return multi_model
 
-    def _get_canonical_feature_names(self) -> List[str]:
+    def _get_canonical_feature_names(self) -> list[str]:
         """Canonical feature registry'den feature isimlerini al (regex yok)."""
         if hasattr(self, '_feature_names_cache') and self._feature_names_cache:
             return self._feature_names_cache
@@ -502,9 +504,9 @@ class WalkForwardBacktestRunner:
 
     @staticmethod
     def _truncate(
-        market_data: Dict[str, pl.DataFrame],
+        market_data: dict[str, pl.DataFrame],
         test_end: str,
-    ) -> Dict[str, pl.DataFrame]:
+    ) -> dict[str, pl.DataFrame]:
         """Veriyi test_end'e kadar kes (point-in-time)."""
         end_ts = pl.Series(test_end)
         pit = {}
@@ -531,9 +533,9 @@ class WalkForwardBacktestRunner:
 
     @staticmethod
     def _verify_fold(
-        fold: Dict[str, Any],
+        fold: dict[str, Any],
         result: BacktestResultV4,
-        pit_data: Dict[str, pl.DataFrame],
+        pit_data: dict[str, pl.DataFrame],
         test_end: str,
     ) -> tuple:
         """Fold leakage doğrulaması.
@@ -586,7 +588,7 @@ class WalkForwardBacktestRunner:
     def _aggregate(
         self,
         run_id: str,
-        folds: List[FoldBacktestResult],
+        folds: list[FoldBacktestResult],
     ) -> WalkForwardBacktestResult:
         returns = [f.total_return_pct for f in folds]
         sharpes = [f.sharpe_ratio for f in folds]
@@ -631,7 +633,7 @@ class WalkForwardBacktestRunner:
             },
         )
 
-    def _base_run_id(self, market_data: Dict[str, pl.DataFrame]) -> str:
+    def _base_run_id(self, market_data: dict[str, pl.DataFrame]) -> str:
         tickers = sorted(market_data.keys())
         wf_cfg = (self._wf.purge_days, self._wf.embargo_days, self._wf.train_days,
                   self._wf.test_days, self._wf.step_days)

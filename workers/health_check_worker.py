@@ -4,8 +4,9 @@ ALPHA BIST — Health Check Worker
 Sistem sağlık kontrolü worker'ı.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -16,9 +17,9 @@ class HealthCheckWorker:
     """Sistem sağlık kontrolü worker'ı."""
 
     def __init__(self):
-        self._last_check: Optional[str] = None
+        self._last_check: str | None = None
 
-    def run_full_check(self) -> Dict[str, Any]:
+    def run_full_check(self) -> dict[str, Any]:
         """Tüm sistem sağlık kontrollerini çalıştır."""
         result = {
             "timestamp": datetime.now(_TZ_ISTANBUL).isoformat(),
@@ -41,7 +42,7 @@ class HealthCheckWorker:
         self._last_check = result["timestamp"]
         return result
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {"last_check": self._last_check}
 
 

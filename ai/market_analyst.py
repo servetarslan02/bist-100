@@ -4,8 +4,9 @@ ALPHA BIST — Market Analyst
 ML modellerinin çıktılarını insan-okunabilir analize dönüştüren agent.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -16,10 +17,10 @@ class MarketAnalyst:
     """ML destekli piyasa analiz agent'ı."""
 
     def __init__(self):
-        self._cache: Dict[str, Dict[str, Any]] = {}
+        self._cache: dict[str, dict[str, Any]] = {}
 
-    def analyze_ticker(self, ticker: str, features: Optional[Dict[str, float]] = None,
-                       model_score: Optional[float] = None) -> Dict[str, Any]:
+    def analyze_ticker(self, ticker: str, features: dict[str, float] | None = None,
+                       model_score: float | None = None) -> dict[str, Any]:
         """Tek hisse için analiz üret."""
         result = {
             "ticker": ticker,
@@ -40,7 +41,7 @@ class MarketAnalyst:
         self._cache[ticker] = result
         return result
 
-    def summarize_market(self, bist100_change: float = 0.0) -> Dict[str, Any]:
+    def summarize_market(self, bist100_change: float = 0.0) -> dict[str, Any]:
         """Piyasa geneli özet."""
         result = {
             "timestamp": datetime.now(_TZ_ISTANBUL).isoformat(),
@@ -70,7 +71,7 @@ class MarketAnalyst:
 
         return result
 
-    def _interpret_technical(self, features: Dict[str, float]) -> Dict[str, Any]:
+    def _interpret_technical(self, features: dict[str, float]) -> dict[str, Any]:
         signals = []
         rsi = features.get("rsi_14")
         if rsi is not None:
@@ -80,7 +81,7 @@ class MarketAnalyst:
                 signals.append({"indicator": "RSI", "signal": "ALIŞ", "value": rsi})
         return {"signals": signals}
 
-    def _interpret_model_score(self, score: float) -> Dict[str, Any]:
+    def _interpret_model_score(self, score: float) -> dict[str, Any]:
         if score > 0.05:
             direction = "YUKARI"
             confidence = min(abs(score) * 10, 1.0)
@@ -92,28 +93,28 @@ class MarketAnalyst:
             confidence = 0.3
         return {"score": round(score, 4), "direction": direction, "confidence": round(confidence, 2)}
 
-    def _assess_risk(self, features: Dict[str, float]) -> Dict[str, Any]:
+    def _assess_risk(self, features: dict[str, float]) -> dict[str, Any]:
         risk_factors = []
         atr = features.get("atr_pct", 0)
         if atr > 3.0:
             risk_factors.append({"factor": "Yüksek volatilite", "level": "HIGH"})
         return {"risk_factors": risk_factors, "overall_risk": "YÜKSEK" if len(risk_factors) >= 2 else "ORTA" if risk_factors else "DÜŞÜK"}
 
-    def _generate_summary(self, sections: Dict[str, Any]) -> str:
+    def _generate_summary(self, sections: dict[str, Any]) -> str:
         model = sections.get("model", {})
         risk = sections.get("risk", {})
         parts = []
         if model.get("direction") == "YUKARI":
             parts.append(f"Model yukarı yön işaret ediyor (güven: %{model.get('confidence', 0)*100:.0f})")
         elif model.get("direction") == "AŞAĞI":
-            parts.append(f"Model aşağı yön işaret ediyor")
+            parts.append("Model aşağı yön işaret ediyor")
         else:
             parts.append("Model belirgin yön göstermiyor")
         if risk.get("overall_risk") == "YÜKSEK":
             parts.append("⚠️ Yüksek risk")
         return ". ".join(parts) + "."
 
-    def get_cached_analysis(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def get_cached_analysis(self, ticker: str) -> dict[str, Any] | None:
         return self._cache.get(ticker)
 
 

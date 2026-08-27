@@ -18,10 +18,11 @@ RISK_ON, RISK_OFF, CRISIS, RECOVERY,
 MOMENTUM_EXPANSION, MOMENTUM_CONTRACTION
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -34,12 +35,12 @@ class EnsembleResult:
     confidence: float
     consensus: bool                          # Tüm yöntemler aynı sonuca mı vardı?
     method_count: int                        # Kaç yöntem çalıştı
-    regime_scores: Dict[str, float] = field(default_factory=dict)  # Her rejim için ağırlıklı skor
-    method_details: Dict[str, Dict] = field(default_factory=dict)  # Her yöntemin detayı
-    hmm_probabilities: Dict[str, float] = field(default_factory=dict)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    regime_scores: dict[str, float] = field(default_factory=dict)  # Her rejim için ağırlıklı skor
+    method_details: dict[str, dict] = field(default_factory=dict)  # Her yöntemin detayı
+    hmm_probabilities: dict[str, float] = field(default_factory=dict)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "regime": self.regime,
             "confidence": round(self.confidence, 4),
@@ -111,9 +112,9 @@ class EnsembleRegimeDetector:
 
     def detect(
         self,
-        features: Dict[str, float],
-        returns: Optional[np.ndarray] = None,
-        volatility: Optional[np.ndarray] = None,
+        features: dict[str, float],
+        returns: np.ndarray | None = None,
+        volatility: np.ndarray | None = None,
     ) -> EnsembleResult:
         """Ensemble rejim tespiti.
 
@@ -133,7 +134,7 @@ class EnsembleRegimeDetector:
         # 1. Skor bazlı (her zaman çalışır) — bu sonuç aynı zamanda
         # rejime-duyarlı ağırlıklandırma için "preliminary regime" olarak
         # kullanılır (bkz. get_regime_adapted_weights).
-        preliminary_regime: Optional[str] = None
+        preliminary_regime: str | None = None
         if self._score_engine:
             try:
                 score_result = self._score_engine.detect_regime(features)
@@ -211,8 +212,8 @@ class EnsembleRegimeDetector:
     def _detect_gmm(
         self,
         returns: np.ndarray,
-        volatility: Optional[np.ndarray] = None,
-    ) -> Dict:
+        volatility: np.ndarray | None = None,
+    ) -> dict:
         """Gaussian Mixture Model ile rejim tespiti.
 
         Two Sigma yaklaşımı: factor-level regime detection.
@@ -261,7 +262,7 @@ class EnsembleRegimeDetector:
             },
         }
 
-    def _assign_gmm_regime_names(self, gmm, X: np.ndarray) -> List[str]:
+    def _assign_gmm_regime_names(self, gmm, X: np.ndarray) -> list[str]:
         """GMM component'lerine isim ata.
 
         Return ortalamasına göre sırala:
@@ -296,8 +297,8 @@ class EnsembleRegimeDetector:
 
     def _weighted_vote(
         self,
-        results: Dict[str, Dict],
-        method_details: Dict[str, Dict],
+        results: dict[str, dict],
+        method_details: dict[str, dict],
     ) -> EnsembleResult:
         """Ağırlıklı oylama ile final karar.
 
@@ -305,9 +306,9 @@ class EnsembleRegimeDetector:
         En yüksek skorlu rejim kazanır.
         """
         # Rejim skorlarını topla
-        regime_scores: Dict[str, float] = {}
+        regime_scores: dict[str, float] = {}
 
-        for method, result in results.items():
+        for _method, result in results.items():
             regime = result["regime"]
             weight = result["weight"]
             confidence = result["confidence"]
@@ -373,9 +374,9 @@ class EnsembleRegimeDetector:
 
     def optimize_weights_from_history(
         self,
-        regime_history: List[Dict[str, Any]],
+        regime_history: list[dict[str, Any]],
         lookback: int = 100,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Geçmiş rejim tahminlerinden ağırlık optimizasyonu.
 
         Backtest sonucu hangi yöntem daha doğruysa onun ağırlığını artırır.
@@ -444,7 +445,7 @@ class EnsembleRegimeDetector:
 
         return optimized
 
-    def get_weights(self) -> Dict[str, float]:
+    def get_weights(self) -> dict[str, float]:
         """Mevcut ağırlıkları döndür."""
         return {
             "score": self._score_weight,
@@ -452,7 +453,7 @@ class EnsembleRegimeDetector:
             "gmm": self._gmm_weight,
         }
 
-    def get_regime_adapted_weights(self, preliminary_regime: str) -> Dict[str, float]:
+    def get_regime_adapted_weights(self, preliminary_regime: str) -> dict[str, float]:
         """Rejime göre ağırlık adaptasyonu.
 
         Crisis/High-Vol rejimlerde HMM ağırlığı artar (matematiksel model daha güvenilir).

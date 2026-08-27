@@ -4,24 +4,26 @@ ALPHA BIST — Ingestion Faz 0 Tests
 Circuit Breaker, Rate Limiter, Retry Policy, Provider Manager testleri.
 """
 
-import asyncio
-import pytest
-import time
-from unittest.mock import AsyncMock, MagicMock, patch
 
 # Import modules
-import sys
-import os
+import time
+
+import pytest
 
 from services.ingestion.circuit_breaker import (
-    CircuitBreaker, CircuitState, CircuitBreakerError, CircuitBreakerManager,
+    CircuitBreaker,
+    CircuitBreakerError,
+    CircuitBreakerManager,
+    CircuitState,
 )
+from services.ingestion.provider_manager import ProviderManager
 from services.ingestion.rate_limiter import RateLimiter, create_default_rate_limiter
 from services.ingestion.retry_policy import (
-    RetryPolicy, RetryExhaustedError, HTTPStatusError, get_retry_policy,
+    HTTPStatusError,
+    RetryExhaustedError,
+    RetryPolicy,
+    get_retry_policy,
 )
-from services.ingestion.provider_manager import ProviderManager, ProviderResult
-
 
 # =====================================================
 # Circuit Breaker Tests
@@ -200,7 +202,7 @@ class TestRateLimiter:
 
     def test_no_limit_by_default(self):
         """Limit yoksa beklemez."""
-        limiter = RateLimiter()
+        RateLimiter()
         # Limit tanımlanmamış → acquire hemen döner
         # (asyncio.run kullanmadan sync test)
 
@@ -304,7 +306,7 @@ class TestRetryPolicy:
         """Timeout retry yapılabilir."""
         policy = RetryPolicy()
         assert policy._is_retryable(TimeoutError()) is True
-        assert policy._is_retryable(asyncio.TimeoutError()) is True
+        assert policy._is_retryable(TimeoutError()) is True
 
     def test_is_retryable_connection(self):
         """ConnectionError retry yapılabilir."""

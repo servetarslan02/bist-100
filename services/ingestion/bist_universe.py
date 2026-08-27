@@ -4,8 +4,9 @@ Borsa İstanbul'daki TÜM hisseleri (600+ hisse) canlı kaynaklardan dinamik ola
 Yeni halka arzlar ve değişiklikler otomatik olarak keşfedilir.
 """
 
-from typing import Dict, List
+
 import structlog
+
 from .providers.universe_provider import universe_updater
 
 logger = structlog.get_logger()
@@ -23,34 +24,34 @@ class BISTUniverse:
         self._updater.refresh_universe()
 
     @property
-    def BIST_ALL_TICKERS(self) -> List[str]:
+    def BIST_ALL_TICKERS(self) -> list[str]:
         """TÜM BIST hisse sembolleri listesi (600+ hisse)."""
         uni = self._updater.get_universe()
         return list(uni.keys())
 
     @property
-    def BIST_100_TICKERS(self) -> List[str]:
+    def BIST_100_TICKERS(self) -> list[str]:
         """BIST 100 hisseleri."""
         return self._updater.get_index_members("XU100")
 
     @property
-    def BIST_30_TICKERS(self) -> List[str]:
+    def BIST_30_TICKERS(self) -> list[str]:
         """BIST 30 hisseleri."""
         return self._updater.get_index_members("XU030")
 
     @property
-    def BIST_50_TICKERS(self) -> List[str]:
+    def BIST_50_TICKERS(self) -> list[str]:
         """BIST 50 hisseleri."""
         return self._updater.get_index_members("XU050")
 
     @property
-    def SECTOR_MAP(self) -> Dict[str, str]:
+    def SECTOR_MAP(self) -> dict[str, str]:
         """Tüm hisselerin sektör haritası."""
         uni = self._updater.get_universe()
         return {t: info.sector for t, info in uni.items()}
 
     @property
-    def COMPANY_NAMES(self) -> Dict[str, str]:
+    def COMPANY_NAMES(self) -> dict[str, str]:
         """Tüm hisselerin şirket isimleri."""
         uni = self._updater.get_universe()
         return {t: getattr(info, 'name', t) for t, info in uni.items()}
@@ -67,15 +68,15 @@ class BISTUniverse:
         info = uni.get(ticker.upper())
         return info.sector if info else "DIGER"
 
-    def get_tickers_by_sector(self, sector: str) -> List[str]:
+    def get_tickers_by_sector(self, sector: str) -> list[str]:
         """Sektöre göre hisseleri getir."""
         return self._updater.get_tickers_by_sector(sector)
 
-    def get_tickers(self) -> List[str]:
+    def get_tickers(self) -> list[str]:
         """Tüm hisseleri getir."""
         return self.BIST_ALL_TICKERS
 
-    def get_index_members(self, index: str = "XU100") -> List[str]:
+    def get_index_members(self, index: str = "XU100") -> list[str]:
         """Endeks üyelerini getir."""
         return self._updater.get_index_members(index)
 

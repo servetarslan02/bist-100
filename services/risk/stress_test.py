@@ -13,9 +13,10 @@ Kaynaklar:
 - ScienceDirect — Integrated Risk Management Framework (2026)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -28,23 +29,23 @@ class ScenarioResult:
     scenario_type: str  # historical, hypothetical, monte_carlo
     total_impact_pct: float
     total_impact_amount: float
-    position_impacts: List[Dict[str, Any]]
+    position_impacts: list[dict[str, Any]]
     worst_position: str
     best_position: str
-    recovery_estimate_days: Optional[int] = None
+    recovery_estimate_days: int | None = None
 
 
 @dataclass
 class StressTestReport:
     """Stres testi raporu."""
     portfolio_value: float
-    scenarios: List[ScenarioResult]
+    scenarios: list[ScenarioResult]
     worst_scenario: ScenarioResult
     best_scenario: ScenarioResult
     avg_impact_pct: float
     max_loss_amount: float
     risk_score: float  # 0-100
-    recommendations: List[str]
+    recommendations: list[str]
 
 
 class StressTestEngine:
@@ -198,7 +199,7 @@ class StressTestEngine:
 
     def run_scenario(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         scenario_key: str,
     ) -> ScenarioResult:
         """Tek senaryo çalıştır.
@@ -275,7 +276,7 @@ class StressTestEngine:
 
     def run_all_scenarios(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
     ) -> StressTestReport:
         """Tüm senaryoları çalıştır.
 
@@ -334,7 +335,7 @@ class StressTestEngine:
     def add_custom_scenario(
         self,
         key: str,
-        scenario: Dict[str, Any],
+        scenario: dict[str, Any],
         scenario_type: str = "hypothetical",
     ):
         """F-015: Dinamik senaryo ekleme.
@@ -349,12 +350,12 @@ class StressTestEngine:
 
     def run_monte_carlo_stress(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         returns_history: np.ndarray,
         n_simulations: int = 10000,
         holding_days: int = 5,
-        seed: Optional[int] = None,
-    ) -> Dict[str, Any]:
+        seed: int | None = None,
+    ) -> dict[str, Any]:
         """Monte Carlo stres testi.
 
         Args:
@@ -416,9 +417,9 @@ class StressTestEngine:
 
     def find_breaking_point(
         self,
-        portfolio: Dict[str, Any],
+        portfolio: dict[str, Any],
         max_loss_pct: float = 20.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Breaking point analizi — portföy ne kadar kaybeder?
 
         Args:
@@ -452,7 +453,7 @@ class StressTestEngine:
             "n_breaking": len(breaking_scenarios),
         }
 
-    def _calculate_risk_score(self, scenarios: List[ScenarioResult], total_value: float) -> float:
+    def _calculate_risk_score(self, scenarios: list[ScenarioResult], total_value: float) -> float:
         """Risk skoru hesapla (0-100)."""
         if not scenarios or total_value <= 0:
             return 50.0
@@ -501,7 +502,7 @@ class StressTestEngine:
 
         return min(100, score)
 
-    def _generate_recommendations(self, scenarios: List[ScenarioResult], risk_score: float) -> List[str]:
+    def _generate_recommendations(self, scenarios: list[ScenarioResult], risk_score: float) -> list[str]:
         """Stres testi sonuçlarına göre öneriler."""
         recommendations = []
 

@@ -9,15 +9,16 @@ FAZ 4: Synthesis Engine
 """
 
 import time
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
-from .agent_system import AgentRole, AgentResult
-from .llm_client import BaseLLMClient
-from .debate_engine import DebateResult
-from .communication_bus import Resolution
 from .agent_memory import AgentMemory
+from .agent_system import AgentResult, AgentRole
+from .communication_bus import Resolution
+from .debate_engine import DebateResult
+from .llm_client import BaseLLMClient
 from .prompts import PromptFactory
 
 logger = structlog.get_logger()
@@ -33,16 +34,16 @@ class SynthesisResult:
     consensus_reached: bool
     debate_occurred: bool
     risk_approved: bool
-    agent_summary: Dict[str, Any] = field(default_factory=dict)
-    conflict_analysis: Dict[str, Any] = field(default_factory=dict)
-    debate_result: Optional[Dict] = None
-    resolution: Optional[Dict] = None
+    agent_summary: dict[str, Any] = field(default_factory=dict)
+    conflict_analysis: dict[str, Any] = field(default_factory=dict)
+    debate_result: dict | None = None
+    resolution: dict | None = None
     reasoning: str = ""
-    reasons: List[str] = field(default_factory=list)
-    risks: List[str] = field(default_factory=list)
-    memory_context: Optional[Dict] = None
+    reasons: list[str] = field(default_factory=list)
+    risks: list[str] = field(default_factory=list)
+    memory_context: dict | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "ticker": self.ticker,
             "final_direction": self.final_direction,
@@ -76,12 +77,12 @@ class SynthesisEngine:
     async def synthesize(
         self,
         ticker: str,
-        agent_results: Dict[AgentRole, AgentResult],
-        debate_result: Optional[DebateResult] = None,
-        resolution: Optional[Resolution] = None,
+        agent_results: dict[AgentRole, AgentResult],
+        debate_result: DebateResult | None = None,
+        resolution: Resolution | None = None,
         risk_approved: bool = True,
-        agent_memory: Optional[AgentMemory] = None,
-        llm_client: Optional[BaseLLMClient] = None,
+        agent_memory: AgentMemory | None = None,
+        llm_client: BaseLLMClient | None = None,
     ) -> SynthesisResult:
         """Gelişmiş sentez.
 
@@ -176,8 +177,8 @@ class SynthesisEngine:
         return result
 
     def _create_agent_summary(
-        self, results: Dict[AgentRole, AgentResult]
-    ) -> Dict[str, Any]:
+        self, results: dict[AgentRole, AgentResult]
+    ) -> dict[str, Any]:
         """Agent özetini oluştur."""
         summary = {}
         for role, result in results.items():
@@ -192,8 +193,8 @@ class SynthesisEngine:
         return summary
 
     def _analyze_conflicts(
-        self, results: Dict[AgentRole, AgentResult]
-    ) -> Dict[str, Any]:
+        self, results: dict[AgentRole, AgentResult]
+    ) -> dict[str, Any]:
         """Çelişki analizi."""
         valid = {r: res for r, res in results.items() if res.success}
         directions = {}
@@ -216,7 +217,7 @@ class SynthesisEngine:
         }
 
     def _weighted_score(
-        self, results: Dict[AgentRole, AgentResult]
+        self, results: dict[AgentRole, AgentResult]
     ) -> float:
         """Confidence-weighted ortalama skor."""
         valid = {r: res for r, res in results.items() if res.success}
@@ -225,7 +226,7 @@ class SynthesisEngine:
 
         total_weight = 0
         weighted_sum = 0
-        for role, result in valid.items():
+        for _role, result in valid.items():
             score = result.output.get("score", 50)
             confidence = result.confidence
             weighted_sum += score * confidence
@@ -234,12 +235,12 @@ class SynthesisEngine:
         return weighted_sum / total_weight if total_weight > 0 else 50.0
 
     def _simple_majority(
-        self, results: Dict[AgentRole, AgentResult]
+        self, results: dict[AgentRole, AgentResult]
     ) -> str:
         """Basit çoğunluk oyu."""
         valid = {r: res for r, res in results.items() if res.success}
         directions = {}
-        for role, result in valid.items():
+        for _role, result in valid.items():
             d = result.output.get("direction", "NEUTRAL")
             directions[d] = directions.get(d, 0) + 1
 
@@ -253,7 +254,7 @@ class SynthesisEngine:
         return "NEUTRAL"
 
     def _simple_confidence(
-        self, results: Dict[AgentRole, AgentResult]
+        self, results: dict[AgentRole, AgentResult]
     ) -> float:
         """Basit ortalama güven."""
         valid = [res for r, res in results.items() if res.success]
@@ -262,8 +263,8 @@ class SynthesisEngine:
         return sum(r.confidence for r in valid) / len(valid)
 
     def _collect_reasons(
-        self, results: Dict[AgentRole, AgentResult]
-    ) -> List[str]:
+        self, results: dict[AgentRole, AgentResult]
+    ) -> list[str]:
         """Tüm nedenleri topla."""
         reasons = []
         for role, result in results.items():
@@ -273,8 +274,8 @@ class SynthesisEngine:
         return reasons[:10]
 
     def _collect_risks(
-        self, results: Dict[AgentRole, AgentResult]
-    ) -> List[str]:
+        self, results: dict[AgentRole, AgentResult]
+    ) -> list[str]:
         """Tüm riskleri topla."""
         risks = []
         for role, result in results.items():
@@ -286,12 +287,12 @@ class SynthesisEngine:
     async def _llm_synthesize(
         self,
         ticker: str,
-        agent_results: Dict[AgentRole, AgentResult],
-        debate_result: Optional[DebateResult],
-        resolution: Optional[Resolution],
+        agent_results: dict[AgentRole, AgentResult],
+        debate_result: DebateResult | None,
+        resolution: Resolution | None,
         risk_approved: bool,
         llm_client: BaseLLMClient,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """LLM ile sentez yap."""
         # Agent sonuçlarını formatla
         agent_text = []

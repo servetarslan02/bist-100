@@ -4,10 +4,11 @@ World State = zaman içinde değişen latent state.
 Event → World State t0 → Event → World State t1 → Impact Propagation → BIST State t1
 """
 
-import numpy as np
-from typing import Dict, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -36,12 +37,12 @@ class WorldState:
     max_value: float = 1.0
 
     # Factor bazlı nötr seviyeler
-    neutral_levels: Dict[str, float] = field(default_factory=lambda: {
+    neutral_levels: dict[str, float] = field(default_factory=lambda: {
         "global_risk_appetite": 0.5, "usd_strength": 0.5, "us_rate_pressure": 0.5,
         "commodity_pressure": 0.5, "oil_pressure": 0.5, "turkey_macro_risk": 0.6,
         "geopolitical_risk": 0.45, "em_risk_appetite": 0.5, "inflation_pressure": 0.55,
     })
-    decay_rates: Dict[str, float] = field(default_factory=lambda: {
+    decay_rates: dict[str, float] = field(default_factory=lambda: {
         "global_risk_appetite": 0.95, "usd_strength": 0.90, "us_rate_pressure": 0.92,
         "commodity_pressure": 0.88, "oil_pressure": 0.88, "turkey_macro_risk": 0.97,
         "geopolitical_risk": 0.93, "em_risk_appetite": 0.95, "inflation_pressure": 0.96,
@@ -75,7 +76,7 @@ class WorldState:
         self.vix_level = float(np.clip(vec[8], 0, 1)) * 100
         self.inflation_pressure = float(np.clip(vec[9], 0, 1))
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """World state'i dictionary'e cevir."""
         return {
             "global_risk_appetite": self.global_risk_appetite,
@@ -173,21 +174,21 @@ class WorldStateManager:
     }
 
     def __init__(self):
-        self._current_state = WorldState(timestamp=datetime.now(timezone.utc))
-        self._last_update = datetime.now(timezone.utc)
+        self._current_state = WorldState(timestamp=datetime.now(UTC))
+        self._last_update = datetime.now(UTC)
 
     @property
     def current_state(self) -> WorldState:
         return self._current_state
 
-    def update_from_event(self, event_type: str, event_data: Dict[str, Any]) -> Dict[str, float]:
+    def update_from_event(self, event_type: str, event_data: dict[str, Any]) -> dict[str, float]:
         """
         Event'ten world state güncelle.
 
         Returns: world state delta (değişen faktörler)
         """
         # Decay uygula (zaman geçtikçe etki azalır)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         hours_elapsed = (now - self._last_update).total_seconds() / 3600
         self._current_state.apply_decay(hours_elapsed)
         self._last_update = now
@@ -203,10 +204,7 @@ class WorldStateManager:
         for factor, delta in factor_deltas.items():
             if hasattr(self._current_state, factor):
                 current_val = getattr(self._current_state, factor)
-                if factor == "vix_level":
-                    new_val = current_val + delta
-                else:
-                    new_val = current_val + delta
+                new_val = current_val + delta if factor == "vix_level" else current_val + delta
                 setattr(self._current_state, factor, new_val)
 
         self._current_state.timestamp = now
@@ -228,7 +226,7 @@ class WorldStateManager:
 
         return delta
 
-    def update_from_macro(self, macro_data: Dict[str, Any]):
+    def update_from_macro(self, macro_data: dict[str, Any]):
         """Macro verilerden world state güncelle.
 
         P1 düzeltmesi: Hard-coded eşikler kaldırıldı.
@@ -278,13 +276,13 @@ class WorldStateManager:
                         self._current_state.oil_pressure + delta, 0, 1
                     ))
 
-        self._current_state.timestamp = datetime.now(timezone.utc)
+        self._current_state.timestamp = datetime.now(UTC)
 
     def get_state_vector(self) -> np.ndarray:
         """World state vektörü (ML feature olarak kullanılabilir)."""
         return self._current_state.to_vector()
 
-    def get_state_dict(self) -> Dict[str, float]:
+    def get_state_dict(self) -> dict[str, float]:
         """World state dictionary."""
         return self._current_state.to_dict()
 

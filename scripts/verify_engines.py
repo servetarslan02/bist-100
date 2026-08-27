@@ -1,5 +1,3 @@
-import sys
-from datetime import datetime
 
 print("=========================================================")
 print("ALPHA BIST — KURUMSAL MOTORLAR DENETİM & DOĞRULAMA")
@@ -7,7 +5,8 @@ print("=========================================================")
 
 # 1. SCHEDULER & MARKET PHASES
 print("\n[1] BIST SEANS VE TATİL YÖNETİCİSİ:")
-from services.scheduler.unified_scheduler import MarketSessionManager, HolidayProvider
+from services.scheduler.unified_scheduler import MarketSessionManager
+
 msm = MarketSessionManager()
 now_ist = msm.now_istanbul()
 print(f"  • Mevcut BIST Saati: {now_ist.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -18,6 +17,7 @@ print(f"  • Bir Sonraki Faza Kalan Süre: {msm.seconds_until_next_phase():.0f}
 # 2. SPEC ANOMALY ENGINE
 print("\n[2] SPEC ANOMALİ & PATLAMA MOTORU:")
 from services.intelligence.spec_engine import SPECEngine
+
 engine = SPECEngine()
 spec_res = engine.compute_spec(
     ticker='POLTK',
@@ -42,14 +42,16 @@ print(f"  • Kanıt Konsensüsü: {spec_res.evidence_consensus:.2f}")
 # 3. PAPER TRADING ORCHESTRATOR & RISK GATE
 print("\n[3] OTONOM SANAL FON & RİSK KAPISI:")
 from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
+
 pto = PaperTradingOrchestrator(initial_capital=10_000_000.0)
 print(f"  • Sanal Fon Başlangıç Sermayesi: ₺{pto.initial_capital:,.0f}")
-print(f"  • Risk Gate (Risk Kapısı) Modülü: AKTİF")
-print(f"  • State Store (Kayıt Defteri): AKTİF")
+print("  • Risk Gate (Risk Kapısı) Modülü: AKTİF")
+print("  • State Store (Kayıt Defteri): AKTİF")
 
 # 4. GÜNLÜK İŞ AKIŞI (DAILY WORKFLOW)
 print("\n[4] GÜNLÜK SEANS İŞ AKIŞI:")
 from services.scheduler.daily_workflow import DailyWorkflow
+
 dw = DailyWorkflow()
 status = dw.get_status()
 print(f"  • Mevcut İş Akışı Fazı: {status.current_phase}")

@@ -7,8 +7,9 @@ Vadeli İşlem ve Opsiyon Piyasası takibi:
 - Margin call tespiti
 """
 
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -21,13 +22,13 @@ class MarginStatus:
     available: float = 0.0
     surplus: float = 0.0
     action: str = ""       # "OK", "MARGIN_CALL", "LIQUIDATE"
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
             self.details = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "margin_call": self.margin_call,
             "required": round(self.required, 2),
@@ -46,7 +47,7 @@ class VIOPMonitor:
     MARGIN_CALL_THRESHOLD = 0.13  # %13 margin call eşiği
 
     def __init__(self):
-        self._custom_margin_rates: Dict[str, float] = {}
+        self._custom_margin_rates: dict[str, float] = {}
 
     def set_margin_rate(self, ticker: str, rate: float):
         """Özel teminat oranı ata."""
@@ -81,10 +82,7 @@ class VIOPMonitor:
         margin_call = False
         action = "OK"
 
-        if surplus < 0:
-            margin_call = True
-            action = "MARGIN_CALL"
-        elif available_margin < position_value * self.MARGIN_CALL_THRESHOLD:
+        if surplus < 0 or available_margin < position_value * self.MARGIN_CALL_THRESHOLD:
             margin_call = True
             action = "MARGIN_CALL"
 

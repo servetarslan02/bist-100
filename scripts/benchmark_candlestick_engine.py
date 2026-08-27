@@ -5,12 +5,12 @@ Gerçek BIST-100 hisseleri üzerinde son 1 yıllık A/B testini koşturur:
 A) Eski Sistem: Basit RSI & SMA Kesişimi
 B) Yeni 10/10 Sistem: Japon Mum Formasyonları + Price Action + FVG + Alıcı Gücü
 """
-import sys
 import os
-import yfinance as yf
-import polars as pl
+import sys
+
 import numpy as np
-from datetime import datetime
+import polars as pl
+import yfinance as yf
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
@@ -46,9 +46,6 @@ def run_benchmark():
                 continue
 
             closes = df["Close"].values
-            opens = df["Open"].values
-            highs = df["High"].values
-            lows = df["Low"].values
 
             # Her işlem günü için simülasyon (Son 200 gün)
             for i in range(30, len(df) - 5):
@@ -61,7 +58,7 @@ def run_benchmark():
                 # 1. Eski Sistem (Baseline): Sadece RSI < 35 ve SMA20 > SMA50
                 # -------------------------------------------------------------
                 sma20 = np.mean(closes[max(0, i-19):i+1])
-                sma50 = np.mean(closes[max(0, i-49):i+1])
+                np.mean(closes[max(0, i-49):i+1])
                 deltas = np.diff(closes[max(0, i-14):i+1])
                 gains = np.maximum(deltas, 0)
                 losses = np.maximum(-deltas, 0)
@@ -80,7 +77,7 @@ def run_benchmark():
                 # 2. Yeni 10/10 Sistem: Mum Formasyonu + Price Action + FVG
                 # -------------------------------------------------------------
                 candle_res = candle_engine.analyze_dataframe(window_df, sym)
-                
+
                 # Alım Kuralı: Bullish Engulfing, Hammer, Morning Star, Bullish FVG
                 # veya Güçlü Alıcı Baskısı (%65+) ile Confluence
                 strong_bullish_patterns = {"BULLISH_ENGULFING", "HAMMER_PINBAR", "MORNING_STAR", "THREE_WHITE_SOLDIERS", "BULLISH_FVG"}
@@ -95,7 +92,7 @@ def run_benchmark():
                         "score": candle_res.candle_score
                     })
 
-        except Exception as e:
+        except Exception:
             continue
 
     # İstatistiksel Karşılaştırma

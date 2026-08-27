@@ -16,15 +16,16 @@ Referanslar:
 - 02-SISTEM-MIMARISI.md - Katman 5 (Portfolio & Risk)
 """
 
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import Dict, List, Optional, Any, Tuple, Set
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 import structlog
 
+from .bias_detector import BiasDetectorMiddleware, LookAheadBiasDetector
 from .transaction_costs import TransactionCostEngine, bist_transaction_cost
-from .bias_detector import LookAheadBiasDetector, BiasDetectorMiddleware
 
 logger = structlog.get_logger()
 
@@ -107,13 +108,13 @@ class MultiAssetResult:
     total_slippage: float = 0.0
     avg_positions: float = 0.0
     avg_turnover: float = 0.0
-    sector_exposures: Dict[str, float] = field(default_factory=dict)
-    bias_report: Optional[Dict[str, Any]] = None
-    equity_curve: List[Tuple[str, float]] = field(default_factory=list)
-    trade_log: List[Dict[str, Any]] = field(default_factory=list)
-    daily_metrics: List[Dict[str, Any]] = field(default_factory=list)
+    sector_exposures: dict[str, float] = field(default_factory=dict)
+    bias_report: dict[str, Any] | None = None
+    equity_curve: list[tuple[str, float]] = field(default_factory=list)
+    trade_log: list[dict[str, Any]] = field(default_factory=list)
+    daily_metrics: list[dict[str, Any]] = field(default_factory=list)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "run_id": self.run_id,
             "start_date": self.start_date,
@@ -149,8 +150,8 @@ class MultiAssetBacktestEngine:
 
     def __init__(
         self,
-        config: Optional[MultiAssetConfig] = None,
-        cost_engine: Optional[TransactionCostEngine] = None,
+        config: MultiAssetConfig | None = None,
+        cost_engine: TransactionCostEngine | None = None,
     ):
         self.config = config or MultiAssetConfig()
         self.cost_engine = cost_engine or bist_transaction_cost
@@ -161,9 +162,9 @@ class MultiAssetBacktestEngine:
         self,
         market_data: pl.DataFrame,
         signal_data: pl.DataFrame,
-        sector_mapping: Dict[str, str],
-        benchmark_data: Optional[pl.DataFrame] = None,
-        universe_tickers: Optional[Set[str]] = None,
+        sector_mapping: dict[str, str],
+        benchmark_data: pl.DataFrame | None = None,
+        universe_tickers: set[str] | None = None,
     ) -> MultiAssetResult:
         """
         Multi-asset backtest çalıştır.
@@ -196,7 +197,7 @@ class MultiAssetBacktestEngine:
 
         import hashlib
         run_id = hashlib.md5(
-            f"multi_{datetime.now(timezone.utc).isoformat()}".encode()
+            f"multi_{datetime.now(UTC).isoformat()}".encode()
         ).hexdigest()[:12]
 
         logger.info("Starting multi-asset backtest",
@@ -210,7 +211,7 @@ class MultiAssetBacktestEngine:
         cash = capital
 
         # State
-        positions: Dict[str, Dict] = {}  # ticker → {quantity, entry_price, entry_date, sector}
+        positions: dict[str, dict] = {}  # ticker → {quantity, entry_price, entry_date, sector}
         equity_curve = []
         trade_log = []
         daily_metrics = []
@@ -226,16 +227,16 @@ class MultiAssetBacktestEngine:
         # Aynı günün kapanışıyla hem sinyal üretip hem işlem yapmak,
         # gerçek hayatta imkansız bir öngörü (look-ahead bias) varsayar
         # (bkz. documentation/14 — kod incelemesiyle tespit edilen bug).
-        next_date_map: Dict[Any, Any] = {
+        next_date_map: dict[Any, Any] = {
             dates[i]: dates[i + 1] for i in range(len(dates) - 1)
         }
-        open_price_map: Dict[Tuple[Any, str], float] = {}
+        open_price_map: dict[tuple[Any, str], float] = {}
         if "open" in market_data.columns:
             for row in market_data[["date", "ticker", "open"]].itertuples(index=False):
                 open_price_map[(row.date, row.ticker)] = row.open
 
         # Gap risk kontrolü için önceki kapanış fiyatı haritası
-        close_price_map: Dict[Tuple[Any, str], float] = {}
+        close_price_map: dict[tuple[Any, str], float] = {}
         if "close" in market_data.columns:
             for row in market_data[["date", "ticker", "close"]].itertuples(index=False):
                 close_price_map[(row.date, row.ticker)] = row.close
@@ -262,7 +263,7 @@ class MultiAssetBacktestEngine:
             bias_report = bias_report_obj.to_dict()
 
         # Sector tracking
-        sector_exposure: Dict[str, float] = {}
+        sector_exposure: dict[str, float] = {}
 
         # Main loop
         prev_equity = capital
@@ -278,15 +279,15 @@ class MultiAssetBacktestEngine:
 
         for date in dates:
             # Current day data
-            day_market = market_data.filter(pl.col('date') == target_date)
-            day_signals = signal_data.filter(pl.col('date') == target_date) if signal_data is not None else pl.DataFrame()
+            day_market = market_data.filter(pl.col('date') == date)
+            day_signals = signal_data.filter(pl.col('date') == date) if signal_data is not None else pl.DataFrame()
 
             if day_market.empty:
                 continue
 
             # Current prices
-            prices = dict(zip(day_market["ticker"], day_market["close"]))
-            volumes = dict(zip(day_market["ticker"], day_market["volume"]))
+            prices = dict(zip(day_market["ticker"], day_market["close"], strict=False))
+            volumes = dict(zip(day_market["ticker"], day_market["volume"], strict=False))
 
             # Mark-to-market
             portfolio_value = cash

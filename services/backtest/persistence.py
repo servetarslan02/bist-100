@@ -10,10 +10,11 @@ DuckDB-based persistence for backtest results:
 Recovery: restart sonrası eksiksiz veri yükler.
 """
 
-import orjson
-import duckdb
-from typing import Dict, Any, List, Optional
 from pathlib import Path
+from typing import Any
+
+import duckdb
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -94,8 +95,8 @@ class BacktestPersistence:
         start_date: str,
         end_date: str,
         initial_capital: float,
-        metrics: Dict[str, Any],
-        config: Optional[Dict[str, Any]] = None,
+        metrics: dict[str, Any],
+        config: dict[str, Any] | None = None,
     ) -> None:
         """Run metadata kaydet."""
         conn = duckdb.connect(self._db_path)
@@ -122,7 +123,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def save_trades(self, run_id: str, trades: List[Dict[str, Any]]) -> None:
+    def save_trades(self, run_id: str, trades: list[dict[str, Any]]) -> None:
         """Trade'leri kaydet."""
         if not trades:
             return
@@ -150,7 +151,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def save_equity_curve(self, run_id: str, curve: List[Dict[str, Any]]) -> None:
+    def save_equity_curve(self, run_id: str, curve: list[dict[str, Any]]) -> None:
         """Equity curve kaydet."""
         if not curve:
             return
@@ -175,7 +176,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
+    def get_run(self, run_id: str) -> dict[str, Any] | None:
         """Run metadata getir."""
         conn = duckdb.connect(self._db_path)
         try:
@@ -193,7 +194,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def get_trades(self, run_id: str) -> List[Dict[str, Any]]:
+    def get_trades(self, run_id: str) -> list[dict[str, Any]]:
         """Trade'leri getir."""
         conn = duckdb.connect(self._db_path)
         try:
@@ -205,7 +206,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def get_equity_curve(self, run_id: str) -> List[Dict[str, Any]]:
+    def get_equity_curve(self, run_id: str) -> list[dict[str, Any]]:
         """Equity curve getir."""
         conn = duckdb.connect(self._db_path)
         try:
@@ -217,7 +218,7 @@ class BacktestPersistence:
         finally:
             conn.close()
 
-    def list_runs(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def list_runs(self, limit: int = 50) -> list[dict[str, Any]]:
         """Son run'ları listele."""
         conn = duckdb.connect(self._db_path)
         try:

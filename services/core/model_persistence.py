@@ -4,9 +4,10 @@ FAZ 5.1: Model metadata DB persistence.
 FAZ 4 model yapısını bozmaz; DB ile ilişkilendirme sağlar.
 """
 
-import orjson
 import hashlib
-from typing import Optional, Dict, Any, List
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -25,9 +26,9 @@ class ModelPersistence:
         version: str,
         model_obj: Any,
         artifact_path: str,
-        training_data_start: Optional[str] = None,
-        training_data_end: Optional[str] = None,
-    ) -> Optional[int]:
+        training_data_start: str | None = None,
+        training_data_end: str | None = None,
+    ) -> int | None:
         """Model metadata'sını DB'ye kaydet.
 
         Args:
@@ -112,7 +113,7 @@ class ModelPersistence:
             return None
 
     @staticmethod
-    async def get_champion_model(model_name: str) -> Optional[Dict[str, Any]]:
+    async def get_champion_model(model_name: str) -> dict[str, Any] | None:
         """Champion model metadata'sını getir."""
         try:
             from .database import pg_fetchrow
@@ -172,7 +173,7 @@ class ModelPersistence:
             return False
 
     @staticmethod
-    async def list_model_versions(model_name: str, limit: int = 10) -> List[Dict[str, Any]]:
+    async def list_model_versions(model_name: str, limit: int = 10) -> list[dict[str, Any]]:
         """Model versiyonlarını listele."""
         try:
             from .database import pg_fetch

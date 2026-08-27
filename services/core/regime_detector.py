@@ -10,11 +10,12 @@ ROADMAP v3.0:
 KURAL: BULL'da momentum, BEAR'da quality, SIDEWAYS'da mean reversion.
 """
 
-import numpy as np
-from typing import Any, Dict, List
-from dataclasses import dataclass
 from collections import deque
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -26,8 +27,8 @@ class RegimeState:
     regime: str  # BULL, BEAR, SIDEWAYS, HIGH_VOL, LOW_VOL
     confidence: float
     duration_days: int
-    transition_probability: Dict[str, float]
-    factors: Dict[str, float]
+    transition_probability: dict[str, float]
+    factors: dict[str, float]
 
 
 class RegimeDetector:
@@ -43,7 +44,7 @@ class RegimeDetector:
 
     def detect_regime(
         self,
-        market_data: Dict[str, Any],  # {ticker: DataFrame}
+        market_data: dict[str, Any],  # {ticker: DataFrame}
         benchmark_ticker: str = "XU100",
     ) -> RegimeState:
         """Piyasa rejimini tespit et."""
@@ -162,7 +163,7 @@ class RegimeDetector:
         """Breadth (piyasa genişliği) faktörlerini hesapla."""
         advancing = 0
         total = 0
-        for ticker, tdf in market_data.items():
+        for _ticker, tdf in market_data.items():
             if len(tdf) >= 2:
                 tclose = tdf["Close"].values
                 if tclose[-1] > tclose[-2]:
@@ -256,7 +257,7 @@ class RegimeDetector:
             self._regime_duration += 1
 
         self._regime_history.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "regime": regime,
             "confidence": confidence,
             "factors": factors,
@@ -267,7 +268,7 @@ class RegimeDetector:
         logger.info("Regime detected", regime=regime, confidence=round(confidence, 4),
                    duration=self._regime_duration)
 
-    def _estimate_transition_probability(self, current_regime: str) -> Dict[str, float]:
+    def _estimate_transition_probability(self, current_regime: str) -> dict[str, float]:
         """Rejim geçiş olasılıklarını tahmin et."""
         # Basit geçiş matrisi (gerçek veri ile güncellenebilir)
         transition_matrix = {
@@ -280,7 +281,7 @@ class RegimeDetector:
 
         return transition_matrix.get(current_regime, {r: 0.2 for r in self.REGIMES})
 
-    def get_regime_history(self) -> List[Dict]:
+    def get_regime_history(self) -> list[dict]:
         return list(self._regime_history)
 
 

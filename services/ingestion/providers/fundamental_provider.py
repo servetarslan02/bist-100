@@ -12,10 +12,10 @@ v2.0: Async refactor + retry + rate limiter entegrasyonu
 
 import asyncio
 import concurrent.futures
-from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
-import structlog
+from datetime import UTC, datetime
+from typing import Any
 
+import structlog
 
 logger = structlog.get_logger()
 
@@ -24,7 +24,7 @@ class FundamentalProvider:
     """Şirket finansal verilerini çeker (async)."""
 
     def __init__(self):
-        self._cache: Dict[str, Dict] = {}
+        self._cache: dict[str, dict] = {}
         self._cache_ttl_seconds = 3600  # 1 saat cache
         self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 
@@ -36,11 +36,11 @@ class FundamentalProvider:
                 loop.run_in_executor(self._executor, lambda: func(*args, **kwargs)),
                 timeout=timeout,
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Fundamental fetch timeout", timeout=timeout)
             return None
 
-    async def fetch_fundamentals(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_fundamentals(self, ticker: str) -> dict[str, Any] | None:
         """Ana fundamental veri çekme fonksiyonu (async).
 
         Önce yfinance'dan dener, başarısız olursa KAP'tan dener.
@@ -49,13 +49,13 @@ class FundamentalProvider:
         cached = self._cache.get(ticker)
         if cached:
             cached_time = cached.get("_cached_at", 0)
-            if cached_time and (datetime.now(timezone.utc).timestamp() - cached_time) < self._cache_ttl_seconds:
+            if cached_time and (datetime.now(UTC).timestamp() - cached_time) < self._cache_ttl_seconds:
                 return cached
 
         # yfinance'dan çek
         result = await self._fetch_from_yfinance(ticker)
         if result:
-            result["_cached_at"] = datetime.now(timezone.utc).timestamp()
+            result["_cached_at"] = datetime.now(UTC).timestamp()
             result["_source"] = "yfinance"
             self._cache[ticker] = result
             return result
@@ -63,7 +63,7 @@ class FundamentalProvider:
         # KAP'tan çek
         result = await self._fetch_from_kap(ticker)
         if result:
-            result["_cached_at"] = datetime.now(timezone.utc).timestamp()
+            result["_cached_at"] = datetime.now(UTC).timestamp()
             result["_source"] = "kap"
             self._cache[ticker] = result
             return result
@@ -71,7 +71,7 @@ class FundamentalProvider:
         logger.warning("No fundamental data found", ticker=ticker)
         return None
 
-    async def _fetch_from_yfinance(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_from_yfinance(self, ticker: str) -> dict[str, Any] | None:
         """yfinance'dan finansal veri çek (async)."""
         try:
             import yfinance as yf
@@ -85,7 +85,7 @@ class FundamentalProvider:
 
                 return {
                     "ticker": ticker,
-                    "fetch_date": datetime.now(timezone.utc).isoformat(),
+                    "fetch_date": datetime.now(UTC).isoformat(),
                     # Değerleme
                     "pe_ratio": info.get("trailingPE"),
                     "forward_pe": info.get("forwardPE"),
@@ -147,7 +147,7 @@ class FundamentalProvider:
             logger.debug("yfinance fundamental fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def _fetch_from_kap(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def _fetch_from_kap(self, ticker: str) -> dict[str, Any] | None:
         """KAP'tan finansal veri çek (async)."""
         try:
             from .kap_provider import kap_provider
@@ -156,7 +156,7 @@ class FundamentalProvider:
             logger.debug("KAP fundamental fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def fetch_quarterly_financials(self, ticker: str, periods: int = 8) -> Optional[List[Dict]]:
+    async def fetch_quarterly_financials(self, ticker: str, periods: int = 8) -> list[dict] | None:
         """Çeyreklik finansal veri çek (async)."""
         try:
             import yfinance as yf
@@ -187,7 +187,7 @@ class FundamentalProvider:
             logger.debug("Quarterly financials fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def fetch_balance_sheet(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_balance_sheet(self, ticker: str) -> dict[str, Any] | None:
         """Güncel bilanço verisi çek (async)."""
         try:
             import yfinance as yf
@@ -212,7 +212,7 @@ class FundamentalProvider:
             logger.debug("Balance sheet fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def fetch_cash_flow(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_cash_flow(self, ticker: str) -> dict[str, Any] | None:
         """Nakit akış tablosu çek (async)."""
         try:
             import yfinance as yf
@@ -237,7 +237,7 @@ class FundamentalProvider:
             logger.debug("Cash flow fetch failed", ticker=ticker, error=str(e))
             return None
 
-    async def get_valuation_summary(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def get_valuation_summary(self, ticker: str) -> dict[str, Any] | None:
         """Değerleme özeti oluştur (async)."""
         fund = await self.fetch_fundamentals(ticker)
         if not fund:
@@ -286,7 +286,7 @@ class FundamentalProvider:
 
         return summary
 
-    def clear_cache(self, ticker: Optional[str] = None):
+    def clear_cache(self, ticker: str | None = None):
         """Cache temizle."""
         if ticker:
             self._cache.pop(ticker, None)

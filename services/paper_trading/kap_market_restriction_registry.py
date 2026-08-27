@@ -10,8 +10,8 @@ Kritik İlke:
 - Eksik veya gecikmiş veri durumunda fail-safe olarak NO_TRADE kuralı işletilir.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -24,7 +24,7 @@ class MarketRestrictionRecord:
     restriction_type: str        # "VBTS_GROSS_SETTLEMENT" | "VBTS_SHORT_BAN" | "HALT" | "CIRCUIT_BREAKER"
     published_at: str            # ISO Timestamp (KAP yayin zamani)
     effective_date: str          # Yürürlüğe girdiği ilk seans tarihi (YYYY-MM-DD)
-    end_date: Optional[str] = None # Tedbirin bittiği tarih (YYYY-MM-DD)
+    end_date: str | None = None # Tedbirin bittiği tarih (YYYY-MM-DD)
     details: str = ""
 
 
@@ -32,10 +32,10 @@ class KAPMarketRestrictionRegistry:
     """Zaman damgalı KAP piyasa tedbir ve kısıt sicil yöneticisi."""
 
     def __init__(self):
-        self._restrictions: Dict[str, List[MarketRestrictionRecord]] = {}
-        self._halted_tickers: Set[str] = set()
-        self._gross_settlement_tickers: Set[str] = set()
-        self._short_ban_tickers: Set[str] = set()
+        self._restrictions: dict[str, list[MarketRestrictionRecord]] = {}
+        self._halted_tickers: set[str] = set()
+        self._gross_settlement_tickers: set[str] = set()
+        self._short_ban_tickers: set[str] = set()
 
     def register_restriction(
         self,
@@ -43,7 +43,7 @@ class KAPMarketRestrictionRegistry:
         restriction_type: str,
         published_at: str,
         effective_date: str,
-        end_date: Optional[str] = None,
+        end_date: str | None = None,
         details: str = "",
     ):
         """Yeni bir piyasa tedbiri / kısıtı kaydeder."""
@@ -100,7 +100,7 @@ class KAPMarketRestrictionRegistry:
         current_date: str,
         side: str,
         data_quality_ok: bool = True,
-    ) -> Tuple[bool, Optional[str]]:
+    ) -> tuple[bool, str | None]:
         """
         İşlem öncesi piyasa kısıtı ve veri güvenilirlik denetimi.
         Eksik/gecikmiş veride doğrudan NO_TRADE döner.

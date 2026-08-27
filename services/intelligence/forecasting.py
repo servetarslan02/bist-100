@@ -8,10 +8,10 @@ ALPHA BIST — Forecasting & Ensemble v1.0
 - Event Timeline Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -37,9 +37,9 @@ class ForecastingEngine:
     def compute_forecasts(
         self,
         ticker: str,
-        features: Dict[str, float],
-        historical_returns: List[float],
-    ) -> List[Forecast]:
+        features: dict[str, float],
+        historical_returns: list[float],
+    ) -> list[Forecast]:
         """Farklı zaman ufukları için tahmin üret."""
         forecasts = []
 
@@ -49,7 +49,7 @@ class ForecastingEngine:
 
         return forecasts
 
-    def _forecast_horizon(self, ticker: str, features: Dict, returns: List[float], horizon: int) -> Forecast:
+    def _forecast_horizon(self, ticker: str, features: dict, returns: list[float], horizon: int) -> Forecast:
         """Tek ufuk için tahmin."""
         # Feature-based heuristic prediction
         momentum = features.get("momentum_20d", 0)
@@ -85,7 +85,7 @@ class ForecastingEngine:
             probability_positive=round(prob, 4),
             confidence=round(confidence, 4),
             model_source="heuristic",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
 
@@ -94,8 +94,8 @@ class EnsembleForecasting:
 
     def combine_forecasts(
         self,
-        forecasts: List[Forecast],
-        weights: Optional[Dict[str, float]] = None,
+        forecasts: list[Forecast],
+        weights: dict[str, float] | None = None,
     ) -> Forecast:
         """Çoklu tahminleri birleştir."""
         if not forecasts:
@@ -128,7 +128,7 @@ class EnsembleForecasting:
             probability_positive=round(weighted_prob, 4),
             confidence=round(weighted_confidence, 4),
             model_source="ensemble",
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
 

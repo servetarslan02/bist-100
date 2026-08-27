@@ -7,9 +7,10 @@ Drift detection, A/B test, calibration için temel.
 KURAL: Tekrar kullanılabilir, test edilebilir, production-ready.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +22,7 @@ class PSIResult:
     psi: float
     drift_detected: bool
     severity: str  # STABLE, WARNING, ALERT, CRITICAL
-    bin_details: List[Dict] = field(default_factory=list)
+    bin_details: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -39,7 +40,7 @@ class PageHinkleyResult:
     drift_detected: bool
     max_deviation: float
     threshold: float
-    change_point_index: Optional[int] = None
+    change_point_index: int | None = None
 
 
 @dataclass
@@ -329,7 +330,7 @@ class StatisticalTests:
         current_value: float,
         warning_threshold: float = 2.5,
         critical_threshold: float = 3.5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Z-score drift testi.
 
         Args:

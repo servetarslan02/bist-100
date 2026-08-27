@@ -3,10 +3,11 @@
 Finansal NLP sentiment analizi — transformer-based,
 multi-source (KAP, haber, sosyal medya), confidence scoring.
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -55,7 +56,7 @@ class FinGPTSentiment:
         self.model_name = model_name
         self._model = None
         self._tokenizer = None
-        self._sentiment_history: Dict[str, List[SentimentResult]] = {}
+        self._sentiment_history: dict[str, list[SentimentResult]] = {}
         self._source_weights = {
             "kap": 1.0,      # KAP en güvenilir
             "news": 0.7,
@@ -66,7 +67,7 @@ class FinGPTSentiment:
     def load_model(self) -> bool:
         """Model yükle."""
         try:
-            from transformers import AutoTokenizer, AutoModelForSequenceClassification
+            from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
             if self.model_name == "FinBERT":
                 model_path = "ProsusAI/finbert"
@@ -104,11 +105,11 @@ class FinGPTSentiment:
         else:
             return self._rule_based_analyze(text, source, ticker)
 
-    def analyze_batch(self, texts: List[str], source: str = "news", ticker: str = "") -> List[SentimentResult]:
+    def analyze_batch(self, texts: list[str], source: str = "news", ticker: str = "") -> list[SentimentResult]:
         """Toplu sentiment analizi."""
         return [self.analyze(text, source, ticker) for text in texts]
 
-    def get_ticker_sentiment(self, ticker: str, window_hours: int = 24) -> Optional[AggregatedSentiment]:
+    def get_ticker_sentiment(self, ticker: str, window_hours: int = 24) -> AggregatedSentiment | None:
         """Bir hisse için toplu sentiment.
 
         Args:
@@ -123,7 +124,7 @@ class FinGPTSentiment:
             return None
 
         # Son N saat
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         recent = [
             r for r in history
             if (now - datetime.fromisoformat(r.timestamp)).total_seconds() < window_hours * 3600
@@ -204,7 +205,7 @@ class FinGPTSentiment:
                 confidence=round(confidence, 4),
                 source=source,
                 ticker=ticker,
-                timestamp=datetime.now(timezone.utc).isoformat(),
+                timestamp=datetime.now(UTC).isoformat(),
             )
 
             # History
@@ -248,7 +249,7 @@ class FinGPTSentiment:
             confidence=round(confidence, 4),
             source=source,
             ticker=ticker,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         if ticker:
@@ -258,7 +259,7 @@ class FinGPTSentiment:
 
         return result
 
-    def get_history(self, ticker: str) -> List[Dict[str, Any]]:
+    def get_history(self, ticker: str) -> list[dict[str, Any]]:
         """Sentiment geçmişi."""
         history = self._sentiment_history.get(ticker, [])
         return [

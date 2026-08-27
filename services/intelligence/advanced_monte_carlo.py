@@ -13,6 +13,7 @@ Kullanım:
 """
 
 import numpy as np
+
 try:
     from numba import jit
 except ImportError:
@@ -20,15 +21,15 @@ except ImportError:
         def decorator(func):
             return func
         return decorator
-from typing import Optional
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
 
 @jit(nopython=True)
 def _run_jump_diffusion(
-    current_price: float, mu: float, sigma: float, lambda_t: float, compensator: float, 
+    current_price: float, mu: float, sigma: float, lambda_t: float, compensator: float,
     jump_mean: float, jump_std: float, horizon_days: int, n_sims: int, dt: float
 ) -> np.ndarray:
     drift = (mu - 0.5 * sigma**2 - compensator) * dt
@@ -51,12 +52,12 @@ def _run_jump_diffusion(
 
             total_return = log_return + jump_size
             prices[i, t] = prices[i, t-1] * np.exp(total_return)
-            
+
     return prices
 
 @jit(nopython=True)
 def _run_heston_lite(
-    current_price: float, mu: float, sigma: float, kappa: float, theta: float, 
+    current_price: float, mu: float, sigma: float, kappa: float, theta: float,
     xi: float, rho: float, dt: float, horizon_days: int, n_sims: int
 ) -> np.ndarray:
     prices = np.zeros((n_sims, horizon_days + 1))
@@ -121,7 +122,7 @@ class AdvancedMCResult:
     jump_mean: float = 0.0
     jump_std: float = 0.0
 
-    sample_paths: Optional[np.ndarray] = None
+    sample_paths: np.ndarray | None = None
 
 
 class AdvancedMonteCarloEngine:
@@ -135,7 +136,7 @@ class AdvancedMonteCarloEngine:
         sigma: float,
         horizon_days: int = 20,
         n_sims: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> AdvancedMCResult:
         """Geometric Brownian Motion (standart)."""
         if seed is not None:
@@ -167,7 +168,7 @@ class AdvancedMonteCarloEngine:
         jump_std: float = 0.05,
         horizon_days: int = 20,
         n_sims: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> AdvancedMCResult:
         if seed is not None:
             np.random.seed(seed)
@@ -177,7 +178,7 @@ class AdvancedMonteCarloEngine:
         compensator = jump_intensity * (np.exp(jump_mean + 0.5 * jump_std**2) - 1)
 
         prices = _run_jump_diffusion(
-            current_price, mu, sigma, lambda_t, compensator, 
+            current_price, mu, sigma, lambda_t, compensator,
             jump_mean, jump_std, horizon_days, n_sims, dt
         )
 
@@ -205,7 +206,7 @@ class AdvancedMonteCarloEngine:
         degrees_of_freedom: float = 5.0,
         horizon_days: int = 20,
         n_sims: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> AdvancedMCResult:
         """Student-t Distribution (Fat Tails)."""
         if seed is not None:
@@ -246,7 +247,7 @@ class AdvancedMonteCarloEngine:
         mean_reversion: float = 2.0,
         horizon_days: int = 20,
         n_sims: int = 10000,
-        seed: Optional[int] = None,
+        seed: int | None = None,
     ) -> AdvancedMCResult:
         if seed is not None:
             np.random.seed(seed)

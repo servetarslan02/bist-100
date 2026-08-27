@@ -4,11 +4,12 @@ ALPHA BIST — Strategy Replay
 Strateji replay motoru.
 """
 
-import polars as pl
-import numpy as np
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
+from datetime import timedelta, timezone
+from typing import Any
+
+import numpy as np
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -26,10 +27,10 @@ class ReplayResult:
     total_return_pct: float = 0.0
     sharpe_ratio: float = 0.0
     max_drawdown_pct: float = 0.0
-    trades: List[Dict[str, Any]] = field(default_factory=list)
-    equity_curve: List[float] = field(default_factory=list)
+    trades: list[dict[str, Any]] = field(default_factory=list)
+    equity_curve: list[float] = field(default_factory=list)
 
-    def summary(self) -> Dict[str, Any]:
+    def summary(self) -> dict[str, Any]:
         return {
             "period": f"{self.start_date} → {self.end_date}",
             "total_ticks": self.total_ticks, "total_orders": self.total_orders,
@@ -50,7 +51,7 @@ class StrategyReplay:
     def load_strategy(self, strategy):
         self._strategy = strategy
 
-    def run(self, start_date: str, end_date: str, tickers: Optional[List[str]] = None,
+    def run(self, start_date: str, end_date: str, tickers: list[str] | None = None,
             initial_capital: float = 1_000_000.0) -> ReplayResult:
         """Replay'i çalıştır."""
         from replay.market_player import MarketPlayer

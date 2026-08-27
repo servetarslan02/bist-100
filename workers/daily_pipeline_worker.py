@@ -5,8 +5,9 @@ Günlük trading pipeline'ını çalıştıran worker.
 BIST-100 odaklı.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -17,11 +18,11 @@ class DailyPipelineWorker:
     """Günlük trading pipeline worker'ı."""
 
     def __init__(self):
-        self._last_run_date: Optional[str] = None
+        self._last_run_date: str | None = None
         self._last_run_status: str = "never"
-        self._last_run_result: Optional[Dict[str, Any]] = None
+        self._last_run_result: dict[str, Any] | None = None
 
-    def run(self, date: Optional[str] = None, force: bool = False) -> Dict[str, Any]:
+    def run(self, date: str | None = None, force: bool = False) -> dict[str, Any]:
         """Günlük pipeline'ı çalıştır."""
         target_date = date or datetime.now(_TZ_ISTANBUL).strftime("%Y-%m-%d")
 
@@ -61,7 +62,7 @@ class DailyPipelineWorker:
         self._last_run_result = result
         return result
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {
             "last_run_date": self._last_run_date,
             "last_run_status": self._last_run_status,

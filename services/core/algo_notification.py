@@ -1,9 +1,11 @@
 """ALPHA BIST — Algo Trading Notification (SPK)."""
-from typing import Dict, Any
+from typing import Any
+
 import structlog
+
 logger = structlog.get_logger()
 
-def generate_algo_notification(strategy: Dict[str, Any]) -> Dict[str, Any]:
+def generate_algo_notification(strategy: dict[str, Any]) -> dict[str, Any]:
     """SPK algoritmik trading bildirimi oluştur."""
     return {
         "notification_type": "ALGO_TRADING",

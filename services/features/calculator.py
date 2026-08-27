@@ -3,15 +3,17 @@ ALPHA BIST — Feature Calculator Bridge (Polars-Native)
 services.ml.feature_engine.FeatureEngine canonical motoruna bağlanır.
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import polars as pl
+
 from services.ml.feature_engine import FeatureEngine
 
 
 class FeatureCalculator(FeatureEngine):
     """Canonical FeatureEngine bridge for feature calculator."""
 
-    def compute_all_features(self, df: Any, ticker: str = "") -> Dict[str, float]:
+    def compute_all_features(self, df: Any, ticker: str = "") -> dict[str, float]:
         """Compute all features for given dataframe and ticker."""
         if df is None:
             return {}

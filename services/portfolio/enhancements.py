@@ -9,9 +9,10 @@ ALPHA BIST — Portfolio Enhancements v1.0
 - Multi-Currency Support
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -36,7 +37,7 @@ class TaxModel:
     # Holding period eşikleri
     SHORT_TERM_DAYS = 365          # Kısa vadeli < 1 yıl
 
-    def compute_dividend_tax(self, gross_dividend: float) -> Dict[str, float]:
+    def compute_dividend_tax(self, gross_dividend: float) -> dict[str, float]:
         """Temettü vergisi hesapla."""
         stopaj = gross_dividend * self.STOCK_DIVIDEND_TAX
         net = gross_dividend - stopaj
@@ -51,7 +52,7 @@ class TaxModel:
         self,
         realized_gain: float,
         holding_days: int = 0,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Sermaye kazancı vergisi hesapla.
 
         Args:
@@ -80,7 +81,7 @@ class TaxModel:
             "tax_rate": tax_rate,
         }
 
-    def compute_commission_tax(self, commission: float) -> Dict[str, float]:
+    def compute_commission_tax(self, commission: float) -> dict[str, float]:
         """Komisyon üzerinden BSMV."""
         bsmv = commission * self.BSMV_RATE
         return {
@@ -93,7 +94,7 @@ class TaxModel:
         self,
         ticker: str,
         sell_date: datetime,
-        buy_history: List[Dict],
+        buy_history: list[dict],
     ) -> bool:
         """Wash sale kontrolü — 30 gün içinde aynı hisseyi tekrar aldın mı?
 
@@ -124,10 +125,10 @@ class TaxModel:
 
     def compute_total_tax(
         self,
-        trades: List[Dict],
-        dividends: List[Dict],
+        trades: list[dict],
+        dividends: list[dict],
         commissions: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Toplam vergi yükü hesapla.
 
         Args:
@@ -190,7 +191,7 @@ class DividendHandler:
         dividend_per_share: float,
         ex_date: str,
         payment_date: str,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Temettü işle."""
         gross = quantity * dividend_per_share
         tax_model = TaxModel()
@@ -214,10 +215,10 @@ class BenchmarkEngine:
 
     def compare(
         self,
-        portfolio_returns: List[float],
-        benchmark_returns: List[float],
+        portfolio_returns: list[float],
+        benchmark_returns: list[float],
         risk_free_rate: float = 0.15,  # %15 yıllık — TCMB faizinden güncellenmeli
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Portföy vs benchmark karşılaştır."""
         if len(portfolio_returns) != len(benchmark_returns) or len(portfolio_returns) < 2:
             return {}
@@ -265,11 +266,11 @@ class PerformanceAttribution:
 
     def decompose(
         self,
-        portfolio_weights: Dict[str, float],
-        portfolio_returns: Dict[str, float],
-        benchmark_weights: Dict[str, float],
-        benchmark_returns: Dict[str, float],
-    ) -> Dict[str, Any]:
+        portfolio_weights: dict[str, float],
+        portfolio_returns: dict[str, float],
+        benchmark_weights: dict[str, float],
+        benchmark_returns: dict[str, float],
+    ) -> dict[str, Any]:
         """Toplam getiriyi bileşenlerine ayır (Brinson modeli)."""
         # Allocation effect (ağırlık farkı × benchmark getiri)
         allocation = 0
@@ -308,8 +309,8 @@ class PerformanceAttribution:
     def factor_attribution(
         self,
         portfolio_returns: np.ndarray,
-        factor_returns: Dict[str, np.ndarray],
-    ) -> Dict[str, Any]:
+        factor_returns: dict[str, np.ndarray],
+    ) -> dict[str, Any]:
         """Faktör bazlı performans attribüsyonu.
 
         Faktörler: value, momentum, quality, size, volatility
@@ -369,10 +370,10 @@ n            factor_returns: {"factor_name": getiri dizisi}
 
     def sector_attribution(
         self,
-        positions: List[Dict],
-        sector_returns: Dict[str, float],
+        positions: list[dict],
+        sector_returns: dict[str, float],
         total_value: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Sektör bazlı attribüsyon.
 
         Args:
@@ -415,7 +416,7 @@ class MultiCurrencyHandler:
     def __init__(self):
         # Başlangıç kurları — update_rate() ile güncellenmeli
         # Gerçek değerler TCMB API veya config'den yüklenmeli
-        self._rates: Dict[str, float] = {"TRY": 1.0, "USD": 47.88, "EUR": 55.38}
+        self._rates: dict[str, float] = {"TRY": 1.0, "USD": 47.88, "EUR": 55.38}
         self._rates_stale = True  # Kurların güncel olup olmadığını takip et
 
     def update_rate(self, currency: str, rate_to_try: float):
@@ -438,7 +439,7 @@ class MultiCurrencyHandler:
         try_amount = amount * from_rate
         return try_amount / to_rate
 
-    def get_fx_impact(self, positions: List[Dict], from_currency: str = "TRY") -> Dict[str, float]:
+    def get_fx_impact(self, positions: list[dict], from_currency: str = "TRY") -> dict[str, float]:
         """FX etkisini hesapla."""
         total_try = sum(self.convert(p.get("value", 0), p.get("currency", "TRY"), "TRY") for p in positions)
         total_usd = self.convert(total_try, "TRY", "USD")
@@ -469,7 +470,7 @@ class TransactionCostAnalyzer:
         daily_volume: float = 0,
         volatility: float = 0.02,
         spread_pct: float = 0.05,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Detaylı işlem maliyeti analizi.
 
         Args:
@@ -525,7 +526,7 @@ class TransactionCostAnalyzer:
         price: float,
         daily_volume: int,
         volatility: float,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Slippage tahmini.
 
         Args:

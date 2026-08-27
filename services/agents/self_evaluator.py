@@ -13,10 +13,11 @@ Kontroller:
 FAZ 5: Self-Evaluation
 """
 
-import numpy as np
-from typing import Dict, Optional, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 from .agent_memory import AgentMemory
@@ -30,15 +31,15 @@ class EvalReport:
     agent_role: str
     accuracy: float
     recent_accuracy: float  # Son 50 görev
-    calibration: Dict[str, Any]
+    calibration: dict[str, Any]
     drift_detected: bool
     overconfident: bool
     total_tasks: int
     total_outcomes: int
     recommendation: str  # OK, RETRAIN, INVESTIGATE_DRIFT, RECALIBRATE
-    details: Dict[str, Any] = field(default_factory=dict)
+    details: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "agent_role": self.agent_role,
             "accuracy": self.accuracy,
@@ -79,7 +80,7 @@ class AgentSelfEvaluator:
     def evaluate(
         self,
         memory: AgentMemory,
-        regime: Optional[str] = None,
+        regime: str | None = None,
     ) -> EvalReport:
         """Agent performansını değerlendir.
 
@@ -133,7 +134,7 @@ class AgentSelfEvaluator:
 
         return report
 
-    def _check_calibration(self, memory: AgentMemory) -> Dict[str, Any]:
+    def _check_calibration(self, memory: AgentMemory) -> dict[str, Any]:
         """Confidence kalibrasyonu — beklenen vs gerçek doğruluk."""
         return memory.episodic.get_confidence_calibration()
 
@@ -168,7 +169,7 @@ class AgentSelfEvaluator:
 
         return drift
 
-    def _check_overconfidence(self, calibration: Dict) -> bool:
+    def _check_overconfidence(self, calibration: dict) -> bool:
         """Overconfidence kontrolü.
 
         Yüksek confidence ama düşük gerçek doğruluk = overconfident.
@@ -205,7 +206,7 @@ class AgentSelfEvaluator:
         memory: AgentMemory,
         accuracy: float,
         recent_accuracy: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Detaylı bilgi oluştur."""
         return {
             "accuracy_by_regime": memory.episodic.get_accuracy_by_regime(),
@@ -214,7 +215,7 @@ class AgentSelfEvaluator:
             "outcome_distribution": self._outcome_distribution(memory),
         }
 
-    def _confidence_stats(self, memory: AgentMemory) -> Dict[str, float]:
+    def _confidence_stats(self, memory: AgentMemory) -> dict[str, float]:
         """Confidence istatistikleri."""
         confidences = [e.confidence for e in memory.episodic.episodes]
         if not confidences:
@@ -227,7 +228,7 @@ class AgentSelfEvaluator:
             "max": round(float(np.max(confidences)), 4),
         }
 
-    def _outcome_distribution(self, memory: AgentMemory) -> Dict[str, int]:
+    def _outcome_distribution(self, memory: AgentMemory) -> dict[str, int]:
         """Sonuç dağılımı."""
         outcomes = memory.episodic.outcomes.values()
         return {
@@ -261,8 +262,8 @@ class MultiAgentEvaluator:
 
     def evaluate_all(
         self,
-        memories: Dict[str, AgentMemory],
-    ) -> Dict[str, Any]:
+        memories: dict[str, AgentMemory],
+    ) -> dict[str, Any]:
         """Tüm agent'ları değerlendir."""
         reports = {}
         alerts = []
@@ -291,7 +292,7 @@ class MultiAgentEvaluator:
             system_health = "DEGRADED"
 
         return {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "system_health": system_health,
             "agent_reports": reports,
             "alerts": alerts,

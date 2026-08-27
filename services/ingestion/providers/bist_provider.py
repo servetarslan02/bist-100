@@ -9,7 +9,8 @@ v2.0: Async refactor + detaylı veri + endeks bileşenleri
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 import structlog
 
 from ...core.async_http import get_client
@@ -41,22 +42,22 @@ class BISTProvider:
             "Accept-Language": "tr-TR,tr;q=0.9",
         })
 
-    async def fetch_index_data(self) -> Dict[str, Any]:
+    async def fetch_index_data(self) -> dict[str, Any]:
         """BIST endeks verilerini çek (async)."""
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return {}
 
-    async def fetch_market_summary(self) -> Dict[str, Any]:
+    async def fetch_market_summary(self) -> dict[str, Any]:
         """Piyasa özeti: yükselen/düşen/hacim (async)."""
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return {}
 
-    async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_stock_price(self, ticker: str) -> dict[str, Any] | None:
         """Tek hisse fiyatı — 15dk gecikmeli (async)."""
         logger.warning("BIST Provider requires institutional VERDA API credentials. Endpoint disabled.")
         return None
 
-    async def fetch_batch_prices(self, tickers: List[str]) -> Dict[str, Dict]:
+    async def fetch_batch_prices(self, tickers: list[str]) -> dict[str, dict]:
         """Toplu fiyat çekme (async, paralel)."""
         semaphore = asyncio.Semaphore(5)  # Max 5 paralel
 
@@ -79,7 +80,7 @@ class BISTProvider:
         logger.info("BIST batch prices fetched", count=len(output))
         return output
 
-    async def fetch_sector_indices(self) -> Dict[str, Any]:
+    async def fetch_sector_indices(self) -> dict[str, Any]:
         """Sektör endeksleri (async)."""
         results = {}
         for symbol, name in self.INDICES.items():
@@ -98,7 +99,7 @@ class BISTProvider:
 
         return results
 
-    def _parse_index_data(self, data: Any) -> Dict[str, Any]:
+    def _parse_index_data(self, data: Any) -> dict[str, Any]:
         indices = {}
         for item in data if isinstance(data, list) else []:
             symbol = item.get("symbol", "")

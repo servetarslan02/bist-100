@@ -5,13 +5,9 @@ ALPHA BIST — Production-Grade Historical Data Ingestion Tests
 PIT-safe, deterministic, incremental ingestion testleri.
 """
 
-import sys
 import os
-import orjson
+import sys
 import tempfile
-import numpy as np
-from datetime import datetime, timedelta
-
 
 
 def _make_temp_repo():
@@ -25,7 +21,9 @@ def _make_temp_repo():
 def _make_test_snapshots():
     """Test snapshot'ları oluştur."""
     from services.data.historical_contracts import (
-        FundamentalSnapshot, EventSnapshot, CatalystSnapshot,
+        CatalystSnapshot,
+        EventSnapshot,
+        FundamentalSnapshot,
     )
 
     fundamentals = [
@@ -109,10 +107,12 @@ def _make_test_snapshots():
 
 def test_future_fundamental_no_score_effect():
     """Gelecekteki fundamental veri skoru etkilememeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
-    from services.data.historical_adapter import HistoricalDataAdapter
+    import os
+    import tempfile
+
     from services.core.canonical_scoring import canonical_scoring
-    import tempfile, os
+    from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -155,9 +155,11 @@ def test_future_fundamental_no_score_effect():
 
 def test_future_kap_no_score_effect():
     """Gelecekteki KAP event skoru etkilememeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -189,9 +191,11 @@ def test_future_kap_no_score_effect():
 
 def test_future_news_no_score_effect():
     """Gelecekteki news event skoru etkilememeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -222,9 +226,11 @@ def test_future_news_no_score_effect():
 
 def test_future_catalyst_no_score_effect():
     """Gelecekteki catalyst skoru etkilememeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -255,9 +261,11 @@ def test_future_catalyst_no_score_effect():
 
 def test_publication_vs_period_end():
     """publication_date ve period_end karışmamalı."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -276,7 +284,7 @@ def test_publication_vs_period_end():
     # 2025-07-01: period_end geçmiş ama publication henüz yok
     feats = adapter.get_fundamental_features("THYAO", "2025-07-01")
     if feats:
-        issues.append(f"2025-07-01'de fundamental var (publication 2025-08-14)")
+        issues.append("2025-07-01'de fundamental var (publication 2025-08-14)")
 
     # 2025-08-14: publication tarihi
     feats2 = adapter.get_fundamental_features("THYAO", "2025-08-14")
@@ -293,8 +301,10 @@ def test_publication_vs_period_end():
 
 def test_duplicate_ingestion_idempotent():
     """Aynı veri tekrar tekrar_ingest edilebilmeli (idempotent)."""
+    import os
+    import tempfile
+
     from services.data.persistent_repository import PersistentHistoricalRepository
-    import tempfile, os
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -330,8 +340,10 @@ def test_duplicate_ingestion_idempotent():
 
 def test_same_event_two_sources():
     """Aynı event farklı kaynaklardan gelirse tek event olmalı."""
+    import os
+    import tempfile
+
     from services.data.persistent_repository import PersistentHistoricalRepository
-    import tempfile, os
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -369,9 +381,11 @@ def test_same_event_two_sources():
 
 def test_missing_publication_timestamp():
     """Publication timestamp yoksa UNKNOWN olarak işaretlenmeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -386,7 +400,7 @@ def test_missing_publication_timestamp():
     ))
 
     adapter = HistoricalDataAdapter(repo)
-    feats = adapter.get_fundamental_features("THYAO", "2025-12-01")
+    adapter.get_fundamental_features("THYAO", "2025-12-01")
 
     # UNKNOWN status'taki veri kullanılabilir ama düşük güvenilirlikte
     # (adapter bunu döndürür ama data_quality düşük olmalı)
@@ -401,9 +415,11 @@ def test_missing_publication_timestamp():
 
 def test_stale_fundamental():
     """Eski fundamental veri STALE olarak işaretlenmeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -432,9 +448,11 @@ def test_stale_fundamental():
 
 def test_restated_fundamental():
     """Restate edilmiş fundamental veri en güncel olanı kullanılmalı."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -471,8 +489,10 @@ def test_restated_fundamental():
 
 def test_partial_ingestion_recovery():
     """Partial ingestion'dan sonra mevcut veri bozulmamalı."""
+    import os
+    import tempfile
+
     from services.data.persistent_repository import PersistentHistoricalRepository
-    import tempfile, os
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -505,8 +525,10 @@ def test_partial_ingestion_recovery():
 
 def test_provider_timeout_recovery():
     """Provider timeout olursa mevcut veri bozulmamalı."""
+    import os
+    import tempfile
+
     from services.data.persistent_repository import PersistentHistoricalRepository
-    import tempfile, os
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -537,10 +559,12 @@ def test_provider_timeout_recovery():
 
 def test_deterministic_historical_replay():
     """Aynı historical veri → aynı sonuç (deterministic)."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
-    from services.data.historical_adapter import HistoricalDataAdapter
+    import os
+    import tempfile
+
     from services.core.canonical_scoring import canonical_scoring
-    import tempfile, os
+    from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -575,10 +599,12 @@ def test_deterministic_historical_replay():
 
 def test_future_data_mutation_invariance():
     """Gelecekteki veri eklendiğinde geçmiş skor değişmemeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
-    from services.data.historical_adapter import HistoricalDataAdapter
+    import os
+    import tempfile
+
     from services.core.canonical_scoring import canonical_scoring
-    import tempfile, os
+    from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -627,9 +653,11 @@ def test_future_data_mutation_invariance():
 
 def test_historical_snapshot_reproducibility():
     """Aynı snapshot farklı session'larda aynı sonucu vermeli."""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -664,8 +692,10 @@ def test_historical_snapshot_reproducibility():
 
 def test_persistent_repo_basic():
     """Persistent repository temel operasyonları çalışıyor mu?"""
+    import os
+    import tempfile
+
     from services.data.persistent_repository import PersistentHistoricalRepository
-    import tempfile, os
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -705,9 +735,11 @@ def test_ingestion_pipeline_import():
 
 def test_historical_adapter_with_persistent_repo():
     """Historical adapter persistent repo ile çalışıyor mu?"""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.historical_adapter import HistoricalDataAdapter
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -715,7 +747,9 @@ def test_historical_adapter_with_persistent_repo():
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import (
-        FundamentalSnapshot, EventSnapshot, CatalystSnapshot,
+        CatalystSnapshot,
+        EventSnapshot,
+        FundamentalSnapshot,
     )
 
     # Veri ekle
@@ -766,10 +800,12 @@ def test_historical_adapter_with_persistent_repo():
 
 def test_canonical_scoring_with_all_historical():
     """Tüm historical verilerle canonical scoring çalışıyor mu?"""
-    from services.data.persistent_repository import PersistentHistoricalRepository
-    from services.data.historical_adapter import HistoricalDataAdapter
+    import os
+    import tempfile
+
     from services.core.canonical_scoring import canonical_scoring
-    import tempfile, os
+    from services.data.historical_adapter import HistoricalDataAdapter
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -777,7 +813,9 @@ def test_canonical_scoring_with_all_historical():
     repo = PersistentHistoricalRepository(db_path=path)
 
     from services.data.historical_contracts import (
-        FundamentalSnapshot, EventSnapshot, CatalystSnapshot,
+        CatalystSnapshot,
+        EventSnapshot,
+        FundamentalSnapshot,
     )
 
     repo.add_fundamental_snapshot(FundamentalSnapshot(
@@ -837,9 +875,11 @@ def test_canonical_scoring_with_all_historical():
 
 def test_news_ingestion():
     """RSS feed'lerden haber ingestion çalışıyor mu?"""
-    from services.data.persistent_repository import PersistentHistoricalRepository
+    import os
+    import tempfile
+
     from services.data.ingestion_pipeline import HistoricalIngestionPipeline
-    import tempfile, os
+    from services.data.persistent_repository import PersistentHistoricalRepository
     issues = []
 
     fd, path = tempfile.mkstemp(suffix='.db')
@@ -934,7 +974,7 @@ def run_all():
     print(f"\n{'=' * 60}")
     print(f"  SONUÇ: {passed} geçti, {failed} başarısız, {skipped} atlandı")
     if all_issues:
-        print(f"\n  HATALAR:")
+        print("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"    {i}. {issue}")
     print("=" * 60)

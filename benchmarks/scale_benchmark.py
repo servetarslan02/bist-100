@@ -17,12 +17,13 @@ per-scan maliyetten ekstrapolasyon yapılır ve açıkça işaretlenir.
 Çıktı: reports/scale_benchmark.json + reports/scale_benchmark.md
 """
 
-import sys
 import os
-import orjson
-import time
 import resource
+import sys
+import time
 from datetime import datetime, timedelta
+
+import orjson
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -30,7 +31,7 @@ import numpy as np
 import polars as pl
 import psutil
 
-from services.backtest.engine_v4 import BacktestEngineV4, BacktestConfig
+from services.backtest.engine_v4 import BacktestConfig, BacktestEngineV4
 
 SCALES = [100, 500, 1000]
 DAYS = 252
@@ -41,7 +42,7 @@ LEGACY_MAX_SCALE = 100  # legacy yol yalnızca bu ölçeğe kadar gerçek çalı
 def make_aligned_market(n_stocks, n_days, seed=42):
     """Gerçek BIST gibi: tüm hisseler aynı işlem takvimini paylaşır."""
     rng = np.random.RandomState(seed)
-    dates = pl.date_range(datetime(2026, 8, 14) - timedelta(days=n_days*2), datetime(2026, 8, 14), timedelta(days=1), eager=True).tail(n_days)
+    pl.date_range(datetime(2026, 8, 14) - timedelta(days=n_days*2), datetime(2026, 8, 14), timedelta(days=1), eager=True).tail(n_days)
     market = {}
     for i in range(n_stocks):
         trend = rng.uniform(-0.001, 0.002)
@@ -179,7 +180,7 @@ def main():
     with open("reports/scale_benchmark.md", "w") as f:
         f.write("\n".join(lines) + "\n")
 
-    print(f"\nRapor: reports/scale_benchmark.json, reports/scale_benchmark.md")
+    print("\nRapor: reports/scale_benchmark.json, reports/scale_benchmark.md")
     return report
 
 

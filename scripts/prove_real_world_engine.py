@@ -1,9 +1,10 @@
-import sys
 import os
-import orjson
-import duckdb
 import urllib.request
 from datetime import datetime
+
+import duckdb
+import orjson
+
 
 def run_proof():
     print("=" * 72)
@@ -73,7 +74,7 @@ def run_proof():
             pf = orjson.loads(resp.read().decode())
             print(f"  [OK] Portfoy Nakit Bakiyesi  : TL {pf.get('cash'):,.2f}")
             print(f"  [OK] Acik Pozisyon Sayisi    : {pf.get('positions_count')} (Sifir Pozisyon)")
-            print(f"  [OK] Seans Disi Guvenlik     : BIST kapaliyken sahte hisse alimi engellendi (%100 Koruma)")
+            print("  [OK] Seans Disi Guvenlik     : BIST kapaliyken sahte hisse alimi engellendi (%100 Koruma)")
     except Exception as e:
         print(f"  [--] Portfoy sorgu hatasi: {e}")
 

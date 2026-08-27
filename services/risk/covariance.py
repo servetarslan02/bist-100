@@ -9,8 +9,9 @@ ROADMAP v3.0 FAZ 5:
 KURAL: Sample covariance = gürültü. Shrinkage = gerçek.
 """
 
+from typing import Any
+
 import numpy as np
-from typing import Dict, List, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -26,8 +27,8 @@ class CovarianceEstimator:
     def estimate(
         self,
         returns: np.ndarray,  # (n_samples, n_assets)
-        tickers: List[str],
-    ) -> Dict[str, Any]:
+        tickers: list[str],
+    ) -> dict[str, Any]:
         """Ledoit-Wolf shrinkage covariance tahmini.
 
         Args:
@@ -116,10 +117,7 @@ class CovarianceEstimator:
         np.sum(target ** 2)
 
         # Optimal shrinkage
-        if pi + rho > 0:
-            delta = max(0, min(1, pi / (pi + rho)))
-        else:
-            delta = 0.0
+        delta = max(0, min(1, pi / (pi + rho))) if pi + rho > 0 else 0.0
 
         # Minimum shrinkage (numerical stability)
         delta = max(delta, 0.1)

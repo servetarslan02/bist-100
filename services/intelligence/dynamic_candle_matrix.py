@@ -5,8 +5,9 @@ Kayan pencere (Rolling Walk-Forward) koşullu beklenen değer (Conditional Expec
 hesaplamasını mikrosaniye hızında önbellekleyerek simülasyonu anlık hale getirir.
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+from typing import Any
+
 import numpy as np
 import polars as pl
 import structlog
@@ -31,7 +32,7 @@ class DynamicCandleMatrix:
 
     def __init__(self, lookback_window: int = 252):
         self.lookback_window = lookback_window
-        self._cache_events: Dict[str, List[Dict[str, Any]]] = {}
+        self._cache_events: dict[str, list[dict[str, Any]]] = {}
 
     def precompute_stock_patterns(self, ticker: str, df: pl.DataFrame, forward_days: int = 5):
         """Hisse verisindeki tüm formasyon olaylarını bir kez hesaplayıp önbelleğe alır."""
@@ -61,9 +62,9 @@ class DynamicCandleMatrix:
         self,
         ticker: str,
         current_date_idx: int,
-        df_history: Optional[pl.DataFrame] = None,
+        df_history: pl.DataFrame | None = None,
         forward_days: int = 5
-    ) -> Dict[str, DynamicPatternMetrics]:
+    ) -> dict[str, DynamicPatternMetrics]:
         """
         Son 252 günlük penceredeki olayları önbellekten anında süzerek
         o günün dinamik kazanma oranını ve beklenen değerini mikrosaniyede çıkarır.
@@ -78,7 +79,7 @@ class DynamicCandleMatrix:
         start_idx = max(0, current_date_idx - self.lookback_window)
 
         # Kayan pencere içindeki olaylar ($t$ gününden öncesi, sıfır lookahead)
-        window_events: Dict[str, List[float]] = {}
+        window_events: dict[str, list[float]] = {}
         for ev in events:
             if start_idx <= ev["day_idx"] < current_date_idx:
                 pat = ev["pattern"]
@@ -86,7 +87,7 @@ class DynamicCandleMatrix:
                     window_events[pat] = []
                 window_events[pat].append(ev["ret_pct"])
 
-        results: Dict[str, DynamicPatternMetrics] = {}
+        results: dict[str, DynamicPatternMetrics] = {}
         for pat, returns in window_events.items():
             arr = np.array(returns)
             count = len(arr)
@@ -98,7 +99,7 @@ class DynamicCandleMatrix:
             win_rate = (len(wins) / count) * 100
             avg_win = float(np.mean(wins)) if len(wins) > 0 else 0.0
             avg_loss = float(np.mean(losses)) if len(losses) > 0 else 1e-9
-            
+
             pf = float(np.sum(wins) / max(np.sum(losses), 1e-9))
             expectancy = ((win_rate / 100.0) * avg_win) - (((100.0 - win_rate) / 100.0) * avg_loss)
 

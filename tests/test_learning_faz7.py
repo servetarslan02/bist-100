@@ -11,10 +11,8 @@ Meta-learning testing:
 """
 
 import sys
-import os
-import numpy as np
-from datetime import datetime, timezone, timedelta
 
+import numpy as np
 
 
 def test_init():
@@ -194,7 +192,7 @@ def test_decay_prediction_stable():
     from services.learning.meta_learner import MetaLearner
 
     m = MetaLearner()
-    for i in range(40):
+    for _i in range(40):
         m.record_performance("m1", "BULL", {
             "sharpe": 1.5 + np.random.randn() * 0.01,  # Stabil
             "win_rate": 0.6,
@@ -312,14 +310,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 7 TEST SONUÇLARI (Meta Learner)")
+    print("📊 FAZ 7 TEST SONUÇLARI (Meta Learner)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

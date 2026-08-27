@@ -8,11 +8,11 @@ ALPHA BIST — Asimetrik Rejim & Ralli Kilidi 30-Yıllık Kitlesel Optimizasyon 
 5. 5'li Sistem Kıyaslaması
 """
 
-import sys
 import os
+import sys
 import time
+
 import polars as pl
-import numpy as np
 
 # Windows UTF-8 Terminal desteği
 if sys.platform == "win32":
@@ -20,15 +20,15 @@ if sys.platform == "win32":
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     except Exception:
-        logger.warning("Caught Exception in module_level", exc_info=True)
+        pass  # logger not yet initialized
 
 # Proje kök dizini
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import structlog
+
 from services.data.historical_warehouse import HistoricalDataWarehouse
 from services.optimization.asymmetric_optimizer import AsymmetricBayesianOptimizer, StrategyParameters
-from services.optimization.robustness_tester import RobustnessTester
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -70,7 +70,7 @@ def main():
         print(f"#{tr.trial_id:<9} | %{tr.total_return_pct:>14,.1f} | {tr.sharpe_ratio:>6.2f} | {tr.profit_factor:>4.2f} | %{tr.max_drawdown:>8.2f} | {tr.fitness_score:>12.3f}")
     print("-" * 95)
 
-    print(f"\n🎯 SEÇİLEN MERKEZ PARAMETRELER:")
+    print("\n🎯 SEÇİLEN MERKEZ PARAMETRELER:")
     print(f"  • Alıcı Baskısı Eşiği        : %{best_params.min_buyer_pressure:.1f}")
     print(f"  • Mum Puanı Eşiği            : {best_params.min_candle_score:.1f}")
     print(f"  • RSI Aşırı Satım            : {best_params.rsi_oversold:.1f}")

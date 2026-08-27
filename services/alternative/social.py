@@ -16,13 +16,14 @@ Features:
 - social_manipulation_score: Manipülasyon skoru
 """
 
-from typing import Dict, Any
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_social_features(social_data: Dict[str, Any], ticker: str) -> Dict[str, float]:
+def compute_social_features(social_data: dict[str, Any], ticker: str) -> dict[str, float]:
     """Sosyal medya feature'ları.
 
     Args:

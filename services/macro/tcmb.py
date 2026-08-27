@@ -13,14 +13,14 @@ TCMB para politikası feature'ları:
 Refactor: Config-driven, error handling, logging
 """
 
-from typing import Dict, Any
-import structlog
+from typing import Any
 
+import structlog
 
 logger = structlog.get_logger()
 
 
-def compute_tcmb_features(tcmb_data: Dict[str, Any]) -> Dict[str, float]:
+def compute_tcmb_features(tcmb_data: dict[str, Any]) -> dict[str, float]:
     """TCMB faiz ve para politikası feature'ları.
 
     Args:

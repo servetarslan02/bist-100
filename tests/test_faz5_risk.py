@@ -5,7 +5,7 @@ Ledoit-Wolf, Volatility Targeting, Kelly Criterion, Rebalance, Concentration tes
 """
 
 import sys
-import os
+
 import numpy as np
 
 
@@ -29,15 +29,15 @@ def test_ledoit_wolf():
     # 2. Simetrik
     assert np.allclose(cov, cov.T)
     passed += 1
-    print(f"  ✓ Symmetric: True")
+    print("  ✓ Symmetric: True")
 
     # 3. Shrinkage etkisi
-    cov_no_shrink = ledoit_wolf.estimate(returns, shrinkage=0)
+    ledoit_wolf.estimate(returns, shrinkage=0)
     cov_full_shrink = ledoit_wolf.estimate(returns, shrinkage=1)
     # Full shrinkage = diagonal matrix
     assert np.allclose(cov_full_shrink, np.diag(np.diag(cov_full_shrink)))
     passed += 1
-    print(f"  ✓ Shrinkage: 0→sample, 1→diagonal")
+    print("  ✓ Shrinkage: 0→sample, 1→diagonal")
 
     # 4. Otomatik shrinkage
     cov_auto = ledoit_wolf.estimate(returns)
@@ -131,7 +131,7 @@ def test_rebalance():
     orders = rebalance_engine.compute_rebalance(current, target, 100000)
     assert len(orders) == 0  # %1 sapma < %5 eşik
     passed += 1
-    print(f"  ✓ Small deviation: no rebalance")
+    print("  ✓ Small deviation: no rebalance")
 
     # 2. Büyük sapma → rebalance
     current = {"A": 0.5, "B": 0.3, "C": 0.2}

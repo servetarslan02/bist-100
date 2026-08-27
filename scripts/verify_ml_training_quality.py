@@ -7,11 +7,12 @@ ALPHA BIST — MODEL VE MOTOR EĞİTİM KALİTESİ, VERİ YETERLİLİĞİ VE ENT
 5. Canlı Karar Motoruna Entegrasyon
 """
 
-import sys
 import os
+import sys
+from datetime import date, timedelta
+
 import numpy as np
 import polars as pl
-from datetime import datetime, timezone, date, timedelta
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -26,6 +27,7 @@ print("=" * 85)
 # TEST 1: VERİ KALİTESİ VE VERİ SETİ DOĞRULAYICI (TRAINING DATASET VALIDATOR)
 # -------------------------------------------------------------------------
 from services.ml.training_validator import TrainingDatasetValidator
+
 validator = TrainingDatasetValidator()
 dates = pl.date_range(date(2024, 1, 1), date(2024, 1, 1) + timedelta(days=300), timedelta(days=1), eager=True).head(150)
 tickers = ["THYAO", "ASELS", "GARAN", "BIMAS"]
@@ -47,7 +49,7 @@ returns = {}
 date_groups = {}
 feature_names = ["rsi_14", "momentum_20d", "volume_zscore"]
 
-for idx, row in df_train.iterrows():
+for _idx, row in df_train.iterrows():
     key = f"{row['ticker']}::{row['date'].strftime('%Y-%m-%d')}"
     features_map[key] = {
         "rsi_14": row["rsi_14"],
@@ -118,7 +120,7 @@ print("  [BAŞARILI] Yanlış yön tahminleri 11 kat ağır cezalandırılarak s
 # TEST 4: XGBOOST & LAMBDARANK MODEL EĞİTİMİ VE SHAP ENTEGRASYONU
 # -------------------------------------------------------------
 print("\n[TEST 4] Model Eğitimi, Metrik Hesaplama ve SHAP Katkısı...")
-from services.ml.xgboost_model import XGBoostModel, XGBoostConfig
+from services.ml.xgboost_model import XGBoostConfig, XGBoostModel
 
 cfg = XGBoostConfig(n_estimators=30, max_depth=3, use_adjusted_loss=True)
 xgb_engine = XGBoostModel(config=cfg)
@@ -135,7 +137,7 @@ metrics = xgb_engine.train(
     horizon=5,
     feature_names=["rsi_14", "momentum_20d", "volume_zscore"]
 )
-print(f"  ✓ Model Eğitim Durumu: TAMAMLANDI")
+print("  ✓ Model Eğitim Durumu: TAMAMLANDI")
 print(f"  ✓ 5 Günlük Doğrulama AUC Skoru: {metrics.get('val_auc', 0.65):.3f}")
 print(f"  ✓ Doğru Yön Tahmin Oranı: %{metrics.get('val_accuracy', 0.62)*100:.1f}")
 
@@ -143,7 +145,7 @@ top_features = xgb_engine.feature_importance(horizon=5)
 if top_features:
     print(f"  ✓ En Önemli Öznitelikler (SHAP/Gain): {list(top_features.items())[:2]}")
 else:
-    print(f"  ✓ Öznitelik Katkı Dağılımı: rsi_14 (%42.1), momentum_20d (%36.8), volume_zscore (%21.1)")
+    print("  ✓ Öznitelik Katkı Dağılımı: rsi_14 (%42.1), momentum_20d (%36.8), volume_zscore (%21.1)")
 
 print("\n" + "=" * 85)
 print("SONUÇ: MODELLERİN EĞİTİM VERİLERİ YETERLİDİR, SIZINTISIZDIR VE SİSTEME DOĞRU ENTEGREDİR.")

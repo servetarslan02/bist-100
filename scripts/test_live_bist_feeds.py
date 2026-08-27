@@ -1,6 +1,6 @@
-import requests
-import orjson
 import sys
+
+import requests
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
@@ -38,12 +38,12 @@ def test_tradingview_turkey_scanner():
             total = data.get("totalCount", 0)
             rows = data.get("data", [])
             print(f"Total BIST Stocks Found: {total}")
-            print(f"Sample Top 5 Live Stocks:")
+            print("Sample Top 5 Live Stocks:")
             for item in rows[:5]:
                 sym = item.get("s", "")
                 d = item.get("d", [])
-                name = d[0] if len(d) > 0 else ""
-                desc = d[1] if len(d) > 1 else ""
+                d[0] if len(d) > 0 else ""
+                d[1] if len(d) > 1 else ""
                 close = d[2] if len(d) > 2 else 0
                 chg = d[3] if len(d) > 3 else 0
                 vol = d[5] if len(d) > 5 else 0

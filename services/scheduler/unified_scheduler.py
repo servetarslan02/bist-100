@@ -19,13 +19,16 @@ Kaynaklar: arXiv Agentic Trading (2026), BIST resmi, APScheduler best practices
 """
 
 import asyncio
-import orjson
 import signal
 import time
-from datetime import datetime, time as dt_time, timezone, timedelta, date
-from typing import Dict, Any, Optional, Callable, Awaitable, List
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from enum import Enum
+from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import time as dt_time
+from enum import StrEnum
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -42,7 +45,7 @@ _TZ_ISTANBUL = timezone(timedelta(hours=3))
 # Market Phases
 # =====================================================
 
-class MarketPhase(str, Enum):
+class MarketPhase(StrEnum):
     """BIST piyasa fazları (2015 BISTECH sonrası tek seans — Eylül 2025 güncel)."""
     CLOSED = "CLOSED"            # Piyasa kapalı (gece, hafta sonu, tatil)
     PRE_MARKET = "PRE_MARKET"    # 09:40-10:00 (açılış seansı emir toplama)
@@ -100,7 +103,7 @@ class HolidayProvider:
     })
 
     def __init__(self):
-        self._dynamic_holidays: Optional[set] = None
+        self._dynamic_holidays: set | None = None
         self._last_fetch: float = 0
         self._fetch_interval: float = 3600  # 1 saatte bir yenile
 
@@ -194,10 +197,10 @@ class MarketSessionManager:
         (dt_time(23, 0), MarketPhase.NIGHT),
     ]
 
-    def __init__(self, holiday_provider: Optional[HolidayProvider] = None):
+    def __init__(self, holiday_provider: HolidayProvider | None = None):
         self._holiday_provider = holiday_provider or HolidayProvider()
-        self._current_phase: Optional[MarketPhase] = None
-        self._phase_callbacks: Dict[MarketPhase, List[Callable]] = {}
+        self._current_phase: MarketPhase | None = None
+        self._phase_callbacks: dict[MarketPhase, list[Callable]] = {}
 
     def now_istanbul(self) -> datetime:
         """Şu anki Istanbul zamanı."""
@@ -264,7 +267,7 @@ class MarketSessionManager:
         target = tomorrow.replace(hour=9, minute=40, second=0, microsecond=0)
         return max(0, (target - now).total_seconds())
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Piyasa durumu."""
         phase = self.current_phase()
         now = self.now_istanbul()
@@ -283,7 +286,7 @@ class MarketSessionManager:
         """Tatil sağlayıcısını al."""
         return self._holiday_provider
 
-    def _on_phase_change(self, old: Optional[MarketPhase], new: MarketPhase):
+    def _on_phase_change(self, old: MarketPhase | None, new: MarketPhase):
         """Faz değişikliği callback."""
         logger.info("Market phase changed",
                    old=old.value if old else None,
@@ -310,7 +313,7 @@ class MarketSessionManager:
 # Job Types
 # =====================================================
 
-class JobType(str, Enum):
+class JobType(StrEnum):
     """Job türleri."""
     # Data
     MARKET_DATA_UPDATE = "market_data_update"
@@ -503,7 +506,7 @@ class JobResult:
     status: str           # SUCCESS, FAILED, TIMEOUT, RETRY
     duration_ms: float
     timestamp: str
-    error: Optional[str] = None
+    error: str | None = None
     retry_count: int = 0
     result: Any = None
     triggered_by: str = "scheduler"  # scheduler, manual, phase_change
@@ -521,8 +524,8 @@ class DBJobTracker:
     """
 
     def __init__(self):
-        self._db_available: Optional[bool] = None
-        self._memory_history: List[Dict[str, Any]] = []
+        self._db_available: bool | None = None
+        self._memory_history: list[dict[str, Any]] = []
         self._max_memory = 1000
 
     async def record_job(self, result: JobResult) -> bool:
@@ -565,7 +568,7 @@ class DBJobTracker:
             self._memory_history = self._memory_history[-self._max_memory:]
         return True
 
-    async def get_job_history(self, job_type: str = None, limit: int = 50) -> List[Dict]:
+    async def get_job_history(self, job_type: str = None, limit: int = 50) -> list[dict]:
         """Job geçmişini al."""
         if self._is_db_available():
             try:
@@ -603,7 +606,7 @@ class DBJobTracker:
             history = [h for h in history if h["job_type"] == job_type]
         return history[-limit:]
 
-    async def get_failure_stats(self, window_hours: int = 24) -> Dict[str, Any]:
+    async def get_failure_stats(self, window_hours: int = 24) -> dict[str, Any]:
         """Son N saatteki failure istatistikleri."""
         if self._is_db_available():
             try:
@@ -645,6 +648,7 @@ class DBJobTracker:
             return self._db_available
         try:
             import socket
+
             from services.core.config import settings
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
@@ -677,11 +681,11 @@ class UnifiedScheduler:
     - Manuel tetikleme (trigger) desteği
     """
 
-    def __init__(self, job_configs: Optional[Dict[str, JobConfig]] = None):
+    def __init__(self, job_configs: dict[str, JobConfig] | None = None):
         self._market = MarketSessionManager()
         self._configs = {**DEFAULT_JOB_CONFIGS, **(job_configs or {})}
-        self._handlers: Dict[str, Callable[..., Awaitable[Any]]] = {}
-        self._last_run: Dict[str, float] = {}
+        self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
+        self._last_run: dict[str, float] = {}
         self._running = False
         self._shutdown_event = asyncio.Event()
 
@@ -689,14 +693,14 @@ class UnifiedScheduler:
         self._db_tracker = DBJobTracker()
 
         # In-memory job history (monitor için)
-        self._job_history: List[JobResult] = []
+        self._job_history: list[JobResult] = []
         self._max_history = 1000
 
         # Manual trigger queue
         self._trigger_queue: asyncio.Queue = asyncio.Queue()
 
         # Phase callbacks
-        self._phase_callbacks: Dict[str, List[Callable]] = {}
+        self._phase_callbacks: dict[str, list[Callable]] = {}
 
         # State persistence — SQLite
         self._state_db_path = "data/scheduler_state.db"
@@ -730,7 +734,7 @@ class UnifiedScheduler:
         if job_type in self._configs:
             self._configs[job_type].priority = max(1, min(10, priority))
 
-    async def trigger_job(self, job_type: str) -> Dict[str, Any]:
+    async def trigger_job(self, job_type: str) -> dict[str, Any]:
         """Job'ı manuel olarak tetikle.
 
         Args:
@@ -839,7 +843,7 @@ class UnifiedScheduler:
                 await self._execute_with_retry(
                     job_type, handler, config, triggered_by="manual"
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 continue
             except asyncio.CancelledError:
                 break
@@ -951,7 +955,7 @@ class UnifiedScheduler:
                     job_type=job_type,
                     status="SUCCESS",
                     duration_ms=duration_ms,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     retry_count=attempt,
                     result=result,
                     triggered_by=triggered_by,
@@ -964,7 +968,7 @@ class UnifiedScheduler:
 
                 return result
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Timeout after {config.timeout_seconds}s"
                 if attempt < config.max_retries:
                     delay = 1.0 * (2 ** attempt)
@@ -987,7 +991,7 @@ class UnifiedScheduler:
             job_type=job_type,
             status="FAILED",
             duration_ms=duration_ms,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             error=last_error,
             retry_count=config.max_retries,
             triggered_by=triggered_by,
@@ -1007,7 +1011,7 @@ class UnifiedScheduler:
         if len(self._job_history) > self._max_history:
             self._job_history = self._job_history[-self._max_history:]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Scheduler durumu."""
         return {
             "running": self._running,
@@ -1018,12 +1022,12 @@ class UnifiedScheduler:
             "total_jobs_run": len(self._job_history),
             "trigger_queue_size": self._trigger_queue.qsize(),
             "last_runs": {
-                job_type: datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                job_type: datetime.fromtimestamp(ts, tz=UTC).isoformat()
                 for job_type, ts in self._last_run.items()
             },
         }
 
-    def get_job_stats(self, job_type: str = None) -> Dict[str, Any]:
+    def get_job_stats(self, job_type: str = None) -> dict[str, Any]:
         """Job istatistikleri."""
         history = self._job_history
         if job_type:
@@ -1048,7 +1052,7 @@ class UnifiedScheduler:
             ),
         }
 
-    def get_job_history(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_job_history(self, limit: int = 50) -> list[dict[str, Any]]:
         """Job geçmişini al."""
         return [
             {
@@ -1063,7 +1067,7 @@ class UnifiedScheduler:
             for r in self._job_history[-limit:]
         ]
 
-    def get_job_configs(self) -> Dict[str, Dict[str, Any]]:
+    def get_job_configs(self) -> dict[str, dict[str, Any]]:
         """Tüm job konfigürasyonlarını al."""
         return {
             name: {
@@ -1088,8 +1092,9 @@ class UnifiedScheduler:
 
     def _init_state_db(self):
         """Scheduler state SQLite tablosunu oluştur."""
-        import duckdb
         from pathlib import Path
+
+        import duckdb
         Path(self._state_db_path).parent.mkdir(parents=True, exist_ok=True)
         conn = duckdb.connect(self._state_db_path)
         conn.execute("""
@@ -1112,7 +1117,7 @@ class UnifiedScheduler:
     def save_state(self):
         """Scheduler durumunu SQLite'a kaydet."""
         import duckdb
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_iso = datetime.now(UTC).isoformat()
         try:
             conn = duckdb.connect(self._state_db_path)
             # Job run'ları kaydet
@@ -1138,8 +1143,9 @@ class UnifiedScheduler:
 
     def _load_state(self):
         """Scheduler durumunu SQLite'dan yükle."""
-        import duckdb
         from pathlib import Path
+
+        import duckdb
         try:
             if not Path(self._state_db_path).exists():
                 return

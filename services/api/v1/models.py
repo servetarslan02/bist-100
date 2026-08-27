@@ -1,11 +1,11 @@
 """Models API - 30-Yıllık BIST Makine Öğrenimi Ensemble Kayıt Defteri."""
 
 import os
-from fastapi import APIRouter, Depends, Query
-import structlog
 
-from ..dependencies import get_current_user, check_rate_limit
-from ...core.redis_helper import get_cached
+import structlog
+from fastapi import APIRouter, Depends, Query
+
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 

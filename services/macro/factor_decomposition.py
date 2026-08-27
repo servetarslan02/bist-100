@@ -10,9 +10,10 @@ Makro faktör ayrıştırması:
 KURAL: Toplam getiri = Σ(faktör katkısı) + residual.
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -34,7 +35,7 @@ class DecompositionResult:
     ticker: str
     sector: str
     total_return: float
-    factor_contributions: List[FactorContribution]
+    factor_contributions: list[FactorContribution]
     residual: float
     residual_pct: float
     explained_pct: float
@@ -75,8 +76,8 @@ class MacroFactorDecomposition:
         ticker: str,
         sector: str,
         total_return: float,
-        macro_changes: Dict[str, float],
-        company_sensitivity: Optional[Dict[str, float]] = None,
+        macro_changes: dict[str, float],
+        company_sensitivity: dict[str, float] | None = None,
     ) -> DecompositionResult:
         """Getiriyi makro faktörlere ayrıştır.
 
@@ -91,10 +92,7 @@ class MacroFactorDecomposition:
             DecompositionResult
         """
         # Hassasiyet al
-        if company_sensitivity:
-            sensitivity = company_sensitivity
-        else:
-            sensitivity = self.SECTOR_SENSITIVITY.get(sector, self.SECTOR_SENSITIVITY["OTHER"])
+        sensitivity = company_sensitivity or self.SECTOR_SENSITIVITY.get(sector, self.SECTOR_SENSITIVITY["OTHER"])
 
         # Her faktörün katkısını hesapla
         contributions = []
@@ -154,7 +152,7 @@ class MacroFactorDecomposition:
             residual_pct=round(residual_pct * 100, 2),
             explained_pct=round((1 - abs(residual_pct)) * 100, 2),
             top_factor=top_factor,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
     def compute_factor_features(
@@ -162,8 +160,8 @@ class MacroFactorDecomposition:
         ticker: str,
         sector: str,
         total_return: float,
-        macro_changes: Dict[str, float],
-    ) -> Dict[str, float]:
+        macro_changes: dict[str, float],
+    ) -> dict[str, float]:
         """Faktör feature'ları üret."""
         result = self.decompose(ticker, sector, total_return, macro_changes)
 
@@ -198,8 +196,8 @@ class MacroFactorDecomposition:
         ticker: str,
         sector: str,
         total_return: float,
-        macro_changes: Dict[str, float],
-    ) -> Dict[str, Any]:
+        macro_changes: dict[str, float],
+    ) -> dict[str, Any]:
         """Faktör ayrıştırma raporu."""
         result = self.decompose(ticker, sector, total_return, macro_changes)
 

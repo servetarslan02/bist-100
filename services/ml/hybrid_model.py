@@ -3,9 +3,10 @@
 FinGPT sentiment + RL action + ML ranking birleşimi.
 Multi-signal fusion, dynamic weighting, conflict resolution.
 """
-import numpy as np
-from typing import Dict, Any, List
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -20,7 +21,7 @@ class HybridSignal:
     sentiment_score: float
     rl_action: int
     conflict: bool
-    signals: Dict[str, Any]
+    signals: dict[str, Any]
     reasoning: str
 
 
@@ -48,7 +49,7 @@ class HybridModel:
         self.rl_weight = rl_weight
         self.conflict_threshold = conflict_threshold
         self.confidence_threshold = confidence_threshold
-        self._regime_weights: Dict[str, Dict[str, float]] = {
+        self._regime_weights: dict[str, dict[str, float]] = {
             "BULL": {"ml": 0.4, "sentiment": 0.4, "rl": 0.2},
             "BEAR": {"ml": 0.5, "sentiment": 0.2, "rl": 0.3},
             "SIDEWAYS": {"ml": 0.6, "sentiment": 0.2, "rl": 0.2},
@@ -147,14 +148,14 @@ class HybridModel:
         sentiment_scores: np.ndarray,
         rl_actions: np.ndarray,
         regime: str = "NORMAL",
-    ) -> List[HybridSignal]:
+    ) -> list[HybridSignal]:
         """Toplu prediction."""
         return [
             self.predict(ml, sent, rl, regime)
-            for ml, sent, rl in zip(ml_scores, sentiment_scores, rl_actions)
+            for ml, sent, rl in zip(ml_scores, sentiment_scores, rl_actions, strict=False)
         ]
 
-    def set_regime_weights(self, regime: str, weights: Dict[str, float]):
+    def set_regime_weights(self, regime: str, weights: dict[str, float]):
         """Rejim ağırlıklarını güncelle."""
         self._regime_weights[regime] = weights
 
@@ -208,7 +209,7 @@ def hybrid_predict(
     market_state: str = "NORMAL",
     ml_score: float = 0.5,
     regime: str = "NORMAL",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Hyybrid prediction — backward compatible wrapper."""
     result = hybrid_model.predict(
         ml_score=ml_score,

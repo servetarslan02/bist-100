@@ -15,8 +15,9 @@ Kullanım:
 
 import hashlib
 import time
-from typing import Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -40,11 +41,11 @@ class EventDeduplicator:
     """
 
     def __init__(self, window_hours: int = 24):
-        self._seen: Dict[str, float] = {}  # hash → timestamp (epoch)
+        self._seen: dict[str, float] = {}  # hash → timestamp (epoch)
         self._window_seconds = window_hours * 3600
         self._stats = DedupStats()
 
-    def _compute_hash(self, event_data: Dict[str, Any]) -> str:
+    def _compute_hash(self, event_data: dict[str, Any]) -> str:
         """
         Event hash'i oluştur.
 
@@ -62,7 +63,7 @@ class EventDeduplicator:
         key = "|".join(key_parts)
         return hashlib.md5(key.encode("utf-8")).hexdigest()
 
-    def is_duplicate(self, event_data: Dict[str, Any]) -> bool:
+    def is_duplicate(self, event_data: dict[str, Any]) -> bool:
         """
         Bu event daha önce işlendi mi?
 
@@ -86,13 +87,13 @@ class EventDeduplicator:
 
         return False
 
-    def mark_seen(self, event_data: Dict[str, Any]):
+    def mark_seen(self, event_data: dict[str, Any]):
         """Event'i işlenmiş olarak işaretle."""
         event_hash = self._compute_hash(event_data)
         self._seen[event_hash] = time.time()
         self._stats.total_unique += 1
 
-    def check_and_mark(self, event_data: Dict[str, Any]) -> bool:
+    def check_and_mark(self, event_data: dict[str, Any]) -> bool:
         """
         Kontrol et ve işaretle (tek adımda).
 

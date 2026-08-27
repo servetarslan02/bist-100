@@ -9,13 +9,11 @@ Senaryo:
 4. Tüm durumun birebir eşleştiğini doğrula
 """
 
-import sys
-import os
-
 import asyncio
-from services.portfolio.main import PortfolioService
-from services.portfolio.portfolio_manager import PortfolioManager
+import sys
+
 from services.core.database_dev import dev_db
+from services.portfolio.main import PortfolioService
 
 
 async def reset_db():

@@ -1,20 +1,24 @@
 """ALPHA BIST - Feature Engine Service (Main Entry Point)"""
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Dict, List
+from datetime import UTC, datetime
+
 import polars as pl
 import structlog
 
 from ..core.database import (
-    init_databases, close_databases, ch_insert,
+    ch_insert,
+    close_databases,
+    init_databases,
     redis_hset,
 )
-from ..core.event_schema import CanonicalEvent
 from ..core.event_bus import (
-    ensure_topics, EventType,
-    EventConsumer, publish_event,
+    EventConsumer,
+    EventType,
+    ensure_topics,
+    publish_event,
 )
+from ..core.event_schema import CanonicalEvent
 from ..core.logging import setup_logging
 from .calculator import feature_calculator
 from .pipeline import feature_pipeline
@@ -28,7 +32,7 @@ class FeatureEngineService:
     def __init__(self):
         self._running = False
         self._consumer: EventConsumer = None
-        self._price_cache: Dict[str, List[Dict]] = {}  # ticker -> recent prices
+        self._price_cache: dict[str, list[dict]] = {}  # ticker -> recent prices
         # Pipeline — drift detection, BIST features, store entegrasyonu
         self._pipeline = feature_pipeline
 
@@ -113,7 +117,7 @@ class FeatureEngineService:
         except Exception as e:
             logger.error("Tick processing error", error=str(e))
 
-    def _compute_features(self, ticker: str, price_data: List[Dict]) -> Dict[str, float]:
+    def _compute_features(self, ticker: str, price_data: list[dict]) -> dict[str, float]:
         """Compute features from price cache."""
         try:
             # Convert to DataFrame
@@ -141,7 +145,7 @@ class FeatureEngineService:
 
             # Add metadata
             features["ticker"] = ticker
-            features["computed_at"] = datetime.now(timezone.utc).isoformat()
+            features["computed_at"] = datetime.now(UTC).isoformat()
             features["data_points"] = len(df)
 
             # === PIPELINE ENTEGRASYONU ===
@@ -164,7 +168,7 @@ class FeatureEngineService:
             logger.warning("Feature computation failed", ticker=ticker, error=str(e))
             return {}
 
-    async def _run_pipeline_async(self, ticker: str, features: Dict[str, float], df):
+    async def _run_pipeline_async(self, ticker: str, features: dict[str, float], df):
         """Pipeline'ı async olarak çalıştır (store, drift detection)."""
         try:
             result = await self._pipeline.run(
@@ -181,10 +185,10 @@ class FeatureEngineService:
         except Exception as e:
             logger.debug("Pipeline run failed", ticker=ticker, error=str(e))
 
-    def _store_features_ch(self, instrument_id: int, ticker: str, features: Dict[str, float]):
+    def _store_features_ch(self, instrument_id: int, ticker: str, features: dict[str, float]):
         """Store features in ClickHouse."""
         try:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             rows = []
 
             for feature_name, feature_value in features.items():

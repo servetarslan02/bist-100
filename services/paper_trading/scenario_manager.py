@@ -11,8 +11,9 @@ Başarı Kapısı:
 4. İyimser Senaryo: Yalnızca REFERANS amaçlıdır; modelin kabul/red kararı üzerinde ASLA etkisi yoktur.
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 from services.paper_trading.synthetic_liquidity import LiquidityScenario
@@ -55,7 +56,7 @@ class LiquidityScenarioManager:
         min_normal_sharpe: float = 0.5,
         max_pessimistic_drawdown: float = 25.0,
         data_quality_ok: bool = True,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Katı Başarı Kapısı:
         - Normal senaryo: net getiri > BIST karşılaştırması
@@ -63,7 +64,7 @@ class LiquidityScenarioManager:
         - Eksik/gecikmiş veri: NO_TRADE
         - İyimser senaryo: Yalnızca referans olarak raporlanır, karar üzerinde etkisi yoktur.
         """
-        rejection_reasons: List[str] = []
+        rejection_reasons: list[str] = []
 
         # 1. Veri Kalitesi / Gecikme Kontrolü
         if not data_quality_ok:

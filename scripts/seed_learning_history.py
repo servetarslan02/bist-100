@@ -1,8 +1,10 @@
 """Seed initial realistic prediction and outcome history for ALPHA BIST learning pipeline."""
 
 import numpy as np
+
 from services.learning.learning_pipeline import LearningPipeline
 from services.learning.model_memory_store import ModelMemoryStore
+
 
 def seed_history():
     store = ModelMemoryStore()

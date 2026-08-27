@@ -11,10 +11,11 @@ Piyasa bileşenlerinin ayrı ayrı state hesaplaması:
 8. Anomaly State: count, severity, sector clustering
 """
 
-import numpy as np
-from typing import Dict, List, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -43,7 +44,7 @@ class ComponentStates:
     sentiment_score: float = 0.0
     macro_score: float = 0.5
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "momentum_state": self.momentum_state,
@@ -73,14 +74,14 @@ class ComponentStateEngine:
 
     def compute_all(
         self,
-        instrument_states: List[Dict],
+        instrument_states: list[dict],
         vix_level: float = None,
         news_sentiment: float = None,
         social_sentiment: float = None,
         put_call_ratio: float = None,
         market_depth: float = None,
-        macro_data: Dict = None,
-        world_state: Dict = None,
+        macro_data: dict = None,
+        world_state: dict = None,
     ) -> ComponentStates:
         """Tüm bileşen state'lerini hesapla.
 
@@ -131,7 +132,7 @@ class ComponentStateEngine:
         macro_score = self._compute_macro_score(world_state)
 
         return ComponentStates(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             momentum_state=momentum_state,
             volatility_state=volatility_state,
             volume_state=volume_state,
@@ -150,7 +151,7 @@ class ComponentStateEngine:
             macro_score=macro_score,
         )
 
-    def _compute_momentum_state(self, momentums: List[float], avg: float) -> str:
+    def _compute_momentum_state(self, momentums: list[float], avg: float) -> str:
         """Momentum state belirle.
 
         POSITIVE: Pozitif momentum yaygın
@@ -174,7 +175,7 @@ class ComponentStateEngine:
 
     def _compute_volatility_state(
         self,
-        volatilities: List[float],
+        volatilities: list[float],
         avg: float,
         vix_level: float = None,
     ) -> str:
@@ -206,7 +207,7 @@ class ComponentStateEngine:
             return "HIGH"
         return "EXTREME"
 
-    def _compute_volume_state(self, zscores: List[float], avg_zscore: float) -> str:
+    def _compute_volume_state(self, zscores: list[float], avg_zscore: float) -> str:
         """Volume state belirle.
 
         BELOW_AVERAGE: Hacim düşük
@@ -225,7 +226,7 @@ class ComponentStateEngine:
             return "BELOW_AVERAGE"
         return "AVERAGE"
 
-    def _compute_rsi_state(self, rsi_values: List[float], avg_rsi: float) -> str:
+    def _compute_rsi_state(self, rsi_values: list[float], avg_rsi: float) -> str:
         """RSI state belirle.
 
         OVERSOLD: RSI < 30 yaygın
@@ -250,9 +251,9 @@ class ComponentStateEngine:
 
     def _compute_liquidity_state(
         self,
-        spreads: List[float],
+        spreads: list[float],
         avg_spread: float,
-        volume_zscores: List[float],
+        volume_zscores: list[float],
         market_depth: float = None,
     ) -> str:
         """Liquidity state belirle.
@@ -343,7 +344,7 @@ class ComponentStateEngine:
             return 0.0
 
         total_weight = sum(weights)
-        return sum(s * w for s, w in zip(scores, weights)) / total_weight
+        return sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
 
     def _compute_fear_greed_score(
         self,
@@ -393,9 +394,9 @@ class ComponentStateEngine:
             return 0.0
 
         total_weight = sum(weights)
-        return sum(s * w for s, w in zip(scores, weights)) / total_weight
+        return sum(s * w for s, w in zip(scores, weights, strict=False)) / total_weight
 
-    def _compute_macro_state(self, world_state: Dict = None) -> str:
+    def _compute_macro_state(self, world_state: dict = None) -> str:
         """Macro state belirle (world_state'den).
 
         EXPANSION: Büyüme, risk-on
@@ -428,7 +429,7 @@ class ComponentStateEngine:
 
         return "NEUTRAL"
 
-    def _compute_macro_score(self, world_state: Dict = None) -> float:
+    def _compute_macro_score(self, world_state: dict = None) -> float:
         """Macro skoru [0, 1]. 1 = risk-on, 0 = risk-off."""
         if not world_state:
             return 0.5
@@ -446,7 +447,7 @@ class ComponentStateEngine:
 
         return float(np.clip(score, 0, 1))
 
-    def _compute_anomaly_state(self, anomaly_scores: List[float]) -> tuple:
+    def _compute_anomaly_state(self, anomaly_scores: list[float]) -> tuple:
         """Anomaly state hesapla.
 
         Returns:

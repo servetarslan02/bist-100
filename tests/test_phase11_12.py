@@ -5,7 +5,6 @@ Position Sizing, Reconciliation, Backtest Engine, Walk-Forward testleri.
 """
 
 import sys
-import os
 
 
 def test_position_sizing():
@@ -102,7 +101,7 @@ def test_reconciliation():
     )
     assert not result3.is_consistent
     passed += 1
-    print(f"  ✓ Equation mismatch detected")
+    print("  ✓ Equation mismatch detected")
 
     return passed, failed
 

@@ -14,9 +14,10 @@ Tespit yöntemi: Her rejim için ağırlıklı skor hesapla, en yüksek skorlu r
 KURAL: Rejim değişimi smoothing ile filtrelenmeli (chatter önleme).
 """
 
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
 
 from services.macro.config.macro_config import macro_config
@@ -29,9 +30,9 @@ class RegimeResult:
     """Rejim tespit sonucu."""
     regime: str
     confidence: float
-    all_scores: Dict[str, float]
+    all_scores: dict[str, float]
     description: str
-    characteristics: List[str]
+    characteristics: list[str]
     recommended_strategy: str
     timestamp: str
 
@@ -82,12 +83,12 @@ class MacroRegimeDetector:
     }
 
     def __init__(self):
-        self._current_regime: Optional[str] = None
-        self._regime_history: List[RegimeResult] = []
-        self._transitions: List[RegimeTransition] = []
+        self._current_regime: str | None = None
+        self._regime_history: list[RegimeResult] = []
+        self._transitions: list[RegimeTransition] = []
         self._regime_duration: int = 0
 
-    def detect_regime(self, macro_features: Dict[str, float]) -> RegimeResult:
+    def detect_regime(self, macro_features: dict[str, float]) -> RegimeResult:
         """Makro rejim tespit et.
 
         Args:
@@ -129,7 +130,7 @@ class MacroRegimeDetector:
                 transition = RegimeTransition(
                     from_regime=self._current_regime,
                     to_regime=best_regime,
-                    timestamp=datetime.now(timezone.utc).isoformat(),
+                    timestamp=datetime.now(UTC).isoformat(),
                     confidence=best_score,
                 )
                 self._transitions.append(transition)
@@ -154,7 +155,7 @@ class MacroRegimeDetector:
             description=regime_info["description"],
             characteristics=regime_info["characteristics"],
             recommended_strategy=regime_info["strategy"],
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
         self._regime_history.append(result)
@@ -162,7 +163,7 @@ class MacroRegimeDetector:
             self._regime_history = self._regime_history[-1000:]
         return result
 
-    def compute_regime_features(self, macro_features: Dict[str, float]) -> Dict[str, float]:
+    def compute_regime_features(self, macro_features: dict[str, float]) -> dict[str, float]:
         """Rejim feature'ları üret."""
         result = self.detect_regime(macro_features)
 
@@ -189,17 +190,17 @@ class MacroRegimeDetector:
         # Rejim değişimi (son 30 günde değişti mi?)
         recent_transitions = [
             t for t in self._transitions
-            if t.timestamp > (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            if t.timestamp > (datetime.now(UTC) - timedelta(days=30)).isoformat()
         ]
         features["macro_regime_changed_30d"] = 1.0 if recent_transitions else 0.0
 
         return features
 
-    def get_current_regime(self) -> Optional[str]:
+    def get_current_regime(self) -> str | None:
         """Mevcut rejim."""
         return self._current_regime
 
-    def get_regime_report(self) -> Dict[str, Any]:
+    def get_regime_report(self) -> dict[str, Any]:
         """Rejim raporu."""
         return {
             "current_regime": self._current_regime,
@@ -216,7 +217,7 @@ class MacroRegimeDetector:
 
     # ===================== SKOR FONKSİYONLARI =====================
 
-    def _score_expansion(self, f: Dict) -> float:
+    def _score_expansion(self, f: dict) -> float:
         """Genişleyici rejim skoru."""
         score = 0.0
         count = 0
@@ -248,7 +249,7 @@ class MacroRegimeDetector:
 
         return min(score, 1.0) if count > 0 else 0.0
 
-    def _score_contraction(self, f: Dict) -> float:
+    def _score_contraction(self, f: dict) -> float:
         """Daraltıcı rejim skoru."""
         score = 0.0
 
@@ -265,7 +266,7 @@ class MacroRegimeDetector:
 
         return min(score, 1.0)
 
-    def _score_stagflation(self, f: Dict) -> float:
+    def _score_stagflation(self, f: dict) -> float:
         """Stagflasyon rejim skoru."""
         score = 0.0
 
@@ -287,7 +288,7 @@ class MacroRegimeDetector:
 
         return min(score, 1.0)
 
-    def _score_reflation(self, f: Dict) -> float:
+    def _score_reflation(self, f: dict) -> float:
         """Reflasyon rejim skoru."""
         score = 0.0
 
@@ -311,7 +312,7 @@ class MacroRegimeDetector:
 
         return min(score, 1.0)
 
-    def _score_risk_on(self, f: Dict) -> float:
+    def _score_risk_on(self, f: dict) -> float:
         """Risk-on rejim skoru."""
         score = 0.0
 
@@ -330,7 +331,7 @@ class MacroRegimeDetector:
 
         return min(score, 1.0)
 
-    def _score_risk_off(self, f: Dict) -> float:
+    def _score_risk_off(self, f: dict) -> float:
         """Risk-off rejim skoru."""
         score = 0.0
 

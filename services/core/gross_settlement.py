@@ -7,8 +7,9 @@ Brüt takas kontrolü:
 - SPK tarafından belirlenir
 """
 
-from typing import Dict, Any, List, Set
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -19,13 +20,13 @@ class GrossSettlementStatus:
     is_gross: bool
     effect: str = ""        # "NO_SHORT_SELL", "T_PLUS_0", "NONE"
     impact: str = ""        # Etki açıklaması
-    details: Dict[str, Any] = None
+    details: dict[str, Any] = None
 
     def __post_init__(self):
         if self.details is None:
             self.details = {}
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "is_gross": self.is_gross,
             "effect": self.effect,
@@ -45,15 +46,15 @@ class GrossSettlementMonitor:
     """
 
     def __init__(self):
-        self._gross_tickers: Set[str] = set()
-        self._gross_tickers_with_details: Dict[str, Dict[str, Any]] = {}  # Detaylı bilgi
+        self._gross_tickers: set[str] = set()
+        self._gross_tickers_with_details: dict[str, dict[str, Any]] = {}  # Detaylı bilgi
 
-    def set_gross_tickers(self, tickers: List[str]):
+    def set_gross_tickers(self, tickers: list[str]):
         """Brüt takaslı hisseleri güncelle."""
         self._gross_tickers = set(tickers)
         logger.info("Gross settlement tickers updated", count=len(tickers))
 
-    def set_gross_ticker_detail(self, ticker: str, details: Dict[str, Any]):
+    def set_gross_ticker_detail(self, ticker: str, details: dict[str, Any]):
         """Brüt takaslı hisse detay bilgisi ekle.
 
         Args:
@@ -102,7 +103,7 @@ class GrossSettlementMonitor:
         details = self._gross_tickers_with_details.get(ticker, {})
         return details.get("day_trade_restricted", False)
 
-    def get_all_gross(self) -> List[str]:
+    def get_all_gross(self) -> list[str]:
         """Tüm brüt takaslı hisseleri getir."""
         return list(self._gross_tickers)
 

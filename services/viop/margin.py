@@ -5,11 +5,12 @@ SPAN teminat hesaplama.
 Enhanced_options modülünden delegate eder.
 """
 
-from typing import Dict, List, Any
-from .enhanced_options import span_margin, SPANMarginCalculator
+from typing import Any
+
+from .enhanced_options import SPANMarginCalculator, span_margin
 
 
-def calculate_span_margin(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+def calculate_span_margin(positions: list[dict[str, Any]]) -> dict[str, Any]:
     """SPAN teminat hesapla.
 
     Gelişmiş arayüz:
@@ -45,7 +46,7 @@ def calculate_span_margin(positions: List[Dict[str, Any]]) -> Dict[str, Any]:
         if is_option:
             # Opsiyon teminatı: delta-adjuted value + short option minimum
             underlying_value = pos.get("underlying_value", value)
-            option_type = pos.get("option_type", "CALL")
+            pos.get("option_type", "CALL")
 
             if position_type == "SHORT":
                 # Kısa opsiyon: max(delta * underlying * margin_rate, prim + %15 * underlying)

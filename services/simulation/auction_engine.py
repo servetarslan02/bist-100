@@ -9,9 +9,11 @@ Borsa İstanbul Pay Piyasası Prosedürü Açık Artırma Algoritması:
 5. Tek Denge Fiyatından (Single Equilibrium Price) tüm eşleşen emirlerin gerçekleşmesi
 """
 
-from typing import List, Dict, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
+
 from services.core.bist_tick_size import round_to_bist_tick
 
 logger = structlog.get_logger()
@@ -32,8 +34,8 @@ class AuctionOrder:
 class AuctionResult:
     equilibrium_price: float
     matched_volume: int
-    matched_trades: List[Dict[str, Any]]
-    unfilled_orders: List[AuctionOrder]
+    matched_trades: list[dict[str, Any]]
+    unfilled_orders: list[AuctionOrder]
     imbalance_volume: int
     imbalance_side: str  # "BUY", "SELL", "NONE"
 
@@ -43,7 +45,7 @@ class CallAuctionEngine:
 
     def calculate_equilibrium(
         self,
-        orders: List[AuctionOrder],
+        orders: list[AuctionOrder],
         reference_price: float,
     ) -> AuctionResult:
         """Emir havuzundan BIST kuralına göre tek fiyat ve eşleşmeleri hesaplar."""

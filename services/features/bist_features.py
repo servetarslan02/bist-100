@@ -7,8 +7,8 @@ ML pipeline'ında kullanılacak BIST-specific features.
 Kaynak: Borsa İstanbul kuralları, SPK mevzuatı
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +26,7 @@ class BISTFeatureDef:
 
 
 # BIST-specific feature tanımları
-BIST_FEATURE_DEFINITIONS: List[BISTFeatureDef] = [
+BIST_FEATURE_DEFINITIONS: list[BISTFeatureDef] = [
 
     # === SEANS FAZI FEATURES ===
     BISTFeatureDef(
@@ -282,24 +282,24 @@ BIST_FEATURE_DEFINITIONS: List[BISTFeatureDef] = [
 ]
 
 
-def get_feature_names_by_category(category: str) -> List[str]:
+def get_feature_names_by_category(category: str) -> list[str]:
     """Belirli kategorideki feature isimlerini döndür."""
     return [f.name for f in BIST_FEATURE_DEFINITIONS if f.category == category]
 
 
-def get_high_importance_features() -> List[str]:
+def get_high_importance_features() -> list[str]:
     """Yüksek önemdeki feature isimlerini döndür."""
     return [f.name for f in BIST_FEATURE_DEFINITIONS if f.importance == "high"]
 
 
-def get_all_feature_names() -> List[str]:
+def get_all_feature_names() -> list[str]:
     """Tüm BIST-specific feature isimlerini döndür."""
     return [f.name for f in BIST_FEATURE_DEFINITIONS]
 
 
-def get_feature_count() -> Dict[str, int]:
+def get_feature_count() -> dict[str, int]:
     """Kategori bazında feature sayısı."""
-    counts: Dict[str, int] = {}
+    counts: dict[str, int] = {}
     for f in BIST_FEATURE_DEFINITIONS:
         counts[f.category] = counts.get(f.category, 0) + 1
     return counts

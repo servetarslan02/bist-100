@@ -10,7 +10,8 @@ FAZ 5.1:
 
 import asyncio
 from contextlib import asynccontextmanager
-from typing import Optional, Any, List, Dict
+from typing import Any
+
 import structlog
 
 try:
@@ -154,9 +155,8 @@ async def get_pg_replica_connection():
 async def get_pg_transaction():
     """Get a PRIMARY PostgreSQL connection with transaction."""
     pool = await get_pg_pool()
-    async with pool.acquire() as conn:
-        async with conn.transaction():
-            yield conn
+    async with pool.acquire() as conn, conn.transaction():
+        yield conn
 
 
 async def pg_execute(query: str, *args) -> str:
@@ -302,7 +302,7 @@ def close_ch_client():
         logger.info("ClickHouse client closed")
 
 
-def ch_execute(query: str, parameters: Optional[Dict] = None) -> Any:
+def ch_execute(query: str, parameters: dict | None = None) -> Any:
     """ClickHouse sorgusu — reconnect mekanizması ile."""
     global _ch_client, _ch_healthy
     max_retries = 2
@@ -323,7 +323,7 @@ def ch_execute(query: str, parameters: Optional[Dict] = None) -> Any:
             raise
 
 
-def ch_insert(table: str, data: List[List[Any]], column_names: Optional[List[str]] = None):
+def ch_insert(table: str, data: list[list[Any]], column_names: list[str] | None = None):
     """ClickHouse insert — reconnect mekanizması ile."""
     global _ch_client, _ch_healthy
     max_retries = 2
@@ -345,7 +345,7 @@ def ch_insert(table: str, data: List[List[Any]], column_names: Optional[List[str
             raise
 
 
-def ch_query_df(query: str, parameters: Optional[Dict] = None):
+def ch_query_df(query: str, parameters: dict | None = None):
     import polars as pl
     with _ch_lock:
         client = get_ch_client()
@@ -399,12 +399,12 @@ async def close_redis():
         logger.info("Redis connection closed")
 
 
-async def redis_get(key: str) -> Optional[str]:
+async def redis_get(key: str) -> str | None:
     r = await get_redis()
     return await r.get(key)
 
 
-async def redis_set(key: str, value: str, ex: Optional[int] = None):
+async def redis_set(key: str, value: str, ex: int | None = None):
     r = await get_redis()
     await r.set(key, value, ex=ex)
 
@@ -414,12 +414,12 @@ async def redis_delete(key: str):
     await r.delete(key)
 
 
-async def redis_hgetall(key: str) -> Dict[str, str]:
+async def redis_hgetall(key: str) -> dict[str, str]:
     r = await get_redis()
     return await r.hgetall(key)
 
 
-async def redis_hset(key: str, mapping: Dict[str, str]):
+async def redis_hset(key: str, mapping: dict[str, str]):
     r = await get_redis()
     await r.hset(key, mapping=mapping)
 
@@ -433,7 +433,7 @@ async def redis_publish(channel: str, message: str):
 # Health Check
 # =====================================================
 
-async def check_db_health() -> Dict[str, Any]:
+async def check_db_health() -> dict[str, Any]:
     """Check health of all database connections."""
     health = {"postgres": "unavailable", "clickhouse": "unavailable", "redis": "unavailable", "questdb": "unavailable"}
 

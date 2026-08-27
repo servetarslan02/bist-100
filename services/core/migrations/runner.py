@@ -22,9 +22,10 @@ import asyncio
 import hashlib
 import re
 import time
-from pathlib import Path
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -76,8 +77,8 @@ class MigrationFile:
 class MigrationStatus:
     current_version: int
     pending_count: int
-    applied: List[Dict[str, Any]]
-    pending: List[Dict[str, Any]]
+    applied: list[dict[str, Any]]
+    pending: list[dict[str, Any]]
 
 
 class MigrationLockError(Exception):
@@ -90,8 +91,8 @@ class MigrationRunner:
     def __init__(self, db, dialect: str = "postgresql"):
         self._db = db
         self._dialect = dialect
-        self._lock_id: Optional[str] = None
-        self._heartbeat_task: Optional[asyncio.Task] = None
+        self._lock_id: str | None = None
+        self._heartbeat_task: asyncio.Task | None = None
 
     # =====================================================
     # LOCK TABLE
@@ -229,7 +230,7 @@ class MigrationRunner:
     # DISCOVERY
     # =====================================================
 
-    def discover_migrations(self) -> List[MigrationFile]:
+    def discover_migrations(self) -> list[MigrationFile]:
         migrations = []
         for f in sorted(MIGRATIONS_DIR.glob("v*.sql")):
             try:
@@ -238,7 +239,7 @@ class MigrationRunner:
                 logger.warning("Skipping invalid migration file", error=str(e))
         return migrations
 
-    async def get_applied(self) -> Dict[int, Dict[str, Any]]:
+    async def get_applied(self) -> dict[int, dict[str, Any]]:
         try:
             rows = await self._fetchall(
                 "SELECT version, name, checksum, applied_at FROM schema_migrations ORDER BY version"
@@ -255,7 +256,7 @@ class MigrationRunner:
     # DEPENDENCY VALIDATION
     # =====================================================
 
-    def _validate_dependencies(self, migrations: List[MigrationFile], applied: Dict[int, Dict]):
+    def _validate_dependencies(self, migrations: list[MigrationFile], applied: dict[int, dict]):
         """Migration bağımlılıklarını doğrula.
 
         Kural: Uygulanmış migration'lar arasında boşluk olmamalı.
@@ -321,7 +322,7 @@ class MigrationRunner:
     # RUN (UP) — with distributed lock
     # =====================================================
 
-    async def run_pending(self) -> List[int]:
+    async def run_pending(self) -> list[int]:
         """Bekleyen migration'ları uygula (distributed lock ile)."""
         # Lock al
         if not await self._acquire_lock():
@@ -394,7 +395,7 @@ class MigrationRunner:
     # ROLLBACK (DOWN) — with distributed lock
     # =====================================================
 
-    async def rollback_to(self, target_version: int) -> List[int]:
+    async def rollback_to(self, target_version: int) -> list[int]:
         """Belirli version'a geri al (distributed lock ile)."""
         if not await self._acquire_lock():
             raise MigrationLockError("Migration kilitli — rollback yapılamıyor.")
@@ -405,7 +406,7 @@ class MigrationRunner:
             all_migrations = self.discover_migrations()
 
             to_rollback = sorted(
-                [v for v in applied_map.keys() if v > target_version],
+                [v for v in applied_map if v > target_version],
                 reverse=True
             )
 
@@ -481,7 +482,7 @@ class MigrationRunner:
     # SQL PREPARATION
     # =====================================================
 
-    def _prepare_statement(self, stmt: str) -> Optional[str]:
+    def _prepare_statement(self, stmt: str) -> str | None:
         stmt = stmt.strip()
         if not stmt:
             return None
@@ -498,7 +499,7 @@ class MigrationRunner:
             stmt = self._pg_to_sqlite(stmt)
         return stmt
 
-    def _split_statements(self, sql: str) -> List[str]:
+    def _split_statements(self, sql: str) -> list[str]:
         if "-- migrate:split" in sql:
             parts = sql.split("-- migrate:split")
             return [p.strip() for p in parts if p.strip()]
@@ -592,14 +593,14 @@ class MigrationRunner:
         else:
             return await self._db.execute(sql, *args)
 
-    async def _fetchall(self, sql: str, *args) -> List[dict]:
+    async def _fetchall(self, sql: str, *args) -> list[dict]:
         if self._dialect == "sqlite":
             cursor = self._db.execute(sql, args)
             return [dict(r) for r in cursor.fetchall()]
         else:
             return [dict(r) for r in await self._db.fetch(sql, *args)]
 
-    async def _fetchone(self, sql: str, *args) -> Optional[dict]:
+    async def _fetchone(self, sql: str, *args) -> dict | None:
         if self._dialect == "sqlite":
             cursor = self._db.execute(sql, args)
             row = cursor.fetchone()

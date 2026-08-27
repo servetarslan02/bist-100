@@ -19,20 +19,20 @@ Kullanım:
     rows = store.fetch("SELECT * FROM ...", params)
 """
 
-import duckdb
-import time
-import signal
 import atexit
-from contextlib import contextmanager
-from datetime import datetime, timezone
+import signal
+import time
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Any
+
+import duckdb
 import structlog
 
 try:
-    import orjson
+    import orjson  # noqa: F401
 except ImportError:
-    raise ImportError("orjson is required")
+    raise ImportError("orjson is required") from None
 
 logger = structlog.get_logger()
 
@@ -43,8 +43,8 @@ class DuckDBStore:
     def __init__(self, db_path: str = "data/central_state.db"):
         self._db_path = Path(db_path)
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        self._conn: Optional[duckdb.DuckDBPyConnection] = None
-        self._write_buffer: List[Tuple[str, tuple]] = []
+        self._conn: duckdb.DuckDBPyConnection | None = None
+        self._write_buffer: list[tuple[str, tuple]] = []
         self._buffer_size = 10
         self._last_flush = time.time()
         self._flush_interval = 30.0
@@ -74,15 +74,15 @@ class DuckDBStore:
         with self._get_conn() as conn:
             conn.execute(query, params)
 
-    def fetch(self, query: str, params: tuple = ()) -> List[Dict[str, Any]]:
+    def fetch(self, query: str, params: tuple = ()) -> list[dict[str, Any]]:
         """Sorgu çalıştır ve sonuçları dict listesi olarak döndür."""
         with self._get_conn() as conn:
             result = conn.execute(query, params)
             columns = [desc[0] for desc in result.description]
             rows = result.fetchall()
-            return [dict(zip(columns, row)) for row in rows]
+            return [dict(zip(columns, row, strict=False)) for row in rows]
 
-    def fetchone(self, query: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
+    def fetchone(self, query: str, params: tuple = ()) -> dict[str, Any] | None:
         """Tek satır döndür."""
         rows = self.fetch(query, params)
         return rows[0] if rows else None
@@ -133,7 +133,7 @@ class DuckDBStore:
             self._conn.close()
             self._conn = None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         with self._get_conn() as conn:
             tables = conn.execute(
@@ -154,30 +154,24 @@ class DuckDBStore:
         }
 
     def __del__(self):
-        try:
+        with suppress(Exception):
             self.close()
-        except Exception:
-            pass
 
 
 # Graceful shutdown
-_stores: List[DuckDBStore] = []
+_stores: list[DuckDBStore] = []
 
 
 def _flush_all_on_exit():
     for store in _stores:
-        try:
+        with suppress(Exception):
             store.flush()
-        except Exception:
-            pass
 
 
 def _flush_all_on_signal(signum, frame):
     for store in _stores:
-        try:
+        with suppress(Exception):
             store.flush()
-        except Exception:
-            pass
 
 
 atexit.register(_flush_all_on_exit)

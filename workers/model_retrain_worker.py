@@ -4,8 +4,9 @@ ALPHA BIST — Model Retrain Worker
 ML modellerini yeniden eğitim worker'ı.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -16,10 +17,10 @@ class ModelRetrainWorker:
     """ML model yeniden eğitim worker'ı."""
 
     def __init__(self):
-        self._last_train_date: Optional[str] = None
+        self._last_train_date: str | None = None
         self._train_count: int = 0
 
-    def run(self, force: bool = False) -> Dict[str, Any]:
+    def run(self, force: bool = False) -> dict[str, Any]:
         """Model yeniden eğitimini çalıştır."""
         today = datetime.now(_TZ_ISTANBUL).strftime("%Y-%m-%d")
 
@@ -33,7 +34,7 @@ class ModelRetrainWorker:
             try:
                 from services.learning.closed_loop import ClosedLoopLearning
                 loop = ClosedLoopLearning()
-                eval_result = loop.evaluate_recent_predictions()
+                loop.evaluate_recent_predictions()
                 result["steps"]["evaluation"] = "ok"
             except Exception as e:
                 result["steps"]["evaluation"] = f"warning: {e}"
@@ -50,7 +51,7 @@ class ModelRetrainWorker:
             self._last_train_date = today
             self._train_count += 1
 
-        except Exception as e:
+        except Exception:
             result["status"] = "failed"
 
         return result
@@ -60,11 +61,11 @@ class ModelRetrainWorker:
             return True
         try:
             last = datetime.strptime(self._last_train_date, "%Y-%m-%d")
-            return (datetime.now(timezone.utc) - last).days >= 7
+            return (datetime.now(UTC) - last).days >= 7
         except ValueError:
             return True
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {
             "last_train_date": self._last_train_date,
             "train_count": self._train_count,

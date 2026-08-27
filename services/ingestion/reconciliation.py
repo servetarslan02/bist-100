@@ -16,9 +16,10 @@ Kullanım:
     })
 """
 
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -33,10 +34,10 @@ class ReconciliationResult:
     conflict: bool                  # Kaynaklar arası çakışma var mı
     quality_score: float            # 0-1
     max_deviation_pct: float        # Maksimum sapma %
-    sources: Dict[str, float] = field(default_factory=dict)  # source → price
-    deviations: Dict[str, float] = field(default_factory=dict)  # source → deviation %
-    warnings: List[str] = field(default_factory=list)
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    sources: dict[str, float] = field(default_factory=dict)  # source → price
+    deviations: dict[str, float] = field(default_factory=dict)  # source → deviation %
+    warnings: list[str] = field(default_factory=list)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class SourceReconciler:
@@ -69,8 +70,8 @@ class SourceReconciler:
     async def reconcile_price(
         self,
         ticker: str,
-        prices: Dict[str, float],
-        max_deviation_pct: Optional[float] = None,
+        prices: dict[str, float],
+        max_deviation_pct: float | None = None,
     ) -> ReconciliationResult:
         """
         Çoklu kaynaktan fiyatı uzlaştır.
@@ -149,8 +150,8 @@ class SourceReconciler:
 
     async def reconcile_batch(
         self,
-        data: Dict[str, Dict[str, float]],
-    ) -> Dict[str, ReconciliationResult]:
+        data: dict[str, dict[str, float]],
+    ) -> dict[str, ReconciliationResult]:
         """
         Toplu uzlaştırma.
 
@@ -165,7 +166,7 @@ class SourceReconciler:
             results[ticker] = await self.reconcile_price(ticker, prices)
         return results
 
-    def _compute_canonical_price(self, prices: Dict[str, float]) -> float:
+    def _compute_canonical_price(self, prices: dict[str, float]) -> float:
         """Ağırlıklı ortalama ile canonical price hesapla."""
         total_weight = 0
         weighted_sum = 0
@@ -180,8 +181,8 @@ class SourceReconciler:
 
     def _compute_quality_score(
         self,
-        prices: Dict[str, float],
-        deviations: Dict[str, float],
+        prices: dict[str, float],
+        deviations: dict[str, float],
         conflict: bool,
     ) -> float:
         """Kalite skoru (0-1)."""
@@ -212,8 +213,8 @@ class SourceReconciler:
 
     def get_quality_report(
         self,
-        results: Dict[str, ReconciliationResult],
-    ) -> Dict[str, Any]:
+        results: dict[str, ReconciliationResult],
+    ) -> dict[str, Any]:
         """Kalite raporu."""
         total = len(results)
         consistent = sum(1 for r in results.values() if not r.conflict)

@@ -11,25 +11,26 @@ bilimsel mikro-yapı ve maliyet modelleriyle simüle eder:
 """
 
 import math
-from enum import Enum
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
-from services.core.bist_tick_size import round_to_bist_tick, get_bist_tick_size
+from services.core.bist_tick_size import get_bist_tick_size, round_to_bist_tick
 from services.simulation.order_book import OrderBookLevel, OrderBookSnapshot
 
 logger = structlog.get_logger()
 
 
-class LiquidityScenario(str, Enum):
+class LiquidityScenario(StrEnum):
     """3 Senaryolu Likidite Değerlendirmesi."""
     PESSIMISTIC = "PESSIMISTIC"  # Stres Senaryosu: Geniş spread, sığ derinlik, katı katılım sınırı (%2 ADV)
     NORMAL = "NORMAL"            # Baz Senaryo: Standart Corwin-Schultz, medyan derinlik (%5 ADV)
     OPTIMISTIC = "OPTIMISTIC"    # İyimser Senaryo: Dar spread, geniş derinlik (%10 ADV)
 
 
-class LiquidityRegime(str, Enum):
+class LiquidityRegime(StrEnum):
     """Hisse Likidite Sınıflandırması."""
     HIGH_LIQUIDITY = "HIGH_LIQUIDITY"    # BIST 30 yüksek hacimli paylar
     NORMAL_LIQUIDITY = "NORMAL_LIQUIDITY" # BIST 100 standart paylar
@@ -66,7 +67,7 @@ class SyntheticLiquidityEstimator:
         """
         Corwin-Schultz (2012) High-Low Spread Tahmincisi.
         S = 2(exp(alpha) - 1) / (1 + exp(alpha))
-        
+
         Referans: Corwin & Schultz (2012), "A Simple Way to Estimate Bid-Ask Spreads from Daily High and Low Prices", Journal of Finance.
         """
         if high_prev <= 0 or low_prev <= 0 or high_curr <= 0 or low_curr <= 0 or price <= 0:
@@ -111,8 +112,8 @@ class SyntheticLiquidityEstimator:
 
     @staticmethod
     def estimate_parkinson_volatility(
-        highs: List[float],
-        lows: List[float],
+        highs: list[float],
+        lows: list[float],
         window: int = 20,
     ) -> float:
         """Parkinson High-Low Volatilite Tahmincisi."""
@@ -121,7 +122,7 @@ class SyntheticLiquidityEstimator:
 
         valid_pairs = [
             math.log(max(h / max(l, 1e-6), 1.0)) ** 2
-            for h, l in zip(highs[-window:], lows[-window:])
+            for h, l in zip(highs[-window:], lows[-window:], strict=False)
             if h > 0 and l > 0
         ]
         if not valid_pairs:
@@ -142,9 +143,9 @@ class SyntheticLiquidityEstimator:
         high_curr: float,
         low_curr: float,
         price: float,
-        volumes: List[float],
-        highs: Optional[List[float]] = None,
-        lows: Optional[List[float]] = None,
+        volumes: list[float],
+        highs: list[float] | None = None,
+        lows: list[float] | None = None,
     ) -> LiquidityMetrics:
         """Hisse için tam likidite metrik profilini hesaplar."""
         spread_pct = cls.estimate_corwin_schultz_spread(
@@ -165,10 +166,7 @@ class SyntheticLiquidityEstimator:
             adv = 1_000_000.0
 
         # Volatilite
-        if highs and lows and len(highs) >= 2:
-            volatility = cls.estimate_parkinson_volatility(highs, lows)
-        else:
-            volatility = 0.25
+        volatility = cls.estimate_parkinson_volatility(highs, lows) if highs and lows and len(highs) >= 2 else 0.25
 
         # Rejim sınıflandırması
         if adv >= 5_000_000 and spread_pct <= 0.2:
@@ -251,8 +249,8 @@ class SyntheticOrderBookBuilder:
         # İlk kademe taban lot büyüklüğü (ADV ve volatiliteye göre ölçekli)
         base_level_qty = max(int((adv * 0.005) * cfg["depth_multiplier"] / (1.0 + volatility * 2.0)), 50)
 
-        bids: List[OrderBookLevel] = []
-        asks: List[OrderBookLevel] = []
+        bids: list[OrderBookLevel] = []
+        asks: list[OrderBookLevel] = []
 
         # 1. Kademe
         bids.append(OrderBookLevel(price=best_bid, quantity=base_level_qty, side="bid"))
@@ -301,7 +299,7 @@ class SyntheticOrderBookBuilder:
         scenario: LiquidityScenario = LiquidityScenario.NORMAL,
         limit_up_price: float = float("inf"),
         limit_down_price: float = 0.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Sentetik defter üzerinde kademeleri tüketerek (Walk-the-Book) emri eşleştirir.
         Almgren-Chriss maksimum katılım sınırını uygular.
@@ -321,7 +319,7 @@ class SyntheticOrderBookBuilder:
         for lvl in levels:
             if remaining <= 0:
                 break
-            
+
             # Tavan/Taban kilidi kontrolü
             if side == "BUY" and limit_up_price < float("inf") and lvl.price >= limit_up_price:
                 # Tavan seviyesinde alıcı sırasına takılır, likidite yoksa durur

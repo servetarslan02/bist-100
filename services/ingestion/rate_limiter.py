@@ -16,8 +16,8 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -39,7 +39,7 @@ class RateLimitStats:
     total_wait_seconds: float = 0.0
     total_rejected: int = 0
     current_window_requests: int = 0
-    last_request_time: Optional[float] = None
+    last_request_time: float | None = None
 
 
 class RateLimiter:
@@ -51,10 +51,10 @@ class RateLimiter:
     """
 
     def __init__(self):
-        self._limits: Dict[str, RateLimitConfig] = {}
-        self._timestamps: Dict[str, List[float]] = {}  # provider → [request_times]
-        self._stats: Dict[str, RateLimitStats] = {}
-        self._locks: Dict[str, asyncio.Lock] = {}
+        self._limits: dict[str, RateLimitConfig] = {}
+        self._timestamps: dict[str, list[float]] = {}  # provider → [request_times]
+        self._stats: dict[str, RateLimitStats] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
 
     def set_limit(
         self,
@@ -181,7 +181,7 @@ class RateLimiter:
         """Tüm provider istatistikleri."""
         return {
             provider: self.get_stats(provider)
-            for provider in self._limits.keys()
+            for provider in self._limits
         }
 
     def is_limited(self, provider: str) -> bool:

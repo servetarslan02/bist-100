@@ -11,21 +11,18 @@ Kapsam:
 - Transaction rollback
 """
 
-import sys
-import os
-import orjson
 import asyncio
+import sys
+
 import duckdb
-import time
+import structlog
 from aiohttp import web
-import aiohttp
 
 from services.core.alert_policy import (
-    AlertPolicy, PolicyDiff, VersionConflictError,
-    MAX_BATCH_SILENCE_SIZE, WEBHOOK_RETRY_COUNT,
+    MAX_BATCH_SILENCE_SIZE,
+    AlertPolicy,
+    VersionConflictError,
 )
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 

@@ -7,9 +7,10 @@ Platt Scaling (logistic regression) veya Isotonic Regression kullanir.
 KURAL: Score != win_probability. Calibration gerekli.
 """
 
-import numpy as np
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -21,7 +22,7 @@ class CalibrationParams:
     method: str = "platt"  # platt | isotonic | empirical
     a: float = 1.0         # Platt: scale
     b: float = 0.0         # Platt: shift
-    empirical_bins: Dict[str, float] = None  # Bin bazli mapping
+    empirical_bins: dict[str, float] = None  # Bin bazli mapping
 
 
 class ScoreCalibrator:
@@ -29,12 +30,12 @@ class ScoreCalibrator:
 
     def __init__(self):
         self.params = CalibrationParams()
-        self._trade_history: List[Dict] = []  # Historical OOS trades
+        self._trade_history: list[dict] = []  # Historical OOS trades
         self._fitted = False
-        self._brier_scores: List[float] = []  # Brier score geçmişi
-        self._calibration_curve: Dict[str, List] = {"predicted": [], "actual": []}
+        self._brier_scores: list[float] = []  # Brier score geçmişi
+        self._calibration_curve: dict[str, list] = {"predicted": [], "actual": []}
 
-    def fit_from_trades(self, trades: List[Dict]):
+    def fit_from_trades(self, trades: list[dict]):
         """Historical OOS trades'ten calibration fit et.
 
         trades: [{score, return_pct, ticker, date}, ...]
@@ -121,7 +122,7 @@ class ScoreCalibrator:
 
         return avg_win, avg_loss
 
-    def compute_brier_score(self, trades: List[Dict] = None) -> float:
+    def compute_brier_score(self, trades: list[dict] = None) -> float:
         """Brier score hesapla — kalibrasyon kalitesi ölçümü.
 
         Brier = (1/N) * Σ(predicted - actual)²
@@ -158,7 +159,7 @@ class ScoreCalibrator:
 
         return brier
 
-    def get_calibration_curve(self, n_bins: int = 10) -> Dict[str, List]:
+    def get_calibration_curve(self, n_bins: int = 10) -> dict[str, list]:
         """Kalibrasyon eğrisi — tahmin vs gerçek.
 
         Args:
@@ -195,11 +196,11 @@ class ScoreCalibrator:
 
         return self._calibration_curve
 
-    def get_brier_history(self) -> List[float]:
+    def get_brier_history(self) -> list[float]:
         """Brier score geçmişini döndür."""
         return self._brier_scores.copy()
 
-    def get_calibration_quality(self) -> Dict[str, Any]:
+    def get_calibration_quality(self) -> dict[str, Any]:
         """Kalibrasyon kalitesi özeti."""
         brier = self.compute_brier_score() if len(self._trade_history) >= 10 else -1
 

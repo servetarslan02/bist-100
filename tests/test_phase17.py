@@ -4,16 +4,19 @@ ALPHA BIST — FAZ 17 Test Suite
 Observability, Recovery, Config System testleri.
 """
 
-import sys
-import os
 import asyncio
+import sys
 
 
 def test_observability():
     """Observability & Monitoring testleri."""
     from services.core.observability import (
-        prometheus_metrics, distributed_tracing, performance_monitor,
-        cost_monitor, resource_monitor, config_manager, health_checker,
+        config_manager,
+        cost_monitor,
+        distributed_tracing,
+        health_checker,
+        performance_monitor,
+        prometheus_metrics,
     )
 
     passed = 0
@@ -107,8 +110,10 @@ def test_observability():
 def test_recovery():
     """Recovery & Resilience testleri."""
     from services.core.recovery import (
-        event_replay, graceful_shutdown, startup_recovery,
+        event_replay,
         failure_injector,
+        graceful_shutdown,
+        startup_recovery,
     )
 
     passed = 0
@@ -162,7 +167,7 @@ def test_recovery():
     failure_injector.clear("database", "down")
     assert not failure_injector.is_failing("database")
     passed += 1
-    print(f"  ✓ Failure injector: inject/clear")
+    print("  ✓ Failure injector: inject/clear")
 
     # 6. Multiple failures
     failure_injector.inject("redis", "down")

@@ -4,16 +4,20 @@ ALPHA BIST — FAZ 7 Test Suite
 AI Agent System testleri.
 """
 
-import sys
-import os
 import asyncio
+import sys
 
 
 def test_agent_system():
     """AI Agent System testleri."""
     from services.agents.agent_system import (
-        AgentRole, AgentTask, BaseAgent, AgentOrchestrator,
-        AgentToolRegistry, AIOutputValidator, AIFallback,
+        AgentOrchestrator,
+        AgentRole,
+        AgentTask,
+        AgentToolRegistry,
+        AIFallback,
+        AIOutputValidator,
+        BaseAgent,
     )
 
     passed = 0
@@ -123,7 +127,7 @@ def main():
     total_passed = 0
     total_failed = 0
 
-    print(f"\n--- AI Agent System ---")
+    print("\n--- AI Agent System ---")
     try:
         p, f = test_agent_system()
         total_passed += p

@@ -6,26 +6,27 @@ JSON ve Protobuf arasında otomatik dönüşüm.
 
 Kullanım:
     from services.core.event_schema import CanonicalEvent, EventType
-    
+
     event = CanonicalEvent(
         type=EventType.TICK,
         ticker="THYAO",
         data={"price": 245.50, "volume": 1000000}
     )
-    
+
     # JSON olarak
     json_data = event.to_json()
-    
+
     # Binary olarak (Protobuf uyumlu)
     binary_data = event.to_binary()
 """
 
-import orjson
-import time
 import struct
-from enum import IntEnum
-from typing import Dict, Any
+import time
 from dataclasses import dataclass, field
+from enum import IntEnum
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -51,7 +52,7 @@ class CanonicalEvent:
     """Standart olay formatı — tüm servisler bunu kullanır."""
     type: EventType
     ticker: str = ""
-    data: Dict[str, Any] = field(default_factory=dict)
+    data: dict[str, Any] = field(default_factory=dict)
     timestamp: int = 0
     source: str = ""
     confidence: float = 0.0
@@ -73,7 +74,7 @@ class CanonicalEvent:
             "sequence": self.sequence,
         }, default=str)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Dict formatına çevir."""
         return {
             "type": self.type.value,

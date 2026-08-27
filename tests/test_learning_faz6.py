@@ -14,8 +14,6 @@ Model versioning testing:
 """
 
 import sys
-import os
-
 
 
 def test_register():
@@ -355,14 +353,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 6 TEST SONUÇLARI (Model Registry)")
+    print("📊 FAZ 6 TEST SONUÇLARI (Model Registry)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

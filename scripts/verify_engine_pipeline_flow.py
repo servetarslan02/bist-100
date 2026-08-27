@@ -7,13 +7,11 @@ ALPHA BIST — Uçtan Uca Motor Veri Akışı, Feature Hesaplama ve Model Yoruml
 5. Karar Motoru ve ATR Stop/Hedef Üretimi (Decision & Risk)
 """
 
-import sys
 import os
-import orjson
+import sys
+
 import numpy as np
-import polars as pl
 import yfinance as yf
-from datetime import datetime, timezone, timedelta
 
 sys.path.insert(0, os.path.abspath("."))
 
@@ -42,7 +40,7 @@ try:
         auto_adjust=True,
         progress=False,
     )
-    for sym, yf_sym in zip(test_tickers, yf_symbols):
+    for sym, yf_sym in zip(test_tickers, yf_symbols, strict=False):
         df_t = df_all[yf_sym].dropna()
         if not df_t.empty and len(df_t) >= 30:
             raw_data[sym] = df_t
@@ -51,7 +49,7 @@ try:
             prev_c = float(df_t["Close"].iloc[-2])
             chg = ((last_c - prev_c) / prev_c) * 100
             print(f"  ✓ {sym:<6} -> Son Fiyat: ₺{last_c:.2f} | Günlük Değişim: %{chg:+.2f} | Hacim: {last_v:,.0f} | Veri Noktası: {len(df_t)} gün")
-    
+
     df_index = df_all["XU100.IS"].dropna()
     print(f"  ✓ XU100.IS -> BIST 100 Endeks Kapanış: {float(df_index['Close'].iloc[-1]):,.2f}")
 except Exception as e:
@@ -71,14 +69,14 @@ for sym in raw_data:
     df = raw_data[sym]
     feats = feat_engine.compute_all(ticker=sym, df=df, benchmark_df=df_index)
     computed_features[sym] = feats
-    
+
     rsi = feats.get("rsi_14", 50.0)
     atr = feats.get("atr_14", 0.0)
     macd = feats.get("macd_hist", 0.0)
     trend_slope = feats.get("trend_slope_20d", 0.0)
     vol_zscore = feats.get("volume_zscore", 0.0)
     bb_pos = feats.get("bb_position", 0.5)
-    
+
     print(f"  ✓ {sym:<6} -> RSI(14): {rsi:.1f} | ATR: {atr:.2f} ₺ | MACD Hist: {macd:+.3f} | Trend Slope: {trend_slope:+.3f} | Hacim Z-Skor: {vol_zscore:+.2f} | Bollinger Poz: %{bb_pos*100:.1f}")
 
 # -------------------------------------------------------------
@@ -113,7 +111,7 @@ for sym in raw_data:
     last_price = float(raw_data[sym]["Close"].iloc[-1])
     feats = computed_features[sym]
     opp = model_outputs[sym]
-    
+
     # Calculate ATR
     high_s = raw_data[sym]["High"].astype(float)
     low_s = raw_data[sym]["Low"].astype(float)
@@ -122,7 +120,7 @@ for sym in raw_data:
     atr_val = float(tr.rolling(14).mean().iloc[-1])
     if np.isnan(atr_val) or atr_val <= 0:
         atr_val = last_price * 0.03
-    
+
     dec_input = DecisionInput(
         ticker=sym,
         price=last_price,
@@ -135,13 +133,13 @@ for sym in raw_data:
         agent_score=float(opp.score * 100.0),
         agent_confidence=float(opp.confidence),
     )
-    
+
     decision = decision_engine.decide(dec_input)
-    
+
     target_str = f"₺{decision.target_price:.2f}" if decision.target_price > 0 else "N/A"
     stop_str = f"₺{decision.stop_price:.2f}" if decision.stop_price > 0 else "N/A"
     rr_ratio = f"{(decision.target_price - last_price)/(last_price - decision.stop_price):.2f}" if (decision.target_price > last_price and decision.stop_price > 0 and decision.stop_price < last_price) else "N/A"
-    
+
     print(f"  ✓ {sym:<6} -> Nihai Karar: {decision.action:<9} | Conviction: {decision.conviction:<6} | Hedef: {target_str:<8} | Stop: {stop_str:<8} | R:R Oranı: {rr_ratio}")
     if decision.reasons:
         print(f"         └─ Karar Gerekçesi: {decision.reasons[0]}")

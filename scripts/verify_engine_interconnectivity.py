@@ -6,9 +6,8 @@ ALPHA BIST — TÜM MOTORLARIN BİRBİRİNE BAĞLILIĞI, İLETİŞİMİ VE ÇEL�
 4. Monte Carlo & Risk Gate Hakemliği
 """
 
-import sys
 import os
-import orjson
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 

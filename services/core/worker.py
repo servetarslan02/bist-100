@@ -11,13 +11,15 @@ Production-grade job execution with:
 
 import asyncio
 import hashlib
-import orjson
 import time
-from typing import Optional, Dict, Any, Callable, Awaitable
+from collections.abc import Awaitable, Callable
 from enum import Enum
+from typing import Any
+
+import orjson
 import structlog
 
-from services.core.production_metrics import production_metrics, Metrics
+from services.core.production_metrics import Metrics, production_metrics
 
 logger = structlog.get_logger()
 
@@ -63,18 +65,18 @@ class JobWorker:
         self._default_max_retries = default_max_retries
         self._retry_base_delay = retry_base_delay
         self._running = False
-        self._active_jobs: Dict[str, asyncio.Task] = {}
+        self._active_jobs: dict[str, asyncio.Task] = {}
 
     async def submit_job(
         self,
         job_type: str,
         handler: Callable[..., Awaitable[Any]],
-        payload: Optional[Dict[str, Any]] = None,
-        idempotency_key: Optional[str] = None,
+        payload: dict[str, Any] | None = None,
+        idempotency_key: str | None = None,
         priority: int = 0,
-        timeout: Optional[int] = None,
-        max_retries: Optional[int] = None,
-    ) -> Optional[int]:
+        timeout: int | None = None,
+        max_retries: int | None = None,
+    ) -> int | None:
         """Job gönder.
 
         Args:
@@ -121,7 +123,7 @@ class JobWorker:
         logger.info("Job submitted", job_id=job_id, job_type=job_type, worker=self._worker_id)
         return job_id
 
-    async def get_job_status(self, job_id: int) -> Optional[Dict[str, Any]]:
+    async def get_job_status(self, job_id: int) -> dict[str, Any] | None:
         """Job durumunu sorgula."""
         try:
             from .database import pg_fetchrow
@@ -170,7 +172,7 @@ class JobWorker:
         self,
         job_id: int,
         handler: Callable,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
         timeout: int,
         max_retries: int,
     ):
@@ -191,7 +193,7 @@ class JobWorker:
                 production_metrics.inc(Metrics.WORKER_JOB_TOTAL)
                 return
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 last_error = f"Timeout after {timeout}s"
                 logger.warning("Job timeout", job_id=job_id, attempt=attempt + 1)
 
@@ -216,12 +218,12 @@ class JobWorker:
         logger.error("Job failed permanently", job_id=job_id, retries=max_retries)
         production_metrics.inc(Metrics.WORKER_JOB_FAILED)
 
-    def _generate_idempotency_key(self, job_type: str, payload: Optional[Dict]) -> str:
+    def _generate_idempotency_key(self, job_type: str, payload: dict | None) -> str:
         """Idempotency key üret."""
         content = f"{job_type}:{orjson.dumps(payload or {}, option=orjson.OPT_SORT_KEYS).decode()}"
         return hashlib.sha256(content.encode()).hexdigest()[:32]
 
-    async def _check_idempotency(self, idempotency_key: str) -> Optional[int]:
+    async def _check_idempotency(self, idempotency_key: str) -> int | None:
         """DB'de aynı idempotency_key ile completed/running job var mı?"""
         if not self._db_available():
             return None
@@ -240,8 +242,8 @@ class JobWorker:
         except Exception:
             return None
 
-    async def _create_job(self, job_type: str, payload: Dict, priority: int,
-                          max_retries: int, idempotency_key: str) -> Optional[int]:
+    async def _create_job(self, job_type: str, payload: dict, priority: int,
+                          max_retries: int, idempotency_key: str) -> int | None:
         """DB'ye job kaydet."""
         if not self._db_available():
             return None
@@ -271,6 +273,7 @@ class JobWorker:
             return JobWorker._db_cache_result
         try:
             import socket
+
             from .config import settings
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(0.5)
@@ -287,7 +290,7 @@ class JobWorker:
     _db_cache_result: bool = False
 
     async def _update_job_status(self, job_id: int, status: JobStatus,
-                                 retry_count: Optional[int] = None):
+                                 retry_count: int | None = None):
         """Job durumunu güncelle."""
         if not self._db_available():
             return

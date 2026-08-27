@@ -1,14 +1,12 @@
-import sys
 import logging
+
 logging.basicConfig(level=logging.ERROR)
-from datetime import datetime, timezone
 
 def test_normal_buy_flow():
     print('=== 1. NORMAL BUY FLOW TEST ===')
-    from services.core.decision_engine import decision_engine, DecisionInput
-    from services.core.risk_gate import risk_gate
-    from services.core.broker import Order
     from services.backtest.transaction_costs import bist_transaction_cost
+    from services.core.decision_engine import DecisionInput, decision_engine
+    from services.core.risk_gate import risk_gate
 
     inp = DecisionInput(
         ticker='THYAO', price=100.0, atr=2.0, ml_score=85.0, ml_confidence=0.85,
@@ -19,7 +17,7 @@ def test_normal_buy_flow():
     print(f'  [PASS] Decision engine produced action={decision.action}, target={decision.target_price}, stop={decision.stop_price}')
 
     risk_res = risk_gate.check_order('THYAO', 'BUY', 40, 100.0, 100000.0, {})
-    assert risk_res.allowed == True, f'Risk gate failed: {risk_res}'
+    assert risk_res.allowed, f'Risk gate failed: {risk_res}'
     print(f'  [PASS] Risk gate approved valid 4% order: allowed={risk_res.allowed}')
 
     cost = bist_transaction_cost.calculate_total_cost('BUY', 100.0, 40, 'THYAO', avg_daily_volume=500_000_000)
@@ -30,7 +28,7 @@ def test_risk_vetoed_buy():
     print('=== 2. RISK VETOED BUY TEST ===')
     from services.core.risk_gate import risk_gate
     res = risk_gate.check_order('THYAO', 'BUY', -50, 100.0, 100000.0, {})
-    assert res.allowed == False, f'Risk veto failed to catch negative quantity: {res}'
+    assert not res.allowed, f'Risk veto failed to catch negative quantity: {res}'
     print(f'  [PASS] Risk gate vetoed invalid quantity: reason={res.reason}')
 
 def test_model_failure_fallback():
@@ -38,7 +36,7 @@ def test_model_failure_fallback():
     from services.core.canonical_scoring import canonical_scoring
     class BrokenML:
         def predict(self, features): raise RuntimeError('Model offline')
-    
+
     score_res = canonical_scoring.compute_canonical_score('THYAO', {'momentum_20d': 5}, 'BULL', ml_model=BrokenML())
     assert score_res.ml_score is None, 'ml_score should be None on failure'
     assert score_res.opportunity_score > 0, 'Opportunity score should fall back to rule-based'
@@ -46,7 +44,7 @@ def test_model_failure_fallback():
 
 def test_data_missing_fallback():
     print('=== 4. DATA MISSING FALLBACK TEST ===')
-    from services.core.data_quality import data_quality, TradabilityMask
+    from services.core.data_quality import TradabilityMask, data_quality
     mask = TradabilityMask('THYAO', '2026-08-21T00:00:00Z', is_tradable=False, reasons=['Sıfır hacim'], price_mask=1.0, volume_mask=0.0)
     raw = {'open': 100.0, 'close': 100.0, 'volume': 0}
     masked = data_quality.apply_mask(raw, mask)

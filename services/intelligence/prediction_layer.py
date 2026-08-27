@@ -10,10 +10,11 @@ Multi-horizon, multi-model prediction:
 v2.0: Multi-horizon + ensemble + calibration
 """
 
-import numpy as np
-from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -39,25 +40,26 @@ class Prediction:
 class MultiHorizonPrediction:
     """Çoklu ufuk prediction."""
     ticker: str
-    predictions: Dict[int, Prediction]  # horizon → Prediction
+    predictions: dict[int, Prediction]  # horizon → Prediction
     consensus_direction: str = "NEUTRAL"
     consensus_confidence: float = 0.0
     best_horizon: int = 5
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 def compute_prediction(
     ticker: str,
     ml_prediction: float,
     ml_confidence: float,
-    features: Dict[str, Any],
+    features: dict[str, Any],
     horizon: int = 5,
     model_source: str = "ml",
-    calibrated_confidence: Optional[float] = None,
-    model_agreement: Optional[float] = None,
+    calibrated_confidence: float | None = None,
+    model_agreement: float | None = None,
 ) -> Prediction:
     """Model prediction'dan structured prediction üret."""
-    _s = lambda v: float(v) if isinstance(v, (int, float)) and np.isfinite(float(v)) else 0.0
+    def _s(v):
+        return float(v) if isinstance(v, (int, float)) and np.isfinite(float(v)) else 0.0
 
     if ml_prediction > 1.0:
         direction = "UP"
@@ -94,7 +96,7 @@ def compute_prediction(
 
 def compute_multi_horizon_predictions(
     ticker: str,
-    features: Dict[str, Any],
+    features: dict[str, Any],
     ensemble_forecaster=None,
     calibrator=None,
     regime: str = "UNKNOWN",
@@ -161,7 +163,7 @@ def compute_multi_horizon_predictions(
     )
 
 
-def _rule_based_prediction(ticker: str, features: Dict, horizon: int) -> Prediction:
+def _rule_based_prediction(ticker: str, features: dict, horizon: int) -> Prediction:
     """Rule-based fallback prediction."""
     momentum = features.get("momentum_20d", 0)
     rsi = features.get("rsi_14", 50)

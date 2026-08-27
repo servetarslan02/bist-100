@@ -1,12 +1,12 @@
 import datetime
-import polars as pl
-import numpy as np
-import lightgbm as lgb
-import yfinance as yf
-from typing import Dict, List
-from pathlib import Path
 import hashlib
+from pathlib import Path
+
+import lightgbm as lgb
+import numpy as np
+import polars as pl
 import structlog
+import yfinance as yf
 
 from services.core.safe_pickle import safe_pickle_dump, safe_pickle_load
 from services.ingestion.bist_universe import bist_universe
@@ -37,7 +37,7 @@ def _detect_gpu_cuda():
 
 
 class AlphaEngine:
-    def __init__(self, exclude_features: List[str] = None):
+    def __init__(self, exclude_features: list[str] = None):
         has_gpu, dev_name = _detect_gpu_cuda()
         self.has_gpu = has_gpu
         self.gpu_device_name = dev_name
@@ -57,12 +57,12 @@ class AlphaEngine:
         ]
         self.exclude_features = exclude_features if exclude_features is not None else default_bad_features
 
-    def fetch_data(self, start_date: str, end_date: str, tickers: List[str] = None):
+    def fetch_data(self, start_date: str, end_date: str, tickers: list[str] = None):
         if tickers is None:
             tickers = bist_universe.BIST_100_TICKERS if hasattr(bist_universe, 'BIST_100_TICKERS') and bist_universe.BIST_100_TICKERS else bist_universe.BIST_ALL_TICKERS[:100]
         sector_map = {t: bist_universe.get_ticker_sector(t) for t in tickers}
 
-        market_data: Dict[str, pl.DataFrame] = {}
+        market_data: dict[str, pl.DataFrame] = {}
         download_tickers = [f"{t}.IS" for t in tickers]
         try:
             raw = yf.download(
@@ -100,14 +100,16 @@ class AlphaEngine:
 
     def generate_training_samples(
         self,
-        market_data: Dict[str, pl.DataFrame],
+        market_data: dict[str, pl.DataFrame],
         bm_df: pl.DataFrame,
-        sector_map: Dict[str, str],
+        sector_map: dict[str, str],
         train_start: datetime.datetime,
         train_end: datetime.datetime,
-        snapshot_offsets: List[int] = [20, 40, 60, 80],
+        snapshot_offsets: list[int] = None,
         forward_days: int = 20,
     ):
+        if snapshot_offsets is None:
+            snapshot_offsets = [20, 40, 60, 80]
         rows = []
         labels = []
         all_keys = []
@@ -273,7 +275,7 @@ class AlphaEngine:
             payload = {
                 "model": self.model, "features": self.features,
                 "params": self.params, "exclude_features": self.exclude_features,
-                "trained_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "trained_at": datetime.datetime.now(datetime.UTC).isoformat(),
                 "feature_hash": hashlib.sha256("|".join(sorted(self.features)).encode()).hexdigest()[:16],
             }
             safe_pickle_dump(payload, path)
@@ -288,8 +290,8 @@ class AlphaEngine:
             payload = safe_pickle_load(path)
             trained_at = datetime.datetime.fromisoformat(payload["trained_at"])
             if trained_at.tzinfo is None:
-                trained_at = trained_at.replace(tzinfo=datetime.timezone.utc)
-            age_hours = (datetime.datetime.now(datetime.timezone.utc) - trained_at).total_seconds() / 3600
+                trained_at = trained_at.replace(tzinfo=datetime.UTC)
+            age_hours = (datetime.datetime.now(datetime.UTC) - trained_at).total_seconds() / 3600
             if age_hours > max_age_hours:
                 return False
             current_hash = hashlib.sha256("|".join(sorted(payload["features"])).encode()).hexdigest()[:16]

@@ -12,16 +12,18 @@ ALPHA BIST — Event Infrastructure v1.0
 """
 
 import hashlib
-from typing import Dict, List, Optional, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class EventPriority(str, Enum):
+class EventPriority(StrEnum):
     CRITICAL = "CRITICAL"
     HIGH = "HIGH"
     NORMAL = "NORMAL"
@@ -45,8 +47,8 @@ class EventOrchestrator:
     """Event pipeline yönetimi."""
 
     def __init__(self):
-        self._handlers: Dict[str, List[Callable]] = {}
-        self._priority_queue: List[Dict] = []
+        self._handlers: dict[str, list[Callable]] = {}
+        self._priority_queue: list[dict] = []
 
     def register(self, event_type: str, handler: Callable, priority: EventPriority = EventPriority.NORMAL):
         """Handler kaydet."""
@@ -54,7 +56,7 @@ class EventOrchestrator:
             self._handlers[event_type] = []
         self._handlers[event_type].append({"handler": handler, "priority": priority})
 
-    async def dispatch(self, event_type: str, data: Dict, priority: EventPriority = EventPriority.NORMAL):
+    async def dispatch(self, event_type: str, data: dict, priority: EventPriority = EventPriority.NORMAL):
         """Event'i dispatch et."""
         handlers = self._handlers.get(event_type, [])
         for h in sorted(handlers, key=lambda x: list(EventPriority).index(x["priority"])):
@@ -71,7 +73,7 @@ class CatalystEngine:
     """Yaklaşan olayları izle."""
 
     def __init__(self):
-        self._catalysts: List[CatalystEvent] = []
+        self._catalysts: list[CatalystEvent] = []
 
     def add_catalyst(self, catalyst: CatalystEvent):
         """Yaklaşan olay ekle."""
@@ -79,15 +81,15 @@ class CatalystEngine:
         if len(self._catalysts) > 500:
             self._catalysts = self._catalysts[-500:]
 
-    def get_upcoming(self, days: int = 7) -> List[Dict]:
+    def get_upcoming(self, days: int = 7) -> list[dict]:
         """Yaklaşan olayları getir."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         upcoming = []
         for c in self._catalysts:
             try:
                 cat_date = datetime.fromisoformat(c.date)
                 if cat_date.tzinfo is None:
-                    cat_date = cat_date.replace(tzinfo=timezone.utc)
+                    cat_date = cat_date.replace(tzinfo=UTC)
                 days_until = (cat_date - now).days
                 if 0 <= days_until <= days:
                     upcoming.append({
@@ -110,18 +112,18 @@ class NotificationSystem:
     CATEGORIES = ["OPPORTUNITY", "RISK", "NEWS", "KAP", "REGIME", "PORTFOLIO", "MODEL", "SYSTEM", "SECURITY"]
 
     def __init__(self):
-        self._notifications: List[Dict] = []
+        self._notifications: list[dict] = []
 
-    def notify(self, category: str, title: str, message: str, severity: str = "INFO", data: Dict = None):
+    def notify(self, category: str, title: str, message: str, severity: str = "INFO", data: dict = None):
         """Bildirim gönder."""
         notification = {
-            "id": hashlib.sha256(f"{category}:{title}:{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:12],
+            "id": hashlib.sha256(f"{category}:{title}:{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12],
             "category": category,
             "title": title,
             "message": message,
             "severity": severity,
             "data": data or {},
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "read": False,
         }
         self._notifications.append(notification)
@@ -129,7 +131,7 @@ class NotificationSystem:
             self._notifications = self._notifications[-500:]
         logger.info("Notification", category=category, title=title, severity=severity)
 
-    def get_unread(self, limit: int = 20) -> List[Dict]:
+    def get_unread(self, limit: int = 20) -> list[dict]:
         """Okunmamış bildirimler."""
         return [n for n in self._notifications if not n["read"]][-limit:]
 
@@ -181,12 +183,12 @@ class SnapshotSystem:
     """Periyodik snapshot sistemi."""
 
     def __init__(self):
-        self._snapshots: List[Dict] = []
+        self._snapshots: list[dict] = []
 
-    def take_snapshot(self, state: Dict[str, Any]):
+    def take_snapshot(self, state: dict[str, Any]):
         """Snapshot al."""
         snapshot = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "state": state,
         }
         self._snapshots.append(snapshot)
@@ -195,11 +197,11 @@ class SnapshotSystem:
         # Son 100 snapshot tut
         self._snapshots = self._snapshots[-100:]
 
-    def get_latest(self) -> Optional[Dict]:
+    def get_latest(self) -> dict | None:
         """Son snapshot."""
         return self._snapshots[-1] if self._snapshots else None
 
-    def get_history(self, limit: int = 10) -> List[Dict]:
+    def get_history(self, limit: int = 10) -> list[dict]:
         """Snapshot geçmişi."""
         return self._snapshots[-limit:]
 
@@ -208,13 +210,13 @@ class CacheSystem:
     """Cache sistemi."""
 
     def __init__(self):
-        self._cache: Dict[str, Dict] = {}
+        self._cache: dict[str, dict] = {}
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         """Cache'den oku."""
         entry = self._cache.get(key)
         if entry:
-            if entry.get("expires_at") and datetime.now(timezone.utc).timestamp() > entry["expires_at"]:
+            if entry.get("expires_at") and datetime.now(UTC).timestamp() > entry["expires_at"]:
                 del self._cache[key]
                 return None
             return entry.get("value")
@@ -224,15 +226,15 @@ class CacheSystem:
         """Cache'e yaz."""
         self._cache[key] = {
             "value": value,
-            "expires_at": datetime.now(timezone.utc).timestamp() + ttl_seconds,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "expires_at": datetime.now(UTC).timestamp() + ttl_seconds,
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
     def invalidate(self, key: str):
         """Cache'i temizle."""
         self._cache.pop(key, None)
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Cache istatistikleri."""
         return {"entries": len(self._cache)}
 
@@ -241,26 +243,26 @@ class JobQueue:
     """İş kuyruğu."""
 
     def __init__(self):
-        self._queue: List[Dict] = []
-        self._running: List[Dict] = []
-        self._completed: List[Dict] = []
+        self._queue: list[dict] = []
+        self._running: list[dict] = []
+        self._completed: list[dict] = []
 
-    def enqueue(self, job_type: str, payload: Dict, priority: str = "NORMAL"):
+    def enqueue(self, job_type: str, payload: dict, priority: str = "NORMAL"):
         """İş ekle."""
         job = {
-            "job_id": hashlib.sha256(f"{job_type}:{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:12],
+            "job_id": hashlib.sha256(f"{job_type}:{datetime.now(UTC).isoformat()}".encode()).hexdigest()[:12],
             "type": job_type,
             "payload": payload,
             "priority": priority,
             "status": "QUEUED",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
         self._queue.append(job)
         if len(self._queue) > 100:
             self._queue = self._queue[-100:]
         return job["job_id"]
 
-    def dequeue(self) -> Optional[Dict]:
+    def dequeue(self) -> dict | None:
         """Sıradaki işi al."""
         if self._queue:
             # Priority sırası
@@ -280,13 +282,13 @@ class JobQueue:
             if job["job_id"] == job_id:
                 job["status"] = "COMPLETED"
                 job["result"] = result
-                job["completed_at"] = datetime.now(timezone.utc).isoformat()
+                job["completed_at"] = datetime.now(UTC).isoformat()
                 self._completed.append(self._running.pop(i))
                 if len(self._completed) > 1000:
                     self._completed = self._completed[-1000:]
                 return
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """Kuyruk istatistikleri."""
         return {
             "queued": len(self._queue),

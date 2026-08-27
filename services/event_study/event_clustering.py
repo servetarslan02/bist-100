@@ -3,9 +3,10 @@
 Yakın tarihli event'lerin etkileşimini tespit etme ve düzeltme.
 MacKinlay (1997) — clustered events problem.
 """
-import numpy as np
-from typing import Dict, List, Any, Optional
 from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -24,8 +25,8 @@ class EventClusteringDetector:
         self.min_cluster_size = min_cluster_size
 
     def detect_clusters(
-        self, events: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
+        self, events: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
         """Event'leri tarihe göre cluster'lara ayır.
 
         Args:
@@ -84,10 +85,10 @@ class EventClusteringDetector:
 
     def adjust_car_for_clustering(
         self,
-        events: List[Dict[str, Any]],
+        events: list[dict[str, Any]],
         market_returns: np.ndarray,
         dates: np.ndarray,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Cluster'lı event'ler için CAR düzeltmesi.
 
         Cluster içindeki event'ler birbirini etkilediği için,
@@ -131,8 +132,8 @@ class EventClusteringDetector:
         return adjusted_events
 
     def get_cluster_statistics(
-        self, clusters: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+        self, clusters: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Cluster istatistikleri.
 
         Returns:
@@ -152,7 +153,7 @@ class EventClusteringDetector:
             },
         }
 
-    def _parse_date(self, date_val: Any) -> Optional[datetime]:
+    def _parse_date(self, date_val: Any) -> datetime | None:
         """Tarih parse et."""
         if isinstance(date_val, datetime):
             return date_val

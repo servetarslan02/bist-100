@@ -4,11 +4,13 @@ ALPHA BIST — Market Player
 Geçmiş piyasa verilerini "canlı gibi" oynatan motor.
 """
 
-import polars as pl
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, List, Generator, Callable
+from collections.abc import Callable, Generator
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from enum import Enum
+from typing import Any
+
+import polars as pl
 import structlog
 
 logger = structlog.get_logger()
@@ -33,7 +35,7 @@ class TickData:
     volume: int
     phase: str = "CONTINUOUS"
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp.isoformat(),
             "ticker": self.ticker,
@@ -47,29 +49,30 @@ class MarketPlayer:
     """Geçmiş piyasa verisini oynatan motor."""
 
     def __init__(self):
-        self._data: Optional[pl.DataFrame] = None
-        self._tickers: List[str] = []
+        self._data: pl.DataFrame | None = None
+        self._tickers: list[str] = []
         self._is_playing: bool = False
         self._is_paused: bool = False
         self._current_index: int = 0
         self._total_ticks: int = 0
         self._speed: PlaybackSpeed = PlaybackSpeed.FAST_10X
         self._ticks_processed: int = 0
-        self._on_tick_callbacks: List[Callable] = []
+        self._on_tick_callbacks: list[Callable] = []
 
     def load_data(
         self,
         start_date: str,
         end_date: str,
-        tickers: Optional[List[str]] = None,
+        tickers: list[str] | None = None,
         source: str = "yfinance",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Tarihsel veriyi yükle (BIST-100)."""
         result = {"start_date": start_date, "end_date": end_date, "source": source}
 
         try:
             if source == "yfinance":
                 import yfinance as yf
+
                 from services.ingestion.bist_universe import bist_universe
 
                 if tickers is None:
@@ -122,7 +125,7 @@ class MarketPlayer:
     def on_tick(self, callback: Callable):
         self._on_tick_callbacks.append(callback)
 
-    def play(self, start_index: int = 0, max_ticks: Optional[int] = None) -> Generator[TickData, None, None]:
+    def play(self, start_index: int = 0, max_ticks: int | None = None) -> Generator[TickData, None, None]:
         """Veriyi oynat."""
         if self._data is None or self._data.empty:
             return
@@ -182,7 +185,7 @@ class MarketPlayer:
     def resume(self): self._is_paused = False
     def stop(self): self._is_playing = False; self._is_paused = False
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {
             "is_playing": self._is_playing, "is_paused": self._is_paused,
             "current_index": self._current_index, "total_ticks": self._total_ticks,

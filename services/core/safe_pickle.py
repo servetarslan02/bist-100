@@ -16,7 +16,7 @@ Kullanım:
 import hashlib
 import pickle
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import structlog
 

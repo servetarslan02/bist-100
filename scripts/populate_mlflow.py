@@ -4,6 +4,7 @@ Logs all active quant, ML and LLM models directly into MLflow backend PostgreSQL
 """
 
 import os
+
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 import mlflow
 
@@ -174,7 +175,7 @@ def sync_to_mlflow():
         exp_name = item["experiment_name"]
         mlflow.set_experiment(exp_name)
 
-        with mlflow.start_run(run_name=item["run_name"]) as run:
+        with mlflow.start_run(run_name=item["run_name"]):
             for k, v in item["tags"].items():
                 mlflow.set_tag(k, v)
             for k, v in item["params"].items():

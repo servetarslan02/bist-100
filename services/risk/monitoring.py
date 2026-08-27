@@ -9,23 +9,25 @@ Kaynaklar:
 - ScienceDirect — Integrated Risk Management Framework (2026)
 """
 
-from typing import Dict, List, Optional, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
     CRITICAL = "CRITICAL"
 
 
-class AlertType(str, Enum):
+class AlertType(StrEnum):
     VAR_BREACH = "VAR_BREACH"
     DRAWDOWN = "DRAWDOWN"
     CONCENTRATION = "CONCENTRATION"
@@ -47,13 +49,13 @@ class Alert:
     metric_name: str
     metric_value: float
     threshold: float
-    ticker: Optional[str] = None
+    ticker: str | None = None
     timestamp: str = ""
     acknowledged: bool = False
 
     def __post_init__(self):
         if not self.timestamp:
-            self.timestamp = datetime.now(timezone.utc).isoformat()
+            self.timestamp = datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -68,7 +70,7 @@ class AlertRule:
     metric_name: str
     enabled: bool = True
     cooldown_seconds: int = 300  # 5 dakika
-    last_fired: Optional[str] = None
+    last_fired: str | None = None
     description: str = ""
 
 
@@ -86,7 +88,7 @@ class RiskMetricsSnapshot:
     daily_pnl_pct: float
     position_count: int
     max_position_pct: float
-    sector_concentration: Dict[str, float]
+    sector_concentration: dict[str, float]
     correlation_risk: float
     regime: str
     risk_score: float  # 0-100
@@ -96,10 +98,10 @@ class RiskMonitor:
     """Risk izleme ve alerting sistemi."""
 
     def __init__(self):
-        self._alerts: List[Alert] = []
-        self._rules: List[AlertRule] = []
-        self._metrics_history: List[RiskMetricsSnapshot] = []
-        self._alert_callbacks: List[Callable] = []
+        self._alerts: list[Alert] = []
+        self._rules: list[AlertRule] = []
+        self._metrics_history: list[RiskMetricsSnapshot] = []
+        self._alert_callbacks: list[Callable] = []
         self._setup_default_rules()
 
     def _setup_default_rules(self):
@@ -187,7 +189,7 @@ class RiskMonitor:
             ),
         ]
 
-    def check_metrics(self, metrics: RiskMetricsSnapshot) -> List[Alert]:
+    def check_metrics(self, metrics: RiskMetricsSnapshot) -> list[Alert]:
         """Risk metriklerini kontrol et ve alert üret.
 
         Args:
@@ -196,7 +198,7 @@ class RiskMonitor:
         Returns:
             Üretilen alert'ler
         """
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         new_alerts = []
 
         # Metrikleri sözlüğe çevir
@@ -222,15 +224,7 @@ class RiskMonitor:
 
             # Koşul kontrolü
             triggered = False
-            if rule.condition == "gt" and value > rule.threshold:
-                triggered = True
-            elif rule.condition == "lt" and value < rule.threshold:
-                triggered = True
-            elif rule.condition == "gte" and value >= rule.threshold:
-                triggered = True
-            elif rule.condition == "lte" and value <= rule.threshold:
-                triggered = True
-            elif rule.condition == "eq" and abs(value - rule.threshold) < 0.001:
+            if rule.condition == "gt" and value > rule.threshold or rule.condition == "lt" and value < rule.threshold or rule.condition == "gte" and value >= rule.threshold or rule.condition == "lte" and value <= rule.threshold or rule.condition == "eq" and abs(value - rule.threshold) < 0.001:
                 triggered = True
 
             if triggered:
@@ -238,7 +232,7 @@ class RiskMonitor:
                 if rule.last_fired:
                     try:
                         last = datetime.fromisoformat(rule.last_fired)
-                        elapsed = (datetime.now(timezone.utc) - last).total_seconds()
+                        elapsed = (datetime.now(UTC) - last).total_seconds()
                         if elapsed < rule.cooldown_seconds:
                             continue
                     except Exception as e:
@@ -303,11 +297,11 @@ class RiskMonitor:
 
     def get_alerts(
         self,
-        severity: Optional[AlertSeverity] = None,
-        alert_type: Optional[AlertType] = None,
+        severity: AlertSeverity | None = None,
+        alert_type: AlertType | None = None,
         limit: int = 50,
         unacknowledged_only: bool = False,
-    ) -> List[Alert]:
+    ) -> list[Alert]:
         """Alert'leri filtrele."""
         filtered = self._alerts
 
@@ -327,34 +321,34 @@ class RiskMonitor:
                 alert.acknowledged = True
                 break
 
-    def get_rules(self) -> List[AlertRule]:
+    def get_rules(self) -> list[AlertRule]:
         """Tüm alert kurallarını al."""
         return self._rules
 
-    def ingest_pipeline_metrics(self, ticker: str, metrics: Dict[str, Any]):
+    def ingest_pipeline_metrics(self, ticker: str, metrics: dict[str, Any]):
         """Pipeline'dan gelen risk metriklerini monitoring'e besle."""
         try:
             if not hasattr(self, '_latest_metrics'):
-                self._latest_metrics: Dict[str, Dict] = {}
+                self._latest_metrics: dict[str, dict] = {}
             self._latest_metrics[ticker] = {
                 "var_95": metrics.get("var_95"),
                 "cvar_95": metrics.get("cvar_95"),
                 "drawdown": metrics.get("drawdown"),
                 "position_size": metrics.get("position_size"),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
             # Alert kontrolü
             self._check_alerts(ticker, metrics)
         except Exception as e:
             logger.warning("Failed to ingest pipeline metrics", ticker=ticker, error=str(e))
 
-    def _check_alerts(self, ticker: str, metrics: Dict[str, Any]):
+    def _check_alerts(self, ticker: str, metrics: dict[str, Any]):
         """Basit alert kontrolü."""
         var_95 = abs(metrics.get("var_95", 0))
         if var_95 > 15:
             logger.warning("HIGH VaR ALERT", ticker=ticker, var_95=var_95)
 
-    def get_alert_summary(self) -> Dict[str, Any]:
+    def get_alert_summary(self) -> dict[str, Any]:
         """Alert özeti."""
         total = len(self._alerts)
         unacknowledged = sum(1 for a in self._alerts if not a.acknowledged)

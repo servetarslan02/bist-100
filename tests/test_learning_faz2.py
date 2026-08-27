@@ -14,9 +14,8 @@ Test edilen:
 """
 
 import sys
-import os
-import numpy as np
 
+import numpy as np
 
 
 def test_no_drift():
@@ -336,14 +335,14 @@ def run_all_tests():
             print(f"❌ {test.__name__}: {e}")
 
     print(f"\n{'='*60}")
-    print(f"📊 FAZ 2 TEST SONUÇLARI (Drift Detection)")
+    print("📊 FAZ 2 TEST SONUÇLARI (Drift Detection)")
     print(f"{'='*60}")
     print(f"✅ Geçen: {passed}")
     print(f"❌ Başarısız: {failed}")
     print(f"📈 Toplam: {passed + failed}")
 
     if errors:
-        print(f"\n🔍 Hatalar:")
+        print("\n🔍 Hatalar:")
         for name, err in errors:
             print(f"  - {name}: {err}")
 

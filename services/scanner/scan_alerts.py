@@ -8,23 +8,25 @@ Kaynaklar: Mometic (2026), Endüstri standardı
 """
 
 import time
-from typing import Dict, List, Any, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
-from enum import Enum
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class ScanAlertSeverity(str, Enum):
+class ScanAlertSeverity(StrEnum):
     INFO = "INFO"
     WARNING = "WARNING"
     BLOCK = "BLOCK"
     CRITICAL = "CRITICAL"
 
 
-class ScanAlertType(str, Enum):
+class ScanAlertType(StrEnum):
     HIGH_SCORE = "HIGH_SCORE"
     NEW_SIGNAL = "NEW_SIGNAL"
     TIER_CHANGE = "TIER_CHANGE"
@@ -79,10 +81,10 @@ class ScanAlertManager:
     """
 
     def __init__(self):
-        self._alerts: List[ScanAlert] = []
-        self._rules: List[ScanAlertRule] = []
-        self._callbacks: List[Callable] = []
-        self._previous_signals: Dict[str, str] = {}  # ticker → signal
+        self._alerts: list[ScanAlert] = []
+        self._rules: list[ScanAlertRule] = []
+        self._callbacks: list[Callable] = []
+        self._previous_signals: dict[str, str] = {}  # ticker → signal
         self._setup_default_rules()
 
     def _setup_default_rules(self):
@@ -148,9 +150,9 @@ class ScanAlertManager:
 
     def check_scan_results(
         self,
-        results: List[Dict[str, Any]],
+        results: list[dict[str, Any]],
         regime: str = "RANGE",
-    ) -> List[ScanAlert]:
+    ) -> list[ScanAlert]:
         """Tarama sonuçlarını kontrol et ve alert üret.
 
         Args:
@@ -221,7 +223,7 @@ class ScanAlertManager:
                         direction=direction,
                         confidence=confidence,
                         price=price,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
+                        timestamp=datetime.now(UTC).isoformat(),
                     )
 
                     new_alerts.append(alert)
@@ -274,7 +276,7 @@ class ScanAlertManager:
         severity: ScanAlertSeverity = None,
         alert_type: ScanAlertType = None,
         limit: int = 50,
-    ) -> List[ScanAlert]:
+    ) -> list[ScanAlert]:
         """Alert'leri filtrele.
 
         Args:
@@ -294,7 +296,7 @@ class ScanAlertManager:
 
         return filtered[-limit:]
 
-    def get_alert_summary(self) -> Dict[str, Any]:
+    def get_alert_summary(self) -> dict[str, Any]:
         """Alert özeti.
 
         Returns:

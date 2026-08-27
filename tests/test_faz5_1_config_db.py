@@ -4,12 +4,11 @@ ALPHA BIST — FAZ 5.1 Test Suite
 Production Config/Secrets + Database + Model Persistence
 """
 
-import sys
-import os
-import orjson
 import hashlib
+import os
+import sys
 
-
+import orjson
 
 # ────────────────────────────────────────────────────────────
 # 1. Production config validation
@@ -17,7 +16,7 @@ import hashlib
 
 def test_config_production_validation():
     """Production'da insecure config reddedilmeli."""
-    from services.core.config import Settings, _INSECURE_VALUES
+    from services.core.config import Settings
 
     passed = 0
     failed = 0
@@ -65,7 +64,7 @@ def test_missing_secret_detection():
 
     # Production + boş secret
     try:
-        s = Settings(APP_ENV="production", SECRET_KEY="", JWT_SECRET="a" * 20,
+        Settings(APP_ENV="production", SECRET_KEY="", JWT_SECRET="a" * 20,
                      POSTGRES_PASSWORD="secure_pw_123456", APP_DEBUG=False)
         print("  ✗ Should reject empty SECRET_KEY")
         failed += 1
@@ -137,7 +136,7 @@ def test_config_fields():
     assert hasattr(s, 'postgres_url')
     assert hasattr(s, 'redis_url')
 
-    print(f"  ✓ Config fields: all present (broker, KAP, security, DB)")
+    print("  ✓ Config fields: all present (broker, KAP, security, DB)")
     passed += 1
 
     return passed, failed
@@ -237,7 +236,6 @@ def test_db_graceful_failure():
 
 def test_model_persistence_serialization():
     """Model metadata serialization/deserialization çalışmalı."""
-    from services.core.model_persistence import ModelPersistence
 
     passed = 0
     failed = 0

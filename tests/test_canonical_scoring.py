@@ -13,12 +13,6 @@ Tek karar mimarisi testleri:
 """
 
 import sys
-import os
-import numpy as np
-import polars as pl
-from datetime import datetime
-
-
 
 # =====================================================
 # HELPERS
@@ -136,7 +130,7 @@ def test_seasonality_used():
     sv = canonical_scoring.compute_score_vector("TEST", features, "BULL")
 
     if sv.seasonality == 0.0:
-        issues.append(f"Seasonality = 0.0 — feature'lar var ama kullanılmıyor")
+        issues.append("Seasonality = 0.0 — feature'lar var ama kullanılmıyor")
     elif sv.seasonality == 50.0:
         # 50 nötr — mevsimsellik bilgisi yok anlamına gelebilir
         month_wr = features.get("seasonality_current_month_win_rate", 0)
@@ -432,7 +426,7 @@ def run_all():
     print(f"\n{'=' * 60}")
     print(f"  SONUÇ: {passed}/{passed + failed} geçti")
     if all_issues:
-        print(f"\n  HATALAR:")
+        print("\n  HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"    {i}. {issue}")
     print("=" * 60)

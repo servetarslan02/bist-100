@@ -93,8 +93,9 @@ DEFAULT_TERMINAL_GROWTH = 0.03      # %3 (enflasyon + reel)
 def _load_risk_free_rate() -> float:
     """TCMB politika faizini config dosyasından oku."""
     try:
-        import orjson
         from pathlib import Path
+
+        import orjson
         config_path = Path(__file__).parent.parent.parent / "config" / "risk_free_rate.json"
         if config_path.exists():
             data = orjson.loads(config_path.read_bytes())

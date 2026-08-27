@@ -7,8 +7,9 @@ Yahoo ↔ Matriks ↔ BIST resmi
 Farklılık varsa → DATA QUALITY WARNING
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass, field
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -19,11 +20,11 @@ class ValidationResult:
     """Doğrulama sonucu."""
     ticker: str
     canonical_price: float
-    sources: Dict[str, float]  # source -> price
+    sources: dict[str, float]  # source -> price
     is_consistent: bool
     max_deviation_pct: float
     quality_score: float  # 0-1
-    warnings: List[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 class DataValidator:
@@ -48,7 +49,7 @@ class DataValidator:
     def validate_price(
         self,
         ticker: str,
-        prices: Dict[str, float],  # source -> price
+        prices: dict[str, float],  # source -> price
     ) -> ValidationResult:
         """
         Fiyat doğrulama — kaynaklar arası karşılaştırma.
@@ -100,7 +101,7 @@ class DataValidator:
             warnings=warnings,
         )
 
-    def _compute_canonical_price(self, prices: Dict[str, float]) -> float:
+    def _compute_canonical_price(self, prices: dict[str, float]) -> float:
         """Ağırlıklı ortalama ile canonical price hesapla."""
         total_weight = 0
         weighted_sum = 0
@@ -114,7 +115,7 @@ class DataValidator:
         return weighted_sum / total_weight if total_weight > 0 else 0
 
     def _compute_quality_score(
-        self, prices: Dict[str, float], deviations: Dict[str, float]
+        self, prices: dict[str, float], deviations: dict[str, float]
     ) -> float:
         """Kalite skoru (0-1)."""
         score = 1.0
@@ -139,8 +140,8 @@ class DataValidator:
         return score
 
     def validate_batch(
-        self, data: Dict[str, Dict[str, float]]
-    ) -> Dict[str, ValidationResult]:
+        self, data: dict[str, dict[str, float]]
+    ) -> dict[str, ValidationResult]:
         """
         Toplu doğrulama.
 
@@ -155,8 +156,8 @@ class DataValidator:
         return results
 
     def get_quality_report(
-        self, results: Dict[str, ValidationResult]
-    ) -> Dict[str, Any]:
+        self, results: dict[str, ValidationResult]
+    ) -> dict[str, Any]:
         """Kalite raporu."""
         total = len(results)
         consistent = sum(1 for r in results.values() if r.is_consistent)

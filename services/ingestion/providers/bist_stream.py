@@ -10,13 +10,13 @@ ALPHA BIST — BIST Market Data Stream v1.0
 """
 
 import asyncio
-import orjson
-from typing import Dict, List, Callable
-from datetime import datetime, timezone
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 
-import yfinance as yf
+import orjson
 import structlog
+import yfinance as yf
 
 logger = structlog.get_logger()
 
@@ -29,7 +29,7 @@ class StreamTick:
     volume: int
     bid: float = 0.0
     ask: float = 0.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     source: str = ""
 
 
@@ -40,7 +40,7 @@ class BISTStreamProvider:
     """
 
     def __init__(self):
-        self._handlers: List[Callable] = []
+        self._handlers: list[Callable] = []
         self._running = False
         self._source = "yfinance"  # Varsayılan
         self._tick_count = 0
@@ -106,7 +106,7 @@ class BISTStreamProvider:
                                 ticker=ticker,
                                 price=float(last_row["Close"]),
                                 volume=int(last_row["Volume"]),
-                                timestamp=datetime.now(timezone.utc),
+                                timestamp=datetime.now(UTC),
                                 source="yfinance",
                             )
 
@@ -163,7 +163,7 @@ class BISTStreamProvider:
                                     ticker=ticker_data.get("symbol", ""),
                                     price=float(ticker_data.get("last", 0)),
                                     volume=int(ticker_data.get("volume", 0)),
-                                    timestamp=datetime.now(timezone.utc),
+                                    timestamp=datetime.now(UTC),
                                     source="investing",
                                 )
 
@@ -178,7 +178,7 @@ class BISTStreamProvider:
 
                                 self._tick_count += 1
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         continue
                     except Exception as e:
                         logger.warning("Investing stream error", error=str(e))
@@ -228,7 +228,7 @@ class BISTStreamProvider:
                                 volume=int(data.get("volume", 0)),
                                 bid=float(data.get("bid", 0)),
                                 ask=float(data.get("ask", 0)),
-                                timestamp=datetime.now(timezone.utc),
+                                timestamp=datetime.now(UTC),
                                 source="bistech",
                             )
 
@@ -243,14 +243,14 @@ class BISTStreamProvider:
 
                             self._tick_count += 1
 
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         continue
 
         except Exception as e:
             logger.error("WebSocket stream failed", error=str(e))
             await self._stream_yfinance()
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "source": self._source,

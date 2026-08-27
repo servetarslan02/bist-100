@@ -4,7 +4,7 @@ ALPHA BIST — Günlük Rapor Üretici
 Her gün piyasa kapandıktan sonra otomatik rapor üretir.
 """
 
-from typing import Dict, List
+
 import structlog
 
 logger = structlog.get_logger()
@@ -12,18 +12,18 @@ logger = structlog.get_logger()
 
 def generate_daily_report(
     date: str,
-    market_state: Dict,
-    signals: List[Dict],
-    trade_plans: List[Dict],
-    anomalies: List[Dict],
-    portfolio: Dict,
-    world_state: Dict,
+    market_state: dict,
+    signals: list[dict],
+    trade_plans: list[dict],
+    anomalies: list[dict],
+    portfolio: dict,
+    world_state: dict,
 ) -> str:
     """Günlük rapor üret."""
 
     lines = []
     lines.append(f"{'='*60}")
-    lines.append(f"ALPHA BIST — GÜNLÜK RAPOR")
+    lines.append("ALPHA BIST — GÜNLÜK RAPOR")
     lines.append(f"Tarih: {date}")
     lines.append(f"{'='*60}")
     lines.append("")
@@ -89,7 +89,7 @@ def generate_daily_report(
     return "\n".join(lines)
 
 
-def generate_alert_message(signal: Dict) -> str:
+def generate_alert_message(signal: dict) -> str:
     """Sinyal bildirimi üret."""
     ticker = signal.get("ticker", "")
     score = signal.get("spec_score", 0)
@@ -106,7 +106,7 @@ def generate_alert_message(signal: Dict) -> str:
         return f"⚪ {ticker} — SPEC={score:.0f}, Fiyat=₺{price:.2f}"
 
 
-def generate_anomaly_alert(anomaly: Dict) -> str:
+def generate_anomaly_alert(anomaly: dict) -> str:
     """Anomali bildirimi üret."""
     ticker = anomaly.get("ticker", "")
     score = anomaly.get("score", 0)

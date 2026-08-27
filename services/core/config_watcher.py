@@ -17,12 +17,14 @@ Kullanım:
 """
 
 import asyncio
-import orjson
 import os
 import time
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -37,10 +39,10 @@ class ConfigAuditEntry:
     new_version: Any = None
     error: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
-            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=timezone.utc).isoformat(),
+            "timestamp_iso": datetime.fromtimestamp(self.timestamp, tz=UTC).isoformat(),
             "action": self.action,
             "config_path": self.config_path,
             "old_version": self.old_version,
@@ -56,9 +58,9 @@ class ConfigWatcher:
         self,
         config_path: str,
         reload_fn: Callable,
-        validate_fn: Optional[Callable] = None,
+        validate_fn: Callable | None = None,
         watch_interval_s: float = 5.0,
-        on_change: Optional[Callable] = None,
+        on_change: Callable | None = None,
     ):
         self._config_path = config_path
         self._reload_fn = reload_fn
@@ -66,9 +68,9 @@ class ConfigWatcher:
         self._watch_interval_s = watch_interval_s
         self._on_change = on_change
         self._last_mtime: float = 0
-        self._last_config: Optional[Dict] = None
-        self._audit_log: List[ConfigAuditEntry] = []
-        self._task: Optional[asyncio.Task] = None
+        self._last_config: dict | None = None
+        self._audit_log: list[ConfigAuditEntry] = []
+        self._task: asyncio.Task | None = None
         self._running = False
         self._reload_count = 0
         self._error_count = 0
@@ -189,11 +191,11 @@ class ConfigWatcher:
             logger.error("Config reload failed, keeping old config", error=str(e))
             self._last_mtime = current_mtime
 
-    def get_audit_log(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def get_audit_log(self, limit: int = 50) -> list[dict[str, Any]]:
         """Config değişiklik audit log."""
         return [e.to_dict() for e in self._audit_log[-limit:]]
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Watcher durumu."""
         return {
             "running": self._running,

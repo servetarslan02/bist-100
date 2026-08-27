@@ -1,8 +1,9 @@
 """Factors API — Gerçek BIST Faktör Analiz ve Exposure Motoru."""
 
 from fastapi import APIRouter, Depends, Query
-from ..dependencies import get_current_user, check_rate_limit
+
 from ...core.redis_helper import get_cached
+from ..dependencies import check_rate_limit, get_current_user
 
 router = APIRouter()
 
@@ -12,11 +13,11 @@ async def factor_scores(ticker: str, user=Depends(get_current_user), _=Depends(c
     """Hisse bazlı çoklu faktör skorları (Momentum, Value, Quality, Volatility, Liquidity, Size)."""
     radar = get_cached("radar:data") or []
     item = next((x for x in radar if x.get("symbol") == ticker.upper()), None)
-    
+
     score = item.get("score", 75.0) if item else 75.0
     item.get("price", 50.0) if item else 50.0
     change = item.get("change", 1.5) if item else 1.5
-    
+
     # Gerçek canlı faktör ayrıştırması
     momentum = min(99.0, max(20.0, 50.0 + change * 8.0))
     volatility = min(95.0, max(15.0, abs(change) * 12.0 + 25.0))

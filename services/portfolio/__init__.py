@@ -5,15 +5,21 @@
 # - main: PortfolioService (DB-backed, atomic operations, lock)
 # - enhancements: Tax, dividend, benchmark, attribution, multi-currency, TCA
 
-from .portfolio_manager import PortfolioManager, portfolio_manager, Position, Trade
 from .enhancements import (
-    TaxModel, tax_model,
-    DividendHandler, dividend_handler,
-    BenchmarkEngine, benchmark_engine,
-    PerformanceAttribution, performance_attribution,
-    MultiCurrencyHandler, multi_currency,
-    TransactionCostAnalyzer, tca,
+    BenchmarkEngine,
+    DividendHandler,
+    MultiCurrencyHandler,
+    PerformanceAttribution,
+    TaxModel,
+    TransactionCostAnalyzer,
+    benchmark_engine,
+    dividend_handler,
+    multi_currency,
+    performance_attribution,
+    tax_model,
+    tca,
 )
+from .portfolio_manager import PortfolioManager, Position, Trade, portfolio_manager
 
 __all__ = [
     # Portfolio Manager

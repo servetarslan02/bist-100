@@ -5,24 +5,20 @@ Comprehensive test suite: Provider refactor, Metrics, Orchestrator, Integration.
 """
 
 import asyncio
-import pytest
 import time
-from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from datetime import datetime, timedelta
 
-import sys
-import os
+import pytest
+import structlog
 
-from services.ingestion.circuit_breaker import CircuitBreaker, CircuitState, CircuitBreakerManager
-from services.ingestion.rate_limiter import RateLimiter
-from services.ingestion.retry_policy import RetryPolicy, RetryExhaustedError
-from services.ingestion.provider_manager import ProviderManager, ProviderResult
-from services.ingestion.reconciliation import SourceReconciler
-from services.ingestion.point_in_time import PointInTimeValidator
+from services.ingestion.circuit_breaker import CircuitBreaker, CircuitBreakerManager, CircuitState
 from services.ingestion.deduplication import EventDeduplicator
 from services.ingestion.incremental import IncrementalFetcher
 from services.ingestion.ingestion_metrics import IngestionMetrics
-import structlog
+from services.ingestion.point_in_time import PointInTimeValidator
+from services.ingestion.provider_manager import ProviderManager
+from services.ingestion.rate_limiter import RateLimiter
+from services.ingestion.reconciliation import SourceReconciler
 
 logger = structlog.get_logger(__name__)
 
@@ -375,9 +371,9 @@ class TestCircuitBreakerAdvanced:
     def test_manager_multiple_providers(self):
         """Çoklu provider circuit breaker."""
         manager = CircuitBreakerManager()
-        cb1 = manager.get_or_create("yfinance")
-        cb2 = manager.get_or_create("kap")
-        cb3 = manager.get_or_create("tcmb")
+        manager.get_or_create("yfinance")
+        manager.get_or_create("kap")
+        manager.get_or_create("tcmb")
 
         assert len(manager.get_all_states()) == 3
 

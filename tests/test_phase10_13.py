@@ -5,13 +5,16 @@ Execution Simulator, Portfolio Integration, Backtest Metrics, E2E testleri.
 """
 
 import sys
-import os
 
 
 def test_execution_simulator():
     """Execution Simulator testleri."""
     from services.simulation.execution_simulator import (
-        execution_simulator, Order, OrderSide, OrderType, OrderStatus,
+        Order,
+        OrderSide,
+        OrderStatus,
+        OrderType,
+        execution_simulator,
     )
 
     passed = 0
@@ -145,11 +148,14 @@ def test_portfolio_metrics():
 
 def test_e2e_pipeline():
     """E2E: Tüm pipeline entegrasyon testi."""
-    from services.scanner.opportunity_engine import opportunity_engine
-    from services.intelligence.signal_fusion import signal_fusion_engine
     from services.core.decision_engine import DecisionEngine, DecisionInput
+    from services.intelligence.signal_fusion import signal_fusion_engine
+    from services.scanner.opportunity_engine import opportunity_engine
     from services.simulation.execution_simulator import (
-        execution_simulator, Order, OrderSide, OrderType,
+        Order,
+        OrderSide,
+        OrderType,
+        execution_simulator,
     )
 
     passed = 0

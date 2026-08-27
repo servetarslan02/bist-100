@@ -10,7 +10,8 @@ v2.0: Async refactor + batch support
 """
 
 import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Any
+
 import structlog
 
 from ...core.async_http import get_client
@@ -29,12 +30,12 @@ class MatriksProvider:
             "Accept": "application/json, text/html, */*",
         })
 
-    async def fetch_stock_price(self, ticker: str) -> Optional[Dict[str, Any]]:
+    async def fetch_stock_price(self, ticker: str) -> dict[str, Any] | None:
         """Tek hisse fiyatı — 15dk gecikmeli (async)."""
-        logger.warning(f"Matriks Provider requires institutional API credentials. Endpoint disabled.")
+        logger.warning("Matriks Provider requires institutional API credentials. Endpoint disabled.")
         return None
 
-    async def fetch_batch(self, tickers: List[str]) -> Dict[str, Dict]:
+    async def fetch_batch(self, tickers: list[str]) -> dict[str, dict]:
         """Toplu fiyat çekme (async, paralel)."""
         semaphore = asyncio.Semaphore(5)
 
@@ -57,7 +58,7 @@ class MatriksProvider:
         logger.info("Matriks batch fetched", count=len(output))
         return output
 
-    async def fetch_index(self, symbol: str = "XU100") -> Optional[Dict[str, Any]]:
+    async def fetch_index(self, symbol: str = "XU100") -> dict[str, Any] | None:
         """Endeks verisi (async)."""
         try:
             url = f"{self.BASE_URL}/api/index/{symbol}"

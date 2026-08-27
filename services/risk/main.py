@@ -1,20 +1,27 @@
 """ALPHA BIST - Risk Engine Service"""
 
 import asyncio
-import orjson
-from datetime import datetime, timezone
-from typing import Dict, List, Any
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
+import orjson
 import structlog
 
 from ..core.database import (
-    init_databases, close_databases, pg_fetchrow, redis_set,
+    close_databases,
+    init_databases,
+    pg_fetchrow,
+    pg_fetchval,
+    redis_set,
+)
+from ..core.event_bus import (
+    EventConsumer,
+    EventType,
+    ensure_topics,
+    publish_event,
 )
 from ..core.event_schema import CanonicalEvent
-from ..core.event_bus import (
-    ensure_topics, EventType,
-    EventConsumer, publish_event,
-)
 from ..core.logging import setup_logging
 
 logger = structlog.get_logger()
@@ -36,9 +43,9 @@ class RiskEngine:
     def __init__(self):
         self._running = False
         self._consumer: EventConsumer = None
-        self._risk_limits: Dict[str, float] = {}
+        self._risk_limits: dict[str, float] = {}
         self._risk_limits_loaded: bool = False  # P0-6: Fail-closed flag
-        self._portfolio_state: Dict[str, Any] = {}
+        self._portfolio_state: dict[str, Any] = {}
 
     async def start(self):
         """Start the risk engine."""
@@ -82,7 +89,7 @@ class RiskEngine:
             "var_95_limit_pct": 3.0,
         }
         try:
-            from ..core.database import pg_fetch, pg_execute
+            from ..core.database import pg_execute, pg_fetch
             # Ensure system_config exists
             try:
                 await pg_execute("""
@@ -253,7 +260,7 @@ class RiskEngine:
                 "action": action,
                 "approved": all_passed and len(blocking_checks) == 0,
                 "checks": checks,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             if not result["approved"]:
@@ -309,7 +316,7 @@ class RiskEngine:
         except Exception as e:
             logger.error("Signal risk check error", error=str(e))
 
-    async def _check_position_limit(self, ticker: str, amount: float, portfolio_id: int) -> Dict[str, Any]:
+    async def _check_position_limit(self, ticker: str, amount: float, portfolio_id: int) -> dict[str, Any]:
         """Check if position size exceeds limit.
 
         P0-6: Risk limits yüklenemezse BLOCK.
@@ -342,7 +349,7 @@ class RiskEngine:
             "details": f"Position: {position_pct:.1f}% (limit: {limit}%)",
         }
 
-    async def _check_sector_concentration(self, ticker: str, portfolio_id: int) -> Dict[str, Any]:
+    async def _check_sector_concentration(self, ticker: str, portfolio_id: int) -> dict[str, Any]:
         """Check sector concentration limit.
 
         P0-6: Unknown sector → BLOCK (WARN değil).
@@ -392,7 +399,7 @@ class RiskEngine:
             "details": f"Sector {sector}: {concentration:.1f}% (limit: {limit}%)",
         }
 
-    async def _check_daily_loss(self, portfolio_id: int) -> Dict[str, Any]:
+    async def _check_daily_loss(self, portfolio_id: int) -> dict[str, Any]:
         """Check daily loss limit."""
         if not self._risk_limits_loaded:
             return {"name": "daily_loss", "passed": False, "severity": "BLOCK",
@@ -426,7 +433,7 @@ class RiskEngine:
             "details": f"Daily loss: {loss_pct:.1f}% (limit: {limit}%)",
         }
 
-    async def _check_drawdown(self, portfolio_id: int) -> Dict[str, Any]:
+    async def _check_drawdown(self, portfolio_id: int) -> dict[str, Any]:
         """Check maximum drawdown limit.
 
         P0-6: Drawdown = peak equity → current equity (initial capital DEĞİL).
@@ -507,11 +514,11 @@ async def main():
 # Enhanced Risk Entegrasyonu
 # =====================================================
 def assess_portfolio_risk(
-    portfolio: Dict,
-    market_data: Dict = None,
+    portfolio: dict,
+    market_data: dict = None,
     returns_history: np.ndarray = None,
     regime: str = "SIDEWAYS",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Gelişmiş portföy risk değerlendirmesi.
 
     Tüm risk modüllerini çalıştırır ve kapsamlı risk raporu üretir.
@@ -526,7 +533,7 @@ def assess_portfolio_risk(
         Kapsamlı risk raporu
     """
     result = {
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "portfolio_value": portfolio.get("total_value", 0),
         "regime": regime,
     }
@@ -651,9 +658,9 @@ def assess_portfolio_risk(
 
 
 def assess_viop_risk(
-    viop_positions: List[Dict[str, Any]],
+    viop_positions: list[dict[str, Any]],
     portfolio_value: float,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """VIOP pozisyonları için risk değerlendirmesi.
 
     Args:

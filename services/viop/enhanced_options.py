@@ -17,11 +17,13 @@ Tüm VIOP opsiyon sistemi tek modülde:
 Kaynaklar: Black-Scholes (1973), BIST SPAN, TradingBlock (2025), DaystoExpiry (2025)
 """
 
-import numpy as np
 import math
-from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
+
+import numpy as np
+
 try:
     from scipy.stats import norm
     _norm_cdf = norm.cdf
@@ -91,7 +93,7 @@ def black_scholes(S: float, K: float, T: float, r: float, sigma: float,
 # =====================================================
 
 def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
-                     option_type: str = "call") -> Dict[str, float]:
+                     option_type: str = "call") -> dict[str, float]:
     """Opsiyon Greeks hesaplama.
 
     Returns:
@@ -104,10 +106,7 @@ def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float,
     """
     if T <= 0 or sigma <= 0 or S <= 0 or K <= 0:
         # Vade dolmuş → intrinsic Greeks
-        if option_type == "call":
-            delta = 1.0 if S > K else 0.0
-        else:
-            delta = -1.0 if S < K else 0.0
+        delta = (1.0 if S > K else 0.0) if option_type == "call" else -1.0 if S < K else 0.0
         return {"delta": delta, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0}
 
     d1 = (np.log(S / K) + (r + sigma**2 / 2) * T) / (sigma * np.sqrt(T))
@@ -178,10 +177,7 @@ class ImpliedVolatility:
             return 0.0
 
         # Fiyat_bound_check: call için max(S - K*e^(-rT), 0), put için max(K*e^(-rT) - S, 0)
-        if option_type == "call":
-            intrinsic = max(S - K * np.exp(-r * T), 0)
-        else:
-            intrinsic = max(K * np.exp(-r * T) - S, 0)
+        intrinsic = max(S - K * np.exp(-r * T), 0) if option_type == "call" else max(K * np.exp(-r * T) - S, 0)
 
         if market_price < intrinsic - 1e-6:
             # Arbitaj var, piyasa fiyatı intrinsic'in altında
@@ -191,7 +187,7 @@ class ImpliedVolatility:
         # Newton-Raphson
         sigma = 0.30  # Başlangıç tahmini
 
-        for i in range(max_iterations):
+        for _i in range(max_iterations):
             price = black_scholes(S, K, T, r, sigma, option_type)
             diff = price - market_price
 
@@ -240,10 +236,10 @@ class ImpliedVolatility:
 
     def calculate_batch(
         self,
-        options: List[Dict[str, Any]],
+        options: list[dict[str, Any]],
         S: float,
         r: float,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Toplu IV hesaplama.
 
         Args:
@@ -327,18 +323,18 @@ class OptionsChain:
         self.underlying = underlying
         self.spot_price = spot_price
         self.risk_free_rate = risk_free_rate
-        self._quotes: Dict[Tuple[float, date, str], OptionQuote] = {}
+        self._quotes: dict[tuple[float, date, str], OptionQuote] = {}
 
     def add_quote(self, quote: OptionQuote) -> None:
         """Opsiyon kotasyonu ekle."""
         key = (quote.strike, quote.expiry, quote.option_type)
         self._quotes[key] = quote
 
-    def get_quote(self, strike: float, expiry: date, option_type: str) -> Optional[OptionQuote]:
+    def get_quote(self, strike: float, expiry: date, option_type: str) -> OptionQuote | None:
         """Tek opsiyon kotasyonu getir."""
         return self._quotes.get((strike, expiry, option_type))
 
-    def get_strikes(self, expiry: Optional[date] = None) -> List[float]:
+    def get_strikes(self, expiry: date | None = None) -> list[float]:
         """Mevcut strike'ları sıralı döndür."""
         strikes = set()
         for (strike, exp, _) in self._quotes:
@@ -346,14 +342,14 @@ class OptionsChain:
                 strikes.add(strike)
         return sorted(strikes)
 
-    def get_expiries(self) -> List[date]:
+    def get_expiries(self) -> list[date]:
         """Mevcut vadeleri sıralı döndür."""
         expiries = set()
         for (_, exp, _) in self._quotes:
             expiries.add(exp)
         return sorted(expiries)
 
-    def get_chain(self, expiry: date) -> Dict[str, List[OptionQuote]]:
+    def get_chain(self, expiry: date) -> dict[str, list[OptionQuote]]:
         """Belirli bir vade için tüm opsiyonları döndür.
 
         Returns:
@@ -372,7 +368,7 @@ class OptionsChain:
 
     def calculate_all_greeks(self, sigma: float = 0.25) -> None:
         """Tüm opsiyonlar için Greeks hesapla (fiyat yoksa Black-Scholes ile)."""
-        for key, quote in self._quotes.items():
+        for _key, quote in self._quotes.items():
             T = (quote.expiry - date.today()).days / 365.0
             if T <= 0:
                 continue
@@ -394,7 +390,7 @@ class OptionsChain:
             quote.theta = greeks["theta"]
             quote.vega = greeks["vega"]
 
-    def find_atm(self, expiry: date) -> Optional[OptionQuote]:
+    def find_atm(self, expiry: date) -> OptionQuote | None:
         """ATM (at-the-money) call opsiyonu bul."""
         strikes = self.get_strikes(expiry)
         if not strikes:
@@ -404,7 +400,7 @@ class OptionsChain:
         closest = min(strikes, key=lambda k: abs(k - self.spot_price))
         return self.get_quote(closest, expiry, "call")
 
-    def get_put_call_pairs(self, expiry: date) -> List[Dict[str, Any]]:
+    def get_put_call_pairs(self, expiry: date) -> list[dict[str, Any]]:
         """Put-Call çiftlerini döndür (parity check için)."""
         pairs = []
         strikes = self.get_strikes(expiry)
@@ -434,9 +430,9 @@ class PortfolioGreeksResult:
     total_rho: float
     n_positions: int
     delta_neutral: bool
-    position_details: List[Dict[str, Any]]
+    position_details: list[dict[str, Any]]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_delta": self.total_delta,
             "total_gamma": self.total_gamma,
@@ -457,7 +453,7 @@ class PortfolioGreeks:
 
     def aggregate(
         self,
-        positions: List[Dict[str, Any]],
+        positions: list[dict[str, Any]],
     ) -> PortfolioGreeksResult:
         """Portföy Greeks hesapla.
 
@@ -537,12 +533,12 @@ class StrategyResult:
     strategy: str
     max_profit: float
     max_loss: float
-    breakeven: List[float]
+    breakeven: list[float]
     risk_reward: float
     description: str
-    legs: List[Dict[str, Any]]
+    legs: list[dict[str, Any]]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "strategy": self.strategy,
             "max_profit": self.max_profit,
@@ -886,7 +882,7 @@ class DeltaHedgeResult:
     estimated_cost: float
     contract_multiplier: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "current_delta": self.current_delta,
             "target_delta": self.target_delta,
@@ -962,7 +958,7 @@ class DeltaHedger:
         spot_price: float,
         price_move_pct: float,
         contract_multiplier: float = 100,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Gamma scalping — delta hedge P&L hesabı.
 
         Gamma pozitif portföyde (long options), fiyat hareketinden kar edilir.
@@ -1021,7 +1017,7 @@ class SPANMarginCalculator:
         {"price_change": 0.0, "vol_change": 0.08},       # 16: Vol up only
     ]
 
-    def calculate(self, positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def calculate(self, positions: list[dict[str, Any]]) -> dict[str, Any]:
         """SPAN teminat hesapla.
 
         Args:
@@ -1065,7 +1061,7 @@ class SPANMarginCalculator:
             "scenarios_tested": len(self.SCENARIOS),
         }
 
-    def _calculate_scenario_pnl(self, position: Dict, scenario: Dict) -> float:
+    def _calculate_scenario_pnl(self, position: dict, scenario: dict) -> float:
         """Tek senaryo için P&L hesaplama.
 
         Delta P&L: value × delta × price_change
@@ -1112,7 +1108,7 @@ class ArbitrageResult:
     strategy: str
     estimated_profit: float
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "spot_price": self.spot_price,
             "futures_price": self.futures_price,
@@ -1205,7 +1201,7 @@ def check_put_call_parity(
     T: float,
     tolerance: float = 0.01,
     arbitrage_threshold: float = 0.05,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Put-Call Parity kontrolü.
 
     C - P = S - K × e^(-rT)
@@ -1250,9 +1246,9 @@ class VIOPRiskCalculator:
 
     def calculate_portfolio_viop_risk(
         self,
-        viop_positions: List[Dict[str, Any]],
+        viop_positions: list[dict[str, Any]],
         portfolio_value: float,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """VIOP pozisyonları için toplam risk hesabı.
 
         Args:
@@ -1335,7 +1331,7 @@ class VIOPRiskCalculator:
         }
 
     def _generate_risk_flags(self, delta_pct: float, notional_pct: float,
-                              gamma_exposure: float) -> List[str]:
+                              gamma_exposure: float) -> list[str]:
         """Risk bayrakları üret."""
         flags = []
 
@@ -1350,8 +1346,8 @@ class VIOPRiskCalculator:
 
     def calculate_margin_requirement(
         self,
-        viop_positions: List[Dict[str, Any]],
-    ) -> Dict[str, Any]:
+        viop_positions: list[dict[str, Any]],
+    ) -> dict[str, Any]:
         """VIOP pozisyonları için toplam teminat hesabı.
 
         Args:
@@ -1387,7 +1383,7 @@ class VIOPRiskCalculator:
 class BacktestTrade:
     """Tek backtest işlemi."""
     entry_date: date
-    exit_date: Optional[date]
+    exit_date: date | None
     strategy: str
     spot_price: float
     entry_premium: float
@@ -1395,7 +1391,7 @@ class BacktestTrade:
     pnl: float = 0.0
     pnl_pct: float = 0.0
     holding_days: int = 0
-    legs: List[Dict[str, Any]] = field(default_factory=list)
+    legs: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -1411,9 +1407,9 @@ class BacktestResult:
     max_loss: float
     avg_holding_days: float
     profit_factor: float
-    trades: List[BacktestTrade]
+    trades: list[BacktestTrade]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "total_trades": self.total_trades,
             "winning_trades": self.winning_trades,
@@ -1442,7 +1438,7 @@ class OptionsBacktestEngine:
 
     def backtest_covered_call(
         self,
-        price_series: List[Dict[str, Any]],
+        price_series: list[dict[str, Any]],
         strike_pct: float = 1.05,  # %5 OTM
         premium_pct: float = 0.02,  # Spot'un %2'si premium
         holding_days: int = 30,
@@ -1501,7 +1497,7 @@ class OptionsBacktestEngine:
 
     def backtest_iron_condor(
         self,
-        price_series: List[Dict[str, Any]],
+        price_series: list[dict[str, Any]],
         width_pct: float = 0.05,  # %5 spread width
         premium_pct: float = 0.015,  # %1.5 net credit
         holding_days: int = 30,
@@ -1574,7 +1570,7 @@ class OptionsBacktestEngine:
 
         return self._summarize_trades(trades)
 
-    def _summarize_trades(self, trades: List[BacktestTrade]) -> BacktestResult:
+    def _summarize_trades(self, trades: list[BacktestTrade]) -> BacktestResult:
         """İşlemleri özetle (vektörize)."""
         if not trades:
             return BacktestResult(

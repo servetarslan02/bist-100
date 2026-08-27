@@ -4,13 +4,10 @@ Portfolio Manager v2.0 — Kurumsal Muhasebe Testleri
 """
 
 import sys
-import os
 
-import numpy as np
-from datetime import datetime, timezone
 from services.portfolio.portfolio_manager import (
-    PortfolioManager, Position, Trade, CommissionModel,
-    CashLedgerEntry, EquitySnapshot, PositionHistoryEntry,
+    CommissionModel,
+    PortfolioManager,
 )
 
 
@@ -155,7 +152,7 @@ def test_realized_pnl():
 
     # Al: 100 adet @ 250, komisyon 50
     pm.open_position("THYAO", "LONG", 100, 250.0, commission=50)
-    cost_basis = 100 * 250 + 50  # 25050
+    100 * 250 + 50  # 25050
 
     # Sat: 100 adet @ 270, komisyon 50
     result = pm.close_position("THYAO", 270.0, commission=50)
@@ -346,7 +343,7 @@ def main():
         print(f"\n{icon} {name}")
         if passed:
             total_pass += 1
-            print(f"   PASSED")
+            print("   PASSED")
         else:
             total_fail += 1
             for issue in issues:
@@ -356,7 +353,7 @@ def main():
     print(f"\n{'=' * 60}")
     print(f"SONUÇ: {total_pass}/{total_pass + total_fail} geçti")
     if all_issues:
-        print(f"\nTÜM HATALAR:")
+        print("\nTÜM HATALAR:")
         for i, issue in enumerate(all_issues, 1):
             print(f"  {i}. {issue}")
     print("=" * 60)

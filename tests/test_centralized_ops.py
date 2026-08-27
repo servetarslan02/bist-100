@@ -10,18 +10,18 @@ Kapsam:
 - Old key token rejection
 """
 
-import sys
-import os
-import orjson
 import asyncio
-import time
-import duckdb
+import os
+import sys
 import tempfile
+import time
 
-from services.core.alert_policy import AlertPolicy, SilenceRule, FALLBACK_ESCALATION_TIMEOUT_S
-from services.core.alerting import AlertingSystem, AlertType
+import duckdb
+import orjson
+
+from services.core.alert_policy import AlertPolicy
+from services.core.alerting import AlertingSystem
 from services.core.monitoring_security import JWTProvider
-
 
 # =====================================================
 # POLICY MANAGEMENT TESTS
@@ -227,7 +227,7 @@ async def test_silence_db_persist():
     db.commit()
 
     policy = AlertPolicy()
-    rule = policy.add_silence(
+    policy.add_silence(
         alert_type="test", duration_s=3600,
         reason="maintenance", created_by="admin", db=db,
     )

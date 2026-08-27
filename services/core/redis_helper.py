@@ -1,7 +1,8 @@
-import orjson
 import os
 import tempfile
-from typing import Optional, Any
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -13,7 +14,7 @@ _CACHE_FILE = os.path.join(tempfile.gettempdir(), "alpha_bist_cache.json")
 def _load_cache():
     if os.path.exists(_CACHE_FILE):
         try:
-            with open(_CACHE_FILE, "r") as f:
+            with open(_CACHE_FILE) as f:
                 return orjson.loads(f.read())
         except Exception:
             logger.warning("Caught Exception in _load_cache", exc_info=True)
@@ -46,7 +47,7 @@ def get_client():
         _redis_available = False
         return None
 
-def get_cached(key: str) -> Optional[Any]:
+def get_cached(key: str) -> Any | None:
     r = get_client()
     if r is None:
         cache = _load_cache()

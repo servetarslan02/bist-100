@@ -17,10 +17,11 @@ Referanslar:
 - "Trading and Exchanges" (Harris, 2003)
 """
 
-import numpy as np
-from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -219,7 +220,7 @@ class MarketImpactModel:
         avg_daily_volume: int,
         volatility: float,
         price: float,
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """
         Market impact tahmini.
 
@@ -256,10 +257,10 @@ class TransactionCostEngine:
 
     def __init__(
         self,
-        fee_structure: Optional[BISTFeeStructure] = None,
-        spread_model: Optional[SpreadModel] = None,
-        slippage_model: Optional[SlippageModel] = None,
-        impact_model: Optional[MarketImpactModel] = None,
+        fee_structure: BISTFeeStructure | None = None,
+        spread_model: SpreadModel | None = None,
+        slippage_model: SlippageModel | None = None,
+        impact_model: MarketImpactModel | None = None,
     ):
         self.fees = fee_structure or BISTFeeStructure()
         self.spread = spread_model or SpreadModel()
@@ -269,7 +270,7 @@ class TransactionCostEngine:
     def classify_liquidity(
         self,
         avg_daily_volume: float,
-        market_cap: Optional[float] = None,
+        market_cap: float | None = None,
     ) -> LiquidityTier:
         """
         Hisseyi likidite katmanına sınıflandır.
@@ -299,9 +300,9 @@ class TransactionCostEngine:
         avg_daily_volume: float = 0,
         volatility_ratio: float = 1.0,
         volume_ratio: float = 1.0,
-        market_cap: Optional[float] = None,
+        market_cap: float | None = None,
         **kwargs,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Toplam işlem maliyeti hesapla.
 
@@ -427,7 +428,7 @@ class TransactionCostEngine:
         quantity: int,
         avg_daily_volume: float = 0,
         volatility_ratio: float = 1.0,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Al-sat (round trip) maliyet tahmini.
 

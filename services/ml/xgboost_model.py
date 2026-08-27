@@ -5,11 +5,11 @@ walk-forward entegrasyonu, SHAP feature importance, regime-aware training,
 overfitting detection, feature interaction.
 """
 import os
-import pickle
-import numpy as np
-from typing import Dict, Any, Optional, List, Tuple
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -33,10 +33,10 @@ class XGBoostConfig:
     verbose: int = 0
     random_state: int = 42
     # Multi-horizon
-    target_horizons: List[int] = field(default_factory=lambda: [1, 5, 20, 60])
+    target_horizons: list[int] = field(default_factory=lambda: [1, 5, 20, 60])
     # Regime-aware
     regime_aware: bool = False
-    regime_weights: Dict[str, float] = field(default_factory=lambda: {
+    regime_weights: dict[str, float] = field(default_factory=lambda: {
         "BULL": 1.0, "BEAR": 1.0, "SIDEWAYS": 1.0, "HIGH_VOL": 1.0
     })
     # Custom loss
@@ -54,7 +54,7 @@ class XGBoostAdjustedLoss:
     def __init__(self, penalty: float = 11.0):
         self.penalty = penalty
 
-    def __call__(self, preds: np.ndarray, dtrain) -> Tuple[np.ndarray, np.ndarray]:
+    def __call__(self, preds: np.ndarray, dtrain) -> tuple[np.ndarray, np.ndarray]:
         """XGBoost custom objective interface.
 
         Args:
@@ -93,24 +93,24 @@ class XGBoostModel:
     - Feature importance: gain, cover, weight
     """
 
-    def __init__(self, config: Optional[XGBoostConfig] = None):
+    def __init__(self, config: XGBoostConfig | None = None):
         self._config = config or XGBoostConfig()
-        self._models: Dict[int, Any] = {}  # horizon → model
+        self._models: dict[int, Any] = {}  # horizon → model
         self._feature_names = None
-        self._training_metrics: Dict[str, Any] = {}
+        self._training_metrics: dict[str, Any] = {}
         self._shap_values = None
-        self._feature_importance_cache: Dict[str, Dict[str, float]] = {}
+        self._feature_importance_cache: dict[str, dict[str, float]] = {}
 
     def train(
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-        feature_names: Optional[List[str]] = None,
-        sample_weights: Optional[np.ndarray] = None,
+        X_val: np.ndarray | None = None,
+        y_val: np.ndarray | None = None,
+        feature_names: list[str] | None = None,
+        sample_weights: np.ndarray | None = None,
         horizon: int = 5,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """XGBoost model eğit.
 
         Args:
@@ -215,11 +215,11 @@ class XGBoostModel:
     def train_multi_horizon(
         self,
         X_train: np.ndarray,
-        y_train_dict: Dict[int, np.ndarray],
-        X_val: Optional[np.ndarray] = None,
-        y_val_dict: Optional[Dict[int, np.ndarray]] = None,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[int, Dict[str, Any]]:
+        y_train_dict: dict[int, np.ndarray],
+        X_val: np.ndarray | None = None,
+        y_val_dict: dict[int, np.ndarray] | None = None,
+        feature_names: list[str] | None = None,
+    ) -> dict[int, dict[str, Any]]:
         """Multi-horizon eğitim."""
         all_metrics = {}
         for horizon in sorted(y_train_dict.keys()):
@@ -259,15 +259,15 @@ class XGBoostModel:
         except Exception:
             return np.zeros(len(X))
 
-    def predict_all_horizons(self, X: np.ndarray) -> Dict[int, np.ndarray]:
+    def predict_all_horizons(self, X: np.ndarray) -> dict[int, np.ndarray]:
         """Tüm horizon'lar için tahmin."""
-        return {h: self.predict(X, h) for h in self._models.keys()}
+        return {h: self.predict(X, h) for h in self._models}
 
     def feature_importance(
         self,
         importance_type: str = "gain",
         horizon: int = 5,
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """Feature importance döndür.
 
         Args:
@@ -298,12 +298,12 @@ class XGBoostModel:
             else:
                 importance = model.feature_importances_
                 if self._feature_names:
-                    return dict(zip(self._feature_names, importance.tolist()))
+                    return dict(zip(self._feature_names, importance.tolist(), strict=False))
                 return {f"f{i}": float(v) for i, v in enumerate(importance)}
         except Exception:
             return None
 
-    def shap_values(self, X: np.ndarray) -> Optional[np.ndarray]:
+    def shap_values(self, X: np.ndarray) -> np.ndarray | None:
         """SHAP values hesapla."""
         model = self._models.get(5)  # Default horizon
         if model is None:
@@ -364,11 +364,11 @@ class XGBoostModel:
         self,
         X_train: np.ndarray,
         y_train: np.ndarray,
-        X_val: Optional[np.ndarray],
-        y_val: Optional[np.ndarray],
+        X_val: np.ndarray | None,
+        y_val: np.ndarray | None,
         horizon: int,
         is_classifier: bool,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Training metrics hesapla."""
         model = self._models.get(horizon)
         metrics = {
@@ -392,14 +392,14 @@ class XGBoostModel:
             val_pred = self.predict(X_val, horizon)
 
             if is_classifier:
-                from sklearn.metrics import roc_auc_score, accuracy_score
+                from sklearn.metrics import accuracy_score, roc_auc_score
                 try:
                     metrics["val_auc"] = round(float(roc_auc_score(y_val, val_pred)), 4)
                     metrics["val_accuracy"] = round(float(accuracy_score(y_val, (val_pred > 0.5).astype(int))), 4)
                 except Exception as e:
                     logger.debug("Handled exception", error=str(e), context="xgboost_model.py:399")
             else:
-                from sklearn.metrics import mean_squared_error, mean_absolute_error
+                from sklearn.metrics import mean_absolute_error, mean_squared_error
                 try:
                     metrics["val_rmse"] = round(float(np.sqrt(mean_squared_error(y_val, val_pred))), 6)
                     metrics["val_mae"] = round(float(mean_absolute_error(y_val, val_pred)), 6)
@@ -415,7 +415,7 @@ class XGBoostModel:
 
         return metrics
 
-    def _compute_shap(self, X: np.ndarray, feature_names: Optional[List[str]]):
+    def _compute_shap(self, X: np.ndarray, feature_names: list[str] | None):
         """SHAP values hesapla ve cache'le."""
         model = self._models.get(5)
         if model is None:
@@ -434,7 +434,7 @@ class XGBoostModel:
 
             mean_shap = np.mean(np.abs(shap_values), axis=0)
             if feature_names and len(feature_names) == len(mean_shap):
-                self._shap_values = dict(zip(feature_names, mean_shap.tolist()))
+                self._shap_values = dict(zip(feature_names, mean_shap.tolist(), strict=False))
             else:
                 self._shap_values = {f"f{i}": float(v) for i, v in enumerate(mean_shap)}
         except ImportError:
@@ -442,7 +442,7 @@ class XGBoostModel:
         except Exception as e:
             logger.debug("xgboost_shap_failed", error=str(e))
 
-    def _cache_feature_importance(self, horizon: int, feature_names: Optional[List[str]]):
+    def _cache_feature_importance(self, horizon: int, feature_names: list[str] | None):
         """Feature importance cache'le (gain, cover, weight)."""
         model = self._models.get(horizon)
         if model is None:
@@ -456,7 +456,7 @@ class XGBoostModel:
             except Exception as e:
                 logger.debug("Handled exception", error=str(e), context="xgboost_model.py:456")
 
-    def _check_overfitting(self, metrics: Dict[str, Any], horizon: int):
+    def _check_overfitting(self, metrics: dict[str, Any], horizon: int):
         """Overfitting kontrolü."""
         if "val_ic" in metrics:
             ic = metrics["val_ic"]
@@ -482,7 +482,7 @@ class XGBoostModel:
                 "feature_names": self._feature_names,
                 "shap_values": self._shap_values,
                 "feature_importance_cache": self._feature_importance_cache,
-                "saved_at": datetime.now(timezone.utc).isoformat(),
+                "saved_at": datetime.now(UTC).isoformat(),
             }, path)
             return True
         except Exception as e:
@@ -510,9 +510,9 @@ class XGBoostModel:
         return len(self._models) > 0
 
     @property
-    def trained_horizons(self) -> List[int]:
+    def trained_horizons(self) -> list[int]:
         return sorted(self._models.keys())
 
     @property
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return self._training_metrics

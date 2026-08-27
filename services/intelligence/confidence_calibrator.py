@@ -14,11 +14,11 @@ Kullanım:
     report = calibrator.calibrate()
 """
 
-import numpy as np
-from typing import Dict, List, Optional
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -38,13 +38,13 @@ class CalibrationBin:
 class CalibrationReport:
     """Kalibrasyon raporu."""
     brier_score: float
-    bins: List[CalibrationBin]
+    bins: list[CalibrationBin]
     overconfident: bool
     overconfidence_magnitude: float  # Ne kadar overconfident
     n_samples: int
     recommended_adjustment: float    # Confidence çarpanı
     regime: str = "ALL"
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -54,7 +54,7 @@ class Observation:
     actual_outcome: bool      # True = pozitif gerçekleşti
     regime: str = "UNKNOWN"
     ticker: str = ""
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class ConfidenceCalibrator:
@@ -87,18 +87,18 @@ class ConfidenceCalibrator:
 
     def add_batch(
         self,
-        predictions: List[float],
-        outcomes: List[bool],
-        regimes: Optional[List[str]] = None,
+        predictions: list[float],
+        outcomes: list[bool],
+        regimes: list[str] | None = None,
     ):
         """Toplu gözlem ekle."""
         if regimes is None:
             regimes = ["UNKNOWN"] * len(predictions)
 
-        for pred, outcome, regime in zip(predictions, outcomes, regimes):
+        for pred, outcome, regime in zip(predictions, outcomes, regimes, strict=False):
             self.add_observation(pred, outcome, regime)
 
-    def calibrate(self, regime: Optional[str] = None) -> CalibrationReport:
+    def calibrate(self, regime: str | None = None) -> CalibrationReport:
         """Kalibrasyon raporu üret.
 
         Args:
@@ -108,10 +108,7 @@ class ConfidenceCalibrator:
             CalibrationReport
         """
         # Filtrele
-        if regime:
-            obs = [o for o in self._observations if o.regime == regime]
-        else:
-            obs = self._observations
+        obs = [o for o in self._observations if o.regime == regime] if regime else self._observations
 
         if len(obs) < self._min_samples:
             return CalibrationReport(
@@ -181,12 +178,9 @@ class ConfidenceCalibrator:
         adjusted = raw_confidence * report.recommended_adjustment
         return max(0.0, min(1.0, adjusted))
 
-    def get_hit_rate(self, regime: Optional[str] = None, threshold: float = 0.5) -> float:
+    def get_hit_rate(self, regime: str | None = None, threshold: float = 0.5) -> float:
         """Hit rate: threshold üstü tahminlerin doğruluk oranı."""
-        if regime:
-            obs = [o for o in self._observations if o.regime == regime]
-        else:
-            obs = self._observations
+        obs = [o for o in self._observations if o.regime == regime] if regime else self._observations
 
         if not obs:
             return 0.0
@@ -198,7 +192,7 @@ class ConfidenceCalibrator:
         correct = sum(1 for o in high_conf if o.actual_outcome)
         return round(correct / len(high_conf), 4)
 
-    def get_regime_calibration(self) -> Dict[str, Dict]:
+    def get_regime_calibration(self) -> dict[str, dict]:
         """Rejim bazlı kalibrasyon."""
         regimes = set(o.regime for o in self._observations)
         result = {}
@@ -213,7 +207,7 @@ class ConfidenceCalibrator:
                 }
         return result
 
-    def get_stats(self) -> Dict:
+    def get_stats(self) -> dict:
         """İstatistikler."""
         return {
             "total_observations": len(self._observations),

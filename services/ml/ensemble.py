@@ -3,8 +3,10 @@
 Ağırlıklı ortalama + stacking ensemble desteği.
 Eski weighted average korunurken, stacking_ensemble.py ile entegrasyon eklendi.
 """
+from collections.abc import Callable
+from typing import Any
+
 import numpy as np
-from typing import Dict, Callable, Optional, Any
 import structlog
 
 logger = structlog.get_logger()
@@ -20,8 +22,8 @@ class EnsembleModel:
 
     def predict(
         self,
-        models: Dict[str, Callable],
-        weights: Dict[str, float],
+        models: dict[str, Callable],
+        weights: dict[str, float],
         X: np.ndarray,
     ) -> np.ndarray:
         """Ağırlıklı ensemble prediction.
@@ -51,8 +53,8 @@ class EnsembleModel:
 
     def predict_with_confidence(
         self,
-        models: Dict[str, Callable],
-        weights: Dict[str, float],
+        models: dict[str, Callable],
+        weights: dict[str, float],
         X: np.ndarray,
     ) -> tuple:
         """Ensemble prediction + confidence (model agreement).
@@ -108,10 +110,10 @@ class EnsembleModel:
 
     def predict_dynamic(
         self,
-        models: Dict[str, Callable],
+        models: dict[str, Callable],
         X: np.ndarray,
         regime: str = "NORMAL",
-        regime_weights: Optional[Dict[str, Dict[str, float]]] = None,
+        regime_weights: dict[str, dict[str, float]] | None = None,
     ) -> np.ndarray:
         """Rejime göre dinamik ağırlıklı ensemble.
 

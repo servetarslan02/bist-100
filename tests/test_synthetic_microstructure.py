@@ -3,13 +3,9 @@ ALPHA BIST — Synthetic Microstructure & Multi-Scenario Liquidity Tests
 """
 
 import unittest
-from datetime import datetime, timedelta, date
-from services.paper_trading.synthetic_liquidity import (
-    SyntheticLiquidityEstimator,
-    SyntheticOrderBookBuilder,
-    LiquidityScenario,
-    LiquidityRegime,
-)
+from datetime import date, timedelta
+
+from services.core.bist_tick_size import get_bist_tick_size
 from services.paper_trading.kap_market_restriction_registry import (
     KAPMarketRestrictionRegistry,
 )
@@ -17,7 +13,11 @@ from services.paper_trading.scenario_manager import (
     LiquidityScenarioManager,
     ScenarioResult,
 )
-from services.core.bist_tick_size import get_bist_tick_size
+from services.paper_trading.synthetic_liquidity import (
+    LiquidityScenario,
+    SyntheticLiquidityEstimator,
+    SyntheticOrderBookBuilder,
+)
 
 
 class TestSyntheticMicrostructure(unittest.TestCase):
@@ -193,8 +193,9 @@ class TestSyntheticMicrostructure(unittest.TestCase):
 
     def test_missing_bars_and_date_mismatch_failsafe(self):
         """Eksik bar veya tarih uyuşmazlığında sıfır sentetik varsayım ve kesin NO_TRADE testi."""
-        from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
         import polars as pl
+
+        from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 
         orch = PaperTradingOrchestrator(
             champion_version="LambdaRank_v3_LOCKED",
@@ -218,7 +219,7 @@ class TestSyntheticMicrostructure(unittest.TestCase):
         self.assertTrue(any("INSUFFICIENT_HISTORICAL_BARS" in a.get("reason", "") for a in audit_log))
 
         # 2. DataFrame'de tarih bulunamadığında asla iloc[-1] (geleceğe bakış) kullanılmaz -> Kesin NO_TRADE
-        dates = pl.date_range(date(2024, 1, 10), date(2024, 1, 10) + timedelta(days=10), timedelta(days=1), eager=True).head(5)
+        pl.date_range(date(2024, 1, 10), date(2024, 1, 10) + timedelta(days=10), timedelta(days=1), eager=True).head(5)
         df = pl.DataFrame({
             'Open': [100]*5, 'High': [102]*5, 'Low': [98]*5, 'Close': [101]*5, 'Volume': [1000000]*5
         })
@@ -233,10 +234,10 @@ class TestSyntheticMicrostructure(unittest.TestCase):
     def test_exclusive_kap_registry_gross_settlement(self):
         """Brüt takasın yalnızca KAP kısıt sicilinden teyit edilmesi testi."""
         from services.paper_trading.kap_market_restriction_registry import kap_restriction_registry
-        
+
         # Sinyalde is_gross_settlement=True gelse bile KAP sicilinde yoksa brüt takas uygulanmaz
         self.assertFalse(kap_restriction_registry.is_gross_settlement("KCHOL", "2024-01-01"))
-        
+
         # KAP siciline tescil edildiğinde devreye girer
         kap_restriction_registry.register_restriction(
             ticker="KCHOL",

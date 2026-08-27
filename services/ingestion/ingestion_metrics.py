@@ -8,7 +8,7 @@ Grafana dashboard'u bu metriklerden beslenir.
 """
 
 try:
-    from prometheus_client import Counter, Histogram, Gauge
+    from prometheus_client import Counter, Gauge, Histogram
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
@@ -16,6 +16,7 @@ except ImportError:
 
 import time
 from contextlib import contextmanager
+
 import structlog
 
 logger = structlog.get_logger()

@@ -3,9 +3,11 @@
 IC, Precision@K, Hit Rate, Sharpe Ratio, Max Drawdown, Calibration Score.
 Faz 2 gereksinimleri: kapsamlı model karşılaştırma.
 """
-import numpy as np
-from typing import Dict, Any, List, Callable, Optional
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +28,7 @@ class ModelResult:
     max_drawdown: float = 0.0     # Maksimum düşüş
     calibration_score: float = 0.0 # Brier score (düşük = iyi)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "accuracy": round(self.accuracy, 4),
@@ -69,12 +71,12 @@ class ModelComparator:
 
     def compare(
         self,
-        models: Dict[str, Callable],
+        models: dict[str, Callable],
         X_test: np.ndarray,
         y_test: np.ndarray,
-        returns: Optional[np.ndarray] = None,
-        y_prob: Optional[Dict[str, np.ndarray]] = None,
-    ) -> List[ModelResult]:
+        returns: np.ndarray | None = None,
+        y_prob: dict[str, np.ndarray] | None = None,
+    ) -> list[ModelResult]:
         """Modelleri kapsamlı karşılaştır.
 
         Args:
@@ -113,8 +115,8 @@ class ModelComparator:
         name: str,
         preds: np.ndarray,
         y_test: np.ndarray,
-        returns: Optional[np.ndarray] = None,
-        probabilities: Optional[np.ndarray] = None,
+        returns: np.ndarray | None = None,
+        probabilities: np.ndarray | None = None,
     ) -> ModelResult:
         """Tek bir modeli değerlendir."""
 

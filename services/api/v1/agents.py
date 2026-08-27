@@ -1,7 +1,9 @@
 """Agents API — Gerçek servislere bağlı."""
 
 from fastapi import APIRouter, Depends
-from ..dependencies import get_current_user, check_rate_limit
+
+from ..dependencies import check_rate_limit, get_current_user
+
 router = APIRouter()
 
 

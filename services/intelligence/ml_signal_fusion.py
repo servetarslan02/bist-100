@@ -12,10 +12,11 @@ Kullanım:
     result = fusion.fuse(ticker, signals, regime="BULL", historical_data=...)
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Tuple, Any
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -28,12 +29,12 @@ class MLFusedSignal:
     regime: str
 
     # Bileşen skorları
-    component_scores: Dict[str, float] = field(default_factory=dict)
-    component_directions: Dict[str, str] = field(default_factory=dict)
+    component_scores: dict[str, float] = field(default_factory=dict)
+    component_directions: dict[str, str] = field(default_factory=dict)
 
     # Optimized ağırlıklar
-    optimized_weights: Dict[str, float] = field(default_factory=dict)
-    default_weights: Dict[str, float] = field(default_factory=dict)
+    optimized_weights: dict[str, float] = field(default_factory=dict)
+    default_weights: dict[str, float] = field(default_factory=dict)
 
     # Sonuç
     fused_score: float = 50.0
@@ -42,16 +43,16 @@ class MLFusedSignal:
 
     # Çelişki
     has_conflict: bool = False
-    conflict_details: List[str] = field(default_factory=list)
+    conflict_details: list[str] = field(default_factory=list)
 
     # Self-check
     self_check_passed: bool = True
-    self_check_warnings: List[str] = field(default_factory=list)
+    self_check_warnings: list[str] = field(default_factory=list)
 
     # Metadata
     weights_source: str = "default"  # "default", "optimized", "regime_override"
     n_models_used: int = 0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 class MLSignalFusion:
@@ -91,16 +92,16 @@ class MLSignalFusion:
     }
 
     def __init__(self):
-        self._optimized_weights: Dict[str, Dict[str, float]] = {}  # regime → weights
-        self._weight_history: List[Dict] = []
+        self._optimized_weights: dict[str, dict[str, float]] = {}  # regime → weights
+        self._weight_history: list[dict] = []
 
     def fuse(
         self,
         ticker: str,
-        signals: Dict[str, Dict[str, Any]],
+        signals: dict[str, dict[str, Any]],
         regime: str = "UNKNOWN",
-        historical_signals: Optional[List[Dict]] = None,
-        historical_outcomes: Optional[List[float]] = None,
+        historical_signals: list[dict] | None = None,
+        historical_outcomes: list[float] | None = None,
     ) -> MLFusedSignal:
         """
         ML-optimized sinyal birleştirme.
@@ -173,9 +174,9 @@ class MLSignalFusion:
     def _determine_weights(
         self,
         regime: str,
-        historical_signals: Optional[List[Dict]],
-        historical_outcomes: Optional[List[float]],
-    ) -> Dict[str, float]:
+        historical_signals: list[dict] | None,
+        historical_outcomes: list[float] | None,
+    ) -> dict[str, float]:
         """Ağırlıkları belirle (SHAP > regime override > default)."""
 
         # 1. SHAP-optimized weights (en iyi)
@@ -199,10 +200,10 @@ class MLSignalFusion:
 
     def _optimize_weights_shap(
         self,
-        historical_signals: List[Dict],
-        historical_outcomes: List[float],
+        historical_signals: list[dict],
+        historical_outcomes: list[float],
         regime: str,
-    ) -> Optional[Dict[str, float]]:
+    ) -> dict[str, float] | None:
         """SHAP importance ile optimal ağırlıkları bul."""
         try:
             from sklearn.ensemble import GradientBoostingRegressor
@@ -240,7 +241,7 @@ class MLSignalFusion:
             if total > 0:
                 weights = {
                     comp: float(imp / total)
-                    for comp, imp in zip(self.COMPONENTS, importance)
+                    for comp, imp in zip(self.COMPONENTS, importance, strict=False)
                 }
             else:
                 return None
@@ -251,7 +252,7 @@ class MLSignalFusion:
                 "regime": regime,
                 "weights": weights,
                 "n_samples": len(X),
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             })
             if len(self._weight_history) > 1000:
                 self._weight_history = self._weight_history[-1000:]
@@ -270,7 +271,7 @@ class MLSignalFusion:
             logger.warning("SHAP optimization failed", error=str(e))
             return None
 
-    def _detect_conflicts(self, signals: Dict) -> Tuple[bool, List[str]]:
+    def _detect_conflicts(self, signals: dict) -> tuple[bool, list[str]]:
         """Çelişki tespiti."""
         conflicts = []
         directions = {}
@@ -287,7 +288,7 @@ class MLSignalFusion:
 
         return len(conflicts) > 0, conflicts
 
-    def _self_check(self, result: MLFusedSignal, signals: Dict) -> Tuple[bool, List[str]]:
+    def _self_check(self, result: MLFusedSignal, signals: dict) -> tuple[bool, list[str]]:
         """Self-check mekanizması."""
         warnings = []
 
@@ -310,11 +311,11 @@ class MLSignalFusion:
 
         return len(warnings) == 0, warnings
 
-    def get_optimized_weights(self, regime: str) -> Optional[Dict[str, float]]:
+    def get_optimized_weights(self, regime: str) -> dict[str, float] | None:
         """Optimize edilmiş ağırlıkları getir."""
         return self._optimized_weights.get(regime)
 
-    def get_weight_history(self) -> List[Dict]:
+    def get_weight_history(self) -> list[dict]:
         """Ağırlık optimizasyon geçmişi."""
         return self._weight_history
 

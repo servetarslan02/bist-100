@@ -8,14 +8,14 @@ Regime drift → Model decay → Retrain → OOS → Champion/Reject
 v2.0: SQLite tabanlı persistence — restart sonrası kaybolmaz
 """
 
-from typing import Dict, List, Optional
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from collections import deque
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+
 import structlog
 
-from services.learning.config.learning_config import learning_settings
 from services.core.state_store import state_store
+from services.learning.config.learning_config import learning_settings
 
 logger = structlog.get_logger()
 
@@ -33,13 +33,13 @@ class LearningState:
     accuracy_trend: float = 0.0  # Pozitif = iyileşiyor
 
     # Feature drift
-    drifted_features: List[str] = field(default_factory=list)
+    drifted_features: list[str] = field(default_factory=list)
 
     # Regime performance
-    regime_accuracy: Dict[str, float] = field(default_factory=dict)
+    regime_accuracy: dict[str, float] = field(default_factory=dict)
 
     # Retrain status
-    last_retrain: Optional[datetime] = None
+    last_retrain: datetime | None = None
     retrain_needed: bool = False
     retrain_reason: str = ""
 
@@ -118,7 +118,7 @@ class LearningLoop:
 
     def record_prediction(self, ticker: str, predicted_direction: str,
                          predicted_return: float, confidence: float,
-                         features: Dict, regime: str):
+                         features: dict, regime: str):
         """Tahmin kaydet."""
         self._prediction_history.append({
             "ticker": ticker,
@@ -127,7 +127,7 @@ class LearningLoop:
             "confidence": confidence,
             "features": features.copy(),
             "regime": regime,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._prediction_history) > 5000:
             self._prediction_history = self._prediction_history[-5000:]
@@ -213,7 +213,7 @@ class LearningLoop:
             self._state.retrain_needed = True
             self._state.retrain_reason = f"Accuracy trend declining: {self._state.accuracy_trend:.3f}"
 
-    def get_state(self) -> Dict:
+    def get_state(self) -> dict:
         """Öğrenme durumunu döndür."""
         return {
             "total_predictions": self._state.total_predictions,
@@ -230,7 +230,7 @@ class LearningLoop:
             "drifted_features": self._state.drifted_features,
         }
 
-    def get_worst_regimes(self) -> List[Dict]:
+    def get_worst_regimes(self) -> list[dict]:
         """En kötü performans gösteren rejimler."""
         results = []
         for regime, data in self._state.regime_accuracy.items():

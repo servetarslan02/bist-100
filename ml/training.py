@@ -3,19 +3,20 @@
 Purged walk-forward validation, gerçek label dataset, proper confidence.
 """
 
-import numpy as np
-import polars as pl
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta, timezone
-from dataclasses import dataclass, field
 import pickle
-import orjson
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
+
+import numpy as np
+import orjson
+import polars as pl
 import structlog
 
 # LabelGenerator entegrasyonu — gelişmiş label'lar için
 try:
-    from services.labels.generator import LabelGenerator, label_generator
+    from services.labels.generator import LabelGenerator, label_generator  # noqa: F401
     HAS_LABEL_GENERATOR = True
 except ImportError:
     HAS_LABEL_GENERATOR = False
@@ -28,7 +29,7 @@ class TrainingConfig:
     """ML training konfigürasyonu."""
     model_name: str
     target: str  # "return_5d", "return_20d", "direction_5d", etc.
-    feature_names: List[str]
+    feature_names: list[str]
     train_months: int = 12
     test_months: int = 1
     purge_days: int = 5
@@ -100,8 +101,8 @@ class MLTrainer:
     """ML model training with purged walk-forward validation."""
 
     def __init__(self):
-        self.models: Dict[str, Any] = {}
-        self.training_results: Dict[str, Dict] = {}
+        self.models: dict[str, Any] = {}
+        self.training_results: dict[str, dict] = {}
 
     def generate_labels(self, data: pl.DataFrame, label_name: str,
                         price_column: str = "close",
@@ -141,9 +142,9 @@ class MLTrainer:
 
         return data.with_columns(pl.Series(label_name, labels))
 
-    def prepare_dataset(self, data: pl.DataFrame, feature_names: List[str],
+    def prepare_dataset(self, data: pl.DataFrame, feature_names: list[str],
                         label_name: str, date_column: str = "timestamp"
-                        ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+                        ) -> tuple[np.ndarray, np.ndarray, list[str]]:
         """Training dataset hazırla — NaN temizle."""
         available_features = [f for f in feature_names if f in data.columns]
 
@@ -160,12 +161,12 @@ class MLTrainer:
         return X, y, available_features
 
     def train_with_walkforward(self, data: pl.DataFrame, config: TrainingConfig,
-                               date_column: str = "timestamp") -> Dict[str, Any]:
+                               date_column: str = "timestamp") -> dict[str, Any]:
         """
         Purged walk-forward validation ile model eğit.
         """
         import lightgbm as lgb
-        from sklearn.metrics import mean_squared_error, r2_score, accuracy_score
+        from sklearn.metrics import accuracy_score, mean_squared_error, r2_score
 
         # Generate labels (skip if already present)
         if config.target not in data.columns:
@@ -275,7 +276,7 @@ class MLTrainer:
                 metric_value = accuracy
             else:
                 y_pred = model.predict(X_test)
-                rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                np.sqrt(mean_squared_error(y_test, y_pred))
                 r2 = r2_score(y_test, y_pred)
                 metric_value = r2
 
@@ -367,7 +368,7 @@ class MLTrainer:
                 "features": feat_names,
                 "metrics": avg_metrics,
                 "confidence": confidence,
-                "training_date": datetime.now(timezone.utc).isoformat(),
+                "training_date": datetime.now(UTC).isoformat(),
             }, option=orjson.OPT_INDENT_2).decode())
 
         self.models[config.model_name] = final_model
@@ -386,11 +387,11 @@ class MLTrainer:
             "metrics": avg_metrics,
             "confidence": confidence,
             "splits": split_results,
-            "feature_importance": dict(zip(feat_names, final_model.feature_importances_.tolist())),
+            "feature_importance": dict(zip(feat_names, final_model.feature_importances_.tolist(), strict=False)),
         }
 
-    def _calculate_confidence(self, predictions: List[Dict],
-                              split_results: List[Dict]) -> float:
+    def _calculate_confidence(self, predictions: list[dict],
+                              split_results: list[dict]) -> float:
         """
         Model confidence — out-of-sample performance bazlı.
 

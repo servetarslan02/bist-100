@@ -14,10 +14,10 @@ Tier 5: Decision            → 3-5 → 0-3, risk kontrollü karar
 Haber/KAP/makro → herhangi bir hisseyi Tier 0'dan Tier 3'e atlayabilir.
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import numpy as np
 import structlog

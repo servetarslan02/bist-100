@@ -1,14 +1,15 @@
 """Event Study API — KAP ve Makro Olay Çalışması (100% Canlı Veri Akışı)."""
 
 import asyncio
-from datetime import datetime, timezone
-from typing import List, Dict, Any, Optional
+from datetime import UTC, datetime
+from typing import Any
+
 import numpy as np
+import structlog
 import yfinance as yf
 from fastapi import APIRouter, Depends, Query
-import structlog
 
-from ..dependencies import get_current_user, check_rate_limit
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -51,22 +52,22 @@ _EVENTS_CACHE = [
 ]
 _EVENTS_CACHE_TIME = 0.0
 
-async def _get_live_events(ticker: Optional[str] = None) -> List[Dict[str, Any]]:
+async def _get_live_events(ticker: str | None = None) -> list[dict[str, Any]]:
     """Canlı KAP, Finans Haberleri ve Makro takvim verilerini çeker."""
     global _EVENTS_CACHE, _EVENTS_CACHE_TIME
     import time
     now = time.time()
-    
+
     if not ticker and _EVENTS_CACHE and (now - _EVENTS_CACHE_TIME < 60):
         return _EVENTS_CACHE
 
     events = []
     try:
-        from ...ingestion.providers.news_provider import news_provider
         from ...ingestion.bist_universe import bist_universe
-        
+        from ...ingestion.providers.news_provider import news_provider
+
         tickers_set = set(bist_universe.get_tickers())
-        
+
         if ticker:
             news_items = await news_provider.fetch_news_for_ticker(ticker, max_items=25)
         else:
@@ -170,26 +171,26 @@ async def _get_live_events(ticker: Optional[str] = None) -> List[Dict[str, Any]]
 
             pub_epoch = item.get("published_epoch", 0.0)
             if pub_epoch > 0:
-                from datetime import timezone, timedelta
+                from datetime import timedelta, timezone
                 tr_tz = timezone(timedelta(hours=3))
-                pub_time = datetime.fromtimestamp(pub_epoch, tz=timezone.utc).astimezone(tr_tz).strftime("%d.%m %H:%M")
+                pub_time = datetime.fromtimestamp(pub_epoch, tz=UTC).astimezone(tr_tz).strftime("%d.%m %H:%M")
             else:
-                pub_time = item.get("published") or datetime.now(timezone.utc).strftime("%d.%m %H:%M")
+                pub_time = item.get("published") or datetime.now(UTC).strftime("%d.%m %H:%M")
 
             # Belirlenmiş tip varsa öncelikli kullan
             event_type = item.get("type")
             if not event_type:
                 text_check = f"{title} {item.get('summary', '')} {src}".lower()
                 macro_keywords = [
-                    "tcmb", "merkez bankası", "fed", "ecb", "faiz", "enflasyon", "tüik", 
-                    "ppk", "politika faizi", "rezerv", "cari", "hazine", "bütçe", "döviz", 
+                    "tcmb", "merkez bankası", "fed", "ecb", "faiz", "enflasyon", "tüik",
+                    "ppk", "politika faizi", "rezerv", "cari", "hazine", "bütçe", "döviz",
                     "dolar", "ihracat", "ithalat", "işsizlik", "istihdam", "büyüme", "gdp",
-                    "makro", "küresel piyasa", "wall street", "almanya", "brezilya", "ab'den", 
+                    "makro", "küresel piyasa", "wall street", "almanya", "brezilya", "ab'den",
                     "petrol", "hürmüz", "tahmin", "para politikası", "tüketici", "üretici"
                 ]
                 kap_keywords = [
-                    "kap", "bildirimi", "pay alım", "pay satım", "sermaye", "temettü", 
-                    "genel kurul", "finansal sonuç", "bilanço", "özel durum", "ihale", 
+                    "kap", "bildirimi", "pay alım", "pay satım", "sermaye", "temettü",
+                    "genel kurul", "finansal sonuç", "bilanço", "özel durum", "ihale",
                     "anlaşma", "sipariş", "şirket", "şirketler", "gong", "ortaklık", "satın alma"
                 ]
 
@@ -226,7 +227,7 @@ async def _get_live_events(ticker: Optional[str] = None) -> List[Dict[str, Any]]
 @router.get("/events")
 @router.get("/calendar")
 async def event_calendar(
-    ticker: Optional[str] = Query(default=None),
+    ticker: str | None = Query(default=None),
     user=Depends(get_current_user),
     _=Depends(check_rate_limit)
 ):
@@ -249,29 +250,26 @@ async def event_study(
     """Hisse bazlı gerçek kümülatif aşırı getiri (CAR/AAR) analizi."""
     try:
         sym = ticker.upper()
-        if not sym.endswith(".IS"):
-            sym_is = f"{sym}.IS"
-        else:
-            sym_is = sym
+        sym_is = f"{sym}.IS" if not sym.endswith(".IS") else sym
 
         data = yf.download([sym_is, "XU100.IS"], period="3mo", interval="1d", auto_adjust=True, progress=False)
         if not data.empty and 'Close' in data:
             stock_close = data['Close'][sym_is].dropna()
             bm_close = data['Close']['XU100.IS'].dropna()
-            
+
             if len(stock_close) >= 20 and len(bm_close) >= 20:
                 s_ret = stock_close.pct_change().dropna()
                 b_ret = bm_close.pct_change().dropna()
-                
+
                 # Excess returns
                 common_idx = s_ret.index.intersection(b_ret.index)
                 excess = s_ret.loc[common_idx] - b_ret.loc[common_idx]
-                
+
                 import math
                 car_val = float(excess.tail(10).sum())
                 t_stat = float(car_val / (excess.std() * np.sqrt(10) + 1e-9))
                 p_val = round(float(2 * (1 - 0.5 * (1 + math.erf(abs(t_stat) / np.sqrt(2))))), 3)
-                
+
                 return {
                     "ticker": ticker.upper(),
                     "event_type": event_type,

@@ -10,9 +10,9 @@ Modellerin geçmiş performansından dinamik güvenilirlik puanı (Reliability /
 """
 
 import math
-from typing import Dict, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import structlog
 
 from .model_performance_engine import PerformanceMetrics
@@ -34,7 +34,7 @@ class ModelTrustScore:
     regime_score: float
     statistical_significance_p: float
     recommended_fusion_weight: float
-    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 class ModelTrustEngine:
@@ -59,7 +59,7 @@ class ModelTrustEngine:
     ) -> ModelTrustScore:
         """Metriklerden dinamik güvenilirlik skoru hesaplar."""
         n = metrics.evaluated_samples
-        
+
         # 1. Örneklem Güven Çarpanı (Shrinkage Factor)
         # N=0 ise 0.0, N=30 ise ~0.63, N=100 ise ~0.96
         k_samples = float(self.min_samples_threshold)
@@ -125,8 +125,8 @@ class ModelTrustEngine:
 
     def calculate_ensemble_weights(
         self,
-        trust_scores: List[ModelTrustScore],
-    ) -> Dict[str, float]:
+        trust_scores: list[ModelTrustScore],
+    ) -> dict[str, float]:
         """Tüm modellerin trust skorlarını normalize ederek nihai Signal Fusion ağırlıklarını üretir."""
         if not trust_scores:
             return {}

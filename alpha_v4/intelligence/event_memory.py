@@ -5,8 +5,9 @@ produce trading signals; it only preserves what happened and what is known.
 """
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from hashlib import sha256
+
 import orjson
 
 
@@ -33,7 +34,7 @@ class EventObservation:
     def validate(self) -> None:
         if not self.evidence_id:
             raise ValueError("event requires evidence")
-        if self.observed_at.tzinfo != timezone.utc:
+        if self.observed_at.tzinfo != UTC:
             raise ValueError("observed_at must be UTC")
         if self.effective_at > self.observed_at:
             raise ValueError("future information cannot be effective before observation")

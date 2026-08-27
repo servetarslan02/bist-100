@@ -1,10 +1,12 @@
 """ALPHA BIST - TCMB EVDS (Electronic Data Distribution System) Provider"""
 
 import os
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
 import structlog
+
 from ...core.async_http import get_client
-from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
 
 logger = structlog.get_logger()
 
@@ -67,14 +69,14 @@ class TCMBProvider:
         # Gerçek veri BIST provider'dan (bist_provider.py) gelmeli.
     }
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         import os
         self.api_key = api_key or os.getenv("TCMB_API_KEY") or os.getenv("EVDS_API_KEY")
         self._client = get_client("tcmb", timeout=10.0, max_retries=2)
         self._warned_no_key = False
         self.baseline_values = _load_baseline_config()
 
-    async def _make_request(self, series_code: str, start_date: str, end_date: str) -> Optional[List[Dict]]:
+    async def _make_request(self, series_code: str, start_date: str, end_date: str) -> list[dict] | None:
         """Make a request to TCMB EVDS API."""
         if not self.api_key:
             if not self._warned_no_key:
@@ -95,36 +97,36 @@ class TCMBProvider:
             logger.error("TCMB EVDS request failed", series=series_code, error=str(e))
             return None
 
-    async def fetch_usd_try(self, days: int = 30) -> Optional[List[Dict]]:
+    async def fetch_usd_try(self, days: int = 30) -> list[dict] | None:
         """Fetch USD/TRY exchange rate."""
-        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(UTC).strftime("%d-%m-%Y")
+        start_date = (datetime.now(UTC) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["usd_try"], start_date, end_date)
 
-    async def fetch_policy_rate(self, days: int = 365) -> Optional[List[Dict]]:
+    async def fetch_policy_rate(self, days: int = 365) -> list[dict] | None:
         """Fetch CBRT policy rate."""
-        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(UTC).strftime("%d-%m-%Y")
+        start_date = (datetime.now(UTC) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["policy_rate"], start_date, end_date)
 
-    async def fetch_inflation(self, days: int = 365) -> Optional[List[Dict]]:
+    async def fetch_inflation(self, days: int = 365) -> list[dict] | None:
         """Fetch CPI data."""
-        end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-        start_date = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%d-%m-%Y")
+        end_date = datetime.now(UTC).strftime("%d-%m-%Y")
+        start_date = (datetime.now(UTC) - timedelta(days=days)).strftime("%d-%m-%Y")
         return await self._make_request(self.SERIES["cpi"], start_date, end_date)
 
-    async def fetch_all_macro(self) -> Dict[str, Any]:
+    async def fetch_all_macro(self) -> dict[str, Any]:
         """Fetch all key macro indicators (with canonical baseline fallback)."""
         result = {}
-        now_str = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_str = datetime.now(UTC).strftime("%d-%m-%Y")
+        now_iso = datetime.now(UTC).isoformat()
 
         baseline_values = self.baseline_values
 
         for name, series in self.SERIES.items():
             try:
-                end_date = datetime.now(timezone.utc).strftime("%d-%m-%Y")
-                start_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%d-%m-%Y")
+                end_date = datetime.now(UTC).strftime("%d-%m-%Y")
+                start_date = (datetime.now(UTC) - timedelta(days=30)).strftime("%d-%m-%Y")
                 data = await self._make_request(series, start_date, end_date)
 
                 if data and len(data) > 0:

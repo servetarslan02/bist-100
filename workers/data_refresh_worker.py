@@ -4,8 +4,9 @@ ALPHA BIST — Data Refresh Worker
 Piyasa verilerini güncelleyen worker.
 """
 
-from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -16,10 +17,10 @@ class DataRefreshWorker:
     """Piyasa verisi yenileme worker'ı."""
 
     def __init__(self):
-        self._last_refresh: Optional[str] = None
+        self._last_refresh: str | None = None
         self._refresh_count: int = 0
 
-    def refresh_market_data(self) -> Dict[str, Any]:
+    def refresh_market_data(self) -> dict[str, Any]:
         """BIST-100 piyasa verilerini yenile."""
         result = {"timestamp": datetime.now(_TZ_ISTANBUL).isoformat()}
 
@@ -43,7 +44,7 @@ class DataRefreshWorker:
 
         return result
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         return {"last_refresh": self._last_refresh, "refresh_count": self._refresh_count}
 
 

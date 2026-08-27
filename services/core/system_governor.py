@@ -16,16 +16,18 @@ Referanslar:
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any, Callable, Set
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class SystemState(str, Enum):
+class SystemState(StrEnum):
     """Sistem durumları."""
     FULL = "FULL"                    # Tüm özellikler aktif
     DEGRADED = "DEGRADED"           # Kritik olmayan özellikler devre dışı
@@ -34,7 +36,7 @@ class SystemState(str, Enum):
     SHUTDOWN = "SHUTDOWN"           # Kapatılıyor
 
 
-class FeatureFlag(str, Enum):
+class FeatureFlag(StrEnum):
     """Feature flag'ler."""
     LIVE_TRADING = "live_trading"
     NEW_POSITIONS = "new_positions"
@@ -57,7 +59,7 @@ class StateTransition:
     timestamp: datetime
     triggered_by: str  # manual, auto, health_check
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "from": self.from_state.value,
             "to": self.to_state.value,
@@ -73,8 +75,8 @@ class HealthCheck:
     component: str
     is_healthy: bool
     latency_ms: float
-    error: Optional[str] = None
-    details: Dict[str, Any] = field(default_factory=dict)
+    error: str | None = None
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class SystemStateGovernor:
@@ -100,17 +102,17 @@ class SystemStateGovernor:
 
     def __init__(self):
         self._state = SystemState.FULL
-        self._feature_flags: Dict[FeatureFlag, bool] = {f: True for f in FeatureFlag}
-        self._transition_history: List[StateTransition] = []
-        self._health_checks: Dict[str, Callable] = {}
-        self._health_results: Dict[str, HealthCheck] = {}
-        self._callbacks: List[Callable] = []
+        self._feature_flags: dict[FeatureFlag, bool] = {f: True for f in FeatureFlag}
+        self._transition_history: list[StateTransition] = []
+        self._health_checks: dict[str, Callable] = {}
+        self._health_results: dict[str, HealthCheck] = {}
+        self._callbacks: list[Callable] = []
         self._auto_recovery_enabled = True
         self._degradation_threshold = 0.5  # %50 unhealthy → DEGRADED
         self._readonly_threshold = 0.75    # %75 unhealthy → READ_ONLY
 
         # State-specific feature overrides
-        self._state_features: Dict[SystemState, Set[FeatureFlag]] = {
+        self._state_features: dict[SystemState, set[FeatureFlag]] = {
             SystemState.FULL: set(),  # No restrictions
             SystemState.DEGRADED: {
                 FeatureFlag.ALTERNATIVE_DATA,
@@ -180,7 +182,7 @@ class SystemStateGovernor:
             from_state=old_state,
             to_state=new_state,
             reason=reason,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             triggered_by=triggered_by,
         )
         self._transition_history.append(transition)
@@ -224,7 +226,7 @@ class SystemStateGovernor:
         if len(self._callbacks) > 100:
             self._callbacks = self._callbacks[-100:]
 
-    async def run_health_checks(self) -> Dict[str, HealthCheck]:
+    async def run_health_checks(self) -> dict[str, HealthCheck]:
         """
         Tüm sağlık kontrollerini çalıştır.
 
@@ -265,7 +267,7 @@ class SystemStateGovernor:
 
         return results
 
-    def _auto_degrade_or_recover(self, results: Dict[str, HealthCheck]):
+    def _auto_degrade_or_recover(self, results: dict[str, HealthCheck]):
         """Otomatik degradation veya recovery."""
         if not results:
             return
@@ -312,7 +314,7 @@ class SystemStateGovernor:
             except Exception as e:
                 logger.error("State change callback error", error=str(e))
 
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> dict[str, Any]:
         """Sistem durumu özeti."""
         return {
             "state": self._state.value,
@@ -332,7 +334,7 @@ class SystemStateGovernor:
             "transitions": len(self._transition_history),
         }
 
-    def get_transition_history(self, limit: int = 20) -> List[Dict[str, Any]]:
+    def get_transition_history(self, limit: int = 20) -> list[dict[str, Any]]:
         """Geçiş geçmişi."""
         return [t.to_dict() for t in self._transition_history[-limit:]]
 
@@ -343,7 +345,7 @@ class SystemStateGovernor:
                     feature=feature.value,
                     enabled=enabled)
 
-    def get_fallback_response(self, feature: FeatureFlag) -> Optional[Dict[str, Any]]:
+    def get_fallback_response(self, feature: FeatureFlag) -> dict[str, Any] | None:
         """
         Feature devre dışıysa fallback response döndür.
 

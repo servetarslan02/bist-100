@@ -8,9 +8,10 @@ P0-7 düzeltmesi:
 - Consistency check sonrası current state
 """
 
+from datetime import UTC, datetime
+from typing import Any
+
 import orjson
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 import structlog
 
 logger = structlog.get_logger()
@@ -24,15 +25,15 @@ class StateRecovery:
     """
 
     def __init__(self):
-        self._recovered_states: Dict[str, Dict] = {}
-        self._recovery_errors: List[str] = []
+        self._recovered_states: dict[str, dict] = {}
+        self._recovery_errors: list[str] = []
 
     async def recover_all_states(
         self,
-        tickers: List[str],
+        tickers: list[str],
         redis_client=None,
         pg_pool=None,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """
         Tüm hisseler için state'i kurtar.
 
@@ -73,7 +74,7 @@ class StateRecovery:
 
     async def _recover_via_snapshot(
         self, ticker: str, redis_client=None, pg_pool=None
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """Snapshot + Event Replay ile state kurtar.
 
         1. Redis'ten son snapshot'ı oku
@@ -127,7 +128,7 @@ class StateRecovery:
 
     async def _recover_from_clickhouse(
         self, ticker: str, pg_pool=None
-    ) -> Optional[Dict]:
+    ) -> dict | None:
         """ClickHouse'dan feature'ları yeniden hesapla.
 
         Son seçenek: Snapshot ve event log yoksa.
@@ -135,8 +136,9 @@ class StateRecovery:
         Ama bu YAVAŞ bir kurtarma yöntemidir ve sadece fallback olarak kullanılır.
         """
         try:
-            import yfinance as yf
             import polars as pl
+            import yfinance as yf
+
             from ..features.calculator import feature_calculator
 
             logger.info("Fallback: ClickHouse recovery", ticker=ticker)
@@ -164,7 +166,7 @@ class StateRecovery:
                 "ticker": ticker,
                 "price": close_list[-1] if close_list else 0,
                 "features": features,
-                "recovered_at": datetime.now(timezone.utc).isoformat(),
+                "recovered_at": datetime.now(UTC).isoformat(),
                 "data_points": len(df),
                 "recovery_method": "clickhouse_fallback",
             }
@@ -176,10 +178,10 @@ class StateRecovery:
             logger.warning("ClickHouse recovery failed", ticker=ticker, error=str(e))
             return None
 
-    async def save_snapshot(self, ticker: str, state: Dict, redis_client=None):
+    async def save_snapshot(self, ticker: str, state: dict, redis_client=None):
         """State snapshot'ını kaydet (Redis + SQLite — dual persistence)."""
         try:
-            state["snapshot_time"] = datetime.now(timezone.utc).isoformat()
+            state["snapshot_time"] = datetime.now(UTC).isoformat()
 
             # Redis'e kaydet
             if redis_client:
@@ -199,19 +201,19 @@ class StateRecovery:
         except Exception as e:
             logger.warning("Snapshot save failed", ticker=ticker, error=str(e))
 
-    def get_state(self, ticker: str) -> Optional[Dict]:
+    def get_state(self, ticker: str) -> dict | None:
         """Kurtarılmış state'i döndür."""
         return self._recovered_states.get(ticker)
 
-    def get_all_states(self) -> Dict[str, Dict]:
+    def get_all_states(self) -> dict[str, dict]:
         """Tüm kurtarılmış state'leri döndür."""
         return self._recovered_states
 
-    def get_recovery_errors(self) -> List[str]:
+    def get_recovery_errors(self) -> list[str]:
         """Recovery hatalarını döndür."""
         return self._recovery_errors
 
-    async def validate_consistency(self, redis_client=None) -> Dict[str, Any]:
+    async def validate_consistency(self, redis_client=None) -> dict[str, Any]:
         """Recovery sonrası consistency kontrolü.
 
         P0-7: Positions, cash, P&L, world state, signals, risk state

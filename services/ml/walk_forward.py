@@ -1,7 +1,7 @@
 """
 ALPHA BIST — Walk-Forward Validation v1.0
 
-ROADMAP v3.0: 
+ROADMAP v3.0:
 - Purge: Train/test arasına boşluk (look-ahead bias önleme)
 - Embargo: Test sonrası boşluk (information leakage önleme)
 - Expanding window: Her adımda daha fazla veri
@@ -9,10 +9,12 @@ ROADMAP v3.0:
 KURAL: Gelecekten bilgi sızdırma!
 """
 
-import numpy as np
-from typing import Dict, List, Any, Callable
-from datetime import datetime
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -26,9 +28,9 @@ class WFResult:
     test_end: datetime
     train_size: int
     test_size: int
-    metrics: Dict[str, float]
-    predictions: List[Dict]
-    actuals: List[float]
+    metrics: dict[str, float]
+    predictions: list[dict]
+    actuals: list[float]
 
 class WalkForwardValidation:
     """Walk-forward validasyon motoru."""
@@ -51,8 +53,8 @@ class WalkForwardValidation:
 
     def generate_splits(
         self,
-        dates: List[datetime],
-    ) -> List[Dict[str, Any]]:
+        dates: list[datetime],
+    ) -> list[dict[str, Any]]:
         """Train/test split'leri oluştur."""
 
         splits = []
@@ -88,10 +90,10 @@ class WalkForwardValidation:
 
     def evaluate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         model_fn: Callable,
         feature_fn: Callable,
-    ) -> List[WFResult]:
+    ) -> list[WFResult]:
         """Walk-forward evaluasyon."""
 
         dates = data.get("dates", [])
@@ -157,9 +159,9 @@ class WalkForwardValidation:
 
     def _calculate_metrics(
         self,
-        predictions: List[Dict],
-        actuals: List[float],
-    ) -> Dict[str, float]:
+        predictions: list[dict],
+        actuals: list[float],
+    ) -> dict[str, float]:
         """Metrik hesapla."""
 
         if not predictions or not actuals:
@@ -186,7 +188,7 @@ class WalkForwardValidation:
             "rmse": round(float(rmse), 4),
         }
 
-    def get_aggregated_metrics(self, results: List[WFResult]) -> Dict[str, Any]:
+    def get_aggregated_metrics(self, results: list[WFResult]) -> dict[str, Any]:
         """Tüm split'lerin aggregate metrikleri."""
 
         if not results:

@@ -10,8 +10,8 @@ ALPHA BIST — Valuation Engine v1.0
 FAZ 4.2-4.5: Valuation Engine
 """
 
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -41,9 +41,9 @@ class DCFResult:
     upside_pct: float
     wacc: float
     terminal_growth: float
-    pv_fcfs: List[float]     # Bugünkü değerler
+    pv_fcfs: list[float]     # Bugünkü değerler
     terminal_value: float
-    sensitivity_table: Dict[str, Dict[str, float]]  # WACC × growth → price
+    sensitivity_table: dict[str, dict[str, float]]  # WACC × growth → price
 
 
 @dataclass
@@ -51,7 +51,7 @@ class ValuationScenario:
     """Değerleme senaryosu."""
     name: str              # Bear, Base, Bull
     probability: float     # Olasılık
-    assumptions: Dict[str, float]
+    assumptions: dict[str, float]
     implied_price: float
     upside_pct: float
 
@@ -61,9 +61,9 @@ class ValuationSummary:
     """Değerleme özeti."""
     ticker: str
     current_price: float
-    multiples: List[MultiplesValuation]
-    dcf: Optional[DCFResult]
-    scenarios: List[ValuationScenario]
+    multiples: list[MultiplesValuation]
+    dcf: DCFResult | None
+    scenarios: list[ValuationScenario]
     expected_value: float  # Olasılık ağırlıklı
     overall_upside_pct: float
     overall_view: str      # UNDERVALUED, FAIR, OVERVALUED
@@ -79,9 +79,9 @@ class ValuationEngine:
 
     def __init__(
         self,
-        wacc: Optional[float] = None,
-        tax_rate: Optional[float] = None,
-        terminal_growth: Optional[float] = None,
+        wacc: float | None = None,
+        tax_rate: float | None = None,
+        terminal_growth: float | None = None,
     ):
         """F-021: Sabitler constructor'dan override edilebilir."""
         self._wacc = wacc if wacc is not None else self.DEFAULT_WACC
@@ -92,10 +92,10 @@ class ValuationEngine:
         self,
         ticker: str,
         current_price: float,
-        company_multiples: Dict[str, float],
-        sector_multiples: Dict[str, Dict[str, float]],
-        historical_multiples: Optional[Dict[str, float]] = None,
-    ) -> List[MultiplesValuation]:
+        company_multiples: dict[str, float],
+        sector_multiples: dict[str, dict[str, float]],
+        historical_multiples: dict[str, float] | None = None,
+    ) -> list[MultiplesValuation]:
         """Multiples karşılaştırmalı değerleme.
 
         Args:
@@ -118,10 +118,9 @@ class ValuationEngine:
 
             # Sektör medyanına göre ima edilen fiyat
             implied_price = 0
-            if sector_median > 0 and company_val > 0:
-                if metric in ("pe", "pb", "ev_ebitda"):
-                    # Düşük çarpan = ucuz
-                    implied_price = current_price * (sector_median / company_val)
+            if sector_median > 0 and company_val > 0 and metric in ("pe", "pb", "ev_ebitda"):
+                # Düşük çarpan = ucuz
+                implied_price = current_price * (sector_median / company_val)
 
             upside_pct = ((implied_price / current_price) - 1) * 100 if current_price > 0 and implied_price > 0 else 0
 
@@ -142,10 +141,10 @@ class ValuationEngine:
         self,
         ticker: str,
         current_price: float,
-        revenue_forecast: List[float],      # 5 yıllık gelir tahmini
-        margin_forecast: List[float],        # 5 yıllık marj tahmini
-        capex_forecast: List[float],         # 5 yıllık capex tahmini
-        wc_change_forecast: List[float],     # 5 yıllık working capital değişimi
+        revenue_forecast: list[float],      # 5 yıllık gelir tahmini
+        margin_forecast: list[float],        # 5 yıllık marj tahmini
+        capex_forecast: list[float],         # 5 yıllık capex tahmini
+        wc_change_forecast: list[float],     # 5 yıllık working capital değişimi
         shares_outstanding: int,
         total_debt: float = 0,
         total_cash: float = 0,
@@ -232,13 +231,13 @@ class ValuationEngine:
         self,
         ticker: str,
         current_price: float,
-        base_assumptions: Dict[str, float],
-        bear_adjustments: Dict[str, float],
-        bull_adjustments: Dict[str, float],
+        base_assumptions: dict[str, float],
+        bear_adjustments: dict[str, float],
+        bull_adjustments: dict[str, float],
         shares_outstanding: int,
         total_debt: float = 0,
         total_cash: float = 0,
-    ) -> List[ValuationScenario]:
+    ) -> list[ValuationScenario]:
         """Bear/Base/Bull senaryoları.
 
         Args:
@@ -302,7 +301,7 @@ class ValuationEngine:
 
         return scenarios
 
-    def compute_expected_value(self, scenarios: List[ValuationScenario]) -> float:
+    def compute_expected_value(self, scenarios: list[ValuationScenario]) -> float:
         """Olasılık ağırlıklı beklenen değer."""
         if not scenarios:
             return 0.0
@@ -312,18 +311,15 @@ class ValuationEngine:
         self,
         ticker: str,
         current_price: float,
-        multiples: List[MultiplesValuation],
-        dcf: Optional[DCFResult],
-        scenarios: List[ValuationScenario],
+        multiples: list[MultiplesValuation],
+        dcf: DCFResult | None,
+        scenarios: list[ValuationScenario],
     ) -> ValuationSummary:
         """Değerleme özeti oluştur."""
         expected_value = self.compute_expected_value(scenarios) if scenarios else 0
 
         # Multiples'ten ortalama upside
-        if multiples:
-            avg_multiples_upside = sum(m.upside_pct for m in multiples) / len(multiples)
-        else:
-            avg_multiples_upside = 0
+        avg_multiples_upside = sum(m.upside_pct for m in multiples) / len(multiples) if multiples else 0
 
         # DCF upside
         dcf_upside = dcf.upside_pct if dcf else 0

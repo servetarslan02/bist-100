@@ -3,8 +3,8 @@
 AR = R_actual - E[R_expected]
 MacKinlay (1997) metodolojisi ile abnormal return hesaplama.
 """
+
 import numpy as np
-from typing import Dict, Optional
 import structlog
 
 logger = structlog.get_logger()
@@ -15,8 +15,8 @@ def calculate_abnormal_return(
     market_returns: np.ndarray,
     alpha: float,
     beta: float,
-    smb_returns: Optional[np.ndarray] = None,
-    hml_returns: Optional[np.ndarray] = None,
+    smb_returns: np.ndarray | None = None,
+    hml_returns: np.ndarray | None = None,
     beta_smb: float = 0.0,
     beta_hml: float = 0.0,
 ) -> np.ndarray:
@@ -58,10 +58,10 @@ def calculate_abnormal_return(
 
 
 def calculate_abnormal_return_batch(
-    stocks_returns: Dict[str, np.ndarray],
+    stocks_returns: dict[str, np.ndarray],
     market_returns: np.ndarray,
-    params: Dict[str, Dict[str, float]],
-) -> Dict[str, np.ndarray]:
+    params: dict[str, dict[str, float]],
+) -> dict[str, np.ndarray]:
     """Birden fazla hisse için toplu abnormal return hesapla.
 
     Args:

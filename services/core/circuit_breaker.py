@@ -9,19 +9,21 @@ Provider'lar için:
 FAZ 1.3-1.5: Provider Failover + Circuit Breaker + Rate Limit
 """
 
-import time
-import random
 import asyncio
-from datetime import datetime, timezone
-from typing import Dict, Optional, Any, Callable
-from enum import Enum
+import random
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     CLOSED = "CLOSED"           # Normal çalışıyor
     OPEN = "OPEN"               # Hatalı, atla
     HALF_OPEN = "HALF_OPEN"     # Dene, başarırsa CLOSED
@@ -42,8 +44,8 @@ class CircuitBreaker:
     recovery_timeout_seconds: int = 60
     state: CircuitState = CircuitState.CLOSED
     failure_count: int = 0
-    last_failure_time: Optional[datetime] = None
-    last_success_time: Optional[datetime] = None
+    last_failure_time: datetime | None = None
+    last_success_time: datetime | None = None
     half_open_calls: int = 0
 
     def record_success(self):
@@ -55,13 +57,13 @@ class CircuitBreaker:
         elif self.state == CircuitState.CLOSED:
             self.failure_count = max(0, self.failure_count - 1)
 
-        self.last_success_time = datetime.now(timezone.utc)
+        self.last_success_time = datetime.now(UTC)
         self._persist_state()
 
     def record_failure(self):
         """Başarısız çağrı kaydet."""
         self.failure_count += 1
-        self.last_failure_time = datetime.now(timezone.utc)
+        self.last_failure_time = datetime.now(UTC)
 
         if self.state == CircuitState.CLOSED and self.failure_count >= self.failure_threshold:
             self.state = CircuitState.OPEN
@@ -81,7 +83,7 @@ class CircuitBreaker:
         if self.state == CircuitState.OPEN:
             # Recovery timeout doldu mu?
             if self.last_failure_time:
-                elapsed = (datetime.now(timezone.utc) - self.last_failure_time).total_seconds()
+                elapsed = (datetime.now(UTC) - self.last_failure_time).total_seconds()
                 if elapsed >= self.recovery_timeout_seconds:
                     self.state = CircuitState.HALF_OPEN
                     self.half_open_calls = 0
@@ -98,7 +100,7 @@ class CircuitBreaker:
 
         return False
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
             "name": self.name,
@@ -177,7 +179,7 @@ class RateLimiter:
             logger.debug("Rate limiter waiting", name=self.name, seconds=round(wait, 2))
             await asyncio.sleep(wait)
 
-    def get_state(self) -> Dict[str, Any]:
+    def get_state(self) -> dict[str, Any]:
         """Durum bilgisi."""
         return {
             "name": self.name,
@@ -249,7 +251,7 @@ class ProviderReliability:
         self._results.append({
             "success": success,
             "latency_ms": latency_ms,
-            "timestamp": datetime.now(timezone.utc),
+            "timestamp": datetime.now(UTC),
         })
         if len(self._results) > 1000:
             self._results = self._results[-1000:]
@@ -284,7 +286,7 @@ class ProviderReliability:
                 break
 
         if last_success:
-            minutes_since = (datetime.now(timezone.utc) - last_success).total_seconds() / 60
+            minutes_since = (datetime.now(UTC) - last_success).total_seconds() / 60
             freshness_factor = max(0, 1 - (minutes_since / 60))  # 1 saat içinde
         else:
             freshness_factor = 0
@@ -292,7 +294,7 @@ class ProviderReliability:
         score = success_rate * 0.6 + latency_factor * 0.2 + freshness_factor * 0.2
         return round(min(1.0, max(0.001, score)), 3)  # 0.001 minimum (tam 0 olamaz)
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         return {
             "name": self.name,
@@ -314,10 +316,10 @@ class ProtectedProvider:
         self,
         name: str,
         func: Callable,
-        circuit_breaker: Optional[CircuitBreaker] = None,
-        rate_limiter: Optional[RateLimiter] = None,
-        retry_policy: Optional[RetryPolicy] = None,
-        reliability: Optional[ProviderReliability] = None,
+        circuit_breaker: CircuitBreaker | None = None,
+        rate_limiter: RateLimiter | None = None,
+        retry_policy: RetryPolicy | None = None,
+        reliability: ProviderReliability | None = None,
     ):
         self.name = name
         self.func = func
@@ -326,7 +328,7 @@ class ProtectedProvider:
         self.retry_policy = retry_policy or RetryPolicy()
         self.reliability = reliability or ProviderReliability(name=name)
 
-    async def execute(self, *args, **kwargs) -> Optional[Any]:
+    async def execute(self, *args, **kwargs) -> Any | None:
         """Korumalı çağrı yap.
 
         Akış:
@@ -365,7 +367,7 @@ class ProtectedProvider:
             logger.error("Provider call failed", provider=self.name, error=str(e))
             return None
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Sağlık durumu."""
         return {
             "provider": self.name,
@@ -379,7 +381,7 @@ class ProtectedProvider:
 # Global Registry
 # =====================================================
 
-_providers: Dict[str, ProtectedProvider] = {}
+_providers: dict[str, ProtectedProvider] = {}
 
 
 def register_protected_provider(
@@ -409,11 +411,11 @@ def register_protected_provider(
     return provider
 
 
-def get_provider(name: str) -> Optional[ProtectedProvider]:
+def get_provider(name: str) -> ProtectedProvider | None:
     """Provider getir."""
     return _providers.get(name)
 
 
-def get_all_health() -> Dict[str, Dict]:
+def get_all_health() -> dict[str, dict]:
     """Tüm provider sağlık durumları."""
     return {name: p.get_health() for name, p in _providers.items()}

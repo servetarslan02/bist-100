@@ -12,22 +12,20 @@ Tüm yeni core modülleri için kapsamlı testler:
 8. System Governor
 """
 
-import asyncio
-import orjson
 import time
-import pytest
-from datetime import datetime, timezone, timedelta, timedelta
-from typing import Dict, List, Any
+from datetime import UTC, datetime, timedelta
 
-from services.core.dead_letter_queue import DeadLetterQueue, DLQStatus
-from services.core.jwt_manager import JWTManager, JWTError, TokenType
-from services.core.transaction_helper import TransactionHelper
+import orjson
+import pytest
+
 from services.core.circuit_breaker_metrics import CircuitBreakerMetricsCollector
 from services.core.config_hot_reload import ConfigHotReload
+from services.core.dead_letter_queue import DeadLetterQueue, DLQStatus
+from services.core.distributed_tracing import DistributedTracer
 from services.core.immutable_audit import ImmutableAuditLog
-from services.core.distributed_tracing import DistributedTracer, correlation_id_var
-from services.core.system_governor import SystemStateGovernor, SystemState, FeatureFlag
-
+from services.core.jwt_manager import JWTError, JWTManager, TokenType
+from services.core.system_governor import FeatureFlag, SystemState, SystemStateGovernor
+from services.core.transaction_helper import TransactionHelper
 
 # =====================================================
 # Phase 1: Dead Letter Queue
@@ -88,7 +86,7 @@ class TestDeadLetterQueue:
         entry = await self.dlq.push(
             "evt_retry", "test_event", '{"data": 1}', "error"
         )
-        entry.next_retry_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+        entry.next_retry_at = datetime.now(UTC) - timedelta(seconds=1)
 
         result = await self.dlq.retry_failed()
         assert result == 1
@@ -151,8 +149,7 @@ class TestJWTManager:
     def test_expired_token(self):
         """Süresi dolmuş token reddedilmeli."""
         # Manually create an expired token
-        import time as _time
-        token = self.jwt.generate_token("user1", "ADMIN", ["READ"])
+        self.jwt.generate_token("user1", "ADMIN", ["READ"])
 
         # Manually expire it by modifying the internal state
         # Create a JWT with past expiration
@@ -263,7 +260,7 @@ class TestCircuitBreakerMetrics:
             failure_threshold = 5
             recovery_timeout_seconds = 60
             last_failure_time = None
-            last_success_time = datetime.now(timezone.utc)
+            last_success_time = datetime.now(UTC)
             _total_requests = 100
             _total_failures = 2
             _total_successes = 98
@@ -313,7 +310,8 @@ class TestConfigHotReload:
     """Config hot-reload testleri."""
 
     def setup_method(self, tmp_path=None):
-        import tempfile, os
+        import os
+        import tempfile
         self.tmp_dir = tempfile.mkdtemp()
         self.config_path = os.path.join(self.tmp_dir, "test_config.json")
 
@@ -451,7 +449,7 @@ class TestDistributedTracing:
         """Yavaş trace tespiti."""
         self.tracer._slow_threshold_ms = 0  # Her şey yavaş
 
-        cid = self.tracer.start_trace("slow_op")
+        self.tracer.start_trace("slow_op")
         span = self.tracer.start_span("slow_span")
         time.sleep(0.01)
         self.tracer.finish_span(span)

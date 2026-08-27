@@ -9,8 +9,8 @@ Google News: 0.50
 Sosyal medya: 0.20-0.50
 """
 
-from typing import Dict
 from dataclasses import dataclass
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,7 +26,7 @@ class NewsSource:
 
 
 # Kaynak tanımları
-NEWS_SOURCES: Dict[str, NewsSource] = {
+NEWS_SOURCES: dict[str, NewsSource] = {
     # Resmi kaynaklar (1.00)
     "kap": NewsSource("KAP", 1.00, "official"),
     "bist": NewsSource("BIST", 1.00, "official"),
@@ -108,7 +108,7 @@ class NewsCredibility:
         # Eşik: ağırlıklandırılmış önem > 0.3
         return weighted > 0.3
 
-    def get_source_report(self) -> Dict[str, Dict]:
+    def get_source_report(self) -> dict[str, dict]:
         """Tüm kaynakların raporu."""
         return {
             key: {

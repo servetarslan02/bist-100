@@ -11,13 +11,10 @@ Kapsam:
 - Deep merge
 """
 
-import sys
 import os
-import orjson
-import tempfile
+import sys
 
 from services.core.config_loader import ConfigLoader
-
 
 # =====================================================
 # CONFIG LOADING TESTS
@@ -154,7 +151,7 @@ def test_env_type_conversion():
         issues.append(f"Int conversion: {config.get('test.int')}")
     if config.get_float("test.float") != 3.14:
         issues.append(f"Float conversion: {config.get('test.float')}")
-    if config.get_bool("test.bool") != True:
+    if not config.get_bool("test.bool"):
         issues.append(f"Bool conversion: {config.get('test.bool')}")
 
     # Temizle

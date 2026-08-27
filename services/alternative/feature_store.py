@@ -10,11 +10,12 @@ Alternative data feature'ları için feature store entegrasyonu.
 - Feature manifest
 """
 
-import orjson
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
@@ -30,10 +31,10 @@ class FeatureManifest:
     dtype: str  # float, int, bool
     range_min: float
     range_max: float
-    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    dependencies: List[str] = field(default_factory=list)
+    created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
+    dependencies: list[str] = field(default_factory=list)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "feature_name": self.feature_name,
             "version": self.version,
@@ -57,10 +58,10 @@ class FeatureStore:
     - Feature lineage (hangi kaynaktan geliyor)
     """
 
-    def __init__(self, store_path: Optional[str] = None):
+    def __init__(self, store_path: str | None = None):
         self._store_path = store_path
-        self._manifests: Dict[str, FeatureManifest] = {}
-        self._feature_values: Dict[str, Dict[str, Dict[str, float]]] = {}  # date → ticker → features
+        self._manifests: dict[str, FeatureManifest] = {}
+        self._feature_values: dict[str, dict[str, dict[str, float]]] = {}  # date → ticker → features
 
     def register_feature(self, manifest: FeatureManifest):
         """Feature kaydet."""
@@ -71,7 +72,7 @@ class FeatureStore:
         self,
         ticker: str,
         date: str,
-        features: Dict[str, float],
+        features: dict[str, float],
         source: str = "alternative",
     ):
         """Feature değerleri yaz.
@@ -90,7 +91,7 @@ class FeatureStore:
         self._feature_values[date][ticker].update(features)
 
         # Manifest'leri otomatik oluştur
-        for name, value in features.items():
+        for name, _value in features.items():
             if name not in self._manifests:
                 self.register_feature(FeatureManifest(
                     feature_name=name,
@@ -106,8 +107,8 @@ class FeatureStore:
         self,
         ticker: str,
         date: str,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
+        feature_names: list[str] | None = None,
+    ) -> dict[str, float]:
         """Feature değerleri oku (point-in-time).
 
         Args:
@@ -134,8 +135,8 @@ class FeatureStore:
         self,
         ticker: str,
         before_date: str,
-        feature_names: Optional[List[str]] = None,
-    ) -> Dict[str, float]:
+        feature_names: list[str] | None = None,
+    ) -> dict[str, float]:
         """En son feature değerlerini getir (point-in-time).
 
         Backtest'te kullanılır — gelecek veri sızıntısı yok.
@@ -149,7 +150,7 @@ class FeatureStore:
             Feature dict
         """
         # Tarihleri sırala
-        dates = sorted([d for d in self._feature_values.keys() if d <= before_date])
+        dates = sorted([d for d in self._feature_values if d <= before_date])
 
         if not dates:
             return {}
@@ -157,11 +158,11 @@ class FeatureStore:
         latest_date = dates[-1]
         return self.get(ticker, latest_date, feature_names)
 
-    def get_feature_manifest(self, feature_name: str) -> Optional[FeatureManifest]:
+    def get_feature_manifest(self, feature_name: str) -> FeatureManifest | None:
         """Feature manifest getir."""
         return self._manifests.get(feature_name)
 
-    def list_features(self, source: Optional[str] = None) -> List[str]:
+    def list_features(self, source: str | None = None) -> list[str]:
         """Feature'ları listele."""
         if source:
             return [
@@ -170,7 +171,7 @@ class FeatureStore:
             ]
         return list(self._manifests.keys())
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """İstatistikler."""
         total_values = sum(
             len(ticker_features)
@@ -185,7 +186,7 @@ class FeatureStore:
             "sources": list(set(m.source for m in self._manifests.values())),
         }
 
-    def save(self, path: Optional[str] = None):
+    def save(self, path: str | None = None):
         """Feature store'u dosyaya kaydet."""
         save_path = path or self._store_path
         if not save_path:
@@ -194,7 +195,7 @@ class FeatureStore:
         data = {
             "manifests": {k: v.to_dict() for k, v in self._manifests.items()},
             "values": self._feature_values,
-            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "saved_at": datetime.now(UTC).isoformat(),
         }
 
         Path(save_path).parent.mkdir(parents=True, exist_ok=True)
@@ -203,7 +204,7 @@ class FeatureStore:
 
         logger.info("Feature store saved", path=save_path)
 
-    def load(self, path: Optional[str] = None):
+    def load(self, path: str | None = None):
         """Feature store'u dosyadan yükle."""
         load_path = path or self._store_path
         if not load_path or not Path(load_path).exists():

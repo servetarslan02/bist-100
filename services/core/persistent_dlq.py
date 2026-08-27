@@ -22,23 +22,22 @@ Kullanım:
 
 import asyncio
 import hashlib
-import os
-import duckdb
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
-from datetime import datetime, timezone, timedelta
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass
-from enum import Enum
-import structlog
+from datetime import UTC, datetime, timedelta
+from enum import StrEnum
+from pathlib import Path
+from typing import Any
 
-import orjson
+import duckdb
+import structlog
 
 logger = structlog.get_logger()
 
 
-class DLQStatus(str, Enum):
+class DLQStatus(StrEnum):
     PENDING = "PENDING"
     RETRYING = "RETRYING"
     RESOLVED = "RESOLVED"
@@ -57,15 +56,15 @@ class DLQEntry:
     max_retries: int = 3
     status: DLQStatus = DLQStatus.PENDING
     created_at: datetime = None
-    last_retry_at: Optional[datetime] = None
-    next_retry_at: Optional[datetime] = None
-    resolved_at: Optional[datetime] = None
+    last_retry_at: datetime | None = None
+    next_retry_at: datetime | None = None
+    resolved_at: datetime | None = None
 
     def __post_init__(self):
         if self.created_at is None:
-            self.created_at = datetime.now(timezone.utc)
+            self.created_at = datetime.now(UTC)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "entry_id": self.entry_id,
             "event_id": self.event_id,
@@ -89,7 +88,7 @@ class DLQEntry:
             return False
         if self.next_retry_at is None:
             return True
-        return datetime.now(timezone.utc) >= self.next_retry_at
+        return datetime.now(UTC) >= self.next_retry_at
 
 
 class PersistentDeadLetterQueue:
@@ -102,7 +101,7 @@ class PersistentDeadLetterQueue:
         self.db_path = Path(db_path)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._max_entries = max_entries
-        self._retry_handlers: Dict[str, Callable] = {}
+        self._retry_handlers: dict[str, Callable] = {}
         self._init_db()
 
         # Stats
@@ -171,7 +170,7 @@ class PersistentDeadLetterQueue:
         ).hexdigest()[:16]
 
         backoff_seconds = 5 * (2 ** retry_count)
-        next_retry = datetime.now(timezone.utc) + timedelta(seconds=backoff_seconds)
+        next_retry = datetime.now(UTC) + timedelta(seconds=backoff_seconds)
 
         with self._connect() as conn:
             conn.execute("""
@@ -182,7 +181,7 @@ class PersistentDeadLetterQueue:
             """, (
                 entry_id, event_id, event_type, payload, error,
                 retry_count, max_retries,
-                datetime.now(timezone.utc).isoformat(),
+                datetime.now(UTC).isoformat(),
                 next_retry.isoformat(),
             ))
             conn.commit()
@@ -196,7 +195,7 @@ class PersistentDeadLetterQueue:
     async def retry_failed(self, batch_size: int = 100) -> int:
         """DLQ'daki retry edilebilir event'leri tekrar dene."""
         retried = 0
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
 
         with self._connect() as conn:
             rows = conn.execute("""
@@ -229,7 +228,7 @@ class PersistentDeadLetterQueue:
                         conn.execute("""
                             UPDATE dlq_entries SET status = 'RESOLVED', resolved_at = ?
                             WHERE entry_id = ?
-                        """, (datetime.now(timezone.utc).isoformat(), entry["entry_id"]))
+                        """, (datetime.now(UTC).isoformat(), entry["entry_id"]))
                         conn.commit()
 
                         self._total_resolved += 1
@@ -248,7 +247,7 @@ class PersistentDeadLetterQueue:
                             self._total_exhausted += 1
                         else:
                             backoff = 5 * (2 ** new_count)
-                            next_retry = (datetime.now(timezone.utc) +
+                            next_retry = (datetime.now(UTC) +
                                         timedelta(seconds=backoff)).isoformat()
                             conn.execute("""
                                 UPDATE dlq_entries SET status = 'PENDING',
@@ -269,7 +268,7 @@ class PersistentDeadLetterQueue:
 
         return retried
 
-    async def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> dict[str, Any]:
         """DLQ istatistikleri."""
         with self._connect() as conn:
             by_status = {}
@@ -304,10 +303,10 @@ class PersistentDeadLetterQueue:
 
     async def get_entries(
         self,
-        status: Optional[str] = None,
-        event_type: Optional[str] = None,
+        status: str | None = None,
+        event_type: str | None = None,
         limit: int = 50,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """DLQ kayıtlarını listele."""
         with self._connect() as conn:
             query = "SELECT * FROM dlq_entries WHERE 1=1"
@@ -336,7 +335,7 @@ class PersistentDeadLetterQueue:
 
     def _cleanup_resolved(self):
         """Çözülmüş kayıtları temizle (son 24 saat tut)."""
-        cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+        cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
         with self._connect() as conn:
             conn.execute("""
                 DELETE FROM dlq_entries

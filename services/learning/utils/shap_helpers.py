@@ -7,10 +7,11 @@ LightGBM, XGBoost, CatBoost için optimize edilmiş.
 KURAL: Hızlı, memory-efficient, production-ready.
 """
 
-import numpy as np
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -19,19 +20,19 @@ logger = structlog.get_logger()
 @dataclass
 class SHAPResult:
     """SHAP hesaplama sonucu."""
-    feature_names: List[str]
+    feature_names: list[str]
     shap_values: np.ndarray  # (n_samples, n_features)
     base_value: float
-    feature_importance: Dict[str, float]  # mean |SHAP|
-    top_features: List[Tuple[str, float]]  # (feature, importance)
+    feature_importance: dict[str, float]  # mean |SHAP|
+    top_features: list[tuple[str, float]]  # (feature, importance)
 
 
 @dataclass
 class SHAPInteractionResult:
     """SHAP interaction sonucu."""
-    feature_pairs: List[Tuple[str, str]]
+    feature_pairs: list[tuple[str, str]]
     interaction_values: np.ndarray
-    top_interactions: List[Dict]
+    top_interactions: list[dict]
 
 
 class SHAPHelpers:
@@ -41,8 +42,8 @@ class SHAPHelpers:
     def compute_shap_values(
         model: Any,
         X: np.ndarray,
-        feature_names: List[str],
-        sample_size: Optional[int] = None,
+        feature_names: list[str],
+        sample_size: int | None = None,
     ) -> SHAPResult:
         """SHAP values hesapla.
 
@@ -95,7 +96,7 @@ class SHAPHelpers:
             mean_abs_shap = np.abs(shap_values).mean(axis=0)
             feature_importance = {
                 name: round(float(imp), 6)
-                for name, imp in zip(feature_names, mean_abs_shap)
+                for name, imp in zip(feature_names, mean_abs_shap, strict=False)
             }
 
             # Top features
@@ -125,7 +126,7 @@ class SHAPHelpers:
     def _fallback_importance(
         model: Any,
         X: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
     ) -> SHAPResult:
         """Fallback: model.feature_importances_ kullan."""
         try:
@@ -135,7 +136,7 @@ class SHAPHelpers:
 
         feature_importance = {
             name: round(float(imp), 6)
-            for name, imp in zip(feature_names, importances)
+            for name, imp in zip(feature_names, importances, strict=False)
         }
 
         top_indices = np.argsort(importances)[::-1]
@@ -156,7 +157,7 @@ class SHAPHelpers:
     def compute_feature_interactions(
         model: Any,
         X: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
         top_n: int = 10,
     ) -> SHAPInteractionResult:
         """SHAP interaction values hesapla.
@@ -214,10 +215,10 @@ class SHAPHelpers:
     @staticmethod
     def compute_regime_shap(
         model: Any,
-        X_by_regime: Dict[str, np.ndarray],
-        feature_names: List[str],
+        X_by_regime: dict[str, np.ndarray],
+        feature_names: list[str],
         sample_size: int = 500,
-    ) -> Dict[str, Dict[str, float]]:
+    ) -> dict[str, dict[str, float]]:
         """Rejim-specific SHAP importance.
 
         Her rejim için ayrı feature importance hesaplar.
@@ -248,8 +249,8 @@ class SHAPHelpers:
     def explain_single_prediction(
         model: Any,
         X_single: np.ndarray,
-        feature_names: List[str],
-    ) -> Dict[str, Any]:
+        feature_names: list[str],
+    ) -> dict[str, Any]:
         """Tek prediction için SHAP explanation.
 
         Args:
@@ -271,7 +272,7 @@ class SHAPHelpers:
 
             # Feature contributions
             contributions = []
-            for name, value, shap_val in zip(feature_names, X_single[0], shap_values[0]):
+            for name, value, shap_val in zip(feature_names, X_single[0], shap_values[0], strict=False):
                 contributions.append({
                     "feature": name,
                     "feature_value": round(float(value), 4),
@@ -301,9 +302,9 @@ class SHAPHelpers:
         self,
         model,
         X: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
         sample_size: int = 100,
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """Global SHAP importance — tüm veri seti üzerinde.
 
         Args:
@@ -333,7 +334,7 @@ class SHAPHelpers:
 
             if len(feature_names) == len(mean_shap):
                 return dict(sorted(
-                    zip(feature_names, mean_shap.tolist()),
+                    zip(feature_names, mean_shap.tolist(), strict=False),
                     key=lambda x: x[1],
                     reverse=True,
                 ))
@@ -345,7 +346,7 @@ class SHAPHelpers:
             if hasattr(model, "feature_importances_"):
                 importance = model.feature_importances_
                 if len(feature_names) == len(importance):
-                    return dict(zip(feature_names, importance.tolist()))
+                    return dict(zip(feature_names, importance.tolist(), strict=False))
             return {}
         except Exception as e:
             logger.error("Global SHAP failed", error=str(e))
@@ -353,9 +354,9 @@ class SHAPHelpers:
 
     def compute_shap_trends(
         self,
-        shap_history: List[Dict[str, float]],
+        shap_history: list[dict[str, float]],
         window_days: int = 30,
-    ) -> Dict[str, Dict[str, Any]]:
+    ) -> dict[str, dict[str, Any]]:
         """Feature importance trend analizi.
 
         Args:
@@ -369,7 +370,7 @@ class SHAPHelpers:
             return {}
 
         # Feature'ları topla
-        feature_values: Dict[str, List[float]] = defaultdict(list)
+        feature_values: dict[str, list[float]] = defaultdict(list)
         for entry in shap_history[-window_days:]:
             for feature, value in entry.items():
                 if feature != "date" and isinstance(value, (int, float)):
@@ -411,13 +412,13 @@ class SHAPHelpers:
         # Önem sırasına göre sırala
         return dict(sorted(trends.items(), key=lambda x: x[1]["avg_importance"], reverse=True))
 
-    def compute_feature_interactions(
+    def compute_feature_interactions_list(
         self,
         model,
         X: np.ndarray,
-        feature_names: List[str],
+        feature_names: list[str],
         top_n: int = 10,
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """Feature interaction'ları hesapla.
 
         Args:

@@ -16,15 +16,16 @@ SÜPER AKILLI, TAM OTOMATİK, KENDİ KENDİNİ YÖNETEN SİSTEM
 KURAL: Sistem insan müdahalesi olmadan 7/24 çalışmalı.
 """
 
-import time
-import numpy as np
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
-from collections import deque, defaultdict
-import structlog
 import hashlib
 import threading
+import time
+from collections import defaultdict, deque
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
+import structlog
 
 from services.learning.config.learning_config import learning_settings
 
@@ -36,8 +37,8 @@ class SystemHealth:
     """Sistem sağlık durumu."""
     timestamp: str
     overall_status: str  # HEALTHY, WARNING, CRITICAL
-    module_status: Dict[str, str]  # {module: status}
-    last_error: Optional[str]
+    module_status: dict[str, str]  # {module: status}
+    last_error: str | None
     uptime_hours: float
     predictions_today: int
     accuracy_today: float
@@ -54,7 +55,7 @@ class ModelVersion:
     training_samples: int
     test_sharpe: float
     test_ic: float
-    feature_importance: Dict[str, float]
+    feature_importance: dict[str, float]
     is_active: bool
     is_champion: bool  # A/B test kazananı
 
@@ -78,11 +79,11 @@ class SuperIntelligenceEngine:
 
     def __init__(
         self,
-        retrain_threshold_sharpe: Optional[float] = None,
-        retrain_threshold_ic: Optional[float] = None,
-        drift_threshold: Optional[float] = None,
-        max_models_history: Optional[int] = None,
-        ab_test_window_days: Optional[int] = None,
+        retrain_threshold_sharpe: float | None = None,
+        retrain_threshold_ic: float | None = None,
+        drift_threshold: float | None = None,
+        max_models_history: int | None = None,
+        ab_test_window_days: int | None = None,
     ):
         cfg = learning_settings
         self.retrain_threshold_sharpe = retrain_threshold_sharpe or cfg.retrain.sharpe_threshold
@@ -93,31 +94,31 @@ class SuperIntelligenceEngine:
 
         # Model versiyonlama
         self._model_versions: deque = deque(maxlen=100)
-        self._active_model_version: Optional[str] = None
-        self._champion_model_version: Optional[str] = None
+        self._active_model_version: str | None = None
+        self._champion_model_version: str | None = None
 
         # Performans geçmişi
         self._performance_history: deque = deque(maxlen=252)  # 1 yıl
         self._prediction_history: deque = deque(maxlen=10000)
 
         # Drift detection
-        self._baseline_distributions: Dict[str, Dict] = {}
+        self._baseline_distributions: dict[str, dict] = {}
         self._drift_alerts: deque = deque(maxlen=1000)
 
         # A/B test state
         self._ab_test_active: bool = False
-        self._ab_test_champion: Optional[str] = None
-        self._ab_test_challenger: Optional[str] = None
+        self._ab_test_champion: str | None = None
+        self._ab_test_challenger: str | None = None
         self._ab_test_results: deque = deque(maxlen=50)
 
         # Meta-learning
-        self._regime_model_performance: Dict[str, Dict[str, List[float]]] = defaultdict(
+        self._regime_model_performance: dict[str, dict[str, list[float]]] = defaultdict(
             lambda: defaultdict(list)
         )
 
         # Health monitoring
         self._health_status = SystemHealth(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             overall_status="HEALTHY",
             module_status={},
             last_error=None,
@@ -142,8 +143,8 @@ class SuperIntelligenceEngine:
         self,
         module_name: str,
         error: Exception,
-        context: Dict,
-    ) -> Dict[str, Any]:
+        context: dict,
+    ) -> dict[str, Any]:
         """Hata tespit et ve otomatik onar."""
 
         error_msg = str(error)
@@ -162,7 +163,7 @@ class SuperIntelligenceEngine:
             healing_action = "fallback_to_rule_based"
 
         healing_record = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "module": module_name,
             "error": error_msg,
             "action": healing_action,
@@ -180,7 +181,7 @@ class SuperIntelligenceEngine:
 
         return healing_record
 
-    def execute_healing(self, healing_record: Dict) -> bool:
+    def execute_healing(self, healing_record: dict) -> bool:
         """Healing aksiyonunu çalıştır."""
         action = healing_record.get("action")
         max_attempts = learning_settings.health.max_healing_attempts
@@ -207,7 +208,7 @@ class SuperIntelligenceEngine:
                 self._activate_fallback()
 
             healing_record["status"] = "COMPLETED"
-            healing_record["resolved_at"] = datetime.now(timezone.utc).isoformat()
+            healing_record["resolved_at"] = datetime.now(UTC).isoformat()
             return True
 
         except Exception as e:
@@ -220,7 +221,7 @@ class SuperIntelligenceEngine:
 
     def check_retrain_needed(
         self,
-        recent_performance: Dict[str, float],
+        recent_performance: dict[str, float],
     ) -> bool:
         """Yeniden eğitim gerekli mi kontrol et."""
 
@@ -244,9 +245,9 @@ class SuperIntelligenceEngine:
 
     def auto_retrain(
         self,
-        training_data: Dict,
-        validation_data: Dict,
-    ) -> Dict[str, Any]:
+        training_data: dict,
+        validation_data: dict,
+    ) -> dict[str, Any]:
         """Otomatik yeniden eğitim."""
 
         logger.info("Auto-retrain started")
@@ -269,7 +270,7 @@ class SuperIntelligenceEngine:
         version_id = self._generate_version_id()
         new_version = ModelVersion(
             version_id=version_id,
-            created_at=datetime.now(timezone.utc).isoformat(),
+            created_at=datetime.now(UTC).isoformat(),
             regime=training_data.get("regime", "UNKNOWN"),
             training_samples=result.get("samples", 0),
             test_sharpe=0.0,  # A/B test ile belirlenecek
@@ -305,9 +306,9 @@ class SuperIntelligenceEngine:
 
     def detect_drift(
         self,
-        current_features: Dict[str, Dict],
-        baseline_features: Optional[Dict[str, Dict]] = None,
-    ) -> Dict[str, Any]:
+        current_features: dict[str, dict],
+        baseline_features: dict[str, dict] | None = None,
+    ) -> dict[str, Any]:
         """Veri drift'i tespit et."""
 
         if baseline_features is None:
@@ -346,7 +347,7 @@ class SuperIntelligenceEngine:
         if overall_drift:
             self._health_status.drift_detected = True
             self._drift_alerts.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
                 "affected_tickers": list(drift_results.keys()),
                 "details": drift_results,
             })
@@ -365,7 +366,7 @@ class SuperIntelligenceEngine:
 
     def update_baseline(
         self,
-        features_map: Dict[str, Dict],
+        features_map: dict[str, dict],
         window_days: int = 60,
     ):
         """Baseline dağılımları güncelle."""
@@ -392,8 +393,8 @@ class SuperIntelligenceEngine:
 
     def evaluate_ab_test(
         self,
-        champion_results: List[float],
-        challenger_results: List[float],
+        champion_results: list[float],
+        challenger_results: list[float],
     ) -> ABTestResult:
         """A/B test sonucunu değerlendir."""
 
@@ -408,7 +409,7 @@ class SuperIntelligenceEngine:
         improvement = (challenger_sharpe - champion_sharpe) / abs(champion_sharpe) * 100 if champion_sharpe != 0 else 0
         is_significant = p_value < 0.05
 
-        winner = challenger if (challenger_sharpe > champion_sharpe and is_significant) else champion
+        winner = self._ab_test_challenger if (challenger_sharpe > champion_sharpe and is_significant) else self._ab_test_champion
 
         result = ABTestResult(
             test_id=self._generate_version_id(),
@@ -445,7 +446,7 @@ class SuperIntelligenceEngine:
         self,
         model_version: str,
         regime: str,
-        metrics: Dict[str, float],
+        metrics: dict[str, float],
     ):
         """Performans kaydet (meta-learning için)."""
         scores = self._regime_model_performance[regime][model_version]
@@ -453,7 +454,7 @@ class SuperIntelligenceEngine:
         if len(scores) > 100:
             self._regime_model_performance[regime][model_version] = scores[-100:]
 
-    def get_best_model_for_regime(self, regime: str) -> Optional[str]:
+    def get_best_model_for_regime(self, regime: str) -> str | None:
         """Rejim için en iyi modeli bul."""
         if regime not in self._regime_model_performance:
             return None
@@ -474,7 +475,7 @@ class SuperIntelligenceEngine:
 
     def get_health_status(self) -> SystemHealth:
         """Sistem sağlık durumunu getir."""
-        self._health_status.timestamp = datetime.now(timezone.utc).isoformat()
+        self._health_status.timestamp = datetime.now(UTC).isoformat()
 
         # Overall status belirle
         critical_modules = sum(1 for s in self._health_status.module_status.values() if s == "CRITICAL")
@@ -489,7 +490,7 @@ class SuperIntelligenceEngine:
 
         return self._health_status
 
-    def update_module_status(self, module: str, status: str, error: Optional[str] = None):
+    def update_module_status(self, module: str, status: str, error: str | None = None):
         """Modül durumunu güncelle."""
         self._health_status.module_status[module] = status
         if error:
@@ -499,11 +500,11 @@ class SuperIntelligenceEngine:
 
     def daily_cycle(
         self,
-        features_map: Dict[str, Dict],
-        predictions: List[Dict],
-        actual_returns: Dict[str, float],
+        features_map: dict[str, dict],
+        predictions: list[dict],
+        actual_returns: dict[str, float],
         regime: str = "UNKNOWN",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Günlük otomasyon döngüsü.
 
         Her gün çalıştırılır:
@@ -514,7 +515,7 @@ class SuperIntelligenceEngine:
         5. Health check
         """
         results = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "regime": regime,
         }
 
@@ -572,9 +573,9 @@ class SuperIntelligenceEngine:
 
     def _calculate_recent_metrics(
         self,
-        predictions: List[Dict],
-        actual_returns: Dict[str, float],
-    ) -> Dict[str, float]:
+        predictions: list[dict],
+        actual_returns: dict[str, float],
+    ) -> dict[str, float]:
         """Son tahminlerin metriklerini hesapla."""
         returns = []
         wins = 0
@@ -618,7 +619,7 @@ class SuperIntelligenceEngine:
 
     def _generate_version_id(self) -> str:
         """Benzersiz versiyon ID oluştur."""
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
         random_hash = hashlib.md5(str(np.random.random()).encode()).hexdigest()[:6]
         return f"v_{timestamp}_{random_hash}"
 
@@ -636,11 +637,11 @@ class SuperIntelligenceEngine:
         """Veri yenileme tetikle — event bus üzerinden."""
         logger.info("Data refresh triggered by self-healing")
         try:
-            from services.core.event_bus import publish_event, EventType
+            from services.core.event_bus import EventType, publish_event
             publish_event(
                 EventType.DATA_REFRESH_REQUESTED,
                 source="super_intelligence",
-                payload={"reason": "self_healing", "timestamp": datetime.now(timezone.utc).isoformat()},
+                payload={"reason": "self_healing", "timestamp": datetime.now(UTC).isoformat()},
             )
         except Exception as e:
             logger.error("Data refresh trigger failed", error=str(e))
@@ -655,7 +656,7 @@ class SuperIntelligenceEngine:
         except ImportError:
             logger.warning("Health monitor not available for restart", module=module)
 
-    def _retry_with_backoff(self, healing_record: Dict):
+    def _retry_with_backoff(self, healing_record: dict):
         """Backoff ile tekrar dene."""
         attempt = healing_record.get("attempt", 0)
         backoff = learning_settings.health.healing_backoff_seconds
@@ -669,7 +670,7 @@ class SuperIntelligenceEngine:
         self._health_status.overall_status = "DEGRADED"
         self._health_status.last_error = "Fallback mode active"
 
-    def _evaluate_active_ab_test(self, actual_returns: Dict[str, float]) -> Optional[Dict]:
+    def _evaluate_active_ab_test(self, actual_returns: dict[str, float]) -> dict | None:
         """Aktif A/B test'i değerlendir."""
         if not self._ab_test_active:
             return None

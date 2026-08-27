@@ -10,9 +10,9 @@ Olasılıksal tahminler:
 FAZ 5.3: Probability Engine
 """
 
-import numpy as np
-from typing import Dict, List, Optional
 from dataclasses import dataclass
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -27,7 +27,7 @@ class ReturnDistribution:
     std_return: float
     skewness: float
     kurtosis: float
-    percentiles: Dict[int, float]  # {10: -5.2, 25: -1.3, 50: 2.1, 75: 5.8, 90: 10.2}
+    percentiles: dict[int, float]  # {10: -5.2, 25: -1.3, 50: 2.1, 75: 5.8, 90: 10.2}
 
 
 @dataclass
@@ -37,7 +37,7 @@ class CalibrationResult:
     mean_actual: float
     brier_score: float
     calibration_error: float
-    bins: List[Dict[str, float]]  # [{predicted: 0.7, actual: 0.65, count: 50}, ...]
+    bins: list[dict[str, float]]  # [{predicted: 0.7, actual: 0.65, count: 50}, ...]
 
 
 @dataclass
@@ -56,7 +56,7 @@ class ProbabilityEngine:
     def compute_return_distribution(
         self,
         ticker: str,
-        historical_returns: List[float],
+        historical_returns: list[float],
         horizon_days: int = 20,
     ) -> ReturnDistribution:
         """Geçmiş getirilerden getiri dağılımı çıkar.
@@ -86,16 +86,10 @@ class ProbabilityEngine:
         std_ret = float(np.std(returns))
 
         # Skewness
-        if std_ret > 0:
-            skew = float(np.mean(((returns - mean_ret) / std_ret) ** 3))
-        else:
-            skew = 0.0
+        skew = float(np.mean(((returns - mean_ret) / std_ret) ** 3)) if std_ret > 0 else 0.0
 
         # Kurtosis
-        if std_ret > 0:
-            kurt = float(np.mean(((returns - mean_ret) / std_ret) ** 4)) - 3
-        else:
-            kurt = 0.0
+        kurt = float(np.mean(((returns - mean_ret) / std_ret) ** 4)) - 3 if std_ret > 0 else 0.0
 
         # Percentiles
         percentiles = {
@@ -116,7 +110,7 @@ class ProbabilityEngine:
             percentiles=percentiles,
         )
 
-    def compute_hit_rate(self, predictions: List[PredictionOutcome]) -> float:
+    def compute_hit_rate(self, predictions: list[PredictionOutcome]) -> float:
         """Tahmin doğruluğu (hit rate).
 
         predicted > 0.5 ve actual = True → doğru
@@ -135,7 +129,7 @@ class ProbabilityEngine:
 
     def compute_calibration(
         self,
-        predictions: List[PredictionOutcome],
+        predictions: list[PredictionOutcome],
         num_bins: int = 10,
     ) -> CalibrationResult:
         """Kalibrasyon analizi.
@@ -178,7 +172,7 @@ class ProbabilityEngine:
         mean_actual = float(np.mean(all_actual))
 
         # Brier Score (düşük = iyi)
-        brier = float(np.mean([(p - a) ** 2 for p, a in zip(all_predicted, all_actual)]))
+        brier = float(np.mean([(p - a) ** 2 for p, a in zip(all_predicted, all_actual, strict=False)]))
 
         # Calibration error (Expected Calibration Error)
         cal_error = 0.0
@@ -197,9 +191,9 @@ class ProbabilityEngine:
 
     def compute_probability_from_features(
         self,
-        features: Dict[str, float],
-        model_weights: Optional[Dict[str, float]] = None,
-    ) -> Dict[str, float]:
+        features: dict[str, float],
+        model_weights: dict[str, float] | None = None,
+    ) -> dict[str, float]:
         """Feature'lardan olasılık tahmini (heuristic).
 
         Gerçek ML modeli yokken kullanılır.

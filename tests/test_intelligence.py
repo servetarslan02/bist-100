@@ -8,11 +8,8 @@ Kapsam:
 - Super Intelligence: karar zinciri, confidence, belirsizlik
 """
 
-import sys
-import os
 import asyncio
-import numpy as np
-
+import sys
 
 # =====================================================
 # EVIDENCE ENGINE TESTS
@@ -64,7 +61,7 @@ async def test_evidence_claim_classification():
     """Claim tipi sınıflandırması çalışmalı."""
     issues = []
 
-    from services.intelligence.evidence_engine import EvidenceVerificationEngine, ClaimType
+    from services.intelligence.evidence_engine import ClaimType, EvidenceVerificationEngine
     engine = EvidenceVerificationEngine()
 
     # FACT: doğrudan veri
@@ -107,7 +104,7 @@ async def test_evidence_contradiction():
     """Çelişkili veri yönetimi çalışmalı."""
     issues = []
 
-    from services.intelligence.evidence_engine import EvidenceVerificationEngine, VerificationResult
+    from services.intelligence.evidence_engine import EvidenceVerificationEngine
     engine = EvidenceVerificationEngine()
 
     # İki zıt iddia
@@ -223,11 +220,11 @@ async def test_super_intelligence_regime_model():
     from services.learning.super_intelligence import super_intelligence
 
     # BULL regime
-    model = super_intelligence.get_best_model_for_regime("BULL")
+    super_intelligence.get_best_model_for_regime("BULL")
     # Model None olabilir (henüz eğitim yok) ama hata vermemeli
 
     # BEAR regime
-    model = super_intelligence.get_best_model_for_regime("BEAR")
+    super_intelligence.get_best_model_for_regime("BEAR")
 
     return "Super Intelligence Regime Model", len(issues) == 0, issues
 

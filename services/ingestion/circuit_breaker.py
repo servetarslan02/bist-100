@@ -23,16 +23,18 @@ Kullanım:
 
 import asyncio
 import time
-from enum import Enum
-from typing import Optional, Callable, Any
-from datetime import datetime, timezone
+from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     """Circuit breaker durumları."""
     CLOSED = "CLOSED"         # Normal — istekler geçiyor
     OPEN = "OPEN"             # Açık — istekler engelleniyor
@@ -49,9 +51,9 @@ class CircuitStats:
     total_fallbacks: int = 0     # Fallback kullanılan
     consecutive_failures: int = 0
     consecutive_successes: int = 0
-    last_failure_time: Optional[float] = None
-    last_success_time: Optional[float] = None
-    last_state_change: Optional[float] = None
+    last_failure_time: float | None = None
+    last_success_time: float | None = None
+    last_state_change: float | None = None
     state_changes: int = 0
 
 
@@ -93,11 +95,10 @@ class CircuitBreaker:
     @property
     def state(self) -> CircuitState:
         """Mevcut durum (OPEN timeout kontrolü ile)."""
-        if self._state == CircuitState.OPEN:
-            if self._stats.last_failure_time:
-                elapsed = time.time() - self._stats.last_failure_time
-                if elapsed >= self.recovery_timeout_s:
-                    self._transition(CircuitState.HALF_OPEN)
+        if self._state == CircuitState.OPEN and self._stats.last_failure_time:
+            elapsed = time.time() - self._stats.last_failure_time
+            if elapsed >= self.recovery_timeout_s:
+                self._transition(CircuitState.HALF_OPEN)
         return self._state
 
     def _transition(self, new_state: CircuitState):
@@ -127,9 +128,8 @@ class CircuitBreaker:
         self._stats.consecutive_failures = 0
         self._stats.last_success_time = time.time()
 
-        if current == CircuitState.HALF_OPEN:
-            if self._stats.consecutive_successes >= self.success_threshold:
-                self._transition(CircuitState.CLOSED)
+        if current == CircuitState.HALF_OPEN and self._stats.consecutive_successes >= self.success_threshold:
+            self._transition(CircuitState.CLOSED)
 
     def record_failure(self):
         """Hata kaydet."""
@@ -234,10 +234,10 @@ class CircuitBreaker:
             ),
             "state_changes": self._stats.state_changes,
             "last_failure": datetime.fromtimestamp(
-                self._stats.last_failure_time, tz=timezone.utc
+                self._stats.last_failure_time, tz=UTC
             ).isoformat() if self._stats.last_failure_time else None,
             "last_success": datetime.fromtimestamp(
-                self._stats.last_success_time, tz=timezone.utc
+                self._stats.last_success_time, tz=UTC
             ).isoformat() if self._stats.last_success_time else None,
         }
 

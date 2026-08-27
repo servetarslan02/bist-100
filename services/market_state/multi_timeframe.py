@@ -11,10 +11,11 @@ Cross-timeframe divergence detection:
 - Alignment score (uyum skoru)
 """
 
-import numpy as np
-from typing import Dict, List, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
+import numpy as np
 import structlog
 
 logger = structlog.get_logger()
@@ -30,9 +31,9 @@ class TimeframeState:
     momentum: float = 0.0
     volatility: float = 0.0
     risk_appetite: float = 0.5
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "timeframe": self.timeframe,
             "regime": self.regime,
@@ -48,12 +49,12 @@ class TimeframeState:
 @dataclass
 class MultiTimeframeResult:
     """Çoklu timeframe sonucu."""
-    states: Dict[str, TimeframeState] = field(default_factory=dict)
+    states: dict[str, TimeframeState] = field(default_factory=dict)
     alignment_score: float = 1.0            # 1 = tam uyum, 0 = tam çelişki
-    divergences: List[str] = field(default_factory=list)
+    divergences: list[str] = field(default_factory=list)
     dominant_timeframe: str = "daily"       # En güvenilir timeframe
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "states": {tf: s.to_dict() for tf, s in self.states.items()},
             "alignment_score": round(self.alignment_score, 4),
@@ -77,7 +78,7 @@ class MultiTimeframeEngine:
 
     def compute_all_timeframes(
         self,
-        data_by_timeframe: Dict[str, Dict],
+        data_by_timeframe: dict[str, dict],
     ) -> MultiTimeframeResult:
         """Her timeframe için market state hesapla.
 
@@ -129,7 +130,7 @@ class MultiTimeframeEngine:
     def _compute_timeframe_state(
         self,
         timeframe: str,
-        data: Dict,
+        data: dict,
     ) -> TimeframeState:
         """Tek bir timeframe için state hesapla."""
         instruments = data.get("instruments", [])
@@ -207,8 +208,8 @@ class MultiTimeframeEngine:
 
     def _detect_divergences(
         self,
-        states: Dict[str, TimeframeState],
-    ) -> List[str]:
+        states: dict[str, TimeframeState],
+    ) -> list[str]:
         """Cross-timeframe divergence tespit.
 
         Örneğin: Günlük BULL ama haftalık BEAR → dikkat
@@ -234,16 +235,15 @@ class MultiTimeframeEngine:
         short_tf = regimes.get("intraday", regimes.get("daily"))
         long_tf = regimes.get("weekly", regimes.get("monthly"))
 
-        if short_tf and long_tf:
-            if (short_tf in ("BULL", "RISK_ON") and long_tf in ("BEAR", "RISK_OFF")) or \
-               (short_tf in ("BEAR", "RISK_OFF") and long_tf in ("BULL", "RISK_ON")):
-                divergences.append(
-                    f"Short/Long term divergence: short={short_tf}, long={long_tf}"
-                )
+        if short_tf and long_tf and ((short_tf in ("BULL", "RISK_ON") and long_tf in ("BEAR", "RISK_OFF")) or \
+               (short_tf in ("BEAR", "RISK_OFF") and long_tf in ("BULL", "RISK_ON"))):
+            divergences.append(
+                f"Short/Long term divergence: short={short_tf}, long={long_tf}"
+            )
 
         return divergences
 
-    def _compute_alignment(self, states: Dict[str, TimeframeState]) -> float:
+    def _compute_alignment(self, states: dict[str, TimeframeState]) -> float:
         """Timeframe uyumu skoru [0, 1].
 
         1 = tüm timeframe'ler aynı rejimde
@@ -269,7 +269,7 @@ class MultiTimeframeEngine:
 
         return alignment
 
-    def _find_dominant(self, states: Dict[str, TimeframeState]) -> str:
+    def _find_dominant(self, states: dict[str, TimeframeState]) -> str:
         """En güvenilir timeframe'i bul.
 
         Güvenilirlik: daily > weekly > monthly > intraday

@@ -22,13 +22,14 @@ Metrics:
 """
 
 import time
-from typing import Dict, Any, Optional
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
-from .db_lock import get_all_metrics, get_health_report
-from .observability import prometheus_metrics, health_checker
 from .alerting import alerting
+from .db_lock import get_all_metrics, get_health_report
+from .observability import health_checker, prometheus_metrics
 
 logger = structlog.get_logger()
 
@@ -38,7 +39,7 @@ class PortfolioMonitor:
 
     def __init__(self):
         self._portfolio_service = None
-        self._last_sync_time: Optional[float] = None
+        self._last_sync_time: float | None = None
         self._sync_interval_s = 5.0  # 5 saniyede bir metrik güncelle
         self._invariant_failure_count = 0
 
@@ -88,8 +89,8 @@ class PortfolioMonitor:
             # Lock metrics
             lock_metrics = get_all_metrics()
             for key, m in lock_metrics.items():
-                prometheus_metrics.inc(f"lock_acquisition_total", m.get("total_acquisitions", 0), {"key": key})
-                prometheus_metrics.set_gauge(f"lock_wait_seconds", m.get("avg_wait_ms", 0) / 1000, {"key": key})
+                prometheus_metrics.inc("lock_acquisition_total", m.get("total_acquisitions", 0), {"key": key})
+                prometheus_metrics.set_gauge("lock_wait_seconds", m.get("avg_wait_ms", 0) / 1000, {"key": key})
             alerting.check_lock_metrics(lock_metrics)
 
             self._last_sync_time = now
@@ -97,7 +98,7 @@ class PortfolioMonitor:
         except Exception as e:
             logger.warning("Metrics sync failed", error=str(e))
 
-    async def get_health_detailed(self) -> Dict[str, Any]:
+    async def get_health_detailed(self) -> dict[str, Any]:
         """Detaylı sağlık raporu (API endpoint için)."""
         await self.sync_metrics()
 
@@ -138,7 +139,7 @@ class PortfolioMonitor:
 
         return {
             "status": overall,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "portfolio": portfolio_health,
             "locks": lock_health,
             "components": health_checker.check_all().get("components", {}),
@@ -155,9 +156,8 @@ class PortfolioMonitor:
         # Counters
         for name, value in metrics.get("counters", {}).items():
             clean_name = name.split("{")[0]
-            labels = ""
             if "{" in name:
-                labels = name[name.index("{"):]
+                name[name.index("{"):]
             lines.append(f"# TYPE {clean_name} counter")
             lines.append(f"{name} {value}")
 
@@ -179,17 +179,17 @@ class PortfolioMonitor:
 
         return "\n".join(lines) + "\n"
 
-    async def get_lock_metrics_api(self) -> Dict[str, Any]:
+    async def get_lock_metrics_api(self) -> dict[str, Any]:
         """Lock metrikleri (API endpoint)."""
         metrics = get_all_metrics()
         health = get_health_report()
         return {
             "metrics": metrics,
             "health": health,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
-    async def get_portfolio_api(self) -> Dict[str, Any]:
+    async def get_portfolio_api(self) -> dict[str, Any]:
         """Portfolio durumu (API endpoint)."""
         try:
             from services.paper_trading.paper_orchestrator import paper_orchestrator
@@ -205,7 +205,7 @@ class PortfolioMonitor:
                     "total_value": summary.get("total_value", 0.0),
                 },
                 "health": {"status": "HEALTHY", "engine": "PaperTradingOrchestrator_SingleSource"},
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
         except Exception as e:
             return {"error": str(e)}

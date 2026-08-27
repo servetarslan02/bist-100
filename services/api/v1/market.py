@@ -1,14 +1,14 @@
-import time
 import asyncio
-from datetime import datetime, timezone
-
+import time
 from collections import defaultdict
+from datetime import UTC, datetime
+
 import numpy as np
+import structlog
 import yfinance as yf
 from fastapi import APIRouter, Depends, HTTPException, Query
-import structlog
 
-from ..dependencies import get_current_user, check_rate_limit, get_service_orchestrator
+from ..dependencies import check_rate_limit, get_current_user, get_service_orchestrator
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -18,20 +18,20 @@ router = APIRouter()
 async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limit)):
     """Piyasa durumu — 0-Gecikmeli radar ve rejim motorundan anında döner."""
     try:
-        from ...intelligence.regime import regime_engine
         from ...core.redis_helper import get_cached
-        
+        from ...intelligence.regime import regime_engine
+
         regime = regime_engine.get_current_regime() if hasattr(regime_engine, 'get_current_regime') else "BULL_TREND"
         if regime == "UNKNOWN" or not regime:
             regime = "BULL_TREND"
-            
+
         radar_items = get_cached("radar:data")
-        
+
         advancing = 0
         declining = 0
         total = 0
         rsi_list = []
-        
+
         if radar_items and isinstance(radar_items, list) and len(radar_items) > 0:
             for item in radar_items:
                 chg = item.get("change", 0.0)
@@ -42,7 +42,7 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
                 total += 1
                 if item.get("rsi"):
                     rsi_list.append(item["rsi"])
-        
+
         if total > 0:
             breadth = (advancing / max(total, 1)) * 100.0
             avg_rsi = float(np.mean(rsi_list)) if rsi_list else 52.4
@@ -51,9 +51,9 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
             declining = 180
             breadth = 59.5
             avg_rsi = 53.2
-        
+
         risk_appetite = round(max(0.1, min(0.95, breadth / 100.0)), 2)
-        
+
         return {
             "regime": regime,
             "breadth_pct": round(breadth, 1),
@@ -62,7 +62,7 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
             "avg_rsi": round(avg_rsi, 1),
             "anomaly_count": 0,
             "risk_appetite": risk_appetite,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "ok",
         }
     except Exception as e:
@@ -75,7 +75,7 @@ async def market_state(user=Depends(get_current_user), _=Depends(check_rate_limi
             "avg_rsi": 52.0,
             "anomaly_count": 0,
             "risk_appetite": 0.65,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "status": "ok",
         }
 
@@ -97,7 +97,7 @@ async def instruments(user=Depends(get_current_user), _=Depends(check_rate_limit
         }
         return _INSTRUMENTS_CACHE
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/instruments/{ticker}")
@@ -108,7 +108,7 @@ async def instrument_detail(ticker: str, user=Depends(get_current_user), _=Depen
         result = {"ticker": ticker, "available": True}
         return result
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/instruments/{ticker}/ohlcv")
@@ -124,7 +124,7 @@ async def ohlcv(ticker: str, period: str = "6mo", interval: str = "1d", user=Dep
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 _KNOWN_COMPANIES = {
@@ -360,7 +360,7 @@ async def features(ticker: str, user=Depends(get_current_user), _=Depends(check_
         FactorEngine()
         return {"ticker": ticker, "features_available": True, "message": "Requires historical data"}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/sectors")
@@ -417,9 +417,11 @@ async def market_radar(
 
 async def _fetch_radar_fresh(limit: int = 1000):
     """0-Gecikmeli Canlı TradingView & Kamu Veri Beslemesi ile TÜM BIST hisselerini çek."""
-    from ...ingestion.bist_universe import bist_universe
     from concurrent.futures import ThreadPoolExecutor
+
     import requests
+
+    from ...ingestion.bist_universe import bist_universe
 
     bist100 = set(bist_universe.BIST_100_TICKERS)
     all_tickers = bist_universe.BIST_ALL_TICKERS
@@ -545,7 +547,7 @@ async def _fetch_radar_fresh(limit: int = 1000):
                     progress=False,
                     threads=True,
                 )
-                for ticker, yf_ticker in zip(chunk, yf_tickers):
+                for ticker, yf_ticker in zip(chunk, yf_tickers, strict=False):
                     try:
                         df = raw if len(chunk) == 1 else (
                             raw[yf_ticker] if yf_ticker in raw.columns.get_level_values(0) else None
@@ -601,7 +603,7 @@ async def _fetch_radar_fresh(limit: int = 1000):
     try:
         from ...core.redis_helper import set_cached
         set_cached("radar:data", results, ttl=180)
-        set_cached("radar:updated_at", datetime.now(timezone.utc).isoformat(), ttl=180)
+        set_cached("radar:updated_at", datetime.now(UTC).isoformat(), ttl=180)
     except Exception as e:
         logger.debug("radar_cache_write_failed", error=str(e))
 
@@ -637,8 +639,8 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
     if _HEATMAP_CACHE and (now - _HEATMAP_TIME < 30):
         return _HEATMAP_CACHE
 
-    from ...ingestion.bist_universe import bist_universe
     from ...core.redis_helper import get_cached
+    from ...ingestion.bist_universe import bist_universe
 
     stock_items = get_cached("radar:data")
     if not stock_items:
@@ -646,7 +648,7 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
             {"symbol": t, "name": t, "price": 50.0, "change": 1.2, "volume": 15000000, "score": 80}
             for t in getattr(bist_universe, 'BIST_100_TICKERS', [])[:50]
         ]
-    
+
     # Bilinen ana hisseler için deterministik kesin sektör eşleme
     TICKER_SECTORS = {
         "AKBNK": "Bankacılık & Finans", "GARAN": "Bankacılık & Finans", "ISCTR": "Bankacılık & Finans",
@@ -732,11 +734,11 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
         items = sector_groups.get(sec_name, [])
         if not items:
             continue
-        
+
         # Sektörün toplam hacmi ve ortalama değişimi
         total_vol = sum(it.get("volume", 0) for it in items)
         avg_chg = round(float(np.mean([it.get("change", 0.0) for it in items])), 2)
-        
+
         stock_list = []
         for it in sorted(items, key=lambda x: x.get("volume", 0), reverse=True)[:16]:
             vol_val = it.get("volume", 0)
@@ -749,7 +751,7 @@ async def market_heatmap(user=Depends(get_current_user), _=Depends(check_rate_li
                 "volume": vol_str,
                 "score": it.get("score", 75),
             })
-            
+
         vol_total_str = f"{(total_vol/1000000000):.1f} Milyar ₺" if total_vol >= 1000000000 else f"{(total_vol/1000000):.0f} Milyon ₺"
         sectors.append({
             "name": sec_name,

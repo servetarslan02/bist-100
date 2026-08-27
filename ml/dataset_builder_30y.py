@@ -10,11 +10,8 @@ ALPHA BIST — 30-Yıllık ML Feature Matrix & Dataset Builder
 özelliklerini sıfır look-ahead garantisiyle hesaplayıp Train/OOS setlerine böler.
 """
 
-import os
-import sys
 import numpy as np
 import polars as pl
-from typing import Dict, Tuple, List
 import structlog
 
 logger = structlog.get_logger()
@@ -29,15 +26,15 @@ class DatasetBuilder30Y:
         self.warehouse = HistoricalDataWarehouse()
         self.bm_df, self.stock_dict = self.warehouse.load_30y_data()
 
-    def build_feature_matrix(self) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def build_feature_matrix(self) -> tuple[pl.DataFrame, pl.DataFrame]:
         """
         Train (1997-2023) ve OOS (2024-2026) feature matrislerini üretir.
         """
         logger.info("30 yıllık veri üzerinde ML feature mühendisliği başlatılıyor...")
-        
+
         bm_closes = self.bm_df["Close"].to_numpy()
         bm_dates = self.bm_df.index
-        
+
         # BIST-100 Rejim Göstergeleri
         bm_sma50 = pl.Series(bm_closes, index=bm_dates).rolling(50).mean().to_numpy()
         bm_sma200 = pl.Series(bm_closes, index=bm_dates).rolling(200).mean().to_numpy()
@@ -49,7 +46,7 @@ class DatasetBuilder30Y:
         for ticker, df in self.stock_dict.items():
             if len(df) < 60:
                 continue
-            
+
             df = df.sort_index()
             closes = df["Close"].to_numpy().astype(np.float64)
             opens = df["Open"].to_numpy().astype(np.float64)
@@ -95,10 +92,10 @@ class DatasetBuilder30Y:
                 ret_1d[i] = ((closes[i] - closes[i-1]) / max(closes[i-1], 1e-4)) * 100.0
                 ret_5d[i] = ((closes[i] - closes[i-5]) / max(closes[i-5], 1e-4)) * 100.0
                 ret_20d[i] = ((closes[i] - closes[i-20]) / max(closes[i-20], 1e-4)) * 100.0
-                
+
                 avg_vol20 = np.mean(volumes[max(0, i-20):i])
                 vol_surge[i] = volumes[i] / max(avg_vol20, 1.0)
-                
+
                 max_h20 = np.max(highs[max(0, i-20):i])
                 high_20d[i] = max_h20
                 near_20d_high[i] = 1.0 if closes[i] >= (max_h20 * 0.98) else 0.0
@@ -116,16 +113,16 @@ class DatasetBuilder30Y:
                 if dt not in bm_dates:
                     continue
                 bm_idx = bm_dates.get_loc(dt)
-                
+
                 # Forward $t+1$ to $t+5$ return
                 entry_p = opens[i+1] * 1.0010  # slippage
                 exit_p = closes[i+5] * 0.9990  # slippage
                 fwd_ret_5d = ((exit_p - entry_p) / entry_p) * 100.0
-                
+
                 # Risk ayarlı hedef (Winsorize edilmiş -10.0 ile +10.0 arası normalize getiri)
                 clipped_ret = np.clip(fwd_ret_5d, -25.0, 35.0)
                 risk_adj_target = float(np.clip(clipped_ret / max(atr_pct[i], 1.0), -10.0, 10.0))
-                
+
                 # Rejim özellikleri
                 is_bull_bm = 1.0 if bm_closes[bm_idx] >= bm_sma50[bm_idx] else 0.0
                 bm_dist_sma200 = ((bm_closes[bm_idx] - bm_sma200[bm_idx]) / max(bm_sma200[bm_idx], 1.0)) * 100.0

@@ -27,7 +27,8 @@ Kullanım:
     total = await shard_router.aggregate("SELECT SUM(volume) FROM prices")
 """
 
-from typing import Dict, Any, List
+from typing import Any
+
 import structlog
 
 try:
@@ -51,7 +52,7 @@ class ShardRouter:
     }
 
     def __init__(self):
-        self._pools: Dict[int, Any] = {}
+        self._pools: dict[int, Any] = {}
         self._enabled = False
 
     @property
@@ -75,7 +76,7 @@ class ShardRouter:
         """Ticker için shard ID döndür."""
         return self._get_shard_id(ticker)
 
-    def get_shard_info(self, ticker: str) -> Dict[str, Any]:
+    def get_shard_info(self, ticker: str) -> dict[str, Any]:
         """Ticker için shard bilgisi döndür."""
         shard_id = self._get_shard_id(ticker)
         return {
@@ -119,7 +120,7 @@ class ShardRouter:
 
     async def close(self):
         """Tüm shard pool'larını kapat."""
-        for shard_id, pool in self._pools.items():
+        for _shard_id, pool in self._pools.items():
             try:
                 await pool.close()
             except Exception:
@@ -147,7 +148,7 @@ class ShardRouter:
         async with pool.acquire() as conn:
             return await conn.execute(query, *args)
 
-    async def fetch(self, ticker: str, query: str, *args) -> List:
+    async def fetch(self, ticker: str, query: str, *args) -> list:
         """Ticker'ın shard'ından read query çalıştır."""
         pool = await self.get_pool(ticker)
         async with pool.acquire() as conn:
@@ -165,7 +166,7 @@ class ShardRouter:
         async with pool.acquire() as conn:
             return await conn.fetchval(query, *args)
 
-    async def query_all(self, query: str, *args) -> Dict[int, List]:
+    async def query_all(self, query: str, *args) -> dict[int, list]:
         """Tüm shard'larda sorgu çalıştır. {shard_id: rows} döndür."""
         results = {}
         for shard_id, pool in self._pools.items():
@@ -185,7 +186,7 @@ class ShardRouter:
 
         # Sonuçları birleştir (SUM, COUNT, AVG için)
         combined = []
-        for shard_id, rows in all_results.items():
+        for _shard_id, rows in all_results.items():
             combined.extend(rows)
 
         if not combined:
@@ -197,13 +198,13 @@ class ShardRouter:
 
         return combined
 
-    def get_all_tickers_for_shard(self, shard_id: int) -> List[str]:
+    def get_all_tickers_for_shard(self, shard_id: int) -> list[str]:
         """Shard'daki tüm ticker'ları döndür."""
         from ..ingestion.bist_universe import get_bist_universe
         universe = get_bist_universe()
         return [t for t in universe if self._get_shard_id(t) == shard_id]
 
-    def get_shard_stats(self) -> Dict[str, Any]:
+    def get_shard_stats(self) -> dict[str, Any]:
         """Shard istatistikleri."""
         from ..ingestion.bist_universe import get_bist_universe
         universe = get_bist_universe()

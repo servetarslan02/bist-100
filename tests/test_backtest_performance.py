@@ -14,14 +14,17 @@ Kapsam:
 """
 
 import sys
-import os
 import time
-import numpy as np
-import polars as pl
 from datetime import datetime, timedelta
 
+import numpy as np
+import polars as pl
+
 from services.scanner.backtest_runner import (
-    ScannerBacktestRunner, PortfolioSimulator, FeatureCache, QualityCache,
+    FeatureCache,
+    PortfolioSimulator,
+    QualityCache,
+    ScannerBacktestRunner,
 )
 
 
@@ -33,7 +36,7 @@ def make_market_data(n_stocks=100, n_days=252, seed=42):
     for ticker in tickers:
         trend = np.random.uniform(-0.001, 0.002)
         vol = np.random.uniform(0.01, 0.025)
-        dates = pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
+        pl.date_range(datetime.now() - timedelta(days=n_days*2), datetime.now(), timedelta(days=1), eager=True).tail(n_days)
         close = 100 * np.exp(np.cumsum(np.random.randn(n_days) * vol + trend))
         high = close * (1 + np.abs(np.random.randn(n_days) * 0.008))
         low = close * (1 - np.abs(np.random.randn(n_days) * 0.008))

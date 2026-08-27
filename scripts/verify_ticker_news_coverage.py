@@ -3,15 +3,16 @@ ALPHA BIST — 629 HİSSE İÇİN CANLI HABER VE KAP KAPSAMI DOĞRULAMA TESTİ
 Farklı sektör ve büyüklükteki hisseler için canlı haber ve KAP akışının çalıştığını kanıtlar.
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
 
 sys.path.insert(0, os.path.abspath("."))
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding='utf-8')
 
 from services.ingestion.providers.news_provider import news_provider
+
 
 async def test_news_coverage():
     print("=" * 85)
@@ -28,7 +29,7 @@ async def test_news_coverage():
             for i, n in enumerate(news[:2], 1):
                 print(f"    {i}. \"{n['title'][:75]}...\"")
         else:
-            print(f"  ⚠️ Haber bulunamadı.")
+            print("  ⚠️ Haber bulunamadı.")
 
     print("\n" + "=" * 85)
     print("KANITLANDI: TÜM BIST HİSSELERİ (629 HİSSE) İÇİN HABER VE KAP KAPSAMI AKTİFTİR.")

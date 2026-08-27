@@ -17,14 +17,18 @@ Kullanım:
 """
 
 import asyncio
-import orjson
 import os
-from typing import Optional, Callable, Dict, Any, AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import TYPE_CHECKING, Any
+
+import orjson
 import structlog
+
+if TYPE_CHECKING:
+    from nats.aio.client import Client as NATS
 
 try:
     import nats
-    from nats.aio.client import Client as NATS
     HAS_NATS = True
 except ImportError:
     HAS_NATS = False
@@ -36,9 +40,9 @@ class NatsClient:
     """NATS istemcisi — tek instance, tüm sistem kullanır."""
 
     def __init__(self):
-        self._nc: Optional[NATS] = None
+        self._nc: NATS | None = None
         self._js = None  # JetStream context
-        self._subscriptions: Dict[str, Any] = {}
+        self._subscriptions: dict[str, Any] = {}
         self._connected = False
 
     async def connect(self, servers: str = None) -> bool:
@@ -106,9 +110,8 @@ class NatsClient:
 
     async def publish(self, subject: str, data: Any) -> bool:
         """Veri yayınla. Başarısız olursa False döner."""
-        if not self.is_connected:
-            if not await self.connect():
-                return False
+        if not self.is_connected and not await self.connect():
+            return False
 
         try:
             if isinstance(data, dict):
@@ -127,11 +130,10 @@ class NatsClient:
             self._connected = False
             return False
 
-    async def subscribe(self, subject: str, handler: Callable = None) -> AsyncIterator[Dict[str, Any]]:
+    async def subscribe(self, subject: str, handler: Callable = None) -> AsyncIterator[dict[str, Any]]:
         """Konuya abone ol. handler verilirse callback, verilmezse async iterator döner."""
-        if not self.is_connected:
-            if not await self.connect():
-                return
+        if not self.is_connected and not await self.connect():
+            return
 
         try:
             if handler:
@@ -203,7 +205,7 @@ class NatsClient:
 
     async def subscribe_durable(self, subject: str, durable_name: str,
                                 handler: Callable = None,
-                                stream: str = None) -> AsyncIterator[Dict[str, Any]]:
+                                stream: str = None) -> AsyncIterator[dict[str, Any]]:
         """JetStream ile kalıcı abone ol.
 
         Durable consumer: mesajlar kaybolmaz, restart sonrası kaldığı yerden devam.
@@ -263,17 +265,13 @@ class NatsClient:
         except Exception as e:
             logger.debug("JetStream subscribe failed", subject=subject, error=str(e))
 
-    async def request(self, subject: str, data: Any, timeout: float = 5.0) -> Dict[str, Any]:
+    async def request(self, subject: str, data: Any, timeout: float = 5.0) -> dict[str, Any]:
         """İstek-yanıt (request-reply pattern)."""
-        if not self.is_connected:
-            if not await self.connect():
-                return {}
+        if not self.is_connected and not await self.connect():
+            return {}
 
         try:
-            if isinstance(data, dict):
-                payload = orjson.dumps(data, default=str).decode()
-            else:
-                payload = str(data).encode()
+            payload = orjson.dumps(data, default=str).decode() if isinstance(data, dict) else str(data).encode()
 
             response = await self._nc.request(subject, payload, timeout=timeout)
             return orjson.loads(response.data.decode())

@@ -10,22 +10,23 @@ Borsa İstanbul Kurumsal Piyasa Mikro-Yapısı ve Eşleşme Motoru:
 - BIST Fiyat Adımları, Komisyon ve Slippage Modeli
 """
 
-import uuid
 import time as _time
-from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+import uuid
 from collections import defaultdict
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
-from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 from services.core.bist_tick_size import round_to_bist_tick
-from services.simulation.auction_engine import AuctionOrder, call_auction_engine
-from services.simulation.order_book import OrderBook
+from services.core.market_session_fsm import BISTMarketPhase, bist_session_fsm
 from services.paper_trading.pre_trade_risk import pre_trade_risk_engine
 from services.paper_trading.synthetic_liquidity import (
-    SyntheticOrderBookBuilder,
     LiquidityScenario,
+    SyntheticOrderBookBuilder,
 )
+from services.simulation.auction_engine import AuctionOrder, call_auction_engine
+from services.simulation.order_book import OrderBook
 
 logger = structlog.get_logger()
 
@@ -50,9 +51,9 @@ class MarketMicrostructureEngine:
         self.slippage_max_pct = slippage_max_pct
 
         # Ticker bazlı emir defterleri (L2 Order Book)
-        self._books: Dict[str, OrderBook] = {}
+        self._books: dict[str, OrderBook] = {}
         # Açık artırma emir toplama havuzları
-        self._auction_pools: Dict[str, List[AuctionOrder]] = defaultdict(list)
+        self._auction_pools: dict[str, list[AuctionOrder]] = defaultdict(list)
         # Günlük ciro takibi
         self._daily_turnover: float = 0.0
 
@@ -71,12 +72,12 @@ class MarketMicrostructureEngine:
         price: float = 0.0,
         reference_price: float = 0.0,
         portfolio_cash: float = float("inf"),
-        market_phase: Optional[BISTMarketPhase] = None,
+        market_phase: BISTMarketPhase | None = None,
         avg_volume: int = 1_000_000,
         volatility: float = 0.25,
         spread_pct: float = 0.1,
         scenario: LiquidityScenario = LiquidityScenario.NORMAL,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """BIST kurallarına göre emri doğrular, seans durumuna göre deftere veya açık artırmaya iletir."""
         current_phase = market_phase or bist_session_fsm.get_phase(ticker=ticker)
         order_id = f"ORD_{date}_{ticker}_{side}_{uuid.uuid4().hex[:6]}"
@@ -99,7 +100,7 @@ class MarketMicrostructureEngine:
             "market_phase": current_phase.value,
             "status": "CREATED",
             "rejection_reason": None,
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_at": datetime.now(UTC).isoformat(),
         }
 
         # 1. EMİR ÖNCESİ RİSK DENETİMİ (Pre-Trade Risk Engine)
@@ -198,7 +199,7 @@ class MarketMicrostructureEngine:
 
         return order_record
 
-    def execute_call_auction(self, ticker: str, reference_price: float) -> Dict[str, Any]:
+    def execute_call_auction(self, ticker: str, reference_price: float) -> dict[str, Any]:
         """Açık artırma havuzundaki emirleri tek denge fiyatından eşleştirir."""
         orders = self._auction_pools.pop(ticker, [])
         if not orders:

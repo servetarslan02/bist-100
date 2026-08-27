@@ -1,6 +1,7 @@
+from typing import Any
+
 import numpy as np
 import polars as pl
-from typing import List, Dict, Any
 
 
 class RiskManager:
@@ -25,7 +26,7 @@ class RiskManager:
             "sector_exposure": {},
         }
 
-    def calculate_weights(self, predictions: List[Dict[str, Any]], method: str = "equal", max_weight: float = 0.20) -> Dict[str, float]:
+    def calculate_weights(self, predictions: list[dict[str, Any]], method: str = "equal", max_weight: float = 0.20) -> dict[str, float]:
         """
         Tahmin edilen TOP N hisse icin agirlik (weight) hesaplar.
         """
@@ -49,7 +50,7 @@ class RiskManager:
                 inv_vols.append(1.0 / vol)
 
             total_inv_vol = sum(inv_vols)
-            for p, inv_v in zip(predictions, inv_vols):
+            for p, inv_v in zip(predictions, inv_vols, strict=False):
                 w = inv_v / total_inv_vol if total_inv_vol > 0 else 1.0 / len(predictions)
                 weights[p["ticker"]] = min(w, max_weight)
 
@@ -64,7 +65,7 @@ class RiskManager:
                     weights[t] = min(w, max_weight)
             else:
                 raw_weights = scores / scores.sum()
-                for p, w in zip(predictions, raw_weights):
+                for p, w in zip(predictions, raw_weights, strict=False):
                     weights[p["ticker"]] = min(float(w), max_weight)
 
         else:

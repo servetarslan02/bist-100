@@ -10,12 +10,12 @@ Learning system sağlık izleme:
 KURAL: Bir modül çökse diğerleri çalışmaya devam etmeli.
 """
 
-from typing import Dict, List, Optional, Any
-from dataclasses import dataclass
-from datetime import datetime, timezone
 from collections import deque
-import structlog
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
+import structlog
 
 logger = structlog.get_logger()
 
@@ -27,7 +27,7 @@ class ModuleHealth:
     status: str  # HEALTHY, WARNING, CRITICAL, DEGRADED, RESTARTING
     last_check: str
     error_count: int
-    last_error: Optional[str]
+    last_error: str | None
     uptime_hours: float
 
 
@@ -36,10 +36,10 @@ class HealthReport:
     """Kapsamlı sağlık raporu."""
     timestamp: str
     overall_status: str
-    modules: Dict[str, ModuleHealth]
-    critical_modules: List[str]
-    warning_modules: List[str]
-    recommendations: List[str]
+    modules: dict[str, ModuleHealth]
+    critical_modules: list[str]
+    warning_modules: list[str]
+    recommendations: list[str]
     error_count: int = 0
     pending_restarts: int = 0
 
@@ -82,10 +82,10 @@ class LearningHealthMonitor:
     """Learning system sağlık izleme."""
 
     def __init__(self):
-        self._module_status: Dict[str, ModuleHealth] = {}
+        self._module_status: dict[str, ModuleHealth] = {}
         self._error_history: deque = deque(maxlen=1000)
         self._restart_requests: deque = deque(maxlen=100)
-        self._start_time = datetime.now(timezone.utc)
+        self._start_time = datetime.now(UTC)
 
     def check_health(self) -> HealthReport:
         """Tüm modüllerin sağlık durumunu kontrol et."""
@@ -115,7 +115,7 @@ class LearningHealthMonitor:
         overall = "CRITICAL" if critical else ("WARNING" if warnings else "HEALTHY")
 
         report = HealthReport(
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             overall_status=overall,
             modules=modules,
             critical_modules=critical,
@@ -138,7 +138,7 @@ class LearningHealthMonitor:
                 self._restart_requests = self._restart_requests[-100:]
             logger.info("Restart requested", module=module)
 
-    def get_restart_requests(self) -> List[str]:
+    def get_restart_requests(self) -> list[str]:
         """Restart isteklerini al ve temizle."""
         requests = self._restart_requests.copy()
         self._restart_requests.clear()
@@ -149,7 +149,7 @@ class LearningHealthMonitor:
         self._error_history.append({
             "module": module,
             "error": error,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         })
         if len(self._error_history) > 1000:
             self._error_history = self._error_history[-1000:]
@@ -159,9 +159,9 @@ class LearningHealthMonitor:
             self._module_status[module].error_count += 1
             self._module_status[module].last_error = error
 
-    def get_report(self) -> Dict[str, Any]:
+    def get_report(self) -> dict[str, Any]:
         """Rapor."""
-        uptime = (datetime.now(timezone.utc) - self._start_time).total_seconds() / 3600
+        uptime = (datetime.now(UTC) - self._start_time).total_seconds() / 3600
         return {
             "status": "OK",
             "uptime_hours": round(uptime, 1),
@@ -177,10 +177,7 @@ class LearningHealthMonitor:
         try:
             from services.learning.integrated_learning import learning_system
             stats = learning_system.get_stats()
-            if stats.get("total_predictions", 0) > 0:
-                status = "HEALTHY"
-            else:
-                status = "WARNING"
+            status = "HEALTHY" if stats.get("total_predictions", 0) > 0 else "WARNING"
         except Exception as e:
             status = "CRITICAL"
             self.record_error("prediction_tracking", str(e))
@@ -189,10 +186,10 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="prediction_tracking",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "prediction_tracking"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "prediction_tracking"), None),
-            uptime_hours=(datetime.now(timezone.utc) - self._start_time).total_seconds() / 3600,
+            uptime_hours=(datetime.now(UTC) - self._start_time).total_seconds() / 3600,
         )
 
     def _check_outcome_tracking(self) -> ModuleHealth:
@@ -208,7 +205,7 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="outcome_tracking",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "outcome_tracking"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "outcome_tracking"), None),
             uptime_hours=0,
@@ -227,7 +224,7 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="calibration",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "calibration"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "calibration"), None),
             uptime_hours=0,
@@ -238,10 +235,7 @@ class LearningHealthMonitor:
         try:
             from services.learning.drift_detector import advanced_drift_detector
             report = advanced_drift_detector.get_drift_report()
-            if report.get("overall_drift"):
-                status = "WARNING"
-            else:
-                status = "HEALTHY"
+            status = "WARNING" if report.get("overall_drift") else "HEALTHY"
         except Exception as e:
             status = "CRITICAL"
             self.record_error("drift_detection", str(e))
@@ -249,7 +243,7 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="drift_detection",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "drift_detection"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "drift_detection"), None),
             uptime_hours=0,
@@ -273,7 +267,7 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="model_performance",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "model_performance"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "model_performance"), None),
             uptime_hours=0,
@@ -293,14 +287,14 @@ class LearningHealthMonitor:
         return ModuleHealth(
             module="feature_pipeline",
             status=status,
-            last_check=datetime.now(timezone.utc).isoformat(),
+            last_check=datetime.now(UTC).isoformat(),
             error_count=sum(1 for e in self._error_history if e["module"] == "feature_pipeline"),
             last_error=next((e["error"] for e in reversed(self._error_history) if e["module"] == "feature_pipeline"), None),
             uptime_hours=0,
         )
 
 
-    def auto_heal(self, health_report: Dict[str, Any] = None):
+    def auto_heal(self, health_report: dict[str, Any] = None):
         """Otomatik onarım — hatalı modülleri onarmaya çalış.
 
         Args:
@@ -361,9 +355,6 @@ class LearningHealthMonitor:
         except Exception as e:
             logger.error("Healing action failed", module=module, action=action, error=str(e))
 
-    def get_report(self) -> Dict[str, Any]:
-        """Sağlık raporu."""
-        return self.check_health()
 
 
 # Singleton

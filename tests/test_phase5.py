@@ -5,7 +5,6 @@ Monte Carlo Engine, Probability Engine testleri.
 """
 
 import sys
-import os
 
 
 def test_monte_carlo():
@@ -44,7 +43,7 @@ def test_monte_carlo():
     assert result.prob_minus_10pct <= result.prob_minus_5pct  # %10 kayıp < %5 kayıp
     assert result.prob_plus_10pct <= result.prob_plus_5pct    # %10 kazanç < %5 kazanç
     passed += 1
-    print(f"  ✓ Probability consistency")
+    print("  ✓ Probability consistency")
 
     # 4. High volatility → wider distribution
     result_high_vol = monte_carlo_engine.simulate_price_paths(
@@ -57,7 +56,7 @@ def test_monte_carlo():
     # Normalize by price
     assert (spread_high / 100) > (spread_low / 305.25)
     passed += 1
-    print(f"  ✓ High volatility → wider spread")
+    print("  ✓ High volatility → wider spread")
 
     # 5. Sample paths
     assert result.sample_paths is not None
@@ -80,7 +79,8 @@ def test_monte_carlo():
 def test_probability_engine():
     """Probability Engine testleri."""
     from services.intelligence.probability import (
-        probability_engine, PredictionOutcome,
+        PredictionOutcome,
+        probability_engine,
     )
 
     passed = 0
@@ -167,7 +167,7 @@ def test_probability_engine():
     empty_cal = probability_engine.compute_calibration([])
     assert empty_cal.brier_score == 0.0
     passed += 1
-    print(f"  ✓ Empty predictions handled")
+    print("  ✓ Empty predictions handled")
 
     return passed, failed
 

@@ -16,9 +16,11 @@ Günlük Akış:
 Kaynaklar: Borsa İstanbul resmi, Eylül 2025 duyurusu
 """
 
-from typing import Dict, Any, Optional, Callable, Awaitable, List
-from datetime import datetime, timezone
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -30,7 +32,7 @@ class WorkflowPhase:
     name: str
     start_time: str
     end_time: str
-    jobs: List[str]
+    jobs: list[str]
     description: str
 
 
@@ -120,12 +122,12 @@ class DailyWorkflow:
     }
 
     def __init__(self):
-        self._handlers: Dict[str, Callable[..., Awaitable[Any]]] = {}
-        self._phase_handlers: Dict[str, Callable] = {}
+        self._handlers: dict[str, Callable[..., Awaitable[Any]]] = {}
+        self._phase_handlers: dict[str, Callable] = {}
         self._jobs_run_today: int = 0
         self._jobs_failed_today: int = 0
         self._daily_report_generated: bool = False
-        self._current_phase: Optional[str] = None
+        self._current_phase: str | None = None
 
     def register_handler(self, job_type: str, handler: Callable[..., Awaitable[Any]]):
         """Job handler kaydet."""
@@ -135,7 +137,7 @@ class DailyWorkflow:
         """Faz başlangıcı handler'ı kaydet."""
         self._phase_handlers[phase] = handler
 
-    async def execute_phase(self, phase_name: str) -> Dict[str, Any]:
+    async def execute_phase(self, phase_name: str) -> dict[str, Any]:
         """Belirli bir faz için job'ları çalıştır."""
         phase = self.PHASES.get(phase_name)
         if not phase:
@@ -194,10 +196,10 @@ class DailyWorkflow:
             jobs_run_today=self._jobs_run_today,
             jobs_failed_today=self._jobs_failed_today,
             daily_report_generated=self._daily_report_generated,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
 
-    def get_phases(self) -> Dict[str, Dict[str, Any]]:
+    def get_phases(self) -> dict[str, dict[str, Any]]:
         """Tüm fazları al."""
         return {
             name: {

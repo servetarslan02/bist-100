@@ -1,36 +1,36 @@
 """ALPHA BIST - Data Models & Schemas"""
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Dict, Any
-from datetime import datetime, date, timezone
-from enum import Enum
+from datetime import UTC, date, datetime
+from enum import StrEnum
+from typing import Any
 
+from pydantic import BaseModel, Field, field_validator
 
 # =====================================================
 # Enums
 # =====================================================
 
-class Direction(str, Enum):
+class Direction(StrEnum):
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
     CRITICAL = "CRITICAL"
 
 
-class SignalStatus(str, Enum):
+class SignalStatus(StrEnum):
     ACTIVE = "ACTIVE"
     EXPIRED = "EXPIRED"
     TRIGGERED = "TRIGGERED"
     CANCELLED = "CANCELLED"
 
 
-class MarketRegime(str, Enum):
+class MarketRegime(StrEnum):
     RISK_ON = "RISK-ON"
     RISK_OFF = "RISK-OFF"
     TRENDING_UP = "TRENDING-UP"
@@ -44,7 +44,7 @@ class MarketRegime(str, Enum):
     MOMENTUM_CONTRACTION = "MOMENTUM-CONTRACTION"
 
 
-class TimeHorizon(str, Enum):
+class TimeHorizon(StrEnum):
     SHORT = "1-5D"
     MEDIUM = "1-4W"
     LONG = "1-6M"
@@ -62,8 +62,8 @@ class MarketTick(BaseModel):
     timestamp: datetime
     price: float
     volume: int
-    bid: Optional[float] = None
-    ask: Optional[float] = None
+    bid: float | None = None
+    ask: float | None = None
     source: str = "yfinance"
     quality: float = 1.0
 
@@ -98,16 +98,16 @@ class OHLCV(BaseModel):
     low: float
     close: float
     volume: int
-    vwap: Optional[float] = None
+    vwap: float | None = None
 
 
 class OrderBookSnapshot(BaseModel):
     instrument_id: int
     timestamp: datetime
-    bid_prices: List[float]
-    bid_volumes: List[int]
-    ask_prices: List[float]
-    ask_volumes: List[int]
+    bid_prices: list[float]
+    bid_volumes: list[int]
+    ask_prices: list[float]
+    ask_volumes: list[int]
     spread: float
     mid_price: float
 
@@ -171,9 +171,9 @@ class AssetState(BaseModel):
     turnover_rate: float = 0.0
 
     # Fundamental
-    pe_ratio: Optional[float] = None
-    pb_ratio: Optional[float] = None
-    dividend_yield: Optional[float] = None
+    pe_ratio: float | None = None
+    pb_ratio: float | None = None
+    dividend_yield: float | None = None
 
     # Event/Sentiment
     kap_sentiment: float = 0.0
@@ -275,7 +275,7 @@ class Signal(BaseModel):
     - score, confidence ∈ [0,1] aralığında olmalı
     - Timestamp timezone-aware
     """
-    id: Optional[int] = None
+    id: int | None = None
     instrument_id: int
     ticker: str
     signal_type: str
@@ -291,8 +291,8 @@ class Signal(BaseModel):
     model_version: str = ""
     strategy_id: int = 0
     status: SignalStatus = SignalStatus.ACTIVE
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    expires_at: Optional[datetime] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    expires_at: datetime | None = None
 
     @field_validator("confidence")
     @classmethod
@@ -323,11 +323,11 @@ class Position(BaseModel):
     unrealized_pnl: float = 0.0
     unrealized_pnl_pct: float = 0.0
     weight_pct: float = 0.0
-    entry_date: Optional[datetime] = None
+    entry_date: datetime | None = None
 
 
 class Portfolio(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     name: str
     initial_capital: float = 100000
     current_capital: float = 100000
@@ -335,7 +335,7 @@ class Portfolio(BaseModel):
     invested_value: float = 0.0
     total_pnl: float = 0.0
     total_return_pct: float = 0.0
-    positions: List[Position] = Field(default_factory=list)
+    positions: list[Position] = Field(default_factory=list)
     is_paper: bool = True
 
 
@@ -344,7 +344,7 @@ class Portfolio(BaseModel):
 # =====================================================
 
 class Prediction(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     model_version_id: int
     instrument_id: int
     ticker: str
@@ -355,7 +355,7 @@ class Prediction(BaseModel):
     probability_positive: float
     predicted_volatility_pct: float
     confidence: float
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Outcome(BaseModel):
@@ -375,16 +375,16 @@ class Outcome(BaseModel):
 class ScenarioResult(BaseModel):
     scenario_name: str
     market_change_pct: float
-    portfolio_impact: Dict[str, Any]
+    portfolio_impact: dict[str, Any]
     probability: float
 
 
 class SimulationResult(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     name: str
     simulation_type: str
-    parameters: Dict[str, Any]
-    scenarios: List[ScenarioResult] = Field(default_factory=list)
+    parameters: dict[str, Any]
+    scenarios: list[ScenarioResult] = Field(default_factory=list)
     expected_return: float = 0.0
     expected_drawdown: float = 0.0
     var_95: float = 0.0
@@ -397,12 +397,12 @@ class SimulationResult(BaseModel):
 # =====================================================
 
 class Alert(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     alert_type: str
     severity: RiskLevel
     title: str
     message: str
-    instrument_id: Optional[int] = None
-    data: Dict[str, Any] = Field(default_factory=dict)
+    instrument_id: int | None = None
+    data: dict[str, Any] = Field(default_factory=dict)
     acknowledged: bool = False
-    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

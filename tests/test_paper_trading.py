@@ -15,24 +15,22 @@ Test coverage:
 """
 
 import os
-import sys
-import orjson
 import tempfile
 import unittest
-from datetime import datetime, timezone, timedelta, date
-from pathlib import Path
+from datetime import date, timedelta
 
 import numpy as np
+import orjson
 import polars as pl
 
-# Add parent to path
-
-from services.paper_trading.state_store import PaperStateStore
-from services.paper_trading.virtual_portfolio import VirtualPortfolio
 from services.paper_trading.paper_execution import PaperExecutionEngine
+from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
 from services.paper_trading.paper_risk_gate import PaperRiskGate
 from services.paper_trading.performance_tracker import PerformanceTracker
-from services.paper_trading.paper_orchestrator import PaperTradingOrchestrator
+
+# Add parent to path
+from services.paper_trading.state_store import PaperStateStore
+from services.paper_trading.virtual_portfolio import VirtualPortfolio
 
 
 class TestPaperStateStore(unittest.TestCase):
@@ -415,7 +413,7 @@ class TestPaperTradingOrchestrator(unittest.TestCase):
         self.assertIn("performance_metrics", report)
         self.assertIn("portfolio_summary", report)
         self.assertEqual(report["champion_version"], "LambdaRank_v3_LOCKED")
-        print(f"\n=== REPLAY REPORT ===")
+        print("\n=== REPLAY REPORT ===")
         print(orjson.dumps(report["performance_metrics"], option=orjson.OPT_INDENT_2).decode())
         print(f"Portfolio summary: {report['portfolio_summary']}")
 

@@ -13,26 +13,34 @@ Kapsam:
 - OAuth/OIDC stub
 """
 
-import sys
-import os
 import asyncio
+import os
+import sys
+
 import orjson
-import time
 
 from services.core.alerting import (
-    AlertingSystem, Alert, AlertType, AlertSeverity,
-    WebhookProvider, EmailProvider, LogProvider,
-    NotificationResult, RetryConfig,
-)
-from services.core.monitoring_security import (
-    MonitoringAuth, AuthProvider, AuthResult, AuthManager,
-    StaticTokenProvider, OAuthProvider,
+    Alert,
+    AlertingSystem,
+    AlertSeverity,
+    AlertType,
+    LogProvider,
+    NotificationResult,
+    RetryConfig,
+    WebhookProvider,
 )
 from services.core.grafana_provisioning import (
-    GrafanaProvisioner, GrafanaConfig, DatasourceConfig,
     DashboardVersion,
+    DatasourceConfig,
+    GrafanaConfig,
+    GrafanaProvisioner,
 )
-
+from services.core.monitoring_security import (
+    AuthManager,
+    AuthResult,
+    OAuthProvider,
+    StaticTokenProvider,
+)
 
 # =====================================================
 # WEBHOOK TESTS

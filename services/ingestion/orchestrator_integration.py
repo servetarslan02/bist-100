@@ -11,27 +11,28 @@ Kullanım:
 
 import asyncio
 import time
-from typing import Dict, List, Optional, Any
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import Any
+
 import structlog
 
 from .circuit_breaker import CircuitBreakerManager
-from .rate_limiter import create_default_rate_limiter
-from .provider_manager import ProviderManager, ProviderResult
-from .reconciliation import SourceReconciler
-from .point_in_time import PointInTimeValidator
 from .deduplication import EventDeduplicator
 from .incremental import IncrementalFetcher
 from .ingestion_metrics import ingestion_metrics
-from .providers.yfinance_provider import yfinance_provider
+from .point_in_time import PointInTimeValidator
+from .provider_manager import ProviderManager, ProviderResult
+from .providers.bist_provider import bist_provider
+from .providers.fundamental_provider import fundamental_provider
 from .providers.kap_provider import kap_provider
+from .providers.macro_provider import macro_provider
+from .providers.matriks_provider import matriks_provider
 from .providers.news_provider import news_provider
 from .providers.social_provider import social_provider
-from .providers.fundamental_provider import fundamental_provider
-from .providers.macro_provider import macro_provider
-from .providers.bist_provider import bist_provider
-from .providers.matriks_provider import matriks_provider
+from .providers.yfinance_provider import yfinance_provider
+from .rate_limiter import create_default_rate_limiter
+from .reconciliation import SourceReconciler
 
 logger = structlog.get_logger()
 
@@ -40,17 +41,17 @@ logger = structlog.get_logger()
 class IngestionResult:
     """Ingestion sonuç raporu."""
     ticker: str
-    market_data: Optional[ProviderResult] = None
-    fundamental_data: Optional[Dict] = None
-    kap_disclosures: List[Dict] = field(default_factory=list)
-    news: List[Dict] = field(default_factory=list)
-    social: List[Dict] = field(default_factory=list)
-    macro: Dict = field(default_factory=dict)
+    market_data: ProviderResult | None = None
+    fundamental_data: dict | None = None
+    kap_disclosures: list[dict] = field(default_factory=list)
+    news: list[dict] = field(default_factory=list)
+    social: list[dict] = field(default_factory=list)
+    macro: dict = field(default_factory=dict)
     quality_score: float = 0.0
-    reconciliation: Optional[Dict] = None
-    errors: List[str] = field(default_factory=list)
+    reconciliation: dict | None = None
+    errors: list[str] = field(default_factory=list)
     elapsed_ms: float = 0.0
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
 @dataclass
@@ -62,10 +63,10 @@ class PipelineReport:
     skipped: int = 0
     avg_quality_score: float = 0.0
     total_elapsed_s: float = 0.0
-    results: Dict[str, IngestionResult] = field(default_factory=dict)
-    macro_data: Dict = field(default_factory=dict)
-    errors: List[str] = field(default_factory=list)
-    metrics: Dict = field(default_factory=dict)
+    results: dict[str, IngestionResult] = field(default_factory=dict)
+    macro_data: dict = field(default_factory=dict)
+    errors: list[str] = field(default_factory=list)
+    metrics: dict = field(default_factory=dict)
 
 
 class IngestionOrchestrator:
@@ -125,7 +126,7 @@ class IngestionOrchestrator:
 
     async def run_full_ingestion(
         self,
-        tickers: List[str],
+        tickers: list[str],
         include_fundamental: bool = True,
         include_kap: bool = True,
         include_news: bool = True,
@@ -281,7 +282,7 @@ class IngestionOrchestrator:
         result.elapsed_ms = round((time.time() - start) * 1000, 2)
         return result
 
-    async def _fetch_macro(self) -> Dict[str, Any]:
+    async def _fetch_macro(self) -> dict[str, Any]:
         """Makro verileri çek."""
         try:
             from ..core.config import settings
@@ -300,7 +301,7 @@ class IngestionOrchestrator:
             logger.warning("Macro fetch failed", error=str(e))
             return {}
 
-    def get_health(self) -> Dict[str, Any]:
+    def get_health(self) -> dict[str, Any]:
         """Sistem sağlık durumu."""
         return {
             "providers": self._pm.get_health(),

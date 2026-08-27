@@ -5,19 +5,20 @@ Structured output şemaları — hallucination azaltır.
 Her agent rolü için beklenen JSON formatı tanımlı.
 """
 
+from enum import Enum, StrEnum
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any
-from enum import Enum
 
 
-class Direction(str, Enum):
+class Direction(StrEnum):
     LONG = "LONG"
     SHORT = "SHORT"
     NEUTRAL = "NEUTRAL"
     NO_TRADE = "NO_TRADE"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"
@@ -37,8 +38,8 @@ class AgentOutputSchema(BaseModel):
     confidence: float = Field(default=0.5)
     score: float = Field(default=50.0, ge=0.0, le=100.0)
     reasoning: str = ""
-    reasons: List[str] = Field(default_factory=list)
-    risks: List[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
     source: str = "llm"
 
     @field_validator("confidence", mode="before")
@@ -49,9 +50,9 @@ class AgentOutputSchema(BaseModel):
 
 class TechnicalOutputSchema(AgentOutputSchema):
     """Teknik analiz agent çıktısı."""
-    support_levels: List[float] = Field(default_factory=list)
-    resistance_levels: List[float] = Field(default_factory=list)
-    patterns: List[str] = Field(default_factory=list)
+    support_levels: list[float] = Field(default_factory=list)
+    resistance_levels: list[float] = Field(default_factory=list)
+    patterns: list[str] = Field(default_factory=list)
     trend: str = "NEUTRAL"  # UP, DOWN, NEUTRAL
     momentum: str = "NEUTRAL"  # STRONG, WEAK, NEUTRAL
 
@@ -61,14 +62,14 @@ class FundamentalOutputSchema(AgentOutputSchema):
     valuation: str = "FAIR"  # UNDERVALUED, OVERVALUED, FAIR
     quality_score: float = Field(default=50.0, ge=0.0, le=100.0)
     growth_score: float = Field(default=50.0, ge=0.0, le=100.0)
-    key_metrics: Dict[str, float] = Field(default_factory=dict)
+    key_metrics: dict[str, float] = Field(default_factory=dict)
 
 
 class NewsOutputSchema(AgentOutputSchema):
     """Haber/KAP analiz agent çıktısı."""
     sentiment_score: float = Field(default=0.0, ge=-1.0, le=1.0)
     event_count: int = 0
-    key_events: List[str] = Field(default_factory=list)
+    key_events: list[str] = Field(default_factory=list)
     sentiment_trend: str = "STABLE"  # IMPROVING, DETERIORATING, STABLE
 
 
@@ -76,7 +77,7 @@ class MacroOutputSchema(AgentOutputSchema):
     """Makro analiz agent çıktısı."""
     regime: str = "UNKNOWN"  # RISK_ON, RISK_OFF, NEUTRAL, TRANSITION
     macro_score: float = Field(default=50.0, ge=0.0, le=100.0)
-    key_factors: List[str] = Field(default_factory=list)
+    key_factors: list[str] = Field(default_factory=list)
     fx_impact: str = "NEUTRAL"  # POSITIVE, NEGATIVE, NEUTRAL
 
 
@@ -85,9 +86,9 @@ class DebateArgumentSchema(BaseModel):
     position: Direction
     confidence: float = Field(default=0.5)
     main_argument: str = ""
-    evidence: List[str] = Field(default_factory=list)
-    counterarguments: List[str] = Field(default_factory=list)
-    risks: List[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
+    counterarguments: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
     conclusion: str = ""
 
     @field_validator("confidence", mode="before")
@@ -101,8 +102,8 @@ class RiskAssessmentSchema(BaseModel):
     risk_level: RiskLevel = RiskLevel.MEDIUM
     risk_score: float = Field(default=50.0, ge=0.0, le=100.0)
     approved: bool = True
-    veto_reason: Optional[str] = None
-    risk_factors: List[str] = Field(default_factory=list)
+    veto_reason: str | None = None
+    risk_factors: list[str] = Field(default_factory=list)
     max_position_pct: float = Field(default=5.0, ge=0.0, le=100.0)
     stop_loss_pct: float = Field(default=5.0, ge=0.0, le=100.0)
 
@@ -116,11 +117,11 @@ class SynthesisResultSchema(BaseModel):
     consensus_reached: bool = True
     debate_occurred: bool = False
     risk_approved: bool = True
-    agent_summary: Dict[str, Any] = Field(default_factory=dict)
-    conflict_analysis: Dict[str, Any] = Field(default_factory=dict)
+    agent_summary: dict[str, Any] = Field(default_factory=dict)
+    conflict_analysis: dict[str, Any] = Field(default_factory=dict)
     reasoning: str = ""
-    reasons: List[str] = Field(default_factory=list)
-    risks: List[str] = Field(default_factory=list)
+    reasons: list[str] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
 
     @field_validator("final_confidence", mode="before")
     @classmethod
@@ -134,12 +135,12 @@ class AgentMessageSchema(BaseModel):
     receiver: str
     task_id: str
     message_type: str  # REQUEST, RESPONSE, DEBATE, ALERT, CONTEXT
-    payload: Dict[str, Any] = Field(default_factory=dict)
-    timestamp: Optional[str] = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    timestamp: str | None = None
     priority: str = "NORMAL"  # LOW, NORMAL, HIGH, CRITICAL
 
 
-def validate_agent_output(data: Dict[str, Any], schema_class=None) -> tuple:
+def validate_agent_output(data: dict[str, Any], schema_class=None) -> tuple:
     """Agent çıktısını doğrula.
 
     Returns: (is_valid, parsed_data, errors)

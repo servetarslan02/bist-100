@@ -12,8 +12,9 @@ Faktör bazlı analiz:
 FAZ 10.8: Factor Engine
 """
 
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any
+
 import structlog
 
 logger = structlog.get_logger()
@@ -57,8 +58,8 @@ class FactorEngine:
     def compute_factor_scores(
         self,
         ticker: str,
-        fundamentals: Dict[str, float],
-        technicals: Dict[str, float],
+        fundamentals: dict[str, float],
+        technicals: dict[str, float],
     ) -> FactorScore:
         """Tek hisse için faktör skorları hesapla."""
         score = FactorScore(ticker=ticker)
@@ -90,7 +91,7 @@ class FactorEngine:
 
         return score
 
-    def _compute_value(self, f: Dict) -> float:
+    def _compute_value(self, f: dict) -> float:
         """Value factor (düşük çarpan = yüksek skor). Sektör/Piyasa medyanına rölatif çalışır."""
         score = 50.0
 
@@ -133,7 +134,7 @@ class FactorEngine:
 
         return max(0, min(100, score))
 
-    def _compute_momentum(self, f: Dict) -> float:
+    def _compute_momentum(self, f: dict) -> float:
         """Momentum factor."""
         score = 50.0
 
@@ -159,7 +160,7 @@ class FactorEngine:
 
         return max(0, min(100, score))
 
-    def _compute_quality(self, f: Dict) -> float:
+    def _compute_quality(self, f: dict) -> float:
         """Quality factor."""
         score = 50.0
 
@@ -198,7 +199,7 @@ class FactorEngine:
 
         return max(0, min(100, score))
 
-    def _compute_size(self, f: Dict) -> float:
+    def _compute_size(self, f: dict) -> float:
         """Size factor (büyük şirket = düşük skor, küçük şirket = yüksek skor). Rölatif hesaplar."""
         market_cap = f.get("market_cap", 0)
         if not market_cap or market_cap <= 0:
@@ -220,7 +221,7 @@ class FactorEngine:
 
         return 50.0
 
-    def _compute_low_vol(self, f: Dict) -> float:
+    def _compute_low_vol(self, f: dict) -> float:
         """Low Volatility factor (düşük volatilite = yüksek skor)."""
         vol = f.get("realized_vol_20d", 20)
         if not vol or vol <= 0:
@@ -239,8 +240,8 @@ class FactorEngine:
 
     def compute_portfolio_exposure(
         self,
-        positions: List[Dict[str, Any]],
-        factor_scores: Dict[str, FactorScore],
+        positions: list[dict[str, Any]],
+        factor_scores: dict[str, FactorScore],
     ) -> FactorExposure:
         """Portföy faktör maruziyeti hesapla."""
         total_value = sum(p.get("value", 0) for p in positions)
@@ -279,13 +280,13 @@ factor_engine = FactorEngine()
 # =====================================================
 # B30 Factor Investing entegrasyonu
 # =====================================================
-def compute_financial_scores(financials: Dict[str, Any]) -> Dict[str, Any]:
+def compute_financial_scores(financials: dict[str, Any]) -> dict[str, Any]:
     """Piotroski F-Score, Beneish M-Score, Altman Z-Score hesapla."""
     result = {}
     try:
-        from services.factors.piotroski import calculate_f_score
-        from services.factors.beneish import calculate_m_score
         from services.factors.altman import calculate_z_score
+        from services.factors.beneish import calculate_m_score
+        from services.factors.piotroski import calculate_f_score
         f_result = calculate_f_score(financials)
         m_result = calculate_m_score(financials)
         z_result = calculate_z_score(financials)

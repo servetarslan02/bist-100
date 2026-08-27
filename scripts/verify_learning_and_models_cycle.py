@@ -1,6 +1,7 @@
-import urllib.request
-import orjson
 import sys
+import urllib.request
+
+import orjson
 
 sys.stdout.reconfigure(encoding='utf-8')
 
@@ -77,8 +78,8 @@ def verify_learning_system():
         })
         req_out = urllib.request.Request("http://localhost:8000/api/v1/learning/record_outcome", data=out_payload, headers={"Content-Type": "application/json", "X-User-Id": "1"})
         with urllib.request.urlopen(req_out) as r_o:
-            res_o = orjson.loads(r_o.read().decode())
-            print(f"  ✓ Adım 2 (Piyasa Sonucu Bağı) : Başarılı (PnL & Başarı eşleştirildi).")
+            orjson.loads(r_o.read().decode())
+            print("  ✓ Adım 2 (Piyasa Sonucu Bağı) : Başarılı (PnL & Başarı eşleştirildi).")
 
         # C) Öğrenme Döngüsünü Çalıştır
         req_cyc = urllib.request.Request("http://localhost:8000/api/v1/learning/cycle?regime=BULL_MOMENTUM", data=b"", headers={"X-User-Id": "1"})

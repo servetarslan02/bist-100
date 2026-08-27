@@ -8,30 +8,39 @@ Kullanım:
 """
 
 import asyncio
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from datetime import datetime, timezone
+import structlog
 
 from services.alternative import (
-    BaseAdapter, RateLimiter, CircuitBreaker, CircuitState,
-    DataQualityValidator, QualityReport,
-    AdapterRegistry, adapter_registry,
-    GoogleTrendsAdapter, google_trends_adapter,
-    BKMAdapter, bkm_adapter,
-    KariyerNetAdapter, kariyer_net_adapter,
-    EksiSozlukAdapter, eksi_sozluk_adapter,
-    InvestingAdapter, investing_adapter,
-    SatelliteAdapter, satellite_adapter,
-    LLMSentimentAnalyzer, llm_sentiment,
-    CrossSourceReconciler, ReconciliationReport, reconciler,
-    FeatureStore, FeatureManifest, feature_store,
-    AlternativeFeatureEngine, alt_feature_engine,
-    compute_social_features, compute_job_features,
-    compute_cc_features, compute_satellite_features,
+    AdapterRegistry,
+    AlternativeFeatureEngine,
+    BaseAdapter,
+    BKMAdapter,
+    CircuitBreaker,
+    CircuitState,
+    DataQualityValidator,
+    FeatureManifest,
+    FeatureStore,
+    LLMSentimentAnalyzer,
+    RateLimiter,
+    adapter_registry,
+    alt_feature_engine,
+    bkm_adapter,
+    compute_cc_features,
+    compute_job_features,
+    compute_satellite_features,
+    compute_social_features,
     compute_web_features,
+    eksi_sozluk_adapter,
+    feature_store,
+    google_trends_adapter,
+    investing_adapter,
+    kariyer_net_adapter,
+    llm_sentiment,
+    reconciler,
+    satellite_adapter,
 )
-
-import structlog
 
 logger = structlog.get_logger(__name__)
 
@@ -124,7 +133,7 @@ class TestFaz0_RateLimiter:
         # 3. istek beklemeli ama timeout ile
         try:
             await asyncio.wait_for(limiter.acquire(), timeout=0.5)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.warning("Timeout in test_acquire_respects_limit", exc_info=True)
 
 
@@ -631,16 +640,21 @@ class TestFaz5_Integration:
     def test_all_imports(self):
         """Tüm modüllerin import edilebilir olduğunu doğrula."""
         from services.alternative import (
-            BaseAdapter, RateLimiter, CircuitBreaker,
-            DataQualityValidator, AdapterRegistry,
-            google_trends_adapter, bkm_adapter,
-            kariyer_net_adapter, eksi_sozluk_adapter,
-            investing_adapter,
-            llm_sentiment, alt_feature_engine,
-            reconciler, feature_store,
-            compute_social_features, compute_job_features,
-            compute_cc_features, compute_satellite_features,
+            AdapterRegistry,
+            CircuitBreaker,
+            DataQualityValidator,
+            RateLimiter,
+            bkm_adapter,
+            compute_cc_features,
+            compute_job_features,
+            compute_satellite_features,
+            compute_social_features,
             compute_web_features,
+            eksi_sozluk_adapter,
+            google_trends_adapter,
+            investing_adapter,
+            kariyer_net_adapter,
+            reconciler,
         )
         assert BaseAdapter is not None
         assert RateLimiter is not None
@@ -664,7 +678,6 @@ class TestFaz5_Integration:
 
     def test_adapter_registry_singleton(self):
         """Singleton registry'nin doğru çalıştığını doğrula."""
-        from services.alternative import adapter_registry
         assert isinstance(adapter_registry, AdapterRegistry)
 
     def test_legacy_functions_compatible(self):

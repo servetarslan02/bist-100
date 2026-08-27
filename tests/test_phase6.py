@@ -5,15 +5,16 @@ Scenario Engine, Stress Test Engine testleri.
 """
 
 import sys
-import os
 
 
 def test_scenario_engine():
     """Scenario Engine testleri."""
-    from services.intelligence.scenario import (
-        scenario_engine, ScenarioInput, PREDEFINED_SCENARIOS,
-    )
     from services.intelligence.macro_sensitivity import macro_sensitivity_engine
+    from services.intelligence.scenario import (
+        PREDEFINED_SCENARIOS,
+        ScenarioInput,
+        scenario_engine,
+    )
 
     passed = 0
     failed = 0
@@ -36,7 +37,7 @@ def test_scenario_engine():
 
     # 2. Predefined scenarios
     zero_count = 0
-    for name, scenario in PREDEFINED_SCENARIOS.items():
+    for _name, scenario in PREDEFINED_SCENARIOS.items():
         result = scenario_engine.run_scenario(scenario, positions, macro_sensitivity_engine)
         if result.portfolio_impact_pct == 0:
             zero_count += 1
@@ -100,7 +101,7 @@ def main():
     total_passed = 0
     total_failed = 0
 
-    print(f"\n--- Scenario Engine ---")
+    print("\n--- Scenario Engine ---")
     try:
         p, f = test_scenario_engine()
         total_passed += p

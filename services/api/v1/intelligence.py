@@ -1,11 +1,12 @@
 """Intelligence API — Gerçek yapay zeka, rejim ve karar modellerine bağlı."""
 
 import asyncio
-from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional, Dict, Any
+from typing import Any
 
-from ..dependencies import get_current_user, check_rate_limit
 import structlog
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..dependencies import check_rate_limit, get_current_user
 
 logger = structlog.get_logger()
 router = APIRouter()
@@ -102,7 +103,7 @@ async def simulation(
             "max_drawdown_sim": round(res.max_drawdown_sim, 2),
         }
     except Exception as e:
-        raise HTTPException(500, f"Monte Carlo simulation error: {e}")
+        raise HTTPException(500, f"Monte Carlo simulation error: {e}") from e
 
 
 @router.get("/analysis/{ticker}")
@@ -121,7 +122,7 @@ async def analysis(ticker: str, user=Depends(get_current_user), _=Depends(check_
 
 @router.post("/ask_gemini")
 async def ask_gemini_endpoint(
-    body: Dict[str, Any],
+    body: dict[str, Any],
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):
@@ -141,11 +142,11 @@ async def gemini_report(
     ticker: str,
     price: float = 100.0,
     sector: str = "BIST",
-    rsi: Optional[float] = None,
-    pe: Optional[float] = None,
-    pb: Optional[float] = None,
-    support: Optional[float] = None,
-    resistance: Optional[float] = None,
+    rsi: float | None = None,
+    pe: float | None = None,
+    pb: float | None = None,
+    support: float | None = None,
+    resistance: float | None = None,
     user=Depends(get_current_user),
     _=Depends(check_rate_limit),
 ):

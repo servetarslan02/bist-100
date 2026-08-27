@@ -15,22 +15,23 @@ Referanslar:
 - RFC 7519 (JWT)
 """
 
+import base64
 import hmac
 import os
 import secrets
-import orjson
-import base64
 import time
-from typing import Dict, List, Optional, Any, Set
 from dataclasses import dataclass, field
 from datetime import timedelta
-from enum import Enum
+from enum import StrEnum
+from typing import Any
+
+import orjson
 import structlog
 
 logger = structlog.get_logger()
 
 
-class TokenType(str, Enum):
+class TokenType(StrEnum):
     ACCESS = "access"
     REFRESH = "refresh"
     API_KEY = "api_key"
@@ -41,13 +42,13 @@ class JWTClaims:
     """JWT claims."""
     sub: str  # user_id
     role: str
-    permissions: List[str]
+    permissions: list[str]
     token_type: TokenType = TokenType.ACCESS
     issued_at: float = field(default_factory=time.time)
     expires_at: float = 0.0
     jti: str = field(default_factory=lambda: secrets.token_hex(8))
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "sub": self.sub,
             "role": self.role,
@@ -59,7 +60,7 @@ class JWTClaims:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "JWTClaims":
+    def from_dict(cls, data: dict[str, Any]) -> "JWTClaims":
         return cls(
             sub=data.get("sub", ""),
             role=data.get("role", ""),
@@ -102,15 +103,15 @@ class JWTManager:
         self._access_ttl = timedelta(hours=access_token_ttl_hours)
         self._refresh_ttl = timedelta(days=refresh_token_ttl_days)
         self._algorithm = algorithm
-        self._revoked_tokens: Set[str] = set()  # revoked JTIs
+        self._revoked_tokens: set[str] = set()  # revoked JTIs
 
     def generate_token(
         self,
         user_id: str,
         role: str,
-        permissions: List[str],
+        permissions: list[str],
         token_type: TokenType = TokenType.ACCESS,
-        custom_claims: Optional[Dict[str, Any]] = None,
+        custom_claims: dict[str, Any] | None = None,
     ) -> str:
         """
         JWT token oluştur.
@@ -209,7 +210,7 @@ class JWTManager:
         except JWTError:
             raise
         except Exception as e:
-            raise JWTError(f"Token validation failed: {e}")
+            raise JWTError(f"Token validation failed: {e}") from e
 
     def refresh_token(self, token: str) -> str:
         """
@@ -251,7 +252,7 @@ class JWTManager:
         self,
         user_id: str,
         role: str,
-        permissions: List[str],
+        permissions: list[str],
         name: str = "default",
     ) -> str:
         """
