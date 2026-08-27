@@ -69,6 +69,14 @@ class MacroFeatureEngine:
         """Get cached macro features."""
         return self._cache.copy()
 
+    def compute_all_macro_features(
+        self,
+        macro_data: dict[str, Any],
+        market_data: dict[str, Any] | None = None,
+    ) -> dict[str, float]:
+        """Backward-compatible wrapper — orchestrator bu metodu çağırır."""
+        return self.compute_features(macro_data, market_data)
+
 
 # Singleton
 macro_feature_engine = MacroFeatureEngine()
