@@ -189,7 +189,7 @@ class CacheWarmer:
 
             except Exception as e:
                 logger.debug("Hot key refresh failed", error=str(e))
-            await asyncio.sleep(30)  # 30 saniyede bir tazele
+            await asyncio.sleep(3600)  # 1 saatte bir tazele
 
 
 # Singleton
