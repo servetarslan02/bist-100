@@ -383,10 +383,14 @@ async def _get_redis():
     return _redis_conn
 
 
-async def _check_and_mark_published(event_id: str) -> bool:
+async def _check_and_mark_published(event_id: str, critical: bool = False) -> bool:
     """Idempotency check — aynı event_id tekrar publish edilmesin.
     Returns True if this is a new event, False if duplicate.
-    Öncelik: Redis > PostgreSQL > fail-open
+
+    Öncelik: Redis > PostgreSQL > fail-closed (kritik) / fail-open (kritik olmayan)
+
+    KURAL (manifesto): Kritik olaylar (trade signal, order cancel) fail-closed çalışır.
+    Redis ve PostgreSQL ikisi de başarısız olursa, kritik olay publish edilmez.
     """
     # 1. Redis dene (reuse connection)
     try:
@@ -412,8 +416,16 @@ async def _check_and_mark_published(event_id: str) -> bool:
     except Exception as e:
         logger.debug("PostgreSQL idempotency check skipped", error=str(e))
 
-    # 3. Fail-open
-    return True
+    # 3. Fail-closed (kritik) / fail-open (kritik olmayan)
+    if critical:
+        logger.error(
+            "CRITICAL: Idempotency check failed for critical event — blocking publish",
+            event_id=event_id,
+        )
+        return False  # Fail-closed: kritik olay publish edilmez
+
+    logger.warning("Idempotency check failed — allowing publish (non-critical)", event_id=event_id)
+    return True  # Fail-open: kritik olmayan olay
 
 
 async def _publish_to_stream(event: CanonicalEvent):
