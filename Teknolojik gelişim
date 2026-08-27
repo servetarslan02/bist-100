@@ -20,7 +20,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 5 | DuckDB | ✅ Tamamlandı | `67e5298` | Research engine, Parquet export, Polars entegrasyonu, 16 test |
 | 6 | Polars | ✅ Tamamlandı | `0ccf815` | Polars standardı, polars_utils.py, historical_warehouse native Polars, DuckDB native entegrasyon |
 | 7 | LightGBM | ✅ Tamamlandı | `196b1cb` | HyperOptimizer v2.0 (LambdaRank, 12 parametre, pruning), ModelCalibration v2.0 (bootstrap CI, Platt vs Isotonic, Brier Skill Score, adaptive online), FeatureDrift v2.0 (gerçek PSI, correlation drift), OOF predictions |
-| 8 | XGBoost | ❌ Başlanmadı | - | - |
+| 8 | XGBoost | ✅ Tamamlandı | `7e02086` | compare_xgboost_vs_lightgbm() fonksiyonu eklendi — aynı条件下 LightGBM karşılaştırma |
 | 9 | CatBoost | ❌ Başlanmadı | - | - |
 | 10 | Ensemble | ❌ Başlanmadı | - | - |
 | 11 | Feature Engineering | ❌ Başlanmadı | - | - |
@@ -46,7 +46,7 @@ Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğ
 | 31 | Backup & DR | ✅ Kısmen | `5a9747a` | Backup script DuckDB+PITR güncellendi |
 | 32 | CI/CD Güvenlik | ❌ Başlanmadı | - | - |
 
-**İlerleme: 8/32 tamamlandı (%25.0)**
+**İlerleme: 9/32 tamamlandı (%28.1)**
 
 ### Eklenen Dosyalar (17 dosya, 3,584 satır)
 

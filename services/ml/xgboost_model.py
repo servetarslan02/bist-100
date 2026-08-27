@@ -537,3 +537,117 @@ class XGBoostModel:
     @property
     def metrics(self) -> dict[str, Any]:
         return self._training_metrics
+
+
+def compare_xgboost_vs_lightgbm(
+    features_map: dict[str, dict[str, Any]],
+    returns: dict[str, float],
+    date_groups: dict[str, str],
+    feature_names: list[str],
+    config: XGBoostConfig | None = None,
+) -> dict[str, Any]:
+    """XGBoost vs LightGBM karşılaştırması — aynı条件下.
+
+    Aynı feature set, aynı walk-forward, aynı transaction cost,
+    aynı holdout, aynı evaluation metrics ile karşılaştırır.
+
+    Args:
+        features_map: Feature değerleri
+        returns: Gerçek getiriler
+        date_groups: Tarih grupları
+        feature_names: Feature isimleri
+        config: XGBoost konfigürasyonu
+
+    Returns:
+        Kararlılık raporu dict
+    """
+    from .lightgbm_trainer import LightGBMTrainer, MLModelConfig
+    from .model_comparator import ModelComparator
+
+    # Veriyi hazırla
+    trainer = LightGBMTrainer()
+    X, y, _, tickers = trainer._prepare_data(features_map, returns, date_groups, feature_names)
+
+    if len(X) < 100:
+        return {"error": "Insufficient data", "samples": len(X)}
+
+    # Impute
+    impute_values = trainer._compute_impute_values(X, feature_names)
+    X = trainer._impute(X, impute_values)
+
+    # Train/val split (son %20)
+    n = len(X)
+    split_idx = int(n * 0.8)
+    X_train, X_val = X[:split_idx], X[split_idx:]
+    y_train, y_val = y[:split_idx], y[split_idx:]
+
+    # Scale (train'den öğren)
+    scaler_mean = np.mean(X_train, axis=0)
+    scaler_std = np.std(X_train, axis=0)
+    scaler_std[scaler_std == 0] = 1.0
+    X_train_s = (X_train - scaler_mean) / scaler_std
+    X_val_s = (X_val - scaler_mean) / scaler_std
+
+    results = {}
+
+    # 1. LightGBM eğit
+    try:
+        lgb_model = trainer.train(features_map, returns, date_groups, feature_names)
+        if lgb_model:
+            lgb_pred = lgb_model.predict_batch([dict(zip(feature_names, row)) for row in X_val_s])
+            lgb_pred = np.array(lgb_pred)
+            results["lightgbm"] = {
+                "val_ic": round(float(np.corrcoef(lgb_pred, y_val)[0, 1]), 4) if len(np.unique(lgb_pred)) > 1 else 0.0,
+                "val_directional_accuracy": round(float(np.mean((lgb_pred > 0) == (y_val > 0))), 4),
+                "train_samples": lgb_model.train_samples,
+                "confidence": lgb_model.confidence_score,
+            }
+    except Exception as e:
+        results["lightgbm"] = {"error": str(e)}
+
+    # 2. XGBoost eğit
+    try:
+        xgb_model = XGBoostModel(config)
+        xgb_metrics = xgb_model.train(
+            X_train_s, y_train, X_val_s, y_val,
+            feature_names=feature_names, horizon=5,
+        )
+        xgb_pred = xgb_model.predict(X_val_s, horizon=5)
+        results["xgboost"] = {
+            "val_ic": xgb_metrics.get("val_ic", 0.0),
+            "val_directional_accuracy": xgb_metrics.get("val_directional_accuracy", 0.0),
+            "val_rmse": xgb_metrics.get("val_rmse", 0.0),
+            "train_samples": len(X_train),
+        }
+    except Exception as e:
+        results["xgboost"] = {"error": str(e)}
+
+    # 3. Karşılaştırma
+    lgb_ic = results.get("lightgbm", {}).get("val_ic", 0.0)
+    xgb_ic = results.get("xgboost", {}).get("val_ic", 0.0)
+
+    if lgb_ic > xgb_ic:
+        winner = "lightgbm"
+        margin = lgb_ic - xgb_ic
+    elif xgb_ic > lgb_ic:
+        winner = "xgboost"
+        margin = xgb_ic - lgb_ic
+    else:
+        winner = "equal"
+        margin = 0.0
+
+    results["comparison"] = {
+        "winner": winner,
+        "ic_margin": round(margin, 4),
+        "recommendation": "CHAMPION" if margin > 0.02 else "COMPARABLE",
+    }
+
+    logger.info(
+        "XGBoost vs LightGBM comparison",
+        winner=winner,
+        lgb_ic=lgb_ic,
+        xgb_ic=xgb_ic,
+        margin=round(margin, 4),
+    )
+
+    return results
