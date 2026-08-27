@@ -74,6 +74,9 @@ def _compute_hijri_holidays(gregorian_year: int) -> list[date]:
         2028: date(2028, 2, 27),
         2029: date(2029, 2, 16),
         2030: date(2030, 2, 6),
+        2031: date(2031, 1, 26),
+        2032: date(2032, 1, 16),
+        2033: date(2033, 1, 5),
     }
 
     kurban_references: dict[int, date] = {
@@ -84,6 +87,9 @@ def _compute_hijri_holidays(gregorian_year: int) -> list[date]:
         2028: date(2028, 5, 6),
         2029: date(2029, 4, 25),
         2030: date(2030, 4, 15),
+        2031: date(2031, 4, 5),
+        2032: date(2032, 3, 25),
+        2033: date(2033, 3, 15),
     }
 
     holidays: list[date] = []
@@ -125,15 +131,18 @@ def _compute_half_days_eves(gregorian_year: int, religious_holidays: list[date])
     """Dini bayram arifelerini (yarım gün) hesapla."""
     eves: list[date] = []
 
+    # Pozisyon bazlı filtre kullan (ay filtresi 2029+ yıllarında hatalı)
+    sorted_holidays = sorted(religious_holidays)
+    ramazan_days = sorted_holidays[:3] if len(sorted_holidays) >= 3 else sorted_holidays
+    kurban_days = sorted_holidays[3:7] if len(sorted_holidays) >= 7 else []
+
     # Ramazan Bayramı arifesi (1. gününden 1 gün önce)
-    ramazan_days = sorted([d for d in religious_holidays if d.month in (2, 3, 4)])
     if ramazan_days:
         eve = ramazan_days[0] - timedelta(days=1)
         if eve.year == gregorian_year:
             eves.append(eve)
 
     # Kurban Bayramı arifesi (1. gününden 1 gün önce)
-    kurban_days = sorted([d for d in religious_holidays if d.month in (5, 6, 7)])
     if kurban_days:
         eve = kurban_days[0] - timedelta(days=1)
         if eve.year == gregorian_year:
@@ -474,9 +483,10 @@ class HolidayManager:
             return names[key]
 
         # Dini bayram tespiti
-        religious = _compute_hijri_holidays(d.year)
-        ramazan = sorted([r for r in religious if r.month in (2, 3, 4)])
-        kurban = sorted([r for r in religious if r.month in (5, 6, 7)])
+        # Pozisyon bazlı filtre kullan (ay filtresi 2029+ yıllarında hatalı)
+        religious = sorted(_compute_hijri_holidays(d.year))
+        ramazan = religious[:3] if len(religious) >= 3 else religious
+        kurban = religious[3:7] if len(religious) >= 7 else []
 
         if d in ramazan:
             idx = ramazan.index(d) + 1
