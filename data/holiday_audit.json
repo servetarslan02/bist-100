@@ -1,0 +1,16 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-08-28T03:42:06.115431",
+      "action": "add",
+      "date": "2026-08-28",
+      "reason": "Anlık tatil"
+    },
+    {
+      "timestamp": "2026-08-28T03:42:06.150466",
+      "action": "remove",
+      "date": "2026-08-28",
+      "reason": "İptal"
+    }
+  ]
+}
