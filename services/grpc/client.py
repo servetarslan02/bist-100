@@ -157,6 +157,7 @@ class MarketClient(BaseGRPCClient):
         request = market_pb2.TickRequest(tickers=tickers)
         try:
             async for tick in self._stub.StreamTicks(request):
+                yield {
                     "ticker": tick.ticker,
                     "price": tick.price,
                     "change": tick.change,
@@ -216,6 +217,7 @@ class SignalClient(BaseGRPCClient):
         request = market_pb2.SignalRequest(min_confidence=min_confidence)
         try:
             direction_map = {0: "BUY", 1: "SELL", 2: "HOLD"}
+            async for signal in self._stub.StreamSignals(request):
                 yield {
                     "ticker": signal.ticker,
                     "direction": direction_map.get(signal.direction, "HOLD"),

@@ -907,7 +907,7 @@ def _get_historical_returns():
 
 @router.get("/stress-test")
 @router.post("/stress-test")
-async def run_stress_test(
+async def run_stress_test_quick(
     horizon_days: int = Query(30, ge=5, le=252),
     vol_multiplier: float = Query(1.0, ge=0.5, le=3.0),
     scenario: str = Query("gfc_2008"),
