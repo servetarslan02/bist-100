@@ -1,0 +1,962 @@
+Tabii. Buradaki amaç mevcut teknolojileri değiştirmek değil, her birini doğru konumlandırıp güçlendirmek. Önceki bulgularımızı da dahil ederek kapsamlı ama uygulanabilir bir geliştirme raporu şöyle:
+
+ALPHA BIST — Teknoloji Geliştirme Raporu
+
+1. PostgreSQL 🟢 → GÜÇLENDİR
+
+Görevi: Ana ilişkisel veri, metadata, kararlar, modeller, kullanıcı/sistem kayıtları.
+
+Öneriler:
+
+Connection pooling → PgBouncer
+
+Read/write ayrımı
+
+Doğru composite/index stratejisi
+
+Partitioning gereken büyük tablolar
+
+JSONB sadece gerçekten semi-structured alanlarda
+
+PostgreSQL native backup + point-in-time recovery
+
+Query performance monitoring
+
+EXPLAIN ANALYZE ile ağır sorguların düzenli denetimi
+
+
+Değiştir: ❌
+Geliştir: ✅
+
+
+---
+
+2. TimescaleDB 🟢 → GÜÇLENDİR
+
+Görevi: OHLCV, market time-series ve tarihsel finansal veriler.
+
+Öneriler:
+
+Hypertable'ların doğru partition edilmesi
+
+Compression/columnar storage
+
+Retention policy
+
+Continuous aggregates
+
+Doğru timestamp/index düzeni
+
+PIT sorgularının standartlaştırılması
+
+Veri kalitesi kontrolleri
+
+
+Özellikle:
+
+> “Modelin 2025-05-10 tarihinde bildiği veri”
+
+
+
+ile
+
+> “Bugün elimizde bulunan 2025-05-10 verisi”
+
+
+
+arasındaki farkı sistematik olarak korumalıyız.
+
+Değiştir: ❌
+Geliştir: ⭐⭐⭐⭐⭐
+
+
+---
+
+3. QuestDB 🟢 → GÜÇLENDİR
+
+Görevi: Yüksek hacimli tick/intraday veri.
+
+Öneriler:
+
+QuestDB'yi sadece gerçekten yüksek-ingest gerektiren veride kullanmak
+
+PostgreSQL/Timescale ile görev sınırlarını netleştirmek
+
+Gereksiz duplicate storage azaltmak
+
+Ingestion benchmark
+
+Retention/compression stratejisi
+
+Failure/recovery testleri
+
+
+En önemli konu:
+
+Aynı veriyi üç farklı DB'de gereksiz yere tutmamak.
+
+Değiştir: ❌
+Geliştir: ✅
+
+
+---
+
+4. SQLite 🟡 → SINIRLANDIR
+
+SQLite kötü değil; yanlış yerde kullanılması problem.
+
+Kullan:
+
+local cache
+
+küçük metadata
+
+test
+
+development
+
+standalone utility
+
+
+Kullanma:
+
+merkezi production state
+
+yüksek concurrency
+
+büyük market data
+
+kritik transaction state
+
+
+Öneri: SQLite'ı tamamen kaldırmak yerine kullanım alanını kesin olarak sınırlandırmak.
+
+
+---
+
+5. DuckDB 🟢 → ARAŞTIRMA MOTORU YAP
+
+Özellikle:
+
+Backtest / analytics / Parquet / historical research
+
+için çok uygun.
+
+Geliştirmeler:
+
+TimescaleDB
+      ↓
+Parquet
+      ↓
+DuckDB
+      ↓
+Polars
+      ↓
+Research / Backtest
+
+Böylece production DB'ye ağır araştırma sorguları bindirmeyiz.
+
+Değiştir: ❌
+Geliştir: ⭐⭐⭐⭐⭐
+
+
+---
+
+6. Polars 🟢 → ANA DATAFRAME STANDARDI
+
+Bence bunu daha da merkezileştirelim.
+
+Kurallar:
+
+> Yeni yüksek hacimli data-processing kodu → Polars.
+
+
+
+Pandas sadece:
+
+library compatibility
+
+küçük utility
+
+dış kütüphane zorunluluğu
+
+
+için.
+
+Ayrıca:
+
+Lazy API
+
+predicate pushdown
+
+projection pushdown
+
+streaming
+
+expression-based transformations
+
+
+kullanımı artırılmalı.
+
+Kritik bulgu
+
+Mevcut FeatureEngine içinde Polars/Pandas/dict kullanımının karıştığını daha önce yakaladık.
+
+Bu düzeltilmeli.
+
+
+---
+
+7. ML — LightGBM 🟢⭐⭐⭐⭐⭐
+
+Ana model olarak kalmalı.
+
+Özellikle:
+
+LightGBM LambdaRank
+
+sizin ranking problemine çok uygun.
+
+Geliştirmeler:
+
+Hyperparameter optimization
+
+Feature stability analysis
+
+Feature importance drift
+
+Calibration
+
+Probability/ranking calibration
+
+Model versioning
+
+Seed determinism
+
+Walk-forward retraining
+
+Champion/Challenger
+
+Out-of-fold prediction
+
+SHAP monitoring
+
+
+En önemlisi:
+
+Sadece CAGR'a göre model seçmeyelim.
+
+Model selection:
+
+Return
++ Sharpe
++ Max DD
++ IC
++ ICIR
++ Stability
++ Turnover
++ Regime performance
++ Statistical significance
+
+ile yapılmalı.
+
+
+---
+
+8. XGBoost 🟢
+
+Alternatif/challenger olarak kalsın.
+
+Geliştirme:
+
+Aynı feature set
+
+Aynı walk-forward
+
+Aynı transaction cost
+
+Aynı holdout
+
+Aynı evaluation metrics
+
+
+ile LightGBM'e karşı test edilmeli.
+
+Kazandığında champion olabilir.
+
+Otomatik “XGBoost daha yeni” diye kullanılmamalı.
+
+
+---
+
+9. CatBoost 🟢
+
+Özellikle categorical/heterogeneous feature yapısında güçlü.
+
+Ama sizin sistemde:
+
+CatBoost'un gerçekten LightGBM'i geçip geçmediği
+
+walk-forward üzerinde ölçülmeli.
+
+Geliştirme:
+
+Hyperparameter search
+
+Feature stability
+
+Calibration
+
+SHAP
+
+Regime-specific performance
+
+Model degradation monitoring
+
+
+
+---
+
+10. Ensemble 🟡
+
+Burada özellikle dikkat.
+
+Daha önce yaptığımız testlerde ensemble'ın otomatik olarak daha iyi olmadığını görmüştük.
+
+Bu yüzden:
+
+Ensemble = default değil.
+
+Sadece:
+
+LightGBM
+XGBoost
+CatBoost
+     ↓
+Correlation / diversity
+     ↓
+Ensemble
+     ↓
+Walk-forward test
+
+sonucunda gerçekten fayda sağlıyorsa kullanılmalı.
+
+
+---
+
+11. Feature Engineering 🟡 → EN ÖNEMLİ GELİŞTİRME ALANLARINDAN BİRİ
+
+Feature pipeline tamamen standardize edilmeli.
+
+Her feature için metadata:
+
+name
+source
+formula
+frequency
+available_at
+lookback
+version
+owner
+PIT-safe?
+
+olmalı.
+
+Örneğin:
+
+RSI_14
+source: OHLCV
+lookback: 14
+frequency: daily
+available_at: close
+PIT-safe: true
+version: 3
+
+Bu yapı ileride Feast kullanıp kullanmamamızdan bağımsız olarak faydalı.
+
+
+---
+
+12. Feast 🟡 → OPSİYONEL GELİŞTİRME
+
+Şimdilik direkt eklemek yerine önce feature pipeline standardize edilmeli.
+
+Eğer feature sayısı ve training/inference karmaşıklığı büyürse:
+
+Feast
+
+eklenebilir.
+
+Ama:
+
+> Feast mevcut feature kodumuzdaki hataları sihirli şekilde çözmez.
+
+
+
+Önce doğru feature contract.
+
+
+---
+
+13. Calibration 🟢
+
+Sizde önemli.
+
+Platt Scaling/Kelly tarafı zaten geliştirilmişti.
+
+İleri seviye:
+
+Isotonic regression karşılaştırması
+
+Calibration drift
+
+Brier score
+
+Expected Calibration Error
+
+Regime-specific calibration
+
+Calibration retraining schedule
+
+
+Ama calibration'ın future information kullanmadığından emin olunmalı.
+
+
+---
+
+14. Backtest Engine 🟢⭐⭐⭐⭐⭐
+
+Değiştirmeyin.
+
+Mevcut özel motor doğru tercih.
+
+Geliştirme:
+
+Strict PIT
+
+Survivorship control
+
+Delisted stock handling
+
+IPO handling
+
+T+1 execution
+
+Slippage
+
+Transaction cost
+
+Market impact
+
+Liquidity constraints
+
+Corporate actions
+
+Deterministic replay
+
+Event replay
+
+
+Ve önemli:
+
+Fail-open kaldırılmalı.
+
+Data quality motoru hata verdiğinde:
+
+> “Veri kaliteli kabul et”
+
+
+
+olmamalı.
+
+Fail-closed / fail-safe davranış tercih edilmeli.
+
+
+---
+
+15. Walk-Forward Engine 🟢
+
+Burası sistemin en kritik doğrulama katmanı.
+
+Geliştirme:
+
+Train
+   ↓
+Validation
+   ↓
+Test
+   ↓
+Next period
+   ↓
+Retrain
+
+Her fold için:
+
+feature snapshot
+
+model version
+
+parameters
+
+data version
+
+prediction
+
+realized outcome
+
+transaction cost
+
+
+kaydedilmeli.
+
+Sonuç tamamen reproducible olmalı.
+
+
+---
+
+16. Risk Engine 🟢⭐⭐⭐⭐⭐
+
+Mevcut risk katmanı güçlü.
+
+Geliştirme:
+
+regime-aware limits
+
+volatility scaling
+
+correlation-aware sizing
+
+sector concentration
+
+liquidity-aware sizing
+
+drawdown response
+
+stress scenarios
+
+tail-risk monitoring
+
+model confidence → position size bağlantısı
+
+
+Özellikle:
+
+Model güveni yüksek = otomatik büyük pozisyon
+
+olmamalı.
+
+Risk motoru son sözü söylemeli.
+
+
+---
+
+17. Portfolio Optimizer 🟢
+
+Geliştirmeler:
+
+covariance shrinkage
+
+turnover penalty
+
+transaction cost-aware optimization
+
+sector constraints
+
+liquidity constraints
+
+max position
+
+minimum position
+
+hysteresis
+
+regime constraints
+
+
+Sizde zaten bunların önemli kısmı var.
+
+Burada hedef:
+
+Daha fazla algoritma eklemek değil, mevcut optimizasyonun gerçekten deterministic ve test edilebilir olması.
+
+
+---
+
+18. NATS JetStream 🟢
+
+Event-driven mimari için iyi.
+
+Geliştirme:
+
+Market Data
+     ↓
+NATS
+ ↓   ↓   ↓
+Feature
+Risk
+ML
+
+Kurallar:
+
+event schema/version
+
+idempotency
+
+retry
+
+dead-letter strategy
+
+message ordering
+
+correlation ID
+
+timestamps
+
+observability
+
+
+Kafka'ya geçmeye gerek yok.
+
+
+---
+
+19. Celery 🟢
+
+Çalışıyorsa değiştirmeyin.
+
+Geliştirme:
+
+retry policy
+
+task timeout
+
+idempotency
+
+dead-letter handling
+
+task monitoring
+
+concurrency limits
+
+duplicate execution prevention
+
+
+Celery → Dramatiq/arq geçişi şu an öncelik değil.
+
+
+---
+
+20. FastAPI 🟢
+
+Geliştirme:
+
+Pydantic validation
+
+authentication
+
+rate limiting
+
+request IDs
+
+structured errors
+
+async I/O
+
+health/readiness endpoints
+
+OpenAPI contract testing
+
+
+
+---
+
+21. gRPC 🟢
+
+Servisler arası iletişim için kalsın.
+
+Geliştirme:
+
+protobuf versioning
+
+deadlines
+
+retry policy
+
+health checks
+
+backward compatibility
+
+request correlation ID
+
+
+
+---
+
+22. OpenTelemetry + Prometheus + Grafana 🟢⭐⭐⭐⭐⭐
+
+Bunu daha da güçlendirmek önemli.
+
+İzlenecekler:
+
+API latency
+DB latency
+ML inference latency
+Feature generation latency
+NATS lag
+Celery failures
+Memory
+CPU
+Disk
+Model errors
+Data freshness
+
+Ve ML tarafında:
+
+prediction distribution
+feature drift
+model drift
+IC
+ICIR
+hit rate
+drawdown
+turnover
+
+
+---
+
+23. pgvector 🟡
+
+Burada gerçekten faydalı olabilir.
+
+Örneğin:
+
+> “Haziran 2026 V-Dip'e benzeyen geçmiş olayları bul.”
+
+
+
+veya:
+
+> “Bu piyasa rejimine benzeyen geçmiş kararları getir.”
+
+
+
+için kullanılabilir.
+
+Ama ana ML pipeline'ının yerine geçmez.
+
+
+---
+
+24. Evidently 🟢/🟡
+
+ML monitoring için değerlendirilebilir.
+
+Özellikle:
+
+Feature drift + prediction drift + model performance
+
+izleme tarafında faydalı.
+
+Ancak mevcut OTel/Prometheus sisteminin üzerine aynı metriği iki kere kurmamak gerekir.
+
+
+---
+
+25. Great Expectations 🟡
+
+Data quality için değerlendirilebilir.
+
+Ama burada benim tercihim:
+
+Önce kendi kritik finansal veri contract'larımızı oluşturmak.
+
+Örneğin:
+
+price > 0
+high >= low
+high >= open
+high >= close
+volume >= 0
+timestamp monotonik
+duplicate yok
+future timestamp yok
+missingness < threshold
+
+Sonra gerekiyorsa framework eklemek.
+
+
+---
+
+26. Model/Experiment Tracking 🟢
+
+Burada MLflow benzeri yapı değerlendirilebilir.
+
+Her model için:
+
+model_version
+training_data_version
+feature_version
+parameters
+metrics
+git_commit
+timestamp
+regime
+
+saklanmalı.
+
+Amaç:
+
+> “Bu modeli 6 ay önce neden production'a aldık?”
+
+
+
+sorusunu cevaplayabilmek.
+
+
+---
+
+27. GitHub Actions 🟢⭐⭐⭐⭐⭐
+
+Bence kesinlikle güçlendirilmeli.
+
+Her push:
+
+Lint
+ ↓
+Unit tests
+ ↓
+Integration tests
+ ↓
+PIT tests
+ ↓
+Data contract tests
+ ↓
+ML smoke test
+ ↓
+Build
+
+Production'a geçişte:
+
+Champion validation
+↓
+Regression test
+↓
+Deploy
+
+
+---
+
+28. Docker 🟢
+
+Container'lar için:
+
+multi-stage builds
+
+pinned versions
+
+healthcheck
+
+non-root users
+
+resource limits
+
+immutable image tags
+
+vulnerability scanning
+
+
+yapılmalı.
+
+
+---
+
+29. Secrets Management 🟡
+
+Şimdilik Vault kurmam.
+
+Daha mantıklı:
+
+Docker secrets / SOPS
+
+Sonra sistem büyürse Vault.
+
+Özellikle:
+
+changeme, default password, fallback credential
+
+gibi şeyler CI'da otomatik fail ettirilmeli.
+
+
+---
+
+30. Genel Mimari Geliştirme
+
+Bence bütün teknolojilerden daha önemli olan bu.
+
+Her servisin:
+
+INPUT
+ ↓
+VALIDATION
+ ↓
+PROCESSING
+ ↓
+OUTPUT
+ ↓
+OBSERVABILITY
+ ↓
+ERROR/FALLBACK
+
+standardına sahip olması gerekiyor.
+
+Ve her motor için:
+
+Contract
+
+Input schema
+Output schema
+Error behavior
+Timestamp semantics
+Version
+Dependencies
+
+tanımlanmalı.
+
+
+---
+
+En önemli 10 geliştirme
+
+Hepsini aynı anda yapmayalım. Ben önceliği şöyle veririm:
+
+#	Geliştirme	Öncelik
+
+1	Feature Engine düzeltme + standardizasyon	🔴
+2	PIT/data leakage garantisi	🔴
+3	Data quality + fail-closed	🔴
+4	ML training/inference feature parity	🔴
+5	Model version + reproducibility	🔴
+6	Champion/Challenger gerçek entegrasyonu	🟠
+7	ML drift/performance monitoring	🟠
+8	DB/query/performance optimization	🟠
+9	GitHub Actions kapsamını genişletme	🟠
+10	pgvector / Feast / Evidently gibi eklemeler	🟡
+
+
+Net kararım
+
+Teknoloji değiştirme projesi yapmayalım.
+
+Mevcut:
+
+PostgreSQL + TimescaleDB + QuestDB + SQLite + DuckDB + Polars + LightGBM + XGBoost + CatBoost + özel Backtest + Risk + NATS + Celery + FastAPI/gRPC + Next.js + OTel/Prometheus/Grafana
+
+yapısı yeterince güçlü.
+
+Asıl eksik:
+
+> Bu parçaların birbirleriyle kusursuz, güvenli, PIT-safe, deterministic ve production-grade çalışması.
+
+
+
+Bence bundan sonraki büyük çalışma “Technology Upgrade” değil, “Architecture & Engine Hardening” olmalı.
